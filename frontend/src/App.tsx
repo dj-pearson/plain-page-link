@@ -3,7 +3,7 @@ import { Toaster } from "sonner";
 
 // Public pages
 import Landing from "./pages/public/Landing";
-import ProfilePage from "./pages/public/ProfilePage";
+import ProfilePage from "./pages/public/FullProfilePage";
 import NotFound from "./pages/public/NotFound";
 
 // Auth pages
