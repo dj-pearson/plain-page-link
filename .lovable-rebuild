@@ -1,0 +1,13 @@
+# Force Rebuild - LinkStack Migration Complete
+
+This file forces Lovable to rebuild the project with the new structure.
+
+## Changes Made:
+- Copied all frontend code from frontend/src/ to root src/
+- Updated package.json with all dependencies  
+- Fixed CSS imports
+- Removed old blank page files
+- All LinkStack features now available
+
+Build timestamp: 2025-10-30T20:00:00Z
+

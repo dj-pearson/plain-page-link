@@ -5,7 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
-import "./styles/index.css";
+import "./index.css";
 
 const queryClient = new QueryClient({
     defaultOptions: {
