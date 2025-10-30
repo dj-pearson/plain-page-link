@@ -17,6 +17,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Instagram,
+  Facebook,
+  Linkedin,
+  Music,
+  Youtube,
+  Home,
+  MapPin,
+  Calendar,
+  Globe,
+  Mail,
+  Phone,
+  MessageCircle,
+  FileText,
+  Link as LinkIcon,
+  type LucideIcon,
+} from "lucide-react";
 
 interface AddLinkModalProps {
   open: boolean;
@@ -31,28 +48,28 @@ export interface LinkFormData {
   active: boolean;
 }
 
-const SOCIAL_ICONS = [
-  { value: "📷", label: "Instagram" },
-  { value: "👤", label: "Facebook" },
-  { value: "💼", label: "LinkedIn" },
-  { value: "🎵", label: "TikTok" },
-  { value: "▶️", label: "YouTube" },
-  { value: "🏠", label: "Zillow" },
-  { value: "📍", label: "Realtor.com" },
-  { value: "📅", label: "Calendar" },
-  { value: "🌐", label: "Website" },
-  { value: "📧", label: "Email" },
-  { value: "📱", label: "Phone" },
-  { value: "💬", label: "WhatsApp" },
-  { value: "📄", label: "Document" },
-  { value: "🔗", label: "Link" },
+const SOCIAL_ICONS: { value: string; label: string; icon: LucideIcon }[] = [
+  { value: "instagram", label: "Instagram", icon: Instagram },
+  { value: "facebook", label: "Facebook", icon: Facebook },
+  { value: "linkedin", label: "LinkedIn", icon: Linkedin },
+  { value: "tiktok", label: "TikTok", icon: Music },
+  { value: "youtube", label: "YouTube", icon: Youtube },
+  { value: "zillow", label: "Zillow", icon: Home },
+  { value: "realtor", label: "Realtor.com", icon: MapPin },
+  { value: "calendar", label: "Calendar", icon: Calendar },
+  { value: "website", label: "Website", icon: Globe },
+  { value: "email", label: "Email", icon: Mail },
+  { value: "phone", label: "Phone", icon: Phone },
+  { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { value: "document", label: "Document", icon: FileText },
+  { value: "link", label: "Link", icon: LinkIcon },
 ];
 
 export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) {
   const [formData, setFormData] = useState<LinkFormData>({
     title: "",
     url: "",
-    icon: "🔗",
+    icon: "link",
     active: true,
   });
 
@@ -69,7 +86,7 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
     setFormData({
       title: "",
       url: "",
-      icon: "🔗",
+      icon: "link",
       active: true,
     });
   };
@@ -120,24 +137,30 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
             >
               <SelectTrigger>
                 <SelectValue>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xl">{formData.icon}</span>
-                    <span>
-                      {SOCIAL_ICONS.find((i) => i.value === formData.icon)
-                        ?.label || "Custom"}
-                    </span>
-                  </span>
+                  {(() => {
+                    const selected = SOCIAL_ICONS.find((i) => i.value === formData.icon);
+                    const IconComponent = selected?.icon || LinkIcon;
+                    return (
+                      <span className="flex items-center gap-2">
+                        <IconComponent className="h-4 w-4" />
+                        <span>{selected?.label || "Custom"}</span>
+                      </span>
+                    );
+                  })()}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {SOCIAL_ICONS.map((icon) => (
-                  <SelectItem key={icon.value} value={icon.value}>
-                    <span className="flex items-center gap-2">
-                      <span className="text-xl">{icon.value}</span>
-                      <span>{icon.label}</span>
-                    </span>
-                  </SelectItem>
-                ))}
+                {SOCIAL_ICONS.map((iconItem) => {
+                  const IconComponent = iconItem.icon;
+                  return (
+                    <SelectItem key={iconItem.value} value={iconItem.value}>
+                      <span className="flex items-center gap-2">
+                        <IconComponent className="h-4 w-4" />
+                        <span>{iconItem.label}</span>
+                      </span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

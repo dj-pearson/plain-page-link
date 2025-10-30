@@ -1,8 +1,19 @@
 import { useState } from "react";
-import { Plus, GripVertical, Edit, Trash2, ExternalLink } from "lucide-react";
+import { Plus, GripVertical, Edit, Trash2, ExternalLink, Instagram, Facebook, Home, Calendar, Link as LinkIcon } from "lucide-react";
 import { AddLinkModal } from "@/components/modals/AddLinkModal";
 import type { LinkFormData } from "@/components/modals/AddLinkModal";
 import { useToast } from "@/hooks/use-toast";
+
+const getIconComponent = (iconName: string) => {
+  const iconMap: Record<string, any> = {
+    calendar: Calendar,
+    instagram: Instagram,
+    facebook: Facebook,
+    zillow: Home,
+    link: LinkIcon,
+  };
+  return iconMap[iconName] || LinkIcon;
+};
 
 export default function Links() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -23,7 +34,7 @@ export default function Links() {
       id: 1,
       title: "Schedule a Consultation",
       url: "https://calendly.com/agent",
-      icon: "📅",
+      icon: "calendar",
       clicks: 156,
       active: true,
     },
@@ -31,7 +42,7 @@ export default function Links() {
       id: 2,
       title: "Instagram",
       url: "https://instagram.com/agent",
-      icon: "📷",
+      icon: "instagram",
       clicks: 423,
       active: true,
     },
@@ -39,7 +50,7 @@ export default function Links() {
       id: 3,
       title: "Request Home Valuation",
       url: "https://example.com/valuation",
-      icon: "🏠",
+      icon: "zillow",
       clicks: 89,
       active: true,
     },
@@ -47,7 +58,7 @@ export default function Links() {
       id: 4,
       title: "Facebook",
       url: "https://facebook.com/agent",
-      icon: "👤",
+      icon: "facebook",
       clicks: 267,
       active: false,
     },
@@ -105,8 +116,11 @@ export default function Links() {
             </button>
 
             {/* Icon */}
-            <div className="w-12 h-12 flex items-center justify-center bg-accent rounded-lg text-2xl">
-              {link.icon}
+            <div className="w-12 h-12 flex items-center justify-center bg-accent rounded-lg">
+              {(() => {
+                const IconComponent = getIconComponent(link.icon);
+                return <IconComponent className="h-6 w-6 text-foreground" />;
+              })()}
             </div>
 
             {/* Content */}
