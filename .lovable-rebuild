@@ -1,4 +1,4 @@
-# Project Structure - Clean Build with Fixed index.html
+# Project Structure - Clean Build using app.html entry
 
 All project files are now in the root src/ directory.
 
@@ -8,12 +8,12 @@ All project files are now in the root src/ directory.
 - src/index.css - Global styles with Tailwind
 - vite.config.ts - Vite configuration at root
 - tailwind.config.ts - Tailwind configuration at root
-- index.html - Properly recreated as file (was directory)
+- app.html - HTML entry for Vite build (avoids index.html directory collision)
 - Removed duplicate frontend/ directory
 
-## Latest Fix:
-- index.html was corrupted as directory
-- Deleted and recreated as proper HTML file with Tailwind CDN fallback
+## Latest Fixes:
+- index.html collision in build environment -> configured Vite to use app.html
+- Ensures build does not read a directory as file
 
-Build timestamp: 2025-10-30T22:00:00Z
+Build timestamp: 2025-10-30T22:15:00Z
 

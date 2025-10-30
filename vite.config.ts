@@ -17,4 +17,10 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Use app.html as the HTML entry to avoid any filesystem conflicts with index.html
+  build: {
+    rollupOptions: {
+      input: path.resolve(__dirname, 'app.html'),
+    },
+  },
 }));
