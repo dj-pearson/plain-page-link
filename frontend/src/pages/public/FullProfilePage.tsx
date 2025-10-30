@@ -9,7 +9,8 @@ import { LeadCaptureCTA } from "@/components/profile/LeadCaptureCTA";
 import { TestimonialSection } from "@/components/profile/TestimonialSection";
 import { SocialProofBanner } from "@/components/profile/SocialProofBanner";
 import ListingDetailModal from "@/components/profile/ListingDetailModal";
-import type { Profile, Listing } from "@/types";
+import LinkStackBlocks from "@/components/profile/LinkStackBlocks";
+import type { Profile, Listing, LinkStackLink } from "@/types";
 import type { Testimonial } from "@/types/testimonial";
 
 // Mock data for demonstration
@@ -180,6 +181,74 @@ const mockListings: Listing[] = [
         is_featured: false,
         created_at: "2025-08-01T00:00:00Z",
         updated_at: "2025-09-20T00:00:00Z",
+    },
+];
+
+// Mock LinkStack links
+const mockLinks: LinkStackLink[] = [
+    {
+        id: 1,
+        user_id: 1,
+        link: "https://example.com/market-report",
+        title: "Download Free Market Report",
+        type: "link",
+        type_params: null,
+        button_id: 1,
+        custom_icon: "fa-solid fa-download",
+        custom_css: "",
+        order: 0,
+        up_link: "yes",
+        click_number: 45,
+        created_at: "2025-10-01T00:00:00Z",
+        updated_at: "2025-10-30T00:00:00Z",
+    },
+    {
+        id: 2,
+        user_id: 1,
+        link: null,
+        title: "Connect With Me",
+        type: "heading",
+        type_params: null,
+        button_id: null,
+        custom_icon: "",
+        custom_css: "",
+        order: 1,
+        up_link: "yes",
+        click_number: 0,
+        created_at: "2025-10-01T00:00:00Z",
+        updated_at: "2025-10-30T00:00:00Z",
+    },
+    {
+        id: 3,
+        user_id: 1,
+        link: "https://instagram.com/sarahjohnsonrealtor",
+        title: "Instagram",
+        type: "predefined",
+        type_params: { service_name: "instagram", username: "sarahjohnsonrealtor" },
+        button_id: null,
+        custom_icon: "fa-brands fa-instagram",
+        custom_css: "",
+        order: 2,
+        up_link: "yes",
+        click_number: 123,
+        created_at: "2025-10-01T00:00:00Z",
+        updated_at: "2025-10-30T00:00:00Z",
+    },
+    {
+        id: 4,
+        user_id: 1,
+        link: "tel:+16195551234",
+        title: "Call or Text Me",
+        type: "telephone",
+        type_params: { phone_number: "+16195551234", country_code: "+1" },
+        button_id: null,
+        custom_icon: "fa-solid fa-phone",
+        custom_css: "",
+        order: 3,
+        up_link: "yes",
+        click_number: 67,
+        created_at: "2025-10-01T00:00:00Z",
+        updated_at: "2025-10-30T00:00:00Z",
     },
 ];
 
@@ -360,6 +429,15 @@ export default function FullProfilePage() {
                             <TestimonialSection testimonials={testimonials} />
                         </div>
                     )}
+
+                    {/* Custom LinkStack Blocks */}
+                    <LinkStackBlocks
+                        links={mockLinks}
+                        onLinkClick={(link) => {
+                            // Track click analytics
+                            console.log("Link clicked:", link);
+                        }}
+                    />
 
                     {/* Social Links */}
                     <SocialLinks profile={profile} />

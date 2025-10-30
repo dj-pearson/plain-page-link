@@ -7,3 +7,4 @@ export * from "./testimonial";
 export * from "./link";
 export * from "./theme";
 export * from "./analytics";
+export * from "./linkstack";
