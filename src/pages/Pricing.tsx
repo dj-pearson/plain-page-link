@@ -209,6 +209,7 @@ export default function Pricing() {
               <p className="text-sm text-muted-foreground">$15/month</p>
             </Card>
           </div>
+          </div>
         </div>
       </div>
     </>
