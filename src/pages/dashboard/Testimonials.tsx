@@ -1,6 +1,21 @@
+import { useState } from "react";
 import { Plus, Star, Edit, Trash2, Quote } from "lucide-react";
+import { AddTestimonialModal } from "@/components/modals/AddTestimonialModal";
+import type { TestimonialFormData } from "@/components/modals/AddTestimonialModal";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Testimonials() {
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const { toast } = useToast();
+
+  const handleAddTestimonial = (data: TestimonialFormData) => {
+    // TODO: Save to backend
+    console.log("New testimonial:", data);
+    toast({
+      title: "Testimonial added!",
+      description: "Client review has been added successfully.",
+    });
+  };
   // Mock data
   const testimonials = [
     {
@@ -63,7 +78,10 @@ export default function Testimonials() {
             Showcase client reviews and success stories
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+        >
           <Plus className="h-4 w-4" />
           Add Testimonial
         </button>
@@ -182,6 +200,13 @@ export default function Testimonials() {
           after successful transactions!
         </p>
       </div>
+
+      {/* Add Testimonial Modal */}
+      <AddTestimonialModal
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        onSave={handleAddTestimonial}
+      />
     </div>
   );
 }
