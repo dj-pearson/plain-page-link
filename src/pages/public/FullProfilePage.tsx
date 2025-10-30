@@ -10,6 +10,7 @@ import { TestimonialSection } from "@/components/profile/TestimonialSection";
 import { SocialProofBanner } from "@/components/profile/SocialProofBanner";
 import ListingDetailModal from "@/components/profile/ListingDetailModal";
 import LinkStackBlocks from "@/components/profile/LinkStackBlocks";
+import { useProfileTracking, trackLinkClick } from "@/hooks/useProfileTracking";
 import type { Profile, Listing, LinkStackLink } from "@/types";
 import type { Testimonial } from "@/types/testimonial";
 
@@ -350,6 +351,9 @@ export default function FullProfilePage() {
     const profile = mockProfile;
     const listings = mockListings;
     const testimonials = mockTestimonials;
+
+    // Track profile view analytics
+    useProfileTracking(profile.user_id.toString(), slug || "");
     const activeListings = listings.filter((l) => l.status === "active");
     const soldListings = listings.filter((l) => l.status === "sold");
 
@@ -434,8 +438,8 @@ export default function FullProfilePage() {
                     <LinkStackBlocks
                         links={mockLinks}
                         onLinkClick={(link) => {
-                            // Track click analytics
-                            console.log("Link clicked:", link);
+                            // Track link click analytics
+                            trackLinkClick(link.id.toString());
                         }}
                     />
 
