@@ -1,8 +1,7 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import { Home, BarChart3, Users, Zap } from "lucide-react";
 
-const Index = () => {
+export default function Landing() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
             {/* Header */}
@@ -140,7 +139,7 @@ const Index = () => {
             </footer>
         </div>
     );
-};
+}
 
 function FeatureCard({
     icon,
@@ -161,5 +160,3 @@ function FeatureCard({
         </div>
     );
 }
-
-export default Index;
