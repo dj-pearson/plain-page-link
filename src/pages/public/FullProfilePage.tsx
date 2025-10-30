@@ -446,21 +446,80 @@ export default function FullProfilePage() {
                     {/* Social Links */}
                     <SocialLinks profile={profile} />
 
-                    {/* Footer */}
-                    <div className="text-center py-8 text-sm text-gray-500">
-                        <p>
-                            © 2025 {profile.display_name}. All rights reserved.
-                        </p>
-                        <p className="mt-2">
-                            Powered by{" "}
-                            <a
-                                href="https://agentbio.net"
-                                className="text-blue-600 hover:text-blue-700"
-                            >
-                                AgentBio.net
-                            </a>
-                        </p>
-                    </div>
+                    {/* Compliance Footer with Equal Housing */}
+                    <footer className="mt-12 pt-8 pb-6 border-t border-gray-200 bg-gray-50 rounded-lg">
+                        <div className="text-center">
+                            {/* Equal Housing Opportunity Logo */}
+                            <div className="flex justify-center mb-3">
+                                <svg
+                                    className="h-10 w-10 text-blue-600"
+                                    viewBox="0 0 100 100"
+                                    fill="currentColor"
+                                    role="img"
+                                    aria-label="Equal Housing Opportunity"
+                                >
+                                    {/* Simple Equal Housing symbol */}
+                                    <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="3" fill="none" />
+                                    <rect x="30" y="20" width="40" height="60" fill="none" stroke="currentColor" strokeWidth="3" />
+                                    <line x1="35" y1="45" x2="65" y2="45" stroke="currentColor" strokeWidth="3" />
+                                    <line x1="35" y1="55" x2="65" y2="55" stroke="currentColor" strokeWidth="3" />
+                                </svg>
+                            </div>
+
+                            {/* Equal Housing Statement */}
+                            <p className="text-xs font-semibold text-gray-700 mb-2">
+                                Equal Housing Opportunity
+                            </p>
+                            <p className="text-xs text-gray-600 mb-4 max-w-2xl mx-auto leading-relaxed px-4">
+                                We are pledged to the letter and spirit of U.S. policy for the achievement of equal housing opportunity throughout the Nation.
+                            </p>
+
+                            {/* License Information */}
+                            {profile.license_number && (
+                                <div className="mb-4 pb-4 border-b border-gray-300">
+                                    <p className="text-xs text-gray-700 font-medium">
+                                        {profile.display_name}
+                                        {profile.title && ` | ${profile.title}`}
+                                    </p>
+                                    <p className="text-xs text-gray-600">
+                                        {profile.brokerage_name && `${profile.brokerage_name} | `}
+                                        License #{profile.license_number} ({profile.license_state})
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Legal Links */}
+                            <div className="flex flex-wrap justify-center gap-3 text-xs text-gray-500 mb-3">
+                                <a href="/legal/terms" className="hover:text-blue-600 hover:underline">
+                                    Terms of Service
+                                </a>
+                                <span>•</span>
+                                <a href="/legal/privacy" className="hover:text-blue-600 hover:underline">
+                                    Privacy Policy
+                                </a>
+                                <span>•</span>
+                                <a href="/legal/cookies" className="hover:text-blue-600 hover:underline">
+                                    Cookie Policy
+                                </a>
+                            </div>
+
+                            {/* Copyright */}
+                            <p className="text-xs text-gray-500">
+                                © {new Date().getFullYear()} {profile.display_name}. All rights reserved.
+                            </p>
+                            <p className="text-xs text-gray-400 mt-2">
+                                Powered by{" "}
+                                <a
+                                    href="https://agentbio.net"
+                                    className="hover:text-blue-600 hover:underline"
+                                    target="_blank"
+                                    rel="noopener"
+                                >
+                                    AgentBio.net
+                                </a>
+                            </p>
+                        </div>
+                    </footer>
                 </div>
             </div>
 
