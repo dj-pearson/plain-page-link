@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Plus, Star, Edit, Trash2, Quote } from "lucide-react";
 import { AddTestimonialModal } from "@/components/modals/AddTestimonialModal";
+import { EditTestimonialModal, EditTestimonialFormData } from "@/components/modals/EditTestimonialModal";
 import type { TestimonialFormData } from "@/components/modals/AddTestimonialModal";
 import { useToast } from "@/hooks/use-toast";
 import { useTestimonials } from "@/hooks/useTestimonials";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Testimonials() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingTestimonial, setEditingTestimonial] = useState<any>(null);
   const { toast } = useToast();
   const { testimonials, isLoading, addTestimonial, deleteTestimonial } = useTestimonials();
 
@@ -40,6 +43,44 @@ export default function Testimonials() {
       toast({
         title: "Error",
         description: "Failed to delete testimonial.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditTestimonial = async (data: EditTestimonialFormData) => {
+    if (!editingTestimonial) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('testimonials')
+        .update({
+          client_name: data.client_name,
+          client_title: data.client_title,
+          rating: data.rating,
+          review: data.review,
+          property_type: data.property_type,
+          transaction_type: data.transaction_type,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingTestimonial.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Testimonial updated!",
+        description: "Client review has been updated successfully.",
+      });
+      setEditingTestimonial(null);
+      window.location.reload();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update testimonial. Please try again.",
         variant: "destructive",
       });
     }
@@ -146,7 +187,10 @@ export default function Testimonials() {
 
               {/* Actions */}
               <div className="flex items-center gap-1">
-                <button className="p-2 hover:bg-accent rounded-lg transition-colors">
+                <button 
+                  onClick={() => setEditingTestimonial(testimonial)}
+                  className="p-2 hover:bg-accent rounded-lg transition-colors"
+                >
                   <Edit className="h-4 w-4 text-muted-foreground" />
                 </button>
                 <button 
@@ -195,6 +239,23 @@ export default function Testimonials() {
         onOpenChange={setIsAddModalOpen}
         onSave={handleAddTestimonial}
       />
+
+      {/* Edit Testimonial Modal */}
+      {editingTestimonial && (
+        <EditTestimonialModal
+          isOpen={!!editingTestimonial}
+          onClose={() => setEditingTestimonial(null)}
+          onSubmit={handleEditTestimonial}
+          initialData={{
+            client_name: editingTestimonial.client_name,
+            review: editingTestimonial.review,
+            rating: editingTestimonial.rating,
+            client_title: editingTestimonial.client_title,
+            property_type: editingTestimonial.property_type,
+            transaction_type: editingTestimonial.transaction_type,
+          }}
+        />
+      )}
     </div>
   );
 }
