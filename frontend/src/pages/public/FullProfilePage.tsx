@@ -8,6 +8,7 @@ import SoldProperties from "@/components/profile/SoldProperties";
 import { LeadCaptureCTA } from "@/components/profile/LeadCaptureCTA";
 import { TestimonialSection } from "@/components/profile/TestimonialSection";
 import { SocialProofBanner } from "@/components/profile/SocialProofBanner";
+import ListingDetailModal from "@/components/profile/ListingDetailModal";
 import type { Profile, Listing } from "@/types";
 import type { Testimonial } from "@/types/testimonial";
 
@@ -381,27 +382,13 @@ export default function FullProfilePage() {
                 </div>
             </div>
 
-            {/* TODO: Listing Detail Modal */}
+            {/* Listing Detail Modal */}
             {selectedListing && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-6">
-                            <button
-                                onClick={() => setSelectedListing(null)}
-                                className="float-right text-gray-500 hover:text-gray-700"
-                            >
-                                ✕
-                            </button>
-                            <h2 className="text-2xl font-bold">
-                                {selectedListing.title ||
-                                    selectedListing.address_full}
-                            </h2>
-                            <p className="text-gray-600 mt-4">
-                                Listing details modal coming soon...
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <ListingDetailModal
+                    listing={selectedListing}
+                    isOpen={!!selectedListing}
+                    onClose={() => setSelectedListing(null)}
+                />
             )}
         </div>
     );
