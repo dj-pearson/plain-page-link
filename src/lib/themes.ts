@@ -188,8 +188,8 @@ export function applyTheme(theme: ThemeConfig) {
     root.style.setProperty("--font-heading", theme.fonts.heading);
     root.style.setProperty("--font-body", theme.fonts.body);
 
-    // Store theme ID in localStorage
-    localStorage.setItem("agentbio-theme", theme.id);
+    // Store full theme in localStorage for persistence
+    localStorage.setItem("agentbio-theme", JSON.stringify(theme));
 }
 
 export function getThemeById(id: string): ThemeConfig | undefined {
@@ -197,8 +197,16 @@ export function getThemeById(id: string): ThemeConfig | undefined {
 }
 
 export function getCurrentTheme(): ThemeConfig {
-    const savedThemeId = localStorage.getItem("agentbio-theme");
-    return getThemeById(savedThemeId || "modern-clean") || DEFAULT_THEMES[0];
+    // Try to get full theme object from localStorage first
+    const savedTheme = localStorage.getItem("agentbio-theme");
+    if (savedTheme) {
+        try {
+            return JSON.parse(savedTheme);
+        } catch (e) {
+            console.error("Failed to parse saved theme:", e);
+        }
+    }
+    return DEFAULT_THEMES[0];
 }
 
 export function hexToRgb(

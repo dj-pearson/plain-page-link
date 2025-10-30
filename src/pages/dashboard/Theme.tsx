@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ThemeCard } from "@/components/dashboard/ThemeCard";
 import { ColorPicker } from "@/components/dashboard/ColorPicker";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,9 @@ import {
     type ThemeConfig,
 } from "@/lib/themes";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 const AVAILABLE_FONTS = [
     "Inter",
@@ -43,12 +46,46 @@ const AVAILABLE_FONTS = [
 
 export default function Theme() {
     const { toast } = useToast();
+    const { user } = useAuthStore();
     const [selectedTheme, setSelectedTheme] = useState<ThemeConfig>(
         getCurrentTheme()
     );
     const [customColors, setCustomColors] = useState(selectedTheme.colors);
     const [customFonts, setCustomFonts] = useState(selectedTheme.fonts);
     const [isCustomizing, setIsCustomizing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Load saved theme from database
+    useEffect(() => {
+        loadSavedTheme();
+    }, [user]);
+
+    const loadSavedTheme = async () => {
+        if (!user) return;
+
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('theme')
+                .eq('id', user.id)
+                .single();
+
+            if (error) throw error;
+
+            if (data?.theme) {
+                const savedTheme = typeof data.theme === 'string' 
+                    ? JSON.parse(data.theme) 
+                    : data.theme;
+                
+                setSelectedTheme(savedTheme);
+                setCustomColors(savedTheme.colors);
+                setCustomFonts(savedTheme.fonts);
+                applyTheme(savedTheme);
+            }
+        } catch (error) {
+            console.error('Failed to load saved theme:', error);
+        }
+    };
 
     const handleThemeSelect = (theme: ThemeConfig) => {
         setSelectedTheme(theme);
@@ -57,27 +94,87 @@ export default function Theme() {
         setIsCustomizing(false);
     };
 
-    const handleSaveTheme = () => {
-        const themeToApply: ThemeConfig = {
-            ...selectedTheme,
-            colors: customColors,
-            fonts: customFonts,
-        };
+    const handleSaveTheme = async () => {
+        if (!user) {
+            toast({
+                title: "Error",
+                description: "You must be logged in to save themes",
+                variant: "destructive",
+            });
+            return;
+        }
 
-        applyTheme(themeToApply);
+        setIsSaving(true);
+        
+        try {
+            const themeToApply: ThemeConfig = {
+                ...selectedTheme,
+                colors: customColors,
+                fonts: customFonts,
+            };
 
-        toast({
-            title: "Theme saved!",
-            description: "Your profile theme has been updated successfully.",
-        });
+            // Save to database
+            const { error } = await supabase
+                .from('profiles')
+                .update({ 
+                    theme: JSON.stringify(themeToApply)
+                })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            // Apply locally
+            applyTheme(themeToApply);
+
+            toast({
+                title: "Theme saved!",
+                description: "Your profile theme has been updated successfully.",
+            });
+            
+            setIsCustomizing(false);
+        } catch (error) {
+            console.error('Failed to save theme:', error);
+            toast({
+                title: "Error",
+                description: "Failed to save theme. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    const handlePreviewTheme = (theme: ThemeConfig) => {
-        // TODO: Open preview in new tab or modal
-        toast({
-            title: "Preview coming soon",
-            description: `Preview for ${theme.name} will open in a new window.`,
-        });
+    const handlePreviewTheme = async () => {
+        if (!user) {
+            toast({
+                title: "Error",
+                description: "You must be logged in to preview",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            // Get user's username
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', user.id)
+                .single();
+
+            if (error) throw error;
+
+            if (data?.username) {
+                // Open profile in new tab
+                window.open(`/${data.username}`, '_blank');
+            }
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Failed to open preview",
+                variant: "destructive",
+            });
+        }
     };
 
     const handleResetToDefault = () => {
@@ -117,6 +214,15 @@ export default function Theme() {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePreviewTheme}
+                        title="Open your public profile in a new tab to see your theme"
+                    >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Preview Live
+                    </Button>
                     {isCustomizing && (
                         <Button
                             variant="outline"
@@ -127,11 +233,22 @@ export default function Theme() {
                             Reset
                         </Button>
                     )}
-                    <Button size="sm" onClick={handleSaveTheme}>
-                        <Save className="w-4 h-4 mr-2" />
+                    <Button size="sm" onClick={handleSaveTheme} disabled={isSaving}>
+                        {isSaving ? (
+                            <LoadingSpinner size="sm" className="mr-2" />
+                        ) : (
+                            <Save className="w-4 h-4 mr-2" />
+                        )}
                         Save Theme
                     </Button>
                 </div>
+            </div>
+
+            {/* Info Banner */}
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                    💡 <strong>Tip:</strong> After saving your theme, click "Preview Live" to see how it looks on your public profile. Changes are applied instantly!
+                </p>
             </div>
 
             <Tabs defaultValue="presets" className="space-y-6">
@@ -160,7 +277,6 @@ export default function Theme() {
                                     theme={theme}
                                     isSelected={selectedTheme.id === theme.id}
                                     onSelect={handleThemeSelect}
-                                    onPreview={handlePreviewTheme}
                                 />
                             ))}
                         </div>
@@ -181,7 +297,6 @@ export default function Theme() {
                                     theme={theme}
                                     isSelected={selectedTheme.id === theme.id}
                                     onSelect={handleThemeSelect}
-                                    onPreview={handlePreviewTheme}
                                 />
                             ))}
                         </div>

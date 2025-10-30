@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { FullPageLoader } from "@/components/LoadingSpinner";
@@ -16,6 +16,7 @@ import { useProfileTracking, trackLinkClick } from "@/hooks/useProfileTracking";
 import { usePublicProfile } from "@/hooks/usePublicProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { SEOHead } from "@/components/SEOHead";
+import { applyTheme } from "@/lib/themes";
 import type { Listing } from "@/types";
 
 export default function FullProfilePage() {
@@ -24,6 +25,20 @@ export default function FullProfilePage() {
 
     // Fetch profile and related data
     const { data, isLoading, error } = usePublicProfile(slug || '');
+
+    // Apply theme when profile loads
+    useEffect(() => {
+        if (data?.profile?.theme) {
+            try {
+                const theme = typeof data.profile.theme === 'string' 
+                    ? JSON.parse(data.profile.theme) 
+                    : data.profile.theme;
+                applyTheme(theme);
+            } catch (e) {
+                console.error('Failed to apply profile theme:', e);
+            }
+        }
+    }, [data]);
 
     if (isLoading) {
         return <FullPageLoader text="Loading profile..." />;
