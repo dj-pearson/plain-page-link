@@ -17,7 +17,13 @@ const queryClient = new QueryClient({
     },
 });
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+const rootEl = document.getElementById("root")!;
+if (!rootEl) {
+    console.error("Root element #root not found");
+}
+console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
+
+ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
         <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
@@ -29,3 +35,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </ErrorBoundary>
     </React.StrictMode>
 );
+
+console.log("[Lovable] React render invoked");
