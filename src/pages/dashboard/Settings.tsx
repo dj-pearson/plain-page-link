@@ -1,7 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Shield, Bell, CreditCard, User, Lock, Mail, Save } from "lucide-react";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { useSettings } from "@/hooks/useSettings";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Settings() {
+  const { user } = useAuthStore();
+  const { settings, updateSettings } = useSettings();
+  const { toast } = useToast();
+
   const [notifications, setNotifications] = useState({
     emailLeads: true,
     smsLeads: false,
@@ -14,6 +22,89 @@ export default function Settings() {
     new: "",
     confirm: "",
   });
+
+  // Sync local state with settings from database
+  useEffect(() => {
+    if (settings) {
+      setNotifications({
+        emailLeads: settings.email_leads,
+        smsLeads: settings.sms_leads,
+        weeklyReport: settings.weekly_report,
+        marketingEmails: settings.marketing_emails,
+      });
+    }
+  }, [settings]);
+
+  const handleNotificationChange = async (key: keyof typeof notifications, value: boolean) => {
+    setNotifications(prev => ({ ...prev, [key]: value }));
+    
+    // Map frontend keys to database column names
+    const dbKey = key === 'emailLeads' ? 'email_leads' :
+                  key === 'smsLeads' ? 'sms_leads' :
+                  key === 'weeklyReport' ? 'weekly_report' :
+                  'marketing_emails';
+    
+    try {
+      await updateSettings.mutateAsync({ [dbKey]: value });
+      toast({
+        title: "Settings updated",
+        description: "Your notification preferences have been saved.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update settings.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (password.new !== password.confirm) {
+      toast({
+        title: "Error",
+        description: "New passwords don't match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.new.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: password.new,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Password updated",
+        description: "Your password has been changed successfully.",
+      });
+
+      setPassword({ current: "", new: "", confirm: "" });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const memberSince = user?.created_at 
+    ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : "Unknown";
 
   return (
     <div className="space-y-6">
@@ -38,33 +129,29 @@ export default function Settings() {
             <div>
               <div className="font-medium text-foreground">Email Address</div>
               <div className="text-sm text-muted-foreground">
-                sarah.johnson@email.com
+                {user?.email || "Not available"}
               </div>
             </div>
-            <button className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium">
-              Change
-            </button>
           </div>
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
-              <div className="font-medium text-foreground">Account Type</div>
-              <div className="text-sm text-muted-foreground">Professional Plan</div>
+              <div className="font-medium text-foreground">User ID</div>
+              <div className="text-sm text-muted-foreground font-mono text-xs">
+                {user?.id || "Not available"}
+              </div>
             </div>
-            <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium">
-              Upgrade
-            </button>
           </div>
           <div className="flex items-center justify-between py-3">
             <div>
               <div className="font-medium text-foreground">Member Since</div>
-              <div className="text-sm text-muted-foreground">January 15, 2024</div>
+              <div className="text-sm text-muted-foreground">{memberSince}</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Change Password */}
-      <div className="bg-card border border-border rounded-lg p-6">
+      <form onSubmit={handlePasswordChange} className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center gap-3 mb-4">
           <Lock className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">
@@ -74,19 +161,6 @@ export default function Settings() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Current Password
-            </label>
-            <input
-              type="password"
-              value={password.current}
-              onChange={(e) =>
-                setPassword({ ...password, current: e.target.value })
-              }
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
               New Password
             </label>
             <input
@@ -94,6 +168,8 @@ export default function Settings() {
               value={password.new}
               onChange={(e) => setPassword({ ...password, new: e.target.value })}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+              minLength={6}
             />
           </div>
           <div>
@@ -107,14 +183,19 @@ export default function Settings() {
                 setPassword({ ...password, confirm: e.target.value })
               }
               className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+              minLength={6}
             />
           </div>
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
+          <button 
+            type="submit"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+          >
             <Save className="h-4 w-4" />
             Update Password
           </button>
         </div>
-      </div>
+      </form>
 
       {/* Notifications */}
       <div className="bg-card border border-border rounded-lg p-6">
@@ -136,12 +217,7 @@ export default function Settings() {
               <input
                 type="checkbox"
                 checked={notifications.emailLeads}
-                onChange={(e) =>
-                  setNotifications({
-                    ...notifications,
-                    emailLeads: e.target.checked,
-                  })
-                }
+                onChange={(e) => handleNotificationChange('emailLeads', e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -158,12 +234,7 @@ export default function Settings() {
               <input
                 type="checkbox"
                 checked={notifications.smsLeads}
-                onChange={(e) =>
-                  setNotifications({
-                    ...notifications,
-                    smsLeads: e.target.checked,
-                  })
-                }
+                onChange={(e) => handleNotificationChange('smsLeads', e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -180,12 +251,7 @@ export default function Settings() {
               <input
                 type="checkbox"
                 checked={notifications.weeklyReport}
-                onChange={(e) =>
-                  setNotifications({
-                    ...notifications,
-                    weeklyReport: e.target.checked,
-                  })
-                }
+                onChange={(e) => handleNotificationChange('weeklyReport', e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -202,12 +268,7 @@ export default function Settings() {
               <input
                 type="checkbox"
                 checked={notifications.marketingEmails}
-                onChange={(e) =>
-                  setNotifications({
-                    ...notifications,
-                    marketingEmails: e.target.checked,
-                  })
-                }
+                onChange={(e) => handleNotificationChange('marketingEmails', e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>

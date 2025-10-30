@@ -260,6 +260,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          created_at: string | null
+          email_leads: boolean | null
+          id: string
+          marketing_emails: boolean | null
+          sms_leads: boolean | null
+          updated_at: string | null
+          user_id: string
+          weekly_report: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          email_leads?: boolean | null
+          id?: string
+          marketing_emails?: boolean | null
+          sms_leads?: boolean | null
+          updated_at?: string | null
+          user_id: string
+          weekly_report?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          email_leads?: boolean | null
+          id?: string
+          marketing_emails?: boolean | null
+          sms_leads?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+          weekly_report?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
