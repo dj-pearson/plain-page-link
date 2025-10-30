@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_views: {
+        Row: {
+          device: string | null
+          id: string
+          location: string | null
+          source: string | null
+          user_id: string
+          viewed_at: string | null
+          visitor_id: string | null
+        }
+        Insert: {
+          device?: string | null
+          id?: string
+          location?: string | null
+          source?: string | null
+          user_id: string
+          viewed_at?: string | null
+          visitor_id?: string | null
+        }
+        Update: {
+          device?: string | null
+          id?: string
+          location?: string | null
+          source?: string | null
+          user_id?: string
+          viewed_at?: string | null
+          visitor_id?: string | null
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          created_at: string | null
+          email: string
+          form_data: Json | null
+          id: string
+          lead_type: string
+          message: string | null
+          name: string
+          phone: string | null
+          source: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          form_data?: Json | null
+          id?: string
+          lead_type: string
+          message?: string | null
+          name: string
+          phone?: string | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          form_data?: Json | null
+          id?: string
+          lead_type?: string
+          message?: string | null
+          name?: string
+          phone?: string | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       links: {
         Row: {
           click_count: number | null
@@ -53,6 +128,51 @@ export type Database = {
         }
         Relationships: []
       }
+      listings: {
+        Row: {
+          address: string
+          baths: number
+          beds: number
+          city: string
+          created_at: string | null
+          id: string
+          image: string | null
+          price: string
+          sqft: number | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          address: string
+          baths: number
+          beds: number
+          city: string
+          created_at?: string | null
+          id?: string
+          image?: string | null
+          price: string
+          sqft?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          address?: string
+          baths?: number
+          beds?: number
+          city?: string
+          created_at?: string | null
+          id?: string
+          image?: string | null
+          price?: string
+          sqft?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -83,6 +203,42 @@ export type Database = {
           theme?: string | null
           updated_at?: string | null
           username?: string
+        }
+        Relationships: []
+      }
+      testimonials: {
+        Row: {
+          client_name: string
+          created_at: string | null
+          date: string | null
+          id: string
+          property_type: string | null
+          rating: number
+          review: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string | null
+          date?: string | null
+          id?: string
+          property_type?: string | null
+          rating: number
+          review: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string | null
+          date?: string | null
+          id?: string
+          property_type?: string | null
+          rating?: number
+          review?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

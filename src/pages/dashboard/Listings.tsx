@@ -3,60 +3,48 @@ import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2 } from "lucide-re
 import { AddListingModal } from "@/components/modals/AddListingModal";
 import type { ListingFormData } from "@/components/modals/AddListingModal";
 import { useToast } from "@/hooks/use-toast";
+import { useListings } from "@/hooks/useListings";
 
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { toast } = useToast();
+  const { listings, isLoading, addListing, deleteListing } = useListings();
 
-  const handleAddListing = (data: ListingFormData) => {
-    // TODO: Save to backend
-    console.log("New listing:", data);
-    toast({
-      title: "Listing added!",
-      description: "Your property listing has been created successfully.",
-    });
+  const handleAddListing = async (data: ListingFormData) => {
+    try {
+      await addListing.mutateAsync(data);
+      toast({
+        title: "Listing added!",
+        description: "Your property listing has been created successfully.",
+      });
+      setIsAddModalOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add listing. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  // Mock data - will be replaced with real data from backend
-  const listings = [
-    {
-      id: 1,
-      image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400",
-      address: "123 Oak Street",
-      city: "San Francisco, CA",
-      price: "$1,250,000",
-      beds: 4,
-      baths: 3,
-      sqft: "2,400",
-      status: "Active",
-      views: 234,
-    },
-    {
-      id: 2,
-      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400",
-      address: "456 Maple Avenue",
-      city: "Los Angeles, CA",
-      price: "$895,000",
-      beds: 3,
-      baths: 2,
-      sqft: "1,850",
-      status: "Pending",
-      views: 189,
-    },
-    {
-      id: 3,
-      image: "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=400",
-      address: "789 Pine Road",
-      city: "San Diego, CA",
-      price: "$1,450,000",
-      beds: 5,
-      baths: 4,
-      sqft: "3,200",
-      status: "Active",
-      views: 412,
-    },
-  ];
+  const handleDeleteListing = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this listing?")) return;
+    
+    try {
+      await deleteListing.mutateAsync(id);
+      toast({
+        title: "Listing deleted",
+        description: "Property listing has been removed.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete listing.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -103,13 +91,13 @@ export default function Listings() {
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <div className="text-2xl font-bold text-green-600">
-            {listings.filter((l) => l.status === "Active").length}
+            {listings.filter((l) => l.status === "active").length}
           </div>
           <div className="text-sm text-muted-foreground">Active</div>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <div className="text-2xl font-bold text-yellow-600">
-            {listings.filter((l) => l.status === "Pending").length}
+            {listings.filter((l) => l.status === "pending").length}
           </div>
           <div className="text-sm text-muted-foreground">Pending</div>
         </div>
@@ -132,7 +120,7 @@ export default function Listings() {
               <div className="absolute top-3 left-3">
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    listing.status === "Active"
+                    listing.status === "active"
                       ? "bg-green-500 text-white"
                       : "bg-yellow-500 text-white"
                   }`}
@@ -161,20 +149,26 @@ export default function Listings() {
                 <span>{listing.beds} beds</span>
                 <span>•</span>
                 <span>{listing.baths} baths</span>
-                <span>•</span>
-                <span>{listing.sqft} sqft</span>
+                {listing.sqft && (
+                  <>
+                    <span>•</span>
+                    <span>{listing.sqft.toLocaleString()} sqft</span>
+                  </>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-border">
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Eye className="h-4 w-4" />
-                  <span>{listing.views} views</span>
+                <div className="text-sm text-muted-foreground">
+                  Listed {new Date(listing.created_at).toLocaleDateString()}
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="p-2 hover:bg-accent rounded-lg transition-colors">
                     <Edit className="h-4 w-4 text-muted-foreground" />
                   </button>
-                  <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
+                  <button 
+                    onClick={() => handleDeleteListing(listing.id)}
+                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                  >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </button>
                 </div>

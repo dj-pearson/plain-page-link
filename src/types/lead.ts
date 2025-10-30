@@ -15,7 +15,24 @@ export type LeadStatus =
 export type LeadPriority = "low" | "medium" | "high";
 export type ContactMethod = "email" | "phone" | "sms" | "video";
 
+// Database Lead type (matches the Supabase table)
 export interface Lead {
+    id: string;
+    user_id: string;
+    lead_type: string;
+    name: string;
+    email: string;
+    phone?: string | null;
+    message?: string | null;
+    status: string;
+    source: string;
+    form_data?: Record<string, any> | null;
+    created_at: string;
+    updated_at: string;
+}
+
+// Legacy Lead type for compatibility
+export interface LegacyLead {
     id: number;
     profile_id: number;
     listing_id: number | null;

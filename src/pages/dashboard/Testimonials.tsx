@@ -3,55 +3,51 @@ import { Plus, Star, Edit, Trash2, Quote } from "lucide-react";
 import { AddTestimonialModal } from "@/components/modals/AddTestimonialModal";
 import type { TestimonialFormData } from "@/components/modals/AddTestimonialModal";
 import { useToast } from "@/hooks/use-toast";
+import { useTestimonials } from "@/hooks/useTestimonials";
 
 export default function Testimonials() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { toast } = useToast();
+  const { testimonials, isLoading, addTestimonial, deleteTestimonial } = useTestimonials();
 
-  const handleAddTestimonial = (data: TestimonialFormData) => {
-    // TODO: Save to backend
-    console.log("New testimonial:", data);
-    toast({
-      title: "Testimonial added!",
-      description: "Client review has been added successfully.",
-    });
+  const handleAddTestimonial = async (data: TestimonialFormData) => {
+    try {
+      await addTestimonial.mutateAsync(data);
+      toast({
+        title: "Testimonial added!",
+        description: "Client review has been added successfully.",
+      });
+      setIsAddModalOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add testimonial. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
-  // Mock data
-  const testimonials = [
-    {
-      id: 1,
-      clientName: "Jennifer Wilson",
-      rating: 5,
-      review:
-        "Working with this agent was an absolute pleasure! They helped us find our dream home within our budget and made the entire process stress-free. Highly recommend!",
-      propertyType: "Single Family Home",
-      date: "2024-01-15",
-      featured: true,
-      avatar: "https://ui-avatars.com/api/?name=Jennifer+Wilson&background=3b82f6&color=fff",
-    },
-    {
-      id: 2,
-      clientName: "Michael Chen",
-      rating: 5,
-      review:
-        "Exceptional service from start to finish. The agent's market knowledge and negotiation skills got us an amazing deal. We couldn't be happier with our new investment property.",
-      propertyType: "Investment Property",
-      date: "2024-01-10",
-      featured: false,
-      avatar: "https://ui-avatars.com/api/?name=Michael+Chen&background=8b5cf6&color=fff",
-    },
-    {
-      id: 3,
-      clientName: "Sarah Martinez",
-      rating: 5,
-      review:
-        "Sold our home in just 2 weeks! The marketing strategy was top-notch and the communication throughout was excellent. Truly a 5-star experience.",
-      propertyType: "Condo",
-      date: "2023-12-20",
-      featured: true,
-      avatar: "https://ui-avatars.com/api/?name=Sarah+Martinez&background=ec4899&color=fff",
-    },
-  ];
+
+  const handleDeleteTestimonial = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this testimonial?")) return;
+    
+    try {
+      await deleteTestimonial.mutateAsync(id);
+      toast({
+        title: "Testimonial deleted",
+        description: "Client review has been removed.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete testimonial.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const averageRating = testimonials.length > 0
+    ? (testimonials.reduce((sum, t) => sum + t.rating, 0) / testimonials.length).toFixed(1)
+    : "0.0";
 
   const renderStars = (rating: number) => {
     return (
@@ -97,18 +93,18 @@ export default function Testimonials() {
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <div className="flex items-center gap-2">
-            <div className="text-2xl font-bold text-foreground">5.0</div>
+            <div className="text-2xl font-bold text-foreground">{averageRating}</div>
             <div className="flex">
-              {renderStars(5)}
+              {renderStars(Math.round(parseFloat(averageRating)))}
             </div>
           </div>
           <div className="text-sm text-muted-foreground">Average Rating</div>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <div className="text-2xl font-bold text-primary">
-            {testimonials.filter((t) => t.featured).length}
+            {testimonials.length}
           </div>
-          <div className="text-sm text-muted-foreground">Featured</div>
+          <div className="text-sm text-muted-foreground">Total Reviews</div>
         </div>
       </div>
 
@@ -119,15 +115,6 @@ export default function Testimonials() {
             key={testimonial.id}
             className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow relative"
           >
-            {/* Featured Badge */}
-            {testimonial.featured && (
-              <div className="absolute top-4 right-4">
-                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">
-                  ⭐ Featured
-                </span>
-              </div>
-            )}
-
             {/* Quote Icon */}
             <div className="mb-4">
               <Quote className="h-8 w-8 text-primary opacity-20" />
@@ -144,17 +131,15 @@ export default function Testimonials() {
             {/* Client Info */}
             <div className="flex items-center justify-between pt-4 border-t border-border">
               <div className="flex items-center gap-3">
-                <img
-                  src={testimonial.avatar}
-                  alt={testimonial.clientName}
-                  className="w-12 h-12 rounded-full"
-                />
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                  {testimonial.client_name.split(' ').map(n => n[0]).join('')}
+                </div>
                 <div>
                   <div className="font-medium text-foreground">
-                    {testimonial.clientName}
+                    {testimonial.client_name}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {testimonial.propertyType}
+                    {testimonial.property_type || "Client"}
                   </div>
                 </div>
               </div>
@@ -164,7 +149,10 @@ export default function Testimonials() {
                 <button className="p-2 hover:bg-accent rounded-lg transition-colors">
                   <Edit className="h-4 w-4 text-muted-foreground" />
                 </button>
-                <button className="p-2 hover:bg-red-50 rounded-lg transition-colors">
+                <button 
+                  onClick={() => handleDeleteTestimonial(testimonial.id)}
+                  className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                >
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </button>
               </div>
