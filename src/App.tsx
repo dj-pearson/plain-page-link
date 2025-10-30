@@ -1,7 +1,7 @@
-import Landing from "../frontend/src/pages/public/Landing";
+import Index from "./pages/Index";
 
 function App() {
-  return <Landing />;
+  return <Index />;
 }
 
 export default App;
