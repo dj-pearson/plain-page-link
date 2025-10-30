@@ -1,116 +1,57 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Instagram,
-  Facebook,
-  Linkedin,
-  Music,
-  Youtube,
-  Home,
-  MapPin,
-  Calendar,
-  Globe,
-  Mail,
-  Phone,
-  MessageCircle,
-  FileText,
-  Link as LinkIcon,
-  type LucideIcon,
-} from "lucide-react";
-import type { Link } from "@/hooks/useLinks";
 
-interface EditLinkModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  link: Link | null;
-  onSave?: (id: string, data: Partial<Link>) => void;
+export interface EditLinkFormData {
+  title: string;
+  url: string;
+  icon?: string;
 }
 
-const SOCIAL_ICONS: { value: string; label: string; icon: LucideIcon }[] = [
-  { value: "instagram", label: "Instagram", icon: Instagram },
-  { value: "facebook", label: "Facebook", icon: Facebook },
-  { value: "linkedin", label: "LinkedIn", icon: Linkedin },
-  { value: "tiktok", label: "TikTok", icon: Music },
-  { value: "youtube", label: "YouTube", icon: Youtube },
-  { value: "zillow", label: "Zillow", icon: Home },
-  { value: "realtor", label: "Realtor.com", icon: MapPin },
-  { value: "calendar", label: "Calendar", icon: Calendar },
-  { value: "website", label: "Website", icon: Globe },
-  { value: "email", label: "Email", icon: Mail },
-  { value: "phone", label: "Phone", icon: Phone },
-  { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { value: "document", label: "Document", icon: FileText },
-  { value: "link", label: "Link", icon: LinkIcon },
-];
+interface EditLinkModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: EditLinkFormData) => void;
+  initialData: EditLinkFormData;
+}
 
-export function EditLinkModal({ open, onOpenChange, link, onSave }: EditLinkModalProps) {
-  const [formData, setFormData] = useState({
-    title: "",
-    url: "",
-    icon: "link",
-    is_active: true,
-  });
+export function EditLinkModal({ isOpen, onClose, onSubmit, initialData }: EditLinkModalProps) {
+  const [formData, setFormData] = useState<EditLinkFormData>(initialData);
 
   useEffect(() => {
-    if (link) {
-      setFormData({
-        title: link.title,
-        url: link.url,
-        icon: link.icon,
-        is_active: link.is_active,
-      });
-    }
-  }, [link]);
+    setFormData(initialData);
+  }, [initialData]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (link) {
-      onSave?.(link.id, formData);
-      onOpenChange(false);
-    }
+    onSubmit(formData);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Edit Link</DialogTitle>
-          <DialogDescription>
-            Update your link information
-          </DialogDescription>
-        </DialogHeader>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-card border border-border rounded-lg w-full max-w-md">
+        <div className="border-b border-border p-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Edit Link</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-accent rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <Label htmlFor="title">Link Title *</Label>
             <Input
               id="title"
-              name="title"
               value={formData.title}
-              onChange={handleChange}
-              placeholder="Schedule a Consultation"
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="e.g., My Website"
               required
             />
           </div>
@@ -119,80 +60,37 @@ export function EditLinkModal({ open, onOpenChange, link, onSave }: EditLinkModa
             <Label htmlFor="url">URL *</Label>
             <Input
               id="url"
-              name="url"
               type="url"
               value={formData.url}
-              onChange={handleChange}
+              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
               placeholder="https://example.com"
               required
             />
           </div>
 
           <div>
-            <Label htmlFor="icon">Icon</Label>
-            <Select
-              value={formData.icon}
-              onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, icon: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue>
-                  {(() => {
-                    const selected = SOCIAL_ICONS.find((i) => i.value === formData.icon);
-                    const IconComponent = selected?.icon || LinkIcon;
-                    return (
-                      <span className="flex items-center gap-2">
-                        <IconComponent className="h-4 w-4" />
-                        <span>{selected?.label || "Custom"}</span>
-                      </span>
-                    );
-                  })()}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {SOCIAL_ICONS.map((iconItem) => {
-                  const IconComponent = iconItem.icon;
-                  return (
-                    <SelectItem key={iconItem.value} value={iconItem.value}>
-                      <span className="flex items-center gap-2">
-                        <IconComponent className="h-4 w-4" />
-                        <span>{iconItem.label}</span>
-                      </span>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="is_active"
-              checked={formData.is_active}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, is_active: e.target.checked }))
-              }
-              className="rounded border-border"
+            <Label htmlFor="icon">Icon (optional)</Label>
+            <Input
+              id="icon"
+              value={formData.icon || ''}
+              onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+              placeholder="e.g., link, globe, home"
             />
-            <Label htmlFor="is_active" className="cursor-pointer">
-              Active (visible on profile)
-            </Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Icon name from Lucide icons
+            </p>
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit">Save Changes</Button>
-          </DialogFooter>
+            <Button type="submit" className="flex-1">
+              Save Changes
+            </Button>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

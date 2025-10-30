@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2 } from "lucide-react";
 import { AddListingModal } from "@/components/modals/AddListingModal";
+import { EditListingModal, EditListingFormData } from "@/components/modals/EditListingModal";
 import type { ListingFormData } from "@/components/modals/AddListingModal";
 import { useToast } from "@/hooks/use-toast";
 import { useListings } from "@/hooks/useListings";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingListing, setEditingListing] = useState<any>(null);
   const { toast } = useToast();
   const { listings, isLoading, addListing, deleteListing } = useListings();
 
@@ -41,6 +44,50 @@ export default function Listings() {
       toast({
         title: "Error",
         description: "Failed to delete listing.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditListing = async (data: EditListingFormData) => {
+    if (!editingListing) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('listings')
+        .update({
+          address: data.address,
+          city: data.city,
+          price: data.price,
+          beds: data.beds,
+          baths: data.baths,
+          sqft: data.sqft,
+          status: data.status,
+          image: data.image,
+          description: data.description,
+          mls_number: data.mls_number,
+          property_type: data.property_type,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingListing.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Listing updated!",
+        description: "Your property listing has been updated successfully.",
+      });
+      setEditingListing(null);
+      // Refetch listings
+      window.location.reload();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update listing. Please try again.",
         variant: "destructive",
       });
     }
@@ -128,9 +175,20 @@ export default function Listings() {
                   {listing.status}
                 </span>
               </div>
-              <div className="absolute top-3 right-3">
-                <button className="p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
-                  <MoreVertical className="h-4 w-4" />
+              <div className="absolute top-3 right-3 flex gap-2">
+                <button 
+                  onClick={() => setEditingListing(listing)}
+                  className="p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
+                  title="Edit listing"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+                <button 
+                  onClick={() => handleDeleteListing(listing.id)}
+                  className="p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors text-red-600"
+                  title="Delete listing"
+                >
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -160,17 +218,6 @@ export default function Listings() {
               <div className="flex items-center justify-between pt-3 border-t border-border">
                 <div className="text-sm text-muted-foreground">
                   Listed {new Date(listing.created_at).toLocaleDateString()}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="p-2 hover:bg-accent rounded-lg transition-colors">
-                    <Edit className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteListing(listing.id)}
-                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </button>
                 </div>
               </div>
             </div>
@@ -202,10 +249,32 @@ export default function Listings() {
 
       {/* Add Listing Modal */}
       <AddListingModal
-        open={isAddModalOpen}
-        onOpenChange={setIsAddModalOpen}
-        onSave={handleAddListing}
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSubmit={handleAddListing}
       />
+
+      {/* Edit Listing Modal */}
+      {editingListing && (
+        <EditListingModal
+          isOpen={!!editingListing}
+          onClose={() => setEditingListing(null)}
+          onSubmit={handleEditListing}
+          initialData={{
+            address: editingListing.address,
+            city: editingListing.city,
+            price: editingListing.price,
+            beds: editingListing.beds,
+            baths: editingListing.baths,
+            sqft: editingListing.sqft,
+            status: editingListing.status,
+            image: editingListing.image,
+            description: editingListing.description,
+            mls_number: editingListing.mls_number,
+            property_type: editingListing.property_type,
+          }}
+        />
+      )}
     </div>
   );
 }
