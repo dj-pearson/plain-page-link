@@ -1,0 +1,122 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuthStore } from "@/stores/useAuthStore";
+import type { LinkFormData } from "@/components/modals/AddLinkModal";
+
+export interface Link {
+  id: string;
+  user_id: string;
+  title: string;
+  url: string;
+  icon: string;
+  position: number;
+  is_active: boolean;
+  click_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useLinks() {
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  const { data: links = [], isLoading } = useQuery({
+    queryKey: ["links", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data, error } = await supabase
+        .from("links")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("position", { ascending: true });
+
+      if (error) throw error;
+      return data as Link[];
+    },
+    enabled: !!user?.id,
+  });
+
+  const addLink = useMutation({
+    mutationFn: async (linkData: LinkFormData) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      const maxPosition = links.length > 0 
+        ? Math.max(...links.map(l => l.position)) 
+        : -1;
+
+      const { data, error } = await supabase
+        .from("links")
+        .insert({
+          user_id: user.id,
+          title: linkData.title,
+          url: linkData.url,
+          icon: linkData.icon,
+          position: maxPosition + 1,
+          is_active: linkData.active,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links", user?.id] });
+    },
+  });
+
+  const updateLink = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Link> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("links")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links", user?.id] });
+    },
+  });
+
+  const deleteLink = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("links")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links", user?.id] });
+    },
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("links")
+        .update({ is_active })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links", user?.id] });
+    },
+  });
+
+  return {
+    links,
+    isLoading,
+    addLink,
+    updateLink,
+    deleteLink,
+    toggleActive,
+  };
+}
