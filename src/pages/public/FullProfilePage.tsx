@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { FullPageLoader } from "@/components/LoadingSpinner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ContactButtons from "@/components/profile/ContactButtons";
 import SocialLinks from "@/components/profile/SocialLinks";
@@ -25,11 +26,7 @@ export default function FullProfilePage() {
     const { data, isLoading, error } = usePublicProfile(slug || '');
 
     if (isLoading) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-        );
+        return <FullPageLoader text="Loading profile..." />;
     }
 
     if (error || !data) {

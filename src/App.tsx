@@ -1,7 +1,9 @@
 import { useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuthStore } from "./stores/useAuthStore";
+import { trackPageView } from "./lib/analytics";
+import { errorHandler } from "./lib/errorHandler";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 // Public pages
@@ -29,11 +31,26 @@ import Analytics from "./pages/dashboard/Analytics";
 import Settings from "./pages/dashboard/Settings";
 
 function App() {
-    const { initialize } = useAuthStore();
+    const { initialize, user } = useAuthStore();
+    const location = useLocation();
 
     useEffect(() => {
         initialize();
     }, [initialize]);
+
+    // Track page views on route change
+    useEffect(() => {
+        trackPageView(location.pathname);
+    }, [location]);
+
+    // Set user context for error monitoring
+    useEffect(() => {
+        if (user) {
+            errorHandler.setUser(user.id, user.email);
+        } else {
+            errorHandler.clearUser();
+        }
+    }, [user]);
 
     return (
         <>
