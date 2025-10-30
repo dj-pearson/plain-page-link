@@ -206,6 +206,48 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          features: Json
+          id: string
+          is_active: boolean | null
+          limits: Json
+          name: string
+          price_monthly: number
+          price_yearly: number | null
+          sort_order: number | null
+          stripe_price_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean | null
+          limits?: Json
+          name: string
+          price_monthly: number
+          price_yearly?: number | null
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean | null
+          limits?: Json
+          name?: string
+          price_monthly?: number
+          price_yearly?: number | null
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       testimonials: {
         Row: {
           client_name: string
@@ -237,6 +279,36 @@ export type Database = {
           property_type?: string | null
           rating?: number
           review?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usage_tracking: {
+        Row: {
+          count: number | null
+          created_at: string | null
+          id: string
+          last_reset_at: string | null
+          resource_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          count?: number | null
+          created_at?: string | null
+          id?: string
+          last_reset_at?: string | null
+          resource_type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          count?: number | null
+          created_at?: string | null
+          id?: string
+          last_reset_at?: string | null
+          resource_type?: string
           updated_at?: string | null
           user_id?: string
         }
@@ -293,11 +365,66 @@ export type Database = {
         }
         Relationships: []
       }
+      user_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_id: string | null
+          status: Database["public"]["Enums"]["subscription_status"] | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string | null
+          status?: Database["public"]["Enums"]["subscription_status"] | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string | null
+          status?: Database["public"]["Enums"]["subscription_status"] | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_usage_limit: {
+        Args: { _limit: number; _resource_type: string; _user_id: string }
+        Returns: boolean
+      }
+      get_user_plan: { Args: { _user_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -309,6 +436,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      subscription_status:
+        | "active"
+        | "canceled"
+        | "past_due"
+        | "incomplete"
+        | "trialing"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -437,6 +570,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      subscription_status: [
+        "active",
+        "canceled",
+        "past_due",
+        "incomplete",
+        "trialing",
+      ],
     },
   },
 } as const
