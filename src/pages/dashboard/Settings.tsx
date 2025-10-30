@@ -4,11 +4,19 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { UsernameInput } from "@/components/UsernameInput";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Settings() {
   const { user } = useAuthStore();
   const { settings, updateSettings } = useSettings();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [notifications, setNotifications] = useState({
     emailLeads: true,
@@ -21,6 +29,72 @@ export default function Settings() {
     current: "",
     new: "",
     confirm: "",
+  });
+
+  // Profile state
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const [formData, setFormData] = useState({
+    username: '',
+    full_name: '',
+    bio: '',
+  });
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        username: profile.username || '',
+        full_name: profile.full_name || '',
+        bio: profile.bio || '',
+      });
+    }
+  }, [profile]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username: data.username,
+          full_name: data.full_name,
+          bio: data.bio,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update profile",
+        variant: "destructive",
+      });
+    },
   });
 
   // Sync local state with settings from database
@@ -115,6 +189,66 @@ export default function Settings() {
           Manage your account and preferences
         </p>
       </div>
+
+      {/* Profile & Username Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Profile & Username</CardTitle>
+          <CardDescription>
+            Manage your public profile and unique URL
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center gap-6">
+            <Avatar className="w-20 h-20">
+              <AvatarImage src={profile?.avatar_url || undefined} />
+              <AvatarFallback className="text-xl">
+                {profile?.full_name?.[0] || profile?.username?.[0] || 'U'}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+
+          <UsernameInput
+            value={formData.username}
+            onChange={(value) => setFormData({ ...formData, username: value })}
+            currentUsername={profile?.username}
+          />
+
+          <div className="space-y-2">
+            <Label htmlFor="full_name">Full Name</Label>
+            <Input
+              id="full_name"
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+              placeholder="Enter your full name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bio">Bio</Label>
+            <Textarea
+              id="bio"
+              value={formData.bio}
+              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              placeholder="Tell us about yourself"
+              rows={4}
+              maxLength={500}
+            />
+            <p className="text-xs text-muted-foreground">
+              {formData.bio?.length || 0}/500 characters
+            </p>
+          </div>
+
+          <button
+            onClick={() => updateProfileMutation.mutate(formData)}
+            disabled={updateProfileMutation.isPending}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            {updateProfileMutation.isPending ? 'Saving...' : 'Save Profile Changes'}
+          </button>
+        </CardContent>
+      </Card>
 
       {/* Account Information */}
       <div className="bg-card border border-border rounded-lg p-6">

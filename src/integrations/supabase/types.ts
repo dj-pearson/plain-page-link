@@ -424,6 +424,10 @@ export type Database = {
         Args: { _limit: number; _resource_type: string; _user_id: string }
         Returns: boolean
       }
+      check_username_available: {
+        Args: { _current_user_id: string; _username: string }
+        Returns: boolean
+      }
       get_user_plan: { Args: { _user_id: string }; Returns: Json }
       has_role: {
         Args: {
