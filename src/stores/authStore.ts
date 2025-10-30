@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '@/types/user';
+import apiClient from '@/lib/api';
 
 interface AuthState {
   user: User | null;
@@ -29,85 +30,70 @@ export const useAuthStore = create<AuthState>()(
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          // TODO: Replace with actual API call
-          // const response = await apiClient.post('/auth/login', { email, password });
-          
-          // Mock implementation for now
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          const mockUser: User = {
-            id: '1',
-            name: 'John Doe',
-            email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          
-          const mockToken = 'mock-jwt-token';
+          const response = await apiClient.post('/login', { email, password });
+          const { user, token } = response.data;
           
           set({
-            user: mockUser,
-            token: mockToken,
+            user,
+            token,
             isAuthenticated: true,
             isLoading: false,
           });
           
-          // Store token in localStorage for API client
-          localStorage.setItem('auth_token', mockToken);
-        } catch (error) {
+          localStorage.setItem('auth_token', token);
+        } catch (error: any) {
+          const errorMessage = error.response?.data?.message || 'Login failed';
           set({
-            error: error instanceof Error ? error.message : 'Login failed',
+            error: errorMessage,
             isLoading: false,
           });
-          throw error;
+          throw new Error(errorMessage);
         }
       },
 
       register: async (name: string, email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          // TODO: Replace with actual API call
-          // const response = await apiClient.post('/auth/register', { name, email, password });
-          
-          // Mock implementation for now
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          const mockUser: User = {
-            id: '1',
-            name,
-            email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          
-          const mockToken = 'mock-jwt-token';
+          const response = await apiClient.post('/register', { 
+            name, 
+            email, 
+            password,
+            password_confirmation: password 
+          });
+          const { user, token } = response.data;
           
           set({
-            user: mockUser,
-            token: mockToken,
+            user,
+            token,
             isAuthenticated: true,
             isLoading: false,
           });
           
-          // Store token in localStorage for API client
-          localStorage.setItem('auth_token', mockToken);
-        } catch (error) {
+          localStorage.setItem('auth_token', token);
+        } catch (error: any) {
+          const errorMessage = error.response?.data?.message || 'Registration failed';
           set({
-            error: error instanceof Error ? error.message : 'Registration failed',
+            error: errorMessage,
             isLoading: false,
           });
-          throw error;
+          throw new Error(errorMessage);
         }
       },
 
-      logout: () => {
-        localStorage.removeItem('auth_token');
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          error: null,
-        });
+      logout: async () => {
+        try {
+          await apiClient.post('/logout');
+        } catch (error) {
+          console.error('Logout error:', error);
+        } finally {
+          localStorage.removeItem('auth_token');
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            error: null,
+          });
+        }
       },
 
       setUser: (user: User) => {
