@@ -1,13 +1,14 @@
-# Force Rebuild - LinkStack Migration Complete
+# Project Structure - Clean Build
 
-This file forces Lovable to rebuild the project with the new structure.
+All project files are now in the root src/ directory.
 
-## Changes Made:
-- Copied all frontend code from frontend/src/ to root src/
-- Updated package.json with all dependencies  
-- Fixed CSS imports
-- Removed old blank page files
-- All LinkStack features now available
+## Structure:
+- src/ - All React components, pages, and utilities
+- src/main.tsx - Application entry point
+- src/index.css - Global styles with Tailwind
+- vite.config.ts - Vite configuration at root
+- tailwind.config.ts - Tailwind configuration at root
+- Removed duplicate frontend/ directory
 
-Build timestamp: 2025-10-30T20:00:00Z
+Build timestamp: 2025-10-30T21:00:00Z
 
