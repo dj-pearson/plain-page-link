@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react";
-import { Camera, Save, ExternalLink, MapPin, Phone, Mail, Globe } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Camera, Save } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
+import { useAvatarUpload } from "@/hooks/useAvatarUpload";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Profile() {
   const { profile, isLoading, updateProfile } = useProfile();
+  const { uploadAvatar, uploading } = useAvatarUpload();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     full_name: "",
     username: "",
@@ -31,6 +34,16 @@ export default function Profile() {
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = await uploadAvatar(file);
+    if (url) {
+      setFormData({ ...formData, avatar_url: url });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,12 +93,22 @@ export default function Profile() {
         </h2>
         <div className="flex items-center gap-6">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-3xl font-bold text-primary">
-              {formData.full_name?.split(' ').map(n => n[0]).join('') || formData.username?.[0]?.toUpperCase() || "?"}
-            </div>
+            {formData.avatar_url ? (
+              <img 
+                src={formData.avatar_url} 
+                alt="Profile" 
+                className="w-24 h-24 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-3xl font-bold text-primary">
+                {formData.full_name?.split(' ').map(n => n[0]).join('') || formData.username?.[0]?.toUpperCase() || "?"}
+              </div>
+            )}
             <button
               type="button"
-              className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Camera className="h-4 w-4" />
             </button>
@@ -93,14 +116,23 @@ export default function Profile() {
           <div>
             <h3 className="font-medium text-foreground mb-1">Upload Photo</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              JPG, PNG or GIF. Max size 5MB.
+              JPG, PNG or WEBP. Max size 5MB.
             </p>
             <button
               type="button"
-              className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium disabled:opacity-50"
             >
-              Choose File
+              {uploading ? "Uploading..." : "Choose File"}
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
         </div>
       </div>
