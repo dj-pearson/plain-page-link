@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +24,18 @@ serve(async (req) => {
       throw new Error('No authorization header');
     }
 
+    // Get user from auth header
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') as string;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error('User not authenticated');
+    }
+
     // Create or retrieve customer
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -35,8 +48,9 @@ serve(async (req) => {
       ],
       success_url: successUrl,
       cancel_url: cancelUrl,
+      customer_email: user.email,
       metadata: {
-        auth_header: authHeader,
+        user_id: user.id,
       },
     });
 

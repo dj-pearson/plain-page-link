@@ -8,6 +8,9 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Landing from "./pages/public/Landing";
 import ProfilePage from "./pages/public/FullProfilePage";
 import NotFound from "./pages/public/NotFound";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsOfService from "./pages/legal/TermsOfService";
+import Pricing from "./pages/Pricing";
 
 // Auth pages
 import Login from "./pages/auth/Login";
@@ -37,6 +40,9 @@ function App() {
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Landing />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
                 <Route path="/:slug" element={<ProfilePage />} />
 
                 {/* Auth routes */}
