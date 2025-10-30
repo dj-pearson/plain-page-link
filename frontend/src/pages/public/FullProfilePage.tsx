@@ -5,7 +5,11 @@ import ContactButtons from "@/components/profile/ContactButtons";
 import SocialLinks from "@/components/profile/SocialLinks";
 import ListingGallery from "@/components/profile/ListingGallery";
 import SoldProperties from "@/components/profile/SoldProperties";
+import { LeadCaptureCTA } from "@/components/profile/LeadCaptureCTA";
+import { TestimonialSection } from "@/components/profile/TestimonialSection";
+import { SocialProofBanner } from "@/components/profile/SocialProofBanner";
 import type { Profile, Listing } from "@/types";
+import type { Testimonial } from "@/types/testimonial";
 
 // Mock data for demonstration
 const mockProfile: Profile = {
@@ -178,6 +182,94 @@ const mockListings: Listing[] = [
     },
 ];
 
+const mockTestimonials: Testimonial[] = [
+    {
+        id: 1,
+        profile_id: 1,
+        client_name: "Michael & Jennifer Chen",
+        client_photo: null,
+        client_title: "First-Time Homebuyers",
+        rating: 5,
+        review_text:
+            "Sarah made our first home buying experience absolutely seamless! She was patient, knowledgeable, and went above and beyond to find us the perfect home within our budget. We couldn't have asked for a better agent!",
+        property_type: "Single Family Home",
+        transaction_type: "buyer",
+        date: "2025-09-15",
+        is_featured: true,
+        sort_order: 0,
+        created_at: "2025-09-20T00:00:00Z",
+        updated_at: "2025-09-20T00:00:00Z",
+    },
+    {
+        id: 2,
+        profile_id: 1,
+        client_name: "Robert Thompson",
+        client_photo: null,
+        client_title: "Luxury Home Seller",
+        rating: 5,
+        review_text:
+            "Working with Sarah to sell my waterfront property was a pleasure. She priced it perfectly, marketed it beautifully, and we had multiple offers within days. Her negotiation skills got me $200k over asking!",
+        property_type: "Waterfront Estate",
+        transaction_type: "seller",
+        date: "2025-08-22",
+        is_featured: true,
+        sort_order: 1,
+        created_at: "2025-08-25T00:00:00Z",
+        updated_at: "2025-08-25T00:00:00Z",
+    },
+    {
+        id: 3,
+        profile_id: 1,
+        client_name: "Amanda Rodriguez",
+        client_photo: null,
+        client_title: "Investment Property Buyer",
+        rating: 5,
+        review_text:
+            "As an out-of-state investor, I needed someone I could trust completely. Sarah exceeded all expectations - from property research to coordinating inspections remotely. She's now my go-to agent for all San Diego investments!",
+        property_type: "Multi-Family",
+        transaction_type: "buyer",
+        date: "2025-07-10",
+        is_featured: false,
+        sort_order: 2,
+        created_at: "2025-07-15T00:00:00Z",
+        updated_at: "2025-07-15T00:00:00Z",
+    },
+    {
+        id: 4,
+        profile_id: 1,
+        client_name: "David & Lisa Martinez",
+        client_photo: null,
+        client_title: "Downsizing to Condo",
+        rating: 5,
+        review_text:
+            "After 30 years in our family home, the thought of selling was overwhelming. Sarah handled everything with such care and professionalism. She helped us find the perfect condo and made the transition stress-free.",
+        property_type: "Condo",
+        transaction_type: "buyer",
+        date: "2025-06-05",
+        is_featured: false,
+        sort_order: 3,
+        created_at: "2025-06-10T00:00:00Z",
+        updated_at: "2025-06-10T00:00:00Z",
+    },
+    {
+        id: 5,
+        profile_id: 1,
+        client_name: "Emily Watson",
+        client_photo: null,
+        client_title: "Relocating Family",
+        rating: 5,
+        review_text:
+            "Moving from New York to San Diego with two kids was daunting, but Sarah made it easy. She learned exactly what we needed, showed us great neighborhoods, and found our dream home before we even arrived!",
+        property_type: "Single Family Home",
+        transaction_type: "buyer",
+        date: "2025-05-18",
+        is_featured: false,
+        sort_order: 4,
+        created_at: "2025-05-20T00:00:00Z",
+        updated_at: "2025-05-20T00:00:00Z",
+    },
+];
+
 export default function FullProfilePage() {
     const { slug } = useParams<{ slug: string }>();
     const [selectedListing, setSelectedListing] = useState<Listing | null>(
@@ -187,7 +279,20 @@ export default function FullProfilePage() {
     // In real app, fetch profile and listings based on slug
     const profile = mockProfile;
     const listings = mockListings;
+    const testimonials = mockTestimonials;
     const activeListings = listings.filter((l) => l.status === "active");
+    const soldListings = listings.filter((l) => l.status === "sold");
+
+    // Calculate social proof stats
+    const totalVolume = soldListings.reduce(
+        (sum, listing) => sum + listing.price,
+        0
+    );
+    const averageRating =
+        testimonials.length > 0
+            ? testimonials.reduce((sum, t) => sum + t.rating, 0) /
+              testimonials.length
+            : 0;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
@@ -204,6 +309,19 @@ export default function FullProfilePage() {
                         }
                     />
 
+                    {/* Social Proof Banner */}
+                    <div className="pt-4">
+                        <SocialProofBanner
+                            stats={{
+                                propertiesSold: soldListings.length,
+                                totalVolume: totalVolume,
+                                averageRating: averageRating,
+                                reviewCount: testimonials.length,
+                                yearsExperience: profile.years_experience,
+                            }}
+                        />
+                    </div>
+
                     {/* Active Listings */}
                     {activeListings.length > 0 && (
                         <div className="pt-4">
@@ -217,6 +335,14 @@ export default function FullProfilePage() {
                         </div>
                     )}
 
+                    {/* Lead Capture CTAs */}
+                    <div className="pt-8">
+                        <LeadCaptureCTA
+                            agentId={profile.id.toString()}
+                            agentName={profile.display_name}
+                        />
+                    </div>
+
                     {/* Sold Properties */}
                     <div className="pt-4">
                         <SoldProperties
@@ -226,6 +352,13 @@ export default function FullProfilePage() {
                             }
                         />
                     </div>
+
+                    {/* Testimonials */}
+                    {testimonials.length > 0 && (
+                        <div className="pt-8">
+                            <TestimonialSection testimonials={testimonials} />
+                        </div>
+                    )}
 
                     {/* Social Links */}
                     <SocialLinks profile={profile} />
