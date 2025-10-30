@@ -1,9 +1,31 @@
 import { Link } from "react-router-dom";
 import { Home, BarChart3, Users, Zap } from "lucide-react";
+import { SEOHead } from "@/components/SEOHead";
 
 export default function Landing() {
+    const schema = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "AgentBio - Real Estate Agent Link-in-Bio Platform",
+        "applicationCategory": "BusinessApplication",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "description": "Create your professional real estate link-in-bio page with property listings, testimonials, and lead capture."
+    };
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <>
+            <SEOHead
+                title="AgentBio - Professional Link-in-Bio for Real Estate Agents"
+                description="Create a stunning link-in-bio page for your real estate business. Showcase properties, capture leads, and grow your brand with AgentBio."
+                keywords={["real estate", "link in bio", "agent website", "property listings", "lead generation"]}
+                canonicalUrl={window.location.origin}
+                schema={schema}
+            />
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
             {/* Header */}
             <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -20,12 +42,12 @@ export default function Landing() {
                         >
                             Features
                         </a>
-                        <a
-                            href="#pricing"
+                        <Link
+                            to="/pricing"
                             className="text-gray-600 hover:text-gray-900"
                         >
                             Pricing
-                        </a>
+                        </Link>
                         <Link
                             to="/auth/login"
                             className="text-gray-600 hover:text-gray-900"
@@ -138,6 +160,7 @@ export default function Landing() {
                 </div>
             </footer>
         </div>
+        </>
     );
 }
 

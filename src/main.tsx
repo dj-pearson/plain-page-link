@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 import "./index.css";
@@ -26,12 +27,14 @@ console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
 ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
         <ErrorBoundary>
-            <QueryClientProvider client={queryClient}>
-                <BrowserRouter>
-                    <App />
-                </BrowserRouter>
-                <ReactQueryDevtools initialIsOpen={false} />
-            </QueryClientProvider>
+            <HelmetProvider>
+                <QueryClientProvider client={queryClient}>
+                    <BrowserRouter>
+                        <App />
+                    </BrowserRouter>
+                    <ReactQueryDevtools initialIsOpen={false} />
+                </QueryClientProvider>
+            </HelmetProvider>
         </ErrorBoundary>
     </React.StrictMode>
 );

@@ -14,6 +14,7 @@ import LinkStackBlocks from "@/components/profile/LinkStackBlocks";
 import { useProfileTracking, trackLinkClick } from "@/hooks/useProfileTracking";
 import { usePublicProfile } from "@/hooks/usePublicProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { SEOHead } from "@/components/SEOHead";
 import type { Listing } from "@/types";
 
 export default function FullProfilePage() {
@@ -53,8 +54,49 @@ export default function FullProfilePage() {
               testimonials.length
             : 0;
 
+    // Generate SEO data
+    const seoTitle = profile.seo_title || `${profile.full_name || profile.username} - Real Estate Agent`;
+    const seoDescription = profile.seo_description || profile.bio || `Browse properties and connect with ${profile.full_name || profile.username}, a trusted real estate professional.`;
+    const currentUrl = `${window.location.origin}/${slug}`;
+    
+    // Generate structured data for SEO
+    const personSchema = {
+        "@context": "https://schema.org",
+        "@type": "RealEstateAgent",
+        "name": profile.full_name || profile.username,
+        "description": profile.bio,
+        "telephone": profile.phone,
+        "email": profile.email_display,
+        "image": profile.avatar_url,
+        "address": {
+            "@type": "PostalAddress",
+            "addressRegion": profile.license_state
+        },
+        "jobTitle": profile.title,
+        "aggregateRating": testimonials.length > 0 ? {
+            "@type": "AggregateRating",
+            "ratingValue": averageRating,
+            "reviewCount": testimonials.length
+        } : undefined
+    };
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+        <>
+            <SEOHead
+                title={seoTitle}
+                description={seoDescription}
+                ogImage={profile.og_image || profile.avatar_url}
+                canonicalUrl={currentUrl}
+                keywords={[
+                    profile.full_name || profile.username,
+                    "real estate agent",
+                    profile.license_state || "",
+                    ...(profile.specialties || []),
+                    ...(profile.service_cities || [])
+                ].filter(Boolean)}
+                schema={personSchema}
+            />
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
             <div className="container mx-auto px-4 py-8 max-w-5xl">
                 <div className="space-y-6">
                     {/* Profile Header */}
@@ -181,16 +223,12 @@ export default function FullProfilePage() {
 
                             {/* Legal Links */}
                             <div className="flex flex-wrap justify-center gap-3 text-xs text-gray-500 mb-3">
-                                <a href="/legal/terms" className="hover:text-blue-600 hover:underline">
+                                <a href="/terms" className="hover:text-blue-600 hover:underline">
                                     Terms of Service
                                 </a>
                                 <span>•</span>
-                                <a href="/legal/privacy" className="hover:text-blue-600 hover:underline">
+                                <a href="/privacy" className="hover:text-blue-600 hover:underline">
                                     Privacy Policy
-                                </a>
-                                <span>•</span>
-                                <a href="/legal/cookies" className="hover:text-blue-600 hover:underline">
-                                    Cookie Policy
                                 </a>
                             </div>
 
@@ -223,5 +261,6 @@ export default function FullProfilePage() {
                 />
             )}
         </div>
+        </>
     );
 }

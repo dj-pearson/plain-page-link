@@ -6,11 +6,19 @@ import { Switch } from "@/components/ui/switch";
 import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { SEOHead } from "@/components/SEOHead";
 
 export default function Pricing() {
   const [isYearly, setIsYearly] = useState(false);
   const { plans, subscription } = useSubscription();
   const { toast } = useToast();
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "ProductGroup",
+    "name": "AgentBio Subscription Plans",
+    "description": "Choose the perfect plan for your real estate business"
+  };
 
   const handleSubscribe = async (priceId: string) => {
     try {
@@ -55,7 +63,15 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 py-20 px-4">
+    <>
+      <SEOHead
+        title="Pricing - AgentBio Professional Plans"
+        description="Choose the perfect plan for your real estate business. Start free and scale as you grow with AgentBio."
+        keywords={["real estate pricing", "agent subscriptions", "link in bio plans"]}
+        canonicalUrl={`${window.location.origin}/pricing`}
+        schema={schema}
+      />
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 py-20 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
@@ -195,6 +211,6 @@ export default function Pricing() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
