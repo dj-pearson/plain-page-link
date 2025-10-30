@@ -3,7 +3,7 @@ import { Home, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect } from "react";
 
 const loginSchema = z.object({
@@ -16,7 +16,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
     const navigate = useNavigate();
-    const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+    const { signIn, isLoading, error, clearError, user } = useAuthStore();
 
     const {
         register,
@@ -27,10 +27,10 @@ export default function Login() {
     });
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (user) {
             navigate("/dashboard");
         }
-    }, [isAuthenticated, navigate]);
+    }, [user, navigate]);
 
     useEffect(() => {
         return () => {
@@ -40,7 +40,7 @@ export default function Login() {
 
     const onSubmit = async (data: LoginFormData) => {
         try {
-            await login(data.email, data.password);
+            await signIn(data.email, data.password);
         } catch (error) {
             // Error is handled by the store
             console.error("Login failed:", error);

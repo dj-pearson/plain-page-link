@@ -3,11 +3,12 @@ import { Home, Mail, Lock, User, AlertCircle, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect } from "react";
 
 const registerSchema = z
     .object({
+        username: z.string().min(3, "Username must be at least 3 characters").regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
         name: z.string().min(2, "Name must be at least 2 characters"),
         email: z.string().email("Please enter a valid email address"),
         password: z.string().min(6, "Password must be at least 6 characters"),
@@ -25,7 +26,7 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function Register() {
     const navigate = useNavigate();
-    const { register: registerUser, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+    const { signUp, isLoading, error, clearError, user } = useAuthStore();
 
     const {
         register,
@@ -36,10 +37,10 @@ export default function Register() {
     });
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (user) {
             navigate("/dashboard");
         }
-    }, [isAuthenticated, navigate]);
+    }, [user, navigate]);
 
     useEffect(() => {
         return () => {
@@ -49,7 +50,7 @@ export default function Register() {
 
     const onSubmit = async (data: RegisterFormData) => {
         try {
-            await registerUser(data.name, data.email, data.password);
+            await signUp(data.email, data.password, data.username, data.name);
         } catch (error) {
             // Error is handled by the store
             console.error("Registration failed:", error);
@@ -91,6 +92,30 @@ export default function Register() {
                     )}
 
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Username
+                            </label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <input
+                                    {...register("username")}
+                                    type="text"
+                                    placeholder="johndoe"
+                                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                        errors.username
+                                            ? "border-red-300"
+                                            : "border-gray-300"
+                                    }`}
+                                />
+                            </div>
+                            {errors.username && (
+                                <p className="mt-1 text-sm text-red-600">
+                                    {errors.username.message}
+                                </p>
+                            )}
+                        </div>
+
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Full Name

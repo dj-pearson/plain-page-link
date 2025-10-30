@@ -1,4 +1,5 @@
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuthStore } from "@/stores/useAuthStore";
 import {
     Home,
     LayoutDashboard,
@@ -15,9 +16,26 @@ import {
 
 export default function DashboardLayout() {
     const location = useLocation();
+    const navigate = useNavigate();
+    const { profile, signOut } = useAuthStore();
 
     const isActive = (path: string) => {
         return location.pathname === path;
+    };
+
+    const handleLogout = async () => {
+        await signOut();
+        navigate("/auth/login");
+    };
+
+    const getInitials = (name: string | null | undefined) => {
+        if (!name) return "U";
+        return name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .toUpperCase()
+            .slice(0, 2);
     };
 
     return (
@@ -95,7 +113,10 @@ export default function DashboardLayout() {
                 </nav>
 
                 <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-                    <button className="flex items-center gap-2 text-gray-600 hover:text-gray-900 w-full px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+                    <button 
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 w-full px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
                         <LogOut className="h-5 w-5" />
                         <span>Log Out</span>
                     </button>
@@ -112,7 +133,7 @@ export default function DashboardLayout() {
                         </h1>
                         <div className="flex items-center gap-4">
                             <Link
-                                to="/sarah-johnson"
+                                to={`/${profile?.username || ""}`}
                                 target="_blank"
                                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                             >
@@ -120,7 +141,7 @@ export default function DashboardLayout() {
                             </Link>
                             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                                 <span className="text-blue-600 font-semibold">
-                                    SJ
+                                    {getInitials(profile?.full_name)}
                                 </span>
                             </div>
                         </div>

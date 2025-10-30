@@ -1,5 +1,8 @@
+import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
+import { useAuthStore } from "./stores/useAuthStore";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 // Public pages
 import Landing from "./pages/public/Landing";
@@ -23,6 +26,12 @@ import Analytics from "./pages/dashboard/Analytics";
 import Settings from "./pages/dashboard/Settings";
 
 function App() {
+    const { initialize } = useAuthStore();
+
+    useEffect(() => {
+        initialize();
+    }, [initialize]);
+
     return (
         <>
             <Routes>
@@ -35,7 +44,14 @@ function App() {
                 <Route path="/auth/register" element={<Register />} />
 
                 {/* Dashboard routes (protected) */}
-                <Route path="/dashboard" element={<DashboardLayout />}>
+                <Route
+                    path="/dashboard"
+                    element={
+                        <ProtectedRoute>
+                            <DashboardLayout />
+                        </ProtectedRoute>
+                    }
+                >
                     <Route index element={<Overview />} />
                     <Route path="listings" element={<Listings />} />
                     <Route path="leads" element={<Leads />} />
