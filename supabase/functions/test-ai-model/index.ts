@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,22 +15,51 @@ serve(async (req) => {
   try {
     const { model } = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log(`Testing AI model: ${model || 'google/gemini-2.5-flash'}`);
 
-    // Make a simple test request to the AI
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: model || "google/gemini-2.5-flash",
+    // Fetch model configuration from database
+    const { data: modelConfig, error: dbError } = await supabase
+      .from('ai_models')
+      .select('*')
+      .eq('model_id', model || 'google/gemini-2.5-flash')
+      .single();
+
+    if (dbError || !modelConfig) {
+      console.error('Model not found in database:', dbError);
+      throw new Error(`Model configuration not found for: ${model}`);
+    }
+
+    // Get the API key from secrets
+    const apiKey = Deno.env.get(modelConfig.secret_name || 'LOVABLE_API_KEY');
+    if (!apiKey) {
+      throw new Error(`API key not configured: ${modelConfig.secret_name}`);
+    }
+
+    // Prepare headers based on auth type
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (modelConfig.auth_type === 'x-api-key') {
+      headers["x-api-key"] = apiKey;
+      headers["anthropic-version"] = "2023-06-01";
+    } else {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    // Prepare request body based on provider
+    let requestBody: any;
+    const endpoint = modelConfig.api_endpoint || 'https://ai.gateway.lovable.dev/v1/chat/completions';
+
+    if (modelConfig.provider.toLowerCase() === 'anthropic') {
+      // Anthropic format
+      requestBody = {
+        model: modelConfig.model_id,
         messages: [
           {
             role: "user",
@@ -37,12 +67,33 @@ serve(async (req) => {
           }
         ],
         max_tokens: 50,
-      }),
+      };
+    } else {
+      // OpenAI/Lovable AI format
+      requestBody = {
+        model: modelConfig.model_id,
+        messages: [
+          {
+            role: "user",
+            content: "Reply with exactly: AI model test successful"
+          }
+        ],
+        max_tokens: 50,
+      };
+    }
+
+    console.log(`Making request to: ${endpoint}`);
+
+    // Make test request to the AI
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("AI API error:", response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -58,17 +109,24 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: "Payment required. Please add credits to your Lovable AI workspace." 
+            error: "Payment required. Please check your API credits." 
           }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`AI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const testResult = data.choices?.[0]?.message?.content || '';
+    
+    // Extract response based on provider
+    let testResult = '';
+    if (modelConfig.provider.toLowerCase() === 'anthropic') {
+      testResult = data.content?.[0]?.text || '';
+    } else {
+      testResult = data.choices?.[0]?.message?.content || '';
+    }
 
     console.log("AI test response:", testResult);
 
@@ -77,7 +135,8 @@ serve(async (req) => {
         success: true,
         message: "AI model is working correctly",
         response: testResult,
-        model: model || "google/gemini-2.5-flash"
+        model: modelConfig.model_id,
+        provider: modelConfig.provider
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
