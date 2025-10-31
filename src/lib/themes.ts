@@ -5,6 +5,138 @@
 
 import { PageTheme } from "@/types/pageBuilder";
 
+// ThemeConfig interface for theme cards
+export interface ThemeConfig {
+    id: string;
+    name: string;
+    description: string;
+    isPremium: boolean;
+    colors: {
+        primary: string;
+        secondary: string;
+        accent: string;
+        background: string;
+        foreground: string;
+        muted: string;
+    };
+    fonts: {
+        heading: string;
+        body: string;
+    };
+}
+
+// Default themes for selection
+export const DEFAULT_THEMES: ThemeConfig[] = [
+    {
+        id: "modern",
+        name: "Modern",
+        description: "Clean and contemporary design with blue accents",
+        isPremium: false,
+        colors: {
+            primary: "#2563eb",
+            secondary: "#10b981",
+            accent: "#f59e0b",
+            background: "#ffffff",
+            foreground: "#1f2937",
+            muted: "#9ca3af",
+        },
+        fonts: {
+            heading: "Inter",
+            body: "Inter",
+        },
+    },
+    {
+        id: "classic",
+        name: "Classic",
+        description: "Traditional and timeless styling",
+        isPremium: false,
+        colors: {
+            primary: "#1e40af",
+            secondary: "#059669",
+            accent: "#dc2626",
+            background: "#f9fafb",
+            foreground: "#111827",
+            muted: "#6b7280",
+        },
+        fonts: {
+            heading: "Georgia",
+            body: "Georgia",
+        },
+    },
+    {
+        id: "minimal",
+        name: "Minimal",
+        description: "Simple and elegant monochrome design",
+        isPremium: false,
+        colors: {
+            primary: "#000000",
+            secondary: "#6b7280",
+            accent: "#000000",
+            background: "#ffffff",
+            foreground: "#374151",
+            muted: "#9ca3af",
+        },
+        fonts: {
+            heading: "Helvetica",
+            body: "Helvetica",
+        },
+    },
+    {
+        id: "bold",
+        name: "Bold",
+        description: "Vibrant and energetic color scheme",
+        isPremium: true,
+        colors: {
+            primary: "#dc2626",
+            secondary: "#f59e0b",
+            accent: "#7c2d12",
+            background: "#fef2f2",
+            foreground: "#1f2937",
+            muted: "#f87171",
+        },
+        fonts: {
+            heading: "Montserrat",
+            body: "Open Sans",
+        },
+    },
+    {
+        id: "elegant",
+        name: "Elegant",
+        description: "Sophisticated purple and violet tones",
+        isPremium: true,
+        colors: {
+            primary: "#6366f1",
+            secondary: "#8b5cf6",
+            accent: "#c026d3",
+            background: "#faf5ff",
+            foreground: "#1e1b4b",
+            muted: "#a78bfa",
+        },
+        fonts: {
+            heading: "Playfair Display",
+            body: "Lora",
+        },
+    },
+    {
+        id: "ocean",
+        name: "Ocean",
+        description: "Calming blue and cyan palette",
+        isPremium: true,
+        colors: {
+            primary: "#0891b2",
+            secondary: "#06b6d4",
+            accent: "#0e7490",
+            background: "#ecfeff",
+            foreground: "#164e63",
+            muted: "#67e8f9",
+        },
+        fonts: {
+            heading: "Roboto",
+            body: "Roboto",
+        },
+    },
+];
+
 // Theme Presets
 export const themePresets: Record<string, PageTheme> = {
     modern: {
