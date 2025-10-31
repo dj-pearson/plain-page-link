@@ -8,6 +8,3 @@ verify_jwt = true
 
 [functions.generate-article]
 verify_jwt = true
-
-[functions.grant-admin]
-verify_jwt = false
