@@ -39,6 +39,7 @@ import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import PageBuilderEditor from "./pages/PageBuilder";
 import PublicPage from "./pages/PublicPage";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
+import GrantAdminAccess from "./pages/GrantAdminAccess";
 
 function App() {
     const { initialize, user } = useAuthStore();
@@ -133,8 +134,9 @@ function App() {
                     <Route path="settings" element={<Settings />} />
                 </Route>
 
-                {/* Admin routes (protected) */}
+                {/* Admin routes */}
                 <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/grant-admin" element={<GrantAdminAccess />} />
 
                 {/* 404 */}
                 <Route path="*" element={<NotFound />} />
