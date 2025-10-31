@@ -84,6 +84,12 @@ export default function Landing() {
                             Features
                         </a>
                         <Link
+                            to="/blog"
+                            className="text-gray-600 hover:text-gray-900"
+                        >
+                            Blog
+                        </Link>
+                        <Link
                             to="/pricing"
                             className="text-gray-600 hover:text-gray-900"
                         >
@@ -203,6 +209,7 @@ export default function Landing() {
             <footer className="bg-gray-900 text-gray-400 py-12">
                 <div className="container mx-auto px-4">
                     <nav className="text-center mb-4" aria-label="Footer navigation">
+                        <Link to="/blog" className="text-gray-400 hover:text-white mx-3">Blog</Link>
                         <Link to="/pricing" className="text-gray-400 hover:text-white mx-3">Pricing</Link>
                         <Link to="/privacy" className="text-gray-400 hover:text-white mx-3">Privacy Policy</Link>
                         <Link to="/terms" className="text-gray-400 hover:text-white mx-3">Terms of Service</Link>
