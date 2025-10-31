@@ -1,0 +1,9 @@
+# Redirect all routes to index.html for client-side routing
+/*    /index.html   200
+
+# Redirect www to non-www (optional)
+https://www.:splat https://:splat 301!
+
+# Redirect old blog URLs (if applicable)
+/blog/*  /blog/:splat  200
+/@:username  /@:username  200
