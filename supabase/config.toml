@@ -1,1 +1,10 @@
 project_id = "axoqjwvqxgtzsdmlmnbv"
+
+[functions.test-ai-model]
+verify_jwt = true
+
+[functions.generate-social-post]
+verify_jwt = true
+
+[functions.generate-article]
+verify_jwt = true
