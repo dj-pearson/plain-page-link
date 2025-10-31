@@ -5,6 +5,10 @@ import { useAuthStore } from "./stores/useAuthStore";
 import { trackPageView } from "./lib/analytics";
 import { errorHandler } from "./lib/errorHandler";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
+import { pwaManager } from "./lib/pwa";
+import { offlineStorage } from "./lib/offline-storage";
+import { pushNotifications } from "./lib/push-notifications";
 
 // Public pages
 import Landing from "./pages/public/Landing";
@@ -29,6 +33,7 @@ import Links from "./pages/dashboard/Links";
 import Testimonials from "./pages/dashboard/Testimonials";
 import Analytics from "./pages/dashboard/Analytics";
 import Settings from "./pages/dashboard/Settings";
+import QuickActionsDashboard from "./pages/QuickActionsDashboard";
 
 function App() {
     const { initialize, user } = useAuthStore();
@@ -36,7 +41,27 @@ function App() {
 
     useEffect(() => {
         initialize();
-    }, [initialize]);
+
+        // Initialize PWA features
+        const initPWA = async () => {
+            // Initialize offline storage
+            await offlineStorage.init();
+
+            // Initialize push notifications
+            const notificationsInitialized = await pushNotifications.init();
+
+            if (notificationsInitialized && user) {
+                // Request notification permission if logged in
+                const hasPermission =
+                    await pushNotifications.requestPermission();
+                if (hasPermission) {
+                    await pushNotifications.registerToken(user.id);
+                }
+            }
+        };
+
+        initPWA();
+    }, [initialize, user]);
 
     // Track page views on route change
     useEffect(() => {
@@ -77,6 +102,10 @@ function App() {
                 >
                     <Route index element={<Overview />} />
                     <Route path="listings" element={<Listings />} />
+                    <Route
+                        path="quick-actions"
+                        element={<QuickActionsDashboard />}
+                    />
                     <Route path="leads" element={<Leads />} />
                     <Route path="profile" element={<Profile />} />
                     <Route path="theme" element={<Theme />} />
@@ -91,6 +120,7 @@ function App() {
             </Routes>
 
             <Toaster position="top-right" richColors />
+            <PWAInstallPrompt />
         </>
     );
 }

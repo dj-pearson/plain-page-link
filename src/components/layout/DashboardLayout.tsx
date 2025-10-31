@@ -13,6 +13,7 @@ import {
     Settings,
     LogOut,
 } from "lucide-react";
+import { MobileNav } from "@/components/mobile/MobileNav";
 
 export default function DashboardLayout() {
     const location = useLocation();
@@ -40,8 +41,8 @@ export default function DashboardLayout() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Sidebar */}
-            <aside className="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40">
+            {/* Sidebar - Hidden on mobile */}
+            <aside className="hidden md:fixed md:block left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40">
                 <div className="p-6">
                     <Link
                         to="/"
@@ -113,7 +114,7 @@ export default function DashboardLayout() {
                 </nav>
 
                 <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-                    <button 
+                    <button
                         onClick={handleLogout}
                         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 w-full px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
                     >
@@ -124,7 +125,7 @@ export default function DashboardLayout() {
             </aside>
 
             {/* Main Content */}
-            <div className="ml-64 min-h-screen">
+            <div className="md:ml-64 min-h-screen">
                 {/* Top Bar */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="px-6 py-4 flex items-center justify-between">
@@ -149,10 +150,13 @@ export default function DashboardLayout() {
                 </header>
 
                 {/* Page Content */}
-                <main className="p-6">
+                <main className="p-4 md:p-6 pb-20 md:pb-6">
                     <Outlet />
                 </main>
             </div>
+
+            {/* Mobile Bottom Navigation */}
+            <MobileNav />
         </div>
     );
 }
