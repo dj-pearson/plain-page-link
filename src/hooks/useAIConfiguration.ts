@@ -12,6 +12,9 @@ export interface AIModel {
   max_output_tokens: number;
   supports_vision: boolean;
   is_active: boolean;
+  auth_type: 'bearer' | 'x-api-key';
+  secret_name: string;
+  api_endpoint: string;
 }
 
 export interface AIConfig {
@@ -93,6 +96,24 @@ export function useAIConfiguration() {
     },
   });
 
+  // Add new model
+  const addModelMutation = useMutation({
+    mutationFn: async (model: Omit<AIModel, 'id'>) => {
+      const { error } = await supabase
+        .from('ai_models')
+        .insert([model]);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-models'] });
+      toast.success('Model added successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to add model: ' + error.message);
+    },
+  });
+
   // Test AI model
   const testModelMutation = useMutation({
     mutationFn: async (model?: string) => {
@@ -139,7 +160,9 @@ export function useAIConfiguration() {
     getConfigValue,
     handleUpdateConfig,
     toggleModel: toggleModelMutation.mutate,
+    addModel: addModelMutation.mutate,
     testModel: testModelMutation.mutate,
     isTestingModel: testModelMutation.isPending,
+    isAddingModel: addModelMutation.isPending,
   };
 }

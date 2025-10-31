@@ -4,8 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, TestTube, Brain } from "lucide-react";
 import { useAIConfiguration } from "@/hooks/useAIConfiguration";
+import { AddModelDialog } from "./AddModelDialog";
 
 export function AIConfigurationManager() {
   const {
@@ -15,8 +17,10 @@ export function AIConfigurationManager() {
     getConfigValue,
     handleUpdateConfig,
     toggleModel,
+    addModel,
     testModel,
     isTestingModel,
+    isAddingModel,
   } = useAIConfiguration();
 
   if (isLoading) {
@@ -136,22 +140,47 @@ export function AIConfigurationManager() {
       {/* Available Models */}
       <Card>
         <CardHeader>
-          <CardTitle>Available AI Models</CardTitle>
-          <CardDescription>Manage which models are available for selection</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Available AI Models</CardTitle>
+              <CardDescription>Manage which models are available for selection</CardDescription>
+            </div>
+            <AddModelDialog onAdd={addModel} isAdding={isAddingModel} />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {models?.map((model) => (
-              <div key={model.id} className="flex items-center justify-between p-4 border rounded-lg">
+              <div key={model.id} className="flex items-start justify-between p-4 border rounded-lg gap-4">
                 <div className="flex-1">
-                  <h4 className="font-semibold">{model.model_name}</h4>
-                  <p className="text-sm text-muted-foreground">{model.description}</p>
-                  <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold">{model.model_name}</h4>
+                    <Badge variant="outline" className="text-xs">
+                      {model.provider}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{model.description}</p>
+                  
+                  <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground">
                     <span>Context: {model.context_window.toLocaleString()} tokens</span>
                     <span>Max Output: {model.max_output_tokens.toLocaleString()} tokens</span>
-                    {model.supports_vision && <span>✓ Vision Support</span>}
+                    {model.supports_vision && <span>✓ Vision</span>}
                   </div>
+
+                  <div className="flex flex-wrap gap-3 mt-2 text-xs">
+                    <Badge variant="secondary">
+                      {model.auth_type === 'bearer' ? 'Bearer Token' : 'X-API-Key'}
+                    </Badge>
+                    <Badge variant="secondary">
+                      Secret: {model.secret_name}
+                    </Badge>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground mt-2 font-mono truncate">
+                    {model.api_endpoint}
+                  </p>
                 </div>
+                
                 <Switch
                   checked={model.is_active}
                   onCheckedChange={(checked) => 

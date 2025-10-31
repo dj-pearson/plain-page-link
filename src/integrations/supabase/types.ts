@@ -46,6 +46,8 @@ export type Database = {
       }
       ai_models: {
         Row: {
+          api_endpoint: string | null
+          auth_type: string | null
           context_window: number | null
           created_at: string | null
           description: string | null
@@ -55,10 +57,13 @@ export type Database = {
           model_id: string
           model_name: string
           provider: string
+          secret_name: string | null
           supports_vision: boolean | null
           updated_at: string | null
         }
         Insert: {
+          api_endpoint?: string | null
+          auth_type?: string | null
           context_window?: number | null
           created_at?: string | null
           description?: string | null
@@ -68,10 +73,13 @@ export type Database = {
           model_id: string
           model_name: string
           provider: string
+          secret_name?: string | null
           supports_vision?: boolean | null
           updated_at?: string | null
         }
         Update: {
+          api_endpoint?: string | null
+          auth_type?: string | null
           context_window?: number | null
           created_at?: string | null
           description?: string | null
@@ -81,6 +89,7 @@ export type Database = {
           model_id?: string
           model_name?: string
           provider?: string
+          secret_name?: string | null
           supports_vision?: boolean | null
           updated_at?: string | null
         }
