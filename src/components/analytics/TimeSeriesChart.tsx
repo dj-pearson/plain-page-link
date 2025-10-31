@@ -26,7 +26,7 @@ export function TimeSeriesChart({
     const { actualData, predictedData, maxValue, minValue } = useMemo(() => {
         const actual = data.filter((d) => !d.label);
         const predicted = data.filter((d) => d.label === "predicted");
-        const all Values = data.map((d) => d.value);
+        const allValues = data.map((d) => d.value);
 
         return {
             actualData: actual,
