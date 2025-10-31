@@ -129,9 +129,8 @@ serve(async (req) => {
 
     if (modelData.auth_type === 'x-api-key') {
       headers['x-api-key'] = apiKey;
-      if (modelData.provider === 'Anthropic') {
-        headers['anthropic-version'] = '2023-06-01';
-      }
+      // Anthropic always requires this header
+      headers['anthropic-version'] = '2023-06-01';
     } else {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
