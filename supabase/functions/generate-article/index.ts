@@ -122,15 +122,16 @@ serve(async (req) => {
 - Target audience: homebuyers, sellers, and real estate investors
 - Tone: Professional yet approachable`;
 
-    // Build headers based on auth type
+    // Determine provider helpers and build headers
+    const isAnthropic = (modelData.provider?.toLowerCase?.() === 'anthropic') || (modelData.api_endpoint?.includes('anthropic.com'));
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
 
     if (modelData.auth_type === 'x-api-key') {
       headers['x-api-key'] = apiKey;
-      // Anthropic always requires this header
-      headers['anthropic-version'] = '2023-06-01';
+      if (isAnthropic) headers['anthropic-version'] = '2023-06-01';
     } else {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
@@ -139,7 +140,7 @@ serve(async (req) => {
     const systemMessage = "You are an expert real estate content writer and SEO specialist. Create high-quality, informative articles that provide value to readers.";
     let requestBody: any;
 
-    if (modelData.provider === 'Anthropic') {
+    if (isAnthropic) {
       requestBody = {
         model: modelData.model_name,
         max_tokens: config.max_tokens_large || 8000,
@@ -189,7 +190,7 @@ serve(async (req) => {
     
     // Extract content based on provider format
     let content = '';
-    if (modelData.provider === 'Anthropic') {
+    if (isAnthropic) {
       content = aiData.content?.[0]?.text || '';
     } else {
       content = aiData.choices?.[0]?.message?.content || '';
