@@ -56,7 +56,7 @@ serve(async (req) => {
           success: false,
           error: "Please provide a topic or add keywords to your keyword list first"
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -127,7 +127,19 @@ serve(async (req) => {
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("AI generation error:", aiResponse.status, errorText);
-      throw new Error(`AI generation failed: ${aiResponse.status}`);
+      let friendly = "AI gateway error";
+      const status = aiResponse.status;
+      if (status === 402) {
+        friendly = "Payment required, please add Lovable AI credits.";
+      } else if (status === 429) {
+        friendly = "Rate limit exceeded, please try again shortly.";
+      } else if (status === 400) {
+        friendly = "Invalid AI request. Please try a simpler topic or fewer instructions.";
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: `${friendly}: ${status}` }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const aiData = await aiResponse.json();
