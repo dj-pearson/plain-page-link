@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Home, BarChart3, Users, Zap } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
+import { BlogSection } from "@/components/blog/BlogSection";
 
 export default function Landing() {
     const schema = {
@@ -175,6 +176,9 @@ export default function Landing() {
                     </div>
                 </div>
             </section>
+
+            {/* Blog Section */}
+            <BlogSection limit={6} showSearch={true} showFilters={true} />
 
             {/* CTA Section */}
             <section className="py-20 bg-blue-600 text-white" aria-labelledby="cta-heading">

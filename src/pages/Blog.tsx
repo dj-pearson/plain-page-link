@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Search, Calendar, Eye } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BlogListSEO } from "@/components/blog/BlogListSEO";
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,8 +52,18 @@ export default function Blog() {
     return matchesSearch && matchesCategory;
   });
 
+  // Get latest article date for SEO
+  const latestArticleDate = useMemo(() => {
+    if (articles.length === 0) return undefined;
+    return articles[0]?.published_at;
+  }, [articles]);
+
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      {/* SEO for Blog Listing Page */}
+      <BlogListSEO totalArticles={articles.length} latestArticleDate={latestArticleDate} />
+
+      <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-6">
@@ -147,6 +158,6 @@ export default function Blog() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
