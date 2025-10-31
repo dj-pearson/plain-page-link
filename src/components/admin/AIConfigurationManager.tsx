@@ -1,136 +1,25 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
-import { Loader2, Save, TestTube, Brain } from "lucide-react";
-
-interface AIModel {
-  id: string;
-  model_id: string;
-  model_name: string;
-  provider: string;
-  description: string;
-  context_window: number;
-  max_output_tokens: number;
-  supports_vision: boolean;
-  is_active: boolean;
-}
-
-interface AIConfig {
-  id: string;
-  setting_key: string;
-  setting_value: any;
-  description: string;
-}
+import { Loader2, TestTube, Brain } from "lucide-react";
+import { useAIConfiguration } from "@/hooks/useAIConfiguration";
 
 export function AIConfigurationManager() {
-  const queryClient = useQueryClient();
-  const [isTestingModel, setIsTestingModel] = useState(false);
+  const {
+    models,
+    config,
+    isLoading,
+    getConfigValue,
+    handleUpdateConfig,
+    toggleModel,
+    testModel,
+    isTestingModel,
+  } = useAIConfiguration();
 
-  // Fetch AI models
-  const { data: models, isLoading: modelsLoading } = useQuery({
-    queryKey: ['ai-models'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ai_models')
-        .select('*')
-        .eq('is_active', true)
-        .order('provider', { ascending: true });
-      
-      if (error) throw error;
-      return data as AIModel[];
-    },
-  });
-
-  // Fetch AI configuration
-  const { data: config, isLoading: configLoading } = useQuery({
-    queryKey: ['ai-configuration'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ai_configuration')
-        .select('*');
-      
-      if (error) throw error;
-      return data as AIConfig[];
-    },
-  });
-
-  // Update configuration mutation
-  const updateConfigMutation = useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: any }) => {
-      const { error } = await supabase
-        .from('ai_configuration')
-        .update({ 
-          setting_value: value,
-          updated_at: new Date().toISOString(),
-          updated_by: (await supabase.auth.getUser()).data.user?.id
-        })
-        .eq('setting_key', key);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-configuration'] });
-      toast.success('Configuration updated successfully');
-    },
-    onError: (error) => {
-      toast.error('Failed to update configuration: ' + error.message);
-    },
-  });
-
-  // Toggle model active status
-  const toggleModelMutation = useMutation({
-    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      const { error } = await supabase
-        .from('ai_models')
-        .update({ is_active: isActive })
-        .eq('id', id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-models'] });
-      toast.success('Model status updated');
-    },
-    onError: (error) => {
-      toast.error('Failed to update model: ' + error.message);
-    },
-  });
-
-  const getConfigValue = (key: string) => {
-    const item = config?.find(c => c.setting_key === key);
-    return item ? JSON.parse(item.setting_value) : '';
-  };
-
-  const handleUpdateConfig = (key: string, value: any) => {
-    updateConfigMutation.mutate({ key, value: JSON.stringify(value) });
-  };
-
-  const testModel = async () => {
-    setIsTestingModel(true);
-    try {
-      // Test the AI configuration by making a simple request
-      toast.info('Testing AI model connection...');
-      
-      // Here you would call your edge function to test the model
-      // For now, just simulate a test
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast.success('AI model is working correctly!');
-    } catch (error) {
-      toast.error('Model test failed');
-    } finally {
-      setIsTestingModel(false);
-    }
-  };
-
-  if (modelsLoading || configLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -175,8 +64,9 @@ export function AIConfigurationManager() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={testModel}
+                onClick={() => testModel(defaultModel)}
                 disabled={isTestingModel}
+                title="Test AI Model"
               >
                 {isTestingModel ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -265,7 +155,7 @@ export function AIConfigurationManager() {
                 <Switch
                   checked={model.is_active}
                   onCheckedChange={(checked) => 
-                    toggleModelMutation.mutate({ id: model.id, isActive: checked })
+                    toggleModel({ id: model.id, isActive: checked })
                   }
                 />
               </div>

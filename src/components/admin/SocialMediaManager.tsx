@@ -1,41 +1,16 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Calendar, Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Eye, Edit, Trash, Calendar, Send, Plus } from "lucide-react";
 import { format } from "date-fns";
-
-interface SocialMediaPost {
-  id: string;
-  content_type: string;
-  subject_type: string;
-  platform_type: string;
-  post_title: string;
-  status: string;
-  created_at: string;
-  scheduled_for: string | null;
-  posted_at: string | null;
-}
+import { useSocialMedia } from "@/hooks/useSocialMedia";
+import { CreateSocialPostDialog } from "./CreateSocialPostDialog";
 
 export function SocialMediaManager() {
   const [activeTab, setActiveTab] = useState("all");
-
-  // Fetch posts
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ['social-media-posts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('social_media_posts')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as SocialMediaPost[];
-    },
-  });
+  const { posts, isLoading, deletePost } = useSocialMedia();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -76,10 +51,7 @@ export function SocialMediaManager() {
                 Manage and generate social media posts for your real estate business
               </CardDescription>
             </div>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Post
-            </Button>
+            <CreateSocialPostDialog />
           </div>
         </CardHeader>
         <CardContent>
@@ -131,8 +103,23 @@ export function SocialMediaManager() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">View</Button>
-                        <Button variant="outline" size="sm">Edit</Button>
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete this post?')) {
+                              deletePost(post.id);
+                            }
+                          }}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -140,10 +127,7 @@ export function SocialMediaManager() {
               ) : (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">No posts found</p>
-                  <Button variant="outline" className="mt-4">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Post
-                  </Button>
+                  <CreateSocialPostDialog />
                 </div>
               )}
             </TabsContent>

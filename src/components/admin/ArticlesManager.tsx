@@ -1,43 +1,16 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Eye, Edit, Trash } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Eye, Edit, Trash, CheckCircle, Plus } from "lucide-react";
 import { format } from "date-fns";
-
-interface Article {
-  id: string;
-  title: string;
-  slug: string;
-  excerpt: string | null;
-  status: string;
-  category: string;
-  tags: string[];
-  view_count: number;
-  published_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import { useArticles } from "@/hooks/useArticles";
+import { CreateArticleDialog } from "./CreateArticleDialog";
 
 export function ArticlesManager() {
   const [activeTab, setActiveTab] = useState("all");
-
-  // Fetch articles
-  const { data: articles, isLoading } = useQuery({
-    queryKey: ['articles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('articles')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as Article[];
-    },
-  });
+  const { articles, isLoading, deleteArticle, publishArticle } = useArticles();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -72,10 +45,7 @@ export function ArticlesManager() {
                 Manage your real estate blog content and articles
               </CardDescription>
             </div>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Article
-            </Button>
+            <CreateArticleDialog />
           </div>
         </CardHeader>
         <CardContent>
@@ -122,13 +92,36 @@ export function ArticlesManager() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" title="View">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" title="Edit">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        {article.status === 'draft' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              if (confirm('Publish this article?')) {
+                                publishArticle(article.id);
+                              }
+                            }}
+                            title="Publish"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            if (confirm('Delete this article?')) {
+                              deleteArticle(article.id);
+                            }
+                          }}
+                          title="Delete"
+                        >
                           <Trash className="h-4 w-4" />
                         </Button>
                       </div>
@@ -138,10 +131,9 @@ export function ArticlesManager() {
               ) : (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">No articles found</p>
-                  <Button variant="outline" className="mt-4">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Article
-                  </Button>
+                  <div className="mt-4">
+                    <CreateArticleDialog />
+                  </div>
                 </div>
               )}
             </TabsContent>
