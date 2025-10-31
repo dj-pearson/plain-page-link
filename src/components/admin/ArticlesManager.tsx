@@ -3,14 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Eye, Edit, Trash, CheckCircle, Plus } from "lucide-react";
+import { Loader2, Eye, Edit, Trash, CheckCircle, Plus, Hash } from "lucide-react";
 import { format } from "date-fns";
 import { useArticles } from "@/hooks/useArticles";
+import { useKeywords } from "@/hooks/useKeywords";
 import { CreateArticleDialog } from "./CreateArticleDialog";
 
 export function ArticlesManager() {
   const [activeTab, setActiveTab] = useState("all");
   const { articles, isLoading, deleteArticle, publishArticle } = useArticles();
+  const { keywords, isLoading: isLoadingKeywords } = useKeywords();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -76,7 +78,13 @@ export function ArticlesManager() {
                         )}
                         <div className="flex flex-wrap gap-2 mb-3">
                           <Badge variant="outline">{article.category}</Badge>
-                          {article.tags?.slice(0, 3).map((tag, idx) => (
+                          {article.keyword_id && (
+                            <Badge variant="secondary" className="gap-1">
+                              <Hash className="h-3 w-3" />
+                              {keywords?.find(k => k.id === article.keyword_id)?.keyword || 'Keyword'}
+                            </Badge>
+                          )}
+                          {article.tags?.slice(0, 2).map((tag, idx) => (
                             <Badge key={idx} variant="secondary">{tag}</Badge>
                           ))}
                         </div>
@@ -138,6 +146,45 @@ export function ArticlesManager() {
               )}
             </TabsContent>
           </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Keyword Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Keyword Management</CardTitle>
+          <CardDescription>Track SEO keyword usage across articles</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingKeywords ? (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="border rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground">Total Keywords</p>
+                  <p className="text-2xl font-bold">{keywords?.length || 0}</p>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground">Unused</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {keywords?.filter(k => k.usage_count === 0).length || 0}
+                  </p>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground">Most Used</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {Math.max(...(keywords?.map(k => k.usage_count) || [0]))}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Keywords are automatically tracked when articles are published. Import your keywords.csv to get started.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

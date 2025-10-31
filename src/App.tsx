@@ -17,6 +17,8 @@ import NotFound from "./pages/public/NotFound";
 import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import TermsOfService from "./pages/legal/TermsOfService";
 import Pricing from "./pages/Pricing";
+import Blog from "./pages/Blog";
+import BlogArticle from "./pages/BlogArticle";
 
 // Auth pages
 import Login from "./pages/auth/Login";
@@ -92,6 +94,8 @@ function App() {
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/blog/:slug" element={<BlogArticle />} />
                 <Route path="/p/:slug" element={<PublicPage />} />
                 <Route path="/:slug" element={<ProfilePage />} />
 

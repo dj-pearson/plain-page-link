@@ -16,6 +16,7 @@ export interface Article {
   seo_title?: string;
   seo_description?: string;
   seo_keywords?: string[];
+  keyword_id?: string;
   view_count: number;
   published_at?: string;
   created_at: string;
@@ -42,10 +43,11 @@ export function useArticles() {
   // Generate article with AI
   const generateArticleMutation = useMutation({
     mutationFn: async (params: {
-      topic: string;
+      topic?: string;
       category?: string;
       keywords?: string[];
       customInstructions?: string;
+      autoSelectKeyword?: boolean;
     }) => {
       const { data, error } = await supabase.functions.invoke('generate-article', {
         body: params

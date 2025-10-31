@@ -12,17 +12,47 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, category, keywords, customInstructions } = await req.json();
-    
+    const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = await req.json();
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
+
     if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Missing required environment variables");
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Auto-select unused keyword if no topic provided
+    let selectedTopic = topic;
+    let selectedKeywordId = null;
+    let selectedKeywords = keywords || [];
+
+    if (!selectedTopic && autoSelectKeyword) {
+      // Find unused or least-used keyword, prioritizing never-used keywords
+      const { data: unusedKeywords, error: keywordError } = await supabase
+        .from('keywords')
+        .select('id, keyword, category')
+        .eq('is_active', true)
+        .order('usage_count', { ascending: true })
+        .order('last_used_at', { ascending: true, nullsFirst: true })
+        .limit(1);
+
+      if (keywordError) {
+        console.error('Error fetching keyword:', keywordError);
+      } else if (unusedKeywords && unusedKeywords.length > 0) {
+        const selectedKeyword = unusedKeywords[0];
+        selectedTopic = selectedKeyword.keyword;
+        selectedKeywordId = selectedKeyword.id;
+        selectedKeywords = [selectedKeyword.keyword];
+        console.log('Auto-selected keyword:', selectedKeyword.keyword);
+      }
+    }
+
+    if (!selectedTopic) {
+      throw new Error("No topic provided and no keywords available");
+    }
 
     // Get AI configuration
     const { data: configData } = await supabase
@@ -35,17 +65,18 @@ serve(async (req) => {
       config[item.setting_key] = JSON.parse(item.setting_value);
     });
 
-    console.log("Generating article:", { topic, category });
+    console.log("Generating article:", { topic: selectedTopic, category });
 
     // Build prompt for article generation
-    let prompt = `Write a comprehensive, SEO-optimized blog article about: ${topic}`;
-    
+    let prompt = `Write a comprehensive, SEO-optimized blog article about: ${selectedTopic}`;
+
     if (category) {
       prompt += `\n\nCategory: ${category}`;
     }
-    
-    if (keywords && keywords.length > 0) {
-      prompt += `\n\nTarget Keywords: ${keywords.join(', ')}`;
+
+    if (selectedKeywords && selectedKeywords.length > 0) {
+      prompt += `\n\nTarget Keywords: ${selectedKeywords.join(', ')}`;
+      prompt += `\n\nIMPORTANT: Focus the article specifically on the keyword "${selectedKeywords[0]}" and naturally incorporate related keywords throughout the content.`;
     }
     
     if (customInstructions) {
@@ -98,7 +129,7 @@ serve(async (req) => {
 
     // Extract title from content (first # heading)
     const titleMatch = content.match(/^#\s+(.+)$/m);
-    const title = titleMatch ? titleMatch[1] : topic;
+    const title = titleMatch ? titleMatch[1] : selectedTopic;
 
     // Generate slug from title
     const slug = title
@@ -127,7 +158,9 @@ serve(async (req) => {
           seoTitle,
           seoDescription,
           category: category || 'General',
-          tags: keywords || []
+          tags: selectedKeywords || [],
+          keywordId: selectedKeywordId,
+          selectedKeyword: selectedTopic
         }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

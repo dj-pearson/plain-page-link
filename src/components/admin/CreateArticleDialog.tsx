@@ -6,10 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, Sparkles } from "lucide-react";
 import { useArticles } from "@/hooks/useArticles";
+import { useKeywords } from "@/hooks/useKeywords";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function CreateArticleDialog() {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"keyword" | "manual">("keyword");
+  const [selectedKeywordId, setSelectedKeywordId] = useState<string>("");
   const [topic, setTopic] = useState("");
   const [category, setCategory] = useState("Real Estate Tips");
   const [keywords, setKeywords] = useState("");
@@ -17,22 +21,48 @@ export function CreateArticleDialog() {
   const [generatedArticle, setGeneratedArticle] = useState<any>(null);
 
   const { generateArticle, isGenerating, createArticle } = useArticles();
+  const { unusedKeywords, isLoading: isLoadingKeywords } = useKeywords();
 
   const handleGenerate = () => {
-    if (!topic) return;
+    if (mode === "keyword") {
+      // Use selected keyword or auto-select
+      const selectedKeyword = unusedKeywords.find(k => k.id === selectedKeywordId);
 
-    generateArticle({
-      topic,
-      category,
-      keywords: keywords ? keywords.split(',').map(k => k.trim()) : undefined,
-      customInstructions: customInstructions || undefined,
-    }, {
-      onSuccess: (data) => {
-        if (data.success) {
-          setGeneratedArticle(data.article);
+      generateArticle({
+        topic: selectedKeyword?.keyword,
+        category,
+        keywords: selectedKeyword ? [selectedKeyword.keyword] : undefined,
+        customInstructions: customInstructions || undefined,
+        autoSelectKeyword: !selectedKeywordId,
+      }, {
+        onSuccess: (data) => {
+          if (data.success) {
+            setGeneratedArticle(data.article);
+            // Store the keyword ID from auto-selection if needed
+            if (data.article.keywordId) {
+              setSelectedKeywordId(data.article.keywordId);
+            }
+          }
         }
-      }
-    });
+      });
+    } else {
+      // Manual mode - topic is required
+      if (!topic) return;
+
+      generateArticle({
+        topic,
+        category,
+        keywords: keywords ? keywords.split(',').map(k => k.trim()) : undefined,
+        customInstructions: customInstructions || undefined,
+        autoSelectKeyword: false,
+      }, {
+        onSuccess: (data) => {
+          if (data.success) {
+            setGeneratedArticle(data.article);
+          }
+        }
+      });
+    }
   };
 
   const handleSave = () => {
@@ -48,6 +78,7 @@ export function CreateArticleDialog() {
       seo_title: generatedArticle.seoTitle,
       seo_description: generatedArticle.seoDescription,
       seo_keywords: generatedArticle.tags,
+      keyword_id: mode === "keyword" ? (generatedArticle.keywordId || selectedKeywordId || null) : null,
       status: 'draft',
     }, {
       onSuccess: () => {
@@ -56,6 +87,7 @@ export function CreateArticleDialog() {
         setTopic("");
         setKeywords("");
         setCustomInstructions("");
+        setSelectedKeywordId("");
       }
     });
   };
@@ -77,16 +109,62 @@ export function CreateArticleDialog() {
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
-          {/* Topic */}
-          <div className="space-y-2">
-            <Label htmlFor="topic">Article Topic *</Label>
-            <Input
-              id="topic"
-              placeholder="e.g., First-Time Homebuyer Tips for 2025"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-            />
-          </div>
+          {/* Mode Selection */}
+          <Tabs value={mode} onValueChange={(v) => setMode(v as "keyword" | "manual")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="keyword">From Keyword</TabsTrigger>
+              <TabsTrigger value="manual">Manual Topic</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="keyword" className="space-y-4">
+              {/* Keyword Selector */}
+              <div className="space-y-2">
+                <Label htmlFor="keyword-select">Select Keyword (Optional - auto-selects if empty)</Label>
+                <Select value={selectedKeywordId} onValueChange={setSelectedKeywordId}>
+                  <SelectTrigger id="keyword-select">
+                    <SelectValue placeholder="Auto-select unused keyword..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingKeywords ? (
+                      <SelectItem value="loading" disabled>Loading keywords...</SelectItem>
+                    ) : unusedKeywords.length === 0 ? (
+                      <SelectItem value="none" disabled>No keywords available</SelectItem>
+                    ) : (
+                      unusedKeywords.map((kw) => (
+                        <SelectItem key={kw.id} value={kw.id}>
+                          {kw.keyword} (used {kw.usage_count} times)
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="manual" className="space-y-4">
+              {/* Topic */}
+              <div className="space-y-2">
+                <Label htmlFor="topic">Article Topic *</Label>
+                <Input
+                  id="topic"
+                  placeholder="e.g., First-Time Homebuyer Tips for 2025"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                />
+              </div>
+
+              {/* Keywords */}
+              <div className="space-y-2">
+                <Label htmlFor="keywords">Target Keywords (comma-separated)</Label>
+                <Input
+                  id="keywords"
+                  placeholder="e.g., real estate, home buying, mortgage tips"
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
 
           {/* Category */}
           <div className="space-y-2">
@@ -108,17 +186,6 @@ export function CreateArticleDialog() {
             </Select>
           </div>
 
-          {/* Keywords */}
-          <div className="space-y-2">
-            <Label htmlFor="keywords">Target Keywords (comma-separated)</Label>
-            <Input
-              id="keywords"
-              placeholder="e.g., real estate, home buying, mortgage tips"
-              value={keywords}
-              onChange={(e) => setKeywords(e.target.value)}
-            />
-          </div>
-
           {/* Custom Instructions */}
           <div className="space-y-2">
             <Label htmlFor="instructions">Custom Instructions (Optional)</Label>
@@ -134,7 +201,7 @@ export function CreateArticleDialog() {
           {/* Generate Button */}
           <Button
             onClick={handleGenerate}
-            disabled={isGenerating || !topic}
+            disabled={isGenerating || (mode === "manual" && !topic)}
             className="w-full gap-2"
           >
             {isGenerating ? (
@@ -145,7 +212,9 @@ export function CreateArticleDialog() {
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Generate Article with AI
+                {mode === "keyword" && !selectedKeywordId
+                  ? "Auto-Select Keyword & Generate"
+                  : "Generate Article with AI"}
               </>
             )}
           </Button>
