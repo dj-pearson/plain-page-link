@@ -51,7 +51,13 @@ serve(async (req) => {
     }
 
     if (!selectedTopic) {
-      throw new Error("No topic provided and no keywords available");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Please provide a topic or add keywords to your keyword list first"
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Get AI configuration
