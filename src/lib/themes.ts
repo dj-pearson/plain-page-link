@@ -1,227 +1,306 @@
-// Theme definitions for AgentBio.net
+/**
+ * Theme Engine
+ * Predefined themes and customization options
+ */
 
-export interface ThemeColors {
-    primary: string;
-    secondary: string;
-    accent: string;
-    background: string;
-    foreground: string;
-    card: string;
-    cardForeground: string;
-    muted: string;
-    mutedForeground: string;
-}
+import { PageTheme } from "@/types/pageBuilder";
 
-export interface ThemeFonts {
-    heading: string;
-    body: string;
-}
-
-export interface ThemeConfig {
-    id: string;
-    name: string;
-    description: string;
-    category: "light" | "dark" | "colorful";
-    isPremium: boolean;
-    previewImage?: string;
-    colors: ThemeColors;
-    fonts: ThemeFonts;
-}
-
-export const DEFAULT_THEMES: ThemeConfig[] = [
-    {
-        id: "modern-clean",
-        name: "Modern Clean",
-        description: "Minimalist design with clean lines and professional feel",
-        category: "light",
-        isPremium: false,
+// Theme Presets
+export const themePresets: Record<string, PageTheme> = {
+    modern: {
+        name: "Modern",
+        preset: "modern",
         colors: {
-            primary: "#3B82F6",
-            secondary: "#10B981",
-            accent: "#F59E0B",
-            background: "#FFFFFF",
-            foreground: "#1F2937",
-            card: "#F9FAFB",
-            cardForeground: "#1F2937",
-            muted: "#F3F4F6",
-            mutedForeground: "#6B7280",
+            primary: "#2563eb",
+            secondary: "#10b981",
+            background: "#ffffff",
+            text: "#1f2937",
+            accent: "#f59e0b",
         },
         fonts: {
             heading: "Inter",
             body: "Inter",
         },
+        borderRadius: "medium",
+        spacing: "normal",
     },
-    {
-        id: "luxury-dark",
-        name: "Luxury Dark",
-        description: "Elegant dark theme perfect for high-end properties",
-        category: "dark",
-        isPremium: true,
+    classic: {
+        name: "Classic",
+        preset: "classic",
         colors: {
-            primary: "#C084FC",
-            secondary: "#FDE047",
-            accent: "#F472B6",
-            background: "#0F172A",
-            foreground: "#F8FAFC",
-            card: "#1E293B",
-            cardForeground: "#F8FAFC",
-            muted: "#334155",
-            mutedForeground: "#CBD5E1",
+            primary: "#1e40af",
+            secondary: "#059669",
+            background: "#f9fafb",
+            text: "#111827",
+            accent: "#dc2626",
         },
         fonts: {
-            heading: "Playfair Display",
-            body: "Lato",
+            heading: "Georgia",
+            body: "Georgia",
         },
+        borderRadius: "small",
+        spacing: "normal",
     },
-    {
-        id: "coastal-breeze",
-        name: "Coastal Breeze",
-        description: "Fresh and airy design inspired by beachfront properties",
-        category: "light",
-        isPremium: false,
+    minimal: {
+        name: "Minimal",
+        preset: "minimal",
         colors: {
-            primary: "#06B6D4",
-            secondary: "#0EA5E9",
-            accent: "#F59E0B",
-            background: "#FFFFFF",
-            foreground: "#0F172A",
-            card: "#F0F9FF",
-            cardForeground: "#0F172A",
-            muted: "#E0F2FE",
-            mutedForeground: "#475569",
+            primary: "#000000",
+            secondary: "#6b7280",
+            background: "#ffffff",
+            text: "#374151",
+            accent: "#000000",
+        },
+        fonts: {
+            heading: "Helvetica",
+            body: "Helvetica",
+        },
+        borderRadius: "none",
+        spacing: "spacious",
+    },
+    bold: {
+        name: "Bold",
+        preset: "bold",
+        colors: {
+            primary: "#dc2626",
+            secondary: "#f59e0b",
+            background: "#fef2f2",
+            text: "#1f2937",
+            accent: "#7c2d12",
         },
         fonts: {
             heading: "Montserrat",
             body: "Open Sans",
         },
+        borderRadius: "large",
+        spacing: "compact",
     },
-    {
-        id: "urban-pro",
-        name: "Urban Professional",
-        description: "Bold and confident for city real estate experts",
-        category: "light",
-        isPremium: true,
+    elegant: {
+        name: "Elegant",
+        preset: "elegant",
         colors: {
-            primary: "#1E293B",
-            secondary: "#DC2626",
-            accent: "#FACC15",
-            background: "#FFFFFF",
-            foreground: "#1F2937",
-            card: "#F8FAFC",
-            cardForeground: "#1F2937",
-            muted: "#E2E8F0",
-            mutedForeground: "#64748B",
+            primary: "#6366f1",
+            secondary: "#8b5cf6",
+            background: "#faf5ff",
+            text: "#1e1b4b",
+            accent: "#c026d3",
         },
         fonts: {
-            heading: "Bebas Neue",
+            heading: "Playfair Display",
+            body: "Lora",
+        },
+        borderRadius: "medium",
+        spacing: "spacious",
+    },
+    ocean: {
+        name: "Ocean",
+        preset: "ocean",
+        colors: {
+            primary: "#0891b2",
+            secondary: "#06b6d4",
+            background: "#ecfeff",
+            text: "#164e63",
+            accent: "#0e7490",
+        },
+        fonts: {
+            heading: "Roboto",
             body: "Roboto",
         },
+        borderRadius: "medium",
+        spacing: "normal",
     },
-    {
-        id: "warm-welcome",
-        name: "Warm Welcome",
-        description: "Inviting and friendly design for first-time buyers",
-        category: "colorful",
-        isPremium: false,
+    sunset: {
+        name: "Sunset",
+        preset: "sunset",
         colors: {
-            primary: "#F97316",
-            secondary: "#EAB308",
-            accent: "#EC4899",
-            background: "#FFFBEB",
-            foreground: "#78350F",
-            card: "#FFF7ED",
-            cardForeground: "#78350F",
-            muted: "#FED7AA",
-            mutedForeground: "#9A3412",
+            primary: "#f97316",
+            secondary: "#fb923c",
+            background: "#fff7ed",
+            text: "#7c2d12",
+            accent: "#ea580c",
         },
         fonts: {
             heading: "Poppins",
             body: "Poppins",
         },
+        borderRadius: "large",
+        spacing: "normal",
     },
-    {
-        id: "forest-green",
-        name: "Forest Green",
-        description:
-            "Natural and eco-friendly theme for sustainable properties",
-        category: "light",
-        isPremium: true,
+    forest: {
+        name: "Forest",
+        preset: "forest",
         colors: {
             primary: "#059669",
-            secondary: "#10B981",
-            accent: "#FBBF24",
-            background: "#F9FAFB",
-            foreground: "#064E3B",
-            card: "#ECFDF5",
-            cardForeground: "#064E3B",
-            muted: "#D1FAE5",
-            mutedForeground: "#065F46",
+            secondary: "#10b981",
+            background: "#f0fdf4",
+            text: "#14532d",
+            accent: "#065f46",
         },
         fonts: {
             heading: "Merriweather",
             body: "Source Sans Pro",
         },
+        borderRadius: "small",
+        spacing: "normal",
     },
+    dark: {
+        name: "Dark",
+        preset: "dark",
+        colors: {
+            primary: "#60a5fa",
+            secondary: "#34d399",
+            background: "#111827",
+            text: "#f9fafb",
+            accent: "#fbbf24",
+        },
+        fonts: {
+            heading: "Inter",
+            body: "Inter",
+        },
+        borderRadius: "medium",
+        spacing: "normal",
+    },
+};
+
+// Available fonts
+export const availableFonts = [
+    "Inter",
+    "Roboto",
+    "Open Sans",
+    "Lato",
+    "Montserrat",
+    "Poppins",
+    "Raleway",
+    "Nunito",
+    "Ubuntu",
+    "Playfair Display",
+    "Merriweather",
+    "Georgia",
+    "Times New Roman",
+    "Helvetica",
+    "Arial",
+    "Verdana",
+    "Source Sans Pro",
+    "Lora",
 ];
 
-export function applyTheme(theme: ThemeConfig) {
-    const root = document.documentElement;
+// Color palette suggestions
+export const colorPalettes = {
+    professional: [
+        "#2563eb", // Blue
+        "#1e40af", // Dark Blue
+        "#059669", // Green
+        "#dc2626", // Red
+        "#7c3aed", // Purple
+    ],
+    vibrant: [
+        "#f59e0b", // Amber
+        "#ec4899", // Pink
+        "#8b5cf6", // Violet
+        "#f97316", // Orange
+        "#06b6d4", // Cyan
+    ],
+    neutral: [
+        "#000000", // Black
+        "#374151", // Gray-700
+        "#6b7280", // Gray-500
+        "#9ca3af", // Gray-400
+        "#d1d5db", // Gray-300
+    ],
+    nature: [
+        "#059669", // Green
+        "#0891b2", // Cyan
+        "#7c2d12", // Brown
+        "#854d0e", // Amber-800
+        "#166534", // Green-800
+    ],
+};
 
-    // Apply colors as CSS variables
-    root.style.setProperty("--color-primary", theme.colors.primary);
-    root.style.setProperty("--color-secondary", theme.colors.secondary);
-    root.style.setProperty("--color-accent", theme.colors.accent);
-    root.style.setProperty("--color-background", theme.colors.background);
-    root.style.setProperty("--color-foreground", theme.colors.foreground);
-    root.style.setProperty("--color-card", theme.colors.card);
-    root.style.setProperty(
-        "--color-card-foreground",
-        theme.colors.cardForeground
-    );
-    root.style.setProperty("--color-muted", theme.colors.muted);
-    root.style.setProperty(
-        "--color-muted-foreground",
-        theme.colors.mutedForeground
-    );
+// Generate CSS variables from theme
+export const generateThemeCSS = (theme: PageTheme): string => {
+    const borderRadiusMap = {
+        none: "0",
+        small: "0.25rem",
+        medium: "0.5rem",
+        large: "1rem",
+        full: "9999px",
+    };
 
-    // Apply fonts
-    root.style.setProperty("--font-heading", theme.fonts.heading);
-    root.style.setProperty("--font-body", theme.fonts.body);
+    const spacingMap = {
+        compact: "0.5rem",
+        normal: "1rem",
+        spacious: "2rem",
+    };
 
-    // Store full theme in localStorage for persistence
-    localStorage.setItem("agentbio-theme", JSON.stringify(theme));
-}
-
-export function getThemeById(id: string): ThemeConfig | undefined {
-    return DEFAULT_THEMES.find((theme) => theme.id === id);
-}
-
-export function getCurrentTheme(): ThemeConfig {
-    // Try to get full theme object from localStorage first
-    const savedTheme = localStorage.getItem("agentbio-theme");
-    if (savedTheme) {
-        try {
-            return JSON.parse(savedTheme);
-        } catch (e) {
-            console.error("Failed to parse saved theme:", e);
+    return `
+        :root {
+            --theme-primary: ${theme.colors.primary};
+            --theme-secondary: ${theme.colors.secondary};
+            --theme-background: ${theme.colors.background};
+            --theme-text: ${theme.colors.text};
+            --theme-accent: ${theme.colors.accent};
+            --theme-border-radius: ${borderRadiusMap[theme.borderRadius]};
+            --theme-spacing: ${spacingMap[theme.spacing]};
+            --theme-font-heading: ${theme.fonts.heading}, sans-serif;
+            --theme-font-body: ${theme.fonts.body}, sans-serif;
         }
-    }
-    return DEFAULT_THEMES[0];
-}
+    `;
+};
 
-export function hexToRgb(
-    hex: string
-): { r: number; g: number; b: number } | null {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result
-        ? {
-              r: parseInt(result[1], 16),
-              g: parseInt(result[2], 16),
-              b: parseInt(result[3], 16),
-          }
-        : null;
-}
+// Get theme by preset name
+export const getThemePreset = (presetName: string): PageTheme | null => {
+    return themePresets[presetName] || null;
+};
 
-export function rgbToHex(r: number, g: number, b: number): string {
-    return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
-}
+// Get all theme preset names
+export const getThemePresetNames = (): string[] => {
+    return Object.keys(themePresets);
+};
+
+// Validate color hex code
+export const isValidHexColor = (color: string): boolean => {
+    return /^#([0-9A-F]{3}){1,2}$/i.test(color);
+};
+
+// Generate contrasting text color for a background
+export const getContrastingColor = (
+    hexColor: string
+): "#000000" | "#ffffff" => {
+    // Remove # if present
+    const color = hexColor.replace("#", "");
+
+    // Convert to RGB
+    const r = parseInt(color.substring(0, 2), 16);
+    const g = parseInt(color.substring(2, 4), 16);
+    const b = parseInt(color.substring(4, 6), 16);
+
+    // Calculate luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+    // Return black for light backgrounds, white for dark backgrounds
+    return luminance > 0.5 ? "#000000" : "#ffffff";
+};
+
+// Lighten or darken a color
+export const adjustColorBrightness = (
+    hexColor: string,
+    percent: number
+): string => {
+    const color = hexColor.replace("#", "");
+    const num = parseInt(color, 16);
+
+    const r = Math.max(
+        0,
+        Math.min(255, (num >> 16) + Math.round(2.55 * percent))
+    );
+    const g = Math.max(
+        0,
+        Math.min(255, ((num >> 8) & 0x00ff) + Math.round(2.55 * percent))
+    );
+    const b = Math.max(
+        0,
+        Math.min(255, (num & 0x0000ff) + Math.round(2.55 * percent))
+    );
+
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+};

@@ -34,6 +34,10 @@ import Testimonials from "./pages/dashboard/Testimonials";
 import Analytics from "./pages/dashboard/Analytics";
 import Settings from "./pages/dashboard/Settings";
 import QuickActionsDashboard from "./pages/QuickActionsDashboard";
+import LeadManagementDashboard from "./pages/LeadManagementDashboard";
+import AnalyticsDashboard from "./pages/AnalyticsDashboard";
+import PageBuilderEditor from "./pages/PageBuilder";
+import PublicPage from "./pages/PublicPage";
 
 function App() {
     const { initialize, user } = useAuthStore();
@@ -85,6 +89,7 @@ function App() {
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/p/:slug" element={<PublicPage />} />
                 <Route path="/:slug" element={<ProfilePage />} />
 
                 {/* Auth routes */}
@@ -107,6 +112,18 @@ function App() {
                         element={<QuickActionsDashboard />}
                     />
                     <Route path="leads" element={<Leads />} />
+                    <Route
+                        path="lead-management"
+                        element={<LeadManagementDashboard />}
+                    />
+                    <Route
+                        path="analytics-advanced"
+                        element={<AnalyticsDashboard />}
+                    />
+                    <Route
+                        path="page-builder"
+                        element={<PageBuilderEditor />}
+                    />
                     <Route path="profile" element={<Profile />} />
                     <Route path="theme" element={<Theme />} />
                     <Route path="links" element={<Links />} />
