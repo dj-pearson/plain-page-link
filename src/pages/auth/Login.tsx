@@ -48,23 +48,32 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center px-4">
-            <div className="w-full max-w-md">
-                <div className="text-center mb-8">
-                    <Link
-                        to="/"
-                        className="inline-flex items-center gap-2 text-2xl font-bold text-gray-900 mb-2 hover:text-blue-600 transition-colors"
-                    >
-                        <Home className="h-8 w-8 text-blue-600" />
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+            {/* Header Navigation */}
+            <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+                <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+                    <Link to="/" className="flex items-center gap-2 text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
+                        <Home className="h-6 w-6 text-blue-600" />
                         AgentBio.net
                     </Link>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                        Welcome Back
-                    </h1>
-                    <p className="text-gray-600">
-                        Log in to manage your profile
-                    </p>
+                    <nav className="flex items-center gap-4 text-sm">
+                        <Link to="/blog" className="text-gray-600 hover:text-gray-900">Blog</Link>
+                        <Link to="/pricing" className="text-gray-600 hover:text-gray-900">Pricing</Link>
+                        <Link to="/auth/register" className="text-blue-600 hover:text-blue-700 font-semibold">Sign Up</Link>
+                    </nav>
                 </div>
+            </header>
+
+            <div className="flex items-center justify-center px-4 py-12">
+                <div className="w-full max-w-md">
+                    <div className="text-center mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                            Welcome Back
+                        </h1>
+                        <p className="text-gray-600">
+                            Log in to manage your profile
+                        </p>
+                    </div>
 
                 <div className="bg-white rounded-lg shadow-lg p-8">
                     {error && (

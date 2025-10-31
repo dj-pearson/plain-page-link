@@ -13,6 +13,7 @@ import {
     Settings,
     LogOut,
     Shield,
+    BookOpen,
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile/MobileNav";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +92,12 @@ export default function DashboardLayout() {
                         icon={<BarChart3 className="h-5 w-5" />}
                         label="Analytics"
                         active={isActive("/dashboard/analytics")}
+                    />
+                    <NavLink
+                        to="/blog"
+                        icon={<BookOpen className="h-5 w-5" />}
+                        label="Blog"
+                        active={isActive("/blog")}
                     />
 
                     <div className="pt-4 mt-4 border-t border-gray-200">
