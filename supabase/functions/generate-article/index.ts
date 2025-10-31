@@ -51,13 +51,10 @@ serve(async (req) => {
     }
 
     if (!selectedTopic) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Please provide a topic or add keywords to your keyword list first"
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // Fallback to a sensible default so auto-select still works without seeded keywords
+      selectedTopic = "Professional real estate agent portfolio link";
+      selectedKeywords = [selectedTopic];
+      console.log("No keywords found; using fallback topic");
     }
 
     // Get AI configuration
