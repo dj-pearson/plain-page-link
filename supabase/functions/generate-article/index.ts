@@ -68,6 +68,31 @@ serve(async (req) => {
       config[item.setting_key] = JSON.parse(item.setting_value);
     });
 
+    // Get the selected model's details from ai_models table
+    const defaultModelId = config.default_model || "google/gemini-2.5-flash";
+    const { data: modelData, error: modelError } = await supabase
+      .from('ai_models')
+      .select('*')
+      .eq('model_id', defaultModelId)
+      .eq('is_active', true)
+      .single();
+
+    if (modelError || !modelData) {
+      console.error('Model not found:', defaultModelId, modelError);
+      return new Response(
+        JSON.stringify({ success: false, error: `Model ${defaultModelId} not configured` }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const apiKey = Deno.env.get(modelData.secret_name || 'LOVABLE_API_KEY');
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: `API key ${modelData.secret_name} not configured` }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log("Generating article:", { topic: selectedTopic, category });
 
     // Build prompt for article generation
@@ -97,28 +122,50 @@ serve(async (req) => {
 - Target audience: homebuyers, sellers, and real estate investors
 - Tone: Professional yet approachable`;
 
-    // Call AI to generate article
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: config.default_model || "google/gemini-2.5-flash",
+    // Build headers based on auth type
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (modelData.auth_type === 'x-api-key') {
+      headers['x-api-key'] = apiKey;
+      if (modelData.provider === 'Anthropic') {
+        headers['anthropic-version'] = '2023-06-01';
+      }
+    } else {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    // Build request body based on provider
+    const systemMessage = "You are an expert real estate content writer and SEO specialist. Create high-quality, informative articles that provide value to readers.";
+    let requestBody: any;
+
+    if (modelData.provider === 'Anthropic') {
+      requestBody = {
+        model: modelData.model_name,
+        max_tokens: config.max_tokens_large || 8000,
         messages: [
-          {
-            role: "system",
-            content: "You are an expert real estate content writer and SEO specialist. Create high-quality, informative articles that provide value to readers."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
+          { role: "user", content: prompt }
+        ],
+        system: systemMessage,
+      };
+    } else {
+      requestBody = {
+        model: modelData.model_name,
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: prompt }
         ],
         temperature: config.temperature_creative || 0.7,
         max_tokens: config.max_tokens_large || 8000,
-      }),
+      };
+    }
+
+    // Call AI to generate article
+    const aiResponse = await fetch(modelData.api_endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
     });
 
     if (!aiResponse.ok) {
@@ -140,7 +187,14 @@ serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content || '';
+    
+    // Extract content based on provider format
+    let content = '';
+    if (modelData.provider === 'Anthropic') {
+      content = aiData.content?.[0]?.text || '';
+    } else {
+      content = aiData.choices?.[0]?.message?.content || '';
+    }
 
     // Extract title from content (first # heading)
     const titleMatch = content.match(/^#\s+(.+)$/m);
