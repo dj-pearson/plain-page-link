@@ -38,6 +38,7 @@ import LeadManagementDashboard from "./pages/LeadManagementDashboard";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import PageBuilderEditor from "./pages/PageBuilder";
 import PublicPage from "./pages/PublicPage";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
 
 function App() {
     const { initialize, user } = useAuthStore();
@@ -131,6 +132,9 @@ function App() {
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="settings" element={<Settings />} />
                 </Route>
+
+                {/* Admin routes (protected) */}
+                <Route path="/admin" element={<AdminDashboard />} />
 
                 {/* 404 */}
                 <Route path="*" element={<NotFound />} />

@@ -1,0 +1,74 @@
+import { Navigate } from "react-router-dom";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Settings, BrainCircuit, Share2, FileText } from "lucide-react";
+import { AIConfigurationManager } from "@/components/admin/AIConfigurationManager";
+import { SocialMediaManager } from "@/components/admin/SocialMediaManager";
+import { ArticlesManager } from "@/components/admin/ArticlesManager";
+
+export function AdminDashboard() {
+  const { user, role } = useAuthStore();
+
+  // Redirect if not admin
+  if (!user || role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="border-b">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center gap-3">
+            <Settings className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+              <p className="text-muted-foreground">Manage AI, content, and platform settings</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <Tabs defaultValue="ai" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+            <TabsTrigger value="ai" className="gap-2">
+              <BrainCircuit className="h-4 w-4" />
+              AI Settings
+            </TabsTrigger>
+            <TabsTrigger value="social" className="gap-2">
+              <Share2 className="h-4 w-4" />
+              Social Media
+            </TabsTrigger>
+            <TabsTrigger value="articles" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Articles
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Platform
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="ai" className="space-y-6">
+            <AIConfigurationManager />
+          </TabsContent>
+
+          <TabsContent value="social" className="space-y-6">
+            <SocialMediaManager />
+          </TabsContent>
+
+          <TabsContent value="articles" className="space-y-6">
+            <ArticlesManager />
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <div className="rounded-lg border p-6">
+              <h2 className="text-2xl font-bold mb-4">Platform Settings</h2>
+              <p className="text-muted-foreground">Additional platform configuration coming soon...</p>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
