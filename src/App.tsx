@@ -44,29 +44,31 @@ function App() {
     const { initialize, user } = useAuthStore();
     const location = useLocation();
 
+    // Initialize auth and PWA on mount
     useEffect(() => {
         initialize();
 
-        // Initialize PWA features
         const initPWA = async () => {
-            // Initialize offline storage
             await offlineStorage.init();
+            await pushNotifications.init();
+        };
 
-            // Initialize push notifications
-            const notificationsInitialized = await pushNotifications.init();
+        initPWA();
+    }, [initialize]);
 
-            if (notificationsInitialized && user) {
-                // Request notification permission if logged in
-                const hasPermission =
-                    await pushNotifications.requestPermission();
+    // Handle push notification registration when user logs in
+    useEffect(() => {
+        const registerPushNotifications = async () => {
+            if (user) {
+                const hasPermission = await pushNotifications.requestPermission();
                 if (hasPermission) {
                     await pushNotifications.registerToken(user.id);
                 }
             }
         };
 
-        initPWA();
-    }, [initialize, user]);
+        registerPushNotifications();
+    }, [user]);
 
     // Track page views on route change
     useEffect(() => {
