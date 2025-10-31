@@ -1,7 +1,8 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, BrainCircuit, Share2, FileText } from "lucide-react";
+import { Settings, BrainCircuit, Share2, FileText, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { AIConfigurationManager } from "@/components/admin/AIConfigurationManager";
 import { SocialMediaManager } from "@/components/admin/SocialMediaManager";
 import { ArticlesManager } from "@/components/admin/ArticlesManager";
@@ -18,12 +19,20 @@ export function AdminDashboard() {
     <div className="min-h-screen bg-background">
       <div className="border-b">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-3">
-            <Settings className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-              <p className="text-muted-foreground">Manage AI, content, and platform settings</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Settings className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+                <p className="text-muted-foreground">Manage AI, content, and platform settings</p>
+              </div>
             </div>
+            <Link to="/dashboard">
+              <Button variant="outline" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Dashboard
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

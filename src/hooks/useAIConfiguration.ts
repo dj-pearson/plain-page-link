@@ -117,7 +117,15 @@ export function useAIConfiguration() {
 
   const getConfigValue = (key: string) => {
     const item = configQuery.data?.find(c => c.setting_key === key);
-    return item ? JSON.parse(item.setting_value) : '';
+    if (!item) return '';
+    
+    try {
+      // Try to parse as JSON first
+      return JSON.parse(item.setting_value);
+    } catch {
+      // If parsing fails, return the raw string value
+      return item.setting_value;
+    }
   };
 
   const handleUpdateConfig = (key: string, value: any) => {
