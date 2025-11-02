@@ -505,6 +505,16 @@ export class AnalyticsEngine {
     }
 }
 
+// Track page views (client-side analytics)
+export const trackPageView = (path: string) => {
+    // Log page view
+    console.log('[Analytics] Page view:', path);
+    
+    // Future: Send to analytics service
+    // Example: Google Analytics, PostHog, etc.
+    // gtag('event', 'page_view', { page_path: path });
+};
+
 // Export helper functions
 export const calculateKPIs = AnalyticsEngine.calculateKPIs;
 export const generateTimeSeries = AnalyticsEngine.generateTimeSeries;

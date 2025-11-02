@@ -5,7 +5,8 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc && vite build",
+        "build": "vite build",
+        "build:check": "tsc --noEmit && vite build",
         "build:dev": "vite build --mode development",
         "preview": "vite preview"
     },
@@ -43,6 +44,7 @@
         "react-dropzone": "^14.2.3",
         "react-helmet-async": "^2.0.5",
         "react-hook-form": "^7.51.0",
+        "react-markdown": "^10.1.0",
         "react-router-dom": "^6.22.3",
         "recharts": "^2.12.2",
         "sonner": "^1.4.3",

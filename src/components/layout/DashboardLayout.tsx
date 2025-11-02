@@ -12,13 +12,16 @@ import {
     Palette,
     Settings,
     LogOut,
+    Shield,
+    BookOpen,
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile/MobileNav";
+import { Badge } from "@/components/ui/badge";
 
 export default function DashboardLayout() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { profile, signOut } = useAuthStore();
+    const { profile, signOut, role } = useAuthStore();
 
     const isActive = (path: string) => {
         return location.pathname === path;
@@ -90,8 +93,29 @@ export default function DashboardLayout() {
                         label="Analytics"
                         active={isActive("/dashboard/analytics")}
                     />
+                    <NavLink
+                        to="/blog"
+                        icon={<BookOpen className="h-5 w-5" />}
+                        label="Blog"
+                        active={isActive("/blog")}
+                    />
 
                     <div className="pt-4 mt-4 border-t border-gray-200">
+                        {role === 'admin' && (
+                            <NavLink
+                                to="/admin"
+                                icon={<Shield className="h-5 w-5" />}
+                                label={
+                                    <div className="flex items-center gap-2">
+                                        Admin
+                                        <Badge variant="secondary" className="text-xs">
+                                            ROOT
+                                        </Badge>
+                                    </div>
+                                }
+                                active={isActive("/admin")}
+                            />
+                        )}
                         <NavLink
                             to="/dashboard/profile"
                             icon={<User className="h-5 w-5" />}
@@ -169,7 +193,7 @@ function NavLink({
 }: {
     to: string;
     icon: React.ReactNode;
-    label: string;
+    label: string | React.ReactNode;
     active: boolean;
 }) {
     return (

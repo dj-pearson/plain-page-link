@@ -17,6 +17,8 @@ import NotFound from "./pages/public/NotFound";
 import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import TermsOfService from "./pages/legal/TermsOfService";
 import Pricing from "./pages/Pricing";
+import Blog from "./pages/Blog";
+import BlogArticle from "./pages/BlogArticle";
 
 // Auth pages
 import Login from "./pages/auth/Login";
@@ -38,34 +40,37 @@ import LeadManagementDashboard from "./pages/LeadManagementDashboard";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import PageBuilderEditor from "./pages/PageBuilder";
 import PublicPage from "./pages/PublicPage";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
 
 function App() {
     const { initialize, user } = useAuthStore();
     const location = useLocation();
 
+    // Initialize auth and PWA on mount
     useEffect(() => {
         initialize();
 
-        // Initialize PWA features
         const initPWA = async () => {
-            // Initialize offline storage
             await offlineStorage.init();
+            await pushNotifications.init();
+        };
 
-            // Initialize push notifications
-            const notificationsInitialized = await pushNotifications.init();
+        initPWA();
+    }, [initialize]);
 
-            if (notificationsInitialized && user) {
-                // Request notification permission if logged in
-                const hasPermission =
-                    await pushNotifications.requestPermission();
+    // Handle push notification registration when user logs in
+    useEffect(() => {
+        const registerPushNotifications = async () => {
+            if (user) {
+                const hasPermission = await pushNotifications.requestPermission();
                 if (hasPermission) {
                     await pushNotifications.registerToken(user.id);
                 }
             }
         };
 
-        initPWA();
-    }, [initialize, user]);
+        registerPushNotifications();
+    }, [user]);
 
     // Track page views on route change
     useEffect(() => {
@@ -89,6 +94,8 @@ function App() {
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/blog/:slug" element={<BlogArticle />} />
                 <Route path="/p/:slug" element={<PublicPage />} />
                 <Route path="/:slug" element={<ProfilePage />} />
 
@@ -131,6 +138,9 @@ function App() {
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="settings" element={<Settings />} />
                 </Route>
+
+                {/* Admin routes */}
+                <Route path="/admin" element={<AdminDashboard />} />
 
                 {/* 404 */}
                 <Route path="*" element={<NotFound />} />

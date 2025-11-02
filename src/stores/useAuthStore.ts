@@ -28,7 +28,7 @@ export const useAuthStore = create<AuthState>()(
       session: null,
       profile: null,
       role: null,
-      isLoading: false,
+      isLoading: true,
       error: null,
 
       initialize: async () => {
@@ -46,18 +46,20 @@ export const useAuthStore = create<AuthState>()(
               .eq('id', session.user.id)
               .single();
             
-            // Fetch role
-            const { data: userRole } = await supabase
+            // Fetch roles (prioritize admin)
+            const { data: userRoles } = await supabase
               .from('user_roles')
               .select('role')
               .eq('user_id', session.user.id)
-              .single();
+              .order('role', { ascending: true }); // 'admin' comes before 'user'
+            
+            const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
             
             set({
               user: session.user,
               session,
               profile: profile || null,
-              role: userRole?.role || null,
+              role: role,
               isLoading: false,
             });
           } else {
@@ -81,13 +83,14 @@ export const useAuthStore = create<AuthState>()(
                   .eq('id', session.user.id)
                   .single();
                 
-                const { data: userRole } = await supabase
+                const { data: userRoles } = await supabase
                   .from('user_roles')
                   .select('role')
                   .eq('user_id', session.user.id)
-                  .single();
+                  .order('role', { ascending: true });
                 
-                set({ profile: profile || null, role: userRole?.role || null });
+                const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
+                set({ profile: profile || null, role });
               };
               fetchUserData();
             }, 0);
@@ -147,17 +150,19 @@ export const useAuthStore = create<AuthState>()(
             .eq('id', data.user.id)
             .single();
           
-          const { data: userRole } = await supabase
+          const { data: userRoles } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', data.user.id)
-            .single();
+            .order('role', { ascending: true });
+          
+          const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
           
           set({
             user: data.user,
             session: data.session,
             profile: profile || null,
-            role: userRole?.role || null,
+            role: role,
             isLoading: false,
           });
         } catch (error: any) {

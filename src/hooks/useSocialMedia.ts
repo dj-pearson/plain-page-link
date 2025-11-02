@@ -1,0 +1,226 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+export interface SocialMediaPost {
+  id: string;
+  content_type: string;
+  subject_type: string;
+  platform_type: string;
+  post_content: any;
+  post_title: string;
+  listing_id?: string;
+  property_address?: string;
+  status: string;
+  created_at: string;
+  scheduled_for?: string;
+  posted_at?: string;
+  ai_prompt_used?: string;
+}
+
+export interface SocialMediaWebhook {
+  id: string;
+  name: string;
+  platform: string;
+  webhook_url: string;
+  is_active: boolean;
+  headers: any;
+}
+
+export function useSocialMedia() {
+  const queryClient = useQueryClient();
+
+  // Fetch posts
+  const postsQuery = useQuery({
+    queryKey: ['social-media-posts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('social_media_posts')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as SocialMediaPost[];
+    },
+  });
+
+  // Fetch webhooks
+  const webhooksQuery = useQuery({
+    queryKey: ['social-media-webhooks'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('social_media_webhooks')
+        .select('*')
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      return data as SocialMediaWebhook[];
+    },
+  });
+
+  // Generate post with AI
+  const generatePostMutation = useMutation({
+    mutationFn: async (params: {
+      contentType: string;
+      subjectType: string;
+      platformType: string;
+      listingId?: string;
+      customPrompt?: string;
+    }) => {
+      const { data, error } = await supabase.functions.invoke('generate-social-post', {
+        body: params
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success('Content generated successfully!');
+      } else {
+        toast.error(data.error || 'Generation failed');
+      }
+    },
+    onError: (error) => {
+      toast.error('Failed to generate content: ' + error.message);
+    },
+  });
+
+  // Create post
+  const createPostMutation = useMutation({
+    mutationFn: async (post: Partial<SocialMediaPost>) => {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase
+        .from('social_media_posts')
+        .insert({
+          ...post,
+          created_by: userData.user?.id
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['social-media-posts'] });
+      toast.success('Post created successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to create post: ' + error.message);
+    },
+  });
+
+  // Update post
+  const updatePostMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<SocialMediaPost> }) => {
+      const { error } = await supabase
+        .from('social_media_posts')
+        .update(updates)
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['social-media-posts'] });
+      toast.success('Post updated successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to update post: ' + error.message);
+    },
+  });
+
+  // Delete post
+  const deletePostMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('social_media_posts')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['social-media-posts'] });
+      toast.success('Post deleted successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete post: ' + error.message);
+    },
+  });
+
+  // Create webhook
+  const createWebhookMutation = useMutation({
+    mutationFn: async (webhook: Partial<SocialMediaWebhook>) => {
+      const { data, error } = await supabase
+        .from('social_media_webhooks')
+        .insert(webhook)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['social-media-webhooks'] });
+      toast.success('Webhook created successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to create webhook: ' + error.message);
+    },
+  });
+
+  // Update webhook
+  const updateWebhookMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<SocialMediaWebhook> }) => {
+      const { error } = await supabase
+        .from('social_media_webhooks')
+        .update(updates)
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['social-media-webhooks'] });
+      toast.success('Webhook updated successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to update webhook: ' + error.message);
+    },
+  });
+
+  // Delete webhook
+  const deleteWebhookMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('social_media_webhooks')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['social-media-webhooks'] });
+      toast.success('Webhook deleted successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete webhook: ' + error.message);
+    },
+  });
+
+  return {
+    posts: postsQuery.data,
+    webhooks: webhooksQuery.data,
+    isLoading: postsQuery.isLoading || webhooksQuery.isLoading,
+    generatePost: generatePostMutation.mutate,
+    isGenerating: generatePostMutation.isPending,
+    generatedContent: generatePostMutation.data,
+    createPost: createPostMutation.mutate,
+    updatePost: updatePostMutation.mutate,
+    deletePost: deletePostMutation.mutate,
+    createWebhook: createWebhookMutation.mutate,
+    updateWebhook: updateWebhookMutation.mutate,
+    deleteWebhook: deleteWebhookMutation.mutate,
+  };
+}
