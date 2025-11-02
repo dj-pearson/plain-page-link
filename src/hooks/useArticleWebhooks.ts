@@ -93,11 +93,36 @@ export function useArticleWebhooks() {
     },
   });
 
+  // Test webhook
+  const testWebhookMutation = useMutation({
+    mutationFn: async (webhookUrl: string) => {
+      const { data, error } = await supabase.functions.invoke('test-article-webhook', {
+        body: { webhookUrl }
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data?.success) {
+        toast.success('Test payload sent successfully! Check your Make.com scenario.');
+      } else {
+        toast.error(data?.error || 'Test failed');
+      }
+    },
+    onError: (error) => {
+      toast.error('Failed to test webhook: ' + error.message);
+    },
+  });
+
   return {
     webhooks: webhooksQuery.data,
     isLoading: webhooksQuery.isLoading,
     createWebhook: createWebhookMutation.mutate,
     updateWebhook: updateWebhookMutation.mutate,
     deleteWebhook: deleteWebhookMutation.mutate,
+    testWebhook: testWebhookMutation.mutate,
+    isTesting: testWebhookMutation.isPending,
+    testResult: testWebhookMutation.data,
   };
 }

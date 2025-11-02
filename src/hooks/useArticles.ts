@@ -135,6 +135,28 @@ export function useArticles() {
     },
   });
 
+  // Re-publish article (trigger webhooks again)
+  const republishArticleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke('publish-article-to-social', {
+        body: { articleId: id }
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data?.success) {
+        toast.success('Article distributed to social platforms successfully');
+      } else {
+        toast.error(data?.error || 'Failed to distribute article');
+      }
+    },
+    onError: (error) => {
+      toast.error('Failed to distribute article: ' + error.message);
+    },
+  });
+
   // Delete article
   const deleteArticleMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -163,6 +185,8 @@ export function useArticles() {
     createArticle: createArticleMutation.mutate,
     updateArticle: updateArticleMutation.mutate,
     publishArticle: publishArticleMutation.mutate,
+    republishArticle: republishArticleMutation.mutate,
+    isRepublishing: republishArticleMutation.isPending,
     deleteArticle: deleteArticleMutation.mutate,
   };
 }

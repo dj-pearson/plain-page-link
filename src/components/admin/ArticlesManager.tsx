@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Eye, Edit, Trash, CheckCircle, Plus, Hash, ExternalLink } from "lucide-react";
+import { Loader2, Eye, Edit, Trash, CheckCircle, Plus, Hash, ExternalLink, Send, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { useArticles } from "@/hooks/useArticles";
 import { useKeywords } from "@/hooks/useKeywords";
@@ -14,9 +14,9 @@ import { ArticleWebhookDialog } from "./ArticleWebhookDialog";
 
 export function ArticlesManager() {
   const [activeTab, setActiveTab] = useState("all");
-  const { articles, isLoading, deleteArticle, publishArticle } = useArticles();
+  const { articles, isLoading, deleteArticle, publishArticle, republishArticle, isRepublishing } = useArticles();
   const { keywords, isLoading: isLoadingKeywords } = useKeywords();
-  const { webhooks, isLoading: isLoadingWebhooks, updateWebhook, deleteWebhook } = useArticleWebhooks();
+  const { webhooks, isLoading: isLoadingWebhooks, updateWebhook, deleteWebhook, testWebhook, isTesting } = useArticleWebhooks();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -124,6 +124,25 @@ export function ArticlesManager() {
                             <CheckCircle className="h-4 w-4" />
                           </Button>
                         )}
+                        {article.status === 'published' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              if (confirm('Re-distribute this article to social platforms?')) {
+                                republishArticle(article.id);
+                              }
+                            }}
+                            disabled={isRepublishing}
+                            title="Re-publish to Social Media"
+                          >
+                            {isRepublishing ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
                         <Button 
                           variant="outline" 
                           size="sm"
@@ -228,41 +247,64 @@ export function ArticlesManager() {
           ) : webhooks && webhooks.length > 0 ? (
             <div className="space-y-3">
               {webhooks.map((webhook) => (
-                <div key={webhook.id} className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold">{webhook.name}</h4>
-                      <Badge variant={webhook.is_active ? "default" : "secondary"}>
-                        {webhook.is_active ? "Active" : "Inactive"}
-                      </Badge>
+                <div key={webhook.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold">{webhook.name}</h4>
+                        <Badge variant={webhook.is_active ? "default" : "secondary"}>
+                          {webhook.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                      <a 
+                        href={webhook.webhook_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
+                      >
+                        {webhook.webhook_url}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
                     </div>
-                    <a 
-                      href={webhook.webhook_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
-                    >
-                      {webhook.webhook_url}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={webhook.is_active}
+                        onCheckedChange={(checked) => {
+                          updateWebhook({ id: webhook.id, updates: { is_active: checked } });
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('Delete this webhook?')) {
+                            deleteWebhook(webhook.id);
+                          }
+                        }}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={webhook.is_active}
-                      onCheckedChange={(checked) => {
-                        updateWebhook({ id: webhook.id, updates: { is_active: checked } });
-                      }}
-                    />
+                  <div className="pt-3 border-t">
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
-                      onClick={() => {
-                        if (confirm('Delete this webhook?')) {
-                          deleteWebhook(webhook.id);
-                        }
-                      }}
+                      onClick={() => testWebhook(webhook.webhook_url)}
+                      disabled={isTesting}
+                      className="w-full"
                     >
-                      <Trash className="h-4 w-4" />
+                      {isTesting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-4 w-4 mr-2" />
+                          Send Test Payload to Make.com
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
