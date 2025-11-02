@@ -84,8 +84,8 @@ export default function Landing() {
                         <span className="text-blue-600"> Portfolio Link</span>
                     </h1>
                     <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                        Create your professional agent portfolio link to showcase sold properties, 
-                        active listings, and testimonials. Capture qualified leads and convert 
+                        Create your professional agent portfolio link to showcase sold properties,
+                        active listings, and testimonials. Capture qualified leads and convert
                         social media traffic into clients with our purpose-built platform.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -116,8 +116,8 @@ export default function Landing() {
                             Professional Agent Portfolio Builder Features
                         </h2>
                         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                            Purpose-built for real estate agents. Create your professional 
-                            realtor portfolio link with everything you need to showcase sold 
+                            Purpose-built for real estate agents. Create your professional
+                            realtor portfolio link with everything you need to showcase sold
                             properties and convert leads.
                         </p>
                     </header>

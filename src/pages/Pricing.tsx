@@ -86,7 +86,7 @@ export default function Pricing() {
           <p className="text-xl text-muted-foreground mb-8">
             Start free and scale as you grow
           </p>
-          
+
           <div className="flex items-center justify-center gap-4">
             <span className={!isYearly ? "font-semibold" : "text-muted-foreground"}>Monthly</span>
             <Switch checked={isYearly} onCheckedChange={setIsYearly} />
@@ -98,11 +98,11 @@ export default function Pricing() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {plans?.map((plan) => (
-            <Card 
+            <Card
               key={plan.id}
               className={`relative ${
-                plan.name === 'professional' 
-                  ? 'border-primary shadow-lg shadow-primary/20 scale-105' 
+                plan.name === 'professional'
+                  ? 'border-primary shadow-lg shadow-primary/20 scale-105'
                   : ''
               }`}
             >
@@ -162,7 +162,7 @@ export default function Pricing() {
                       </span>
                     </li>
                   )}
-                  {Object.entries(plan.features).map(([key, value]) => 
+                  {Object.entries(plan.features).map(([key, value]) =>
                     value && (
                       <li key={key} className="flex items-start gap-2">
                         <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
@@ -182,10 +182,10 @@ export default function Pricing() {
                   disabled={isCurrentPlan(plan.name) || plan.name === 'enterprise'}
                   onClick={() => plan.stripe_price_id && handleSubscribe(plan.stripe_price_id)}
                 >
-                  {isCurrentPlan(plan.name) 
-                    ? 'Current Plan' 
-                    : plan.name === 'free' 
-                    ? 'Get Started' 
+                  {isCurrentPlan(plan.name)
+                    ? 'Current Plan'
+                    : plan.name === 'free'
+                    ? 'Get Started'
                     : plan.name === 'enterprise'
                     ? 'Contact Sales'
                     : 'Subscribe'}
@@ -218,7 +218,7 @@ export default function Pricing() {
           </div>
         </div>
       </div>
-      
+
       {/* Footer */}
       <PublicFooter />
       </div>

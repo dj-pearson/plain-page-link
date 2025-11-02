@@ -68,7 +68,7 @@ export default function Blog() {
       <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <PublicHeader />
-      
+
       {/* Page Title Section */}
       <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-b">
         <div className="container mx-auto px-4 py-12">
@@ -158,7 +158,7 @@ export default function Blog() {
           </div>
         )}
       </div>
-      
+
       {/* Footer */}
       <PublicFooter />
       </div>

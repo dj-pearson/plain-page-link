@@ -100,7 +100,7 @@ export default function BlogArticle() {
       <div className="min-h-screen bg-background flex flex-col">
         {/* Header */}
         <PublicHeader />
-        
+
         {/* Breadcrumb Bar */}
         <div className="bg-gray-50 border-b">
           <div className="container mx-auto px-4 py-3">
@@ -310,7 +310,7 @@ export default function BlogArticle() {
             tags={article.tags || []}
           />
         </article>
-        
+
         {/* Footer */}
         <PublicFooter />
       </div>
