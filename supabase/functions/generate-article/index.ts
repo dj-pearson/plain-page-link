@@ -244,6 +244,23 @@ serve(async (req) => {
 
     console.log("Article generated and saved successfully");
 
+    // Trigger social media post generation and webhook distribution
+    try {
+      console.log('Triggering social media post generation...');
+      const socialResponse = await supabase.functions.invoke('publish-article-to-social', {
+        body: { articleId: insertedArticle.id }
+      });
+
+      if (socialResponse.error) {
+        console.error('Error triggering social post:', socialResponse.error);
+      } else {
+        console.log('Social post triggered successfully:', socialResponse.data);
+      }
+    } catch (socialError) {
+      console.error('Failed to trigger social post:', socialError);
+      // Don't fail the article generation if social posting fails
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

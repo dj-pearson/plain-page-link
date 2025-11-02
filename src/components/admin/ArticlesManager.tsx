@@ -3,16 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Eye, Edit, Trash, CheckCircle, Plus, Hash } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Eye, Edit, Trash, CheckCircle, Plus, Hash, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { useArticles } from "@/hooks/useArticles";
 import { useKeywords } from "@/hooks/useKeywords";
+import { useArticleWebhooks } from "@/hooks/useArticleWebhooks";
 import { CreateArticleDialog } from "./CreateArticleDialog";
+import { ArticleWebhookDialog } from "./ArticleWebhookDialog";
 
 export function ArticlesManager() {
   const [activeTab, setActiveTab] = useState("all");
   const { articles, isLoading, deleteArticle, publishArticle } = useArticles();
   const { keywords, isLoading: isLoadingKeywords } = useKeywords();
+  const { webhooks, isLoading: isLoadingWebhooks, updateWebhook, deleteWebhook } = useArticleWebhooks();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -208,17 +212,70 @@ export function ArticlesManager() {
       {/* Webhook Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Article Webhooks</CardTitle>
-          <CardDescription>Configure webhooks for automatic article distribution</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Article Webhooks</CardTitle>
+              <CardDescription>Configure webhooks for automatic article distribution</CardDescription>
+            </div>
+            <ArticleWebhookDialog />
+          </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Send published articles to external platforms automatically
-          </p>
-          <Button variant="outline">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Webhook
-          </Button>
+          {isLoadingWebhooks ? (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : webhooks && webhooks.length > 0 ? (
+            <div className="space-y-3">
+              {webhooks.map((webhook) => (
+                <div key={webhook.id} className="border rounded-lg p-4 flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-semibold">{webhook.name}</h4>
+                      <Badge variant={webhook.is_active ? "default" : "secondary"}>
+                        {webhook.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <a 
+                      href={webhook.webhook_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
+                    >
+                      {webhook.webhook_url}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={webhook.is_active}
+                      onCheckedChange={(checked) => {
+                        updateWebhook({ id: webhook.id, updates: { is_active: checked } });
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm('Delete this webhook?')) {
+                          deleteWebhook(webhook.id);
+                        }
+                      }}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground mb-4">
+                No webhooks configured. Add one to automatically send published articles to external platforms.
+              </p>
+              <ArticleWebhookDialog />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

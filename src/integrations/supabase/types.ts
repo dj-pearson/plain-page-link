@@ -179,7 +179,9 @@ export type Database = {
           event_type: string | null
           id: string
           is_active: boolean | null
+          name: string
           updated_at: string | null
+          user_id: string
           webhook_url: string
         }
         Insert: {
@@ -187,7 +189,9 @@ export type Database = {
           event_type?: string | null
           id?: string
           is_active?: boolean | null
+          name?: string
           updated_at?: string | null
+          user_id?: string
           webhook_url: string
         }
         Update: {
@@ -195,7 +199,9 @@ export type Database = {
           event_type?: string | null
           id?: string
           is_active?: boolean | null
+          name?: string
           updated_at?: string | null
+          user_id?: string
           webhook_url?: string
         }
         Relationships: []
@@ -210,6 +216,7 @@ export type Database = {
           featured_image_url: string | null
           generated_from_suggestion_id: string | null
           id: string
+          keyword_id: string | null
           published_at: string | null
           seo_description: string | null
           seo_keywords: string[] | null
@@ -230,6 +237,7 @@ export type Database = {
           featured_image_url?: string | null
           generated_from_suggestion_id?: string | null
           id?: string
+          keyword_id?: string | null
           published_at?: string | null
           seo_description?: string | null
           seo_keywords?: string[] | null
@@ -250,6 +258,7 @@ export type Database = {
           featured_image_url?: string | null
           generated_from_suggestion_id?: string | null
           id?: string
+          keyword_id?: string | null
           published_at?: string | null
           seo_description?: string | null
           seo_keywords?: string[] | null
@@ -267,6 +276,13 @@ export type Database = {
             columns: ["generated_from_suggestion_id"]
             isOneToOne: false
             referencedRelation: "content_suggestions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "articles_keyword_id_fkey"
+            columns: ["keyword_id"]
+            isOneToOne: false
+            referencedRelation: "keywords"
             referencedColumns: ["id"]
           },
         ]
@@ -301,6 +317,48 @@ export type Database = {
           suggested_by?: string | null
           topic?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      keywords: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          difficulty: string | null
+          id: string
+          is_active: boolean | null
+          keyword: string
+          last_used_at: string | null
+          notes: string | null
+          search_volume: number | null
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string
+          is_active?: boolean | null
+          keyword: string
+          last_used_at?: string | null
+          notes?: string | null
+          search_volume?: number | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string
+          is_active?: boolean | null
+          keyword?: string
+          last_used_at?: string | null
+          notes?: string | null
+          search_volume?: number | null
+          updated_at?: string | null
+          usage_count?: number | null
         }
         Relationships: []
       }
