@@ -28,7 +28,7 @@ export const useAuthStore = create<AuthState>()(
       session: null,
       profile: null,
       role: null,
-      isLoading: false,
+      isLoading: true,
       error: null,
 
       initialize: async () => {
