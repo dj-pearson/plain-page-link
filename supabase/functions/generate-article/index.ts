@@ -214,7 +214,7 @@ serve(async (req) => {
     const seoTitle = title.length > 60 ? title.substring(0, 57) + '...' : title;
     const seoDescription = excerpt.length > 160 ? excerpt.substring(0, 157) + '...' : excerpt;
 
-    // Save article to database
+    // Save article to database and auto-publish
     const { data: insertedArticle, error: insertError } = await supabase
       .from('articles')
       .insert({
@@ -228,7 +228,8 @@ serve(async (req) => {
         category: category || 'General',
         tags: selectedKeywords || [],
         keyword_id: selectedKeywordId,
-        status: 'draft'
+        status: 'published',
+        published_at: new Date().toISOString()
       })
       .select()
       .single();
