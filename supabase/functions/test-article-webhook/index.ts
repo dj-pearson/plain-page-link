@@ -21,7 +21,7 @@ serve(async (req) => {
     // Create sample payload that matches exactly what will be sent
     const samplePayload = {
       articleTitle: "Sample Article: Top 10 Home Buying Tips for 2025",
-      articleUrl: "https://yourdomain.com/articles/sample-article-slug",
+      articleUrl: "https://agentbio.net/articles/sample-article-slug",
       longFormPost: `🏡 Exciting News! Check out our latest article on home buying tips for 2025!
 
 In today's real estate market, being prepared is more important than ever. Our comprehensive guide covers everything from financing options to negotiation strategies that can save you thousands.
@@ -30,10 +30,10 @@ Whether you're a first-time buyer or looking to upgrade, these insights will hel
 
 Don't miss out on these valuable tips that could make all the difference in your home buying journey!
 
-Read the full article here: https://yourdomain.com/articles/sample-article-slug
+Read the full article here: https://agentbio.net/articles/sample-article-slug
 
 #RealEstate #HomeBuying #RealEstateTips #PropertyInvestment #HomeOwnership`,
-      shortFormPost: `🏡 New article alert! Discover the top 10 home buying tips for 2025. Essential reading for every home buyer! https://yourdomain.com/articles/sample-article-slug`,
+      shortFormPost: `🏡 New article alert! Discover the top 10 home buying tips for 2025. Essential reading for every home buyer! https://agentbio.net/articles/sample-article-slug`,
       hashtags: [
         "RealEstate",
         "HomeBuying",

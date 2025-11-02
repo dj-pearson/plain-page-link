@@ -72,7 +72,7 @@ serve(async (req) => {
 
     console.log('Generating social media content...');
 
-    const articleUrl = `https://yourdomain.com/articles/${article.slug}`;
+    const articleUrl = `https://agentbio.net/articles/${article.slug}`;
     
     const prompt = `Create social media posts to promote this article:
 Title: ${article.title}
@@ -84,7 +84,12 @@ Generate:
 2. A short-form post (100-150 characters) suitable for Twitter and Threads
 3. 5-8 relevant hashtags
 
-Format the response as JSON with keys: longForm, shortForm, hashtags (array)`;
+Return ONLY valid JSON with this exact structure:
+{
+  "longForm": "your long post here",
+  "shortForm": "your short post here",
+  "hashtags": ["hashtag1", "hashtag2", ...]
+}`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -95,9 +100,10 @@ Format the response as JSON with keys: longForm, shortForm, hashtags (array)`;
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: 'You are a social media marketing expert. Always respond with valid JSON.' },
+          { role: 'system', content: 'You are a social media marketing expert. You MUST respond ONLY with valid JSON, no markdown formatting, no code blocks, just pure JSON.' },
           { role: 'user', content: prompt }
         ],
+        temperature: 0.7,
       }),
     });
 
@@ -110,26 +116,37 @@ Format the response as JSON with keys: longForm, shortForm, hashtags (array)`;
     const aiData = await aiResponse.json();
     const generatedContent = aiData.choices[0].message.content;
     
-    console.log('Generated content:', generatedContent);
+    console.log('AI Raw response:', generatedContent);
 
     // Parse the AI response
     let socialContent;
     try {
+      // Remove markdown code blocks if present
+      let cleanedContent = generatedContent.trim();
+      if (cleanedContent.startsWith('```json')) {
+        cleanedContent = cleanedContent.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+      } else if (cleanedContent.startsWith('```')) {
+        cleanedContent = cleanedContent.replace(/```\s*/g, '');
+      }
+      
       // Try to extract JSON from the response
-      const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
+      const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         socialContent = JSON.parse(jsonMatch[0]);
+        console.log('Parsed social content:', JSON.stringify(socialContent, null, 2));
       } else {
         throw new Error('No JSON found in response');
       }
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
+      console.error('Raw content was:', generatedContent);
       // Fallback content
       socialContent = {
-        longForm: `Check out our latest article: "${article.title}"\n\n${article.excerpt || ''}\n\nRead more: ${articleUrl}`,
-        shortForm: `New article: "${article.title}" ${articleUrl}`,
-        hashtags: ['realestate', 'property', 'homes']
+        longForm: `🏡 Check out our latest article: "${article.title}"\n\n${article.excerpt || ''}\n\nRead more: ${articleUrl}\n\n#RealEstate #Property #Homes`,
+        shortForm: `📰 New article: "${article.title}" ${articleUrl}`,
+        hashtags: ['RealEstate', 'Property', 'Homes', 'RealEstateAgent']
       };
+      console.log('Using fallback content:', JSON.stringify(socialContent, null, 2));
     }
 
     // Send to all active webhooks
