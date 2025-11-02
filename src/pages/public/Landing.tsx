@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { Home, BarChart3, Users, Zap } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { BlogSection } from "@/components/blog/BlogSection";
+import { PublicHeader } from "@/components/layout/PublicHeader";
+import { PublicFooter } from "@/components/layout/PublicFooter";
 
 export default function Landing() {
     const schema = {
@@ -68,48 +70,7 @@ export default function Landing() {
             />
             <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
             {/* Header */}
-            <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-                <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Home className="h-8 w-8 text-blue-600" />
-                        <span className="text-2xl font-bold text-gray-900">
-                            AgentBio.net
-                        </span>
-                    </div>
-                    <nav className="hidden md:flex items-center gap-6">
-                        <a
-                            href="#features"
-                            className="text-gray-600 hover:text-gray-900"
-                        >
-                            Features
-                        </a>
-                        <Link
-                            to="/blog"
-                            className="text-gray-600 hover:text-gray-900"
-                        >
-                            Blog
-                        </Link>
-                        <Link
-                            to="/pricing"
-                            className="text-gray-600 hover:text-gray-900"
-                        >
-                            Pricing
-                        </Link>
-                        <Link
-                            to="/auth/login"
-                            className="text-gray-600 hover:text-gray-900"
-                        >
-                            Log In
-                        </Link>
-                        <Link
-                            to="/auth/register"
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                        >
-                            Get Started
-                        </Link>
-                    </nav>
-                </div>
-            </header>
+            <PublicHeader />
 
             {/* Hero Section */}
             <section className="container mx-auto px-4 py-20 md:py-32">
@@ -206,17 +167,7 @@ export default function Landing() {
             </section>
 
             {/* Footer */}
-            <footer className="bg-gray-900 text-gray-400 py-12">
-                <div className="container mx-auto px-4">
-                    <nav className="text-center mb-4" aria-label="Footer navigation">
-                        <Link to="/blog" className="text-gray-400 hover:text-white mx-3">Blog</Link>
-                        <Link to="/pricing" className="text-gray-400 hover:text-white mx-3">Pricing</Link>
-                        <Link to="/privacy" className="text-gray-400 hover:text-white mx-3">Privacy Policy</Link>
-                        <Link to="/terms" className="text-gray-400 hover:text-white mx-3">Terms of Service</Link>
-                    </nav>
-                    <p className="text-center">&copy; 2025 AgentBio.net - Professional Real Estate Agent Portfolio Links. All rights reserved.</p>
-                </div>
-            </footer>
+            <PublicFooter />
         </main>
         </>
     );

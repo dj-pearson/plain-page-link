@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Calendar, Eye } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlogListSEO } from "@/components/blog/BlogListSEO";
+import { PublicHeader } from "@/components/layout/PublicHeader";
+import { PublicFooter } from "@/components/layout/PublicFooter";
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,23 +65,21 @@ export default function Blog() {
       {/* SEO for Blog Listing Page */}
       <BlogListSEO totalArticles={articles.length} latestArticleDate={latestArticleDate} />
 
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Real Estate Blog</h1>
-              <p className="text-muted-foreground mt-1">
-                Tips, insights, and guides for homebuyers and sellers
-              </p>
-            </div>
-            <Link to="/">
-              <Button variant="outline">Back to Home</Button>
-            </Link>
+      <PublicHeader />
+      
+      {/* Page Title Section */}
+      <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-b">
+        <div className="container mx-auto px-4 py-12">
+          <div className="max-w-3xl">
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Real Estate Blog</h1>
+            <p className="text-lg text-gray-600">
+              Expert tips, market insights, and comprehensive guides for homebuyers, sellers, and real estate professionals
+            </p>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Filter Section */}
       <div className="container mx-auto px-4 py-8">
@@ -158,6 +158,9 @@ export default function Blog() {
           </div>
         )}
       </div>
+      
+      {/* Footer */}
+      <PublicFooter />
       </div>
     </>
   );

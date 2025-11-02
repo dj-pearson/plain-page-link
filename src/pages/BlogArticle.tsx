@@ -9,6 +9,8 @@ import { Calendar, Eye, ArrowLeft, Clock, User } from "lucide-react";
 import { ArticleSEO } from "@/components/blog/ArticleSEO";
 import { SimilarArticles } from "@/components/blog/SimilarArticles";
 import { Breadcrumbs } from "@/components/blog/Breadcrumbs";
+import { PublicHeader } from "@/components/layout/PublicHeader";
+import { PublicFooter } from "@/components/layout/PublicFooter";
 import ReactMarkdown from "react-markdown";
 
 export default function BlogArticle() {
@@ -95,10 +97,13 @@ export default function BlogArticle() {
         readingTime={readingTime}
       />
 
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         {/* Header */}
-        <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-          <div className="container mx-auto px-4 py-4">
+        <PublicHeader />
+        
+        {/* Breadcrumb Bar */}
+        <div className="bg-gray-50 border-b">
+          <div className="container mx-auto px-4 py-3">
             <Link to="/blog">
               <Button variant="ghost" size="sm" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -106,7 +111,7 @@ export default function BlogArticle() {
               </Button>
             </Link>
           </div>
-        </header>
+        </div>
 
         {/* Article Content */}
         <article
@@ -305,6 +310,9 @@ export default function BlogArticle() {
             tags={article.tags || []}
           />
         </article>
+        
+        {/* Footer */}
+        <PublicFooter />
       </div>
     </>
   );
