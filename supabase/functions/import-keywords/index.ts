@@ -34,37 +34,35 @@ serve(async (req) => {
       throw new Error('Admin access required');
     }
 
-    const { keywords, category = 'Real Estate' } = await req.json();
+    const { keywords } = await req.json();
 
     if (!keywords || !Array.isArray(keywords)) {
       throw new Error('Keywords array is required');
     }
 
     // Parse keywords and prepare for insert
-    const keywordsToInsert = keywords.map((keyword: string) => {
-      const cleanKeyword = keyword.trim().toLowerCase();
-
-      // Categorize keywords based on content
-      let autoCategory = category;
-      if (cleanKeyword.includes('luxury') || cleanKeyword.includes('high-end')) {
-        autoCategory = 'Luxury Real Estate';
-      } else if (cleanKeyword.includes('social media') || cleanKeyword.includes('instagram') || cleanKeyword.includes('facebook')) {
-        autoCategory = 'Social Media';
-      } else if (cleanKeyword.includes('bio link') || cleanKeyword.includes('link in bio')) {
-        autoCategory = 'Link in Bio';
-      } else if (cleanKeyword.includes('agent') || cleanKeyword.includes('realtor')) {
-        autoCategory = 'Real Estate Agents';
-      } else if (cleanKeyword.includes('marketing') || cleanKeyword.includes('branding')) {
-        autoCategory = 'Marketing';
+    const keywordsToInsert = keywords.map((kw: any) => {
+      // Support both string format (legacy) and object format (CSV)
+      if (typeof kw === 'string') {
+        return {
+          keyword: kw.trim().toLowerCase(),
+          category: 'Real Estate',
+          is_active: true,
+          usage_count: 0,
+        };
       }
 
+      // Object format from CSV
       return {
-        keyword: cleanKeyword,
-        category: autoCategory,
-        is_active: true,
+        keyword: kw.keyword?.trim().toLowerCase() || '',
+        category: kw.category || 'Real Estate',
+        difficulty: kw.difficulty || 'medium',
+        search_volume: kw.search_volume ? parseInt(kw.search_volume) : null,
+        notes: kw.notes || null,
+        is_active: kw.is_active !== undefined ? kw.is_active : true,
         usage_count: 0,
       };
-    });
+    }).filter(k => k.keyword); // Remove empty keywords
 
     // Insert keywords (ignore duplicates)
     const { data, error: insertError } = await supabaseClient

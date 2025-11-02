@@ -53,7 +53,7 @@ export function useKeywords() {
 
   // Import keywords from CSV
   const importKeywordsMutation = useMutation({
-    mutationFn: async (keywords: string[]) => {
+    mutationFn: async (keywords: Array<string | Partial<Keyword>>) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
@@ -130,7 +130,7 @@ export function useKeywords() {
     keywords,
     unusedKeywords,
     isLoading,
-    importKeywords: (keywords: string[]) => importKeywordsMutation.mutate(keywords),
+    importKeywords: (keywords: Array<string | Partial<Keyword>>) => importKeywordsMutation.mutate(keywords),
     isImporting: importKeywordsMutation.isPending,
     updateKeyword: (id: string, updates: Partial<Keyword>) =>
       updateKeywordMutation.mutate({ id, updates }),

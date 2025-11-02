@@ -11,6 +11,7 @@ import { useKeywords } from "@/hooks/useKeywords";
 import { useArticleWebhooks } from "@/hooks/useArticleWebhooks";
 import { CreateArticleDialog } from "./CreateArticleDialog";
 import { ArticleWebhookDialog } from "./ArticleWebhookDialog";
+import { KeywordImportDialog } from "./KeywordImportDialog";
 
 export function ArticlesManager() {
   const [activeTab, setActiveTab] = useState("all");
@@ -175,8 +176,13 @@ export function ArticlesManager() {
       {/* Keyword Management */}
       <Card>
         <CardHeader>
-          <CardTitle>Keyword Management</CardTitle>
-          <CardDescription>Track SEO keyword usage across articles</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Keyword Management</CardTitle>
+              <CardDescription>Track SEO keyword usage across articles</CardDescription>
+            </div>
+            <KeywordImportDialog />
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingKeywords ? (
