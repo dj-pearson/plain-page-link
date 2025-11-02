@@ -214,23 +214,39 @@ serve(async (req) => {
     const seoTitle = title.length > 60 ? title.substring(0, 57) + '...' : title;
     const seoDescription = excerpt.length > 160 ? excerpt.substring(0, 157) + '...' : excerpt;
 
-    console.log("Article generated successfully");
+    // Save article to database
+    const { data: insertedArticle, error: insertError } = await supabase
+      .from('articles')
+      .insert({
+        title,
+        slug,
+        content,
+        excerpt,
+        seo_title: seoTitle,
+        seo_description: seoDescription,
+        seo_keywords: selectedKeywords,
+        category: category || 'General',
+        tags: selectedKeywords || [],
+        keyword_id: selectedKeywordId,
+        status: 'draft'
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("Error saving article:", insertError);
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to save article: ${insertError.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Article generated and saved successfully");
 
     return new Response(
       JSON.stringify({
         success: true,
-        article: {
-          title,
-          slug,
-          content,
-          excerpt,
-          seoTitle,
-          seoDescription,
-          category: category || 'General',
-          tags: selectedKeywords || [],
-          keywordId: selectedKeywordId,
-          selectedKeyword: selectedTopic
-        }
+        article: insertedArticle
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
