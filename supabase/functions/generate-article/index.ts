@@ -14,6 +14,23 @@ serve(async (req) => {
   try {
     const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = await req.json();
 
+    // Get user ID from authorization header
+    const authHeader = req.headers.get('authorization');
+    let userId = null;
+    
+    if (authHeader) {
+      // Extract JWT token and decode to get user ID
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        // Decode JWT to get user ID (simple base64 decode of payload)
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userId = payload.sub;
+        console.log('User ID from JWT:', userId);
+      } catch (e) {
+        console.error('Failed to decode JWT:', e);
+      }
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -228,6 +245,7 @@ serve(async (req) => {
         category: category || 'General',
         tags: selectedKeywords || [],
         keyword_id: selectedKeywordId,
+        author_id: userId, // Include the user ID
         status: 'published',
         published_at: new Date().toISOString()
       })

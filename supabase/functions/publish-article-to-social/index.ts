@@ -33,13 +33,21 @@ serve(async (req) => {
     }
 
     console.log('Article fetched:', article.title);
+    console.log('Article author_id:', article.author_id);
 
-    // Fetch active webhooks for the user
-    const { data: webhooks, error: webhookError } = await supabase
+    // Fetch active webhooks
+    // If article has author_id, fetch user's webhooks, otherwise fetch all active webhooks
+    let webhooksQuery = supabase
       .from('article_webhooks')
       .select('*')
-      .eq('user_id', article.author_id)
       .eq('is_active', true);
+
+    // Only filter by user_id if author_id is not null
+    if (article.author_id && article.author_id !== '00000000-0000-0000-0000-000000000000') {
+      webhooksQuery = webhooksQuery.eq('user_id', article.author_id);
+    }
+
+    const { data: webhooks, error: webhookError } = await webhooksQuery;
 
     if (webhookError) {
       console.error('Error fetching webhooks:', webhookError);
