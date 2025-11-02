@@ -72,7 +72,7 @@ serve(async (req) => {
 
     console.log('Generating social media content...');
 
-    const articleUrl = `https://agentbio.net/articles/${article.slug}`;
+    const articleUrl = `https://agentbio.net/blog/${article.slug}`;
     
     const prompt = `Create social media posts to promote this article:
 Title: ${article.title}
