@@ -2,6 +2,7 @@ import { X, Bed, Bath, Ruler, MapPin, Calendar, Share2, Heart } from "lucide-rea
 import { useState } from "react";
 import type { Listing } from "@/types/listing";
 import { formatPrice, formatPropertyStats, formatAddress, formatDate } from "@/lib/format";
+import { getImageUrls } from "@/lib/images";
 
 interface ListingDetailModalProps {
     listing: Listing;
@@ -19,9 +20,14 @@ export default function ListingDetailModal({
 
     if (!isOpen) return null;
 
-    const images = listing.images && listing.images.length > 0
-        ? listing.images
-        : [listing.image_url || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"];
+    const images = getImageUrls(
+        listing.photos?.length > 0 
+            ? listing.photos 
+            : listing.primary_photo 
+                ? [listing.primary_photo]
+                : undefined,
+        'listings'
+    );
 
     const handlePrevImage = () => {
         setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));

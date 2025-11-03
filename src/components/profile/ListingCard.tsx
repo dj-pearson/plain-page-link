@@ -1,5 +1,6 @@
 import { Bed, Bath, Maximize, MapPin, Calendar } from "lucide-react";
 import { formatPrice, formatPropertyStats } from "@/lib/format";
+import { getImageUrl } from "@/lib/images";
 import type { Listing } from "@/types";
 
 interface ListingCardProps {
@@ -24,10 +25,10 @@ const statusLabels = {
 };
 
 export default function ListingCard({ listing, onClick }: ListingCardProps) {
-    const primaryPhoto =
-        listing.primary_photo ||
-        listing.photos[0] ||
-        "/placeholder-property.jpg";
+    const primaryPhoto = getImageUrl(
+        listing.primary_photo || listing.photos?.[0],
+        'listings'
+    );
 
     return (
         <div

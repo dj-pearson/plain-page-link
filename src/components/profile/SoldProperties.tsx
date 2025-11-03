@@ -18,7 +18,7 @@ export default function SoldProperties({
     }
 
     // Calculate some stats
-    const totalValue = soldListings.reduce((sum, l) => sum + l.price, 0);
+    const totalValue = soldListings.reduce((sum, l) => sum + (l.price || 0), 0);
     const avgSalePrice =
         soldListings.length > 0 ? totalValue / soldListings.length : 0;
 
@@ -47,14 +47,17 @@ export default function SoldProperties({
                     </div>
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
                         <p className="text-3xl font-bold">
-                            ${(totalValue / 1000000).toFixed(1)}
-                            M+
+                            ${totalValue >= 1000000 
+                                ? `${(totalValue / 1000000).toFixed(1)}M+` 
+                                : `${(totalValue / 1000).toFixed(0)}K+`}
                         </p>
                         <p className="text-sm text-blue-100">Total Volume</p>
                     </div>
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 col-span-2 md:col-span-1">
                         <p className="text-3xl font-bold flex items-center gap-2">
-                            ${(avgSalePrice / 1000).toFixed(0)}K
+                            ${avgSalePrice >= 1000000 
+                                ? `${(avgSalePrice / 1000000).toFixed(1)}M` 
+                                : `${(avgSalePrice / 1000).toFixed(0)}K`}
                             <TrendingUp className="h-5 w-5" />
                         </p>
                         <p className="text-sm text-blue-100">Avg Sale Price</p>

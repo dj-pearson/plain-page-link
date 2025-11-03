@@ -25,14 +25,14 @@ export function SocialProofBanner({ stats }: SocialProofBannerProps) {
     };
 
     const statsToDisplay = [
-        stats.propertiesSold && {
+        stats.propertiesSold && stats.propertiesSold > 0 && {
             icon: Home,
-            value: stats.propertiesSold,
+            value: stats.propertiesSold.toString(),
             label: "Properties Sold",
             color: "text-blue-600",
             bgColor: "bg-blue-100",
         },
-        stats.totalVolume && {
+        stats.totalVolume && stats.totalVolume > 0 && {
             icon: TrendingUp,
             value: formatVolume(stats.totalVolume),
             label: "Total Volume",
@@ -40,14 +40,16 @@ export function SocialProofBanner({ stats }: SocialProofBannerProps) {
             bgColor: "bg-green-100",
         },
         stats.averageRating &&
-            stats.reviewCount && {
+            stats.reviewCount && 
+            stats.averageRating > 0 &&
+            stats.reviewCount > 0 && {
                 icon: Star,
                 value: `${stats.averageRating.toFixed(1)}/5`,
                 label: `${stats.reviewCount} Reviews`,
                 color: "text-yellow-600",
                 bgColor: "bg-yellow-100",
             },
-        stats.yearsExperience && {
+        stats.yearsExperience && stats.yearsExperience > 0 && {
             icon: Award,
             value: `${stats.yearsExperience}+`,
             label: "Years Experience",
