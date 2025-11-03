@@ -101,8 +101,11 @@ export default function ListingDetailModal({
                     <div className="relative bg-gray-900 aspect-video">
                         <img
                             src={images[currentImageIndex]}
-                            alt={`${listing.title} - Image ${currentImageIndex + 1}`}
+                            alt={`${listing.title || (listing as any).address || 'Property'} - Image ${currentImageIndex + 1}`}
                             className="w-full h-full object-contain"
+                            onError={(e) => {
+                                e.currentTarget.src = '/placeholder-property.jpg';
+                            }}
                         />
 
                         {images.length > 1 && (
@@ -145,6 +148,9 @@ export default function ListingDetailModal({
                                         src={image}
                                         alt={`Thumbnail ${index + 1}`}
                                         className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            e.currentTarget.src = '/placeholder-property.jpg';
+                                        }}
                                     />
                                 </button>
                             ))}
@@ -161,7 +167,9 @@ export default function ListingDetailModal({
                                 </p>
                                 <div className="flex items-center gap-2 text-gray-600">
                                     <MapPin className="h-4 w-4" />
-                                    <span>{formatAddress(listing.address)}</span>
+                                    <span>
+                                        {(listing as any).address || ''}{(listing as any).city ? `, ${(listing as any).city}` : ''}
+                                    </span>
                                 </div>
                             </div>
                             <span

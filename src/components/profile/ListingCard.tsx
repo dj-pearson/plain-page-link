@@ -39,9 +39,12 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
             <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
                 <img
                     src={primaryPhoto}
-                    alt={listing.title || listing.address_full}
+                    alt={listing.title || (listing as any).address || 'Property'}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
+                    onError={(e) => {
+                        e.currentTarget.src = '/placeholder-property.jpg';
+                    }}
                 />
 
                 {/* Status Badge */}
@@ -123,8 +126,7 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
                 <div className="flex items-start gap-2 text-sm text-gray-700">
                     <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                     <p className="line-clamp-2">
-                        {listing.address_street}, {listing.address_city},{" "}
-                        {listing.address_state} {listing.address_zip}
+                        {(listing as any).address || ''}{(listing as any).city ? `, ${(listing as any).city}` : ''}
                     </p>
                 </div>
 
