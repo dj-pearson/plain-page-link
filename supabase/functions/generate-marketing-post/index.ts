@@ -15,12 +15,12 @@ serve(async (req) => {
     const { webhookUrl } = await req.json();
     console.log('Generating marketing post for webhook:', webhookUrl);
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const claudeApiKey = Deno.env.get('CLAUDE_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!claudeApiKey) {
+      throw new Error('CLAUDE_API_KEY not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -69,25 +69,26 @@ Return ONLY valid JSON with this exact structure:
   "hashtags": ["hashtag1", "hashtag2", ...]
 }`;
 
-    console.log('Calling AI to generate marketing content...');
+    console.log('Calling Claude API to generate marketing content...');
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'x-api-key': claudeApiKey,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: config.default_model || 'google/gemini-2.5-flash',
+        model: config.default_model || 'claude-sonnet-4-5-20250929',
+        max_tokens: config.max_tokens_large || 8000,
+        temperature: config.temperature_creative || 0.7,
+        system: 'You are a creative social media marketing expert specializing in real estate. Generate unique, engaging content that stands out. NEVER repeat the same angles or hooks. You MUST respond ONLY with valid JSON, no markdown formatting, no code blocks, just pure JSON.',
         messages: [
           { 
-            role: 'system', 
-            content: 'You are a creative social media marketing expert specializing in real estate. Generate unique, engaging content that stands out. NEVER repeat the same angles or hooks. You MUST respond ONLY with valid JSON, no markdown formatting, no code blocks, just pure JSON.' 
-          },
-          { role: 'user', content: prompt }
+            role: 'user', 
+            content: prompt 
+          }
         ],
-        temperature: config.temperature_creative || 0.7,
-        max_tokens: config.max_tokens_large || 8000,
       }),
     });
 
@@ -98,7 +99,7 @@ Return ONLY valid JSON with this exact structure:
     }
 
     const aiData = await aiResponse.json();
-    const generatedContent = aiData.choices[0].message.content;
+    const generatedContent = aiData.content[0].text;
     
     console.log('AI Raw response:', generatedContent);
 
