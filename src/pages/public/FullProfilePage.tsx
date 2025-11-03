@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Navigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { FullPageLoader } from "@/components/LoadingSpinner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SEOHead } from "@/components/SEOHead";
 import { applyTheme } from "@/lib/themes";
 import type { Listing } from "@/types";
-import NotFound from "@/pages/public/NotFound";
+import NotFound from "./NotFound";
 
 export default function FullProfilePage() {
     const { slug } = useParams<{ slug: string }>();
@@ -46,7 +46,7 @@ export default function FullProfilePage() {
     }
 
     if (error || !data) {
-        return <Navigate to="/404" replace />;
+        return <NotFound />;
     }
 
     const { profile, listings, testimonials, links } = data;

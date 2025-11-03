@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuthStore } from "./stores/useAuthStore";
-import { trackPageView } from "./lib/analytics";
 import { errorHandler } from "./lib/errorHandler";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
