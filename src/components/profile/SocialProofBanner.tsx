@@ -66,12 +66,7 @@ export function SocialProofBanner({ stats }: SocialProofBannerProps) {
                 <h3 className="text-center text-lg font-semibold mb-6">
                     Trusted by Hundreds of Happy Clients
                 </h3>
-                <div
-                    className={`grid grid-cols-2 md:grid-cols-${Math.min(
-                        statsToDisplay.length,
-                        4
-                    )} gap-6`}
-                >
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     {statsToDisplay.map((stat, index) => {
                         if (!stat) return null;
                         const Icon = stat.icon;

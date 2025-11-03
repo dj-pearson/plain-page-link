@@ -25,7 +25,7 @@ if (!rootEl) {
 console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
 
 ReactDOM.createRoot(rootEl).render(
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ErrorBoundary>
             <HelmetProvider>
                 <QueryClientProvider client={queryClient}>

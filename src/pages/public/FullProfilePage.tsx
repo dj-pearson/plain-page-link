@@ -35,10 +35,19 @@ export default function FullProfilePage() {
     useEffect(() => {
         if (data?.profile?.theme) {
             try {
-                const theme = typeof data.profile.theme === 'string'
-                    ? JSON.parse(data.profile.theme)
-                    : data.profile.theme;
-                applyTheme(theme);
+                // Check if theme is a valid JSON string or just a theme name like "default"
+                if (typeof data.profile.theme === 'string') {
+                    // Only try to parse if it looks like JSON (starts with { or [)
+                    if (data.profile.theme.trim().startsWith('{') || data.profile.theme.trim().startsWith('[')) {
+                        applyTheme(data.profile.theme);
+                    } else {
+                        // It's just a theme name like "default", skip applying
+                        console.log('[Theme] Using theme preset:', data.profile.theme);
+                    }
+                } else {
+                    // It's already an object, stringify it
+                    applyTheme(JSON.stringify(data.profile.theme));
+                }
             } catch (e) {
                 console.error('Failed to apply profile theme:', e);
             }
