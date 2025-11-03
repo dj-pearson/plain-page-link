@@ -19,7 +19,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
                 ) : (
                     <div className="w-24 h-24 md:w-32 md:h-32 rounded-full mx-auto bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-4 border-blue-100">
                         <span className="text-4xl md:text-5xl font-bold text-white">
-                            {profile.display_name
+                            {(profile.display_name || profile.full_name || profile.username || "U")
                                 .split(" ")
                                 .map((n) => n[0])
                                 .join("")
@@ -32,7 +32,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
 
             {/* Name & Title */}
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-                {profile.display_name}
+                {profile.display_name || profile.full_name || profile.username}
             </h1>
             {profile.title && (
                 <p className="text-lg text-blue-600 font-medium mb-4">
@@ -63,7 +63,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
                         <span>{profile.years_experience} years</span>
                     </div>
                 )}
-                {profile.service_cities.length > 0 && (
+                {profile.service_cities && profile.service_cities.length > 0 && (
                     <div className="flex items-center gap-1">
                         <MapPin className="h-4 w-4" />
                         <span>{profile.service_cities[0]}</span>
@@ -74,7 +74,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
                         )}
                     </div>
                 )}
-                {profile.certifications.length > 0 && (
+                {profile.certifications && profile.certifications.length > 0 && (
                     <div className="flex items-center gap-1">
                         <Award className="h-4 w-4" />
                         <span>{profile.certifications.join(", ")}</span>
@@ -92,7 +92,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
             )}
 
             {/* Specialties */}
-            {profile.specialties.length > 0 && (
+            {profile.specialties && profile.specialties.length > 0 && (
                 <div className="mt-6">
                     <div className="flex flex-wrap justify-center gap-2">
                         {profile.specialties.map((specialty, index) => (

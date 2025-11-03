@@ -43,7 +43,6 @@ import { AdminDashboard } from "./pages/admin/AdminDashboard";
 
 function App() {
     const { initialize, user } = useAuthStore();
-    
 
     // Initialize auth and PWA on mount
     useEffect(() => {

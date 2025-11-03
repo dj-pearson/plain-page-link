@@ -27,12 +27,16 @@ export default function FullProfilePage() {
     // Fetch profile and related data
     const { data, isLoading, error } = usePublicProfile(slug || '');
 
+    // Track profile view analytics - must be called before any conditional returns
+    // We pass the profile.id only when data is available
+    useProfileTracking(data?.profile?.id, slug || "");
+
     // Apply theme when profile loads
     useEffect(() => {
         if (data?.profile?.theme) {
             try {
-                const theme = typeof data.profile.theme === 'string' 
-                    ? JSON.parse(data.profile.theme) 
+                const theme = typeof data.profile.theme === 'string'
+                    ? JSON.parse(data.profile.theme)
                     : data.profile.theme;
                 applyTheme(theme);
             } catch (e) {
@@ -51,8 +55,6 @@ export default function FullProfilePage() {
 
     const { profile, listings, testimonials, links } = data;
 
-    // Track profile view analytics
-    useProfileTracking(profile.id, slug || "");
     const activeListings = listings.filter((l: any) => l.status === "active");
     const soldListings = listings.filter((l: any) => l.status === "sold");
 
@@ -71,7 +73,7 @@ export default function FullProfilePage() {
     const seoTitle = profile.seo_title || `${profile.full_name || profile.username} - Real Estate Agent`;
     const seoDescription = profile.seo_description || profile.bio || `Browse properties and connect with ${profile.full_name || profile.username}, a trusted real estate professional.`;
     const currentUrl = `${window.location.origin}/${slug}`;
-    
+
     // Generate structured data for SEO
     const personSchema = {
         "@context": "https://schema.org",

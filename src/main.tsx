@@ -25,18 +25,16 @@ if (!rootEl) {
 console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
 
 ReactDOM.createRoot(rootEl).render(
-    <React.StrictMode>
-        <BrowserRouter>
-            <ErrorBoundary>
-                <HelmetProvider>
-                    <QueryClientProvider client={queryClient}>
-                        <App />
-                        <ReactQueryDevtools initialIsOpen={false} />
-                    </QueryClientProvider>
-                </HelmetProvider>
-            </ErrorBoundary>
-        </BrowserRouter>
-    </React.StrictMode>
+    <BrowserRouter>
+        <ErrorBoundary>
+            <HelmetProvider>
+                <QueryClientProvider client={queryClient}>
+                    <App />
+                    <ReactQueryDevtools initialIsOpen={false} />
+                </QueryClientProvider>
+            </HelmetProvider>
+        </ErrorBoundary>
+    </BrowserRouter>
 );
 
 console.log("[Lovable] React render invoked");
