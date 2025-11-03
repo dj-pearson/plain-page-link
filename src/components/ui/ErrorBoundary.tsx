@@ -1,6 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertCircle, RefreshCcw, Home } from "lucide-react";
-import { Link } from "react-router-dom";
 
 interface Props {
     children: ReactNode;
@@ -93,13 +92,13 @@ export default class ErrorBoundary extends Component<Props, State> {
                                 <RefreshCcw className="h-5 w-5" />
                                 Try Again
                             </button>
-                            <Link
-                                to="/"
+                            <a
+                                href="/"
                                 className="flex-1 flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:border-gray-400 transition-colors"
                             >
                                 <Home className="h-5 w-5" />
                                 Go Home
-                            </Link>
+                            </a>
                         </div>
                     </div>
                 </div>
