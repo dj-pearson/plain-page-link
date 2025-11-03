@@ -51,11 +51,27 @@ export const usePublicProfile = (username: string) => {
 
       if (linksError) throw linksError;
 
+      // Fetch user settings for profile visibility
+      const { data: settings, error: settingsError } = await supabase
+        .from('user_settings')
+        .select('show_listings, show_sold_properties, show_testimonials, show_social_proof, show_contact_buttons')
+        .eq('user_id', profile.id)
+        .maybeSingle();
+
+      if (settingsError) throw settingsError;
+
       return {
         profile,
         listings: listings || [],
         testimonials: testimonials || [],
-        links: links || []
+        links: links || [],
+        settings: settings || {
+          show_listings: true,
+          show_sold_properties: true,
+          show_testimonials: true,
+          show_social_proof: true,
+          show_contact_buttons: true,
+        }
       };
     },
     enabled: !!username,

@@ -9,6 +9,11 @@ export interface UserSettings {
   sms_leads: boolean;
   weekly_report: boolean;
   marketing_emails: boolean;
+  show_listings: boolean;
+  show_sold_properties: boolean;
+  show_testimonials: boolean;
+  show_social_proof: boolean;
+  show_contact_buttons: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +45,11 @@ export function useSettings() {
             sms_leads: false,
             weekly_report: true,
             marketing_emails: false,
+            show_listings: true,
+            show_sold_properties: true,
+            show_testimonials: true,
+            show_social_proof: true,
+            show_contact_buttons: true,
           })
           .select()
           .single();

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, Bell, CreditCard, User, Lock, Mail, Save } from "lucide-react";
+import { Shield, Bell, CreditCard, User, Lock, Mail, Save, Eye } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,14 @@ export default function Settings() {
     smsLeads: false,
     weeklyReport: true,
     marketingEmails: false,
+  });
+
+  const [profileVisibility, setProfileVisibility] = useState({
+    showListings: true,
+    showSoldProperties: true,
+    showTestimonials: true,
+    showSocialProof: true,
+    showContactButtons: true,
   });
 
   const [password, setPassword] = useState({
@@ -106,6 +114,13 @@ export default function Settings() {
         weeklyReport: settings.weekly_report,
         marketingEmails: settings.marketing_emails,
       });
+      setProfileVisibility({
+        showListings: settings.show_listings,
+        showSoldProperties: settings.show_sold_properties,
+        showTestimonials: settings.show_testimonials,
+        showSocialProof: settings.show_social_proof,
+        showContactButtons: settings.show_contact_buttons,
+      });
     }
   }, [settings]);
 
@@ -128,6 +143,31 @@ export default function Settings() {
       toast({
         title: "Error",
         description: "Failed to update settings.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleProfileVisibilityChange = async (key: keyof typeof profileVisibility, value: boolean) => {
+    setProfileVisibility(prev => ({ ...prev, [key]: value }));
+    
+    // Map frontend keys to database column names
+    const dbKey = key === 'showListings' ? 'show_listings' :
+                  key === 'showSoldProperties' ? 'show_sold_properties' :
+                  key === 'showTestimonials' ? 'show_testimonials' :
+                  key === 'showSocialProof' ? 'show_social_proof' :
+                  'show_contact_buttons';
+    
+    try {
+      await updateSettings.mutateAsync({ [dbKey]: value });
+      toast({
+        title: "Profile visibility updated",
+        description: "Your profile display preferences have been saved.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update visibility settings.",
         variant: "destructive",
       });
     }
@@ -403,6 +443,106 @@ export default function Settings() {
                 type="checkbox"
                 checked={notifications.marketingEmails}
                 onChange={(e) => handleNotificationChange('marketingEmails', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile Visibility */}
+      <div className="bg-card border border-border rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Eye className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">
+            Profile Visibility
+          </h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Control which sections appear on your public profile page
+        </p>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
+              <div className="font-medium text-foreground">Show Contact Buttons</div>
+              <div className="text-sm text-muted-foreground">
+                Display email, phone, and text buttons
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={profileVisibility.showContactButtons}
+                onChange={(e) => handleProfileVisibilityChange('showContactButtons', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
+              <div className="font-medium text-foreground">Show Social Proof Banner</div>
+              <div className="text-sm text-muted-foreground">
+                Display stats like properties sold and total volume
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={profileVisibility.showSocialProof}
+                onChange={(e) => handleProfileVisibilityChange('showSocialProof', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
+              <div className="font-medium text-foreground">Show Active Listings</div>
+              <div className="text-sm text-muted-foreground">
+                Display your currently available properties
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={profileVisibility.showListings}
+                onChange={(e) => handleProfileVisibilityChange('showListings', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
+              <div className="font-medium text-foreground">Show Sold Properties</div>
+              <div className="text-sm text-muted-foreground">
+                Display your past sales and success history
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={profileVisibility.showSoldProperties}
+                onChange={(e) => handleProfileVisibilityChange('showSoldProperties', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+          <div className="flex items-center justify-between py-3">
+            <div>
+              <div className="font-medium text-foreground">Show Testimonials</div>
+              <div className="text-sm text-muted-foreground">
+                Display client reviews and ratings
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={profileVisibility.showTestimonials}
+                onChange={(e) => handleProfileVisibilityChange('showTestimonials', e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>

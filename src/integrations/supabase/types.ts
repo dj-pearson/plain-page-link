@@ -996,6 +996,11 @@ export type Database = {
           email_leads: boolean | null
           id: string
           marketing_emails: boolean | null
+          show_contact_buttons: boolean | null
+          show_listings: boolean | null
+          show_social_proof: boolean | null
+          show_sold_properties: boolean | null
+          show_testimonials: boolean | null
           sms_leads: boolean | null
           updated_at: string | null
           user_id: string
@@ -1006,6 +1011,11 @@ export type Database = {
           email_leads?: boolean | null
           id?: string
           marketing_emails?: boolean | null
+          show_contact_buttons?: boolean | null
+          show_listings?: boolean | null
+          show_social_proof?: boolean | null
+          show_sold_properties?: boolean | null
+          show_testimonials?: boolean | null
           sms_leads?: boolean | null
           updated_at?: string | null
           user_id: string
@@ -1016,6 +1026,11 @@ export type Database = {
           email_leads?: boolean | null
           id?: string
           marketing_emails?: boolean | null
+          show_contact_buttons?: boolean | null
+          show_listings?: boolean | null
+          show_social_proof?: boolean | null
+          show_sold_properties?: boolean | null
+          show_testimonials?: boolean | null
           sms_leads?: boolean | null
           updated_at?: string | null
           user_id?: string

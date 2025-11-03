@@ -63,7 +63,7 @@ export default function FullProfilePage() {
         return <NotFound />;
     }
 
-    const { profile, listings, testimonials, links } = data;
+    const { profile, listings, testimonials, links, settings } = data;
 
     const activeListings = listings.filter((l: any) => l.status === "active");
     const soldListings = listings.filter((l: any) => l.status === "sold");
@@ -128,28 +128,32 @@ export default function FullProfilePage() {
                     <ProfileHeader profile={profile} />
 
                     {/* Contact Buttons */}
-                    <ContactButtons
-                        profile={profile}
-                        onContactClick={(method) =>
-                            console.log("Contact clicked:", method)
-                        }
-                    />
+                    {settings?.show_contact_buttons !== false && (
+                        <ContactButtons
+                            profile={profile}
+                            onContactClick={(method) =>
+                                console.log("Contact clicked:", method)
+                            }
+                        />
+                    )}
 
                     {/* Social Proof Banner */}
-                    <div className="pt-4">
-                        <SocialProofBanner
-                            stats={{
-                                propertiesSold: soldListings.length,
-                                totalVolume: totalVolume,
-                                averageRating: averageRating,
-                                reviewCount: testimonials.length,
-                                yearsExperience: profile.years_experience,
-                            }}
-                        />
-                    </div>
+                    {settings?.show_social_proof !== false && (
+                        <div className="pt-4">
+                            <SocialProofBanner
+                                stats={{
+                                    propertiesSold: soldListings.length,
+                                    totalVolume: totalVolume,
+                                    averageRating: averageRating,
+                                    reviewCount: testimonials.length,
+                                    yearsExperience: profile.years_experience,
+                                }}
+                            />
+                        </div>
+                    )}
 
                     {/* Active Listings */}
-                    {activeListings.length > 0 && (
+                    {settings?.show_listings !== false && activeListings.length > 0 && (
                         <div className="pt-4">
                             <ListingGallery
                                 listings={activeListings}
@@ -170,17 +174,19 @@ export default function FullProfilePage() {
                     </div>
 
                     {/* Sold Properties */}
-                    <div className="pt-4">
-                        <SoldProperties
-                            listings={listings}
-                            onListingClick={(listing) =>
-                                setSelectedListing(listing)
-                            }
-                        />
-                    </div>
+                    {settings?.show_sold_properties !== false && (
+                        <div className="pt-4">
+                            <SoldProperties
+                                listings={listings}
+                                onListingClick={(listing) =>
+                                    setSelectedListing(listing)
+                                }
+                            />
+                        </div>
+                    )}
 
                     {/* Testimonials */}
-                    {testimonials.length > 0 && (
+                    {settings?.show_testimonials !== false && testimonials.length > 0 && (
                         <div className="pt-8">
                             <TestimonialSection testimonials={testimonials} />
                         </div>
