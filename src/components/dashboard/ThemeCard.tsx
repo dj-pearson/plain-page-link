@@ -35,10 +35,15 @@ export function ThemeCard({
             <CardContent className="p-0">
                 {/* Theme Preview */}
                 <div
-                    className="h-32 p-4 rounded-t-lg"
+                    className="h-32 p-4 rounded-t-lg relative overflow-hidden"
                     style={{ backgroundColor: theme.colors.background }}
                 >
-                    <div className="flex items-start gap-2 mb-3">
+                    {/* Show sparkle effect for 3D themes */}
+                    {theme.has3D && (
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-pink-500/10 animate-pulse" />
+                    )}
+                    
+                    <div className="flex items-start gap-2 mb-3 relative z-10">
                         <div
                             className="w-16 h-16 rounded-full"
                             style={{ backgroundColor: theme.colors.primary }}
@@ -63,7 +68,7 @@ export function ThemeCard({
                     </div>
 
                     {/* Color Palette */}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 relative z-10">
                         <div
                             className="w-8 h-8 rounded"
                             style={{ backgroundColor: theme.colors.primary }}

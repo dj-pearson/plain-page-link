@@ -73,9 +73,21 @@ export default function Theme() {
             if (error) throw error;
 
             if (data?.theme) {
-                const savedTheme = typeof data.theme === 'string' 
-                    ? JSON.parse(data.theme) 
-                    : data.theme;
+                let savedTheme: ThemeConfig;
+                
+                // Handle different theme formats
+                if (typeof data.theme === 'string') {
+                    // Check if it's JSON or just a preset name
+                    if (data.theme.startsWith('{')) {
+                        savedTheme = JSON.parse(data.theme);
+                    } else {
+                        // It's a preset name, find the matching theme
+                        const matchingTheme = DEFAULT_THEMES.find(t => t.id === data.theme);
+                        savedTheme = matchingTheme || DEFAULT_THEMES[0];
+                    }
+                } else {
+                    savedTheme = data.theme as ThemeConfig;
+                }
                 
                 setSelectedTheme(savedTheme);
                 setCustomColors(savedTheme.colors);
@@ -84,14 +96,22 @@ export default function Theme() {
             }
         } catch (error) {
             console.error('Failed to load saved theme:', error);
+            // Load default theme on error
+            const defaultTheme = DEFAULT_THEMES[0];
+            setSelectedTheme(defaultTheme);
+            setCustomColors(defaultTheme.colors);
+            setCustomFonts(defaultTheme.fonts);
         }
     };
 
-    const handleThemeSelect = (theme: ThemeConfig) => {
+    const handleThemeSelect = async (theme: ThemeConfig) => {
         setSelectedTheme(theme);
         setCustomColors(theme.colors);
         setCustomFonts(theme.fonts);
         setIsCustomizing(false);
+        
+        // Auto-apply theme for instant preview
+        applyTheme(theme);
     };
 
     const handleSaveTheme = async () => {
@@ -245,10 +265,23 @@ export default function Theme() {
             </div>
 
             {/* Info Banner */}
-            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                    💡 <strong>Tip:</strong> After saving your theme, click "Preview Live" to see how it looks on your public profile. Changes are applied instantly!
-                </p>
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                    <div className="text-2xl">✨</div>
+                    <div className="flex-1">
+                        <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                            How to see your theme changes:
+                        </p>
+                        <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
+                            <li>Select a theme below and click <strong>"Save Theme"</strong></li>
+                            <li>Click <strong>"Preview Live"</strong> button above to open your public profile in a new tab</li>
+                            <li>Premium themes with 3D effects will show animated backgrounds on your public page!</li>
+                        </ol>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                            💡 Note: Theme effects only appear on your <strong>public profile page</strong>, not in this dashboard.
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <Tabs defaultValue="presets" className="space-y-6">
