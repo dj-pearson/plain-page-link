@@ -26,16 +26,16 @@ console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
 
 ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
-        <ErrorBoundary>
-            <HelmetProvider>
-                <QueryClientProvider client={queryClient}>
-                    <BrowserRouter>
+        <BrowserRouter>
+            <ErrorBoundary>
+                <HelmetProvider>
+                    <QueryClientProvider client={queryClient}>
                         <App />
-                    </BrowserRouter>
-                    <ReactQueryDevtools initialIsOpen={false} />
-                </QueryClientProvider>
-            </HelmetProvider>
-        </ErrorBoundary>
+                        <ReactQueryDevtools initialIsOpen={false} />
+                    </QueryClientProvider>
+                </HelmetProvider>
+            </ErrorBoundary>
+        </BrowserRouter>
     </React.StrictMode>
 );
 
