@@ -29,7 +29,6 @@
         "@supabase/supabase-js": "^2.78.0",
         "@tanstack/react-query": "^5.28.4",
         "@tanstack/react-query-devtools": "^5.28.4",
-        "@vite-pwa/assets-generator": "^0.2.6",
         "axios": "^1.6.7",
         "class-variance-authority": "^0.7.0",
         "clsx": "^2.1.0",
