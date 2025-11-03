@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuthStore } from "./stores/useAuthStore";
 import { trackPageView } from "./lib/analytics";
@@ -44,7 +44,7 @@ import { AdminDashboard } from "./pages/admin/AdminDashboard";
 
 function App() {
     const { initialize, user } = useAuthStore();
-    const location = useLocation();
+    
 
     // Initialize auth and PWA on mount
     useEffect(() => {
@@ -72,10 +72,6 @@ function App() {
         registerPushNotifications();
     }, [user]);
 
-    // Track page views on route change
-    useEffect(() => {
-        trackPageView(location.pathname);
-    }, [location]);
 
     // Set user context for error monitoring
     useEffect(() => {

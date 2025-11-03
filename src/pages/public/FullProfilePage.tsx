@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SEOHead } from "@/components/SEOHead";
 import { applyTheme } from "@/lib/themes";
 import type { Listing } from "@/types";
+import NotFound from "@/pages/public/NotFound";
 
 export default function FullProfilePage() {
     const { slug } = useParams<{ slug: string }>();
