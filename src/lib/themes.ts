@@ -11,6 +11,8 @@ export interface ThemeConfig {
     name: string;
     description: string;
     isPremium: boolean;
+    has3D?: boolean;
+    threeDEffect?: '3d-particles' | '3d-mesh' | '3d-floating';
     colors: {
         primary: string;
         secondary: string;
@@ -133,6 +135,106 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
         fonts: {
             heading: "Roboto",
             body: "Roboto",
+        },
+    },
+    {
+        id: "cosmic",
+        name: "Cosmic",
+        description: "Futuristic theme with 3D particle effects",
+        isPremium: true,
+        has3D: true,
+        threeDEffect: "3d-particles",
+        colors: {
+            primary: "#8b5cf6",
+            secondary: "#a78bfa",
+            accent: "#c084fc",
+            background: "#0f172a",
+            foreground: "#e2e8f0",
+            muted: "#6366f1",
+        },
+        fonts: {
+            heading: "Orbitron",
+            body: "Rajdhani",
+        },
+    },
+    {
+        id: "luxe",
+        name: "Luxe",
+        description: "Premium gradient mesh with 3D sphere animation",
+        isPremium: true,
+        has3D: true,
+        threeDEffect: "3d-mesh",
+        colors: {
+            primary: "#fbbf24",
+            secondary: "#f59e0b",
+            accent: "#d97706",
+            background: "#1e1b4b",
+            foreground: "#fef3c7",
+            muted: "#fde68a",
+        },
+        fonts: {
+            heading: "Playfair Display",
+            body: "Crimson Pro",
+        },
+    },
+    {
+        id: "neon",
+        name: "Neon",
+        description: "Vibrant theme with floating 3D geometry",
+        isPremium: true,
+        has3D: true,
+        threeDEffect: "3d-floating",
+        colors: {
+            primary: "#ec4899",
+            secondary: "#f472b6",
+            accent: "#fb7185",
+            background: "#18181b",
+            foreground: "#fce7f3",
+            muted: "#f9a8d4",
+        },
+        fonts: {
+            heading: "Bungee",
+            body: "Exo 2",
+        },
+    },
+    {
+        id: "royal",
+        name: "Royal",
+        description: "Regal purple and gold with animated particles",
+        isPremium: true,
+        has3D: true,
+        threeDEffect: "3d-particles",
+        colors: {
+            primary: "#7c3aed",
+            secondary: "#a855f7",
+            accent: "#fbbf24",
+            background: "#1e1b4b",
+            foreground: "#f3e8ff",
+            muted: "#c4b5fd",
+        },
+        fonts: {
+            heading: "Cinzel",
+            body: "Cormorant Garamond",
+        },
+    },
+    {
+        id: "aurora",
+        name: "Aurora",
+        description: "Northern lights inspired with gradient mesh",
+        isPremium: true,
+        has3D: true,
+        threeDEffect: "3d-mesh",
+        colors: {
+            primary: "#10b981",
+            secondary: "#34d399",
+            accent: "#6ee7b7",
+            background: "#0c4a6e",
+            foreground: "#ecfdf5",
+            muted: "#6ee7b7",
+        },
+        fonts: {
+            heading: "Quicksand",
+            body: "Nunito",
         },
     },
 ];
@@ -471,60 +573,84 @@ export const hexToHSL = (hex: string): string => {
 };
 
 // Apply theme to document
-export const applyTheme = (themeData: string | null) => {
+export const applyTheme = (themeData: string | ThemeConfig | null) => {
     if (!themeData) return;
 
     try {
-        const theme: PageTheme = JSON.parse(themeData);
+        let theme: any;
+        
+        // Handle different input types
+        if (typeof themeData === 'string') {
+            theme = JSON.parse(themeData);
+        } else {
+            theme = themeData;
+        }
+
         const root = document.documentElement;
 
         // Apply colors as CSS variables
         if (theme.colors) {
-            root.style.setProperty("--theme-primary", hexToHSL(theme.colors.primary));
-            root.style.setProperty("--theme-secondary", hexToHSL(theme.colors.secondary));
-            root.style.setProperty("--theme-background", hexToHSL(theme.colors.background));
-            root.style.setProperty("--theme-text", hexToHSL(theme.colors.text));
-            root.style.setProperty("--theme-accent", hexToHSL(theme.colors.accent));
+            // Support both old PageTheme format and new ThemeConfig format
+            const primaryColor = theme.colors.primary;
+            const secondaryColor = theme.colors.secondary;
+            const bgColor = theme.colors.background;
+            const textColor = theme.colors.text || theme.colors.foreground;
+            const accentColor = theme.colors.accent;
+
+            if (primaryColor) root.style.setProperty("--theme-primary", hexToHSL(primaryColor));
+            if (secondaryColor) root.style.setProperty("--theme-secondary", hexToHSL(secondaryColor));
+            if (bgColor) root.style.setProperty("--theme-background", hexToHSL(bgColor));
+            if (textColor) root.style.setProperty("--theme-text", hexToHSL(textColor));
+            if (accentColor) root.style.setProperty("--theme-accent", hexToHSL(accentColor));
         }
 
         // Apply fonts
         if (theme.fonts) {
             root.style.setProperty("--theme-font-heading", theme.fonts.heading);
             root.style.setProperty("--theme-font-body", theme.fonts.body);
+            
+            // Also apply to body for immediate effect
+            document.body.style.fontFamily = `${theme.fonts.body}, sans-serif`;
         }
 
-        // Apply border radius
-        const borderRadiusMap: Record<string, string> = {
-            none: "0",
-            small: "0.25rem",
-            medium: "0.5rem",
-            large: "1rem",
-            full: "9999px",
-        };
-        root.style.setProperty(
-            "--theme-border-radius",
-            borderRadiusMap[theme.borderRadius] || "0.5rem"
-        );
+        // Apply border radius if present
+        if (theme.borderRadius) {
+            const borderRadiusMap: Record<string, string> = {
+                none: "0",
+                small: "0.25rem",
+                medium: "0.5rem",
+                large: "1rem",
+                full: "9999px",
+            };
+            root.style.setProperty(
+                "--theme-border-radius",
+                borderRadiusMap[theme.borderRadius] || "0.5rem"
+            );
+        }
 
-        // Apply spacing
-        const spacingMap: Record<string, string> = {
-            compact: "0.5rem",
-            normal: "1rem",
-            spacious: "2rem",
-        };
-        root.style.setProperty(
-            "--theme-spacing",
-            spacingMap[theme.spacing] || "1rem"
-        );
+        // Apply spacing if present
+        if (theme.spacing) {
+            const spacingMap: Record<string, string> = {
+                compact: "0.5rem",
+                normal: "1rem",
+                spacious: "2rem",
+            };
+            root.style.setProperty(
+                "--theme-spacing",
+                spacingMap[theme.spacing] || "1rem"
+            );
+        }
     } catch (error) {
         console.error("Failed to apply theme:", error);
     }
 };
 
 // Get current theme from preset or default
-export const getCurrentTheme = (presetName?: string): PageTheme => {
-    if (presetName && themePresets[presetName]) {
-        return themePresets[presetName];
+export const getCurrentTheme = (presetName?: string): ThemeConfig => {
+    const modern = DEFAULT_THEMES.find(t => t.id === 'modern') || DEFAULT_THEMES[0];
+    if (presetName) {
+        const theme = DEFAULT_THEMES.find(t => t.id === presetName);
+        if (theme) return theme;
     }
-    return themePresets.modern; // Default theme
+    return modern;
 };

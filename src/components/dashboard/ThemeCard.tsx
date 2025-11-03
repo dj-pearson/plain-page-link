@@ -93,11 +93,18 @@ export function ThemeCard({
                                 {theme.description}
                             </p>
                         </div>
-                        {theme.isPremium && (
-                            <Badge variant="secondary" className="text-xs">
-                                Pro
-                            </Badge>
-                        )}
+                        <div className="flex flex-col gap-1">
+                            {theme.isPremium && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Pro
+                                </Badge>
+                            )}
+                            {theme.has3D && (
+                                <Badge variant="outline" className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
+                                    3D
+                                </Badge>
+                            )}
+                        </div>
                     </div>
 
                     {/* Font Info */}

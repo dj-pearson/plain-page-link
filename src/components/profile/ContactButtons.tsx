@@ -36,7 +36,11 @@ export default function ContactButtons({
                 {profile.phone && (
                     <button
                         onClick={() => handleClick("phone", profile.phone!)}
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
+                        className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold transition-all shadow-sm hover:shadow-md"
+                        style={{
+                            backgroundColor: `hsl(var(--theme-primary, 217 91% 60%))`,
+                            color: 'white'
+                        }}
                     >
                         <Phone className="h-5 w-5" />
                         <span>Call</span>
@@ -49,7 +53,11 @@ export default function ContactButtons({
                         onClick={() =>
                             handleClick("email", profile.email_display!)
                         }
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors shadow-sm hover:shadow-md"
+                        className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold transition-all shadow-sm hover:shadow-md"
+                        style={{
+                            backgroundColor: `hsl(var(--theme-secondary, 142 71% 45%))`,
+                            color: 'white'
+                        }}
                     >
                         <Mail className="h-5 w-5" />
                         <span>Email</span>
@@ -60,7 +68,11 @@ export default function ContactButtons({
                 {profile.phone && profile.sms_enabled && (
                     <button
                         onClick={() => handleClick("sms", profile.phone!)}
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-sm hover:shadow-md"
+                        className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold transition-all shadow-sm hover:shadow-md"
+                        style={{
+                            backgroundColor: `hsl(var(--theme-accent, 38 92% 50%))`,
+                            color: 'white'
+                        }}
                     >
                         <MessageSquare className="h-5 w-5" />
                         <span>Text</span>

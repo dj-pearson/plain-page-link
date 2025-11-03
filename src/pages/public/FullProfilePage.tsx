@@ -16,14 +16,18 @@ import { useProfileTracking, trackLinkClick } from "@/hooks/useProfileTracking";
 import { usePublicProfile } from "@/hooks/usePublicProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { SEOHead } from "@/components/SEOHead";
-import { applyTheme } from "@/lib/themes";
+import { applyTheme, type ThemeConfig } from "@/lib/themes";
 import { parsePrice } from "@/lib/format";
 import type { Listing } from "@/types";
 import NotFound from "./NotFound";
+import { ThreeDBackground } from "@/components/theme/ThreeDBackground";
+import { GradientMesh } from "@/components/theme/GradientMesh";
+import { FloatingGeometry } from "@/components/theme/FloatingGeometry";
 
 export default function FullProfilePage() {
     const { slug } = useParams<{ slug: string }>();
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+    const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
 
     // Fetch profile and related data
     const { data, isLoading, error } = usePublicProfile(slug || '');
@@ -40,6 +44,8 @@ export default function FullProfilePage() {
                 if (typeof data.profile.theme === 'string') {
                     // Only try to parse if it looks like JSON (starts with { or [)
                     if (data.profile.theme.trim().startsWith('{') || data.profile.theme.trim().startsWith('[')) {
+                        const parsedTheme = JSON.parse(data.profile.theme);
+                        setActiveTheme(parsedTheme);
                         applyTheme(data.profile.theme);
                     } else {
                         // It's just a theme name like "default", skip applying
@@ -47,6 +53,7 @@ export default function FullProfilePage() {
                     }
                 } else {
                     // It's already an object, stringify it
+                    setActiveTheme(data.profile.theme as ThemeConfig);
                     applyTheme(JSON.stringify(data.profile.theme));
                 }
             } catch (e) {
@@ -105,6 +112,25 @@ export default function FullProfilePage() {
         } : undefined
     };
 
+    // Render 3D background based on theme
+    const render3DBackground = () => {
+        if (!activeTheme?.has3D || !activeTheme?.threeDEffect) return null;
+        
+        const primaryColor = activeTheme.colors?.primary || '#2563eb';
+        const secondaryColor = activeTheme.colors?.secondary || '#10b981';
+        
+        switch (activeTheme.threeDEffect) {
+            case '3d-particles':
+                return <ThreeDBackground variant="particles" color={primaryColor} />;
+            case '3d-mesh':
+                return <GradientMesh color1={primaryColor} color2={secondaryColor} />;
+            case '3d-floating':
+                return <FloatingGeometry color={primaryColor} />;
+            default:
+                return null;
+        }
+    };
+
     return (
         <>
             <SEOHead
@@ -121,8 +147,13 @@ export default function FullProfilePage() {
                 ].filter(Boolean)}
                 schema={personSchema}
             />
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-            <div className="container mx-auto px-4 py-8 max-w-5xl">
+            {render3DBackground()}
+            <div className="min-h-screen relative" 
+                 style={{ 
+                     backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
+                     color: `hsl(var(--theme-text, 222 47% 11%))`
+                 }}>
+            <div className="container mx-auto px-4 py-8 max-w-5xl relative z-10">
                 <div className="space-y-6">
                     {/* Profile Header */}
                     <ProfileHeader profile={profile} />
