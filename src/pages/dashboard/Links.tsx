@@ -5,6 +5,9 @@ import { EditLinkModal } from "@/components/modals/EditLinkModal";
 import type { LinkFormData } from "@/components/modals/AddLinkModal";
 import { useToast } from "@/hooks/use-toast";
 import { useLinks, type Link } from "@/hooks/useLinks";
+import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
+import { UpgradeModal } from "@/components/UpgradeModal";
+import { LimitBanner } from "@/components/LimitBanner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,8 +45,18 @@ export default function Links() {
   const [editingLink, setEditingLink] = useState<Link | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { toast } = useToast();
   const { links, isLoading, addLink, updateLink, deleteLink, toggleActive } = useLinks();
+  const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
+
+  const handleAddClick = () => {
+    if (!canAdd('links')) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    setIsAddModalOpen(true);
+  };
 
   const handleAddLink = async (data: LinkFormData) => {
     try {
@@ -119,13 +132,22 @@ export default function Links() {
           </p>
         </div>
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleAddClick}
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
         >
           <Plus className="h-4 w-4" />
           Add Link
         </button>
       </div>
+
+      {/* Limit Banner */}
+      {subscription && getLimit('links') !== Infinity && (
+        <LimitBanner
+          feature="links"
+          current={getUsage('links')}
+          limit={getLimit('links')}
+        />
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -271,6 +293,15 @@ export default function Links() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        feature="links"
+        currentPlan={subscription?.plan_name || "Free"}
+        requiredPlan="Starter"
+      />
     </div>
   );
 }

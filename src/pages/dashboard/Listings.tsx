@@ -6,13 +6,26 @@ import type { ListingFormData } from "@/components/modals/AddListingModal";
 import { useToast } from "@/hooks/use-toast";
 import { useListings } from "@/hooks/useListings";
 import { supabase } from "@/integrations/supabase/client";
+import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
+import { UpgradeModal } from "@/components/UpgradeModal";
+import { LimitBanner } from "@/components/LimitBanner";
 
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<any>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { toast } = useToast();
   const { listings, isLoading, addListing, deleteListing } = useListings();
+  const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
+
+  const handleAddClick = () => {
+    if (!canAdd('listings')) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    setIsAddModalOpen(true);
+  };
 
   const handleAddListing = async (data: ListingFormData) => {
     try {
@@ -104,13 +117,22 @@ export default function Listings() {
           </p>
         </div>
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleAddClick}
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
         >
           <Plus className="h-4 w-4" />
           Add Property
         </button>
       </div>
+
+      {/* Limit Banner */}
+      {subscription && getLimit('listings') !== Infinity && (
+        <LimitBanner
+          feature="listings"
+          current={getUsage('listings')}
+          limit={getLimit('listings')}
+        />
+      )}
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -275,6 +297,15 @@ export default function Listings() {
           }}
         />
       )}
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        feature="listings"
+        currentPlan={subscription?.plan_name || "Free"}
+        requiredPlan="Starter"
+      />
     </div>
   );
 }

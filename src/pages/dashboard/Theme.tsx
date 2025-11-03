@@ -30,6 +30,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 const AVAILABLE_FONTS = [
     "Inter",
@@ -54,6 +56,8 @@ export default function Theme() {
     const [customFonts, setCustomFonts] = useState(selectedTheme.fonts);
     const [isCustomizing, setIsCustomizing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const { subscription } = useSubscriptionLimits();
 
     // Load saved theme from database
     useEffect(() => {
@@ -105,6 +109,12 @@ export default function Theme() {
     };
 
     const handleThemeSelect = async (theme: ThemeConfig) => {
+        // Check if theme is premium and user doesn't have access
+        if (theme.isPremium && subscription?.plan_name === 'free') {
+            setShowUpgradeModal(true);
+            return;
+        }
+
         setSelectedTheme(theme);
         setCustomColors(theme.colors);
         setCustomFonts(theme.fonts);
@@ -606,6 +616,15 @@ export default function Theme() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Upgrade Modal */}
+            <UpgradeModal
+                open={showUpgradeModal}
+                onOpenChange={setShowUpgradeModal}
+                feature="premium_themes"
+                currentPlan={subscription?.plan_name || "Free"}
+                requiredPlan="Professional"
+            />
         </div>
     );
 }

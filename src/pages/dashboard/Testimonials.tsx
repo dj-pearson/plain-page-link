@@ -6,12 +6,25 @@ import type { TestimonialFormData } from "@/components/modals/AddTestimonialModa
 import { useToast } from "@/hooks/use-toast";
 import { useTestimonials } from "@/hooks/useTestimonials";
 import { supabase } from "@/integrations/supabase/client";
+import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
+import { UpgradeModal } from "@/components/UpgradeModal";
+import { LimitBanner } from "@/components/LimitBanner";
 
 export default function Testimonials() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTestimonial, setEditingTestimonial] = useState<any>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { toast } = useToast();
   const { testimonials, isLoading, addTestimonial, deleteTestimonial } = useTestimonials();
+  const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
+
+  const handleAddClick = () => {
+    if (!canAdd('testimonials')) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    setIsAddModalOpen(true);
+  };
 
   const handleAddTestimonial = async (data: TestimonialFormData) => {
     try {
@@ -116,13 +129,22 @@ export default function Testimonials() {
           </p>
         </div>
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleAddClick}
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
         >
           <Plus className="h-4 w-4" />
           Add Testimonial
         </button>
       </div>
+
+      {/* Limit Banner */}
+      {subscription && getLimit('testimonials') !== Infinity && (
+        <LimitBanner
+          feature="testimonials"
+          current={getUsage('testimonials')}
+          limit={getLimit('testimonials')}
+        />
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -256,6 +278,15 @@ export default function Testimonials() {
           }}
         />
       )}
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        feature="testimonials"
+        currentPlan={subscription?.plan_name || "Free"}
+        requiredPlan="Starter"
+      />
     </div>
   );
 }
