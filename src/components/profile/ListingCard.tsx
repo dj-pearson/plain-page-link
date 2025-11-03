@@ -26,7 +26,7 @@ const statusLabels = {
 
 export default function ListingCard({ listing, onClick }: ListingCardProps) {
     const primaryPhoto = getImageUrl(
-        listing.primary_photo || listing.photos?.[0],
+        (listing as any).image || listing.photos?.[0],
         'listings'
     );
 
