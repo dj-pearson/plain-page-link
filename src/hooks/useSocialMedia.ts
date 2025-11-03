@@ -209,6 +209,50 @@ export function useSocialMedia() {
     },
   });
 
+  // Test webhook
+  const testWebhookMutation = useMutation({
+    mutationFn: async (webhookId: string) => {
+      const { data, error } = await supabase.functions.invoke('test-social-webhook', {
+        body: { webhookId }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success('Test webhook sent successfully!');
+      } else {
+        toast.error('Test webhook failed: ' + (data.error || 'Unknown error'));
+      }
+    },
+    onError: (error) => {
+      toast.error('Failed to test webhook: ' + error.message);
+    },
+  });
+
+  // Generate marketing post
+  const generateMarketingPostMutation = useMutation({
+    mutationFn: async (webhookUrl?: string) => {
+      const { data, error } = await supabase.functions.invoke('generate-marketing-post', {
+        body: { webhookUrl }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(data.message);
+      } else {
+        toast.error(data.error || 'Failed to generate post');
+      }
+    },
+    onError: (error) => {
+      toast.error('Failed to generate post: ' + error.message);
+    },
+  });
+
   return {
     posts: postsQuery.data,
     webhooks: webhooksQuery.data,
@@ -222,5 +266,10 @@ export function useSocialMedia() {
     createWebhook: createWebhookMutation.mutate,
     updateWebhook: updateWebhookMutation.mutate,
     deleteWebhook: deleteWebhookMutation.mutate,
+    testWebhook: testWebhookMutation.mutate,
+    isTestingWebhook: testWebhookMutation.isPending,
+    generateMarketingPost: generateMarketingPostMutation.mutate,
+    isGeneratingMarketingPost: generateMarketingPostMutation.isPending,
+    marketingPostData: generateMarketingPostMutation.data,
   };
 }

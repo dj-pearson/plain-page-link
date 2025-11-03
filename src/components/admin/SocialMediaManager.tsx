@@ -11,7 +11,19 @@ import { SocialMediaWebhookDialog } from "./SocialMediaWebhookDialog";
 
 export function SocialMediaManager() {
   const [activeTab, setActiveTab] = useState("all");
-  const { posts, webhooks, isLoading, deletePost, updateWebhook, deleteWebhook } = useSocialMedia();
+  const { 
+    posts, 
+    webhooks, 
+    isLoading, 
+    deletePost, 
+    updateWebhook, 
+    deleteWebhook,
+    testWebhook,
+    isTestingWebhook,
+    generateMarketingPost,
+    isGeneratingMarketingPost,
+    marketingPostData,
+  } = useSocialMedia();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -166,6 +178,19 @@ export function SocialMediaManager() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => testWebhook(webhook.id)}
+                      disabled={isTestingWebhook}
+                      title="Test webhook with sample post"
+                    >
+                      {isTestingWebhook ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => updateWebhook({ 
                         id: webhook.id, 
                         updates: { is_active: !webhook.is_active } 
@@ -197,6 +222,76 @@ export function SocialMediaManager() {
               <p className="text-sm text-muted-foreground mb-4">
                 No webhooks configured yet. Add a webhook to automatically distribute posts.
               </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Marketing Post Generator */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Marketing Post Generator</CardTitle>
+          <CardDescription>
+            Generate unique, catchy social media posts to drive agent signups
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => generateMarketingPost()}
+              disabled={isGeneratingMarketingPost}
+              className="flex-1"
+            >
+              {isGeneratingMarketingPost ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Generate New Post
+                </>
+              )}
+            </Button>
+            {webhooks && webhooks.length > 0 && (
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  const activeWebhook = webhooks.find(w => w.is_active);
+                  if (activeWebhook) {
+                    generateMarketingPost(activeWebhook.webhook_url);
+                  }
+                }}
+                disabled={isGeneratingMarketingPost || !webhooks.some(w => w.is_active)}
+              >
+                Generate & Send
+              </Button>
+            )}
+          </div>
+
+          {marketingPostData && marketingPostData.payload && (
+            <div className="space-y-4 mt-4 border-t pt-4">
+              <div>
+                <h4 className="font-semibold mb-2">Long Form (LinkedIn/Facebook):</h4>
+                <div className="bg-muted p-4 rounded-lg text-sm whitespace-pre-wrap">
+                  {marketingPostData.payload.longFormPost}
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">Short Form (Twitter/Threads):</h4>
+                <div className="bg-muted p-4 rounded-lg text-sm">
+                  {marketingPostData.payload.shortFormPost}
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">Hashtags:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {marketingPostData.payload.hashtags.map((tag: string, idx: number) => (
+                    <Badge key={idx} variant="secondary">{tag}</Badge>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
