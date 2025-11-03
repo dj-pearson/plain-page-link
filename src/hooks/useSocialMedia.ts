@@ -44,6 +44,21 @@ export function useSocialMedia() {
     },
   });
 
+  // Fetch marketing posts
+  const marketingPostsQuery = useQuery({
+    queryKey: ['marketing-posts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('social_media_posts')
+        .select('*')
+        .eq('content_type', 'marketing')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as SocialMediaPost[];
+    },
+  });
+
   // Fetch webhooks
   const webhooksQuery = useQuery({
     queryKey: ['social-media-webhooks'],
@@ -242,6 +257,7 @@ export function useSocialMedia() {
       return data;
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['marketing-posts'] });
       if (data.success) {
         toast.success(data.message);
       } else {
@@ -253,10 +269,53 @@ export function useSocialMedia() {
     },
   });
 
+  // Retry/redeploy marketing post
+  const retryMarketingPostMutation = useMutation({
+    mutationFn: async ({ postId, webhookUrl }: { postId: string; webhookUrl: string }) => {
+      const { data: post } = await supabase
+        .from('social_media_posts')
+        .select('post_content')
+        .eq('id', postId)
+        .single();
+
+      if (!post) throw new Error('Post not found');
+
+      const webhookResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(post.post_content),
+      });
+
+      if (!webhookResponse.ok) {
+        throw new Error('Webhook delivery failed');
+      }
+
+      await supabase
+        .from('social_media_posts')
+        .update({ 
+          status: 'posted', 
+          posted_at: new Date().toISOString(),
+          webhook_urls: [webhookUrl]
+        })
+        .eq('id', postId);
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing-posts'] });
+      toast.success('Post resent successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to retry post:', error);
+      toast.error('Failed to resend post');
+    },
+  });
+
   return {
     posts: postsQuery.data,
+    marketingPosts: marketingPostsQuery.data,
     webhooks: webhooksQuery.data,
-    isLoading: postsQuery.isLoading || webhooksQuery.isLoading,
+    isLoading: postsQuery.isLoading || webhooksQuery.isLoading || marketingPostsQuery.isLoading,
     generatePost: generatePostMutation.mutate,
     isGenerating: generatePostMutation.isPending,
     generatedContent: generatePostMutation.data,
@@ -271,5 +330,7 @@ export function useSocialMedia() {
     generateMarketingPost: generateMarketingPostMutation.mutate,
     isGeneratingMarketingPost: generateMarketingPostMutation.isPending,
     marketingPostData: generateMarketingPostMutation.data,
+    retryMarketingPost: retryMarketingPostMutation.mutate,
+    isRetryingPost: retryMarketingPostMutation.isPending,
   };
 }

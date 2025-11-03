@@ -139,6 +139,40 @@ Return ONLY valid JSON with this exact structure:
 
     console.log('Generated payload:', JSON.stringify(payload, null, 2));
 
+    // Save to database
+    const authHeader = req.headers.get('authorization');
+    let userId = null;
+    
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await supabase.auth.getUser(token);
+      userId = user?.id;
+    }
+
+    const postStatus = webhookUrl ? 'posted' : 'draft';
+    
+    const { data: savedPost, error: saveError } = await supabase
+      .from('social_media_posts')
+      .insert({
+        platform_type: 'multi_platform',
+        content_type: 'marketing',
+        subject_type: 'agent_signup',
+        post_title: 'AgentBio Marketing Post',
+        post_content: payload,
+        status: postStatus,
+        created_by: userId,
+        posted_at: webhookUrl ? new Date().toISOString() : null,
+        webhook_urls: webhookUrl ? [webhookUrl] : null,
+      })
+      .select()
+      .single();
+
+    if (saveError) {
+      console.error('Failed to save post to database:', saveError);
+    } else {
+      console.log('Post saved to database:', savedPost.id);
+    }
+
     // Send to webhook if URL provided
     if (webhookUrl) {
       console.log('Sending to webhook:', webhookUrl);
@@ -175,6 +209,7 @@ Return ONLY valid JSON with this exact structure:
       JSON.stringify({
         success: true,
         payload,
+        postId: savedPost?.id,
         message: webhookUrl ? 'Content generated and sent to webhook' : 'Content generated successfully',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

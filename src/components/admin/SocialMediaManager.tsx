@@ -12,7 +12,8 @@ import { SocialMediaWebhookDialog } from "./SocialMediaWebhookDialog";
 export function SocialMediaManager() {
   const [activeTab, setActiveTab] = useState("all");
   const { 
-    posts, 
+    posts,
+    marketingPosts,
     webhooks, 
     isLoading, 
     deletePost, 
@@ -23,6 +24,8 @@ export function SocialMediaManager() {
     generateMarketingPost,
     isGeneratingMarketingPost,
     marketingPostData,
+    retryMarketingPost,
+    isRetryingPost,
   } = useSocialMedia();
 
   const getStatusColor = (status: string) => {
@@ -292,6 +295,105 @@ export function SocialMediaManager() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Marketing Post History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Marketing Post History</CardTitle>
+          <CardDescription>
+            View and redeploy previously generated marketing posts
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {marketingPosts && marketingPosts.length > 0 ? (
+            <div className="space-y-4">
+              {marketingPosts.map((post) => {
+                const content = post.post_content as any;
+                return (
+                  <div key={post.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${getStatusColor(post.status)} text-white`}>
+                          {post.status}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(post.created_at), 'MMM d, yyyy h:mm a')}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        {webhooks && webhooks.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const activeWebhook = webhooks.find(w => w.is_active);
+                              if (activeWebhook) {
+                                retryMarketingPost({ 
+                                  postId: post.id, 
+                                  webhookUrl: activeWebhook.webhook_url 
+                                });
+                              }
+                            }}
+                            disabled={isRetryingPost || !webhooks.some(w => w.is_active)}
+                          >
+                            {isRetryingPost ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Send className="h-4 w-4 mr-2" />
+                                Resend
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete this post?')) {
+                              deletePost(post.id);
+                            }
+                          }}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className="text-sm font-semibold mb-1">Long Form:</h4>
+                        <div className="bg-muted p-3 rounded text-sm whitespace-pre-wrap">
+                          {content.longFormPost}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold mb-1">Short Form:</h4>
+                        <div className="bg-muted p-3 rounded text-sm">
+                          {content.shortFormPost}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {content.hashtags?.map((tag: string, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">
+                No marketing posts generated yet. Create your first one above!
+              </p>
             </div>
           )}
         </CardContent>
