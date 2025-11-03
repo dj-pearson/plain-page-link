@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,10 +16,27 @@ serve(async (req) => {
     console.log('Generating marketing post for webhook:', webhookUrl);
 
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     if (!lovableApiKey) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get AI configuration from database
+    const { data: configData } = await supabase
+      .from('ai_configuration')
+      .select('setting_key, setting_value')
+      .in('setting_key', ['default_model', 'temperature_creative', 'max_tokens_large']);
+    
+    const config: Record<string, any> = {};
+    configData?.forEach(item => {
+      config[item.setting_key] = JSON.parse(item.setting_value);
+    });
+
+    console.log('Using AI config:', config);
 
     // Generate unique, catchy marketing content
     const prompt = `Create a compelling social media marketing post to drive real estate agents to sign up for AgentBio - a link-in-bio platform specifically built for real estate professionals.
@@ -60,7 +78,7 @@ Return ONLY valid JSON with this exact structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: config.default_model || 'google/gemini-2.5-flash',
         messages: [
           { 
             role: 'system', 
@@ -68,7 +86,8 @@ Return ONLY valid JSON with this exact structure:
           },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.9, // Higher temperature for more creativity and variation
+        temperature: config.temperature_creative || 0.7,
+        max_tokens: config.max_tokens_large || 8000,
       }),
     });
 
