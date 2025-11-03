@@ -3,14 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Eye, Edit, Trash, Calendar, Send, Plus } from "lucide-react";
+import { Loader2, Eye, Edit, Trash, Calendar, Send, Plus, Link2, ToggleLeft, ToggleRight } from "lucide-react";
 import { format } from "date-fns";
 import { useSocialMedia } from "@/hooks/useSocialMedia";
 import { CreateSocialPostDialog } from "./CreateSocialPostDialog";
+import { SocialMediaWebhookDialog } from "./SocialMediaWebhookDialog";
 
 export function SocialMediaManager() {
   const [activeTab, setActiveTab] = useState("all");
-  const { posts, isLoading, deletePost } = useSocialMedia();
+  const { posts, webhooks, isLoading, deletePost, updateWebhook, deleteWebhook } = useSocialMedia();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -138,17 +139,66 @@ export function SocialMediaManager() {
       {/* Webhook Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Webhook Configuration</CardTitle>
-          <CardDescription>Configure webhooks for automatic post distribution</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Webhook Configuration</CardTitle>
+              <CardDescription>Configure webhooks for automatic post distribution</CardDescription>
+            </div>
+            <SocialMediaWebhookDialog />
+          </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Webhook management coming soon - automate posting to multiple platforms
-          </p>
-          <Button variant="outline">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Webhook
-          </Button>
+          {webhooks && webhooks.length > 0 ? (
+            <div className="space-y-3">
+              {webhooks.map((webhook) => (
+                <div key={webhook.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Link2 className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{webhook.name}</p>
+                      <p className="text-sm text-muted-foreground">{webhook.platform}</p>
+                      <p className="text-xs text-muted-foreground mt-1 truncate max-w-md">
+                        {webhook.webhook_url}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateWebhook({ 
+                        id: webhook.id, 
+                        updates: { is_active: !webhook.is_active } 
+                      })}
+                    >
+                      {webhook.is_active ? (
+                        <ToggleRight className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <ToggleLeft className="h-5 w-5 text-gray-400" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this webhook?')) {
+                          deleteWebhook(webhook.id);
+                        }
+                      }}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground mb-4">
+                No webhooks configured yet. Add a webhook to automatically distribute posts.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
