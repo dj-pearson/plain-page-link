@@ -1,7 +1,7 @@
 import { X, Bed, Bath, Ruler, MapPin, Calendar, Share2, Heart } from "lucide-react";
 import { useState } from "react";
 import type { Listing } from "@/types/listing";
-import { formatPrice, formatPropertyStats, formatAddress, formatDate } from "@/lib/format";
+import { formatPrice, formatPropertyStats, formatAddress, formatDate, parsePrice } from "@/lib/format";
 import { getImageUrls } from "@/lib/images";
 
 interface ListingDetailModalProps {
@@ -157,7 +157,7 @@ export default function ListingDetailModal({
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <p className="text-3xl font-bold text-gray-900 mb-2">
-                                    {formatPrice(listing.price)}
+                                    {formatPrice(parsePrice((listing as any).price))}
                                 </p>
                                 <div className="flex items-center gap-2 text-gray-600">
                                     <MapPin className="h-4 w-4" />

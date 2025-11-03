@@ -16,6 +16,14 @@ export function formatPrice(price: number): string {
     }).format(price);
 }
 
+// Parse flexible price inputs like "$1,234,567" or "1234567" to a number
+export function parsePrice(value: unknown): number {
+    if (typeof value === 'number') return isNaN(value) ? 0 : value;
+    if (value == null) return 0;
+    const numeric = Number(String(value).replace(/[^0-9.]/g, ''));
+    return isNaN(numeric) ? 0 : numeric;
+}
+
 /**
  * Format number with commas
  */

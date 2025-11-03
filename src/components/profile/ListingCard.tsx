@@ -1,5 +1,5 @@
 import { Bed, Bath, Maximize, MapPin, Calendar } from "lucide-react";
-import { formatPrice, formatPropertyStats } from "@/lib/format";
+import { formatPrice, formatPropertyStats, parsePrice } from "@/lib/format";
 import { getImageUrl } from "@/lib/images";
 import type { Listing } from "@/types";
 
@@ -81,14 +81,14 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
                 {/* Price */}
                 <div className="mb-2">
                     <p className="text-2xl font-bold text-gray-900">
-                        {formatPrice(listing.price)}
+                        {formatPrice(parsePrice((listing as any).price))}
                     </p>
-                    {listing.original_price &&
-                        listing.original_price !== listing.price && (
-                            <p className="text-sm text-gray-500 line-through">
-                                {formatPrice(listing.original_price)}
-                            </p>
-                        )}
+                    {((listing as any).original_price &&
+                        parsePrice((listing as any).original_price) !== parsePrice((listing as any).price)) && (
+                        <p className="text-sm text-gray-500 line-through">
+                            {formatPrice(parsePrice((listing as any).original_price))}
+                        </p>
+                    )}
                 </div>
 
                 {/* Property Stats */}

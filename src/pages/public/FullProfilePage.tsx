@@ -17,6 +17,7 @@ import { usePublicProfile } from "@/hooks/usePublicProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { SEOHead } from "@/components/SEOHead";
 import { applyTheme } from "@/lib/themes";
+import { parsePrice } from "@/lib/format";
 import type { Listing } from "@/types";
 import NotFound from "./NotFound";
 
@@ -69,7 +70,7 @@ export default function FullProfilePage() {
 
     // Calculate social proof stats
     const totalVolume = soldListings.reduce(
-        (sum: number, listing: any) => sum + (listing.price || 0),
+        (sum: number, listing: any) => sum + parsePrice(listing.price),
         0
     );
     const averageRating =
