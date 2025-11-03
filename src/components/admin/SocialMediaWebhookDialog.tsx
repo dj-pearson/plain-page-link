@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useSocialMedia } from "@/hooks/useSocialMedia";
+import { toast } from "sonner";
 
 export function SocialMediaWebhookDialog() {
   const [open, setOpen] = useState(false);
@@ -19,7 +20,18 @@ export function SocialMediaWebhookDialog() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim() || !platform.trim() || !webhookUrl.trim()) {
+    if (!name.trim()) {
+      toast.error("Please enter a webhook name");
+      return;
+    }
+    
+    if (!platform) {
+      toast.error("Please select a platform");
+      return;
+    }
+    
+    if (!webhookUrl.trim()) {
+      toast.error("Please enter a webhook URL");
       return;
     }
 
@@ -66,8 +78,8 @@ export function SocialMediaWebhookDialog() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="platform">Platform</Label>
-            <Select value={platform} onValueChange={setPlatform} required>
+            <Label htmlFor="platform">Platform *</Label>
+            <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger id="platform">
                 <SelectValue placeholder="Select platform" />
               </SelectTrigger>
