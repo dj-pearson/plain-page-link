@@ -179,16 +179,25 @@ export default function Pricing() {
                 <Button
                   className="w-full"
                   variant={plan.name === 'professional' ? 'default' : 'outline'}
-                  disabled={isCurrentPlan(plan.name) || plan.name === 'enterprise'}
+                  disabled={
+                    isCurrentPlan(plan.name) || 
+                    plan.name === 'enterprise' || 
+                    !plan.stripe_price_id
+                  }
                   onClick={() => plan.stripe_price_id && handleSubscribe(plan.stripe_price_id)}
+                  asChild={plan.name === 'free'}
                 >
-                  {isCurrentPlan(plan.name)
-                    ? 'Current Plan'
-                    : plan.name === 'free'
-                    ? 'Get Started'
-                    : plan.name === 'enterprise'
-                    ? 'Contact Sales'
-                    : 'Subscribe'}
+                  {plan.name === 'free' ? (
+                    <Link to="/register">Get Started</Link>
+                  ) : isCurrentPlan(plan.name) ? (
+                    'Current Plan'
+                  ) : plan.name === 'enterprise' ? (
+                    'Contact Sales'
+                  ) : !plan.stripe_price_id ? (
+                    'Coming Soon'
+                  ) : (
+                    'Subscribe'
+                  )}
                 </Button>
               </CardFooter>
             </Card>
