@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
-import { Home, BarChart3, Users, Zap } from "lucide-react";
+import { Home, BarChart3, Users } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { BlogSection } from "@/components/blog/BlogSection";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { HeroSection } from "@/components/hero";
 
 export default function Landing() {
     const schema = {
@@ -68,54 +69,24 @@ export default function Landing() {
                 canonicalUrl={window.location.origin}
                 schema={schema}
             />
-            <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+            <main className="min-h-screen bg-background">
             {/* Header */}
             <PublicHeader />
 
-            {/* Hero Section */}
-            <section className="container mx-auto px-4 py-20 md:py-32">
-                <article className="max-w-4xl mx-auto text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-6">
-                        <Zap className="h-4 w-4" aria-hidden="true" />
-                        Built for Real Estate Professionals
-                    </div>
-                    <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-                        Professional Real Estate Agent
-                        <span className="text-blue-600"> Portfolio Link</span>
-                    </h1>
-                    <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                        Create your professional agent portfolio link to showcase sold properties,
-                        active listings, and testimonials. Capture qualified leads and convert
-                        social media traffic into clients with our purpose-built platform.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <Link
-                            to="/auth/register"
-                            className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors"
-                        >
-                            Start Free Trial
-                        </Link>
-                        <a
-                            href="#features"
-                            className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-lg text-lg font-semibold hover:border-gray-400 transition-colors"
-                        >
-                            See How It Works
-                        </a>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-4">
-                        No credit card required • Setup in 5 minutes
-                    </p>
-                </article>
-            </section>
+            {/* 3D Hero Section */}
+            <HeroSection />
 
             {/* Features Section */}
-            <section id="features" className="py-20 bg-white" aria-labelledby="features-heading">
+            <section id="features" className="py-20 bg-background/50" aria-labelledby="features-heading">
                 <div className="container mx-auto px-4">
                     <header className="text-center mb-16">
-                        <h2 id="features-heading" className="text-4xl font-bold text-gray-900 mb-4">
-                            Professional Agent Portfolio Builder Features
+                        <h2 id="features-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                            Professional Agent Portfolio Builder
+                            <span className="block mt-2 glass-heading text-3xl md:text-4xl">
+                                Features
+                            </span>
                         </h2>
-                        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                        <p className="text-xl glass-body max-w-2xl mx-auto">
                             Purpose-built for real estate agents. Create your professional
                             realtor portfolio link with everything you need to showcase sold
                             properties and convert leads.
@@ -124,19 +95,17 @@ export default function Landing() {
 
                     <div className="grid md:grid-cols-3 gap-8">
                         <FeatureCard
-                            icon={<Home className="h-8 w-8 text-blue-600" aria-hidden="true" />}
+                            icon={<Home className="h-8 w-8" aria-hidden="true" />}
                             title="Agent Property Showcase Link"
                             description="Display your agent sold properties portfolio, active listings, and pending sales with stunning photos, prices, and property details. Mobile-optimized galleries for professional presentation."
                         />
                         <FeatureCard
-                            icon={<Users className="h-8 w-8 text-blue-600" aria-hidden="true" />}
+                            icon={<Users className="h-8 w-8" aria-hidden="true" />}
                             title="Qualified Lead Capture"
                             description="Built-in buyer, seller, and home valuation forms designed for real estate professionals. Capture qualified leads with detailed questionnaires and agent client testimonials."
                         />
                         <FeatureCard
-                            icon={
-                                <BarChart3 className="h-8 w-8 text-blue-600" aria-hidden="true" />
-                            }
+                            icon={<BarChart3 className="h-8 w-8" aria-hidden="true" />}
                             title="Agent Analytics & Insights"
                             description="Track your professional portfolio performance with detailed analytics. Monitor profile views, link clicks, and lead sources. See which listings and sold properties get the most attention."
                         />
@@ -148,20 +117,24 @@ export default function Landing() {
             <BlogSection limit={6} showSearch={true} showFilters={true} />
 
             {/* CTA Section */}
-            <section className="py-20 bg-blue-600 text-white" aria-labelledby="cta-heading">
-                <div className="container mx-auto px-4 text-center">
-                    <h2 id="cta-heading" className="text-4xl font-bold mb-4">
-                        Create Your Professional Real Estate Agent Portfolio Link Today
+            <section className="py-20 relative overflow-hidden" aria-labelledby="cta-heading">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#80d0c7]/20 via-[#a1c4fd]/20 to-[#c2e9fb]/20" />
+                <div className="absolute inset-0 bg-glass-background backdrop-blur-sm" />
+                <div className="container mx-auto px-4 text-center relative z-10">
+                    <h2 id="cta-heading" className="text-4xl md:text-5xl font-light tracking-tight mb-4">
+                        <span className="glass-heading">
+                            Create Your Professional Portfolio
+                        </span>
                     </h2>
-                    <p className="text-xl mb-8 text-blue-100">
+                    <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
                         Join thousands of agents showcasing sold properties and capturing qualified leads
                     </p>
                     <Link
                         to="/auth/register"
-                        className="inline-block bg-white text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-50 transition-colors"
+                        className="inline-flex items-center gap-2 px-8 py-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl font-light tracking-tight transition-all hover:border-[#80d0c7] hover:shadow-lg hover:shadow-[#80d0c7]/20"
                         aria-label="Get started with your free professional agent portfolio"
                     >
-                        Get Started Free
+                        <span className="glass-accent">Get Started Free</span>
                     </Link>
                 </div>
             </section>
@@ -183,12 +156,17 @@ function FeatureCard({
     description: string;
 }) {
     return (
-        <div className="p-6 rounded-xl border-2 border-gray-100 hover:border-blue-200 hover:shadow-lg transition-all">
-            <div className="mb-4">{icon}</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                {title}
-            </h3>
-            <p className="text-gray-600">{description}</p>
+        <div className="group p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border hover:border-[#80d0c7] hover:shadow-lg hover:shadow-[#80d0c7]/10 transition-all relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#80d0c7]/5 to-[#a1c4fd]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative z-10">
+                <div className="mb-4 text-transparent bg-gradient-to-r from-[#80d0c7] to-[#a1c4fd] bg-clip-text">
+                    {icon}
+                </div>
+                <h3 className="text-xl font-light tracking-tight text-foreground mb-2">
+                    {title}
+                </h3>
+                <p className="glass-body">{description}</p>
+            </div>
         </div>
     );
 }
