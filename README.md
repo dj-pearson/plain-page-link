@@ -1,185 +1,367 @@
-<p align="center">
+# AgentBio - Professional Real Estate Agent Portfolio Platform<p align="center">
+
   <img width="200px" src="https://raw.githubusercontent.com/LinkStackOrg/branding/main/logo/svg/logo_animated.svg"><br>
-  <br>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" width="400px" srcset="https://raw.githubusercontent.com/LinkStackOrg/branding/main/logo/png/wordmark_light.png">
+
+<p align="center">  <br>
+
+  <img src="https://agentbio.net/Cover.png" alt="AgentBio" width="600">  <picture>
+
+</p>    <source media="(prefers-color-scheme: dark)" width="400px" srcset="https://raw.githubusercontent.com/LinkStackOrg/branding/main/logo/png/wordmark_light.png">
+
     <img width="400px" src="https://raw.githubusercontent.com/LinkStackOrg/branding/main/logo/png/wordmark_dark.png">
-  </picture>
+
+<h3 align="center">The Ultimate Link-in-Bio Solution for Real Estate Agents</h3>  </picture>
+
 </p>
 
-<h3 align="center"><b>Open-Source Linktree Alternative</b></h3>
+<p align="center">
+
+  AgentBio is a comprehensive platform designed specifically for real estate professionals to showcase their listings, sold properties, testimonials, and generate qualified leads—all from a single, professional link.<h3 align="center"><b>Open-Source Linktree Alternative</b></h3>
+
+</p>
 
 <h3 align="center">LinkStack is a highly customizable link sharing platform<br>with an intuitive, easy to use user interface.</h3>
 
+---
+
 <br>
 
-<p align="center">
-  <a href="#Function">Function</a> •
-  <a href="#About">About</a> •
-  <a href="#Instances">Instances</a> •
-  <a href="#Themes">Themes</a> •
-  <a href="#Installation">Installation</a> •
-  <a href="#Docker">Docker Version</a> •
-  <a href="#Updating">Updating</a> •
-  <a href="#Discord">Discord</a> •
-  <a href="#Fork-Structure">Fork structure</a> •
-  <a href="#License">License</a> •
-  <a href="#Supporters">Supporters</a> •
-  <a href="#Special-thanks">Special thanks</a> •
-  <a href="#Additional-credit">Additional credit</a>
-</p>
+## 🎯 Features
 
 <p align="center">
-<a href="https://github.com/linkstackorg/linkstack/stargazers"><img alt="GitHub Repo stars" src="https://img.lss.ovh/github/stars/julianprieber/littlelink-custom?label=Star%20the%20project&logo=GitHub"></a>
-<a href="https://mstdn.social/@linkstack"><img alt="Mastodon Follow" src="https://img.lss.ovh/mastodon/follow/110147874401985724?domain=http%3A%2F%2Fmstdn.social&style=social"></a>
+
+### For Real Estate Agents  <a href="#Function">Function</a> •
+
+  <a href="#About">About</a> •
+
+- **Custom Profile Pages** - Beautiful, mobile-responsive pages with your branding  <a href="#Instances">Instances</a> •
+
+- **Listing Showcase** - Display active listings with photos, details, and contact forms  <a href="#Themes">Themes</a> •
+
+- **Sold Portfolio** - Highlight your successful sales and market expertise  <a href="#Installation">Installation</a> •
+
+- **Lead Capture** - Built-in forms for buyer inquiries, seller leads, and home valuations  <a href="#Docker">Docker Version</a> •
+
+- **Testimonials** - Showcase client reviews and success stories  <a href="#Updating">Updating</a> •
+
+- **QR Codes** - Generate QR codes for business cards, flyers, and yard signs  <a href="#Discord">Discord</a> •
+
+- **Analytics Dashboard** - Track views, clicks, and lead generation performance  <a href="#Fork-Structure">Fork structure</a> •
+
+- **Social Links** - Connect all your social media and professional profiles  <a href="#License">License</a> •
+
+  <a href="#Supporters">Supporters</a> •
+
+### Built for Success  <a href="#Special-thanks">Special thanks</a> •
+
+  <a href="#Additional-credit">Additional credit</a>
+
+- **SEO Optimized** - Built-in blog system for content marketing</p>
+
+- **Mobile-First** - Perfect viewing experience on all devices
+
+- **Fast & Secure** - Built with modern web technologies<p align="center">
+
+- **Easy to Use** - No coding required, intuitive admin panel<a href="https://github.com/linkstackorg/linkstack/stargazers"><img alt="GitHub Repo stars" src="https://img.lss.ovh/github/stars/julianprieber/littlelink-custom?label=Star%20the%20project&logo=GitHub"></a>
+
+- **PWA Support** - Installable on mobile devices for quick access<a href="https://mstdn.social/@linkstack"><img alt="Mastodon Follow" src="https://img.lss.ovh/mastodon/follow/110147874401985724?domain=http%3A%2F%2Fmstdn.social&style=social"></a>
+
 <a href="https://discord.linkstack.org"><img alt="Discord online user count" src="https://img.lss.ovh/discord/955765706111193118?color=4A55CC&label=Discord&logo=Discord&style=flat"></a>
-</p>
+
+---</p>
+
 <p align="center">
-<a href="https://github.com/sponsors/julianprieber"><img alt="GitHub spomsors" src="https://img.lss.ovh/github/sponsors/JulianPrieber?color=BF4B8A&logo=githubsponsors&style=flat&label=Sponsor%20us%20on%20Github"></a>
+
+## 🚀 Getting Started<a href="https://github.com/sponsors/julianprieber"><img alt="GitHub spomsors" src="https://img.lss.ovh/github/sponsors/JulianPrieber?color=BF4B8A&logo=githubsponsors&style=flat&label=Sponsor%20us%20on%20Github"></a>
+
 <a href="https://patreon.com/julianprieber"><img alt="Patreon" src="https://img.lss.ovh/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%3Fusername%3Djulianprieber%26type%3Dpatrons&style=flat&logo=patreon"></a>
-<a href="https://liberapay.com/LinkStack"><img src="https://img.lss.ovh/liberapay/patrons/LinkStack?logo=liberapay&label=LiberaPay%20patrons"></a>
+
+### Live Platform<a href="https://liberapay.com/LinkStack"><img src="https://img.lss.ovh/liberapay/patrons/LinkStack?logo=liberapay&label=LiberaPay%20patrons"></a>
+
 </p>
+
+Visit [agentbio.net](https://agentbio.net) to create your account and get started immediately.
 
 ---
 
+### Technology Stack
+
 <p align="center">
-  <a href="https://github.com/linkstackorg/linkstack/releases/latest/download/linkstack.zip"><img src="https://raw.githubusercontent.com/LinkStackOrg/branding/main/badges/png/download_latest.png" alt="Download latest" width="380" ></a>
-    <br>
-	<a href="https://github.com/linkstackorg/linkstack/releases"><img alt="GitHub release (latest by date)" src="https://img.lss.ovh/github/v/release/JulianPrieber/LittleLink-Custom?label=Latest%20release"></a>
-</p>
+
+- **Frontend**: React + TypeScript + Vite  <a href="https://github.com/linkstackorg/linkstack/releases/latest/download/linkstack.zip"><img src="https://raw.githubusercontent.com/LinkStackOrg/branding/main/badges/png/download_latest.png" alt="Download latest" width="380" ></a>
+
+- **Styling**: Tailwind CSS    <br>
+
+- **Backend**: Supabase (PostgreSQL, Authentication, Storage)	<a href="https://github.com/linkstackorg/linkstack/releases"><img alt="GitHub release (latest by date)" src="https://img.lss.ovh/github/v/release/JulianPrieber/LittleLink-Custom?label=Latest%20release"></a>
+
+- **Hosting**: Cloudflare Pages</p>
+
+- **Analytics**: Google Analytics
+
+---
 
 ---
 
 <a name="Function"></a>
-## Function
 
-LinkStack: The Ultimate Link Management Solution
+## 📱 Key Pages## Function
 
-LinkStack is a unique platform that provides an efficient solution for managing and sharing links online. Our platform offers a website similar to Linktree, which allows users to overcome the limitation of only being able to add one link on social media platforms.
 
-With LinkStack, users can easily link to their own custom page and provide their followers with access to all the links they need in one convenient location. What sets LinkStack apart from other link management platforms is its flexibility, which allows users to host their links on their own web server or web hosting provider. This provides users with complete control over their online presence and ensures that their links are easily accessible.
 
-Additionally, LinkStack allows other users to register and create their own links, making it an ideal solution for businesses and organizations looking to manage multiple links. With our user-friendly Admin Panel, managing and accessing other users' links is easy.
+- **Public Profile** - Your branded landing page at `agentbio.net/@username`LinkStack: The Ultimate Link Management Solution
 
-<br>
+- **Dashboard** - Manage your profile, links, and listings
+
+- **Analytics** - Track performance and engagementLinkStack is a unique platform that provides an efficient solution for managing and sharing links online. Our platform offers a website similar to Linktree, which allows users to overcome the limitation of only being able to add one link on social media platforms.
+
+- **Blog** - Publish SEO-optimized articles
+
+- **Lead Management** - View and manage incoming leadsWith LinkStack, users can easily link to their own custom page and provide their followers with access to all the links they need in one convenient location. What sets LinkStack apart from other link management platforms is its flexibility, which allows users to host their links on their own web server or web hosting provider. This provides users with complete control over their online presence and ensures that their links are easily accessible.
+
+
+
+---Additionally, LinkStack allows other users to register and create their own links, making it an ideal solution for businesses and organizations looking to manage multiple links. With our user-friendly Admin Panel, managing and accessing other users' links is easy.
+
+
+
+## 🎨 Customization<br>
+
 	    
-<a name="About"></a>
+
+AgentBio offers extensive customization options:<a name="About"></a>
+
 ## About
 
-With LinkStack, our mission is to provide users with a free and privacy-focused solution for managing and sharing links online. We believe that everyone should have access to a customizable link-sharing platform without sacrificing their privacy and control over their data.
+- Custom themes and color schemes
 
-To achieve this mission, we offer a self-hosted option for users who want complete control over their data without having it sold to third-party companies. Our platform can be easily implemented through a simple **drag and drop** process, eliminating the need for complex terminal commands or source code manipulation.
+- Logo and avatar uploadsWith LinkStack, our mission is to provide users with a free and privacy-focused solution for managing and sharing links online. We believe that everyone should have access to a customizable link-sharing platform without sacrificing their privacy and control over their data.
+
+- Custom bio and contact information
+
+- Flexible link managementTo achieve this mission, we offer a self-hosted option for users who want complete control over their data without having it sold to third-party companies. Our platform can be easily implemented through a simple **drag and drop** process, eliminating the need for complex terminal commands or source code manipulation.
+
+- Branded QR codes
 
 For those who may not have the technical expertise to self-host, we also offer free instances of our platform while still prioritizing their privacy. Our platform offers many of the same features and options as commercial link-sharing platforms while maintaining the values of privacy and autonomy.
 
+---
+
 Our goal is to provide a free version of a link-sharing service, similar to Linktree, while empowering users to take ownership of their data. We will never sell user data and believe in providing a trustworthy and transparent solution for managing and sharing links online.
-	    
+
+## 📊 Analytics & Insights	    
+
 <br>
-	    
+
+Track your performance with detailed analytics:	    
+
 <a name="Instances"></a>
-## Instances
 
-<h3 align="center">Find the right instance for you</h3>
+- Page views and visitor counts## Instances
 
-<br>
+- Click-through rates on links
+
+- Lead generation metrics<h3 align="center">Find the right instance for you</h3>
+
+- Geographic data
+
+- Device and browser information<br>
+
 <p align="center">Our community instance program provides users with the opportunity to register on hosted instances and use Linkstack for free. Members of our community have generously provided their resources to host instances, allowing us to expand the reach of Linkstack and give back to the community</h3>
 
-<br>
-
-<p align="center">
-  <a href="https://linkstack.org/instances"><img src="https://raw.githubusercontent.com/LinkStackOrg/branding/main/badges/png/create_account.png" alt="Community instances" width="350" ></a>
-</p>
-	    
-<a name="Themes"></a>
-## Themes
-
-<h3 align="center">Custom Themes</h3>
+---
 
 <br>
+
+## 🔒 Privacy & Security
+
 <p align="center">
-Customize the look of your LinkStack instance with themes. Themes allow you to change the look and feel of your site with a few clicks. Users can submit themes they created for everyone to download and use.
-</p>
-    
+
+- Secure authentication with Supabase  <a href="https://linkstack.org/instances"><img src="https://raw.githubusercontent.com/LinkStackOrg/branding/main/badges/png/create_account.png" alt="Community instances" width="350" ></a>
+
+- HTTPS encryption</p>
+
+- GDPR compliant	    
+
+- No data selling - your information stays yours<a name="Themes"></a>
+
+- Regular security updates## Themes
+
+
+
+---<h3 align="center">Custom Themes</h3>
+
+
+
+## 💼 Perfect For<br>
+
 <p align="center">
+
+- **Real Estate Agents** - Showcase listings and generate leadsCustomize the look of your LinkStack instance with themes. Themes allow you to change the look and feel of your site with a few clicks. Users can submit themes they created for everyone to download and use.
+
+- **Brokers** - Provide team members with professional profiles</p>
+
+- **New Agents** - Build credibility with a professional online presence    
+
+- **Top Producers** - Highlight your success and market expertise<p align="center">
+
 Contribute by designing your own themes. You can read more about contributing below.
-</p>
+
+---</p>
+
     
-<br>
 
-|![preview1](https://raw.githubusercontent.com/LinkStackOrg/stargazer/main/preview.png) |![preview2](https://raw.githubusercontent.com/LinkStackOrg/Magic-Kingdom/main/preview.png)|
+## 🛠️ Development<br>
+
+
+
+### Prerequisites|![preview1](https://raw.githubusercontent.com/LinkStackOrg/stargazer/main/preview.png) |![preview2](https://raw.githubusercontent.com/LinkStackOrg/Magic-Kingdom/main/preview.png)|
+
 | ------------- |-------------|
-|![preview3](https://raw.githubusercontent.com/LinkStackOrg/polygon/main/preview.png)|![preview4](https://raw.githubusercontent.com/LinkStackOrg/PolySleek/main/preview.png)|  
 
-<br>
+- Node.js 18+|![preview3](https://raw.githubusercontent.com/LinkStackOrg/polygon/main/preview.png)|![preview4](https://raw.githubusercontent.com/LinkStackOrg/PolySleek/main/preview.png)|  
 
-You can find all available Themes on here:
+- npm or yarn
+
+- Supabase account (for backend services)<br>
+
+
+
+### Local SetupYou can find all available Themes on here:
+
 [linkstack.org/themes](https://linkstack.org/themes)
 
+```bash
 
-<br>
+# Clone the repository
 
-### How to add themes
-#### How to add themes to your LinkStack instance
+git clone https://github.com/dj-pearson/plain-page-link.git<br>
+
+
+
+# Install dependencies### How to add themes
+
+npm install#### How to add themes to your LinkStack instance
+
 You can add your downloaded themes to your LinkStack instance on the Admin Panel. Navigate to the 'Themes' tab and scroll to the bottom of the page.
 
-Now click on Choose file and select your downloaded theme zip file. Now click on 'Upload theme' and you should be able to select your uploaded theme now.
+# Set up environment variables
+
+cp .env.example .env.localNow click on Choose file and select your downloaded theme zip file. Now click on 'Upload theme' and you should be able to select your uploaded theme now.
+
+# Add your Supabase credentials
 
 <br><br>
 
-### **Themes are envisioned to be made by users for users.**
+# Start development server
+
+npm run dev### **Themes are envisioned to be made by users for users.**
+
+```
 
 If you know a bit about CSS, consider making your own theme and adding it to the public directory.
-Everything is documented in the dedicated GitHub repository.
 
-[github.com/LinkStackOrg/linkstack-themes/tree/main/contributing](https://github.com/LinkStackOrg/linkstack-themes/tree/main/contributing)
+### Build for ProductionEverything is documented in the dedicated GitHub repository.
 
-<a name="Installation"></a>
+
+
+```bash[github.com/LinkStackOrg/linkstack-themes/tree/main/contributing](https://github.com/LinkStackOrg/linkstack-themes/tree/main/contributing)
+
+npm run build
+
+```<a name="Installation"></a>
+
 ## Installation
 
+---
+
 ### Downloading and installing steps:
-* **[Download](https://github.com/linkstackorg/linkstack/releases)** the latest release of LinkStack and simply place the folder 'linkstack' or the contents of this folder in the root directory of your website.
 
-### That's it! No coding no command line setup just plug and play.
+## 📄 License* **[Download](https://github.com/linkstackorg/linkstack/releases)** the latest release of LinkStack and simply place the folder 'linkstack' or the contents of this folder in the root directory of your website.
 
-<br>	
 
-#### Go through the first setup page:
 
-When accessing your instance for the first time, you will be greeted by the first setup page.
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)### That's it! No coding no command line setup just plug and play.
 
-<p align="center">
+
+
+This project is licensed under the GNU Affero General Public License v3.0. See the [LICENSE](LICENSE) file for details.<br>	
+
+
+
+---#### Go through the first setup page:
+
+
+
+## 🤝 ContributingWhen accessing your instance for the first time, you will be greeted by the first setup page.
+
+
+
+We welcome contributions! Please feel free to submit a Pull Request.<p align="center">
+
 <img width="650" src="https://raw.githubusercontent.com/LinkStackOrg/branding/main/marketing/setup_wizard.png">
-</p>
 
-<br>
+1. Fork the repository</p>
 
-<a name="Docker"></a>
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)<br>
+
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+
+5. Open a Pull Request<a name="Docker"></a>
+
 ## Docker
 
+---
+
 <p align="center">
-<a href="https://github.com/linkstackorg/linkstack-docker">
+
+## 📧 Support<a href="https://github.com/linkstackorg/linkstack-docker">
+
 <picture>
-  <source media="(prefers-color-scheme: dark)" width="600px" srcset="https://raw.githubusercontent.com/LinkStackOrg/branding/main/marketing/docker_edition_dark.png">
+
+For support, email support@agentbio.net or visit our website at [agentbio.net](https://agentbio.net)  <source media="(prefers-color-scheme: dark)" width="600px" srcset="https://raw.githubusercontent.com/LinkStackOrg/branding/main/marketing/docker_edition_dark.png">
+
   <img width="600px" src="https://raw.githubusercontent.com/LinkStackOrg/branding/main/marketing/docker_edition_light.png">
-</picture>
+
+---</picture>
+
 </a>
-</p>
 
-The official docker version of [LinkStack](https://github.com/linkstackorg/linkstack). This docker image is a simple to set up solution, containing everything you need to run LinkStack.
+## 🌟 Acknowledgments</p>
 
-The docker version of LinkStack retains all the features and customization options of the [original version](https://github.com/linkstackorg/linkstack).
 
-This docker is based on [Alpine Linux](https://www.alpinelinux.org), a Linux distribution designed to be small, simple and secure. The web server is running [Apache2](https://www.apache.org), a free and open-source cross-platform web server software. The docker comes with [PHP 8.2](https://www.php.net/releases/8.2/en.php) for high compatibility and performance.
 
-#### Using the docker is as simple as pulling and deploying.
+Built with modern web technologies:The official docker version of [LinkStack](https://github.com/linkstackorg/linkstack). This docker image is a simple to set up solution, containing everything you need to run LinkStack.
 
-#### Pull
+
+
+- [React](https://reactjs.org/) - UI frameworkThe docker version of LinkStack retains all the features and customization options of the [original version](https://github.com/linkstackorg/linkstack).
+
+- [Vite](https://vitejs.dev/) - Build tool
+
+- [Tailwind CSS](https://tailwindcss.com/) - StylingThis docker is based on [Alpine Linux](https://www.alpinelinux.org), a Linux distribution designed to be small, simple and secure. The web server is running [Apache2](https://www.apache.org), a free and open-source cross-platform web server software. The docker comes with [PHP 8.2](https://www.php.net/releases/8.2/en.php) for high compatibility and performance.
+
+- [Supabase](https://supabase.com/) - Backend services
+
+- [Cloudflare Pages](https://pages.cloudflare.com/) - Hosting#### Using the docker is as simple as pulling and deploying.
+
+- [Radix UI](https://www.radix-ui.com/) - Accessible components
+
+- [Tanstack Query](https://tanstack.com/query) - Data fetching#### Pull
+
+- [Lucide Icons](https://lucide.dev/) - Icon library
 
 `docker pull linkstackorg/linkstack`
 
+---
+
 #### [Learn more about the Docker version](https://github.com/LinkStackOrg/linkstack-docker)
 
-<br>
+<p align="center">Made with ❤️ for Real Estate Professionals</p>
+
+<p align="center">© 2025 AgentBio. All rights reserved.</p><br>
+
 
 <a name="Updating"></a>
 ## Updating
