@@ -18,6 +18,7 @@ import TermsOfService from "./pages/legal/TermsOfService";
 import Pricing from "./pages/Pricing";
 import Blog from "./pages/Blog";
 import BlogArticle from "./pages/BlogArticle";
+import SitemapXml from "./pages/SitemapXml";
 
 // Auth pages
 import Login from "./pages/auth/Login";
@@ -85,6 +86,7 @@ function App() {
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Landing />} />
+                <Route path="/sitemap.xml" element={<SitemapXml />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
