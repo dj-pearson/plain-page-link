@@ -4,8 +4,6 @@ import { Toaster } from "sonner";
 import { useAuthStore } from "./stores/useAuthStore";
 import { errorHandler } from "./lib/errorHandler";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
-import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
-import { pwaManager } from "./lib/pwa";
 import { offlineStorage } from "./lib/offline-storage";
 import { pushNotifications } from "./lib/push-notifications";
 
@@ -141,7 +139,6 @@ function App() {
             </Routes>
 
             <Toaster position="top-right" richColors />
-            <PWAInstallPrompt />
         </>
     );
 }
