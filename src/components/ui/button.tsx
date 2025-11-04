@@ -4,26 +4,26 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-    "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
+    "relative inline-flex items-center justify-center whitespace-nowrap font-light tracking-tight text-sm transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
     {
         variants: {
             variant: {
                 default:
-                    "bg-gradient-to-br from-blue-500/90 to-blue-600/90 text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 backdrop-blur-xl border border-blue-400/20 hover:border-blue-300/30 hover:scale-[1.02]",
+                    "glass backdrop-blur-md text-foreground hover:bg-foreground/10",
                 destructive:
-                    "bg-gradient-to-br from-red-500/90 to-red-600/90 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 backdrop-blur-xl border border-red-400/20 hover:border-red-300/30 hover:scale-[1.02]",
+                    "bg-destructive text-destructive-foreground hover:bg-destructive/80",
                 outline:
-                    "border-2 border-gray-300/40 bg-white/60 backdrop-blur-xl shadow-lg hover:bg-white/80 text-gray-900 hover:shadow-xl hover:border-gray-400/60 hover:scale-[1.02]",
+                    "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
                 secondary:
-                    "bg-gradient-to-br from-gray-200/80 to-gray-300/80 text-gray-900 shadow-lg backdrop-blur-xl border border-gray-400/30 hover:from-gray-300/90 hover:to-gray-400/90 hover:shadow-xl hover:scale-[1.02]",
-                ghost: "hover:bg-white/60 hover:backdrop-blur-xl text-gray-900 hover:shadow-lg hover:scale-[1.02]",
-                link: "text-blue-600 underline-offset-4 hover:underline hover:text-blue-700",
+                    "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+                ghost: "hover:bg-accent hover:text-accent-foreground",
+                link: "text-foreground underline-offset-4 hover:underline",
             },
             size: {
-                default: "h-10 px-4 py-2",
-                sm: "h-8 rounded-lg px-3 text-xs",
-                lg: "h-12 rounded-xl px-8 text-base",
-                icon: "h-10 w-10",
+                default: "h-10 px-4 py-2 rounded-xl",
+                sm: "h-9 rounded-lg px-3",
+                lg: "h-11 rounded-xl px-8",
+                icon: "h-10 w-10 rounded-xl",
             },
         },
         defaultVariants: {
