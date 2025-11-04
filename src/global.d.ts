@@ -20,3 +20,6 @@ declare const ExtendableEvent: {
 // Missing optional peer deps from vite-plugin-pwa type declarations
 declare module '@vite-pwa/assets-generator/api';
 declare module '@vite-pwa/assets-generator/config';
+
+// Unconfig types
+declare type Args<T = any> = T extends (...args: infer A) => any ? A : never;
