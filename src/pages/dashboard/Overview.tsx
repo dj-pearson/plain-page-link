@@ -3,6 +3,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useLinks } from "@/hooks/useLinks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 export default function Overview() {
     const { stats, recentLeads, isLoading } = useAnalytics();
@@ -11,7 +12,11 @@ export default function Overview() {
     const totalLinkClicks = links.reduce((sum, link) => sum + (link.click_count || 0), 0);
 
     if (isLoading) {
-        return <div className="flex items-center justify-center h-64">Loading...</div>;
+        return (
+            <div className="flex items-center justify-center h-64">
+                <LoadingSpinner size="lg" />
+            </div>
+        );
     }
 
     return (
