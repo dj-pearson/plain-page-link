@@ -77,32 +77,104 @@ function FloatingRing({ position, radius, color }: {
 }
 
 /**
- * Central Sphere Component
- * Main focal point with distortion effect
+ * Modern House Component
+ * Main focal point - a geometric modern house
  */
-function CentralSphere() {
-  const meshRef = useRef<THREE.Mesh>(null);
+function ModernHouse() {
+  const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.x = state.clock.getElapsedTime() * 0.1;
-      meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.15;
+    if (groupRef.current) {
+      groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.2;
     }
   });
 
   return (
-    <Sphere ref={meshRef} args={[1.2, 100, 100]} scale={1}>
-      <MeshDistortMaterial
-        color="#80d0c7"
-        attach="material"
-        distort={0.4}
-        speed={1.5}
-        roughness={0.1}
-        metalness={0.8}
-        transparent
-        opacity={0.8}
-      />
-    </Sphere>
+    <group ref={groupRef}>
+      {/* Main house body */}
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[2, 1.5, 1.8]} />
+        <meshStandardMaterial
+          color="#80d0c7"
+          roughness={0.2}
+          metalness={0.8}
+        />
+      </mesh>
+
+      {/* Roof - pyramid style */}
+      <mesh position={[0, 1.1, 0]} rotation={[0, 0, 0]}>
+        <coneGeometry args={[1.5, 0.8, 4]} />
+        <meshStandardMaterial
+          color="#a1c4fd"
+          roughness={0.2}
+          metalness={0.9}
+        />
+      </mesh>
+
+      {/* Door */}
+      <mesh position={[0, -0.4, 0.91]}>
+        <boxGeometry args={[0.4, 0.7, 0.05]} />
+        <meshStandardMaterial
+          color="#5a9fb8"
+          roughness={0.5}
+          metalness={0.3}
+        />
+      </mesh>
+
+      {/* Windows */}
+      <mesh position={[-0.6, 0.2, 0.91]}>
+        <boxGeometry args={[0.35, 0.35, 0.05]} />
+        <meshStandardMaterial
+          color="#c2e9fb"
+          roughness={0.1}
+          metalness={0.9}
+          emissive="#c2e9fb"
+          emissiveIntensity={0.3}
+        />
+      </mesh>
+      <mesh position={[0.6, 0.2, 0.91]}>
+        <boxGeometry args={[0.35, 0.35, 0.05]} />
+        <meshStandardMaterial
+          color="#c2e9fb"
+          roughness={0.1}
+          metalness={0.9}
+          emissive="#c2e9fb"
+          emissiveIntensity={0.3}
+        />
+      </mesh>
+
+      {/* Side windows */}
+      <mesh position={[1.01, 0.2, 0]}>
+        <boxGeometry args={[0.05, 0.35, 0.35]} />
+        <meshStandardMaterial
+          color="#c2e9fb"
+          roughness={0.1}
+          metalness={0.9}
+          emissive="#c2e9fb"
+          emissiveIntensity={0.3}
+        />
+      </mesh>
+      <mesh position={[-1.01, 0.2, 0]}>
+        <boxGeometry args={[0.05, 0.35, 0.35]} />
+        <meshStandardMaterial
+          color="#c2e9fb"
+          roughness={0.1}
+          metalness={0.9}
+          emissive="#c2e9fb"
+          emissiveIntensity={0.3}
+        />
+      </mesh>
+
+      {/* Chimney */}
+      <mesh position={[0.7, 1.6, 0.3]}>
+        <boxGeometry args={[0.2, 0.5, 0.2]} />
+        <meshStandardMaterial
+          color="#7ab8c7"
+          roughness={0.3}
+          metalness={0.7}
+        />
+      </mesh>
+    </group>
   );
 }
 
@@ -188,18 +260,15 @@ function Scene() {
         speed={1}
       />
 
-      {/* Main central sphere */}
-      <CentralSphere />
+      {/* Main modern house */}
+      <ModernHouse />
 
-      {/* Floating geometric shapes */}
-      <AnimatedShape position={[-2, 0.5, -1]} scale={0.6} color={colors.teal} speed={0.8} />
-      <AnimatedShape position={[2.5, -0.5, -2]} scale={0.5} color={colors.blue} speed={1.2} />
-      <AnimatedShape position={[-1.5, -1, 1]} scale={0.4} color={colors.lightBlue} speed={1.5} />
-      <AnimatedShape position={[1.8, 1.2, 0.5]} scale={0.7} color={colors.teal} speed={0.6} />
-
-      {/* Floating rings */}
-      <FloatingRing position={[0, 0, 0]} radius={2} color={colors.blue} />
-      <FloatingRing position={[0, 0, 0]} radius={2.5} color={colors.lightBlue} />
+      {/* Floating geometric shapes around house */}
+      <AnimatedShape position={[-3, 0.5, -1]} scale={0.4} color={colors.teal} speed={0.8} />
+      <AnimatedShape position={[3, -0.5, -2]} scale={0.35} color={colors.blue} speed={1.2} />
+      <AnimatedShape position={[-2.5, -1.5, 1]} scale={0.3} color={colors.lightBlue} speed={1.5} />
+      <AnimatedShape position={[2.8, 1.5, 0.5]} scale={0.45} color={colors.teal} speed={0.6} />
+      <AnimatedShape position={[0, -2, -1.5]} scale={0.35} color={colors.blue} speed={1.0} />
 
       {/* Ambient particles */}
       <AmbientParticles />
