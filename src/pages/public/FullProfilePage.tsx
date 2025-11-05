@@ -203,10 +203,10 @@ export default function FullProfilePage() {
                      backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
                      color: `hsl(var(--theme-text, 222 47% 11%))`
                  }}>
-            <div className="container mx-auto px-4 py-8 max-w-5xl relative z-10">
-                <div className="space-y-6">
+            <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 max-w-5xl relative z-10 pb-24 sm:pb-8">
+                <div className="space-y-4 sm:space-y-6">
                     {/* Profile Header */}
-                    <section id="about" className="scroll-mt-20">
+                    <section id="about" className="scroll-mt-16 sm:scroll-mt-20">
                         <ProfileHeader profile={profile} />
                     </section>
 
@@ -222,7 +222,7 @@ export default function FullProfilePage() {
 
                     {/* Social Proof Banner */}
                     {settings?.show_social_proof !== false && (
-                        <div className="pt-4">
+                        <div className="pt-2 sm:pt-4">
                             <SocialProofBanner
                                 stats={{
                                     propertiesSold: soldListings.length,
@@ -237,7 +237,7 @@ export default function FullProfilePage() {
 
                     {/* Active Listings */}
                     {settings?.show_listings !== false && activeListings.length > 0 && (
-                        <section id="listings" className="pt-4 scroll-mt-20">
+                        <section id="listings" className="pt-2 sm:pt-4 scroll-mt-16 sm:scroll-mt-20">
                             <ListingGallery
                                 listings={activeListings}
                                 title="Featured Properties"
@@ -249,7 +249,7 @@ export default function FullProfilePage() {
                     )}
 
                     {/* Lead Capture CTAs */}
-                    <section id="contact" className="pt-8 scroll-mt-20">
+                    <section id="contact" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
                         <LeadCaptureCTA
                             agentId={profile.id}
                             agentName={profile.full_name || profile.username}
@@ -258,7 +258,7 @@ export default function FullProfilePage() {
 
                     {/* Sold Properties */}
                     {settings?.show_sold_properties !== false && (
-                        <div className="pt-4">
+                        <div className="pt-2 sm:pt-4">
                             <SoldProperties
                                 listings={listings}
                                 onListingClick={(listing) =>
@@ -270,7 +270,7 @@ export default function FullProfilePage() {
 
                     {/* Testimonials */}
                     {settings?.show_testimonials !== false && testimonials.length > 0 && (
-                        <section id="testimonials" className="pt-8 scroll-mt-20">
+                        <section id="testimonials" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
                             <TestimonialSection testimonials={testimonials} />
                         </section>
                     )}
@@ -294,12 +294,12 @@ export default function FullProfilePage() {
                     <SocialLinks profile={profile} />
 
                     {/* Compliance Footer with Equal Housing */}
-                    <footer className="mt-12 pt-8 pb-6 border-t border-gray-200 bg-gray-50 rounded-lg">
-                        <div className="text-center">
+                    <footer className="mt-8 sm:mt-12 pt-6 sm:pt-8 pb-4 sm:pb-6 border-t border-gray-200 bg-gray-50 rounded-lg">
+                        <div className="text-center px-3 sm:px-4">
                             {/* Equal Housing Opportunity Logo */}
-                            <div className="flex justify-center mb-3">
+                            <div className="flex justify-center mb-2 sm:mb-3">
                                 <svg
-                                    className="h-10 w-10 text-blue-600"
+                                    className="h-8 w-8 sm:h-10 sm:w-10 text-blue-600"
                                     viewBox="0 0 100 100"
                                     fill="currentColor"
                                     role="img"
@@ -314,21 +314,21 @@ export default function FullProfilePage() {
                             </div>
 
                             {/* Equal Housing Statement */}
-                            <p className="text-xs font-semibold text-gray-700 mb-2">
+                            <p className="text-xs sm:text-sm font-semibold text-gray-700 mb-1 sm:mb-2">
                                 Equal Housing Opportunity
                             </p>
-                            <p className="text-xs text-gray-600 mb-4 max-w-2xl mx-auto leading-relaxed px-4">
+                            <p className="text-xs text-gray-600 mb-3 sm:mb-4 max-w-2xl mx-auto leading-relaxed">
                                 We are pledged to the letter and spirit of U.S. policy for the achievement of equal housing opportunity throughout the Nation.
                             </p>
 
                             {/* License Information */}
                             {profile.license_number && (
-                                <div className="mb-4 pb-4 border-b border-gray-300">
-                                    <p className="text-xs text-gray-700 font-medium">
+                                <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-300">
+                                    <p className="text-xs sm:text-sm text-gray-700 font-medium">
                                         {profile.display_name}
                                         {profile.title && ` | ${profile.title}`}
                                     </p>
-                                    <p className="text-xs text-gray-600">
+                                    <p className="text-xs text-gray-600 mt-1">
                                         {profile.brokerage_name && `${profile.brokerage_name} | `}
                                         License #{profile.license_number} ({profile.license_state})
                                     </p>
@@ -336,12 +336,12 @@ export default function FullProfilePage() {
                             )}
 
                             {/* Legal Links */}
-                            <div className="flex flex-wrap justify-center gap-3 text-xs text-gray-500 mb-3">
-                                <a href="/terms" className="hover:text-blue-600 hover:underline">
+                            <div className="flex flex-wrap justify-center gap-2 sm:gap-3 text-xs text-gray-500 mb-2 sm:mb-3">
+                                <a href="/terms" className="hover:text-blue-600 active:text-blue-700 hover:underline min-h-[32px] flex items-center">
                                     Terms of Service
                                 </a>
                                 <span>•</span>
-                                <a href="/privacy" className="hover:text-blue-600 hover:underline">
+                                <a href="/privacy" className="hover:text-blue-600 active:text-blue-700 hover:underline min-h-[32px] flex items-center">
                                     Privacy Policy
                                 </a>
                             </div>
@@ -350,11 +350,11 @@ export default function FullProfilePage() {
                             <p className="text-xs text-gray-500">
                                 © {new Date().getFullYear()} {profile.display_name}. All rights reserved.
                             </p>
-                            <p className="text-xs text-gray-400 mt-2">
+                            <p className="text-xs text-gray-400 mt-1 sm:mt-2">
                                 Powered by{" "}
                                 <a
                                     href="https://agentbio.net"
-                                    className="hover:text-blue-600 hover:underline"
+                                    className="hover:text-blue-600 active:text-blue-700 hover:underline"
                                     target="_blank"
                                     rel="noopener"
                                 >
@@ -384,14 +384,15 @@ export default function FullProfilePage() {
                 agentName={profile.full_name || profile.username}
             />
 
-            {/* Sticky Mobile Contact Button */}
+            {/* Sticky Mobile Contact Button - Enhanced for mobile */}
             <button
                 onClick={() => setIsLeadModalOpen(true)}
-                className="md:hidden fixed bottom-4 right-4 z-40 bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 min-w-[56px] min-h-[56px] justify-center"
+                className="md:hidden fixed bottom-6 right-4 z-40 bg-blue-600 text-white rounded-full px-5 py-3.5 shadow-xl hover:bg-blue-700 hover:shadow-2xl transition-all active:scale-90 flex items-center gap-2 min-w-[56px] min-h-[56px] justify-center no-select safe-area-inset-bottom"
                 aria-label="Contact agent"
+                style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
             >
-                <MessageCircle className="w-6 h-6" />
-                <span className="text-sm font-medium whitespace-nowrap">Contact Me</span>
+                <MessageCircle className="w-6 h-6 flex-shrink-0" />
+                <span className="text-sm font-semibold whitespace-nowrap">Contact Me</span>
             </button>
         </div>
         </>

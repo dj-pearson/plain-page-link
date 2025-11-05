@@ -234,60 +234,62 @@ export default function Theme() {
     const premiumThemes = DEFAULT_THEMES.filter((t) => t.isPremium);
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+        <div className="space-y-4 sm:space-y-6">
+            {/* Header - Mobile optimized */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold">Theme Customization</h1>
-                    <p className="text-muted-foreground mt-1">
+                    <h1 className="text-2xl sm:text-3xl font-bold">Theme Customization</h1>
+                    <p className="text-sm sm:text-base text-muted-foreground mt-0.5 sm:mt-1">
                         Customize your profile's look and feel
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={handlePreviewTheme}
                         title="Open your public profile in a new tab to see your theme"
+                        className="flex-1 sm:flex-none"
                     >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Preview Live
+                        <Eye className="w-4 h-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Preview Live</span>
                     </Button>
                     {isCustomizing && (
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={handleResetToDefault}
+                            className="flex-1 sm:flex-none"
                         >
-                            <RotateCcw className="w-4 h-4 mr-2" />
-                            Reset
+                            <RotateCcw className="w-4 h-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Reset</span>
                         </Button>
                     )}
-                    <Button size="sm" onClick={handleSaveTheme} disabled={isSaving}>
+                    <Button size="sm" onClick={handleSaveTheme} disabled={isSaving} className="flex-1 sm:flex-none">
                         {isSaving ? (
                             <LoadingSpinner size="sm" className="mr-2" />
                         ) : (
                             <Save className="w-4 h-4 mr-2" />
                         )}
-                        Save Theme
+                        <span className="text-xs sm:text-sm">Save Theme</span>
                     </Button>
                 </div>
             </div>
 
-            {/* Info Banner */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                    <div className="text-2xl">✨</div>
+            {/* Info Banner - Mobile optimized */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 sm:p-4">
+                <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="text-xl sm:text-2xl flex-shrink-0">✨</div>
                     <div className="flex-1">
-                        <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                        <p className="text-xs sm:text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
                             How to see your theme changes:
                         </p>
-                        <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
+                        <ol className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 space-y-0.5 sm:space-y-1 list-decimal list-inside">
                             <li>Select a theme below and click <strong>"Save Theme"</strong></li>
                             <li>Click <strong>"Preview Live"</strong> button above to open your public profile in a new tab</li>
                             <li>Premium themes with 3D effects will show animated backgrounds on your public page!</li>
                         </ol>
-                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 sm:mt-2">
                             💡 Note: Theme effects only appear on your <strong>public profile page</strong>, not in this dashboard.
                         </p>
                     </div>
@@ -306,14 +308,14 @@ export default function Theme() {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* Theme Presets Tab */}
-                <TabsContent value="presets" className="space-y-6">
+                {/* Theme Presets Tab - Mobile optimized */}
+                <TabsContent value="presets" className="space-y-4 sm:space-y-6">
                     {/* Free Themes */}
                     <div>
-                        <h3 className="text-lg font-semibold mb-4">
+                        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">
                             Free Themes
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             {freeThemes.map((theme) => (
                                 <ThemeCard
                                     key={theme.id}
@@ -327,13 +329,13 @@ export default function Theme() {
 
                     {/* Premium Themes */}
                     <div>
-                        <div className="flex items-center gap-2 mb-4">
-                            <h3 className="text-lg font-semibold">
+                        <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                            <h3 className="text-base sm:text-lg font-semibold">
                                 Premium Themes
                             </h3>
                             <Badge>Pro</Badge>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             {premiumThemes.map((theme) => (
                                 <ThemeCard
                                     key={theme.id}
@@ -346,18 +348,18 @@ export default function Theme() {
                     </div>
                 </TabsContent>
 
-                {/* Customize Tab */}
-                <TabsContent value="customize" className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Customize Tab - Mobile optimized */}
+                <TabsContent value="customize" className="space-y-4 sm:space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                         {/* Colors */}
                         <Card>
-                            <CardHeader>
-                                <CardTitle>Colors</CardTitle>
-                                <CardDescription>
+                            <CardHeader className="pb-3 sm:pb-4">
+                                <CardTitle className="text-base sm:text-lg">Colors</CardTitle>
+                                <CardDescription className="text-xs sm:text-sm">
                                     Customize the color scheme of your profile
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="space-y-3 sm:space-y-4">
                                 <ColorPicker
                                     label="Primary Color"
                                     value={customColors.primary}
@@ -403,13 +405,13 @@ export default function Theme() {
 
                         {/* Fonts */}
                         <Card>
-                            <CardHeader>
-                                <CardTitle>Typography</CardTitle>
-                                <CardDescription>
+                            <CardHeader className="pb-3 sm:pb-4">
+                                <CardTitle className="text-base sm:text-lg">Typography</CardTitle>
+                                <CardDescription className="text-xs sm:text-sm">
                                     Select fonts for headings and body text
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="space-y-3 sm:space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="heading-font">
                                         Heading Font
@@ -508,17 +510,17 @@ export default function Theme() {
                         </Card>
                     </div>
 
-                    {/* Live Preview */}
+                    {/* Live Preview - Mobile optimized */}
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Live Preview</CardTitle>
-                            <CardDescription>
+                        <CardHeader className="pb-3 sm:pb-4">
+                            <CardTitle className="text-base sm:text-lg">Live Preview</CardTitle>
+                            <CardDescription className="text-xs sm:text-sm">
                                 See how your theme will look on your profile
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div
-                                className="rounded-lg p-8 space-y-4"
+                                className="rounded-lg p-4 sm:p-8 space-y-3 sm:space-y-4"
                                 style={{
                                     backgroundColor: customColors.background,
                                 }}
@@ -553,35 +555,35 @@ export default function Theme() {
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     <button
-                                        className="px-4 py-2 rounded-lg text-white text-sm font-medium"
+                                        className="px-3 sm:px-4 py-2 rounded-lg text-white text-xs sm:text-sm font-medium min-h-[44px]"
                                         style={{
                                             backgroundColor:
                                                 customColors.primary,
                                         }}
                                     >
-                                        Primary Button
+                                        Primary
                                     </button>
                                     <button
-                                        className="px-4 py-2 rounded-lg text-sm font-medium"
+                                        className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px]"
                                         style={{
                                             backgroundColor:
                                                 customColors.secondary,
                                             color: "white",
                                         }}
                                     >
-                                        Secondary Button
+                                        Secondary
                                     </button>
                                     <button
-                                        className="px-4 py-2 rounded-lg text-sm font-medium"
+                                        className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px]"
                                         style={{
                                             backgroundColor:
                                                 customColors.accent,
                                             color: "white",
                                         }}
                                     >
-                                        Accent Button
+                                        Accent
                                     </button>
                                 </div>
 
