@@ -30,7 +30,15 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    if (user.user_metadata?.role !== 'admin') {
+    // Check if user has admin role in user_roles table
+    const { data: userRoles, error: roleError } = await supabaseClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .single();
+
+    if (roleError || !userRoles) {
       throw new Error('Admin access required');
     }
 
