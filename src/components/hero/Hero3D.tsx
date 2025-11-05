@@ -1,20 +1,20 @@
-import { useRef, useMemo, Suspense } from 'react';
+import { useRef, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import {
   OrbitControls,
   Environment,
   Float,
-  Text3D,
-  Center,
   MeshReflectorMaterial,
   Html,
-  PerspectiveCamera
+  RoundedBox,
+  Cylinder,
+  Sphere
 } from '@react-three/drei';
 import * as THREE from 'three';
 
 /**
  * Luxury Modern House Component
- * High-end architectural design perfect for Real Estate professionals
+ * High-end architectural design with improved geometry
  */
 function LuxuryModernHouse() {
   const groupRef = useRef<THREE.Group>(null);
@@ -29,64 +29,57 @@ function LuxuryModernHouse() {
   return (
     <group ref={groupRef} position={[0, -0.5, 0]}>
       {/* Foundation / Base */}
-      <mesh position={[0, -0.05, 0]} receiveShadow>
-        <boxGeometry args={[5, 0.1, 4]} />
+      <RoundedBox args={[5, 0.1, 4]} radius={0.02} position={[0, -0.05, 0]} receiveShadow>
         <meshStandardMaterial color="#2c2c2c" roughness={0.8} metalness={0.2} />
-      </mesh>
+      </RoundedBox>
 
       {/* Main House Structure - Ground Floor */}
-      <mesh position={[0, 0.6, 0]} castShadow receiveShadow>
-        <boxGeometry args={[4, 1.2, 3.5]} />
+      <RoundedBox args={[4, 1.2, 3.5]} radius={0.05} position={[0, 0.6, 0]} castShadow receiveShadow>
         <meshStandardMaterial
           color="#f5f5f5"
           roughness={0.2}
           metalness={0.1}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Second Floor - Modern Offset Design */}
-      <mesh position={[-0.3, 1.5, 0.2]} castShadow receiveShadow>
-        <boxGeometry args={[3, 1, 3]} />
+      <RoundedBox args={[3, 1, 3]} radius={0.05} position={[-0.3, 1.5, 0.2]} castShadow receiveShadow>
         <meshStandardMaterial
           color="#ffffff"
           roughness={0.15}
           metalness={0.2}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Accent Panel - Architectural Feature */}
-      <mesh position={[1.3, 1.2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[1, 2, 3.2]} />
+      <RoundedBox args={[1, 2, 3.2]} radius={0.03} position={[1.3, 1.2, 0]} castShadow receiveShadow>
         <meshStandardMaterial
           color="#3a3a3a"
           roughness={0.3}
           metalness={0.6}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Flat Modern Roof */}
-      <mesh position={[-0.3, 2.05, 0.2]} castShadow>
-        <boxGeometry args={[3.1, 0.1, 3.1]} />
+      <RoundedBox args={[3.1, 0.1, 3.1]} radius={0.02} position={[-0.3, 2.05, 0.2]} castShadow>
         <meshStandardMaterial
           color="#2a2a2a"
           roughness={0.4}
           metalness={0.8}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Roof Garden/Terrace Detail */}
-      <mesh position={[-0.3, 2.15, 0.2]}>
-        <boxGeometry args={[1.5, 0.08, 1.5]} />
+      <RoundedBox args={[1.5, 0.08, 1.5]} radius={0.02} position={[-0.3, 2.15, 0.2]}>
         <meshStandardMaterial
           color="#4a7c59"
           roughness={0.9}
           metalness={0.1}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Floor-to-Ceiling Glass Windows - Front */}
-      <mesh position={[0, 0.6, 1.76]} castShadow>
-        <boxGeometry args={[2.5, 1.0, 0.05]} />
+      <RoundedBox args={[2.5, 1.0, 0.05]} radius={0.01} position={[0, 0.6, 1.76]} castShadow>
         <meshPhysicalMaterial
           color="#b8e6f5"
           roughness={0.05}
@@ -96,11 +89,10 @@ function LuxuryModernHouse() {
           transparent
           opacity={0.9}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Second Floor Glass */}
-      <mesh position={[-0.3, 1.5, 1.63]} castShadow>
-        <boxGeometry args={[2.2, 0.8, 0.05]} />
+      <RoundedBox args={[2.2, 0.8, 0.05]} radius={0.01} position={[-0.3, 1.5, 1.63]} castShadow>
         <meshPhysicalMaterial
           color="#b8e6f5"
           roughness={0.05}
@@ -110,41 +102,37 @@ function LuxuryModernHouse() {
           transparent
           opacity={0.9}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Balcony Glass Railing */}
-      <mesh position={[-0.3, 1.0, 1.65]}>
-        <boxGeometry args={[2.4, 0.05, 0.05]} />
+      <RoundedBox args={[2.4, 0.05, 0.05]} radius={0.01} position={[-0.3, 1.0, 1.65]}>
         <meshStandardMaterial
           color="#dddddd"
           roughness={0.2}
           metalness={0.8}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Modern Entrance Door */}
-      <mesh position={[1.2, 0.5, 1.76]}>
-        <boxGeometry args={[0.5, 1.1, 0.05]} />
+      <RoundedBox args={[0.5, 1.1, 0.05]} radius={0.02} position={[1.2, 0.5, 1.76]}>
         <meshStandardMaterial
           color="#1a1a1a"
           roughness={0.4}
           metalness={0.7}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Door Handle Detail */}
-      <mesh position={[1.0, 0.5, 1.8]}>
-        <cylinderGeometry args={[0.03, 0.03, 0.15, 8]} rotation={[0, 0, Math.PI / 2]} />
+      <Cylinder args={[0.03, 0.03, 0.15, 8]} rotation={[0, 0, Math.PI / 2]} position={[1.0, 0.5, 1.8]}>
         <meshStandardMaterial
           color="#c9b037"
           roughness={0.2}
           metalness={1}
         />
-      </mesh>
+      </Cylinder>
 
       {/* Side Glass Panels */}
-      <mesh position={[2.02, 1.2, 0]} castShadow>
-        <boxGeometry args={[0.05, 2, 2.8]} />
+      <RoundedBox args={[0.05, 2, 2.8]} radius={0.01} position={[2.02, 1.2, 0]} castShadow>
         <meshPhysicalMaterial
           color="#b8e6f5"
           roughness={0.05}
@@ -154,46 +142,50 @@ function LuxuryModernHouse() {
           transparent
           opacity={0.85}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Landscape - Front Lawn */}
-      <mesh position={[0, -0.04, 2.8]} receiveShadow>
-        <boxGeometry args={[5, 0.05, 2]} />
+      <RoundedBox args={[5, 0.05, 2]} radius={0.01} position={[0, -0.04, 2.8]} receiveShadow>
         <meshStandardMaterial
           color="#3d5a40"
           roughness={0.95}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Pathway */}
-      <mesh position={[1.2, -0.02, 2.8]} receiveShadow>
-        <boxGeometry args={[0.8, 0.03, 2]} />
+      <RoundedBox args={[0.8, 0.03, 2]} radius={0.01} position={[1.2, -0.02, 2.8]} receiveShadow>
         <meshStandardMaterial
           color="#8a8a8a"
           roughness={0.7}
         />
-      </mesh>
+      </RoundedBox>
 
       {/* Decorative Plants/Bushes */}
-      <mesh position={[-1.5, 0.2, 2.2]}>
-        <sphereGeometry args={[0.3, 8, 8]} />
+      <Sphere args={[0.3, 16, 16]} position={[-1.5, 0.2, 2.2]}>
         <meshStandardMaterial color="#2d5016" roughness={0.9} />
-      </mesh>
-      <mesh position={[0.5, 0.15, 2.5]}>
-        <sphereGeometry args={[0.25, 8, 8]} />
+      </Sphere>
+      <Sphere args={[0.25, 16, 16]} position={[0.5, 0.15, 2.5]}>
         <meshStandardMaterial color="#2d5016" roughness={0.9} />
-      </mesh>
-      <mesh position={[-2, 0.25, 2]}>
-        <sphereGeometry args={[0.35, 8, 8]} />
+      </Sphere>
+      <Sphere args={[0.35, 16, 16]} position={[-2, 0.25, 2]}>
         <meshStandardMaterial color="#2d5016" roughness={0.9} />
-      </mesh>
+      </Sphere>
+
+      {/* Decorative Tree */}
+      <group position={[-2.5, 0, 2.5]}>
+        <Cylinder args={[0.1, 0.12, 1, 8]} position={[0, 0.5, 0]}>
+          <meshStandardMaterial color="#4a3c28" roughness={0.9} />
+        </Cylinder>
+        <Sphere args={[0.5, 16, 16]} position={[0, 1.3, 0]}>
+          <meshStandardMaterial color="#2d5016" roughness={0.9} />
+        </Sphere>
+      </group>
     </group>
   );
 }
 
 /**
- * Floating Property Card Component
- * Interactive listing card showing property info
+ * Floating Property Card Component with Real Text
  */
 function PropertyCard({ position, rotation = 0 }: {
   position: [number, number, number];
@@ -202,36 +194,42 @@ function PropertyCard({ position, rotation = 0 }: {
   return (
     <Float speed={2} rotationIntensity={0.3} floatIntensity={0.5}>
       <group position={position} rotation={[0, rotation, 0]}>
-        <mesh>
-          <boxGeometry args={[1.2, 0.8, 0.05]} />
+        <RoundedBox args={[1.2, 0.8, 0.05]} radius={0.02}>
           <meshStandardMaterial
             color="#ffffff"
             roughness={0.1}
             metalness={0.2}
           />
-        </mesh>
+        </RoundedBox>
         {/* Card accent/image area */}
-        <mesh position={[0, 0.2, 0.026]}>
-          <boxGeometry args={[1.1, 0.4, 0.01]} />
+        <RoundedBox args={[1.1, 0.4, 0.01]} radius={0.01} position={[0, 0.2, 0.026]}>
           <meshStandardMaterial color="#80d0c7" />
-        </mesh>
-        {/* Text lines simulation */}
-        <mesh position={[-0.3, -0.1, 0.026]}>
-          <boxGeometry args={[0.5, 0.05, 0.01]} />
-          <meshStandardMaterial color="#333333" />
-        </mesh>
-        <mesh position={[-0.15, -0.2, 0.026]}>
-          <boxGeometry args={[0.8, 0.04, 0.01]} />
-          <meshStandardMaterial color="#666666" />
-        </mesh>
+        </RoundedBox>
+
+        {/* HTML Text Overlay */}
+        <Html
+          position={[0, -0.15, 0.03]}
+          transform
+          occlude
+          style={{
+            width: '110px',
+            fontSize: '8px',
+            color: '#333',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        >
+          <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>$850,000</div>
+          <div style={{ fontSize: '7px', color: '#666' }}>4 bd • 3 ba • 2,400 sqft</div>
+        </Html>
       </group>
     </Float>
   );
 }
 
 /**
- * SOLD Sign Component
- * Classic real estate sold sign
+ * SOLD Sign Component with Real Text
  */
 function SoldSign() {
   const signRef = useRef<THREE.Group>(null);
@@ -246,28 +244,44 @@ function SoldSign() {
     <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.3}>
       <group ref={signRef} position={[-3, 0.5, 1]}>
         {/* Sign Post */}
-        <mesh position={[0, -0.3, 0]}>
-          <cylinderGeometry args={[0.05, 0.05, 1.5, 8]} />
+        <Cylinder args={[0.05, 0.05, 1.5, 16]} position={[0, -0.3, 0]}>
           <meshStandardMaterial color="#4a4a4a" metalness={0.6} roughness={0.4} />
-        </mesh>
+        </Cylinder>
+
         {/* Sign Board */}
-        <mesh castShadow>
-          <boxGeometry args={[0.8, 0.5, 0.05]} />
+        <RoundedBox args={[0.8, 0.5, 0.05]} radius={0.02} castShadow>
           <meshStandardMaterial color="#dc2626" roughness={0.3} metalness={0.2} />
-        </mesh>
-        {/* SOLD text (simulated with geometry) */}
-        <mesh position={[0, 0, 0.026]}>
-          <boxGeometry args={[0.6, 0.2, 0.01]} />
-          <meshStandardMaterial color="#ffffff" />
-        </mesh>
+        </RoundedBox>
+
+        {/* HTML Text for "SOLD" */}
+        <Html
+          position={[0, 0, 0.03]}
+          transform
+          occlude
+          style={{
+            width: '80px',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        >
+          <div style={{
+            color: 'white',
+            fontSize: '24px',
+            fontWeight: 'bold',
+            textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            letterSpacing: '2px'
+          }}>
+            SOLD
+          </div>
+        </Html>
       </group>
     </Float>
   );
 }
 
 /**
- * Animated Stats Badge
- * Floating achievement/stat indicator
+ * Animated Stats Badge with Real Text
  */
 function StatsBadge({ position, value, label, color }: {
   position: [number, number, number];
@@ -279,8 +293,7 @@ function StatsBadge({ position, value, label, color }: {
     <Float speed={2.5} rotationIntensity={0.4} floatIntensity={0.6}>
       <group position={position}>
         {/* Badge background */}
-        <mesh>
-          <cylinderGeometry args={[0.4, 0.4, 0.1, 32]} rotation={[Math.PI / 2, 0, 0]} />
+        <Cylinder args={[0.4, 0.4, 0.1, 32]} rotation={[Math.PI / 2, 0, 0]}>
           <meshStandardMaterial
             color={color}
             roughness={0.2}
@@ -288,16 +301,44 @@ function StatsBadge({ position, value, label, color }: {
             emissive={color}
             emissiveIntensity={0.3}
           />
-        </mesh>
+        </Cylinder>
+
         {/* Inner circle */}
-        <mesh position={[0, 0, 0.06]}>
-          <cylinderGeometry args={[0.32, 0.32, 0.02, 32]} rotation={[Math.PI / 2, 0, 0]} />
+        <Cylinder args={[0.32, 0.32, 0.02, 32]} rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.06]}>
           <meshStandardMaterial
             color="#ffffff"
             roughness={0.1}
             metalness={0.3}
           />
-        </mesh>
+        </Cylinder>
+
+        {/* HTML Text */}
+        <Html
+          position={[0, 0, 0.08]}
+          transform
+          occlude
+          style={{
+            width: '70px',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        >
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 'bold',
+            color: '#333',
+            marginBottom: '2px'
+          }}>
+            {value}
+          </div>
+          <div style={{
+            fontSize: '10px',
+            color: '#666'
+          }}>
+            {label}
+          </div>
+        </Html>
       </group>
     </Float>
   );
@@ -305,7 +346,6 @@ function StatsBadge({ position, value, label, color }: {
 
 /**
  * Ambient Lighting Orbs
- * Subtle floating lights for atmosphere
  */
 function LightingOrb({ position, color }: {
   position: [number, number, number];
@@ -321,7 +361,7 @@ function LightingOrb({ position, color }: {
 
   return (
     <mesh ref={meshRef} position={position}>
-      <sphereGeometry args={[0.15, 16, 16]} />
+      <sphereGeometry args={[0.15, 32, 32]} />
       <meshStandardMaterial
         color={color}
         emissive={color}
@@ -336,7 +376,6 @@ function LightingOrb({ position, color }: {
 
 /**
  * 3D Scene Component
- * Orchestrates all Real Estate elements
  */
 function Scene() {
   return (
@@ -377,7 +416,7 @@ function Scene() {
       {/* Main Luxury House */}
       <LuxuryModernHouse />
 
-      {/* Real Estate Context Elements */}
+      {/* Real Estate Context Elements with Real Text */}
       <PropertyCard position={[-3.5, 2, -1]} rotation={0.3} />
       <PropertyCard position={[3.5, 1.5, 0]} rotation={-0.4} />
 
