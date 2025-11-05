@@ -175,16 +175,62 @@ serve(async (req) => {
       prompt += `\n\nAdditional Instructions: ${customInstructions}`;
     }
 
-    prompt += `\n\nRequirements:
-- Write in Markdown format
-- Include an engaging title (use # heading)
-- Write 1000-1500 words
-- Include subheadings (use ## and ### headings)
-- Add a compelling introduction and conclusion
-- Use bullet points or numbered lists where appropriate
-- Make it SEO-friendly and easy to read
-- Target audience: homebuyers, sellers, and real estate investors
-- Tone: Professional yet approachable`;
+    prompt += `\n\nYou are a real estate marketing content strategist writing for licensed real estate agents.
+
+PRIMARY OBJECTIVES:
+- Educate real estate agents on practical marketing tactics
+- Position mobile-optimized link-in-bio profiles (AgentBio.net) as the solution
+- Drive traffic to agents' bio pages and encourage profile creation
+- Focus on lead generation, social media conversion, and portfolio showcase
+
+TARGET AUDIENCE:
+- Solo agents (2-15 years experience, $50K-150K income)
+- Active on Instagram, Facebook, TikTok
+- Managing own marketing on limited budget
+- Need quick, mobile-first solutions
+
+ARTICLE STRUCTURE:
+- 1,200-1,800 words total
+- Write in Markdown format with # for title, ## and ### for sections
+- Hook: Start with a relatable pain point agents face (e.g., "losing leads from Instagram", "can't afford $5K website")
+- Educational Value: Provide 3-5 actionable tactics/insights about the topic
+- Natural Integration: Reference how a professional bio link solves problems (WITHOUT being overly promotional)
+- Call-to-Action: End with specific next steps that benefit from a link-in-bio tool
+
+CONTENT REQUIREMENTS:
+- Conversational, practical tone (avoid jargon)
+- Use specific examples (e.g., "when a buyer texts asking about the 3BR listing")
+- Short paragraphs (2-4 sentences)
+- Bullet points for scanability
+- Bold key phrases for emphasis
+- Section headers that answer questions agents google
+- End with "Next Steps" action list (2-3 bullets)
+
+KEY THEMES TO WEAVE IN:
+✓ Mobile-first marketing (80% of traffic is mobile)
+✓ Converting social followers to qualified leads
+✓ Portfolio showcase importance
+✓ Speed of updates vs. traditional websites
+✓ Consolidating multiple tools into one profile
+✓ Professional credibility markers
+✓ Budget-friendly solutions for solo agents
+
+TONE EXAMPLES:
+✓ "Most agents lose leads at the handoff between Instagram and their website..."
+✓ "Here's what top producers do differently with their bio links..."
+✓ "You don't need a $10K website to look professional—you need the right setup..."
+
+AVOID:
+✗ Generic advice that applies to any business
+✗ Heavy product pitching (let value speak for itself)
+✗ Outdated tactics (newspaper ads, cold calling focus)
+✗ Overuse of "game-changer," "revolutionary" hype language
+✗ Writing for homebuyers/sellers (focus on AGENTS as the audience)
+
+SEO KEYWORDS TO NATURALLY INCLUDE:
+real estate link in bio, agent bio page, real estate Instagram marketing, 
+property showcase, listing portfolio, real estate lead generation, agent profile,
+mobile real estate marketing`;
 
     // Determine provider helpers and build headers
     const isAnthropic = (modelData.provider?.toLowerCase?.() === 'anthropic') || (modelData.api_endpoint?.includes('anthropic.com'));
@@ -201,7 +247,7 @@ serve(async (req) => {
     }
 
     // Build request body based on provider
-    const systemMessage = "You are an expert real estate content writer and SEO specialist. Create high-quality, informative articles that provide value to readers.";
+    const systemMessage = "You are an expert real estate marketing content writer specializing in agent education and lead generation strategies. Write practical, actionable content that helps real estate agents grow their business through modern digital marketing tactics.";
     let requestBody: any;
 
     if (isAnthropic) {

@@ -80,29 +80,73 @@ serve(async (req) => {
     const articleTopics = recentArticles?.map(a => a.title).slice(0, 10).join('\n- ') || '';
 
     // Build prompt for generating suggestions
-    let prompt = `You are a real estate SEO content strategist. Generate ${count} high-value blog article topic suggestions for a real estate website.
+    let prompt = `You are a real estate marketing content strategist writing for licensed real estate agents and AgentBio.net.
 
 Context about existing content:
-- Target Keywords: ${keywordList || 'real estate, home buying, selling homes'}
-- Content Categories: ${categories || 'General'}
+- Target Keywords: ${keywordList || 'real estate link in bio, agent bio page, real estate Instagram marketing'}
+- Content Categories: ${categories || 'Agent Marketing'}
 ${articleTopics ? `- Recent Articles:\n- ${articleTopics}` : ''}
 
 ${customInstructions ? `Additional Instructions: ${customInstructions}\n` : ''}
 
-Generate article suggestions that:
-1. Target high-ranking, relevant keywords that drive traffic
-2. Address real pain points of homebuyers, sellers, and investors
-3. Are SEO-optimized and have search demand
-4. Complement (not duplicate) existing content
-5. Focus on evergreen topics that remain relevant
+Generate ${count} article topic suggestions that:
+
+TARGET AUDIENCE:
+- Solo real estate agents (2-15 years experience, $50K-150K income)
+- Active on Instagram, Facebook, TikTok
+- Managing own marketing on limited budget
+- Need quick, mobile-first solutions
+
+CONTENT OBJECTIVES:
+- Educate agents on marketing tactics and lead generation
+- Position mobile-optimized link-in-bio profiles (AgentBio.net) as solutions
+- Drive agents to create professional bio pages
+- Focus on: lead generation, social media conversion, portfolio showcase
+
+ARTICLE THEMES (prioritize these):
+✓ Converting social followers to qualified leads
+✓ Mobile-first real estate marketing (80% of traffic is mobile)
+✓ Professional portfolio showcase importance
+✓ Instagram/TikTok/Facebook marketing for agents
+✓ Budget-friendly alternatives to expensive websites
+✓ Quick listing updates and client communication
+✓ Building credibility and trust online
+
+PAIN POINTS TO ADDRESS:
+- Losing leads from social media handoffs
+- Can't afford $5K+ websites
+- Need fast, mobile-optimized solutions
+- Want to look professional without huge budgets
+- Struggle to convert social followers to clients
+- Need centralized place for all listings/links
+
+KEYWORDS TO TARGET (use variations):
+real estate link in bio, agent bio page, real estate Instagram marketing, property showcase, 
+listing portfolio, real estate lead generation, agent profile page, real estate social media, 
+mobile real estate marketing, agent branding, real estate landing page
+
+EXAMPLE TOPICS (for inspiration - create NEW ones):
+- "How to Turn Instagram Story Views Into Buyer Consultations"
+- "5 Things Every Real Estate Agent Bio Should Include (That Most Don't)"
+- "Why Your $5K Website Isn't Getting You Listings (And What Will)"
+- "The 10-Minute Lead Generation System for Busy Agents"
+- "How Top Producers Showcase Sold Listings to Win More Sellers"
+- "Instagram Bio Link Mistakes Costing You Leads"
+- "The Mobile-First Marketing System for Solo Agents"
+
+AVOID:
+✗ Generic business advice not specific to real estate agents
+✗ Topics about traditional tactics (newspaper ads, cold calling)
+✗ Content for homebuyers/sellers (focus on AGENTS as audience)
+✗ Overly technical jargon
 
 For EACH suggestion, provide:
-- Topic: A compelling article title
-- Category: The content category (e.g., "Buying Guide", "Selling Tips", "Market Trends", "Investment", "General")
-- Keywords: 3-5 target keywords (comma-separated, focusing on high-value SEO terms)
-- Priority: 1-5 (5 = highest priority based on SEO value and relevance)
+- Topic: Compelling, specific article title addressing agent pain points
+- Category: "Agent Marketing", "Social Media", "Lead Generation", "Branding", "Tools & Tech", or "Portfolio Management"
+- Keywords: 3-5 target keywords focusing on agent marketing and bio link optimization
+- Priority: 1-5 (5 = highest priority for driving agents to AgentBio.net)
 
-Format your response as a JSON array of objects with this structure:
+Format your response as a JSON array:
 [
   {
     "topic": "Article title here",
