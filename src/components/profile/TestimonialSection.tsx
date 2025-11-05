@@ -2,6 +2,8 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, Star, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TestimonialCard } from "./TestimonialCard";
+import { useSwipeGesture } from "@/hooks/useSwipeGesture";
+import { hapticFeedback } from "@/lib/haptics";
 import type { Testimonial } from "@/types/testimonial";
 
 interface TestimonialSectionProps {
@@ -28,16 +30,25 @@ export function TestimonialSection({ testimonials }: TestimonialSectionProps) {
         testimonials.length;
 
     const goToPrevious = () => {
+        hapticFeedback.selection();
         setCurrentIndex((prev) =>
             prev === 0 ? sortedTestimonials.length - 1 : prev - 1
         );
     };
 
     const goToNext = () => {
+        hapticFeedback.selection();
         setCurrentIndex((prev) =>
             prev === sortedTestimonials.length - 1 ? 0 : prev + 1
         );
     };
+
+    // Swipe gestures for mobile carousel
+    const { containerRef: swipeRef } = useSwipeGesture({
+        onSwipeLeft: goToNext,
+        onSwipeRight: goToPrevious,
+        threshold: 50,
+    });
 
     // Show 3 testimonials at a time on desktop
     const visibleTestimonials = [
@@ -122,9 +133,9 @@ export function TestimonialSection({ testimonials }: TestimonialSectionProps) {
                 )}
             </div>
 
-            {/* Mobile: Single card with navigation */}
+            {/* Mobile: Single card with navigation and swipe support */}
             <div className="md:hidden">
-                <div className="relative">
+                <div ref={swipeRef} className="relative select-none">
                     <TestimonialCard
                         testimonial={sortedTestimonials[currentIndex]}
                         variant="default"
