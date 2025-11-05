@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Home, Mail, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
+import { Home, Mail, Facebook, Instagram, Linkedin } from "lucide-react";
 
 export function PublicFooter() {
   return (
@@ -21,7 +21,7 @@ export function PublicFooter() {
             {/* Social Links */}
             <div className="flex gap-3">
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/agentbioapp"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-blue-500 transition-colors"
@@ -30,16 +30,18 @@ export function PublicFooter() {
                 <Facebook className="h-5 w-5" />
               </a>
               <a
-                href="https://twitter.com"
+                href="https://x.com/AgentBioApp"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-                aria-label="Twitter"
+                className="text-gray-400 hover:text-gray-200 transition-colors"
+                aria-label="X (formerly Twitter)"
               >
-                <Twitter className="h-5 w-5" />
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
               </a>
               <a
-                href="https://instagram.com"
+                href="https://www.instagram.com/agentbioapp/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-pink-500 transition-colors"
@@ -48,7 +50,7 @@ export function PublicFooter() {
                 <Instagram className="h-5 w-5" />
               </a>
               <a
-                href="https://linkedin.com"
+                href="https://www.linkedin.com/company/agentbio/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-blue-600 transition-colors"
