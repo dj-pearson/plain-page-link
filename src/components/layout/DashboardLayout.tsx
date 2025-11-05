@@ -94,6 +94,18 @@ export default function DashboardLayout() {
                         active={isActive("/dashboard/analytics")}
                     />
                     <NavLink
+                        to="/dashboard/quick-actions"
+                        icon={<Zap className="h-5 w-5" />}
+                        label="Quick Actions"
+                        active={isActive("/dashboard/quick-actions")}
+                    />
+                    <NavLink
+                        to="/dashboard/page-builder"
+                        icon={<FileText className="h-5 w-5" />}
+                        label="Page Builder"
+                        active={isActive("/dashboard/page-builder")}
+                    />
+                    <NavLink
                         to="/blog"
                         icon={<BookOpen className="h-5 w-5" />}
                         label="Blog"
