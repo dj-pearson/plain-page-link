@@ -142,9 +142,9 @@ export function PublicFooter() {
           </div>
         </div>
 
-        {/* Equal Housing Opportunity Section */}
+        {/* Equal Housing Opportunity & Disclaimers Section */}
         <div className="border-t border-gray-800 pt-8 pb-6">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-center">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-center mb-6">
             <div className="flex items-center gap-3">
               {/* Equal Housing Opportunity Logo */}
               <div className="bg-white rounded p-2">
@@ -163,11 +163,37 @@ export function PublicFooter() {
               </div>
             </div>
           </div>
-          <p className="text-xs text-gray-500 text-center mt-4 max-w-3xl mx-auto">
-            AgentBio.net is a passive hosting platform. Agents are solely responsible for their listings and content.
-            All listings must comply with the Fair Housing Act and state fair housing laws prohibiting discrimination
-            based on race, color, religion, sex, handicap, familial status, national origin, or other protected characteristics.
-          </p>
+          
+          {/* Platform Disclaimers */}
+          <div className="space-y-3 text-xs text-gray-500 text-center max-w-4xl mx-auto">
+            <p className="font-semibold text-gray-400">
+              Important Legal Notices
+            </p>
+            <p>
+              <strong className="text-gray-400">Passive Hosting Platform:</strong> AgentBio.net is a passive hosting platform and interactive computer service under 47 U.S.C. § 230. 
+              We do NOT create, verify, endorse, or take responsibility for any content posted by agents, including property listings, photographs, descriptions, pricing, 
+              credentials, testimonials, or any other information.
+            </p>
+            <p>
+              <strong className="text-gray-400">Agent Responsibility:</strong> All real estate agents using this platform are solely and exclusively responsible for: 
+              (1) the accuracy of all property information and credentials, (2) copyright compliance for all photos and materials they upload, 
+              (3) Fair Housing Act compliance in all listings and content, (4) obtaining photographer permissions and license authorizations, 
+              and (5) compliance with state licensing and advertising requirements in all jurisdictions where they hold licenses.
+            </p>
+            <p>
+              <strong className="text-gray-400">Fair Housing Compliance:</strong> All listings must comply with the Fair Housing Act (42 U.S.C. § 3604) and applicable state fair housing laws 
+              prohibiting discrimination based on race, color, religion, sex, handicap, familial status, national origin, or other protected characteristics.
+            </p>
+            <p>
+              <strong className="text-gray-400">Copyright Notice:</strong> Violations of copyright law may result in liability, including statutory damages ranging from $750 to $150,000 per work. 
+              Users who receive three valid DMCA notices within 12 months will have their accounts permanently terminated. See our DMCA Policy for details.
+            </p>
+            <p className="pt-2">
+              For complete terms, please review our <Link to="/terms" className="text-blue-400 hover:text-blue-300">Terms of Service</Link>, {" "}
+              <Link to="/privacy" className="text-blue-400 hover:text-blue-300">Privacy Policy</Link>, and {" "}
+              <Link to="/dmca" className="text-blue-400 hover:text-blue-300">DMCA Policy</Link>.
+            </p>
+          </div>
         </div>
 
         {/* Bottom Bar */}

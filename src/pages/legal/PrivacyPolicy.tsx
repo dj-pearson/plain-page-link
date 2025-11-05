@@ -1,8 +1,13 @@
+import { PublicHeader } from "@/components/layout/PublicHeader";
+import { PublicFooter } from "@/components/layout/PublicFooter";
+
 export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-background py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
+    <>
+      <PublicHeader />
+      <div className="min-h-screen bg-background py-12 px-4">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
 
         <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
           <p className="text-muted-foreground mb-6">
@@ -463,6 +468,8 @@ export default function PrivacyPolicy() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+      <PublicFooter />
+    </>
   );
 }
