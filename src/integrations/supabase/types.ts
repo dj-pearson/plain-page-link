@@ -320,6 +320,54 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_pages: {
+        Row: {
+          blocks: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          published: boolean
+          published_at: string | null
+          seo: Json
+          slug: string
+          theme: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blocks?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          published?: boolean
+          published_at?: string | null
+          seo?: Json
+          slug: string
+          theme?: Json
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blocks?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          published?: boolean
+          published_at?: string | null
+          seo?: Json
+          slug?: string
+          theme?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       keywords: {
         Row: {
           category: string | null

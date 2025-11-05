@@ -25,32 +25,42 @@ export default function PublicPage() {
             }
 
             try {
-                // TODO: Implement actual API call
-                // const response = await api.getPublicPage(slug);
-                // setPage(response.data);
+                const { supabase } = await import("@/integrations/supabase/client");
+                
+                // Fetch published page from database
+                const { data, error } = await supabase
+                    .from('custom_pages')
+                    .select('*')
+                    .eq('slug', slug)
+                    .eq('published', true)
+                    .single();
 
-                // For now, try to load from localStorage
-                const savedPages = Object.keys(localStorage)
-                    .filter((key) => key.startsWith("page_"))
-                    .map((key) => {
-                        try {
-                            return JSON.parse(localStorage.getItem(key) || "");
-                        } catch {
-                            return null;
-                        }
-                    })
-                    .filter((p) => p !== null);
-
-                const matchingPage = savedPages.find((p) => p.slug === slug);
-
-                if (matchingPage && matchingPage.published) {
-                    setPage(matchingPage);
-                } else {
+                if (error) throw error;
+                if (!data) {
                     setError("Page not found or not published");
+                    setLoading(false);
+                    return;
                 }
+
+                // Convert database format to PageConfig
+                const pageConfig: PageConfig = {
+                    id: data.id,
+                    userId: data.user_id,
+                    slug: data.slug,
+                    title: data.title,
+                    description: data.description || '',
+                    blocks: data.blocks as any[],
+                    theme: data.theme as any,
+                    seo: data.seo as any,
+                    published: data.published,
+                    createdAt: new Date(data.created_at),
+                    updatedAt: new Date(data.updated_at),
+                };
+
+                setPage(pageConfig);
             } catch (err) {
                 console.error("Failed to fetch page:", err);
-                setError("Failed to load page");
+                setError("Page not found or not published");
             } finally {
                 setLoading(false);
             }

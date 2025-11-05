@@ -5,6 +5,8 @@
 
 import { create } from "zustand";
 import { PageConfig, PageBlock, BlockConfig } from "@/types/pageBuilder";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
     addBlock,
     removeBlock,
@@ -26,6 +28,8 @@ interface PageBuilderStore {
 
     // Actions
     setPage: (page: PageConfig) => void;
+    loadPage: (pageId: string) => Promise<void>;
+    loadUserPages: () => Promise<PageConfig[]>;
     selectBlock: (blockId: string | null) => void;
     setIsDragging: (isDragging: boolean) => void;
     addBlockToPage: (type: any, position?: number) => void;
@@ -42,6 +46,7 @@ interface PageBuilderStore {
     togglePreviewMode: () => void;
     savePage: () => Promise<void>;
     publishPage: () => Promise<void>;
+    setAsActivePage: (pageId: string) => Promise<void>;
     resetBuilder: () => void;
 }
 
@@ -63,6 +68,74 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
             historyIndex: 0,
             selectedBlockId: null,
         });
+    },
+
+    // Load a page from the database
+    loadPage: async (pageId) => {
+        try {
+            const { data, error } = await supabase
+                .from('custom_pages')
+                .select('*')
+                .eq('id', pageId)
+                .single();
+
+            if (error) throw error;
+            if (!data) throw new Error('Page not found');
+
+            // Convert database format to PageConfig
+            const pageConfig: PageConfig = {
+                id: data.id,
+                userId: data.user_id,
+                slug: data.slug,
+                title: data.title,
+                description: data.description || '',
+                blocks: data.blocks as any[],
+                theme: data.theme as any,
+                seo: data.seo as any,
+                published: data.published,
+                createdAt: new Date(data.created_at),
+                updatedAt: new Date(data.updated_at),
+            };
+
+            get().setPage(pageConfig);
+        } catch (error) {
+            console.error('Failed to load page:', error);
+            toast.error('Failed to load page');
+            throw error;
+        }
+    },
+
+    // Load all user pages
+    loadUserPages: async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+
+            const { data, error } = await supabase
+                .from('custom_pages')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('updated_at', { ascending: false });
+
+            if (error) throw error;
+
+            return (data || []).map(d => ({
+                id: d.id,
+                userId: d.user_id,
+                slug: d.slug,
+                title: d.title,
+                description: d.description || '',
+                blocks: d.blocks as any[],
+                theme: d.theme as any,
+                seo: d.seo as any,
+                published: d.published,
+                createdAt: new Date(d.created_at),
+                updatedAt: new Date(d.updated_at),
+            }));
+        } catch (error) {
+            console.error('Failed to load user pages:', error);
+            return [];
+        }
     },
 
     // Select a block
@@ -235,7 +308,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         }));
     },
 
-    // Save page (to API/localStorage)
+    // Save page (to Supabase)
     savePage: async () => {
         const { page } = get();
         if (!page) return;
@@ -243,18 +316,48 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         set({ isSaving: true });
 
         try {
-            // TODO: Implement actual API call
-            // await api.savePage(page);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
 
-            // For now, save to localStorage
-            localStorage.setItem(`page_${page.id}`, JSON.stringify(page));
+            const pageData = {
+                user_id: user.id,
+                slug: page.slug,
+                title: page.title,
+                description: page.description,
+                blocks: page.blocks,
+                theme: page.theme,
+                seo: page.seo,
+                published: page.published,
+            };
 
-            // Simulate API delay
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            // Check if page exists
+            const { data: existing } = await supabase
+                .from('custom_pages')
+                .select('id')
+                .eq('id', page.id)
+                .single();
 
-            console.log("Page saved successfully");
+            if (existing) {
+                // Update existing page
+                const { error } = await supabase
+                    .from('custom_pages')
+                    .update(pageData)
+                    .eq('id', page.id);
+
+                if (error) throw error;
+            } else {
+                // Insert new page
+                const { error } = await supabase
+                    .from('custom_pages')
+                    .insert({ ...pageData, id: page.id });
+
+                if (error) throw error;
+            }
+
+            toast.success('Page saved successfully');
         } catch (error) {
-            console.error("Failed to save page:", error);
+            console.error('Failed to save page:', error);
+            toast.error('Failed to save page');
             throw error;
         } finally {
             set({ isSaving: false });
@@ -268,6 +371,30 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
 
         updatePageMeta({ published: true });
         await savePage();
+        toast.success('Page published successfully!');
+    },
+
+    // Set as active page (will be shown on profile)
+    setAsActivePage: async (pageId) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+
+            // Set the page as active
+            const { error } = await supabase
+                .from('custom_pages')
+                .update({ is_active: true })
+                .eq('id', pageId)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+
+            toast.success('This page is now your active profile');
+        } catch (error) {
+            console.error('Failed to set active page:', error);
+            toast.error('Failed to set active page');
+            throw error;
+        }
     },
 
     // Reset builder state

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { FullPageLoader } from "@/components/LoadingSpinner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
@@ -28,13 +28,56 @@ export default function FullProfilePage() {
     const { slug } = useParams<{ slug: string }>();
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
     const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
+    const [customPageSlug, setCustomPageSlug] = useState<string | null>(null);
+    const [checkingCustomPage, setCheckingCustomPage] = useState(true);
 
     // Fetch profile and related data
     const { data, isLoading, error } = usePublicProfile(slug || '');
 
+    // Check if user has an active custom page
+    useEffect(() => {
+        const checkForCustomPage = async () => {
+            if (!slug || !data?.profile?.id) {
+                setCheckingCustomPage(false);
+                return;
+            }
+
+            try {
+                const { data: customPage, error } = await supabase
+                    .from('custom_pages')
+                    .select('slug')
+                    .eq('user_id', data.profile.id)
+                    .eq('is_active', true)
+                    .eq('published', true)
+                    .single();
+
+                if (!error && customPage) {
+                    setCustomPageSlug(customPage.slug);
+                }
+            } catch (err) {
+                console.error('Error checking for custom page:', err);
+            } finally {
+                setCheckingCustomPage(false);
+            }
+        };
+
+        if (data) {
+            checkForCustomPage();
+        }
+    }, [slug, data]);
+
     // Track profile view analytics - must be called before any conditional returns
     // We pass the profile.id only when data is available
     useProfileTracking(data?.profile?.id, slug || "");
+
+    // Redirect to custom page if active
+    if (checkingCustomPage) {
+        return <FullPageLoader text="Loading profile..." />;
+    }
+
+    if (customPageSlug) {
+        return <Navigate to={`/p/${customPageSlug}`} replace />;
+    }
 
     // Apply theme when profile loads
     useEffect(() => {
