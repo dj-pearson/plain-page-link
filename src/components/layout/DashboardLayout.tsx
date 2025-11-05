@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile/MobileNav";
 import { Badge } from "@/components/ui/badge";
+import { SkipLink } from "@/components/SkipLink";
 
 export default function DashboardLayout() {
     const location = useLocation();
@@ -45,6 +46,7 @@ export default function DashboardLayout() {
 
     return (
         <div className="min-h-screen bg-gray-50">
+            <SkipLink />
             {/* Sidebar - Hidden on mobile */}
             <aside className="hidden md:fixed md:block left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40">
                 <div className="p-6">
@@ -167,9 +169,12 @@ export default function DashboardLayout() {
                             <Link
                                 to={`/${profile?.username || ""}`}
                                 target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                aria-label={`View your public profile page as ${profile?.username}`}
                             >
-                                View Profile →
+                                <span className="hidden sm:inline">View My Public Profile</span>
+                                <span className="sm:hidden">My Profile</span> →
                             </Link>
                             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                                 <span className="text-blue-600 font-semibold">
@@ -181,7 +186,7 @@ export default function DashboardLayout() {
                 </header>
 
                 {/* Page Content */}
-                <main className="p-4 md:p-6 pb-20 md:pb-6">
+                <main id="main-content" className="p-4 md:p-6 pb-20 md:pb-6" tabIndex={-1}>
                     <Outlet />
                 </main>
             </div>

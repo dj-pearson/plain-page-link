@@ -132,9 +132,9 @@ export default function Landing() {
                     <Link
                         to="/auth/register"
                         className="inline-flex items-center gap-2 px-8 py-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl font-light tracking-tight transition-all hover:border-[#80d0c7] hover:shadow-lg hover:shadow-[#80d0c7]/20"
-                        aria-label="Get started with your free professional agent portfolio"
+                        aria-label="Create your free real estate agent portfolio - no credit card required"
                     >
-                        <span className="glass-accent">Get Started Free</span>
+                        <span className="glass-accent">Get Started Free - No Credit Card Required</span>
                     </Link>
                 </div>
             </section>
