@@ -26,20 +26,20 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({
-  title = 'Professional Real Estate Agent',
-  subtitle = 'Portfolio Link',
-  description = 'Create your professional agent portfolio link to showcase sold properties, active listings, and testimonials. Capture qualified leads and convert social media traffic into clients.',
+  title = 'Your Digital Real Estate',
+  subtitle = 'Showcase',
+  description = 'Transform your online presence with a stunning bio page designed for real estate professionals. Display your sold properties, active listings, client testimonials, and capture leads—all in one powerful link.',
   primaryCta = {
-    text: 'Start Free Trial',
+    text: 'Create Your Showcase',
     href: '/auth/register'
   },
   secondaryCta = {
-    text: 'See How It Works',
+    text: 'View Demo',
     href: '#features'
   },
   badge = {
     icon: <Zap className="h-4 w-4" aria-hidden="true" />,
-    text: 'Built for Real Estate Professionals'
+    text: 'Trusted by Top Real Estate Agents'
   },
   showStats = true
 }: HeroSectionProps) {
@@ -99,7 +99,7 @@ export function HeroSection({
 
           {/* Sub-text */}
           <p className="text-sm text-muted-foreground font-light">
-            No credit card required • Setup in 5 minutes
+            No credit card required • Setup in 3 minutes • Mobile-optimized
           </p>
 
           {/* Stats */}
@@ -107,7 +107,7 @@ export function HeroSection({
             <div className="grid grid-cols-3 gap-6 pt-8 border-t border-glass-border">
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  5k+
+                  2,500+
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
                   Active Agents
@@ -115,18 +115,18 @@ export function HeroSection({
               </div>
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  50k+
+                  $1.2B+
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
-                  Properties Shown
+                  Properties Sold
                 </div>
               </div>
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  99.9%
+                  4.9★
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
-                  Uptime
+                  Agent Rating
                 </div>
               </div>
             </div>
@@ -139,17 +139,17 @@ export function HeroSection({
           <Hero3D height="500px" className="shadow-2xl" />
 
           {/* Floating accent cards */}
-          <div className="hidden lg:block absolute -top-8 -right-8 w-48 p-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl shadow-lg animate-float-slow">
+          <div className="hidden lg:block absolute -top-8 -right-8 w-52 p-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl shadow-lg animate-float-slow">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center">
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
               <div>
                 <div className="text-sm font-light text-foreground">
-                  Interactive 3D
+                  Premium 3D Showcase
                 </div>
                 <div className="text-xs text-muted-foreground font-light">
-                  Drag to explore
+                  Drag to explore luxury
                 </div>
               </div>
             </div>
@@ -159,14 +159,14 @@ export function HeroSection({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground font-light">
-                  Design Quality
+                  Lead Conversion Rate
                 </span>
                 <span className="text-xs glass-accent font-normal">
-                  98%
+                  87%
                 </span>
               </div>
               <div className="h-2 bg-glass-border rounded-full overflow-hidden">
-                <div className="h-full w-[98%] bg-gradient-to-r from-[#80d0c7] to-[#a1c4fd] rounded-full" />
+                <div className="h-full w-[87%] bg-gradient-to-r from-[#80d0c7] to-[#a1c4fd] rounded-full" />
               </div>
             </div>
           </div>
