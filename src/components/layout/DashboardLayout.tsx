@@ -13,7 +13,6 @@ import {
     Settings,
     LogOut,
     Shield,
-    BookOpen,
     Zap,
     FileText,
 } from "lucide-react";
@@ -106,12 +105,6 @@ export default function DashboardLayout() {
                         icon={<FileText className="h-5 w-5" />}
                         label="Page Builder"
                         active={isActive("/dashboard/page-builder")}
-                    />
-                    <NavLink
-                        to="/blog"
-                        icon={<BookOpen className="h-5 w-5" />}
-                        label="Blog"
-                        active={isActive("/blog")}
                     />
 
                     <div className="pt-4 mt-4 border-t border-gray-200">
