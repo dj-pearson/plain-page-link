@@ -118,28 +118,79 @@ export function PublicFooter() {
                 </Link>
               </li>
               <li>
+                <Link to="/dmca" className="text-gray-400 hover:text-white transition-colors">
+                  DMCA Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/acceptable-use" className="text-gray-400 hover:text-white transition-colors">
+                  Acceptable Use
+                </Link>
+              </li>
+              <li>
+                <a href="mailto:legal@agentbio.net" className="text-gray-400 hover:text-white transition-colors">
+                  Legal Inquiries
+                </a>
+              </li>
+              <li>
                 <a href="mailto:support@agentbio.net" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1">
                   <Mail className="h-4 w-4" />
-                  Contact
+                  Support
                 </a>
               </li>
             </ul>
           </div>
         </div>
 
+        {/* Equal Housing Opportunity Section */}
+        <div className="border-t border-gray-800 pt-8 pb-6">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-center">
+            <div className="flex items-center gap-3">
+              {/* Equal Housing Opportunity Logo */}
+              <div className="bg-white rounded p-2">
+                <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="100" height="100" fill="white"/>
+                  <path d="M50 10L20 40H30V90H70V40H80L50 10Z" fill="#000"/>
+                  <rect x="40" y="50" width="20" height="20" fill="white"/>
+                  <text x="50" y="66" fontFamily="Arial" fontSize="20" fontWeight="bold" fill="#000" textAnchor="middle">=</text>
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="text-white font-semibold text-sm">Equal Housing Opportunity</p>
+                <p className="text-gray-400 text-xs">
+                  AgentBio.net is committed to fair housing compliance
+                </p>
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 text-center mt-4 max-w-3xl mx-auto">
+            AgentBio.net is a passive hosting platform. Agents are solely responsible for their listings and content.
+            All listings must comply with the Fair Housing Act and state fair housing laws prohibiting discrimination
+            based on race, color, religion, sex, handicap, familial status, national origin, or other protected characteristics.
+          </p>
+        </div>
+
         {/* Bottom Bar */}
-        <div className="border-t border-gray-800 pt-8">
+        <div className="border-t border-gray-800 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-center md:text-left">
-              &copy; {new Date().getFullYear()} AgentBio.net - Professional Real Estate Agent Portfolio Links. All rights reserved.
+            <p className="text-sm text-center md:text-left text-gray-400">
+              &copy; {new Date().getFullYear()} AgentBio.net. All rights reserved.
             </p>
-            <div className="flex gap-4 text-sm">
+            <div className="flex gap-4 text-sm flex-wrap justify-center">
               <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors">
                 Privacy
               </Link>
               <span className="text-gray-600">•</span>
               <Link to="/terms" className="text-gray-400 hover:text-white transition-colors">
                 Terms
+              </Link>
+              <span className="text-gray-600">•</span>
+              <Link to="/dmca" className="text-gray-400 hover:text-white transition-colors">
+                DMCA
+              </Link>
+              <span className="text-gray-600">•</span>
+              <Link to="/acceptable-use" className="text-gray-400 hover:text-white transition-colors">
+                Acceptable Use
               </Link>
             </div>
           </div>

@@ -13,6 +13,8 @@ import ProfilePage from "./pages/public/FullProfilePage";
 import NotFound from "./pages/public/NotFound";
 import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import TermsOfService from "./pages/legal/TermsOfService";
+import DMCAPolicy from "./pages/legal/DMCAPolicy";
+import AcceptableUse from "./pages/legal/AcceptableUse";
 import Pricing from "./pages/Pricing";
 import Blog from "./pages/Blog";
 import BlogArticle from "./pages/BlogArticle";
@@ -87,6 +89,8 @@ function App() {
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/dmca" element={<DMCAPolicy />} />
+                <Route path="/acceptable-use" element={<AcceptableUse />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/blog/:slug" element={<BlogArticle />} />
                 <Route path="/p/:slug" element={<PublicPage />} />
