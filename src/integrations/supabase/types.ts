@@ -967,6 +967,95 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_alert_rules: {
+        Row: {
+          conditions: Json
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          name: string
+          rule_type: string
+          severity: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          conditions?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          name: string
+          rule_type: string
+          severity?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          conditions?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          name?: string
+          rule_type?: string
+          severity?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      seo_alerts: {
+        Row: {
+          affected_url: string | null
+          alert_rule_id: string | null
+          alert_type: string
+          created_at: string | null
+          id: string
+          message: string
+          severity: string
+          status: string | null
+          title: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          affected_url?: string | null
+          alert_rule_id?: string | null
+          alert_type: string
+          created_at?: string | null
+          id?: string
+          message: string
+          severity: string
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          affected_url?: string | null
+          alert_rule_id?: string | null
+          alert_type?: string
+          created_at?: string | null
+          id?: string
+          message?: string
+          severity?: string
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_alerts_alert_rule_id_fkey"
+            columns: ["alert_rule_id"]
+            isOneToOne: false
+            referencedRelation: "seo_alert_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seo_audit_history: {
         Row: {
           accessibility_score: number | null
@@ -1325,6 +1414,131 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
           visibility_score?: number | null
+        }
+        Relationships: []
+      }
+      seo_monitoring_log: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          results_summary: Json | null
+          schedule_id: string | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          results_summary?: Json | null
+          schedule_id?: string | null
+          started_at?: string | null
+          status: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          results_summary?: Json | null
+          schedule_id?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_monitoring_log_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "seo_monitoring_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seo_monitoring_schedules: {
+        Row: {
+          created_at: string | null
+          frequency: string
+          id: string
+          is_active: boolean | null
+          last_run_at: string | null
+          name: string
+          next_run_at: string | null
+          schedule_type: string
+          target_url: string
+        }
+        Insert: {
+          created_at?: string | null
+          frequency: string
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          name: string
+          next_run_at?: string | null
+          schedule_type: string
+          target_url: string
+        }
+        Update: {
+          created_at?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          name?: string
+          next_run_at?: string | null
+          schedule_type?: string
+          target_url?: string
+        }
+        Relationships: []
+      }
+      seo_notification_preferences: {
+        Row: {
+          broken_links: boolean | null
+          created_at: string | null
+          critical_alerts: boolean | null
+          email_address: string | null
+          email_enabled: boolean | null
+          id: string
+          in_app_enabled: boolean | null
+          performance_alerts: boolean | null
+          ranking_changes: boolean | null
+          security_alerts: boolean | null
+          slack_enabled: boolean | null
+          slack_webhook_url: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          broken_links?: boolean | null
+          created_at?: string | null
+          critical_alerts?: boolean | null
+          email_address?: string | null
+          email_enabled?: boolean | null
+          id?: string
+          in_app_enabled?: boolean | null
+          performance_alerts?: boolean | null
+          ranking_changes?: boolean | null
+          security_alerts?: boolean | null
+          slack_enabled?: boolean | null
+          slack_webhook_url?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          broken_links?: boolean | null
+          created_at?: string | null
+          critical_alerts?: boolean | null
+          email_address?: string | null
+          email_enabled?: boolean | null
+          id?: string
+          in_app_enabled?: boolean | null
+          performance_alerts?: boolean | null
+          ranking_changes?: boolean | null
+          security_alerts?: boolean | null
+          slack_enabled?: boolean | null
+          slack_webhook_url?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
