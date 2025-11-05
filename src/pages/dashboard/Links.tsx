@@ -122,21 +122,21 @@ export default function Links() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Custom Links</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Custom Links</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-0.5 sm:mt-1">
             Manage your social and custom links
           </p>
         </div>
         <button
           onClick={handleAddClick}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+          className="inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 active:scale-95 transition-all font-medium min-h-[44px] w-full sm:w-auto justify-center shadow-sm"
         >
-          <Plus className="h-4 w-4" />
-          Add Link
+          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span className="text-sm sm:text-base">Add Link</span>
         </button>
       </div>
 
@@ -149,67 +149,70 @@ export default function Links() {
         />
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="text-2xl font-bold text-foreground">{links.length}</div>
-          <div className="text-sm text-muted-foreground">Total Links</div>
+      {/* Stats - Mobile optimized 3-column grid */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+          <div className="text-xl sm:text-2xl font-bold text-foreground">{links.length}</div>
+          <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Total</div>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="text-2xl font-bold text-green-600">
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+          <div className="text-xl sm:text-2xl font-bold text-green-600">
             {links.filter((l) => l.is_active).length}
           </div>
-          <div className="text-sm text-muted-foreground">Active</div>
+          <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Active</div>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="text-2xl font-bold text-primary">
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+          <div className="text-xl sm:text-2xl font-bold text-primary">
             {links.reduce((sum, l) => sum + l.click_count, 0)}
           </div>
-          <div className="text-sm text-muted-foreground">Total Clicks</div>
+          <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Clicks</div>
         </div>
       </div>
 
-      {/* Links List */}
+      {/* Links List - Mobile optimized */}
       <div className="bg-card border border-border rounded-lg divide-y divide-border">
         {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">
+          <div className="p-6 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
             Loading links...
           </div>
         ) : links.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">
+          <div className="p-6 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
             No links yet. Click "Add Link" to create your first link.
           </div>
         ) : (
           links.map((link) => (
           <div
             key={link.id}
-            className="p-4 flex items-center gap-4 hover:bg-accent/50 transition-colors"
+            className="p-3 sm:p-4 flex items-center gap-2 sm:gap-4 hover:bg-accent/50 active:bg-accent/70 transition-colors"
           >
-            {/* Drag Handle */}
-            <button className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded">
+            {/* Drag Handle - Hidden on mobile, shown on desktop */}
+            <button
+              className="cursor-grab active:cursor-grabbing p-1.5 hover:bg-accent rounded hidden sm:block min-h-[44px]"
+              aria-label="Drag to reorder"
+            >
               <GripVertical className="h-5 w-5 text-muted-foreground" />
             </button>
 
             {/* Icon */}
-            <div className="w-12 h-12 flex items-center justify-center bg-accent rounded-lg">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-accent rounded-lg flex-shrink-0">
               {(() => {
                 const IconComponent = getIconComponent(link.icon);
-                return <IconComponent className="h-6 w-6 text-foreground" />;
+                return <IconComponent className="h-5 w-5 sm:h-6 sm:w-6 text-foreground" />;
               })()}
             </div>
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-medium text-foreground truncate">
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1 flex-wrap">
+                <h3 className="font-medium text-sm sm:text-base text-foreground truncate">
                   {link.title}
                 </h3>
                 {link.is_active ? (
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                  <span className="px-1.5 sm:px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium flex-shrink-0">
                     Active
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full font-medium">
+                  <span className="px-1.5 sm:px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full font-medium flex-shrink-0">
                     Inactive
                   </span>
                 )}
@@ -218,32 +221,38 @@ export default function Links() {
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-primary active:text-primary flex items-center gap-1 truncate"
               >
-                {link.url}
-                <ExternalLink className="h-3 w-3" />
+                <span className="truncate">{link.url}</span>
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
               </a>
+              {/* Stats on mobile - shown below URL */}
+              <div className="sm:hidden mt-1.5 text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">{link.click_count}</span> clicks
+              </div>
             </div>
 
-            {/* Stats */}
-            <div className="text-right hidden sm:block">
+            {/* Stats - Desktop only */}
+            <div className="text-right hidden sm:block flex-shrink-0">
               <div className="text-lg font-semibold text-foreground">
                 {link.click_count}
               </div>
               <div className="text-xs text-muted-foreground">clicks</div>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-1">
-              <button 
+            {/* Actions - Larger touch targets on mobile */}
+            <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+              <button
                 onClick={() => handleEditLink(link)}
-                className="p-2 hover:bg-accent rounded-lg transition-colors"
+                className="p-2 sm:p-2.5 hover:bg-accent active:bg-accent/80 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Edit link"
               >
                 <Edit className="h-4 w-4 text-muted-foreground" />
               </button>
-              <button 
+              <button
                 onClick={() => handleDeleteClick(link.id)}
-                className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 sm:p-2.5 hover:bg-red-50 active:bg-red-100 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Delete link"
               >
                 <Trash2 className="h-4 w-4 text-red-500" />
               </button>
@@ -253,11 +262,10 @@ export default function Links() {
         )}
       </div>
 
-      {/* Help Text */}
-      <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
-        <p className="text-sm text-blue-800 dark:text-blue-200">
-          💡 <strong>Tip:</strong> Drag and drop links to reorder them. The order
-          here will reflect on your public profile page.
+      {/* Help Text - Mobile optimized */}
+      <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 sm:p-4">
+        <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+          💡 <strong>Tip:</strong> <span className="hidden sm:inline">Drag and drop links to reorder them.</span><span className="sm:hidden">Use the edit option to change link details.</span> The order here will reflect on your public profile page.
         </p>
       </div>
 

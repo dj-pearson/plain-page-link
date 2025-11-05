@@ -159,25 +159,25 @@ export default function DashboardLayout() {
 
             {/* Main Content */}
             <div className="md:ml-64 min-h-screen">
-                {/* Top Bar */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="px-6 py-4 flex items-center justify-between">
-                        <h1 className="text-2xl font-bold text-gray-900">
+                {/* Top Bar - Mobile optimized with better touch targets */}
+                <header className="bg-white border-b border-gray-200 sticky top-0 z-30 safe-area-inset-top">
+                    <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
                             Dashboard
                         </h1>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                             <Link
                                 to={`/${profile?.username || ""}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap min-h-[44px] flex items-center"
                                 aria-label={`View your public profile page as ${profile?.username}`}
                             >
                                 <span className="hidden sm:inline">View My Public Profile</span>
-                                <span className="sm:hidden">My Profile</span> →
+                                <span className="sm:hidden">Profile</span> →
                             </Link>
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <span className="text-blue-600 font-semibold">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span className="text-sm sm:text-base text-blue-600 font-semibold">
                                     {getInitials(profile?.full_name)}
                                 </span>
                             </div>
@@ -185,8 +185,8 @@ export default function DashboardLayout() {
                     </div>
                 </header>
 
-                {/* Page Content */}
-                <main id="main-content" className="p-4 md:p-6 pb-20 md:pb-6" tabIndex={-1}>
+                {/* Page Content - Enhanced mobile spacing and safe areas */}
+                <main id="main-content" className="p-4 sm:p-5 md:p-6 pb-24 sm:pb-24 md:pb-6 safe-area-inset-bottom" tabIndex={-1}>
                     <Outlet />
                 </main>
             </div>
