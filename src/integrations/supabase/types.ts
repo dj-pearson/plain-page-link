@@ -382,6 +382,255 @@ export type Database = {
         }
         Relationships: []
       }
+      gsc_keyword_performance: {
+        Row: {
+          clicks: number | null
+          clicks_change: number | null
+          country: string | null
+          created_at: string | null
+          ctr: number | null
+          ctr_change: number | null
+          date: string
+          device: string | null
+          id: string
+          impressions: number | null
+          impressions_change: number | null
+          position: number | null
+          position_change: number | null
+          property_id: string
+          query: string
+          search_type: string | null
+          url: string | null
+        }
+        Insert: {
+          clicks?: number | null
+          clicks_change?: number | null
+          country?: string | null
+          created_at?: string | null
+          ctr?: number | null
+          ctr_change?: number | null
+          date: string
+          device?: string | null
+          id?: string
+          impressions?: number | null
+          impressions_change?: number | null
+          position?: number | null
+          position_change?: number | null
+          property_id: string
+          query: string
+          search_type?: string | null
+          url?: string | null
+        }
+        Update: {
+          clicks?: number | null
+          clicks_change?: number | null
+          country?: string | null
+          created_at?: string | null
+          ctr?: number | null
+          ctr_change?: number | null
+          date?: string
+          device?: string | null
+          id?: string
+          impressions?: number | null
+          impressions_change?: number | null
+          position?: number | null
+          position_change?: number | null
+          property_id?: string
+          query?: string
+          search_type?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gsc_keyword_performance_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "gsc_properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gsc_oauth_credentials: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          is_active: boolean | null
+          last_refreshed_at: string | null
+          refresh_token: string
+          scope: string
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          refresh_token: string
+          scope: string
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          refresh_token?: string
+          scope?: string
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gsc_page_performance: {
+        Row: {
+          clicks: number | null
+          clicks_change: number | null
+          country: string | null
+          created_at: string | null
+          ctr: number | null
+          ctr_change: number | null
+          date: string
+          device: string | null
+          id: string
+          impressions: number | null
+          impressions_change: number | null
+          page_description: string | null
+          page_title: string | null
+          position: number | null
+          position_change: number | null
+          property_id: string
+          search_type: string | null
+          top_queries: Json | null
+          url: string
+        }
+        Insert: {
+          clicks?: number | null
+          clicks_change?: number | null
+          country?: string | null
+          created_at?: string | null
+          ctr?: number | null
+          ctr_change?: number | null
+          date: string
+          device?: string | null
+          id?: string
+          impressions?: number | null
+          impressions_change?: number | null
+          page_description?: string | null
+          page_title?: string | null
+          position?: number | null
+          position_change?: number | null
+          property_id: string
+          search_type?: string | null
+          top_queries?: Json | null
+          url: string
+        }
+        Update: {
+          clicks?: number | null
+          clicks_change?: number | null
+          country?: string | null
+          created_at?: string | null
+          ctr?: number | null
+          ctr_change?: number | null
+          date?: string
+          device?: string | null
+          id?: string
+          impressions?: number | null
+          impressions_change?: number | null
+          page_description?: string | null
+          page_title?: string | null
+          position?: number | null
+          position_change?: number | null
+          property_id?: string
+          search_type?: string | null
+          top_queries?: Json | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gsc_page_performance_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "gsc_properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gsc_properties: {
+        Row: {
+          auto_sync_enabled: boolean | null
+          created_at: string | null
+          credential_id: string | null
+          id: string
+          is_primary: boolean | null
+          is_verified: boolean | null
+          last_synced_at: string | null
+          permission_level: string | null
+          property_name: string | null
+          property_type: string | null
+          property_url: string
+          sync_error: string | null
+          sync_frequency: string | null
+          sync_status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          credential_id?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          last_synced_at?: string | null
+          permission_level?: string | null
+          property_name?: string | null
+          property_type?: string | null
+          property_url: string
+          sync_error?: string | null
+          sync_frequency?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          credential_id?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          last_synced_at?: string | null
+          permission_level?: string | null
+          property_name?: string | null
+          property_type?: string | null
+          property_url?: string
+          sync_error?: string | null
+          sync_frequency?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gsc_properties_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "gsc_oauth_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       keywords: {
         Row: {
           category: string | null
