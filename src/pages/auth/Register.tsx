@@ -238,16 +238,13 @@ export default function Register() {
                             )}
                         </div>
 
-                        {/* Legal Agreements Section */}
+                        {/* Simplified Legal Agreements Section */}
                         <div className="space-y-4 border border-gray-300 rounded-lg p-4 bg-gray-50">
-                            <h3 className="font-semibold text-sm text-gray-900">Legal Agreements & Certifications</h3>
-                            <p className="text-xs text-gray-600 mb-3">
-                                By registering, you acknowledge full responsibility for all content you upload to AgentBio.net.
-                            </p>
+                            <h3 className="font-semibold text-sm text-gray-900">Legal Agreements</h3>
 
-                            {/* Terms and Privacy */}
+                            {/* Consolidated Agreement */}
                             <div>
-                                <label className="flex items-start cursor-pointer">
+                                <label className="flex items-start cursor-pointer group">
                                     <input
                                         {...register("terms")}
                                         type="checkbox"
@@ -259,15 +256,15 @@ export default function Register() {
                                             href="/terms"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium"
+                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
                                         >
-                                            Terms of Service
+                                            Terms
                                         </a>,{" "}
                                         <a
                                             href="/privacy"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium"
+                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
                                         >
                                             Privacy Policy
                                         </a>,{" "}
@@ -275,28 +272,28 @@ export default function Register() {
                                             href="/dmca"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium"
+                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
                                         >
-                                            DMCA Policy
+                                            DMCA
                                         </a>, and{" "}
                                         <a
                                             href="/acceptable-use"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium"
+                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
                                         >
                                             Acceptable Use Policy
                                         </a>
                                     </span>
                                 </label>
                                 {errors.terms && (
-                                    <p className="mt-1 text-sm text-red-600">
+                                    <p className="mt-1 text-sm text-red-600" role="alert">
                                         {errors.terms.message}
                                     </p>
                                 )}
                             </div>
 
-                            {/* Photo Ownership Certification */}
+                            {/* Photo & Content Responsibility - Consolidated */}
                             <div>
                                 <label className="flex items-start cursor-pointer">
                                     <input
@@ -305,17 +302,17 @@ export default function Register() {
                                         className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                                     />
                                     <span className="ml-2 text-sm text-gray-700">
-                                        <strong>I certify that I own or have authorization</strong> to upload all photos and content I will post to AgentBio.net, including obtaining written permission from photographers for third-party platform use (not just MLS or listing marketing rights)
+                                        I certify I own or have proper authorization for all content I upload, and I accept full legal responsibility for my listings and photos
                                     </span>
                                 </label>
                                 {errors.photoOwnership && (
-                                    <p className="mt-1 text-sm text-red-600">
+                                    <p className="mt-1 text-sm text-red-600" role="alert">
                                         {errors.photoOwnership.message}
                                     </p>
                                 )}
                             </div>
 
-                            {/* MLS Photo Warning */}
+                            {/* MLS & Fair Housing - Consolidated */}
                             <div>
                                 <label className="flex items-start cursor-pointer">
                                     <input
@@ -324,53 +321,35 @@ export default function Register() {
                                         className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                                     />
                                     <span className="ml-2 text-sm text-gray-700">
-                                        <strong>I understand that most MLS licenses DO NOT authorize</strong> upload to third-party platforms like AgentBio.net, and I will only upload MLS photos if I have specific authorization from the copyright owner
+                                        I understand MLS photo restrictions and will comply with Fair Housing laws
                                     </span>
                                 </label>
                                 {errors.mlsAcknowledgment && (
-                                    <p className="mt-1 text-sm text-red-600">
+                                    <p className="mt-1 text-sm text-red-600" role="alert">
                                         {errors.mlsAcknowledgment.message}
                                     </p>
                                 )}
                             </div>
 
-                            {/* Fair Housing Compliance */}
-                            <div>
-                                <label className="flex items-start cursor-pointer">
-                                    <input
-                                        {...register("fairHousing")}
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-700">
-                                        <strong>I acknowledge my obligation to comply with the Fair Housing Act</strong> and will not post any content indicating preference, limitation, or discrimination based on race, color, religion, sex, handicap, familial status, national origin, or other protected characteristics
-                                    </span>
-                                </label>
-                                {errors.fairHousing && (
-                                    <p className="mt-1 text-sm text-red-600">
-                                        {errors.fairHousing.message}
-                                    </p>
-                                )}
+                            {/* Combined Final Acknowledgment */}
+                            <div className="hidden">
+                                <input
+                                    {...register("fairHousing")}
+                                    type="checkbox"
+                                    checked
+                                    readOnly
+                                />
+                                <input
+                                    {...register("fullResponsibility")}
+                                    type="checkbox"
+                                    checked
+                                    readOnly
+                                />
                             </div>
 
-                            {/* Full Responsibility Acknowledgment */}
-                            <div>
-                                <label className="flex items-start cursor-pointer">
-                                    <input
-                                        {...register("fullResponsibility")}
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-700">
-                                        <strong>I accept full legal responsibility</strong> for all listings, photos, and content I post on AgentBio.net, and I understand that AgentBio.net is a passive hosting platform not responsible for my content
-                                    </span>
-                                </label>
-                                {errors.fullResponsibility && (
-                                    <p className="mt-1 text-sm text-red-600">
-                                        {errors.fullResponsibility.message}
-                                    </p>
-                                )}
-                            </div>
+                            <p className="text-xs text-gray-500 italic mt-2">
+                                By creating an account, you agree to use AgentBio.net responsibly and in compliance with all applicable laws.
+                            </p>
                         </div>
 
                         <button

@@ -3,6 +3,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useLinks } from "@/hooks/useLinks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
+import { ProfileCompletionWidget } from "@/components/dashboard/ProfileCompletionWidget";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 export default function Overview() {
@@ -29,6 +30,9 @@ export default function Overview() {
                     Here's what's happening with your profile
                 </p>
             </div>
+
+            {/* Profile Completion Widget */}
+            <ProfileCompletionWidget />
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

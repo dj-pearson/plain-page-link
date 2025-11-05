@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageCircle } from "lucide-react";
 import { FullPageLoader } from "@/components/LoadingSpinner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ContactButtons from "@/components/profile/ContactButtons";
@@ -11,6 +11,8 @@ import { LeadCaptureCTA } from "@/components/profile/LeadCaptureCTA";
 import { TestimonialSection } from "@/components/profile/TestimonialSection";
 import { SocialProofBanner } from "@/components/profile/SocialProofBanner";
 import ListingDetailModal from "@/components/profile/ListingDetailModal";
+import { LeadFormModal } from "@/components/profile/LeadFormModal";
+import { QuickNav } from "@/components/profile/QuickNav";
 import LinkStackBlocks from "@/components/profile/LinkStackBlocks";
 import { useProfileTracking, trackLinkClick } from "@/hooks/useProfileTracking";
 import { usePublicProfile } from "@/hooks/usePublicProfile";
@@ -30,6 +32,7 @@ export default function FullProfilePage() {
     const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
     const [customPageSlug, setCustomPageSlug] = useState<string | null>(null);
     const [checkingCustomPage, setCheckingCustomPage] = useState(true);
+    const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
     // Fetch profile and related data
     const { data, isLoading, error } = usePublicProfile(slug || '');
@@ -191,15 +194,21 @@ export default function FullProfilePage() {
                 schema={personSchema}
             />
             {render3DBackground()}
-            <div className="min-h-screen relative" 
-                 style={{ 
+            <QuickNav
+                hasListings={activeListings.length > 0}
+                hasTestimonials={testimonials.length > 0}
+            />
+            <div className="min-h-screen relative"
+                 style={{
                      backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
                      color: `hsl(var(--theme-text, 222 47% 11%))`
                  }}>
             <div className="container mx-auto px-4 py-8 max-w-5xl relative z-10">
                 <div className="space-y-6">
                     {/* Profile Header */}
-                    <ProfileHeader profile={profile} />
+                    <section id="about" className="scroll-mt-20">
+                        <ProfileHeader profile={profile} />
+                    </section>
 
                     {/* Contact Buttons */}
                     {settings?.show_contact_buttons !== false && (
@@ -228,7 +237,7 @@ export default function FullProfilePage() {
 
                     {/* Active Listings */}
                     {settings?.show_listings !== false && activeListings.length > 0 && (
-                        <div className="pt-4">
+                        <section id="listings" className="pt-4 scroll-mt-20">
                             <ListingGallery
                                 listings={activeListings}
                                 title="Featured Properties"
@@ -236,16 +245,16 @@ export default function FullProfilePage() {
                                     setSelectedListing(listing)
                                 }
                             />
-                        </div>
+                        </section>
                     )}
 
                     {/* Lead Capture CTAs */}
-                    <div className="pt-8">
+                    <section id="contact" className="pt-8 scroll-mt-20">
                         <LeadCaptureCTA
                             agentId={profile.id}
                             agentName={profile.full_name || profile.username}
                         />
-                    </div>
+                    </section>
 
                     {/* Sold Properties */}
                     {settings?.show_sold_properties !== false && (
@@ -261,9 +270,9 @@ export default function FullProfilePage() {
 
                     {/* Testimonials */}
                     {settings?.show_testimonials !== false && testimonials.length > 0 && (
-                        <div className="pt-8">
+                        <section id="testimonials" className="pt-8 scroll-mt-20">
                             <TestimonialSection testimonials={testimonials} />
-                        </div>
+                        </section>
                     )}
 
                     {/* Custom LinkStack Blocks */}
@@ -365,6 +374,25 @@ export default function FullProfilePage() {
                     onClose={() => setSelectedListing(null)}
                 />
             )}
+
+            {/* Lead Form Modal */}
+            <LeadFormModal
+                isOpen={isLeadModalOpen}
+                onClose={() => setIsLeadModalOpen(false)}
+                formType="contact"
+                agentId={profile.id}
+                agentName={profile.full_name || profile.username}
+            />
+
+            {/* Sticky Mobile Contact Button */}
+            <button
+                onClick={() => setIsLeadModalOpen(true)}
+                className="md:hidden fixed bottom-4 right-4 z-40 bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 min-w-[56px] min-h-[56px] justify-center"
+                aria-label="Contact agent"
+            >
+                <MessageCircle className="w-6 h-6" />
+                <span className="text-sm font-medium whitespace-nowrap">Contact Me</span>
+            </button>
         </div>
         </>
     );
