@@ -6,6 +6,7 @@ import { errorHandler } from "./lib/errorHandler";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { offlineStorage } from "./lib/offline-storage";
 import { pushNotifications } from "./lib/push-notifications";
+import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 
 // Public pages
 import Landing from "./pages/public/Landing";
@@ -83,6 +84,9 @@ function App() {
 
     return (
         <>
+            {/* Offline Indicator */}
+            <OfflineIndicator />
+
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Landing />} />

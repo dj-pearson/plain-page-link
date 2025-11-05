@@ -58,8 +58,8 @@ export function MobileNav() {
 
     return (
         <>
-            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 md:hidden safe-area-inset-bottom" aria-label="Mobile navigation">
-                <div className="flex justify-around items-center h-16 px-2">
+            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 md:hidden safe-area-inset-bottom shadow-lg" aria-label="Mobile navigation">
+                <div className="flex justify-around items-center h-16 px-1">
                     {navItems.map((item) => {
                         const isItemActive = isActive(item.href);
                         const Icon = item.icon;
@@ -70,24 +70,31 @@ export function MobileNav() {
                                 to={item.href}
                                 className={cn(
                                     "flex flex-col items-center justify-center flex-1 h-full relative",
-                                    "transition-colors duration-200",
+                                    "transition-all duration-200 rounded-lg mx-0.5",
                                     "min-w-[44px] min-h-[44px]", // iOS touch target minimum
+                                    "active:scale-95 active:bg-gray-100", // Touch feedback
                                     isItemActive
-                                        ? "text-primary"
-                                        : "text-gray-600 hover:text-gray-900"
+                                        ? "text-primary bg-primary/5"
+                                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                                 )}
                                 aria-label={item.label}
                                 aria-current={isItemActive ? "page" : undefined}
                             >
                                 <div className="relative">
-                                    <Icon className="w-6 h-6" />
+                                    <Icon className={cn(
+                                        "w-6 h-6 transition-transform",
+                                        isItemActive && "scale-110"
+                                    )} />
                                     {item.badge && item.badge > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold" aria-label={`${item.badge} unread`}>
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold animate-pulse" aria-label={`${item.badge} unread`}>
                                             {item.badge > 99 ? "99+" : item.badge}
                                         </span>
                                     )}
                                 </div>
-                                <span className="text-xs mt-1 font-medium">
+                                <span className={cn(
+                                    "text-xs mt-1 font-medium transition-all",
+                                    isItemActive && "font-semibold"
+                                )}>
                                     {item.label}
                                 </span>
                             </Link>
@@ -99,9 +106,10 @@ export function MobileNav() {
                         onClick={() => setIsMenuOpen(true)}
                         className={cn(
                             "flex flex-col items-center justify-center flex-1 h-full relative",
-                            "transition-colors duration-200",
+                            "transition-all duration-200 rounded-lg mx-0.5",
                             "min-w-[44px] min-h-[44px]",
-                            "text-gray-600 hover:text-gray-900"
+                            "active:scale-95 active:bg-gray-100", // Touch feedback
+                            "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                         )}
                         aria-label="Open menu with more options"
                         aria-expanded={isMenuOpen}

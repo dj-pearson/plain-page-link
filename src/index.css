@@ -196,6 +196,39 @@ html {
     .stagger-4 {
         animation-delay: 0.4s;
     }
+
+    /* Mobile-first: Safe area insets for notched devices */
+    .safe-area-inset-top {
+        padding-top: env(safe-area-inset-top);
+    }
+    .safe-area-inset-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .safe-area-inset-left {
+        padding-left: env(safe-area-inset-left);
+    }
+    .safe-area-inset-right {
+        padding-right: env(safe-area-inset-right);
+    }
+
+    /* Touch-friendly utilities */
+    .touch-target {
+        @apply min-w-[44px] min-h-[44px];
+    }
+
+    /* Prevent text selection on touch (for buttons/interactive elements) */
+    .no-select {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Smooth momentum scrolling on iOS */
+    .momentum-scroll {
+        -webkit-overflow-scrolling: touch;
+    }
 }
 
 /* Page transitions */

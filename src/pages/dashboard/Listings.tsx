@@ -107,21 +107,21 @@ export default function Listings() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Property Listings</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Property Listings</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-0.5 sm:mt-1">
             Manage your active and sold properties
           </p>
         </div>
         <button
           onClick={handleAddClick}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+          className="inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 active:scale-95 transition-all font-medium min-h-[44px] w-full sm:w-auto justify-center shadow-sm"
         >
-          <Plus className="h-4 w-4" />
-          Add Property
+          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span className="text-sm sm:text-base">Add Property</span>
         </button>
       </div>
 
@@ -134,81 +134,84 @@ export default function Listings() {
         />
       )}
 
-      {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      {/* Filters & Search - Mobile optimized */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             placeholder="Search properties..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base min-h-[44px]"
           />
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors">
+        <button className="inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-background border border-border rounded-lg hover:bg-accent active:scale-95 transition-all min-h-[44px] w-full sm:w-auto">
           <Filter className="h-4 w-4" />
-          Filters
+          <span className="text-sm sm:text-base">Filters</span>
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="text-2xl font-bold text-foreground">{listings.length}</div>
-          <div className="text-sm text-muted-foreground">Total Listings</div>
+      {/* Stats - Mobile optimized 3-column grid */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+          <div className="text-xl sm:text-2xl font-bold text-foreground">{listings.length}</div>
+          <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Total</div>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="text-2xl font-bold text-green-600">
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+          <div className="text-xl sm:text-2xl font-bold text-green-600">
             {listings.filter((l) => l.status === "active").length}
           </div>
-          <div className="text-sm text-muted-foreground">Active</div>
+          <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Active</div>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="text-2xl font-bold text-yellow-600">
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+          <div className="text-xl sm:text-2xl font-bold text-yellow-600">
             {listings.filter((l) => l.status === "pending").length}
           </div>
-          <div className="text-sm text-muted-foreground">Pending</div>
+          <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Pending</div>
         </div>
       </div>
 
-      {/* Listings Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Listings Grid - Mobile optimized */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {listings.map((listing) => (
           <div
             key={listing.id}
-            className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow group"
+            className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg active:shadow-xl transition-all group"
           >
             {/* Image */}
-            <div className="relative h-48 overflow-hidden">
+            <div className="relative h-44 sm:h-48 overflow-hidden">
               <img
                 src={listing.image}
                 alt={listing.address}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
               />
-              <div className="absolute top-3 left-3">
+              <div className="absolute top-2 sm:top-3 left-2 sm:left-3">
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
                     listing.status === "active"
-                      ? "bg-green-500 text-white"
-                      : "bg-yellow-500 text-white"
+                      ? "bg-green-500 text-white shadow-md"
+                      : "bg-yellow-500 text-white shadow-md"
                   }`}
                 >
                   {listing.status}
                 </span>
               </div>
-              <div className="absolute top-3 right-3 flex gap-2">
-                <button 
+              <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 sm:gap-2">
+                <button
                   onClick={() => setEditingListing(listing)}
-                  className="p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
+                  className="p-2 sm:p-2.5 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white active:scale-90 transition-all shadow-md min-w-[44px] min-h-[44px] flex items-center justify-center"
                   title="Edit listing"
+                  aria-label="Edit listing"
                 >
                   <Edit className="h-4 w-4" />
                 </button>
-                <button 
+                <button
                   onClick={() => handleDeleteListing(listing.id)}
-                  className="p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors text-red-600"
+                  className="p-2 sm:p-2.5 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white active:scale-90 transition-all text-red-600 shadow-md min-w-[44px] min-h-[44px] flex items-center justify-center"
                   title="Delete listing"
+                  aria-label="Delete listing"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -216,29 +219,29 @@ export default function Listings() {
             </div>
 
             {/* Content */}
-            <div className="p-4">
-              <div className="mb-3">
-                <div className="text-2xl font-bold text-primary mb-1">
+            <div className="p-3 sm:p-4">
+              <div className="mb-2 sm:mb-3">
+                <div className="text-xl sm:text-2xl font-bold text-primary mb-1">
                   {listing.price}
                 </div>
-                <div className="font-medium text-foreground">{listing.address}</div>
-                <div className="text-sm text-muted-foreground">{listing.city}</div>
+                <div className="font-medium text-sm sm:text-base text-foreground">{listing.address}</div>
+                <div className="text-xs sm:text-sm text-muted-foreground">{listing.city}</div>
               </div>
 
-              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+              <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 flex-wrap">
                 <span>{listing.beds} beds</span>
                 <span>•</span>
                 <span>{listing.baths} baths</span>
                 {listing.sqft && (
                   <>
                     <span>•</span>
-                    <span>{listing.sqft.toLocaleString()} sqft</span>
+                    <span className="whitespace-nowrap">{listing.sqft.toLocaleString()} sqft</span>
                   </>
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-border">
-                <div className="text-sm text-muted-foreground">
+              <div className="flex items-center justify-between pt-2 sm:pt-3 border-t border-border">
+                <div className="text-xs sm:text-sm text-muted-foreground">
                   Listed {new Date(listing.created_at).toLocaleDateString()}
                 </div>
               </div>
@@ -247,24 +250,24 @@ export default function Listings() {
         ))}
       </div>
 
-      {/* Empty State (shown when no listings) */}
+      {/* Empty State (shown when no listings) - Mobile optimized */}
       {listings.length === 0 && (
-        <div className="text-center py-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-accent rounded-full mb-4">
-            <Plus className="h-8 w-8 text-muted-foreground" />
+        <div className="text-center py-8 sm:py-12 px-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-accent rounded-full mb-3 sm:mb-4">
+            <Plus className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">
+          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
             No properties yet
           </h3>
-          <p className="text-muted-foreground mb-6">
+          <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6 max-w-sm mx-auto">
             Start by adding your first property listing
           </p>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 active:scale-95 transition-all font-medium min-h-[44px] shadow-md"
           >
             <Plus className="h-5 w-5" />
-            Add Your First Property
+            <span className="text-sm sm:text-base">Add Your First Property</span>
           </button>
         </div>
       )}
