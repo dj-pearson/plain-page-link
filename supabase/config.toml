@@ -20,3 +20,103 @@ verify_jwt = true
 
 [functions.sitemap]
 verify_jwt = false
+
+# ============================================
+# SEO MANAGEMENT EDGE FUNCTIONS
+# ============================================
+
+# Core SEO Functions
+[functions.seo-audit]
+verify_jwt = true
+
+[functions.apply-seo-fixes]
+verify_jwt = true
+
+[functions.analyze-content]
+verify_jwt = true
+
+[functions.analyze-blog-posts-seo]
+verify_jwt = true
+
+# Crawling & Analysis
+[functions.crawl-site]
+verify_jwt = true
+
+[functions.analyze-images]
+verify_jwt = true
+
+[functions.analyze-internal-links]
+verify_jwt = true
+
+[functions.analyze-semantic-keywords]
+verify_jwt = true
+
+# Technical SEO Checks
+[functions.check-core-web-vitals]
+verify_jwt = true
+
+[functions.check-broken-links]
+verify_jwt = true
+
+[functions.check-keyword-positions]
+verify_jwt = true
+
+[functions.check-mobile-first]
+verify_jwt = true
+
+[functions.check-security-headers]
+verify_jwt = true
+
+# Advanced Analysis
+[functions.detect-redirect-chains]
+verify_jwt = true
+
+[functions.detect-duplicate-content]
+verify_jwt = true
+
+[functions.validate-structured-data]
+verify_jwt = true
+
+[functions.monitor-performance-budget]
+verify_jwt = true
+
+# Google Search Console Integration
+[functions.gsc-oauth]
+verify_jwt = true
+
+[functions.gsc-fetch-properties]
+verify_jwt = true
+
+[functions.gsc-sync-data]
+verify_jwt = true
+
+[functions.gsc-fetch-core-web-vitals]
+verify_jwt = true
+
+# Content Optimization
+[functions.optimize-page-content]
+verify_jwt = true
+
+[functions.generate-blog-content]
+verify_jwt = true
+
+[functions.manage-blog-titles]
+verify_jwt = true
+
+# Monitoring & Notifications
+[functions.send-seo-notification]
+verify_jwt = false  # May be called by external systems
+
+[functions.run-scheduled-audit]
+verify_jwt = false  # Called by cron/scheduler
+
+# Backlinks & SERP Tracking
+[functions.sync-backlinks]
+verify_jwt = true
+
+[functions.track-serp-positions]
+verify_jwt = true
+
+# Sitemaps
+[functions.generate-sitemap]
+verify_jwt = false  # Public access for sitemap
