@@ -38,6 +38,7 @@ import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import PageBuilderEditor from "./pages/PageBuilder";
 import PublicPage from "./pages/PublicPage";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
+import SEODashboard from "./pages/SEODashboard";
 
 function App() {
     const { initialize, user } = useAuthStore();
@@ -137,6 +138,14 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/seo"
+                    element={
+                        <ProtectedRoute>
+                            <SEODashboard />
                         </ProtectedRoute>
                     }
                 />
