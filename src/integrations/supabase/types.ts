@@ -718,6 +718,463 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_audit_history: {
+        Row: {
+          accessibility_score: number | null
+          audit_duration_ms: number | null
+          audit_type: string | null
+          best_practices_score: number | null
+          broken_links_count: number | null
+          created_at: string | null
+          critical_issues: Json | null
+          description_length: number | null
+          external_links_count: number | null
+          has_canonical: boolean | null
+          has_description: boolean | null
+          has_favicon: boolean | null
+          has_keywords: boolean | null
+          has_og_tags: boolean | null
+          has_robots_txt: boolean | null
+          has_sitemap: boolean | null
+          has_ssl: boolean | null
+          has_title: boolean | null
+          has_twitter_cards: boolean | null
+          heading_structure: Json | null
+          id: string
+          images_count: number | null
+          images_with_alt_count: number | null
+          internal_links_count: number | null
+          mobile_friendly: boolean | null
+          overall_score: number | null
+          page_load_time: number | null
+          performance_score: number | null
+          performed_by: string | null
+          raw_audit_data: Json | null
+          recommendations: Json | null
+          seo_score: number | null
+          title_length: number | null
+          url: string
+          warnings: Json | null
+          word_count: number | null
+        }
+        Insert: {
+          accessibility_score?: number | null
+          audit_duration_ms?: number | null
+          audit_type?: string | null
+          best_practices_score?: number | null
+          broken_links_count?: number | null
+          created_at?: string | null
+          critical_issues?: Json | null
+          description_length?: number | null
+          external_links_count?: number | null
+          has_canonical?: boolean | null
+          has_description?: boolean | null
+          has_favicon?: boolean | null
+          has_keywords?: boolean | null
+          has_og_tags?: boolean | null
+          has_robots_txt?: boolean | null
+          has_sitemap?: boolean | null
+          has_ssl?: boolean | null
+          has_title?: boolean | null
+          has_twitter_cards?: boolean | null
+          heading_structure?: Json | null
+          id?: string
+          images_count?: number | null
+          images_with_alt_count?: number | null
+          internal_links_count?: number | null
+          mobile_friendly?: boolean | null
+          overall_score?: number | null
+          page_load_time?: number | null
+          performance_score?: number | null
+          performed_by?: string | null
+          raw_audit_data?: Json | null
+          recommendations?: Json | null
+          seo_score?: number | null
+          title_length?: number | null
+          url: string
+          warnings?: Json | null
+          word_count?: number | null
+        }
+        Update: {
+          accessibility_score?: number | null
+          audit_duration_ms?: number | null
+          audit_type?: string | null
+          best_practices_score?: number | null
+          broken_links_count?: number | null
+          created_at?: string | null
+          critical_issues?: Json | null
+          description_length?: number | null
+          external_links_count?: number | null
+          has_canonical?: boolean | null
+          has_description?: boolean | null
+          has_favicon?: boolean | null
+          has_keywords?: boolean | null
+          has_og_tags?: boolean | null
+          has_robots_txt?: boolean | null
+          has_sitemap?: boolean | null
+          has_ssl?: boolean | null
+          has_title?: boolean | null
+          has_twitter_cards?: boolean | null
+          heading_structure?: Json | null
+          id?: string
+          images_count?: number | null
+          images_with_alt_count?: number | null
+          internal_links_count?: number | null
+          mobile_friendly?: boolean | null
+          overall_score?: number | null
+          page_load_time?: number | null
+          performance_score?: number | null
+          performed_by?: string | null
+          raw_audit_data?: Json | null
+          recommendations?: Json | null
+          seo_score?: number | null
+          title_length?: number | null
+          url?: string
+          warnings?: Json | null
+          word_count?: number | null
+        }
+        Relationships: []
+      }
+      seo_fixes_applied: {
+        Row: {
+          after_value: string | null
+          applied_at: string | null
+          applied_by: string | null
+          audit_id: string | null
+          before_value: string | null
+          created_at: string | null
+          fix_category: string | null
+          fix_description: string
+          fix_impact: string | null
+          fix_type: string
+          id: string
+          issue_description: string
+          reverted_at: string | null
+          status: string | null
+          updated_at: string | null
+          url: string
+          verification_notes: string | null
+          verification_status: string | null
+        }
+        Insert: {
+          after_value?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          audit_id?: string | null
+          before_value?: string | null
+          created_at?: string | null
+          fix_category?: string | null
+          fix_description: string
+          fix_impact?: string | null
+          fix_type: string
+          id?: string
+          issue_description: string
+          reverted_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          url: string
+          verification_notes?: string | null
+          verification_status?: string | null
+        }
+        Update: {
+          after_value?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          audit_id?: string | null
+          before_value?: string | null
+          created_at?: string | null
+          fix_category?: string | null
+          fix_description?: string
+          fix_impact?: string | null
+          fix_type?: string
+          id?: string
+          issue_description?: string
+          reverted_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          url?: string
+          verification_notes?: string | null
+          verification_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_fixes_applied_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "seo_audit_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seo_keyword_history: {
+        Row: {
+          checked_at: string | null
+          clicks: number | null
+          created_at: string | null
+          ctr: number | null
+          data_source: string | null
+          device: string | null
+          id: string
+          impressions: number | null
+          keyword: string
+          keyword_id: string
+          location: string | null
+          position: number | null
+          recorded_at: string | null
+          search_engine: string | null
+          search_volume: number | null
+          url: string | null
+          visibility_score: number | null
+        }
+        Insert: {
+          checked_at?: string | null
+          clicks?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          data_source?: string | null
+          device?: string | null
+          id?: string
+          impressions?: number | null
+          keyword: string
+          keyword_id: string
+          location?: string | null
+          position?: number | null
+          recorded_at?: string | null
+          search_engine?: string | null
+          search_volume?: number | null
+          url?: string | null
+          visibility_score?: number | null
+        }
+        Update: {
+          checked_at?: string | null
+          clicks?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          data_source?: string | null
+          device?: string | null
+          id?: string
+          impressions?: number | null
+          keyword?: string
+          keyword_id?: string
+          location?: string | null
+          position?: number | null
+          recorded_at?: string | null
+          search_engine?: string | null
+          search_volume?: number | null
+          url?: string | null
+          visibility_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_keyword_history_keyword_id_fkey"
+            columns: ["keyword_id"]
+            isOneToOne: false
+            referencedRelation: "seo_keywords"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seo_keywords: {
+        Row: {
+          avg_position: number | null
+          best_position: number | null
+          category: string | null
+          clicks: number | null
+          competition: string | null
+          created_at: string | null
+          created_by: string | null
+          ctr: number | null
+          current_position: number | null
+          difficulty_score: number | null
+          first_ranked_at: string | null
+          id: string
+          impressions: number | null
+          intent: string | null
+          is_active: boolean | null
+          is_ranking: boolean | null
+          keyword: string
+          keyword_type: string | null
+          last_checked_at: string | null
+          last_position_change_at: string | null
+          monthly_searches: number | null
+          notes: string | null
+          position_change: number | null
+          previous_position: number | null
+          priority: number | null
+          search_volume: number | null
+          tags: string[] | null
+          target_position: number | null
+          target_url: string | null
+          updated_at: string | null
+          user_id: string | null
+          visibility_score: number | null
+        }
+        Insert: {
+          avg_position?: number | null
+          best_position?: number | null
+          category?: string | null
+          clicks?: number | null
+          competition?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          ctr?: number | null
+          current_position?: number | null
+          difficulty_score?: number | null
+          first_ranked_at?: string | null
+          id?: string
+          impressions?: number | null
+          intent?: string | null
+          is_active?: boolean | null
+          is_ranking?: boolean | null
+          keyword: string
+          keyword_type?: string | null
+          last_checked_at?: string | null
+          last_position_change_at?: string | null
+          monthly_searches?: number | null
+          notes?: string | null
+          position_change?: number | null
+          previous_position?: number | null
+          priority?: number | null
+          search_volume?: number | null
+          tags?: string[] | null
+          target_position?: number | null
+          target_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          visibility_score?: number | null
+        }
+        Update: {
+          avg_position?: number | null
+          best_position?: number | null
+          category?: string | null
+          clicks?: number | null
+          competition?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          ctr?: number | null
+          current_position?: number | null
+          difficulty_score?: number | null
+          first_ranked_at?: string | null
+          id?: string
+          impressions?: number | null
+          intent?: string | null
+          is_active?: boolean | null
+          is_ranking?: boolean | null
+          keyword?: string
+          keyword_type?: string | null
+          last_checked_at?: string | null
+          last_position_change_at?: string | null
+          monthly_searches?: number | null
+          notes?: string | null
+          position_change?: number | null
+          previous_position?: number | null
+          priority?: number | null
+          search_volume?: number | null
+          tags?: string[] | null
+          target_position?: number | null
+          target_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          visibility_score?: number | null
+        }
+        Relationships: []
+      }
+      seo_settings: {
+        Row: {
+          additional_meta_tags: Json | null
+          apple_touch_icon_url: string | null
+          bing_site_verification: string | null
+          canonical_url_override: string | null
+          created_at: string | null
+          default_author: string | null
+          default_description: string | null
+          default_keywords: string[] | null
+          default_og_image: string | null
+          default_title: string | null
+          favicon_url: string | null
+          google_analytics_id: string | null
+          google_site_verification: string | null
+          google_tag_manager_id: string | null
+          id: string
+          language: string | null
+          llms_txt: string | null
+          manifest_url: string | null
+          region: string | null
+          robots_txt: string | null
+          schema_org_data: Json | null
+          site_name: string | null
+          site_url: string
+          sitemap_enabled: boolean | null
+          sitemap_frequency: string | null
+          sitemap_priority: number | null
+          social_profiles: Json | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          additional_meta_tags?: Json | null
+          apple_touch_icon_url?: string | null
+          bing_site_verification?: string | null
+          canonical_url_override?: string | null
+          created_at?: string | null
+          default_author?: string | null
+          default_description?: string | null
+          default_keywords?: string[] | null
+          default_og_image?: string | null
+          default_title?: string | null
+          favicon_url?: string | null
+          google_analytics_id?: string | null
+          google_site_verification?: string | null
+          google_tag_manager_id?: string | null
+          id?: string
+          language?: string | null
+          llms_txt?: string | null
+          manifest_url?: string | null
+          region?: string | null
+          robots_txt?: string | null
+          schema_org_data?: Json | null
+          site_name?: string | null
+          site_url: string
+          sitemap_enabled?: boolean | null
+          sitemap_frequency?: string | null
+          sitemap_priority?: number | null
+          social_profiles?: Json | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          additional_meta_tags?: Json | null
+          apple_touch_icon_url?: string | null
+          bing_site_verification?: string | null
+          canonical_url_override?: string | null
+          created_at?: string | null
+          default_author?: string | null
+          default_description?: string | null
+          default_keywords?: string[] | null
+          default_og_image?: string | null
+          default_title?: string | null
+          favicon_url?: string | null
+          google_analytics_id?: string | null
+          google_site_verification?: string | null
+          google_tag_manager_id?: string | null
+          id?: string
+          language?: string | null
+          llms_txt?: string | null
+          manifest_url?: string | null
+          region?: string | null
+          robots_txt?: string | null
+          schema_org_data?: Json | null
+          site_name?: string | null
+          site_url?: string
+          sitemap_enabled?: boolean | null
+          sitemap_frequency?: string | null
+          sitemap_priority?: number | null
+          social_profiles?: Json | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       social_media_posts: {
         Row: {
           ai_prompt_used: string | null
