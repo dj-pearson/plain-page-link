@@ -108,14 +108,21 @@ export class PushNotificationManager {
         if (!token) return false;
 
         try {
+            // Get Supabase session token
+            const { supabase } = await import('@/integrations/supabase/client');
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (!session?.access_token) {
+                console.error('[PushNotifications] No active session');
+                return false;
+            }
+
             // Send token to backend
             const response = await fetch("/api/v1/notifications/register", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem(
-                        "authToken"
-                    )}`,
+                    Authorization: `Bearer ${session.access_token}`,
                 },
                 body: JSON.stringify({
                     token,
@@ -143,13 +150,20 @@ export class PushNotificationManager {
         if (!this.currentToken) return true;
 
         try {
+            // Get Supabase session token
+            const { supabase } = await import('@/integrations/supabase/client');
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (!session?.access_token) {
+                console.error('[PushNotifications] No active session');
+                return false;
+            }
+
             const response = await fetch("/api/v1/notifications/unregister", {
                 method: "DELETE",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem(
-                        "authToken"
-                    )}`,
+                    Authorization: `Bearer ${session.access_token}`,
                 },
                 body: JSON.stringify({
                     token: this.currentToken,
