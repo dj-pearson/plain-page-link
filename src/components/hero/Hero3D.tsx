@@ -16,13 +16,19 @@ import * as THREE from 'three';
  * Luxury Modern House Component
  * High-end architectural design with improved geometry
  */
-function LuxuryModernHouse() {
-  const groupRef = useRef<THREE.Group>(null);
+function AnimatedShape({ position, scale, color, speed }: {
+  position: [number, number, number];
+  scale: number;
+  color: string;
+  speed: number;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
-    if (groupRef.current) {
-      // Subtle rotation for showcase
-      groupRef.current.rotation.y = Math.sin(state.clock.getElapsedTime() * 0.15) * 0.1;
+    if (meshRef.current) {
+      meshRef.current.rotation.x = state.clock.getElapsedTime() * speed * 0.3;
+      meshRef.current.rotation.y = state.clock.getElapsedTime() * speed * 0.5;
+      meshRef.current.position.y = position[1] + Math.sin(state.clock.getElapsedTime() * speed) * 0.2;
     }
   });
 
@@ -38,7 +44,7 @@ function LuxuryModernHouse() {
         <meshStandardMaterial
           color="#f5f5f5"
           roughness={0.2}
-          metalness={0.1}
+          metalness={0.8}
         />
       </RoundedBox>
 
@@ -46,25 +52,25 @@ function LuxuryModernHouse() {
       <RoundedBox args={[3, 1, 3]} radius={0.05} position={[-0.3, 1.5, 0.2]} castShadow receiveShadow>
         <meshStandardMaterial
           color="#ffffff"
-          roughness={0.15}
-          metalness={0.2}
+          roughness={0.1}
+          metalness={0.3}
         />
       </RoundedBox>
 
       {/* Accent Panel - Architectural Feature */}
       <RoundedBox args={[1, 2, 3.2]} radius={0.03} position={[1.3, 1.2, 0]} castShadow receiveShadow>
         <meshStandardMaterial
-          color="#3a3a3a"
-          roughness={0.3}
-          metalness={0.6}
+          color="#e8f4f8"
+          roughness={0.15}
+          metalness={0.4}
         />
       </RoundedBox>
 
       {/* Flat Modern Roof */}
       <RoundedBox args={[3.1, 0.1, 3.1]} radius={0.02} position={[-0.3, 2.05, 0.2]} castShadow>
         <meshStandardMaterial
-          color="#2a2a2a"
-          roughness={0.4}
+          color="#a1c4fd"
+          roughness={0.2}
           metalness={0.8}
         />
       </RoundedBox>
@@ -72,9 +78,9 @@ function LuxuryModernHouse() {
       {/* Roof Garden/Terrace Detail */}
       <RoundedBox args={[1.5, 0.08, 1.5]} radius={0.02} position={[-0.3, 2.15, 0.2]}>
         <meshStandardMaterial
-          color="#4a7c59"
-          roughness={0.9}
-          metalness={0.1}
+          color="#80d0c7"
+          roughness={0.3}
+          metalness={0.7}
         />
       </RoundedBox>
 
@@ -83,9 +89,9 @@ function LuxuryModernHouse() {
         <meshPhysicalMaterial
           color="#b8e6f5"
           roughness={0.05}
-          metalness={0.9}
-          transmission={0.7}
-          thickness={0.5}
+          metalness={0.95}
+          emissive="#a1c4fd"
+          emissiveIntensity={0.4}
           transparent
           opacity={0.9}
         />
@@ -96,9 +102,9 @@ function LuxuryModernHouse() {
         <meshPhysicalMaterial
           color="#b8e6f5"
           roughness={0.05}
-          metalness={0.9}
-          transmission={0.7}
-          thickness={0.5}
+          metalness={0.95}
+          emissive="#a1c4fd"
+          emissiveIntensity={0.3}
           transparent
           opacity={0.9}
         />
@@ -107,18 +113,22 @@ function LuxuryModernHouse() {
       {/* Balcony Glass Railing */}
       <RoundedBox args={[2.4, 0.05, 0.05]} radius={0.01} position={[-0.3, 1.0, 1.65]}>
         <meshStandardMaterial
-          color="#dddddd"
-          roughness={0.2}
-          metalness={0.8}
+          color="#c2e9fb"
+          roughness={0.05}
+          metalness={0.95}
+          emissive="#a1c4fd"
+          emissiveIntensity={0.3}
+          transparent
+          opacity={0.9}
         />
       </RoundedBox>
 
       {/* Modern Entrance Door */}
       <RoundedBox args={[0.5, 1.1, 0.05]} radius={0.02} position={[1.2, 0.5, 1.76]}>
         <meshStandardMaterial
-          color="#1a1a1a"
-          roughness={0.4}
-          metalness={0.7}
+          color="#5a9fb8"
+          roughness={0.3}
+          metalness={0.6}
         />
       </RoundedBox>
 
@@ -136,9 +146,9 @@ function LuxuryModernHouse() {
         <meshPhysicalMaterial
           color="#b8e6f5"
           roughness={0.05}
-          metalness={0.9}
-          transmission={0.6}
-          thickness={0.5}
+          metalness={0.95}
+          emissive="#a1c4fd"
+          emissiveIntensity={0.3}
           transparent
           opacity={0.85}
         />
@@ -147,16 +157,18 @@ function LuxuryModernHouse() {
       {/* Landscape - Front Lawn */}
       <RoundedBox args={[5, 0.05, 2]} radius={0.01} position={[0, -0.04, 2.8]} receiveShadow>
         <meshStandardMaterial
-          color="#3d5a40"
-          roughness={0.95}
+          color="#80d0c7"
+          roughness={0.2}
+          metalness={0.7}
         />
       </RoundedBox>
 
       {/* Pathway */}
       <RoundedBox args={[0.8, 0.03, 2]} radius={0.01} position={[1.2, -0.02, 2.8]} receiveShadow>
         <meshStandardMaterial
-          color="#8a8a8a"
-          roughness={0.7}
+          color="#7ab8c7"
+          roughness={0.4}
+          metalness={0.5}
         />
       </RoundedBox>
 
@@ -231,12 +243,16 @@ function PropertyCard({ position, rotation = 0 }: {
 /**
  * SOLD Sign Component with Real Text
  */
-function SoldSign() {
-  const signRef = useRef<THREE.Group>(null);
+function AmbientParticles() {
+  const particlesRef = useRef<THREE.Points>(null);
 
-  useFrame((state) => {
-    if (signRef.current) {
-      signRef.current.rotation.y = Math.sin(state.clock.getElapsedTime() * 0.5) * 0.2;
+  const particlesPosition = useMemo(() => {
+    const positions = new Float32Array(2000 * 3);
+    for (let i = 0; i < 2000; i++) {
+      const x = (Math.random() - 0.5) * 15;
+      const y = (Math.random() - 0.5) * 15;
+      const z = (Math.random() - 0.5) * 15;
+      positions.set([x, y, z], i * 3);
     }
   });
 
@@ -354,8 +370,8 @@ function LightingOrb({ position, color }: {
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.position.y = position[1] + Math.sin(state.clock.getElapsedTime() * 0.8) * 0.3;
+    if (particlesRef.current) {
+      particlesRef.current.rotation.y = state.clock.getElapsedTime() * 0.05;
     }
   });
 
@@ -367,10 +383,10 @@ function LightingOrb({ position, color }: {
         emissive={color}
         emissiveIntensity={0.6}
         transparent
-        opacity={0.7}
+        opacity={0.6}
+        sizeAttenuation
       />
-      <pointLight color={color} intensity={0.5} distance={3} />
-    </mesh>
+    </points>
   );
 }
 
@@ -378,36 +394,25 @@ function LightingOrb({ position, color }: {
  * 3D Scene Component
  */
 function Scene() {
+  // Liquid Glass brand colors
+  const colors = {
+    teal: '#80d0c7',
+    blue: '#a1c4fd',
+    lightBlue: '#c2e9fb',
+  };
+
   return (
     <>
-      {/* Professional Lighting Setup */}
-      <ambientLight intensity={0.4} />
-
-      {/* Main key light */}
-      <directionalLight
-        position={[5, 8, 5]}
-        intensity={1.2}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={50}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
-      />
-
-      {/* Fill light */}
-      <directionalLight position={[-5, 5, -5]} intensity={0.5} color="#a1c4fd" />
-
-      {/* Rim light */}
+      {/* Lighting */}
+      <ambientLight intensity={0.5} />
+      <pointLight position={[10, 10, 10]} intensity={1} color="#ffffff" />
+      <pointLight position={[-10, -10, -10]} intensity={0.5} color="#80d0c7" />
       <spotLight
-        position={[0, 10, -5]}
-        angle={0.5}
+        position={[0, 5, 0]}
+        intensity={0.5}
+        angle={0.6}
         penumbra={1}
-        intensity={0.6}
-        color="#80d0c7"
-        castShadow
+        color="#a1c4fd"
       />
 
       {/* Environment for reflections */}
@@ -429,44 +434,27 @@ function Scene() {
         color="#80d0c7"
       />
 
-      <StatsBadge
-        position={[-2.5, 2.8, -0.5]}
-        value="5★"
-        label="Rating"
-        color="#a1c4fd"
-      />
+      {/* Main modern house */}
+      <ModernHouse />
 
-      {/* Ambient lighting orbs */}
-      <LightingOrb position={[-4, 1.5, -2]} color="#80d0c7" />
-      <LightingOrb position={[4, 2, -1]} color="#a1c4fd" />
-      <LightingOrb position={[0, 3, -3]} color="#c2e9fb" />
+      {/* Floating geometric shapes around house */}
+      <AnimatedShape position={[-3, 0.5, -1]} scale={0.4} color={colors.teal} speed={0.8} />
+      <AnimatedShape position={[3, -0.5, -2]} scale={0.35} color={colors.blue} speed={1.2} />
+      <AnimatedShape position={[-2.5, -1.5, 1]} scale={0.3} color={colors.lightBlue} speed={1.5} />
+      <AnimatedShape position={[2.8, 1.5, 0.5]} scale={0.45} color={colors.teal} speed={0.6} />
+      <AnimatedShape position={[0, -2, -1.5]} scale={0.35} color={colors.blue} speed={1.0} />
 
-      {/* Ground plane with reflection */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 0]} receiveShadow>
-        <planeGeometry args={[20, 20]} />
-        <MeshReflectorMaterial
-          blur={[300, 100]}
-          resolution={512}
-          mixBlur={1}
-          mixStrength={0.3}
-          roughness={1}
-          depthScale={1.2}
-          minDepthThreshold={0.4}
-          maxDepthThreshold={1.4}
-          color="#1a1a1a"
-          metalness={0.5}
-        />
-      </mesh>
+      {/* Ambient particles */}
+      <AmbientParticles />
 
       {/* Camera controls */}
       <OrbitControls
         enableZoom={false}
         enablePan={false}
         autoRotate
-        autoRotateSpeed={0.3}
-        maxPolarAngle={Math.PI / 2.2}
-        minPolarAngle={Math.PI / 3}
-        target={[0, 0.5, 0]}
+        autoRotateSpeed={0.5}
+        maxPolarAngle={Math.PI / 2}
+        minPolarAngle={Math.PI / 2}
       />
     </>
   );
@@ -477,11 +465,11 @@ function Scene() {
  */
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center w-full h-full bg-gradient-to-br from-black/5 to-black/10">
+    <div className="flex items-center justify-center w-full h-full">
       <div className="relative">
-        <div className="w-20 h-20 border-4 border-glass-border rounded-full animate-spin border-t-transparent" />
+        <div className="w-16 h-16 border-4 border-glass-border rounded-full animate-pulse" />
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] rounded-full animate-pulse" />
+          <div className="w-8 h-8 bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] rounded-full animate-ping" />
         </div>
       </div>
     </div>
@@ -490,7 +478,7 @@ function LoadingFallback() {
 
 /**
  * Hero3D Component
- * Main export - Premium Real Estate 3D Showcase
+ * Main export - 3D Hero Section with Liquid Glass integration
  */
 interface Hero3DProps {
   className?: string;
@@ -504,20 +492,17 @@ export function Hero3D({ className = '', height = '600px' }: Hero3DProps) {
       style={{ height }}
     >
       {/* Liquid Glass overlay container */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black/5 via-transparent to-black/10 backdrop-blur-sm border border-glass-border rounded-2xl" />
+      <div className="absolute inset-0 bg-glass-background backdrop-blur-sm border border-glass-border rounded-2xl" />
 
       {/* 3D Canvas */}
       <div className="absolute inset-0">
         <Suspense fallback={<LoadingFallback />}>
           <Canvas
-            shadows
-            camera={{ position: [6, 3, 8], fov: 60 }}
+            camera={{ position: [0, 0, 5], fov: 75 }}
             gl={{
               antialias: true,
               alpha: true,
-              powerPreference: 'high-performance',
-              toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.2,
+              powerPreference: 'high-performance'
             }}
             dpr={[1, 2]}
           >
@@ -526,11 +511,11 @@ export function Hero3D({ className = '', height = '600px' }: Hero3DProps) {
         </Suspense>
       </div>
 
-      {/* Bottom fade for UI overlay */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/30 via-black/10 to-transparent rounded-b-2xl pointer-events-none" />
+      {/* Prismatic gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/10 rounded-2xl pointer-events-none" />
 
-      {/* Top fade */}
-      <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-black/10 to-transparent rounded-t-2xl pointer-events-none" />
+      {/* Bottom fade for text readability */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/20 to-transparent rounded-b-2xl pointer-events-none" />
     </div>
   );
 }

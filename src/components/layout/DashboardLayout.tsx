@@ -14,6 +14,8 @@ import {
     LogOut,
     Shield,
     BookOpen,
+    Zap,
+    FileText,
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile/MobileNav";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +94,18 @@ export default function DashboardLayout() {
                         icon={<BarChart3 className="h-5 w-5" />}
                         label="Analytics"
                         active={isActive("/dashboard/analytics")}
+                    />
+                    <NavLink
+                        to="/dashboard/quick-actions"
+                        icon={<Zap className="h-5 w-5" />}
+                        label="Quick Actions"
+                        active={isActive("/dashboard/quick-actions")}
+                    />
+                    <NavLink
+                        to="/dashboard/page-builder"
+                        icon={<FileText className="h-5 w-5" />}
+                        label="Page Builder"
+                        active={isActive("/dashboard/page-builder")}
                     />
                     <NavLink
                         to="/blog"

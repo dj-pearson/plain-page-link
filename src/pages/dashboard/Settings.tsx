@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProfileDisplaySettings } from "@/components/settings/ProfileDisplaySettings";
 
 export default function Settings() {
   const { user } = useAuthStore();
@@ -289,6 +290,9 @@ export default function Settings() {
           </button>
         </CardContent>
       </Card>
+
+      {/* Profile Display Settings */}
+      <ProfileDisplaySettings />
 
       {/* Account Information */}
       <div className="bg-card border border-border rounded-lg p-6">

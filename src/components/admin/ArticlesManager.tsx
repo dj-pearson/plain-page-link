@@ -12,6 +12,7 @@ import { useArticleWebhooks } from "@/hooks/useArticleWebhooks";
 import { CreateArticleDialog } from "./CreateArticleDialog";
 import { ArticleWebhookDialog } from "./ArticleWebhookDialog";
 import { KeywordImportDialog } from "./KeywordImportDialog";
+import { ContentSuggestionsCard } from "./ContentSuggestionsCard";
 
 export function ArticlesManager() {
   const [activeTab, setActiveTab] = useState("all");
@@ -218,21 +219,7 @@ export function ArticlesManager() {
       </Card>
 
       {/* Content Suggestions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>AI Content Suggestions</CardTitle>
-          <CardDescription>Generate article ideas based on market trends and topics</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            AI-powered content suggestion system coming soon
-          </p>
-          <Button variant="outline">
-            <Plus className="h-4 w-4 mr-2" />
-            Get Suggestions
-          </Button>
-        </CardContent>
-      </Card>
+      <ContentSuggestionsCard />
 
       {/* Webhook Configuration */}
       <Card>

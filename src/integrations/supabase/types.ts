@@ -291,7 +291,9 @@ export type Database = {
         Row: {
           category: string | null
           created_at: string | null
+          generated_article_id: string | null
           id: string
+          keywords: string[] | null
           priority: number | null
           status: string | null
           suggested_by: string | null
@@ -301,7 +303,9 @@ export type Database = {
         Insert: {
           category?: string | null
           created_at?: string | null
+          generated_article_id?: string | null
           id?: string
+          keywords?: string[] | null
           priority?: number | null
           status?: string | null
           suggested_by?: string | null
@@ -311,12 +315,70 @@ export type Database = {
         Update: {
           category?: string | null
           created_at?: string | null
+          generated_article_id?: string | null
           id?: string
+          keywords?: string[] | null
           priority?: number | null
           status?: string | null
           suggested_by?: string | null
           topic?: string
           updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_suggestions_generated_article_id_fkey"
+            columns: ["generated_article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_pages: {
+        Row: {
+          blocks: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          published: boolean
+          published_at: string | null
+          seo: Json
+          slug: string
+          theme: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blocks?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          published?: boolean
+          published_at?: string | null
+          seo?: Json
+          slug: string
+          theme?: Json
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blocks?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          published?: boolean
+          published_at?: string | null
+          seo?: Json
+          slug?: string
+          theme?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

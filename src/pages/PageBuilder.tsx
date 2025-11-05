@@ -3,9 +3,11 @@
  * Main interface for building and editing link-in-bio pages
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePageBuilderStore } from "@/stores/pageBuilderStore";
 import { createNewPage, getBlockTemplates } from "@/lib/pageBuilder";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { PageList } from "@/components/pageBuilder/PageList";
 import { BlockRenderer } from "@/components/pageBuilder/BlockRenderer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,10 +26,13 @@ import {
     Copy,
     EyeOff,
     GripVertical,
+    ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function PageBuilderEditor() {
+    const { user, profile } = useAuthStore();
+    const [showPageList, setShowPageList] = useState(true);
     const {
         page,
         selectedBlockId,
@@ -49,13 +54,10 @@ export default function PageBuilderEditor() {
         updatePageMeta,
     } = usePageBuilderStore();
 
-    // Initialize with a new page
+    // Show page list if no page is loaded
     useEffect(() => {
-        if (!page) {
-            const newPage = createNewPage("user_123", "my-link-in-bio");
-            setPage(newPage);
-        }
-    }, [page, setPage]);
+        setShowPageList(!page);
+    }, [page]);
 
     const handleSave = async () => {
         try {
@@ -79,10 +81,11 @@ export default function PageBuilderEditor() {
 
     const blockTemplates = getBlockTemplates();
 
-    if (!page) {
+    // Show page list if no page is loaded
+    if (showPageList || !page) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <p>Loading...</p>
+            <div className="container mx-auto py-8">
+                <PageList />
             </div>
         );
     }
@@ -125,6 +128,20 @@ export default function PageBuilderEditor() {
                 {/* Top Toolbar */}
                 <div className="bg-white border-b p-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setPage(null);
+                                setShowPageList(true);
+                            }}
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Back to Pages
+                        </Button>
+
+                        <div className="w-px h-6 bg-gray-300 mx-2" />
+
                         <Button
                             variant="outline"
                             size="sm"
