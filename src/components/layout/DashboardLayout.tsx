@@ -14,6 +14,8 @@ import {
     LogOut,
     Shield,
     BookOpen,
+    Zap,
+    FileText,
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile/MobileNav";
 import { Badge } from "@/components/ui/badge";
