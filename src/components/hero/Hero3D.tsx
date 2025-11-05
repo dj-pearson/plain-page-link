@@ -1,4 +1,4 @@
-import { useRef, Suspense } from 'react';
+import { useRef, Suspense, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -16,21 +16,8 @@ import * as THREE from 'three';
  * Luxury Modern House Component
  * High-end architectural design with improved geometry
  */
-function AnimatedShape({ position, scale, color, speed }: {
-  position: [number, number, number];
-  scale: number;
-  color: string;
-  speed: number;
-}) {
-  const meshRef = useRef<THREE.Mesh>(null);
-
-  useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.x = state.clock.getElapsedTime() * speed * 0.3;
-      meshRef.current.rotation.y = state.clock.getElapsedTime() * speed * 0.5;
-      meshRef.current.position.y = position[1] + Math.sin(state.clock.getElapsedTime() * speed) * 0.2;
-    }
-  });
+function LuxuryModernHouse() {
+  const groupRef = useRef<THREE.Group>(null);
 
   return (
     <group ref={groupRef} position={[0, -0.5, 0]}>
@@ -197,6 +184,40 @@ function AnimatedShape({ position, scale, color, speed }: {
 }
 
 /**
+ * Animated Shape Component
+ * Floating geometric shapes
+ */
+function AnimatedShape({ position, scale, color, speed }: {
+  position: [number, number, number];
+  scale: number;
+  color: string;
+  speed: number;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.x = state.clock.getElapsedTime() * speed * 0.3;
+      meshRef.current.rotation.y = state.clock.getElapsedTime() * speed * 0.5;
+      meshRef.current.position.y = position[1] + Math.sin(state.clock.getElapsedTime() * speed) * 0.2;
+    }
+  });
+
+  return (
+    <Float speed={speed} rotationIntensity={0.5} floatIntensity={0.5}>
+      <mesh ref={meshRef} position={position} scale={scale}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial
+          color={color}
+          roughness={0.2}
+          metalness={0.8}
+        />
+      </mesh>
+    </Float>
+  );
+}
+
+/**
  * Floating Property Card Component with Real Text
  */
 function PropertyCard({ position, rotation = 0 }: {
@@ -243,18 +264,8 @@ function PropertyCard({ position, rotation = 0 }: {
 /**
  * SOLD Sign Component with Real Text
  */
-function AmbientParticles() {
-  const particlesRef = useRef<THREE.Points>(null);
-
-  const particlesPosition = useMemo(() => {
-    const positions = new Float32Array(2000 * 3);
-    for (let i = 0; i < 2000; i++) {
-      const x = (Math.random() - 0.5) * 15;
-      const y = (Math.random() - 0.5) * 15;
-      const z = (Math.random() - 0.5) * 15;
-      positions.set([x, y, z], i * 3);
-    }
-  });
+function SoldSign() {
+  const signRef = useRef<THREE.Group>(null);
 
   return (
     <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.3}>
@@ -293,6 +304,50 @@ function AmbientParticles() {
         </Html>
       </group>
     </Float>
+  );
+}
+
+/**
+ * Ambient Particles Component
+ */
+function AmbientParticles() {
+  const particlesRef = useRef<THREE.Points>(null);
+
+  const particlesPosition = useMemo(() => {
+    const positions = new Float32Array(2000 * 3);
+    for (let i = 0; i < 2000; i++) {
+      const x = (Math.random() - 0.5) * 15;
+      const y = (Math.random() - 0.5) * 15;
+      const z = (Math.random() - 0.5) * 15;
+      positions.set([x, y, z], i * 3);
+    }
+    return positions;
+  }, []);
+
+  useFrame((state) => {
+    if (particlesRef.current) {
+      particlesRef.current.rotation.y = state.clock.getElapsedTime() * 0.05;
+    }
+  });
+
+  return (
+    <points ref={particlesRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={particlesPosition.length / 3}
+          array={particlesPosition}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.02}
+        color="#80d0c7"
+        transparent
+        opacity={0.6}
+        sizeAttenuation
+      />
+    </points>
   );
 }
 
@@ -370,8 +425,8 @@ function LightingOrb({ position, color }: {
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
-    if (particlesRef.current) {
-      particlesRef.current.rotation.y = state.clock.getElapsedTime() * 0.05;
+    if (meshRef.current) {
+      meshRef.current.position.y = position[1] + Math.sin(state.clock.getElapsedTime() * 2) * 0.1;
     }
   });
 
@@ -384,9 +439,8 @@ function LightingOrb({ position, color }: {
         emissiveIntensity={0.6}
         transparent
         opacity={0.6}
-        sizeAttenuation
       />
-    </points>
+    </mesh>
   );
 }
 
@@ -433,9 +487,6 @@ function Scene() {
         label="Sold"
         color="#80d0c7"
       />
-
-      {/* Main modern house */}
-      <ModernHouse />
 
       {/* Floating geometric shapes around house */}
       <AnimatedShape position={[-3, 0.5, -1]} scale={0.4} color={colors.teal} speed={0.8} />
