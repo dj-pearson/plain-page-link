@@ -163,6 +163,12 @@ export function useContentSuggestions() {
         throw new Error(response.error.message || "Failed to generate article");
       }
 
+      // Mark suggestion as completed
+      await supabase
+        .from("content_suggestions")
+        .update({ status: 'completed', generated_article_id: response.data?.article?.id })
+        .eq("id", suggestion.id);
+
       return response.data;
     },
     onSuccess: () => {
