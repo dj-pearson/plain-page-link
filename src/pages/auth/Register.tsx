@@ -38,7 +38,12 @@ export default function Register() {
 
     useEffect(() => {
         if (user) {
-            navigate("/dashboard");
+            // Redirect to last visited route or default to dashboard
+            const lastRoute = localStorage.getItem('lastVisitedRoute');
+            const redirectTo = lastRoute && lastRoute !== '/auth/login' && lastRoute !== '/auth/register'
+                ? lastRoute
+                : '/dashboard';
+            navigate(redirectTo, { replace: true });
         }
     }, [user, navigate]);
 

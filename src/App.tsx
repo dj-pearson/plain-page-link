@@ -132,7 +132,14 @@ function App() {
                 </Route>
 
                 {/* Admin routes */}
-                <Route path="/admin" element={<AdminDashboard />} />
+                <Route
+                    path="/admin"
+                    element={
+                        <ProtectedRoute>
+                            <AdminDashboard />
+                        </ProtectedRoute>
+                    }
+                />
 
                 {/* 404 */}
                 <Route path="*" element={<NotFound />} />

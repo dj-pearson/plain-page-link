@@ -71,29 +71,29 @@ export const useAuthStore = create<AuthState>()(
         }
 
         // Set up auth state listener
-        supabase.auth.onAuthStateChange((event, session) => {
+        supabase.auth.onAuthStateChange(async (event, session) => {
           set({ session, user: session?.user ?? null });
-          
+
           if (session?.user) {
-            setTimeout(() => {
-              const fetchUserData = async () => {
-                const { data: profile } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', session.user.id)
-                  .single();
-                
-                const { data: userRoles } = await supabase
-                  .from('user_roles')
-                  .select('role')
-                  .eq('user_id', session.user.id)
-                  .order('role', { ascending: true });
-                
-                const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
-                set({ profile: profile || null, role });
-              };
-              fetchUserData();
-            }, 0);
+            // Fetch user data immediately without setTimeout
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+
+              const { data: userRoles } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', session.user.id)
+                .order('role', { ascending: true });
+
+              const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
+              set({ profile: profile || null, role });
+            } catch (error) {
+              console.error('Error fetching user data in auth state listener:', error);
+            }
           } else {
             set({ profile: null, role: null });
           }
