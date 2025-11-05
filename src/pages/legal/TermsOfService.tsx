@@ -71,17 +71,24 @@ export default function TermsOfService() {
               <li>You will comply with all Equal Housing Opportunity requirements in your advertising</li>
             </ul>
 
-            <h3 className="text-xl font-semibold mt-6 mb-3">3.4 Iowa-Specific Requirements</h3>
+            <h3 className="text-xl font-semibold mt-6 mb-3">3.4 State-Specific Licensing and Advertising Requirements</h3>
             <p className="mb-4">
-              If you hold an Iowa real estate license, you additionally warrant that:
+              <strong>AgentBio.net is a national platform serving licensed real estate professionals across all 50 states.</strong> You warrant that you will comply with ALL applicable state real estate licensing laws and advertising requirements in the state(s) where you hold a license and conduct business.
+            </p>
+            <p className="mb-4">
+              Each state has unique advertising and disclosure requirements. Examples include (but are not limited to):
             </p>
             <ul className="list-disc pl-6 mb-4 space-y-2">
-              <li>Your profile displays your full name as licensed (no abbreviations)</li>
-              <li>Your profile displays the city and state where your office is located</li>
-              <li>Your profile lists all states in which you hold a real estate license</li>
-              <li>You comply with Iowa Administrative Code 193E-10 advertising requirements</li>
-              <li>You understand violations may result in fines up to $10,000 or 10% of sale price imposed by the Iowa Real Estate Commission</li>
+              <li><strong>All States:</strong> Display your full name as licensed, brokerage affiliation, office location, and license number as required by your state</li>
+              <li><strong>Iowa:</strong> Iowa Administrative Code 193E-10 requires display of licensed name (no abbreviations), city and state of office, and states where licensed on every page</li>
+              <li><strong>California:</strong> Business and Professions Code § 10140.6 requires license number on all advertising</li>
+              <li><strong>New York:</strong> 19 NYCRR § 175.25 requires firm name and location in all advertising</li>
+              <li><strong>Texas:</strong> TREC Rule § 535.154 requires disclosure of license holder status and license number</li>
+              <li><strong>Florida:</strong> Florida Statute § 475.42 requires brokerage name in all advertising</li>
             </ul>
+            <p className="mb-4">
+              <strong>You are solely responsible for knowing and complying with your state's specific requirements.</strong> Violations may result in fines, license suspension, or disciplinary action by your state real estate commission. We recommend consulting your state real estate commission website or legal counsel for complete requirements.
+            </p>
 
             <h3 className="text-xl font-semibold mt-6 mb-3">3.5 Full Responsibility for Listings</h3>
             <p className="mb-4">
@@ -263,7 +270,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">12. Limitation of Liability</h2>
             <p className="mb-4">
-              <strong>TO THE MAXIMUM EXTENT PERMITTED BY IOWA LAW, IN NO EVENT SHALL AGENTBIO.NET OR ITS OWNERS, OFFICERS, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR:</strong>
+              <strong>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL AGENTBIO.NET OR ITS OWNERS, OFFICERS, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR:</strong>
             </p>
             <ul className="list-disc pl-6 mb-4 space-y-2">
               <li>ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES</li>
@@ -280,7 +287,7 @@ export default function TermsOfService() {
               These limitations apply regardless of the legal theory (contract, tort, negligence, strict liability, or otherwise), even if we have been advised of the possibility of such damages.
             </p>
             <p className="mb-4">
-              <strong>Exceptions:</strong> Iowa law does not permit limitation of liability for personal injury, death, gross negligence, willful misconduct, or fraud. These limitations do not apply to such claims.
+              <strong>Exceptions:</strong> Applicable state and federal laws may not permit limitation of liability for personal injury, death, gross negligence, willful misconduct, or fraud. These limitations do not apply to such claims where prohibited by law.
             </p>
           </section>
 
@@ -292,7 +299,7 @@ export default function TermsOfService() {
               Except as provided below, any dispute, claim, or controversy arising out of or relating to these Terms or the Platform shall be resolved by binding arbitration administered by the American Arbitration Association (AAA) under its Commercial Arbitration Rules.
             </p>
             <p className="mb-4">
-              Arbitration shall be conducted by a single neutral arbitrator. The arbitration shall take place in Des Moines, Iowa, or remotely via videoconference at the parties' mutual agreement. The arbitrator's decision shall be final and binding and may be entered as a judgment in any court of competent jurisdiction.
+              Arbitration shall be conducted by a single neutral arbitrator. The arbitration shall take place remotely via videoconference or telephone, or if in-person arbitration is required, in the federal judicial district where you reside or in Polk County, Iowa, at your option. The arbitrator's decision shall be final and binding and may be entered as a judgment in any court of competent jurisdiction.
             </p>
 
             <h3 className="text-xl font-semibold mt-6 mb-3">13.2 Small Claims Court Exception</h3>

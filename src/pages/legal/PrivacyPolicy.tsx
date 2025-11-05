@@ -223,15 +223,18 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">7. Data Breach Notification</h2>
             <p className="mb-4">
-              In compliance with Iowa Code Chapter 715C and other applicable data breach notification laws, if we discover a data breach compromising your personal information, we will:
+              In compliance with applicable federal and state data breach notification laws across all 50 states, if we discover a data breach compromising your personal information, we will:
             </p>
             <ul className="list-disc pl-6 mb-4 space-y-2">
               <li>Notify affected users in the most expeditious manner possible and without unreasonable delay (typically within 30-60 days)</li>
-              <li>Notify the Iowa Attorney General within 5 business days if 500+ Iowa residents are affected</li>
-              <li>Notify other state attorneys general as required by their laws</li>
-              <li>Provide written, electronic, or substitute notice as appropriate</li>
+              <li>Notify affected state attorneys general as required by state laws (most states require notification if 500+ residents of that state are affected, timing varies by state)</li>
+              <li>Provide written, electronic, or substitute notice as appropriate under applicable law</li>
               <li>Include in notifications: description of breach, approximate date, types of personal information obtained, credit bureau contact information, advice to report identity theft</li>
+              <li>Comply with state-specific breach notification requirements including timing, content, and notification methods</li>
             </ul>
+            <p className="mb-4">
+              All 50 states plus Washington D.C., Puerto Rico, and the U.S. Virgin Islands have data breach notification laws with varying requirements. We comply with the most stringent applicable requirements to ensure all affected users receive timely notification.
+            </p>
             <p className="mb-4">
               You can report suspected security incidents to security@agentbio.net.
             </p>
@@ -267,19 +270,28 @@ export default function PrivacyPolicy() {
               <strong>Do Not Sell My Personal Information:</strong> We do NOT sell personal information. We have not sold personal information in the preceding 12 months.
             </p>
 
-            <h3 className="text-xl font-semibold mt-6 mb-3">8.3 Iowa Residents (Iowa CDPA Rights)</h3>
+            <h3 className="text-xl font-semibold mt-6 mb-3">8.3 Other State Privacy Law Rights</h3>
             <p className="mb-4">
-              If you are an Iowa resident and we meet the Iowa CDPA applicability thresholds (processing data of 100,000+ Iowa residents OR 25,000+ Iowa residents AND deriving 50%+ revenue from data sales), you have rights to:
+              Residents of states with comprehensive privacy laws have similar rights to CCPA. These states include (but are not limited to):
             </p>
             <ul className="list-disc pl-6 mb-4 space-y-2">
-              <li>Access your personal data</li>
-              <li>Correct inaccurate personal data</li>
-              <li>Delete personal data</li>
-              <li>Obtain a portable copy of your data</li>
-              <li>Opt out of: (a) sale of personal data, (b) targeted advertising, (c) profiling with legal/significant effects</li>
+              <li><strong>Colorado, Connecticut, Virginia, Utah:</strong> Rights to access, correct, delete, and obtain portable copies of personal data; opt out of targeted advertising and sales</li>
+              <li><strong>Iowa:</strong> Rights apply when processing 100,000+ Iowa residents OR 25,000+ residents with 50%+ revenue from data sales</li>
+              <li><strong>Oregon, Texas, Montana:</strong> Similar comprehensive privacy rights (laws effective 2024-2026)</li>
+              <li><strong>Additional States:</strong> Many other states have enacted or are enacting privacy laws with similar consumer rights</li>
             </ul>
             <p className="mb-4">
-              We will respond to Iowa consumer rights requests within <strong>45 days</strong> (extendable by 45 additional days with notice).
+              Common rights across state privacy laws include:
+            </p>
+            <ul className="list-disc pl-6 mb-4 space-y-2">
+              <li>Right to access your personal data</li>
+              <li>Right to correct inaccurate personal data</li>
+              <li>Right to delete personal data</li>
+              <li>Right to obtain a portable copy of your data</li>
+              <li>Right to opt out of: (a) sale of personal data, (b) targeted advertising, (c) profiling with legal/significant effects</li>
+            </ul>
+            <p className="mb-4">
+              We respond to state privacy law requests within <strong>45 days</strong> (or as required by applicable state law), extendable by an additional 45 days with notice. We do not discriminate against users for exercising their privacy rights.
             </p>
 
             <h3 className="text-xl font-semibold mt-6 mb-3">8.4 How to Exercise Your Rights</h3>

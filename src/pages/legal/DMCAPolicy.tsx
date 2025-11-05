@@ -132,7 +132,7 @@ export default function DMCAPolicy() {
                 <strong>Your Contact Information:</strong> Your name, address, and telephone number
               </li>
               <li>
-                <strong>Consent to Jurisdiction:</strong> A statement that you consent to the jurisdiction of the Federal District Court for the judicial district in which your address is located (or the Southern District of Iowa if your address is outside the United States), and that you will accept service of process from the person who filed the original DMCA notice or their agent
+                <strong>Consent to Jurisdiction:</strong> A statement that you consent to the jurisdiction of the Federal District Court for the judicial district in which your address is located (or the federal judicial district in which AgentBio.net's principal place of business is located if your address is outside the United States), and that you will accept service of process from the person who filed the original DMCA notice or their agent
               </li>
             </ul>
 
