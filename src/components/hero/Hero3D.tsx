@@ -20,7 +20,7 @@ function LuxuryModernHouse() {
   const groupRef = useRef<THREE.Group>(null);
 
   return (
-    <group ref={groupRef} position={[0, -0.8, 0]}>
+    <group ref={groupRef} position={[0, -1.8, 0]}>
       {/* Foundation / Base */}
       <RoundedBox args={[5, 0.1, 4]} radius={0.02} position={[0, -0.05, 0]} receiveShadow>
         <meshStandardMaterial color="#2c2c2c" roughness={0.8} metalness={0.2} />
