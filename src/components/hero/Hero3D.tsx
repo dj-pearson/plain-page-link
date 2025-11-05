@@ -78,7 +78,7 @@ function FloatingRing({ position, radius, color }: {
 
 /**
  * Modern House Component
- * Main focal point - a geometric modern house
+ * Sleek contemporary architecture with clean lines
  */
 function ModernHouse() {
   const groupRef = useRef<THREE.Group>(null);
@@ -91,87 +91,127 @@ function ModernHouse() {
 
   return (
     <group ref={groupRef}>
-      {/* Main house body */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[2, 1.5, 1.8]} />
+      {/* Main structure - lower level */}
+      <mesh position={[0, -0.3, 0]}>
+        <boxGeometry args={[2.4, 1.2, 1.6]} />
         <meshStandardMaterial
-          color="#80d0c7"
+          color="#ffffff"
+          roughness={0.1}
+          metalness={0.3}
+        />
+      </mesh>
+
+      {/* Upper level - offset modern design */}
+      <mesh position={[0.4, 0.6, 0.2]}>
+        <boxGeometry args={[1.8, 1.0, 1.4]} />
+        <meshStandardMaterial
+          color="#e8f4f8"
+          roughness={0.15}
+          metalness={0.4}
+        />
+      </mesh>
+
+      {/* Flat modern roof */}
+      <mesh position={[0.4, 1.15, 0.2]}>
+        <boxGeometry args={[1.85, 0.08, 1.45]} />
+        <meshStandardMaterial
+          color="#a1c4fd"
           roughness={0.2}
           metalness={0.8}
         />
       </mesh>
 
-      {/* Roof - pyramid style */}
-      <mesh position={[0, 1.1, 0]} rotation={[0, 0, 0]}>
-        <coneGeometry args={[1.5, 0.8, 4]} />
+      {/* Roof overhang */}
+      <mesh position={[0.4, 1.1, 0.2]}>
+        <boxGeometry args={[2.0, 0.04, 1.6]} />
         <meshStandardMaterial
-          color="#a1c4fd"
-          roughness={0.2}
-          metalness={0.9}
-        />
-      </mesh>
-
-      {/* Door */}
-      <mesh position={[0, -0.4, 0.91]}>
-        <boxGeometry args={[0.4, 0.7, 0.05]} />
-        <meshStandardMaterial
-          color="#5a9fb8"
-          roughness={0.5}
-          metalness={0.3}
-        />
-      </mesh>
-
-      {/* Windows */}
-      <mesh position={[-0.6, 0.2, 0.91]}>
-        <boxGeometry args={[0.35, 0.35, 0.05]} />
-        <meshStandardMaterial
-          color="#c2e9fb"
-          roughness={0.1}
-          metalness={0.9}
-          emissive="#c2e9fb"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-      <mesh position={[0.6, 0.2, 0.91]}>
-        <boxGeometry args={[0.35, 0.35, 0.05]} />
-        <meshStandardMaterial
-          color="#c2e9fb"
-          roughness={0.1}
-          metalness={0.9}
-          emissive="#c2e9fb"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-
-      {/* Side windows */}
-      <mesh position={[1.01, 0.2, 0]}>
-        <boxGeometry args={[0.05, 0.35, 0.35]} />
-        <meshStandardMaterial
-          color="#c2e9fb"
-          roughness={0.1}
-          metalness={0.9}
-          emissive="#c2e9fb"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-      <mesh position={[-1.01, 0.2, 0]}>
-        <boxGeometry args={[0.05, 0.35, 0.35]} />
-        <meshStandardMaterial
-          color="#c2e9fb"
-          roughness={0.1}
-          metalness={0.9}
-          emissive="#c2e9fb"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-
-      {/* Chimney */}
-      <mesh position={[0.7, 1.6, 0.3]}>
-        <boxGeometry args={[0.2, 0.5, 0.2]} />
-        <meshStandardMaterial
-          color="#7ab8c7"
+          color="#80d0c7"
           roughness={0.3}
           metalness={0.7}
+        />
+      </mesh>
+
+      {/* Large modern windows - front */}
+      <mesh position={[0.4, 0.6, 0.91]}>
+        <boxGeometry args={[1.2, 0.7, 0.05]} />
+        <meshStandardMaterial
+          color="#c2e9fb"
+          roughness={0.05}
+          metalness={0.95}
+          emissive="#a1c4fd"
+          emissiveIntensity={0.4}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+
+      {/* Lower windows */}
+      <mesh position={[-0.6, -0.3, 0.81]}>
+        <boxGeometry args={[0.5, 0.6, 0.05]} />
+        <meshStandardMaterial
+          color="#c2e9fb"
+          roughness={0.05}
+          metalness={0.95}
+          emissive="#a1c4fd"
+          emissiveIntensity={0.3}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+      <mesh position={[0.4, -0.3, 0.81]}>
+        <boxGeometry args={[0.5, 0.6, 0.05]} />
+        <meshStandardMaterial
+          color="#c2e9fb"
+          roughness={0.05}
+          metalness={0.95}
+          emissive="#a1c4fd"
+          emissiveIntensity={0.3}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+
+      {/* Modern entrance door */}
+      <mesh position={[0.9, -0.5, 0.81]}>
+        <boxGeometry args={[0.35, 0.9, 0.05]} />
+        <meshStandardMaterial
+          color="#5a9fb8"
+          roughness={0.3}
+          metalness={0.6}
+        />
+      </mesh>
+
+      {/* Side glass panels */}
+      <mesh position={[1.3, 0.6, 0]}>
+        <boxGeometry args={[0.05, 0.7, 1.0]} />
+        <meshStandardMaterial
+          color="#c2e9fb"
+          roughness={0.05}
+          metalness={0.95}
+          emissive="#a1c4fd"
+          emissiveIntensity={0.3}
+          transparent
+          opacity={0.85}
+        />
+      </mesh>
+
+      {/* Accent architectural element */}
+      <mesh position={[-0.8, 0.3, 0]}>
+        <boxGeometry args={[0.5, 1.8, 1.4]} />
+        <meshStandardMaterial
+          color="#80d0c7"
+          roughness={0.2}
+          metalness={0.7}
+        />
+      </mesh>
+
+      {/* Ground level base */}
+      <mesh position={[0, -0.95, 0]}>
+        <boxGeometry args={[2.6, 0.1, 1.8]} />
+        <meshStandardMaterial
+          color="#7ab8c7"
+          roughness={0.4}
+          metalness={0.5}
         />
       </mesh>
     </group>
