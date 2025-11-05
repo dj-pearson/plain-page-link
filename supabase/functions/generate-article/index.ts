@@ -41,37 +41,84 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Auto-select unused keyword if no topic provided
+    // Priority order: 1) Queued suggestions, 2) Unused keywords, 3) AI suggestions
     let selectedTopic = topic;
     let selectedKeywordId = null;
     let selectedKeywords = keywords || [];
+    let selectedSuggestionId = null;
+    let articleCategory = category;
 
     if (!selectedTopic && autoSelectKeyword) {
-      // Find unused or least-used keyword, prioritizing never-used keywords
-      const { data: unusedKeywords, error: keywordError } = await supabase
-        .from('keywords')
-        .select('id, keyword, category')
-        .eq('is_active', true)
-        .order('usage_count', { ascending: true })
-        .order('last_used_at', { ascending: true, nullsFirst: true })
+      // PRIORITY 1: Check for queued content suggestions
+      const { data: queuedSuggestions, error: suggestionError } = await supabase
+        .from('content_suggestions')
+        .select('id, topic, category, keywords')
+        .eq('status', 'queued')
+        .order('priority', { ascending: false })
         .limit(1);
 
-      if (keywordError) {
-        console.error('Error fetching keyword:', keywordError);
-      } else if (unusedKeywords && unusedKeywords.length > 0) {
-        const selectedKeyword = unusedKeywords[0];
-        selectedTopic = selectedKeyword.keyword;
-        selectedKeywordId = selectedKeyword.id;
-        selectedKeywords = [selectedKeyword.keyword];
-        console.log('Auto-selected keyword:', selectedKeyword.keyword);
+      if (!suggestionError && queuedSuggestions && queuedSuggestions.length > 0) {
+        const suggestion = queuedSuggestions[0];
+        selectedTopic = suggestion.topic;
+        selectedKeywords = suggestion.keywords || [];
+        selectedSuggestionId = suggestion.id;
+        articleCategory = articleCategory || suggestion.category;
+        console.log('Auto-selected queued suggestion:', suggestion.topic);
+
+        // Mark suggestion as in progress
+        await supabase
+          .from('content_suggestions')
+          .update({ status: 'in_progress' })
+          .eq('id', suggestion.id);
+      } else {
+        // PRIORITY 2: Find unused or least-used keyword
+        const { data: unusedKeywords, error: keywordError } = await supabase
+          .from('keywords')
+          .select('id, keyword, category')
+          .eq('is_active', true)
+          .order('usage_count', { ascending: true })
+          .order('last_used_at', { ascending: true, nullsFirst: true })
+          .limit(1);
+
+        if (keywordError) {
+          console.error('Error fetching keyword:', keywordError);
+        } else if (unusedKeywords && unusedKeywords.length > 0) {
+          const selectedKeyword = unusedKeywords[0];
+          selectedTopic = selectedKeyword.keyword;
+          selectedKeywordId = selectedKeyword.id;
+          selectedKeywords = [selectedKeyword.keyword];
+          console.log('Auto-selected keyword:', selectedKeyword.keyword);
+        } else {
+          // PRIORITY 3: No keywords or suggestions, generate AI suggestion on-the-fly
+          console.log('No queued suggestions or keywords, generating AI suggestion...');
+          
+          const suggestResponse = await supabase.functions.invoke('generate-content-suggestions', {
+            body: { count: 1 }
+          });
+
+          if (!suggestResponse.error && suggestResponse.data?.suggestions?.[0]) {
+            const aiSuggestion = suggestResponse.data.suggestions[0];
+            selectedTopic = aiSuggestion.topic;
+            selectedKeywords = aiSuggestion.keywords || [];
+            selectedSuggestionId = aiSuggestion.id;
+            articleCategory = articleCategory || aiSuggestion.category;
+            console.log('Generated AI suggestion:', aiSuggestion.topic);
+
+            // Mark as in progress
+            await supabase
+              .from('content_suggestions')
+              .update({ status: 'in_progress' })
+              .eq('id', aiSuggestion.id);
+          }
+        }
       }
     }
 
     if (!selectedTopic) {
-      // Fallback to a sensible default so auto-select still works without seeded keywords
+      // Final fallback
       selectedTopic = "Professional real estate agent portfolio link";
       selectedKeywords = [selectedTopic];
-      console.log("No keywords found; using fallback topic");
+      console.log("No content sources found; using fallback topic");
     }
 
     // Get AI configuration
@@ -115,8 +162,8 @@ serve(async (req) => {
     // Build prompt for article generation
     let prompt = `Write a comprehensive, SEO-optimized blog article about: ${selectedTopic}`;
 
-    if (category) {
-      prompt += `\n\nCategory: ${category}`;
+    if (articleCategory) {
+      prompt += `\n\nCategory: ${articleCategory}`;
     }
 
     if (selectedKeywords && selectedKeywords.length > 0) {
@@ -242,10 +289,11 @@ serve(async (req) => {
         seo_title: seoTitle,
         seo_description: seoDescription,
         seo_keywords: selectedKeywords,
-        category: category || 'General',
+        category: articleCategory || 'General',
         tags: selectedKeywords || [],
         keyword_id: selectedKeywordId,
-        author_id: userId, // Include the user ID
+        generated_from_suggestion_id: selectedSuggestionId,
+        author_id: userId,
         status: 'published',
         published_at: new Date().toISOString()
       })
@@ -261,6 +309,17 @@ serve(async (req) => {
     }
 
     console.log("Article generated and saved successfully");
+
+    // Update suggestion status if article was generated from a suggestion
+    if (selectedSuggestionId) {
+      await supabase
+        .from('content_suggestions')
+        .update({ 
+          status: 'completed',
+          generated_article_id: insertedArticle.id
+        })
+        .eq('id', selectedSuggestionId);
+    }
 
     // Trigger social media post generation and webhook distribution
     try {
