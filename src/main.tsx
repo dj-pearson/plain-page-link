@@ -22,7 +22,9 @@ const rootEl = document.getElementById("root")!;
 if (!rootEl) {
     console.error("Root element #root not found");
 }
-console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
+if (import.meta.env.DEV) {
+    console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
+}
 
 ReactDOM.createRoot(rootEl).render(
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -30,11 +32,13 @@ ReactDOM.createRoot(rootEl).render(
             <HelmetProvider>
                 <QueryClientProvider client={queryClient}>
                     <App />
-                    <ReactQueryDevtools initialIsOpen={false} />
+                    {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
                 </QueryClientProvider>
             </HelmetProvider>
         </ErrorBoundary>
     </BrowserRouter>
 );
 
-console.log("[Lovable] React render invoked");
+if (import.meta.env.DEV) {
+    console.log("[Lovable] React render invoked");
+}

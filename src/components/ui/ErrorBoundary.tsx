@@ -66,7 +66,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                             </div>
                         </div>
 
-                        {process.env.NODE_ENV === "development" && this.state.error && (
+                        {import.meta.env.DEV && this.state.error && (
                             <div className="mb-6 p-4 bg-gray-100 rounded-lg">
                                 <p className="text-sm font-mono text-gray-800 mb-2">
                                     {this.state.error.toString()}
