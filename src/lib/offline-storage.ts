@@ -49,7 +49,7 @@ interface OfflineDB extends DBSchema {
                 | "listing_delete"
                 | "lead_response";
             action: "create" | "update" | "delete";
-            data: any;
+            data: unknown;
             timestamp: number;
             attempts: number;
             lastAttempt?: number;
@@ -62,7 +62,7 @@ interface OfflineDB extends DBSchema {
         key: string;
         value: {
             key: string;
-            value: any;
+            value: unknown;
             lastSync: number;
         };
     };
@@ -71,8 +71,8 @@ interface OfflineDB extends DBSchema {
 export class OfflineStorageManager {
     private static instance: OfflineStorageManager;
     private db?: IDBPDatabase<OfflineDB>;
-    private dbName = "agentbio_offline";
-    private dbVersion = 1;
+    private readonly dbName = "agentbio_offline";
+    private readonly dbVersion = 1;
 
     private constructor() {}
 
@@ -124,7 +124,9 @@ export class OfflineStorageManager {
                 },
             });
 
-            console.log("[OfflineStorage] Database initialized");
+            if (import.meta.env.DEV) {
+                console.log("[OfflineStorage] Database initialized");
+            }
         } catch (error) {
             console.error(
                 "[OfflineStorage] Failed to initialize database:",
@@ -214,7 +216,7 @@ export class OfflineStorageManager {
     }
 
     // Preferences operations
-    async savePreference(key: string, value: any): Promise<void> {
+    async savePreference(key: string, value: unknown): Promise<void> {
         if (!this.db) await this.init();
         await this.db!.put("userPreferences", {
             key,
@@ -223,7 +225,7 @@ export class OfflineStorageManager {
         });
     }
 
-    async getPreference(key: string): Promise<any> {
+    async getPreference(key: string): Promise<unknown> {
         if (!this.db) await this.init();
         const pref = await this.db!.get("userPreferences", key);
         return pref?.value;
@@ -236,7 +238,9 @@ export class OfflineStorageManager {
         await this.db!.clear("leads");
         await this.db!.clear("syncQueue");
         await this.db!.clear("userPreferences");
-        console.log("[OfflineStorage] All data cleared");
+        if (import.meta.env.DEV) {
+            console.log("[OfflineStorage] All data cleared");
+        }
     }
 }
 
