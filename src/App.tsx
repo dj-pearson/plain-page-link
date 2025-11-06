@@ -8,6 +8,7 @@ import { offlineStorage } from "./lib/offline-storage";
 import { pushNotifications } from "./lib/push-notifications";
 import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 import { LoadingSpinner } from "./components/LoadingSpinner";
+import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
 
 // Public pages (eager load for better UX on landing)
 import Landing from "./pages/public/Landing";
@@ -94,8 +95,9 @@ function App() {
             {/* Offline Indicator */}
             <OfflineIndicator />
 
-            <Suspense fallback={<LoadingSpinner />}>
-                <Routes>
+            <LazyLoadErrorBoundary>
+                <Suspense fallback={<LoadingSpinner />}>
+                    <Routes>
                     {/* Public routes */}
                     <Route path="/" element={<Landing />} />
                     <Route path="/pricing" element={<Pricing />} />
@@ -170,6 +172,7 @@ function App() {
                     <Route path="*" element={<NotFound />} />
                 </Routes>
             </Suspense>
+            </LazyLoadErrorBoundary>
 
             <Toaster position="top-right" richColors />
         </>
