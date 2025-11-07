@@ -1,9 +1,38 @@
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { SEOHead } from "@/components/SEOHead";
 
 export default function TermsOfService() {
+  const lastUpdated = new Date().toLocaleDateString();
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": "https://agentbio.net/terms#webpage",
+    "url": "https://agentbio.net/terms",
+    "name": "Terms of Service - AgentBio",
+    "description": "AgentBio Terms of Service outlining user rights, responsibilities, and platform usage guidelines for real estate professionals.",
+    "isPartOf": {
+      "@id": "https://agentbio.net/#website"
+    },
+    "about": {
+      "@type": "Thing",
+      "name": "Terms of Service"
+    },
+    "datePublished": "2024-01-01",
+    "dateModified": lastUpdated,
+    "inLanguage": "en-US"
+  };
+
   return (
     <>
+      <SEOHead
+        title="Terms of Service - AgentBio | User Agreement & Platform Rules"
+        description="AgentBio Terms of Service for real estate agents. Learn about licensing requirements, content ownership, copyright compliance, Fair Housing obligations, and user responsibilities."
+        keywords={["terms of service", "user agreement", "platform terms", "real estate agent terms", "copyright policy", "Fair Housing compliance", "licensing requirements"]}
+        canonicalUrl="https://agentbio.net/terms"
+        schema={schema}
+      />
       <PublicHeader />
       <div className="min-h-screen bg-background py-12 px-4">
         <div className="max-w-4xl mx-auto">
@@ -11,7 +40,7 @@ export default function TermsOfService() {
 
         <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
           <p className="text-muted-foreground mb-6">
-            Last updated: {new Date().toLocaleDateString()}
+            Last updated: {lastUpdated}
           </p>
 
           <section>

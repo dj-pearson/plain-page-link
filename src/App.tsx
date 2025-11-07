@@ -28,6 +28,7 @@ const AcceptableUse = lazy(() => import("./pages/legal/AcceptableUse"));
 // Lazy load marketing pages
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Blog = lazy(() => import("./pages/Blog"));
+const BlogCategory = lazy(() => import("./pages/BlogCategory"));
 const BlogArticle = lazy(() => import("./pages/BlogArticle"));
 const PublicPage = lazy(() => import("./pages/PublicPage"));
 
@@ -106,6 +107,7 @@ function App() {
                     <Route path="/dmca" element={<DMCAPolicy />} />
                     <Route path="/acceptable-use" element={<AcceptableUse />} />
                     <Route path="/blog" element={<Blog />} />
+                    <Route path="/blog/category/:category" element={<BlogCategory />} />
                     <Route path="/blog/:slug" element={<BlogArticle />} />
                     <Route path="/p/:slug" element={<PublicPage />} />
                     <Route path="/:slug" element={<ProfilePage />} />

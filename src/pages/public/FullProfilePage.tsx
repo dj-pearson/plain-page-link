@@ -137,25 +137,151 @@ export default function FullProfilePage() {
     const seoDescription = profile.seo_description || profile.bio || `Browse properties and connect with ${profile.full_name || profile.username}, a trusted real estate professional.`;
     const currentUrl = `${window.location.origin}/${slug}`;
 
-    // Generate structured data for SEO
+    // Generate comprehensive structured data for SEO (dual schema for better coverage)
     const personSchema = {
         "@context": "https://schema.org",
-        "@type": "RealEstateAgent",
-        "name": profile.full_name || profile.username,
-        "description": profile.bio,
-        "telephone": profile.phone,
-        "email": profile.email_display,
-        "image": profile.avatar_url,
-        "address": {
-            "@type": "PostalAddress",
-            "addressRegion": profile.license_state
-        },
-        "jobTitle": profile.title,
-        "aggregateRating": testimonials.length > 0 ? {
-            "@type": "AggregateRating",
-            "ratingValue": averageRating,
-            "reviewCount": testimonials.length
-        } : undefined
+        "@graph": [
+            // RealEstateAgent schema
+            {
+                "@type": "RealEstateAgent",
+                "@id": `${currentUrl}#agent`,
+                "name": profile.full_name || profile.username,
+                "description": profile.bio,
+                "telephone": profile.phone,
+                "email": profile.email_display,
+                "image": profile.avatar_url,
+                "url": currentUrl,
+                "address": profile.city && profile.license_state ? {
+                    "@type": "PostalAddress",
+                    "addressLocality": profile.city,
+                    "addressRegion": profile.license_state,
+                    "addressCountry": "US"
+                } : {
+                    "@type": "PostalAddress",
+                    "addressRegion": profile.license_state,
+                    "addressCountry": "US"
+                },
+                "jobTitle": profile.title || "Real Estate Agent",
+                ...(profile.years_experience && {
+                    "yearsInBusiness": profile.years_experience
+                }),
+                ...(profile.specialties && profile.specialties.length > 0 && {
+                    "knowsAbout": profile.specialties
+                }),
+                ...(profile.service_cities && profile.service_cities.length > 0 && {
+                    "areaServed": profile.service_cities.map((city: string) => ({
+                        "@type": "City",
+                        "name": city
+                    }))
+                }),
+                ...(profile.brokerage_name && {
+                    "memberOf": {
+                        "@type": "Organization",
+                        "name": profile.brokerage_name
+                    }
+                }),
+                ...(testimonials.length > 0 && {
+                    "aggregateRating": {
+                        "@type": "AggregateRating",
+                        "ratingValue": averageRating.toFixed(1),
+                        "reviewCount": testimonials.length,
+                        "bestRating": "5",
+                        "worstRating": "1"
+                    }
+                })
+            },
+            // LocalBusiness schema for local SEO
+            {
+                "@type": "LocalBusiness",
+                "@id": `${currentUrl}#business`,
+                "name": `${profile.full_name || profile.username} - ${profile.brokerage_name || 'Real Estate Services'}`,
+                "description": profile.bio,
+                "image": profile.avatar_url,
+                "telephone": profile.phone,
+                "email": profile.email_display,
+                "url": currentUrl,
+                ...(profile.city && profile.license_state && {
+                    "address": {
+                        "@type": "PostalAddress",
+                        "addressLocality": profile.city,
+                        "addressRegion": profile.license_state,
+                        "addressCountry": "US"
+                    }
+                }),
+                "priceRange": "$$",
+                ...(testimonials.length > 0 && {
+                    "aggregateRating": {
+                        "@type": "AggregateRating",
+                        "ratingValue": averageRating.toFixed(1),
+                        "reviewCount": testimonials.length,
+                        "bestRating": "5"
+                    }
+                }),
+                ...(soldListings.length > 0 && {
+                    "numberOfEmployees": {
+                        "@type": "QuantitativeValue",
+                        "value": 1
+                    }
+                })
+            },
+            // WebPage schema
+            {
+                "@type": "WebPage",
+                "@id": `${currentUrl}#webpage`,
+                "url": currentUrl,
+                "name": seoTitle,
+                "description": seoDescription,
+                "isPartOf": {
+                    "@id": `${window.location.origin}/#website`
+                },
+                "about": {
+                    "@id": `${currentUrl}#agent`
+                },
+                "primaryImageOfPage": {
+                    "@type": "ImageObject",
+                    "url": profile.avatar_url
+                }
+            },
+            // BreadcrumbList schema
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {
+                        "@type": "ListItem",
+                        "position": 1,
+                        "name": "Home",
+                        "item": window.location.origin
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 2,
+                        "name": profile.full_name || profile.username,
+                        "item": currentUrl
+                    }
+                ]
+            },
+            // Individual Review schemas
+            ...(testimonials.length > 0 ? testimonials.slice(0, 10).map((testimonial: any, index: number) => ({
+                "@type": "Review",
+                "@id": `${currentUrl}#review-${index}`,
+                "itemReviewed": {
+                    "@id": `${currentUrl}#agent`
+                },
+                "author": {
+                    "@type": "Person",
+                    "name": testimonial.author || "Anonymous"
+                },
+                "reviewRating": {
+                    "@type": "Rating",
+                    "ratingValue": testimonial.rating?.toString() || "5",
+                    "bestRating": "5"
+                },
+                "reviewBody": testimonial.content,
+                ...(testimonial.created_at && {
+                    "datePublished": new Date(testimonial.created_at).toISOString().split('T')[0]
+                })
+            })) : [])
+        ]
     };
 
     // Render 3D background based on theme

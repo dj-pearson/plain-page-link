@@ -1,3 +1,4 @@
+import * as React from "react";
 import { useState } from "react";
 import { Check, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -10,18 +11,139 @@ import { useToast } from "@/hooks/use-toast";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default function Pricing() {
   const [isYearly, setIsYearly] = useState(false);
   const { plans, subscription } = useSubscription();
   const { toast } = useToast();
 
-  const schema = {
-    "@context": "https://schema.org",
-    "@type": "ProductGroup",
-    "name": "AgentBio Subscription Plans",
-    "description": "Choose the perfect plan for your real estate business"
+  // Generate comprehensive schema for pricing page
+  const generatePricingSchema = () => {
+    const baseUrl = window.location.origin;
+
+    return {
+      "@context": "https://schema.org",
+      "@graph": [
+        // Main Product for the service
+        {
+          "@type": "Product",
+          "@id": `${baseUrl}/pricing#product`,
+          "name": "AgentBio - Real Estate Agent Portfolio Platform",
+          "description": "Professional portfolio platform for real estate agents to showcase listings, capture leads, and grow their business online.",
+          "brand": {
+            "@type": "Brand",
+            "name": "AgentBio"
+          },
+          "category": "Business Software",
+          "offers": plans?.map((plan) => ({
+            "@type": "Offer",
+            "@id": `${baseUrl}/pricing#offer-${plan.name}`,
+            "name": `${plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} Plan`,
+            "description": `AgentBio ${plan.name} plan with ${
+              plan.limits.listings === -1 ? 'unlimited' : plan.limits.listings
+            } listings and ${
+              plan.limits.links === -1 ? 'unlimited' : plan.limits.links
+            } custom links`,
+            "price": plan.price_monthly.toString(),
+            "priceCurrency": "USD",
+            "priceSpecification": {
+              "@type": "UnitPriceSpecification",
+              "price": plan.price_monthly,
+              "priceCurrency": "USD",
+              "unitText": "MONTH"
+            },
+            "availability": "https://schema.org/InStock",
+            "url": `${baseUrl}/pricing`,
+            "seller": {
+              "@type": "Organization",
+              "name": "AgentBio"
+            },
+            ...(plan.price_yearly > 0 && {
+              "priceValidUntil": new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
+            })
+          })) || []
+        },
+        // WebPage schema
+        {
+          "@type": "WebPage",
+          "@id": `${baseUrl}/pricing#webpage`,
+          "url": `${baseUrl}/pricing`,
+          "name": "Pricing - AgentBio Professional Plans",
+          "description": "Choose the perfect plan for your real estate business. Start free and scale as you grow with AgentBio.",
+          "isPartOf": {
+            "@id": `${baseUrl}/#website`
+          }
+        },
+        // BreadcrumbList
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Home",
+              "item": baseUrl
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Pricing",
+              "item": `${baseUrl}/pricing`
+            }
+          ]
+        },
+        // FAQPage for common pricing questions
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How much does AgentBio cost?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "AgentBio offers four pricing tiers: Free ($0), Starter ($19/month), Professional ($39/month), and Team ($29/agent/month with 5 agent minimum). Annual plans save 17%."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I start with the free plan?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes! AgentBio offers a free plan with 3 active listings, 5 custom links, basic analytics, and lead capture forms. No credit card required to get started."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I upgrade or downgrade my plan?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Absolutely! You can upgrade or downgrade your AgentBio plan at any time from your dashboard settings. Changes take effect immediately, and billing is prorated."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Do you offer annual billing?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, we offer annual billing with a 17% discount compared to monthly billing. Pay for 10 months and get 12 months of service."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What payment methods do you accept?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "We accept all major credit cards (Visa, Mastercard, American Express, Discover) through our secure payment processor Stripe. All payments are encrypted and PCI compliant."
+              }
+            }
+          ]
+        }
+      ]
+    };
   };
+
+  const schema = generatePricingSchema();
 
   const handleSubscribe = async (priceId: string) => {
     try {
@@ -79,6 +201,11 @@ export default function Pricing() {
       <PublicHeader />
       <div className="bg-gradient-to-br from-background via-background to-primary/5 py-20 px-4">
       <div className="max-w-7xl mx-auto">
+        {/* Breadcrumbs */}
+        <div className="mb-8">
+          <Breadcrumbs items={[{ name: "Pricing", href: "/pricing" }]} />
+        </div>
+
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
             Choose Your Plan
@@ -225,6 +352,33 @@ export default function Pricing() {
             </Card>
           </div>
           </div>
+
+        {/* FAQ Section */}
+        <div className="mt-20">
+          <h2 className="text-3xl font-bold text-center mb-8">Pricing Questions</h2>
+          <div className="max-w-3xl mx-auto space-y-4">
+            <FAQItem
+              question="How much does AgentBio cost?"
+              answer="AgentBio offers four pricing tiers: Free ($0), Starter ($19/month), Professional ($39/month), and Team ($29/agent/month with 5 agent minimum). Annual plans save 17%."
+            />
+            <FAQItem
+              question="Can I start with the free plan?"
+              answer="Yes! AgentBio offers a free plan with 3 active listings, 5 custom links, basic analytics, and lead capture forms. No credit card required to get started."
+            />
+            <FAQItem
+              question="Can I upgrade or downgrade my plan?"
+              answer="Absolutely! You can upgrade or downgrade your AgentBio plan at any time from your dashboard settings. Changes take effect immediately, and billing is prorated."
+            />
+            <FAQItem
+              question="Do you offer annual billing?"
+              answer="Yes, we offer annual billing with a 17% discount compared to monthly billing. Pay for 10 months and get 12 months of service."
+            />
+            <FAQItem
+              question="What payment methods do you accept?"
+              answer="We accept all major credit cards (Visa, Mastercard, American Express, Discover) through our secure payment processor Stripe. All payments are encrypted and PCI compliant."
+            />
+          </div>
+        </div>
         </div>
       </div>
 
@@ -232,5 +386,36 @@ export default function Pricing() {
       <PublicFooter />
       </div>
     </>
+  );
+}
+
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  return (
+    <Card className="overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-muted/50 transition-colors"
+        aria-expanded={isOpen}
+      >
+        <h3 className="text-lg font-semibold pr-4">{question}</h3>
+        <svg
+          className={`w-5 h-5 text-primary transition-transform flex-shrink-0 ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isOpen && (
+        <CardContent className="pt-0 pb-4">
+          <p className="text-muted-foreground leading-relaxed">{answer}</p>
+        </CardContent>
+      )}
+    </Card>
   );
 }

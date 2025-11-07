@@ -1,9 +1,38 @@
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { SEOHead } from "@/components/SEOHead";
 
 export default function PrivacyPolicy() {
+  const lastUpdated = new Date().toLocaleDateString();
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": "https://agentbio.net/privacy#webpage",
+    "url": "https://agentbio.net/privacy",
+    "name": "Privacy Policy - AgentBio",
+    "description": "AgentBio Privacy Policy detailing how we collect, use, and protect your personal information. Learn about your rights under CCPA, data security, and privacy practices.",
+    "isPartOf": {
+      "@id": "https://agentbio.net/#website"
+    },
+    "about": {
+      "@type": "Thing",
+      "name": "Privacy Policy"
+    },
+    "datePublished": "2024-01-01",
+    "dateModified": lastUpdated,
+    "inLanguage": "en-US"
+  };
+
   return (
     <>
+      <SEOHead
+        title="Privacy Policy - AgentBio | Data Protection & User Rights"
+        description="AgentBio Privacy Policy: Learn how we protect your personal information, comply with CCPA and privacy laws, and respect your data rights. CAN-SPAM and TCPA compliant."
+        keywords={["privacy policy", "data protection", "CCPA compliance", "user privacy rights", "data security", "AgentBio privacy", "real estate privacy", "GDPR compliance"]}
+        canonicalUrl="https://agentbio.net/privacy"
+        schema={schema}
+      />
       <PublicHeader />
       <div className="min-h-screen bg-background py-12 px-4">
         <div className="max-w-4xl mx-auto">
@@ -11,7 +40,7 @@ export default function PrivacyPolicy() {
 
         <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
           <p className="text-muted-foreground mb-6">
-            Last updated: {new Date().toLocaleDateString()}
+            Last updated: {lastUpdated}
           </p>
 
           <section>
