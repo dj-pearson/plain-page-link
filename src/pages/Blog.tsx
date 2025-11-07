@@ -32,15 +32,15 @@ export default function Blog() {
   });
 
   const categories = [
-    "all",
-    "Real Estate Tips",
-    "Market Insights",
-    "Buying Guide",
-    "Selling Guide",
-    "Investment",
-    "Neighborhood Guides",
-    "Home Improvement",
-    "General",
+    { name: "all", slug: "all", label: "All Articles" },
+    { name: "Real Estate Tips", slug: "real-estate-tips", label: "Real Estate Tips" },
+    { name: "Market Insights", slug: "market-insights", label: "Market Insights" },
+    { name: "Buying Guide", slug: "buying-guide", label: "Buying Guide" },
+    { name: "Selling Guide", slug: "selling-guide", label: "Selling Guide" },
+    { name: "Investment", slug: "investment", label: "Investment" },
+    { name: "Neighborhood Guides", slug: "neighborhood-guides", label: "Neighborhood Guides" },
+    { name: "Home Improvement", slug: "home-improvement", label: "Home Improvement" },
+    { name: "General", slug: "general", label: "General" },
   ];
 
   const filteredArticles = articles.filter((article) => {
@@ -50,7 +50,9 @@ export default function Blog() {
       article.excerpt?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory =
-      selectedCategory === "all" || article.category === selectedCategory;
+      selectedCategory === "all" ||
+      article.category === categories.find(c => c.slug === selectedCategory)?.name ||
+      article.category === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -105,12 +107,34 @@ export default function Blog() {
             </SelectTrigger>
             <SelectContent>
               {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category === "all" ? "All Categories" : category}
+                <SelectItem key={category.slug} value={category.slug}>
+                  {category.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Category Cards */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+          {categories.slice(1).map((category) => (
+            <Link
+              key={category.slug}
+              to={`/blog/category/${category.slug}`}
+              className="group"
+            >
+              <Card className="h-full hover:shadow-lg transition-all hover:border-primary/50">
+                <CardHeader>
+                  <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                    {category.label}
+                  </CardTitle>
+                  <CardDescription>
+                    {articles.filter(a => a.category === category.name).length} articles
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          ))}
         </div>
 
         {/* Articles Grid */}
