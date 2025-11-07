@@ -1,9 +1,38 @@
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { SEOHead } from "@/components/SEOHead";
 
 export default function DMCAPolicy() {
+  const lastUpdated = new Date().toLocaleDateString();
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": "https://agentbio.net/dmca#webpage",
+    "url": "https://agentbio.net/dmca",
+    "name": "DMCA Copyright Policy - AgentBio",
+    "description": "AgentBio DMCA Copyright Policy: Learn how to file copyright infringement notices, counter-notices, and our repeat infringer policy for real estate photos.",
+    "isPartOf": {
+      "@id": "https://agentbio.net/#website"
+    },
+    "about": {
+      "@type": "Thing",
+      "name": "DMCA Policy"
+    },
+    "datePublished": "2024-01-01",
+    "dateModified": lastUpdated,
+    "inLanguage": "en-US"
+  };
+
   return (
     <>
+      <SEOHead
+        title="DMCA Copyright Policy - AgentBio | Takedown & Copyright Protection"
+        description="AgentBio DMCA Policy: File copyright takedown notices, counter-notices, and understand our repeat infringer policy. Protect your real estate photography rights."
+        keywords={["DMCA policy", "copyright takedown", "copyright infringement", "real estate photography copyright", "DMCA notice", "repeat infringer policy", "photographer rights"]}
+        canonicalUrl="https://agentbio.net/dmca"
+        schema={schema}
+      />
       <PublicHeader />
       <div className="min-h-screen bg-background py-12 px-4">
         <div className="max-w-4xl mx-auto">
@@ -11,7 +40,7 @@ export default function DMCAPolicy() {
 
         <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
           <p className="text-muted-foreground mb-6">
-            Last updated: {new Date().toLocaleDateString()}
+            Last updated: {lastUpdated}
           </p>
 
           <section>

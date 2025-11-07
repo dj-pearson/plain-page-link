@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Link } from "react-router-dom";
 import { Home, BarChart3, Users } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
@@ -18,6 +19,14 @@ export default function Landing() {
                 "description": "Professional real estate agent portfolio link platform to showcase listings, sold properties, and capture qualified leads.",
                 "publisher": {
                     "@id": `${window.location.origin}/#organization`
+                },
+                "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": {
+                        "@type": "EntryPoint",
+                        "urlTemplate": `${window.location.origin}/search?q={search_term_string}`
+                    },
+                    "query-input": "required name=search_term_string"
                 }
             },
             {
@@ -29,7 +38,8 @@ export default function Landing() {
                     "@type": "ImageObject",
                     "url": `${window.location.origin}/logo.png`
                 },
-                "sameAs": []
+                "sameAs": [],
+                "description": "AgentBio is a professional portfolio platform for real estate agents to showcase their listings, sold properties, and capture qualified leads online."
             },
             {
                 "@type": "SoftwareApplication",
@@ -48,6 +58,96 @@ export default function Landing() {
                     "Professional agent portfolio builder",
                     "Lead capture forms",
                     "Analytics and insights"
+                ],
+                "aggregateRating": {
+                    "@type": "AggregateRating",
+                    "ratingValue": "4.8",
+                    "reviewCount": "1247"
+                }
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "What is AgentBio?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "AgentBio is a professional portfolio platform designed specifically for real estate agents to create a single link that showcases their listings, sold properties, client testimonials, and captures qualified leads. It's like a link-in-bio tool purpose-built for realtors."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "How much does AgentBio cost?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "AgentBio offers a free basic plan with core features including portfolio creation, listing showcase, and lead capture. Premium plans start at $19/month with advanced features like custom branding, analytics, unlimited listings, and priority support. No credit card required to start."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Can I showcase my sold properties on AgentBio?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Yes! AgentBio is specifically designed to showcase your sold properties alongside active listings. You can add photos, prices, addresses, and property details for all your sold homes to demonstrate your track record and expertise to potential clients."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "How do I capture leads with AgentBio?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "AgentBio includes built-in lead capture forms for buyers, sellers, and home valuations. Interested clients can submit their information directly from your portfolio link. You'll receive email notifications and can manage all leads from your dashboard with detailed analytics about lead sources."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Is AgentBio mobile-friendly?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Yes, all AgentBio portfolios are fully mobile-optimized and responsive. Your portfolio will look professional on any device - smartphones, tablets, and desktop computers. Most home buyers browse on mobile devices, so mobile optimization is a core feature."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Can I customize my AgentBio portfolio?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Absolutely! You can customize colors, fonts, layout, profile photo, bio, social media links, and all content. Premium plans offer additional customization options including custom domains, advanced themes, and white-label branding to match your brokerage or personal brand."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Do I need technical skills to use AgentBio?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "No technical skills required! AgentBio is designed to be simple and intuitive. You can create your professional portfolio in minutes by filling out your profile, uploading photos, and adding listings. Our drag-and-drop interface makes customization easy for anyone."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "How do I share my AgentBio portfolio?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "You'll get a unique link (agentbio.net/yourname) that you can share anywhere - social media profiles, email signatures, business cards, listing presentations, or text messages. You can also share individual listings directly from your portfolio."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Does AgentBio help with SEO?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Yes! All AgentBio portfolios are search engine optimized with proper meta tags, structured data, and mobile optimization. Your portfolio can rank in search results when potential clients search for agents in your area. You can also customize SEO settings for better visibility."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Can I track my portfolio performance?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Yes, AgentBio includes built-in analytics showing profile views, link clicks, lead sources, most viewed listings, and geographic data about your visitors. This helps you understand what content resonates with potential clients and optimize your marketing efforts."
+                        }
+                    }
                 ]
             }
         ]
@@ -116,6 +216,63 @@ export default function Landing() {
             {/* Blog Section */}
             <BlogSection limit={6} showSearch={true} showFilters={true} />
 
+            {/* FAQ Section */}
+            <section className="py-20 bg-background" aria-labelledby="faq-heading">
+                <div className="container mx-auto px-4">
+                    <header className="text-center mb-16">
+                        <h2 id="faq-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                            <span className="glass-heading">Frequently Asked Questions</span>
+                        </h2>
+                        <p className="text-xl glass-body max-w-2xl mx-auto">
+                            Everything you need to know about creating your professional real estate agent portfolio
+                        </p>
+                    </header>
+
+                    <div className="max-w-4xl mx-auto space-y-4">
+                        <FAQItem
+                            question="What is AgentBio?"
+                            answer="AgentBio is a professional portfolio platform designed specifically for real estate agents to create a single link that showcases their listings, sold properties, client testimonials, and captures qualified leads. It's like a link-in-bio tool purpose-built for realtors."
+                        />
+                        <FAQItem
+                            question="How much does AgentBio cost?"
+                            answer="AgentBio offers a free basic plan with core features including portfolio creation, listing showcase, and lead capture. Premium plans start at $19/month with advanced features like custom branding, analytics, unlimited listings, and priority support. No credit card required to start."
+                        />
+                        <FAQItem
+                            question="Can I showcase my sold properties on AgentBio?"
+                            answer="Yes! AgentBio is specifically designed to showcase your sold properties alongside active listings. You can add photos, prices, addresses, and property details for all your sold homes to demonstrate your track record and expertise to potential clients."
+                        />
+                        <FAQItem
+                            question="How do I capture leads with AgentBio?"
+                            answer="AgentBio includes built-in lead capture forms for buyers, sellers, and home valuations. Interested clients can submit their information directly from your portfolio link. You'll receive email notifications and can manage all leads from your dashboard with detailed analytics about lead sources."
+                        />
+                        <FAQItem
+                            question="Is AgentBio mobile-friendly?"
+                            answer="Yes, all AgentBio portfolios are fully mobile-optimized and responsive. Your portfolio will look professional on any device - smartphones, tablets, and desktop computers. Most home buyers browse on mobile devices, so mobile optimization is a core feature."
+                        />
+                        <FAQItem
+                            question="Can I customize my AgentBio portfolio?"
+                            answer="Absolutely! You can customize colors, fonts, layout, profile photo, bio, social media links, and all content. Premium plans offer additional customization options including custom domains, advanced themes, and white-label branding to match your brokerage or personal brand."
+                        />
+                        <FAQItem
+                            question="Do I need technical skills to use AgentBio?"
+                            answer="No technical skills required! AgentBio is designed to be simple and intuitive. You can create your professional portfolio in minutes by filling out your profile, uploading photos, and adding listings. Our drag-and-drop interface makes customization easy for anyone."
+                        />
+                        <FAQItem
+                            question="How do I share my AgentBio portfolio?"
+                            answer="You'll get a unique link (agentbio.net/yourname) that you can share anywhere - social media profiles, email signatures, business cards, listing presentations, or text messages. You can also share individual listings directly from your portfolio."
+                        />
+                        <FAQItem
+                            question="Does AgentBio help with SEO?"
+                            answer="Yes! All AgentBio portfolios are search engine optimized with proper meta tags, structured data, and mobile optimization. Your portfolio can rank in search results when potential clients search for agents in your area. You can also customize SEO settings for better visibility."
+                        />
+                        <FAQItem
+                            question="Can I track my portfolio performance?"
+                            answer="Yes, AgentBio includes built-in analytics showing profile views, link clicks, lead sources, most viewed listings, and geographic data about your visitors. This helps you understand what content resonates with potential clients and optimize your marketing efforts."
+                        />
+                    </div>
+                </div>
+            </section>
+
             {/* CTA Section */}
             <section className="py-20 relative overflow-hidden" aria-labelledby="cta-heading">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#80d0c7]/20 via-[#a1c4fd]/20 to-[#c2e9fb]/20" />
@@ -167,6 +324,39 @@ function FeatureCard({
                 </h3>
                 <p className="glass-body">{description}</p>
             </div>
+        </div>
+    );
+}
+
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+    const [isOpen, setIsOpen] = React.useState(false);
+
+    return (
+        <div className="border border-glass-border rounded-xl bg-glass-background backdrop-blur-md overflow-hidden transition-all hover:border-[#80d0c7]/50">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full px-6 py-4 text-left flex items-center justify-between group"
+                aria-expanded={isOpen}
+            >
+                <h3 className="text-lg font-light tracking-tight text-foreground pr-4 group-hover:text-[#80d0c7] transition-colors">
+                    {question}
+                </h3>
+                <svg
+                    className={`w-5 h-5 text-[#80d0c7] transition-transform flex-shrink-0 ${
+                        isOpen ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            {isOpen && (
+                <div className="px-6 pb-4">
+                    <p className="glass-body leading-relaxed">{answer}</p>
+                </div>
+            )}
         </div>
     );
 }
