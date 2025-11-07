@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BlogListSEO } from "@/components/blog/BlogListSEO";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,6 +74,11 @@ export default function Blog() {
       <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-b">
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-3xl">
+            {/* Breadcrumbs */}
+            <div className="mb-4">
+              <Breadcrumbs items={[{ name: "Blog", href: "/blog" }]} />
+            </div>
+
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Real Estate Blog</h1>
             <p className="text-lg text-gray-600">
               Expert tips, market insights, and comprehensive guides for homebuyers, sellers, and real estate professionals
