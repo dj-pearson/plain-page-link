@@ -1,13 +1,14 @@
 import { Navigate, Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, BrainCircuit, Share2, FileText, ArrowLeft, Users, Database, Search } from "lucide-react";
+import { Settings, BrainCircuit, Share2, FileText, ArrowLeft, Users, Database, Search, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AIConfigurationManager } from "@/components/admin/AIConfigurationManager";
 import { SocialMediaManager } from "@/components/admin/SocialMediaManager";
 import { ArticlesManager } from "@/components/admin/ArticlesManager";
 import { KeywordImportDialog } from "@/components/admin/KeywordImportDialog";
 import { SEOManager } from "@/components/admin/SEOManager";
+import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDashboard";
 
 export function AdminDashboard() {
   const { user, role } = useAuthStore();
@@ -41,7 +42,7 @@ export function AdminDashboard() {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="ai" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 lg:w-auto">
+          <TabsList className="grid w-full grid-cols-8 lg:w-auto">
             <TabsTrigger value="ai" className="gap-2">
               <BrainCircuit className="h-4 w-4" />
               AI Settings
@@ -61,6 +62,10 @@ export function AdminDashboard() {
             <TabsTrigger value="seo" className="gap-2">
               <Search className="h-4 w-4" />
               SEO
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Search Analytics
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="h-4 w-4" />
@@ -102,6 +107,10 @@ export function AdminDashboard() {
 
           <TabsContent value="seo" className="space-y-6">
             <SEOManager />
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            <SearchAnalyticsDashboard />
           </TabsContent>
 
           <TabsContent value="users" className="space-y-6">
