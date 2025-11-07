@@ -19,6 +19,7 @@ interface BlockRendererProps {
     isEditing?: boolean;
     isSelected?: boolean;
     onSelect?: () => void;
+    userId?: string; // User ID for data fetching
 }
 
 export function BlockRenderer({
@@ -26,6 +27,7 @@ export function BlockRenderer({
     isEditing = false,
     isSelected = false,
     onSelect,
+    userId,
 }: BlockRendererProps) {
     const renderBlock = () => {
         switch (block.type) {
@@ -41,6 +43,7 @@ export function BlockRenderer({
                     <ListingsBlock
                         config={block.config as any}
                         isEditing={isEditing}
+                        userId={userId}
                     />
                 );
             case "link":

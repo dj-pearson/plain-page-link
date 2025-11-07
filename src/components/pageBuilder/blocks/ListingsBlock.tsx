@@ -3,57 +3,80 @@
  * Displays property listings in various layouts
  */
 
+import { useEffect, useState } from "react";
 import { ListingsBlockConfig } from "@/types/pageBuilder";
 import { Badge } from "@/components/ui/badge";
 import { Bed, Bath, Square, MapPin } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ListingsBlockProps {
     config: ListingsBlockConfig;
     isEditing?: boolean;
+    userId?: string; // User ID to fetch listings for
 }
 
-// Mock listing data (replace with actual data from API)
-const mockListings = [
-    {
-        id: "1",
-        image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800",
-        title: "Modern Downtown Condo",
-        price: 425000,
-        address: "123 Main St, Seattle, WA",
-        beds: 2,
-        baths: 2,
-        sqft: 1200,
-        status: "Active",
-    },
-    {
-        id: "2",
-        image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800",
-        title: "Suburban Family Home",
-        price: 675000,
-        address: "456 Oak Ave, Bellevue, WA",
-        beds: 4,
-        baths: 3,
-        sqft: 2400,
-        status: "Pending",
-    },
-    {
-        id: "3",
-        image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800",
-        title: "Luxury Waterfront Estate",
-        price: 1250000,
-        address: "789 Lake Dr, Kirkland, WA",
-        beds: 5,
-        baths: 4,
-        sqft: 3800,
-        status: "Active",
-    },
-];
+interface Listing {
+    id: string;
+    address: string;
+    city: string;
+    state: string;
+    price: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    square_feet?: number;
+    status: string;
+    photos?: string[];
+}
 
 export function ListingsBlock({
     config,
     isEditing = false,
+    userId,
 }: ListingsBlockProps) {
-    const listings = mockListings.slice(0, config.maxItems || 6);
+    const [listings, setListings] = useState<Listing[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchListings() {
+            if (!userId) {
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                let query = supabase
+                    .from("listings")
+                    .select("*")
+                    .eq("user_id", userId)
+                    .order("created_at", { ascending: false });
+
+                // Apply filter
+                if (config.filter === "active") {
+                    query = query.eq("status", "active");
+                } else if (config.filter === "featured") {
+                    query = query.eq("is_featured", true);
+                }
+
+                // Limit results
+                if (config.maxItems) {
+                    query = query.limit(config.maxItems);
+                }
+
+                const { data, error } = await query;
+
+                if (error) throw error;
+
+                setListings(data || []);
+            } catch (error) {
+                console.error("Error fetching listings:", error);
+                setListings([]);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        fetchListings();
+    }, [userId, config.filter, config.maxItems]);
 
     const getGridClass = () => {
         switch (config.layout) {
@@ -66,6 +89,33 @@ export function ListingsBlock({
                 return "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6";
         }
     };
+
+    const getPhotoUrl = (listing: Listing) => {
+        if (listing.photos && Array.isArray(listing.photos) && listing.photos.length > 0) {
+            return listing.photos[0];
+        }
+        // Default placeholder image
+        return "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800";
+    };
+
+    const formatAddress = (listing: Listing) => {
+        return `${listing.address}, ${listing.city}, ${listing.state}`;
+    };
+
+    if (isLoading) {
+        return (
+            <div className="space-y-6">
+                {config.title && (
+                    <h2 className="text-2xl font-bold text-center">
+                        {config.title}
+                    </h2>
+                )}
+                <div className="text-center py-12 text-gray-500">
+                    <p>Loading listings...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -86,15 +136,15 @@ export function ListingsBlock({
                         {/* Image */}
                         <div className="relative aspect-video">
                             <img
-                                src={listing.image}
-                                alt={listing.title}
+                                src={getPhotoUrl(listing)}
+                                alt={formatAddress(listing)}
                                 className="w-full h-full object-cover"
                             />
                             {config.showStatus && (
                                 <Badge
-                                    className="absolute top-2 right-2"
+                                    className="absolute top-2 right-2 capitalize"
                                     variant={
-                                        listing.status === "Active"
+                                        listing.status === "active"
                                             ? "default"
                                             : "secondary"
                                     }
@@ -113,32 +163,35 @@ export function ListingsBlock({
                                 </p>
                             )}
 
-                            {/* Title */}
-                            <h3 className="font-semibold text-lg">
-                                {listing.title}
-                            </h3>
-
                             {/* Address */}
                             <div className="flex items-center gap-1 text-gray-600 text-sm">
                                 <MapPin className="w-4 h-4" />
-                                {listing.address}
+                                {formatAddress(listing)}
                             </div>
 
                             {/* Features */}
-                            <div className="flex items-center gap-4 text-gray-700 text-sm pt-2">
-                                <div className="flex items-center gap-1">
-                                    <Bed className="w-4 h-4" />
-                                    {listing.beds} bd
+                            {(listing.bedrooms || listing.bathrooms || listing.square_feet) && (
+                                <div className="flex items-center gap-4 text-gray-700 text-sm pt-2">
+                                    {listing.bedrooms && (
+                                        <div className="flex items-center gap-1">
+                                            <Bed className="w-4 h-4" />
+                                            {listing.bedrooms} bd
+                                        </div>
+                                    )}
+                                    {listing.bathrooms && (
+                                        <div className="flex items-center gap-1">
+                                            <Bath className="w-4 h-4" />
+                                            {listing.bathrooms} ba
+                                        </div>
+                                    )}
+                                    {listing.square_feet && (
+                                        <div className="flex items-center gap-1">
+                                            <Square className="w-4 h-4" />
+                                            {listing.square_feet.toLocaleString()} sqft
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <Bath className="w-4 h-4" />
-                                    {listing.baths} ba
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Square className="w-4 h-4" />
-                                    {listing.sqft.toLocaleString()} sqft
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -150,7 +203,7 @@ export function ListingsBlock({
                     <p>No listings to display</p>
                     {isEditing && (
                         <p className="text-sm mt-1">
-                            Add some properties to see them here
+                            Add some properties in the Listings dashboard to see them here
                         </p>
                     )}
                 </div>

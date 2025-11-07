@@ -9,6 +9,7 @@ import { PageConfig } from "@/types/pageBuilder";
 import { BlockRenderer } from "@/components/pageBuilder/BlockRenderer";
 import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
+import { getThemedStyles, preloadThemeFonts } from "@/lib/themeUtils";
 
 export default function PublicPage() {
     const { slug } = useParams<{ slug: string }>();
@@ -69,6 +70,13 @@ export default function PublicPage() {
         fetchPage();
     }, [slug]);
 
+    // Preload theme fonts when page loads
+    useEffect(() => {
+        if (page?.theme) {
+            preloadThemeFonts(page.theme);
+        }
+    }, [page?.theme]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -98,24 +106,8 @@ export default function PublicPage() {
         );
     }
 
-    // Apply theme styles
-    const themeStyles = {
-        "--primary-color": page.theme.colors.primary,
-        "--secondary-color": page.theme.colors.secondary,
-        "--background-color": page.theme.colors.background,
-        "--text-color": page.theme.colors.text,
-        "--accent-color": page.theme.colors.accent,
-        "--border-radius":
-            page.theme.borderRadius === "none"
-                ? "0"
-                : page.theme.borderRadius === "small"
-                ? "0.25rem"
-                : page.theme.borderRadius === "large"
-                ? "1rem"
-                : page.theme.borderRadius === "full"
-                ? "9999px"
-                : "0.5rem",
-    } as React.CSSProperties;
+    // Apply theme styles using utility function
+    const themeStyles = getThemedStyles(page.theme);
 
     return (
         <>
@@ -175,18 +167,16 @@ export default function PublicPage() {
                     style={{
                         backgroundColor: page.theme.colors.background,
                         color: page.theme.colors.text,
+                        fontFamily: `'${page.theme.fonts.body}', sans-serif`,
                     }}
                 >
                     {/* Render visible blocks */}
-                    <div
-                        className={`space-y-${
-                            page.theme.spacing === "compact"
-                                ? "4"
-                                : page.theme.spacing === "spacious"
-                                ? "12"
-                                : "8"
-                        }`}
-                    >
+                    <div style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: page.theme.spacing === "compact" ? "1rem" :
+                             page.theme.spacing === "spacious" ? "3rem" : "2rem"
+                    }}>
                         {page.blocks
                             .filter((block) => block.visible)
                             .sort((a, b) => a.order - b.order)
@@ -195,6 +185,7 @@ export default function PublicPage() {
                                     key={block.id}
                                     block={block}
                                     isEditing={false}
+                                    userId={page.userId}
                                 />
                             ))}
                     </div>

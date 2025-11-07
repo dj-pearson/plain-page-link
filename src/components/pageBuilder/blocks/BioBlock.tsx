@@ -15,7 +15,9 @@ interface BioBlockProps {
 
 export function BioBlock({ config, isEditing = false }: BioBlockProps) {
     return (
-        <div className="text-center space-y-4 p-6">
+        <div className="text-center space-y-4 p-6" style={{
+            fontFamily: "var(--theme-font-body, inherit)",
+        }}>
             {/* Avatar */}
             {config.avatarUrl && (
                 <div className="flex justify-center">
@@ -33,7 +35,10 @@ export function BioBlock({ config, isEditing = false }: BioBlockProps) {
 
             {/* Name/Title */}
             <div>
-                <h1 className="text-3xl font-bold text-gray-900">
+                <h1 className="text-3xl font-bold" style={{
+                    color: "var(--theme-text, #1f2937)",
+                    fontFamily: "var(--theme-font-heading, inherit)",
+                }}>
                     {config.title}
                 </h1>
                 {config.subtitle && (
@@ -53,11 +58,18 @@ export function BioBlock({ config, isEditing = false }: BioBlockProps) {
             {/* Contact Button */}
             {config.showContactButton && !isEditing && (
                 <div className="flex gap-3 justify-center pt-2">
-                    <Button className="gap-2">
+                    <Button className="gap-2" style={{
+                        backgroundColor: "var(--theme-primary, #2563eb)",
+                        borderRadius: "var(--theme-border-radius, 0.5rem)",
+                    }}>
                         <Mail className="w-4 h-4" />
                         Contact Me
                     </Button>
-                    <Button variant="outline" className="gap-2">
+                    <Button variant="outline" className="gap-2" style={{
+                        borderRadius: "var(--theme-border-radius, 0.5rem)",
+                        borderColor: "var(--theme-primary, #2563eb)",
+                        color: "var(--theme-primary, #2563eb)",
+                    }}>
                         <Phone className="w-4 h-4" />
                         Call Now
                     </Button>

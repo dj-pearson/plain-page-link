@@ -27,12 +27,17 @@ import {
     EyeOff,
     GripVertical,
     ArrowLeft,
+    Monitor,
+    Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getThemedStyles, preloadThemeFonts } from "@/lib/themeUtils";
 
 export default function PageBuilderEditor() {
     const { user, profile } = useAuthStore();
     const [showPageList, setShowPageList] = useState(true);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [isMobilePreview, setIsMobilePreview] = useState(false);
     const {
         page,
         selectedBlockId,
@@ -59,9 +64,38 @@ export default function PageBuilderEditor() {
         setShowPageList(!page);
     }, [page]);
 
+    // Preload theme fonts when page or theme changes
+    useEffect(() => {
+        if (page?.theme) {
+            preloadThemeFonts(page.theme);
+        }
+    }, [page?.theme]);
+
+    // Auto-save functionality - saves 3 seconds after last change
+    useEffect(() => {
+        if (!page || isSaving) return;
+
+        const autoSaveTimer = setTimeout(async () => {
+            try {
+                await savePage();
+                const savedTime = new Date();
+                setLastSaved(savedTime);
+                // Silent save - no toast notification to avoid spam
+                console.log("Auto-saved at", savedTime.toLocaleTimeString());
+            } catch (error) {
+                console.error("Auto-save failed:", error);
+                // Only show error if auto-save fails
+                toast.error("Auto-save failed - please save manually");
+            }
+        }, 3000); // 3 second debounce
+
+        return () => clearTimeout(autoSaveTimer);
+    }, [page, isSaving, savePage]);
+
     const handleSave = async () => {
         try {
             await savePage();
+            setLastSaved(new Date());
             toast.success("Page saved successfully!");
         } catch (error) {
             toast.error("Failed to save page");
@@ -179,33 +213,64 @@ export default function PageBuilderEditor() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={togglePreviewMode}
-                        >
-                            {isPreviewMode ? (
-                                <>
-                                    <Settings className="w-4 h-4 mr-2" />
-                                    Edit
-                                </>
-                            ) : (
-                                <>
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    Preview
-                                </>
-                            )}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={togglePreviewMode}
+                            >
+                                {isPreviewMode ? (
+                                    <>
+                                        <Settings className="w-4 h-4 mr-2" />
+                                        Edit
+                                    </>
+                                ) : (
+                                    <>
+                                        <Eye className="w-4 h-4 mr-2" />
+                                        Preview
+                                    </>
+                                )}
+                            </Button>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleSave}
-                            disabled={isSaving}
-                        >
-                            <Save className="w-4 h-4 mr-2" />
-                            {isSaving ? "Saving..." : "Save"}
-                        </Button>
+                            {/* Mobile/Desktop Toggle */}
+                            <div className="flex border rounded-md">
+                                <Button
+                                    variant={!isMobilePreview ? "default" : "ghost"}
+                                    size="sm"
+                                    onClick={() => setIsMobilePreview(false)}
+                                    className="rounded-r-none"
+                                    title="Desktop Preview"
+                                >
+                                    <Monitor className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                    variant={isMobilePreview ? "default" : "ghost"}
+                                    size="sm"
+                                    onClick={() => setIsMobilePreview(true)}
+                                    className="rounded-l-none"
+                                    title="Mobile Preview"
+                                >
+                                    <Smartphone className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleSave}
+                                disabled={isSaving}
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                {isSaving ? "Saving..." : "Save"}
+                            </Button>
+                            {lastSaved && !isSaving && (
+                                <span className="text-xs text-gray-500">
+                                    Saved {lastSaved.toLocaleTimeString()}
+                                </span>
+                            )}
+                        </div>
 
                         <Button
                             size="sm"
@@ -220,8 +285,22 @@ export default function PageBuilderEditor() {
 
                 {/* Canvas Area */}
                 <div className="flex-1 overflow-y-auto p-8">
-                    <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg min-h-full">
-                        <div className="p-8 space-y-6">
+                    <div
+                        className="mx-auto rounded-lg shadow-lg min-h-full transition-all duration-300"
+                        style={{
+                            ...getThemedStyles(page.theme),
+                            backgroundColor: page.theme.colors.background,
+                            color: page.theme.colors.text,
+                            fontFamily: `'${page.theme.fonts.body}', sans-serif`,
+                            maxWidth: isMobilePreview ? "375px" : "672px", // Mobile: 375px, Desktop: 672px (2xl)
+                        }}
+                    >
+                        <div className="p-8" style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: page.theme.spacing === "compact" ? "1rem" :
+                                 page.theme.spacing === "spacious" ? "3rem" : "2rem"
+                        }}>
                             {page.blocks.length === 0 ? (
                                 <div className="text-center py-20 text-gray-500">
                                     <Plus className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -302,6 +381,7 @@ export default function PageBuilderEditor() {
                                             onSelect={() =>
                                                 selectBlock(block.id)
                                             }
+                                            userId={page.userId}
                                         />
                                     </div>
                                 ))
