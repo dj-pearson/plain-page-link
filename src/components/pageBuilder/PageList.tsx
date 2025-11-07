@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
     Plus,
     Eye,
     Edit,
@@ -12,10 +19,12 @@ import {
     Globe,
     CheckCircle2,
     ExternalLink,
+    Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createNewPage } from "@/lib/pageBuilder";
+import { pageTemplates, applyTemplate } from "@/lib/pageTemplates";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { PageConfig } from "@/types/pageBuilder";
 
@@ -26,6 +35,7 @@ export function PageList() {
     const [pages, setPages] = useState<PageConfig[]>([]);
     const [loading, setLoading] = useState(true);
     const [activating, setActivating] = useState<string | null>(null);
+    const [showTemplates, setShowTemplates] = useState(false);
 
     useEffect(() => {
         loadPages();
@@ -49,8 +59,32 @@ export function PageList() {
             return;
         }
 
+        setShowTemplates(true);
+    };
+
+    const handleSelectTemplate = (templateId: string | null) => {
+        if (!user || !profile) {
+            toast.error("Please log in to create a page");
+            return;
+        }
+
         const newPage = createNewPage(user.id, profile.username || "my-page");
+
+        // Apply template if selected
+        if (templateId) {
+            const template = pageTemplates.find((t) => t.id === templateId);
+            if (template) {
+                newPage.blocks = applyTemplate(
+                    template,
+                    user.id,
+                    newPage.slug
+                );
+                toast.success(`Created page from "${template.name}" template!`);
+            }
+        }
+
         setPage(newPage);
+        setShowTemplates(false);
         navigate("/dashboard/page-builder");
     };
 
@@ -247,6 +281,76 @@ export function PageList() {
                     })}
                 </div>
             )}
+
+            {/* Template Selector Dialog */}
+            <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Choose a Template</DialogTitle>
+                        <DialogDescription>
+                            Start with a pre-built template or create a blank page
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                        {/* Blank Page Option */}
+                        <Card
+                            className="p-6 cursor-pointer hover:border-primary transition-colors"
+                            onClick={() => handleSelectTemplate(null)}
+                        >
+                            <div className="flex flex-col h-full">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="p-2 bg-gray-100 rounded">
+                                        <Plus className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold">
+                                            Blank Page
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Start from scratch
+                                        </p>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-muted-foreground flex-1">
+                                    Create a completely custom page by adding
+                                    blocks one at a time.
+                                </p>
+                            </div>
+                        </Card>
+
+                        {/* Template Options */}
+                        {pageTemplates.map((template) => (
+                            <Card
+                                key={template.id}
+                                className="p-6 cursor-pointer hover:border-primary transition-colors"
+                                onClick={() =>
+                                    handleSelectTemplate(template.id)
+                                }
+                            >
+                                <div className="flex flex-col h-full">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-primary/10 rounded">
+                                            <Sparkles className="h-6 w-6 text-primary" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold">
+                                                {template.name}
+                                            </h3>
+                                            <Badge variant="outline" className="mt-1">
+                                                {template.blocks.length} blocks
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground flex-1">
+                                        {template.description}
+                                    </p>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

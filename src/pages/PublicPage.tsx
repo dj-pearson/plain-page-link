@@ -195,6 +195,7 @@ export default function PublicPage() {
                                     key={block.id}
                                     block={block}
                                     isEditing={false}
+                                    userId={page.userId}
                                 />
                             ))}
                     </div>

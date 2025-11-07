@@ -33,6 +33,7 @@ import { toast } from "sonner";
 export default function PageBuilderEditor() {
     const { user, profile } = useAuthStore();
     const [showPageList, setShowPageList] = useState(true);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const {
         page,
         selectedBlockId,
@@ -59,9 +60,31 @@ export default function PageBuilderEditor() {
         setShowPageList(!page);
     }, [page]);
 
+    // Auto-save functionality - saves 3 seconds after last change
+    useEffect(() => {
+        if (!page || isSaving) return;
+
+        const autoSaveTimer = setTimeout(async () => {
+            try {
+                await savePage();
+                const savedTime = new Date();
+                setLastSaved(savedTime);
+                // Silent save - no toast notification to avoid spam
+                console.log("Auto-saved at", savedTime.toLocaleTimeString());
+            } catch (error) {
+                console.error("Auto-save failed:", error);
+                // Only show error if auto-save fails
+                toast.error("Auto-save failed - please save manually");
+            }
+        }, 3000); // 3 second debounce
+
+        return () => clearTimeout(autoSaveTimer);
+    }, [page, isSaving, savePage]);
+
     const handleSave = async () => {
         try {
             await savePage();
+            setLastSaved(new Date());
             toast.success("Page saved successfully!");
         } catch (error) {
             toast.error("Failed to save page");
@@ -197,15 +220,22 @@ export default function PageBuilderEditor() {
                             )}
                         </Button>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleSave}
-                            disabled={isSaving}
-                        >
-                            <Save className="w-4 h-4 mr-2" />
-                            {isSaving ? "Saving..." : "Save"}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleSave}
+                                disabled={isSaving}
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                {isSaving ? "Saving..." : "Save"}
+                            </Button>
+                            {lastSaved && !isSaving && (
+                                <span className="text-xs text-gray-500">
+                                    Saved {lastSaved.toLocaleTimeString()}
+                                </span>
+                            )}
+                        </div>
 
                         <Button
                             size="sm"
@@ -302,6 +332,7 @@ export default function PageBuilderEditor() {
                                             onSelect={() =>
                                                 selectBlock(block.id)
                                             }
+                                            userId={page.userId}
                                         />
                                     </div>
                                 ))

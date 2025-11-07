@@ -32,7 +32,7 @@ interface PageBuilderStore {
     loadUserPages: () => Promise<PageConfig[]>;
     selectBlock: (blockId: string | null) => void;
     setIsDragging: (isDragging: boolean) => void;
-    addBlockToPage: (type: any, position?: number) => void;
+    addBlockToPage: (type: any, position?: number) => Promise<void>;
     removeBlockFromPage: (blockId: string) => void;
     updateBlockConfig: (blockId: string, config: Partial<BlockConfig>) => void;
     reorderPageBlocks: (sourceIndex: number, destIndex: number) => void;
@@ -148,21 +148,29 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         set({ isDragging });
     },
 
-    // Add a block to the page
-    addBlockToPage: (type, position) => {
+    // Add a block to the page (with auto-population)
+    addBlockToPage: async (type, position) => {
         const { page, history, historyIndex } = get();
         if (!page) return;
 
-        const newPage = addBlock(page, type, position);
-        const newHistory = history.slice(0, historyIndex + 1);
-        newHistory.push(newPage);
+        try {
+            // Get current user for auto-population
+            const { data: { user } } = await supabase.auth.getUser();
 
-        set({
-            page: newPage,
-            history: newHistory,
-            historyIndex: newHistory.length - 1,
-            selectedBlockId: newPage.blocks[newPage.blocks.length - 1]?.id,
-        });
+            const newPage = await addBlock(page, type, position, user?.id);
+            const newHistory = history.slice(0, historyIndex + 1);
+            newHistory.push(newPage);
+
+            set({
+                page: newPage,
+                history: newHistory,
+                historyIndex: newHistory.length - 1,
+                selectedBlockId: newPage.blocks[newPage.blocks.length - 1]?.id,
+            });
+        } catch (error) {
+            console.error('Error adding block:', error);
+            toast.error('Failed to add block');
+        }
     },
 
     // Remove a block from the page

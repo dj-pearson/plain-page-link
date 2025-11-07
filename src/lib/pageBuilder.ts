@@ -10,6 +10,7 @@ import {
     BlockConfig,
     BlockTemplate,
 } from "@/types/pageBuilder";
+import { autoPopulateBlockConfig } from "./autoPopulateBlocks";
 
 /**
  * Page Builder Engine
@@ -64,16 +65,26 @@ class PageBuilderEngine {
     }
 
     /**
-     * Add a block to the page
+     * Add a block to the page (with auto-population)
      */
-    addBlock(
+    async addBlock(
         page: PageConfig,
         blockType: BlockType,
-        position?: number
-    ): PageConfig {
+        position?: number,
+        userId?: string
+    ): Promise<PageConfig> {
         const template = this.getBlockTemplate(blockType);
         if (!template) {
             throw new Error(`Unknown block type: ${blockType}`);
+        }
+
+        // Auto-populate the config with user data if userId is provided
+        let blockConfig = template.defaultConfig;
+        if (userId) {
+            blockConfig = await autoPopulateBlockConfig(
+                template.defaultConfig,
+                userId
+            );
         }
 
         const newBlock: PageBlock = {
@@ -81,7 +92,7 @@ class PageBuilderEngine {
             type: blockType,
             order: position !== undefined ? position : page.blocks.length,
             visible: true,
-            config: template.defaultConfig,
+            config: blockConfig,
         };
 
         const updatedBlocks = [...page.blocks];
