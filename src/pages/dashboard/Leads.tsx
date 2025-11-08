@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User } from "lucide-react";
+import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
+import { ZapierIntegrationModal } from "@/components/integrations/ZapierIntegrationModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 export default function Leads() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showZapierModal, setShowZapierModal] = useState(false);
   const { user } = useAuthStore();
   const { toast } = useToast();
   const { subscription, hasFeature } = useSubscriptionLimits();
@@ -126,6 +128,14 @@ export default function Leads() {
           </p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
+          <Button
+            onClick={() => setShowZapierModal(true)}
+            variant="outline"
+            className="flex-1 sm:flex-none min-h-[44px] active:scale-95 transition-all"
+          >
+            <Zap className="h-4 w-4 mr-2 text-orange-500" />
+            <span className="text-sm sm:text-base">Zapier</span>
+          </Button>
           <Button
             onClick={handleExportLeads}
             variant="outline"
@@ -273,6 +283,12 @@ export default function Leads() {
         feature="lead_export"
         currentPlan={subscription?.plan_name || "Free"}
         requiredPlan="Starter"
+      />
+
+      {/* Zapier Integration Modal */}
+      <ZapierIntegrationModal
+        open={showZapierModal}
+        onOpenChange={setShowZapierModal}
       />
     </div>
   );

@@ -6,6 +6,8 @@ import { z } from "zod";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect, useState } from "react";
 import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
+import { useUsernameCheck } from "@/hooks/useUsernameCheck";
+import { Check, X, Loader2 as UsernameLoader } from "lucide-react";
 
 const registerSchema = z
     .object({
@@ -14,11 +16,8 @@ const registerSchema = z
         email: z.string().email("Please enter a valid email address"),
         password: z.string().min(6, "Password must be at least 6 characters"),
         confirmPassword: z.string(),
-        terms: z.boolean().refine((val) => val === true, {
-            message: "You must agree to the Terms of Service and Privacy Policy",
-        }),
-        contentResponsibility: z.boolean().refine((val) => val === true, {
-            message: "You must accept responsibility for your content and agree to comply with all applicable laws",
+        agreedToTerms: z.boolean().refine((val) => val === true, {
+            message: "You must agree to the terms to create an account",
         }),
     })
     .refine((data) => data.password === data.confirmPassword, {
@@ -34,6 +33,8 @@ export default function Register() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [passwordValue, setPasswordValue] = useState("");
+    const { checkUsername, isChecking, error: usernameError, isAvailable } = useUsernameCheck();
+    const [usernameTouched, setUsernameTouched] = useState(false);
 
     const {
         register,
@@ -43,6 +44,8 @@ export default function Register() {
     } = useForm<RegisterFormData>({
         resolver: zodResolver(registerSchema),
     });
+
+    const usernameValue = watch("username");
 
     useEffect(() => {
         if (user) {
@@ -60,6 +63,14 @@ export default function Register() {
             clearError();
         };
     }, [clearError]);
+
+    // Check username availability when username changes
+    useEffect(() => {
+        if (usernameValue && usernameValue.length >= 3) {
+            checkUsername(usernameValue);
+            setUsernameTouched(true);
+        }
+    }, [usernameValue, checkUsername]);
 
     const onSubmit = async (data: RegisterFormData) => {
         try {
@@ -124,18 +135,42 @@ export default function Register() {
                                     {...register("username")}
                                     type="text"
                                     placeholder="johndoe"
-                                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                        errors.username
+                                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                        errors.username || (usernameTouched && usernameError)
                                             ? "border-red-300"
+                                            : usernameTouched && isAvailable
+                                            ? "border-green-300"
                                             : "border-gray-300"
                                     }`}
                                 />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    {isChecking && <UsernameLoader className="h-5 w-5 animate-spin text-blue-500" />}
+                                    {!isChecking && usernameTouched && isAvailable && (
+                                        <Check className="h-5 w-5 text-green-500" />
+                                    )}
+                                    {!isChecking && usernameTouched && (usernameError || isAvailable === false) && (
+                                        <X className="h-5 w-5 text-red-500" />
+                                    )}
+                                </div>
                             </div>
                             {errors.username && (
                                 <p className="mt-1 text-sm text-red-600">
                                     {errors.username.message}
                                 </p>
                             )}
+                            {!errors.username && usernameTouched && usernameError && (
+                                <p className="mt-1 text-sm text-red-600">
+                                    {usernameError}
+                                </p>
+                            )}
+                            {!errors.username && usernameTouched && isAvailable && !isChecking && (
+                                <p className="mt-1 text-sm text-green-600">
+                                    ✓ Username is available!
+                                </p>
+                            )}
+                            <p className="mt-1 text-xs text-gray-500">
+                                Your profile will be: agentbio.net/{usernameValue || 'username'}
+                            </p>
                         </div>
 
                         <div>
@@ -261,68 +296,50 @@ export default function Register() {
                             )}
                         </div>
 
-                        {/* Simplified Legal Agreements Section - Just 2 Checkboxes */}
-                        <div className="space-y-4 border border-gray-300 rounded-lg p-4 bg-gray-50">
-                            <h3 className="font-semibold text-sm text-gray-900">Legal Agreements</h3>
-
-                            {/* Main Terms & Privacy Agreement */}
-                            <div>
-                                <label className="flex items-start cursor-pointer group">
-                                    <input
-                                        {...register("terms")}
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-700">
-                                        I agree to the{" "}
-                                        <a
-                                            href="/terms"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
-                                        >
-                                            Terms of Service
-                                        </a>{" "}and{" "}
-                                        <a
-                                            href="/privacy"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
-                                        >
-                                            Privacy Policy
-                                        </a>
-                                    </span>
-                                </label>
-                                {errors.terms && (
-                                    <p className="mt-1 text-sm text-red-600" role="alert">
-                                        {errors.terms.message}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Content Responsibility & Compliance */}
-                            <div>
-                                <label className="flex items-start cursor-pointer">
-                                    <input
-                                        {...register("contentResponsibility")}
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-700">
-                                        I certify that I own or have proper authorization for all content I upload,
-                                        and I will comply with MLS photo restrictions and Fair Housing laws
-                                    </span>
-                                </label>
-                                {errors.contentResponsibility && (
-                                    <p className="mt-1 text-sm text-red-600" role="alert">
-                                        {errors.contentResponsibility.message}
-                                    </p>
-                                )}
-                            </div>
-
-                            <p className="text-xs text-gray-500 italic mt-2">
-                                By creating an account, you accept full legal responsibility for your content and agree to use AgentBio.net responsibly.
-                            </p>
+                        {/* Simplified Legal Agreement - Single Checkbox */}
+                        <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                            <label className="flex items-start cursor-pointer group">
+                                <input
+                                    {...register("agreedToTerms")}
+                                    type="checkbox"
+                                    className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                                />
+                                <span className="ml-2 text-sm text-gray-700">
+                                    I agree to the{" "}
+                                    <a
+                                        href="/terms"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 font-medium underline"
+                                    >
+                                        Terms of Service
+                                    </a>
+                                    ,{" "}
+                                    <a
+                                        href="/privacy"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 font-medium underline"
+                                    >
+                                        Privacy Policy
+                                    </a>
+                                    , and{" "}
+                                    <a
+                                        href="/legal/acceptable-use"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 font-medium underline"
+                                    >
+                                        Acceptable Use Policy
+                                    </a>
+                                    . I will comply with MLS photo restrictions and Fair Housing laws, and I accept responsibility for all content I upload.
+                                </span>
+                            </label>
+                            {errors.agreedToTerms && (
+                                <p className="mt-2 text-sm text-red-600" role="alert">
+                                    {errors.agreedToTerms.message}
+                                </p>
+                            )}
                         </div>
 
                         <button

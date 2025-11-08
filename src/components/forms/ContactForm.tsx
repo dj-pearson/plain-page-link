@@ -11,7 +11,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Mail, Loader2, CheckCircle } from "lucide-react";
+import { Mail, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const contactSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -35,6 +36,7 @@ export function ContactForm({
 }: ContactFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const {
         register,
@@ -47,12 +49,25 @@ export function ContactForm({
 
     const onSubmit = async (data: ContactFormData) => {
         setIsSubmitting(true);
+        setError(null);
         try {
-            // TODO: Integrate with API
-            console.log("Contact form submitted:", { ...data, agentId });
+            // Submit lead via edge function (includes auto-response email)
+            const { data: result, error: submitError } = await supabase.functions.invoke('submit-lead', {
+                body: {
+                    user_id: agentId,
+                    name: data.name,
+                    email: data.email,
+                    phone: data.phone,
+                    message: data.message,
+                    lead_type: 'contact',
+                    referrer_url: window.location.href,
+                    device: /mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+                },
+            });
 
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            if (submitError) {
+                throw submitError;
+            }
 
             setIsSuccess(true);
             reset();
@@ -61,8 +76,9 @@ export function ContactForm({
                 setIsSuccess(false);
                 onSuccess?.();
             }, 3000);
-        } catch (error) {
-            console.error("Error submitting contact form:", error);
+        } catch (err) {
+            console.error("Error submitting contact form:", err);
+            setError("Failed to send message. Please try again.");
         } finally {
             setIsSubmitting(false);
         }
@@ -80,6 +96,9 @@ export function ContactForm({
                             </h3>
                             <p className="text-sm text-green-700 mt-1">
                                 {agentName} will get back to you shortly.
+                            </p>
+                            <p className="text-xs text-green-600 mt-2">
+                                Check your email for a confirmation message.
                             </p>
                         </div>
                     </div>
@@ -100,6 +119,12 @@ export function ContactForm({
                 </CardDescription>
             </CardHeader>
             <CardContent>
+                {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-800">{error}</p>
+                    </div>
+                )}
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <FormField
                         label="Your Name"

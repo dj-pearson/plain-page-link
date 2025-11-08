@@ -10,16 +10,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
+import { SocialShareDialog } from "@/components/listings/SocialShareDialog";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showSocialShareDialog, setShowSocialShareDialog] = useState(false);
+  const [newlyCreatedListing, setNewlyCreatedListing] = useState<any>(null);
   const { toast } = useToast();
   const { listings, isLoading, addListing, deleteListing } = useListings();
   const { uploadListingImages, uploading: uploadingImages } = useListingImageUpload();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
+  const { profile } = useProfile();
 
   const handleAddClick = () => {
     if (!canAdd('listings')) {
@@ -59,11 +64,25 @@ export default function Listings() {
       };
 
       await addListing.mutateAsync(listingData);
+
+      // Store newly created listing for social sharing
+      setNewlyCreatedListing({
+        address: data.address,
+        city: data.city,
+        price: data.price,
+        beds: data.beds,
+        baths: data.baths,
+        sqft: parseInt(data.sqft) || undefined,
+        property_type: data.propertyType,
+        image: imageUrls[0] || undefined,
+      });
+
       toast({
         title: "Listing added!",
         description: "Your property listing has been created successfully.",
       });
       setIsAddModalOpen(false);
+      setShowSocialShareDialog(true);
     } catch (error) {
       toast({
         title: "Error",
@@ -338,6 +357,16 @@ export default function Listings() {
         currentPlan={subscription?.plan_name || "Free"}
         requiredPlan="Starter"
       />
+
+      {/* Social Share Dialog */}
+      {newlyCreatedListing && (
+        <SocialShareDialog
+          open={showSocialShareDialog}
+          onOpenChange={setShowSocialShareDialog}
+          listing={newlyCreatedListing}
+          agentName={profile?.full_name}
+        />
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Star, Edit, Trash2, Quote } from "lucide-react";
+import { Plus, Star, Edit, Trash2, Quote, Share2 } from "lucide-react";
 import { AddTestimonialModal } from "@/components/modals/AddTestimonialModal";
 import { EditTestimonialModal, EditTestimonialFormData } from "@/components/modals/EditTestimonialModal";
 import type { TestimonialFormData } from "@/components/modals/AddTestimonialModal";
@@ -9,14 +9,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
+import { RequestTestimonialModal } from "@/components/testimonials/RequestTestimonialModal";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function Testimonials() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTestimonial, setEditingTestimonial] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const { toast } = useToast();
   const { testimonials, isLoading, addTestimonial, deleteTestimonial } = useTestimonials();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
+  const { profile } = useProfile();
 
   const handleAddClick = () => {
     if (!canAdd('testimonials')) {
@@ -128,13 +132,22 @@ export default function Testimonials() {
             Showcase client reviews and success stories
           </p>
         </div>
-        <button
-          onClick={handleAddClick}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
-        >
-          <Plus className="h-4 w-4" />
-          Add Testimonial
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowRequestModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors font-medium border border-border"
+          >
+            <Share2 className="h-4 w-4" />
+            Request Testimonial
+          </button>
+          <button
+            onClick={handleAddClick}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            Add Testimonial
+          </button>
+        </div>
       </div>
 
       {/* Limit Banner */}
@@ -287,6 +300,16 @@ export default function Testimonials() {
         currentPlan={subscription?.plan_name || "Free"}
         requiredPlan="Starter"
       />
+
+      {/* Request Testimonial Modal */}
+      {profile && (
+        <RequestTestimonialModal
+          open={showRequestModal}
+          onOpenChange={setShowRequestModal}
+          username={profile.username || ''}
+          agentName={profile.full_name || ''}
+        />
+      )}
     </div>
   );
 }

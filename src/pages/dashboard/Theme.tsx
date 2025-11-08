@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Save, RotateCcw, Eye, Palette } from "lucide-react";
+import { Save, RotateCcw, Eye, Palette, Monitor, Smartphone } from "lucide-react";
 import {
     DEFAULT_THEMES,
     getCurrentTheme,
@@ -57,6 +57,7 @@ export default function Theme() {
     const [isCustomizing, setIsCustomizing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
     const { subscription } = useSubscriptionLimits();
 
     // Load saved theme from database
@@ -513,21 +514,54 @@ export default function Theme() {
                     {/* Live Preview - Mobile optimized */}
                     <Card>
                         <CardHeader className="pb-3 sm:pb-4">
-                            <CardTitle className="text-base sm:text-lg">Live Preview</CardTitle>
-                            <CardDescription className="text-xs sm:text-sm">
-                                See how your theme will look on your profile
-                            </CardDescription>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="text-base sm:text-lg">Live Preview</CardTitle>
+                                    <CardDescription className="text-xs sm:text-sm">
+                                        See how your theme will look on different devices
+                                    </CardDescription>
+                                </div>
+                                <div className="flex gap-1 bg-muted p-1 rounded-lg">
+                                    <Button
+                                        variant={previewMode === "desktop" ? "default" : "ghost"}
+                                        size="sm"
+                                        onClick={() => setPreviewMode("desktop")}
+                                        className="gap-1.5"
+                                    >
+                                        <Monitor className="h-4 w-4" />
+                                        <span className="hidden sm:inline text-xs">Desktop</span>
+                                    </Button>
+                                    <Button
+                                        variant={previewMode === "mobile" ? "default" : "ghost"}
+                                        size="sm"
+                                        onClick={() => setPreviewMode("mobile")}
+                                        className="gap-1.5"
+                                    >
+                                        <Smartphone className="h-4 w-4" />
+                                        <span className="hidden sm:inline text-xs">Mobile</span>
+                                    </Button>
+                                </div>
+                            </div>
                         </CardHeader>
                         <CardContent>
-                            <div
-                                className="rounded-lg p-4 sm:p-8 space-y-3 sm:space-y-4"
-                                style={{
-                                    backgroundColor: customColors.background,
-                                }}
-                            >
-                                <div className="flex items-start gap-4">
+                            {/* Preview Container */}
+                            <div className="flex justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-lg p-4 sm:p-8">
+                                <div
+                                    className={`rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4 transition-all duration-300 ${
+                                        previewMode === "mobile"
+                                            ? "w-full max-w-[375px]"
+                                            : "w-full"
+                                    }`}
+                                    style={{
+                                        backgroundColor: customColors.background,
+                                        boxShadow: previewMode === "mobile"
+                                            ? "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+                                            : "none",
+                                    }}
+                                >
+                                <div className={`flex items-start ${previewMode === "mobile" ? "flex-col items-center text-center" : "gap-4"}`}>
                                     <div
-                                        className="w-20 h-20 rounded-full"
+                                        className={`rounded-full ${previewMode === "mobile" ? "w-16 h-16 mb-3" : "w-20 h-20"}`}
                                         style={{
                                             backgroundColor:
                                                 customColors.primary,
@@ -535,7 +569,7 @@ export default function Theme() {
                                     />
                                     <div className="flex-1 space-y-2">
                                         <h3
-                                            className="text-2xl font-bold"
+                                            className={`font-bold ${previewMode === "mobile" ? "text-xl" : "text-2xl"}`}
                                             style={{
                                                 fontFamily: customFonts.heading,
                                                 color: customColors.foreground,
@@ -555,36 +589,38 @@ export default function Theme() {
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2">
+                                <div className={`flex ${previewMode === "mobile" ? "flex-col w-full" : "flex-wrap"} gap-2`}>
                                     <button
-                                        className="px-3 sm:px-4 py-2 rounded-lg text-white text-xs sm:text-sm font-medium min-h-[44px]"
+                                        className={`py-2 rounded-lg text-white text-xs sm:text-sm font-medium min-h-[44px] ${previewMode === "mobile" ? "w-full px-4" : "px-3 sm:px-4"}`}
                                         style={{
                                             backgroundColor:
                                                 customColors.primary,
                                         }}
                                     >
-                                        Primary
+                                        Primary Button
                                     </button>
                                     <button
-                                        className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px]"
+                                        className={`py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px] ${previewMode === "mobile" ? "w-full px-4" : "px-3 sm:px-4"}`}
                                         style={{
                                             backgroundColor:
                                                 customColors.secondary,
                                             color: "white",
                                         }}
                                     >
-                                        Secondary
+                                        Secondary Button
                                     </button>
-                                    <button
-                                        className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px]"
-                                        style={{
-                                            backgroundColor:
-                                                customColors.accent,
-                                            color: "white",
-                                        }}
-                                    >
-                                        Accent
-                                    </button>
+                                    {previewMode === "desktop" && (
+                                        <button
+                                            className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px]"
+                                            style={{
+                                                backgroundColor:
+                                                    customColors.accent,
+                                                color: "white",
+                                            }}
+                                        >
+                                            Accent Button
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div
@@ -594,7 +630,7 @@ export default function Theme() {
                                     }}
                                 >
                                     <h4
-                                        className="font-semibold mb-2"
+                                        className="font-semibold mb-2 text-sm"
                                         style={{
                                             fontFamily: customFonts.heading,
                                             color: customColors.cardForeground,
@@ -603,16 +639,29 @@ export default function Theme() {
                                         Property Card
                                     </h4>
                                     <p
-                                        className="text-sm"
+                                        className="text-xs"
                                         style={{
                                             fontFamily: customFonts.body,
                                             color: customColors.mutedForeground,
                                         }}
                                     >
-                                        This is how property cards will appear
-                                        with your selected theme.
+                                        {previewMode === "mobile"
+                                            ? "Mobile view"
+                                            : "This is how property cards will appear with your selected theme."
+                                        }
                                     </p>
                                 </div>
+                                </div>
+                            </div>
+
+                            {/* Preview Info */}
+                            <div className="mt-4 text-center">
+                                <p className="text-xs text-muted-foreground">
+                                    {previewMode === "mobile"
+                                        ? "📱 Viewing mobile preview (375px wide)"
+                                        : "🖥️ Viewing desktop preview (full width)"
+                                    }
+                                </p>
                             </div>
                         </CardContent>
                     </Card>

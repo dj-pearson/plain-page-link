@@ -2,7 +2,9 @@ import { useState } from "react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
+import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDashboard";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Card,
     CardContent,
@@ -17,6 +19,8 @@ import {
     TrendingUp,
     Calendar,
     Download,
+    BarChart3,
+    Search as SearchIcon,
 } from "lucide-react";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
@@ -35,8 +39,7 @@ export default function Analytics() {
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold">Analytics</h1>
                     <p className="text-sm sm:text-base text-muted-foreground mt-0.5 sm:mt-1">
-                        Track your profile performance and lead generation
-                        metrics
+                        Track your profile performance, lead generation, and search visibility
                     </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
@@ -56,6 +59,23 @@ export default function Analytics() {
                     </Button>
                 </div>
             </div>
+
+            {/* Tabs for different analytics views */}
+            <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+                <TabsList className="grid w-full grid-cols-2 sm:w-auto">
+                    <TabsTrigger value="overview" className="gap-2">
+                        <BarChart3 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Profile Analytics</span>
+                        <span className="sm:hidden">Overview</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="search" className="gap-2">
+                        <SearchIcon className="h-4 w-4" />
+                        <span className="hidden sm:inline">Search Analytics</span>
+                        <span className="sm:hidden">Search</span>
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="space-y-4 sm:space-y-6">
 
             {/* Key Metrics - Mobile optimized 2-column grid */}
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -173,6 +193,12 @@ export default function Analytics() {
                 leads={recentLeads}
                 onLeadClick={(lead) => console.log("Lead clicked:", lead)}
             />
+                </TabsContent>
+
+                <TabsContent value="search" className="space-y-4 sm:space-y-6">
+                    <SearchAnalyticsDashboard />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

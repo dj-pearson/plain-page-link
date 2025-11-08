@@ -49,32 +49,25 @@ export function SearchAnalyticsDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Search Analytics Dashboard</h2>
-          <p className="text-muted-foreground mt-2">
-            Unified view of all your search traffic and analytics platforms
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleRefreshData}
-            disabled={aggregateMutation.isPending}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${aggregateMutation.isPending ? 'animate-spin' : ''}`} />
-            Refresh Data
-          </Button>
-          <Button variant="outline" onClick={handleExportData}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline">
-            <SettingsIcon className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-        </div>
+      {/* Quick Actions */}
+      <div className="flex items-center justify-end gap-2 flex-wrap">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefreshData}
+          disabled={aggregateMutation.isPending}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${aggregateMutation.isPending ? 'animate-spin' : ''}`} />
+          Refresh Data
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExportData}>
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
+        <Button variant="outline" size="sm">
+          <SettingsIcon className="h-4 w-4 mr-2" />
+          Settings
+        </Button>
       </div>
 
       {/* Platform Connections */}
