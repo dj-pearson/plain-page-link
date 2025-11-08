@@ -168,12 +168,12 @@ export default function Login() {
                                     Remember me
                                 </span>
                             </label>
-                            <a
-                                href="#"
-                                className="text-sm text-blue-600 hover:text-blue-700"
+                            <Link
+                                to="/auth/forgot-password"
+                                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                             >
                                 Forgot password?
-                            </a>
+                            </Link>
                         </div>
 
                         <button
