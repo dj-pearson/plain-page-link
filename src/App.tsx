@@ -15,6 +15,9 @@ import Landing from "./pages/public/Landing";
 import ProfilePage from "./pages/public/FullProfilePage";
 import NotFound from "./pages/public/NotFound";
 
+// Lazy load public review page
+const SubmitReview = lazy(() => import("./pages/public/SubmitReview"));
+
 // Auth pages (eager load for better UX)
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
@@ -114,6 +117,7 @@ function App() {
                     <Route path="/blog/category/:category" element={<BlogCategory />} />
                     <Route path="/blog/:slug" element={<BlogArticle />} />
                     <Route path="/p/:slug" element={<PublicPage />} />
+                    <Route path="/:username/review" element={<SubmitReview />} />
                     <Route path="/:slug" element={<ProfilePage />} />
 
                     {/* Auth routes */}
