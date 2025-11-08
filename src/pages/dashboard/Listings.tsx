@@ -5,6 +5,7 @@ import { EditListingModal, EditListingFormData } from "@/components/modals/EditL
 import type { ListingFormData } from "@/components/modals/AddListingModal";
 import { useToast } from "@/hooks/use-toast";
 import { useListings } from "@/hooks/useListings";
+import { useListingImageUpload } from "@/hooks/useListingImageUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
@@ -17,6 +18,7 @@ export default function Listings() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { toast } = useToast();
   const { listings, isLoading, addListing, deleteListing } = useListings();
+  const { uploadListingImages, uploading: uploadingImages } = useListingImageUpload();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
 
   const handleAddClick = () => {
@@ -29,7 +31,34 @@ export default function Listings() {
 
   const handleAddListing = async (data: ListingFormData) => {
     try {
-      await addListing.mutateAsync(data);
+      // Upload images first if any
+      let imageUrls: string[] = [];
+      if (data.images && data.images.length > 0) {
+        imageUrls = await uploadListingImages(data.images);
+
+        if (imageUrls.length === 0) {
+          // Upload failed, error already shown by hook
+          return;
+        }
+      }
+
+      // Create listing data with uploaded image URLs
+      const listingData = {
+        address: data.address,
+        city: data.city,
+        price: data.price,
+        beds: data.beds,
+        baths: data.baths,
+        sqft: parseInt(data.sqft) || null,
+        status: data.status,
+        image: imageUrls[0] || null, // First image as primary
+        photos: imageUrls.length > 0 ? imageUrls : null, // All images
+        description: data.description || null,
+        mls_number: data.mlsNumber || null,
+        property_type: data.propertyType || null,
+      };
+
+      await addListing.mutateAsync(listingData);
       toast({
         title: "Listing added!",
         description: "Your property listing has been created successfully.",

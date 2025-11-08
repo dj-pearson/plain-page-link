@@ -19,6 +19,10 @@ import NotFound from "./pages/public/NotFound";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 
+// Lazy load auth recovery pages
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
+
 // Lazy load legal pages
 const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
@@ -115,6 +119,8 @@ function App() {
                     {/* Auth routes */}
                     <Route path="/auth/login" element={<Login />} />
                     <Route path="/auth/register" element={<Register />} />
+                    <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/auth/reset-password" element={<ResetPassword />} />
 
                     {/* Dashboard routes (protected) */}
                     <Route
