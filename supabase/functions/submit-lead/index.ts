@@ -60,15 +60,57 @@ serve(async (req) => {
       throw insertError
     }
 
-    // Get agent profile for personalized email
+    // Get agent profile for personalized email and Zapier webhook
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name, email')
+      .select('full_name, email, zapier_webhook_url')
       .eq('id', leadData.user_id)
       .single()
 
     const agentName = profile?.full_name || 'Your Real Estate Agent'
     const agentEmail = profile?.email
+    const zapierWebhookUrl = profile?.zapier_webhook_url
+
+    // Send lead to Zapier webhook if configured
+    if (zapierWebhookUrl) {
+      try {
+        const zapierPayload = {
+          lead_id: lead.id,
+          name: leadData.name,
+          email: leadData.email,
+          phone: leadData.phone,
+          message: leadData.message,
+          lead_type: leadData.lead_type,
+          price_range: leadData.price_range,
+          timeline: leadData.timeline,
+          property_address: leadData.property_address,
+          preapproved: leadData.preapproved,
+          referrer_url: leadData.referrer_url,
+          utm_source: leadData.utm_source,
+          utm_medium: leadData.utm_medium,
+          utm_campaign: leadData.utm_campaign,
+          device: leadData.device,
+          created_at: lead.created_at,
+        }
+
+        const zapierResponse = await fetch(zapierWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(zapierPayload),
+        })
+
+        if (!zapierResponse.ok) {
+          console.error('Failed to send to Zapier webhook:', await zapierResponse.text())
+        } else {
+          console.log('Successfully sent lead to Zapier webhook')
+        }
+      } catch (zapierError) {
+        console.error('Error sending to Zapier webhook:', zapierError)
+        // Don't fail the entire request if Zapier webhook fails
+      }
+    }
 
     // Send auto-response email to lead
     const leadTypeLabels: Record<string, string> = {
