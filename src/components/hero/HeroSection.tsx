@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Zap, ArrowRight, Sparkles } from 'lucide-react';
-import { Hero3D } from './Hero3D';
+import { Hero3D } from './Hero3DLazy';
 
 /**
  * HeroSection Component

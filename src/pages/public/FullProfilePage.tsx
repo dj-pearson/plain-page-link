@@ -22,9 +22,9 @@ import { applyTheme, type ThemeConfig } from "@/lib/themes";
 import { parsePrice } from "@/lib/format";
 import type { Listing } from "@/types";
 import NotFound from "./NotFound";
-import { ThreeDBackground } from "@/components/theme/ThreeDBackground";
-import { GradientMesh } from "@/components/theme/GradientMesh";
-import { FloatingGeometry } from "@/components/theme/FloatingGeometry";
+import { ThreeDBackground } from "@/components/theme/ThreeDBackgroundLazy";
+import { GradientMesh } from "@/components/theme/GradientMeshLazy";
+import { FloatingGeometry } from "@/components/theme/FloatingGeometryLazy";
 
 export default function FullProfilePage() {
     const { slug } = useParams<{ slug: string }>();

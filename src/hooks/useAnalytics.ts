@@ -2,42 +2,63 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/useAuthStore";
 
-export function useAnalytics() {
+export type TimeRange = '7d' | '30d' | '90d';
+
+export function useAnalytics(timeRange: TimeRange = '30d') {
   const { user } = useAuthStore();
 
-  // Fetch analytics views
+  // Calculate date cutoff based on time range
+  const getCutoffDate = (range: TimeRange) => {
+    const cutoffDays = { '7d': 7, '30d': 30, '90d': 90 }[range];
+    const date = new Date();
+    date.setDate(date.getDate() - cutoffDays);
+    return date.toISOString();
+  };
+
+  const cutoffDate = getCutoffDate(timeRange);
+
+  // Fetch analytics views with optimizations
   const { data: views = [], isLoading: viewsLoading } = useQuery({
-    queryKey: ["analytics-views", user?.id],
+    queryKey: ["analytics-views", user?.id, timeRange],
     queryFn: async () => {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
         .from("analytics_views")
-        .select("*")
+        .select("viewed_at, visitor_id, page_url, referrer") // Only needed columns
         .eq("user_id", user.id)
-        .order("viewed_at", { ascending: false });
+        .gte("viewed_at", cutoffDate) // Filter by time range
+        .order("viewed_at", { ascending: false })
+        .limit(1000); // Hard limit for safety
 
       if (error) throw error;
       return data;
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds
+    gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
 
-  // Fetch leads for analytics
+  // Fetch leads for analytics with optimizations
   const { data: leads = [], isLoading: leadsLoading } = useQuery({
-    queryKey: ["analytics-leads", user?.id],
+    queryKey: ["analytics-leads", user?.id, timeRange],
     queryFn: async () => {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
         .from("leads")
-        .select("*")
-        .eq("user_id", user.id);
+        .select("created_at, lead_type, status, email, phone") // Only needed columns
+        .eq("user_id", user.id)
+        .gte("created_at", cutoffDate) // Filter by time range
+        .order("created_at", { ascending: false })
+        .limit(500); // Hard limit for safety
 
       if (error) throw error;
       return data;
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds
+    gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
 
   // Calculate stats from data
@@ -85,5 +106,6 @@ export function useAnalytics() {
     leadsData,
     recentLeads: leads.slice(0, 10),
     isLoading: viewsLoading || leadsLoading,
+    timeRange,
   };
 }
