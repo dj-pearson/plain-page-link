@@ -1,10 +1,11 @@
-import { Eye, Users, MousePointerClick, TrendingUp, PartyPopper, Check } from "lucide-react";
+import { Eye, Users, MousePointerClick, TrendingUp, PartyPopper, Check, Copy, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useLinks } from "@/hooks/useLinks";
 import { useProfile } from "@/hooks/useProfile";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { ProfileCompletionWidget } from "@/components/dashboard/ProfileCompletionWidget";
@@ -22,6 +23,7 @@ export default function Overview() {
     const { links } = useLinks();
     const { profile } = useProfile();
     const { subscription } = useSubscription();
+    const { toast } = useToast();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -156,9 +158,29 @@ export default function Overview() {
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-xs sm:text-sm text-muted-foreground text-center py-6 sm:py-8">
-                                No leads yet
-                            </p>
+                            <div className="text-center py-6 sm:py-8">
+                                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-3">
+                                    <Users className="h-6 w-6 text-blue-600" />
+                                </div>
+                                <h4 className="font-semibold text-sm mb-1">Start Capturing Leads</h4>
+                                <p className="text-xs text-muted-foreground mb-3 max-w-xs mx-auto">
+                                    Share your profile link to start receiving inquiries from potential clients
+                                </p>
+                                {profile?.username && (
+                                    <div className="flex items-center justify-center gap-2 p-2 bg-muted rounded-lg max-w-xs mx-auto">
+                                        <code className="text-xs truncate">agentbio.net/{profile.username}</code>
+                                        <button
+                                            onClick={async () => {
+                                                await navigator.clipboard.writeText(`${window.location.origin}/${profile.username}`);
+                                                toast({ title: "Copied!", description: "Profile link copied to clipboard" });
+                                            }}
+                                            className="p-1 hover:bg-background rounded transition-colors"
+                                        >
+                                            <Copy className="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </CardContent>
                 </Card>
@@ -188,9 +210,21 @@ export default function Overview() {
                                     ))}
                             </div>
                         ) : (
-                            <p className="text-xs sm:text-sm text-muted-foreground text-center py-6 sm:py-8">
-                                No links added yet
-                            </p>
+                            <div className="text-center py-6 sm:py-8">
+                                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 mb-3">
+                                    <MousePointerClick className="h-6 w-6 text-purple-600" />
+                                </div>
+                                <h4 className="font-semibold text-sm mb-1">Add Your First Link</h4>
+                                <p className="text-xs text-muted-foreground mb-3 max-w-xs mx-auto">
+                                    Add links to your website, social media, and other profiles
+                                </p>
+                                <a
+                                    href="/dashboard/links"
+                                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                    Manage Links <ExternalLink className="h-3 w-3" />
+                                </a>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
