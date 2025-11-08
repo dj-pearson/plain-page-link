@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UsernameInput } from "@/components/UsernameInput";
+import { ProfileURLCard } from "@/components/settings/ProfileURLCard";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -290,6 +291,9 @@ export default function Settings() {
           </button>
         </CardContent>
       </Card>
+
+      {/* Profile URL Card */}
+      {profile?.username && <ProfileURLCard username={profile.username} />}
 
       {/* Profile Display Settings */}
       <ProfileDisplaySettings />
