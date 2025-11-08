@@ -43,6 +43,10 @@ export default function Profile() {
     youtube_url: "",
     zillow_url: "",
     realtor_com_url: "",
+
+    // SEO
+    seo_title: "",
+    seo_description: "",
   });
 
   // States for managing array inputs
@@ -86,6 +90,10 @@ export default function Profile() {
         youtube_url: profile.youtube_url || "",
         zillow_url: profile.zillow_url || "",
         realtor_com_url: profile.realtor_com_url || "",
+
+        // SEO
+        seo_title: profile.seo_title || "",
+        seo_description: profile.seo_description || "",
       });
     }
   }, [profile]);
@@ -268,6 +276,7 @@ export default function Profile() {
           <TabsTrigger value="contact">Contact</TabsTrigger>
           <TabsTrigger value="service">Service Areas</TabsTrigger>
           <TabsTrigger value="social">Social Media</TabsTrigger>
+          <TabsTrigger value="seo">SEO</TabsTrigger>
         </TabsList>
 
         {/* Basic Information Tab */}
@@ -739,6 +748,121 @@ export default function Profile() {
                   placeholder="https://realtor.com/realestateagents/yourprofile"
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* SEO Tab */}
+        <TabsContent value="seo" className="space-y-6 mt-6">
+          <div className="bg-card border border-border rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              Search Engine Optimization
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Optimize how your profile appears in search engines like Google
+            </p>
+
+            <div className="space-y-6">
+              {/* SEO Title */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  SEO Title
+                </label>
+                <input
+                  type="text"
+                  name="seo_title"
+                  value={formData.seo_title}
+                  onChange={handleChange}
+                  maxLength={60}
+                  placeholder={`${formData.full_name || 'Your Name'} - Real Estate Agent`}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    The title that appears in Google search results
+                  </p>
+                  <span className={`text-xs font-medium ${
+                    formData.seo_title.length > 60 ? 'text-red-600' : 'text-muted-foreground'
+                  }`}>
+                    {formData.seo_title.length}/60
+                  </span>
+                </div>
+              </div>
+
+              {/* Meta Description */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Meta Description
+                </label>
+                <textarea
+                  name="seo_description"
+                  value={formData.seo_description}
+                  onChange={handleChange}
+                  maxLength={160}
+                  rows={3}
+                  placeholder={`Professional real estate services by ${formData.full_name || 'Your Name'}. Specializing in ${formData.service_cities.join(', ') || 'your area'}. Contact me today for all your real estate needs.`}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    The description that appears in Google search results
+                  </p>
+                  <span className={`text-xs font-medium ${
+                    formData.seo_description.length > 160 ? 'text-red-600' : 'text-muted-foreground'
+                  }`}>
+                    {formData.seo_description.length}/160
+                  </span>
+                </div>
+              </div>
+
+              {/* Google Search Preview */}
+              <div className="mt-8">
+                <h3 className="text-sm font-semibold text-foreground mb-3">
+                  Google Search Preview
+                </h3>
+                <div className="bg-background border border-border rounded-lg p-4">
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">
+                      {window.location.origin}/{formData.username || 'username'}
+                    </div>
+                    <div className="text-lg text-blue-600 hover:underline cursor-pointer font-medium line-clamp-1">
+                      {formData.seo_title || `${formData.full_name || 'Your Name'} - Real Estate Agent`}
+                    </div>
+                    <div className="text-sm text-muted-foreground line-clamp-2">
+                      {formData.seo_description || `Professional real estate services by ${formData.full_name || 'Your Name'}. Contact me today for all your real estate needs.`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SEO Tips */}
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4 mt-6">
+                <h4 className="font-semibold text-sm mb-3 text-blue-900 dark:text-blue-100">
+                  💡 SEO Best Practices
+                </h4>
+                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                    <span><strong>Title:</strong> Keep under 60 characters, include your name and location</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                    <span><strong>Description:</strong> Keep under 160 characters, mention your services and areas</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                    <span><strong>Keywords:</strong> Include terms clients search for (e.g., "real estate agent [city]")</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                    <span><strong>Be Specific:</strong> Mention specialties, certifications, or unique services</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                    <span><strong>Call to Action:</strong> Encourage clicks with phrases like "Contact me today"</span>
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
