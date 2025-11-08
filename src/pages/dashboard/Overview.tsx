@@ -1,16 +1,82 @@
-import { Eye, Users, MousePointerClick, TrendingUp } from "lucide-react";
+import { Eye, Users, MousePointerClick, TrendingUp, PartyPopper, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useLinks } from "@/hooks/useLinks";
+import { useProfile } from "@/hooks/useProfile";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { ProfileCompletionWidget } from "@/components/dashboard/ProfileCompletionWidget";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Overview() {
     const { stats, recentLeads, isLoading } = useAnalytics();
     const { links } = useLinks();
+    const { profile } = useProfile();
+    const { subscription } = useSubscription();
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     const totalLinkClicks = links.reduce((sum, link) => sum + (link.click_count || 0), 0);
+
+    // Check if user is new (account created within last 48 hours)
+    const isNewUser = profile?.created_at
+        ? (new Date().getTime() - new Date(profile.created_at).getTime()) < (48 * 60 * 60 * 1000)
+        : false;
+
+    const greeting = isNewUser ? "Welcome to AgentBio!" : "Welcome Back!";
+    const subtitle = isNewUser
+        ? "Let's get your profile set up and start attracting clients"
+        : "Here's what's happening with your profile";
+
+    // Check for subscription success parameter
+    useEffect(() => {
+        if (searchParams.get('subscription') === 'success') {
+            setShowSuccessModal(true);
+            // Remove the query parameter
+            navigate('/dashboard', { replace: true });
+        }
+    }, [searchParams, navigate]);
+
+    // Get features based on plan
+    const getUnlockedFeatures = (planName: string | undefined) => {
+        const features: Record<string, string[]> = {
+            starter: [
+                "20 active listings",
+                "15 custom links",
+                "10 testimonials",
+                "90-day analytics",
+                "Lead export to CSV"
+            ],
+            professional: [
+                "Unlimited listings",
+                "Unlimited custom links",
+                "Unlimited testimonials",
+                "Unlimited analytics history",
+                "Custom domain support",
+                "Premium themes with 3D effects",
+                "Priority email support"
+            ],
+            team: [
+                "Everything in Professional",
+                "Multi-agent dashboard",
+                "Team analytics",
+                "White-label branding",
+                "API access",
+                "Dedicated account manager"
+            ]
+        };
+        return features[planName?.toLowerCase() || 'starter'] || [];
+    };
 
     if (isLoading) {
         return (
@@ -24,10 +90,13 @@ export default function Overview() {
         <div className="space-y-4 sm:space-y-6">
             <div>
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
-                    Welcome Back!
+                    {greeting}
+                    {profile?.full_name && !isNewUser && (
+                        <span className="text-gray-600">, {profile.full_name.split(' ')[0]}</span>
+                    )}
                 </h2>
                 <p className="text-sm sm:text-base text-gray-600">
-                    Here's what's happening with your profile
+                    {subtitle}
                 </p>
             </div>
 
@@ -126,6 +195,50 @@ export default function Overview() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Subscription Success Modal */}
+            <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mx-auto mb-4">
+                            <PartyPopper className="w-8 h-8 text-green-600" />
+                        </div>
+                        <DialogTitle className="text-center text-2xl">
+                            🎉 Welcome to {subscription?.plan_name}!
+                        </DialogTitle>
+                        <DialogDescription className="text-center pt-2">
+                            Your subscription is now active. Here's what you just unlocked:
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="bg-muted/50 rounded-lg p-4 my-4">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                            <Check className="w-5 h-5 text-green-600" />
+                            New Features Available:
+                        </h4>
+                        <ul className="space-y-2">
+                            {getUnlockedFeatures(subscription?.plan_name).map((feature, index) => (
+                                <li key={index} className="flex items-start gap-2 text-sm">
+                                    <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                                    <span>{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-4">
+                            A confirmation email with your receipt has been sent to your email address.
+                        </p>
+                        <button
+                            onClick={() => setShowSuccessModal(false)}
+                            className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                        >
+                            Get Started
+                        </button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
