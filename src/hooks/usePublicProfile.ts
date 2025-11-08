@@ -8,7 +8,42 @@ export const usePublicProfile = (username: string) => {
       // Fetch profile by username
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          id,
+          username,
+          full_name,
+          bio,
+          avatar_url,
+          theme,
+          title,
+          license_number,
+          license_state,
+          brokerage_name,
+          brokerage_logo,
+          years_experience,
+          specialties,
+          certifications,
+          phone,
+          email_display,
+          website_url,
+          service_cities,
+          service_zip_codes,
+          facebook_url,
+          instagram_url,
+          linkedin_url,
+          tiktok_url,
+          youtube_url,
+          zillow_url,
+          realtor_com_url,
+          city,
+          seo_title,
+          seo_description,
+          og_image,
+          display_name,
+          created_at,
+          updated_at,
+          is_published
+        `)
         .eq('username', username)
         .eq('is_published', true)
         .single();
@@ -16,48 +51,91 @@ export const usePublicProfile = (username: string) => {
       if (profileError) throw profileError;
       if (!profile) throw new Error('Profile not found');
 
-      // Increment view count
-      await supabase.rpc('increment_profile_views', {
+      // Increment view count (non-blocking - fire and forget)
+      supabase.rpc('increment_profile_views', {
         _profile_id: profile.id
-      });
+      }).then(() => {}).catch(() => {});
 
-      // Fetch listings
-      const { data: listings, error: listingsError } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('user_id', profile.id)
-        .in('status', ['active', 'pending', 'under_contract', 'sold'])
-        .order('sort_order', { ascending: true });
+      // Fetch all related data in parallel instead of sequential
+      const [
+        { data: listings, error: listingsError },
+        { data: testimonials, error: testimonialsError },
+        { data: links, error: linksError },
+        { data: settings, error: settingsError }
+      ] = await Promise.all([
+        // Fetch listings with only needed columns
+        supabase
+          .from('listings')
+          .select(`
+            id,
+            user_id,
+            image,
+            photos,
+            title,
+            address,
+            city,
+            price,
+            original_price,
+            bedrooms,
+            bathrooms,
+            square_feet,
+            status,
+            sort_order,
+            is_featured,
+            days_on_market,
+            description,
+            open_house_date
+          `)
+          .eq('user_id', profile.id)
+          .in('status', ['active', 'pending', 'under_contract', 'sold'])
+          .order('sort_order', { ascending: true }),
 
+        // Fetch testimonials with only needed columns
+        supabase
+          .from('testimonials')
+          .select(`
+            id,
+            user_id,
+            author_name,
+            author_role,
+            content,
+            rating,
+            sort_order,
+            created_at,
+            is_published
+          `)
+          .eq('user_id', profile.id)
+          .eq('is_published', true)
+          .order('sort_order', { ascending: true }),
+
+        // Fetch links with only needed columns
+        supabase
+          .from('links')
+          .select(`
+            id,
+            user_id,
+            title,
+            url,
+            icon,
+            position,
+            is_active
+          `)
+          .eq('user_id', profile.id)
+          .eq('is_active', true)
+          .order('position', { ascending: true }),
+
+        // Fetch user settings
+        supabase
+          .from('user_settings')
+          .select('show_listings, show_sold_properties, show_testimonials, show_social_proof, show_contact_buttons')
+          .eq('user_id', profile.id)
+          .maybeSingle()
+      ]);
+
+      // Handle errors from parallel queries
       if (listingsError) throw listingsError;
-
-      // Fetch testimonials
-      const { data: testimonials, error: testimonialsError } = await supabase
-        .from('testimonials')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('is_published', true)
-        .order('sort_order', { ascending: true });
-
       if (testimonialsError) throw testimonialsError;
-
-      // Fetch links
-      const { data: links, error: linksError } = await supabase
-        .from('links')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('is_active', true)
-        .order('position', { ascending: true });
-
       if (linksError) throw linksError;
-
-      // Fetch user settings for profile visibility
-      const { data: settings, error: settingsError } = await supabase
-        .from('user_settings')
-        .select('show_listings, show_sold_properties, show_testimonials, show_social_proof, show_contact_buttons')
-        .eq('user_id', profile.id)
-        .maybeSingle();
-
       if (settingsError) throw settingsError;
 
       return {
@@ -75,5 +153,7 @@ export const usePublicProfile = (username: string) => {
       };
     },
     enabled: !!username,
+    staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds - reduces unnecessary refetches
+    gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
 };
