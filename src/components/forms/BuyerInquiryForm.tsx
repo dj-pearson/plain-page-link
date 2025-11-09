@@ -19,7 +19,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Home, Loader2, CheckCircle } from "lucide-react";
+import { Home, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { submitLead, trackFormSubmission } from "@/lib/leadSubmission";
+import { useToast } from "@/hooks/use-toast";
 
 const buyerSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -48,6 +50,8 @@ export function BuyerInquiryForm({
 }: BuyerInquiryFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const { toast } = useToast();
 
     const {
         register,
@@ -62,26 +66,54 @@ export function BuyerInquiryForm({
 
     const onSubmit = async (data: BuyerFormData) => {
         setIsSubmitting(true);
+        setError(null);
+
         try {
-            // TODO: Integrate with API
-            console.log("Buyer inquiry submitted:", {
-                ...data,
+            const result = await submitLead({
                 agentId,
                 leadType: "buyer",
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                data: {
+                    propertyType: data.propertyType,
+                    priceRange: data.priceRange,
+                    bedrooms: data.bedrooms,
+                    timeline: data.timeline,
+                    preApproved: data.preApproved,
+                    message: data.message,
+                },
             });
 
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            if (result.success) {
+                trackFormSubmission("buyer_inquiry", true);
+                toast({
+                    title: "Inquiry Submitted!",
+                    description: `${agentName} will contact you within 24 hours.`,
+                });
+                setIsSuccess(true);
+                reset();
 
-            setIsSuccess(true);
-            reset();
-
-            setTimeout(() => {
-                setIsSuccess(false);
-                onSuccess?.();
-            }, 3000);
+                setTimeout(() => {
+                    setIsSuccess(false);
+                    onSuccess?.();
+                }, 3000);
+            } else {
+                throw new Error(result.error || "Failed to submit inquiry");
+            }
         } catch (error) {
             console.error("Error submitting buyer inquiry:", error);
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : "Failed to submit inquiry. Please try again.";
+            setError(errorMessage);
+            trackFormSubmission("buyer_inquiry", false);
+            toast({
+                title: "Submission Failed",
+                description: errorMessage,
+                variant: "destructive",
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -121,6 +153,18 @@ export function BuyerInquiryForm({
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <h4 className="font-semibold text-red-900 text-sm">
+                                    Submission Error
+                                </h4>
+                                <p className="text-sm text-red-700 mt-1">{error}</p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             label="Your Name"
