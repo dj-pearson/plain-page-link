@@ -12,6 +12,8 @@ import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
 import { SocialShareDialog } from "@/components/listings/SocialShareDialog";
 import { useProfile } from "@/hooks/useProfile";
+import { KeyboardShortcutsHelper } from "@/components/dashboard/KeyboardShortcutsHelper";
+import { useNavigate } from "react-router-dom";
 
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,6 +27,35 @@ export default function Listings() {
   const { uploadListingImages, uploading: uploadingImages } = useListingImageUpload();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
   const { profile } = useProfile();
+  const navigate = useNavigate();
+
+  // Define keyboard shortcuts
+  const shortcuts = [
+    {
+      key: "n",
+      description: "Add new listing",
+      action: () => handleAddClick(),
+      category: "Actions",
+    },
+    {
+      key: "d",
+      description: "Go to Dashboard",
+      action: () => navigate("/dashboard"),
+      category: "Navigation",
+    },
+    {
+      key: "l",
+      description: "Go to Leads",
+      action: () => navigate("/dashboard/leads"),
+      category: "Navigation",
+    },
+    {
+      key: "a",
+      description: "Go to Analytics",
+      action: () => navigate("/dashboard/analytics"),
+      category: "Navigation",
+    },
+  ];
 
   const handleAddClick = () => {
     if (!canAdd('listings')) {
@@ -367,6 +398,9 @@ export default function Listings() {
           agentName={profile?.full_name}
         />
       )}
+
+      {/* Keyboard Shortcuts */}
+      <KeyboardShortcutsHelper shortcuts={shortcuts} />
     </div>
   );
 }
