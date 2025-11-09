@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect, useState } from "react";
 import { emailSchema } from "@/utils/validation";
+import { validateRedirectPath } from "@/utils/navigation";
 
 const loginSchema = z.object({
     email: emailSchema,
@@ -30,11 +31,9 @@ export default function Login() {
 
     useEffect(() => {
         if (user) {
-            // Redirect to last visited route or default to dashboard
+            // SECURITY: Validate redirect path to prevent open redirect attacks
             const lastRoute = localStorage.getItem('lastVisitedRoute');
-            const redirectTo = lastRoute && lastRoute !== '/auth/login' && lastRoute !== '/auth/register'
-                ? lastRoute
-                : '/dashboard';
+            const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
             navigate(redirectTo, { replace: true });
         }
     }, [user, navigate]);

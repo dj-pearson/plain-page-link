@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
@@ -26,13 +25,26 @@ if (import.meta.env.DEV) {
     console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
 }
 
+// SECURITY: Lazy load DevTools only in development to prevent info disclosure in production
+const ReactQueryDevtools = import.meta.env.DEV
+    ? React.lazy(() =>
+          import("@tanstack/react-query-devtools").then((m) => ({
+              default: m.ReactQueryDevtools,
+          }))
+      )
+    : null;
+
 ReactDOM.createRoot(rootEl).render(
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ErrorBoundary>
             <HelmetProvider>
                 <QueryClientProvider client={queryClient}>
                     <App />
-                    {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+                    {ReactQueryDevtools && (
+                        <React.Suspense fallback={null}>
+                            <ReactQueryDevtools initialIsOpen={false} />
+                        </React.Suspense>
+                    )}
                 </QueryClientProvider>
             </HelmetProvider>
         </ErrorBoundary>

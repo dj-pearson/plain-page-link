@@ -9,6 +9,7 @@ import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicato
 import { useUsernameCheck } from "@/hooks/useUsernameCheck";
 import { Check, X, Loader2 as UsernameLoader } from "lucide-react";
 import { passwordSchema, usernameSchema, emailSchema } from "@/utils/validation";
+import { validateRedirectPath } from "@/utils/navigation";
 
 const registerSchema = z
     .object({
@@ -50,11 +51,9 @@ export default function Register() {
 
     useEffect(() => {
         if (user) {
-            // Redirect to last visited route or default to dashboard
+            // SECURITY: Validate redirect path to prevent open redirect attacks
             const lastRoute = localStorage.getItem('lastVisitedRoute');
-            const redirectTo = lastRoute && lastRoute !== '/auth/login' && lastRoute !== '/auth/register'
-                ? lastRoute
-                : '/dashboard';
+            const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
             navigate(redirectTo, { replace: true });
         }
     }, [user, navigate]);
