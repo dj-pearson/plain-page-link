@@ -30,7 +30,12 @@ import {
   Globe,
   Code,
   Activity,
+  Wand2,
 } from "lucide-react";
+import { AlertsDashboard } from "./seo/AlertsDashboard";
+import { AutoFixEngine } from "./seo/AutoFixEngine";
+import { KeywordsTracker } from "./seo/KeywordsTracker";
+import { CompetitorMatrix } from "./seo/CompetitorMatrix";
 
 export const SEOManager = () => {
   const { toast } = useToast();
@@ -81,11 +86,16 @@ export const SEOManager = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="audit" className="w-full">
-        <TabsList className="grid grid-cols-6 lg:grid-cols-11 gap-2 h-auto">
-          <TabsTrigger value="audit" className="flex items-center gap-2">
-            <Search className="w-4 h-4" />
-            <span className="hidden sm:inline">Audit</span>
+      <Tabs defaultValue="alerts" className="w-full">
+        {/* Automation & Alerts Row */}
+        <TabsList className="grid grid-cols-4 lg:grid-cols-4 gap-2 h-auto mb-2">
+          <TabsTrigger value="alerts" className="flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            <span className="hidden sm:inline">Alerts</span>
+          </TabsTrigger>
+          <TabsTrigger value="autofix" className="flex items-center gap-2">
+            <Wand2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Auto-Fix</span>
           </TabsTrigger>
           <TabsTrigger value="keywords" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
@@ -94,6 +104,13 @@ export const SEOManager = () => {
           <TabsTrigger value="competitors" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             <span className="hidden sm:inline">Competitors</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsList className="grid grid-cols-6 lg:grid-cols-11 gap-2 h-auto">
+          <TabsTrigger value="audit" className="flex items-center gap-2">
+            <Search className="w-4 h-4" />
+            <span className="hidden sm:inline">Audit</span>
           </TabsTrigger>
           <TabsTrigger value="pages" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
@@ -294,8 +311,28 @@ export const SEOManager = () => {
           </Card>
         </TabsContent>
 
+        {/* Alerts Dashboard */}
+        <TabsContent value="alerts">
+          <AlertsDashboard />
+        </TabsContent>
+
+        {/* Auto-Fix Engine */}
+        <TabsContent value="autofix">
+          <AutoFixEngine />
+        </TabsContent>
+
+        {/* Keywords Tracker */}
+        <TabsContent value="keywords">
+          <KeywordsTracker />
+        </TabsContent>
+
+        {/* Competitor Matrix */}
+        <TabsContent value="competitors">
+          <CompetitorMatrix />
+        </TabsContent>
+
         {/* Add other tab contents with placeholders for now */}
-        {['keywords', 'competitors', 'pages', 'monitoring', 'meta', 'robots', 'sitemap', 'structured', 'performance', 'backlinks', 'broken-links', 'link-structure', 'content', 'crawler', 'images', 'redirects', 'duplicate', 'security', 'mobile', 'budget', 'semantic'].map((tab) => (
+        {['pages', 'monitoring', 'meta', 'robots', 'sitemap', 'structured', 'performance', 'backlinks', 'broken-links', 'link-structure', 'content', 'crawler', 'images', 'redirects', 'duplicate', 'security', 'mobile', 'budget', 'semantic'].map((tab) => (
           <TabsContent key={tab} value={tab}>
             <Card>
               <CardHeader>

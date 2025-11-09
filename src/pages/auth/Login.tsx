@@ -1,14 +1,16 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Home, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
+import { Home, Mail, Lock, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { emailSchema } from "@/utils/validation";
+import { validateRedirectPath } from "@/utils/navigation";
 
 const loginSchema = z.object({
-    email: z.string().email("Please enter a valid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    email: emailSchema,
+    password: z.string().min(1, "Password is required"),
     remember: z.boolean().optional(),
 });
 
@@ -17,6 +19,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function Login() {
     const navigate = useNavigate();
     const { signIn, isLoading, error, clearError, user } = useAuthStore();
+    const [showPassword, setShowPassword] = useState(false);
 
     const {
         register,
@@ -28,11 +31,9 @@ export default function Login() {
 
     useEffect(() => {
         if (user) {
-            // Redirect to last visited route or default to dashboard
+            // SECURITY: Validate redirect path to prevent open redirect attacks
             const lastRoute = localStorage.getItem('lastVisitedRoute');
-            const redirectTo = lastRoute && lastRoute !== '/auth/login' && lastRoute !== '/auth/register'
-                ? lastRoute
-                : '/dashboard';
+            const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
             navigate(redirectTo, { replace: true });
         }
     }, [user, navigate]);
@@ -128,14 +129,26 @@ export default function Login() {
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
                                     {...register("password")}
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
-                                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                                         errors.password
                                             ? "border-red-300"
                                             : "border-gray-300"
                                     }`}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="h-5 w-5" />
+                                    ) : (
+                                        <Eye className="h-5 w-5" />
+                                    )}
+                                </button>
                             </div>
                             {errors.password && (
                                 <p className="mt-1 text-sm text-red-600">
@@ -155,12 +168,12 @@ export default function Login() {
                                     Remember me
                                 </span>
                             </label>
-                            <a
-                                href="#"
-                                className="text-sm text-blue-600 hover:text-blue-700"
+                            <Link
+                                to="/auth/forgot-password"
+                                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                             >
                                 Forgot password?
-                            </a>
+                            </Link>
                         </div>
 
                         <button

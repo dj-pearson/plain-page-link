@@ -1,23 +1,14 @@
-import { useState } from "react";
-import { Plus, GripVertical, Edit, Trash2, ExternalLink, Instagram, Facebook, Home, Calendar, Link as LinkIcon, Linkedin, Music, Youtube, MapPin, Globe, Mail, Phone, MessageCircle, FileText } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, GripVertical, Edit, Trash2, ExternalLink, Instagram, Facebook, Home, Calendar, Link as LinkIcon, Linkedin, Music, Youtube, MapPin, Globe, Mail, Phone, MessageCircle, FileText, Undo2 } from "lucide-react";
 import { AddLinkModal } from "@/components/modals/AddLinkModal";
 import { EditLinkModal } from "@/components/modals/EditLinkModal";
 import type { LinkFormData } from "@/components/modals/AddLinkModal";
 import { useToast } from "@/hooks/use-toast";
 import { useLinks, type Link } from "@/hooks/useLinks";
+import { useSoftDelete } from "@/hooks/useSoftDelete";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 const getIconComponent = (iconName: string) => {
   const iconMap: Record<string, any> = {
@@ -43,12 +34,26 @@ export default function Links() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<Link | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { toast } = useToast();
   const { links, isLoading, addLink, updateLink, deleteLink, toggleActive } = useLinks();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
+
+  // Set up soft delete with undo
+  const { softDelete, isPendingDeletion, pendingCount } = useSoftDelete<Link>({
+    onDelete: async (id: string) => {
+      await deleteLink.mutateAsync(id);
+    },
+    deleteDelay: 10000, // 10 seconds
+    resourceName: "link",
+    undoMessage: (link) => `"${link.title}" will be deleted in 10 seconds. Click Undo to cancel.`,
+  });
+
+  // Filter out pending deletions from display
+  const visibleLinks = useMemo(
+    () => links.filter((link) => !isPendingDeletion(link.id)),
+    [links, isPendingDeletion]
+  );
 
   const handleAddClick = () => {
     if (!canAdd('links')) {
@@ -95,30 +100,8 @@ export default function Links() {
     }
   };
 
-  const handleDeleteClick = (id: string) => {
-    setDeletingLinkId(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deletingLinkId) return;
-    
-    try {
-      await deleteLink.mutateAsync(deletingLinkId);
-      toast({
-        title: "Link deleted",
-        description: "Your link has been removed successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete link. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setDeleteDialogOpen(false);
-      setDeletingLinkId(null);
-    }
+  const handleDeleteClick = (link: Link) => {
+    softDelete(link);
   };
 
   return (
@@ -152,18 +135,18 @@ export default function Links() {
       {/* Stats - Mobile optimized 3-column grid */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
-          <div className="text-xl sm:text-2xl font-bold text-foreground">{links.length}</div>
+          <div className="text-xl sm:text-2xl font-bold text-foreground">{visibleLinks.length}</div>
           <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Total</div>
         </div>
         <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
           <div className="text-xl sm:text-2xl font-bold text-green-600">
-            {links.filter((l) => l.is_active).length}
+            {visibleLinks.filter((l) => l.is_active).length}
           </div>
           <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Active</div>
         </div>
         <div className="bg-card border border-border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
           <div className="text-xl sm:text-2xl font-bold text-primary">
-            {links.reduce((sum, l) => sum + l.click_count, 0)}
+            {visibleLinks.reduce((sum, l) => sum + l.click_count, 0)}
           </div>
           <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Clicks</div>
         </div>
@@ -175,12 +158,12 @@ export default function Links() {
           <div className="p-6 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
             Loading links...
           </div>
-        ) : links.length === 0 ? (
+        ) : visibleLinks.length === 0 ? (
           <div className="p-6 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
             No links yet. Click "Add Link" to create your first link.
           </div>
         ) : (
-          links.map((link) => (
+          visibleLinks.map((link) => (
           <div
             key={link.id}
             className="p-3 sm:p-4 flex items-center gap-2 sm:gap-4 hover:bg-accent/50 active:bg-accent/70 transition-colors"
@@ -250,7 +233,7 @@ export default function Links() {
                 <Edit className="h-4 w-4 text-muted-foreground" />
               </button>
               <button
-                onClick={() => handleDeleteClick(link.id)}
+                onClick={() => handleDeleteClick(link)}
                 className="p-2 sm:p-2.5 hover:bg-red-50 active:bg-red-100 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                 aria-label="Delete link"
               >
@@ -283,24 +266,6 @@ export default function Links() {
         link={editingLink}
         onSave={handleUpdateLink}
       />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this link. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Upgrade Modal */}
       <UpgradeModal

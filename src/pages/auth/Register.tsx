@@ -1,32 +1,25 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Home, Mail, Lock, User, AlertCircle, Loader2 } from "lucide-react";
+import { Home, Mail, Lock, User, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
+import { useUsernameCheck } from "@/hooks/useUsernameCheck";
+import { Check, X, Loader2 as UsernameLoader } from "lucide-react";
+import { passwordSchema, usernameSchema, emailSchema } from "@/utils/validation";
+import { validateRedirectPath } from "@/utils/navigation";
 
 const registerSchema = z
     .object({
-        username: z.string().min(3, "Username must be at least 3 characters").regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
+        username: usernameSchema,
         name: z.string().min(2, "Name must be at least 2 characters"),
-        email: z.string().email("Please enter a valid email address"),
-        password: z.string().min(6, "Password must be at least 6 characters"),
-        confirmPassword: z.string(),
-        terms: z.boolean().refine((val) => val === true, {
-            message: "You must agree to the Terms of Service, Privacy Policy, DMCA Policy, and Acceptable Use Policy",
-        }),
-        photoOwnership: z.boolean().refine((val) => val === true, {
-            message: "You must certify that you own or have authorization to upload photos",
-        }),
-        mlsAcknowledgment: z.boolean().refine((val) => val === true, {
-            message: "You must acknowledge MLS photo restrictions",
-        }),
-        fairHousing: z.boolean().refine((val) => val === true, {
-            message: "You must acknowledge Fair Housing compliance obligations",
-        }),
-        fullResponsibility: z.boolean().refine((val) => val === true, {
-            message: "You must accept full legal responsibility for your content",
+        email: emailSchema,
+        password: passwordSchema,
+        confirmPassword: z.string().min(1, "Please confirm your password"),
+        agreedToTerms: z.boolean().refine((val) => val === true, {
+            message: "You must agree to the terms to create an account",
         }),
     })
     .refine((data) => data.password === data.confirmPassword, {
@@ -39,22 +32,28 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export default function Register() {
     const navigate = useNavigate();
     const { signUp, isLoading, error, clearError, user } = useAuthStore();
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [passwordValue, setPasswordValue] = useState("");
+    const { checkUsername, isChecking, error: usernameError, isAvailable } = useUsernameCheck();
+    const [usernameTouched, setUsernameTouched] = useState(false);
 
     const {
         register,
         handleSubmit,
         formState: { errors },
+        watch,
     } = useForm<RegisterFormData>({
         resolver: zodResolver(registerSchema),
     });
 
+    const usernameValue = watch("username");
+
     useEffect(() => {
         if (user) {
-            // Redirect to last visited route or default to dashboard
+            // SECURITY: Validate redirect path to prevent open redirect attacks
             const lastRoute = localStorage.getItem('lastVisitedRoute');
-            const redirectTo = lastRoute && lastRoute !== '/auth/login' && lastRoute !== '/auth/register'
-                ? lastRoute
-                : '/dashboard';
+            const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
             navigate(redirectTo, { replace: true });
         }
     }, [user, navigate]);
@@ -64,6 +63,14 @@ export default function Register() {
             clearError();
         };
     }, [clearError]);
+
+    // Check username availability when username changes
+    useEffect(() => {
+        if (usernameValue && usernameValue.length >= 3) {
+            checkUsername(usernameValue);
+            setUsernameTouched(true);
+        }
+    }, [usernameValue, checkUsername]);
 
     const onSubmit = async (data: RegisterFormData) => {
         try {
@@ -128,18 +135,42 @@ export default function Register() {
                                     {...register("username")}
                                     type="text"
                                     placeholder="johndoe"
-                                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                        errors.username
+                                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                        errors.username || (usernameTouched && usernameError)
                                             ? "border-red-300"
+                                            : usernameTouched && isAvailable
+                                            ? "border-green-300"
                                             : "border-gray-300"
                                     }`}
                                 />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    {isChecking && <UsernameLoader className="h-5 w-5 animate-spin text-blue-500" />}
+                                    {!isChecking && usernameTouched && isAvailable && (
+                                        <Check className="h-5 w-5 text-green-500" />
+                                    )}
+                                    {!isChecking && usernameTouched && (usernameError || isAvailable === false) && (
+                                        <X className="h-5 w-5 text-red-500" />
+                                    )}
+                                </div>
                             </div>
                             {errors.username && (
                                 <p className="mt-1 text-sm text-red-600">
                                     {errors.username.message}
                                 </p>
                             )}
+                            {!errors.username && usernameTouched && usernameError && (
+                                <p className="mt-1 text-sm text-red-600">
+                                    {usernameError}
+                                </p>
+                            )}
+                            {!errors.username && usernameTouched && isAvailable && !isChecking && (
+                                <p className="mt-1 text-sm text-green-600">
+                                    ✓ Username is available!
+                                </p>
+                            )}
+                            <p className="mt-1 text-xs text-gray-500">
+                                Your profile will be: agentbio.net/{usernameValue || 'username'}
+                            </p>
                         </div>
 
                         <div>
@@ -197,21 +228,36 @@ export default function Register() {
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
-                                    {...register("password")}
-                                    type="password"
+                                    {...register("password", {
+                                        onChange: (e) => setPasswordValue(e.target.value)
+                                    })}
+                                    type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
-                                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                                         errors.password
                                             ? "border-red-300"
                                             : "border-gray-300"
                                     }`}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="h-5 w-5" />
+                                    ) : (
+                                        <Eye className="h-5 w-5" />
+                                    )}
+                                </button>
                             </div>
                             {errors.password && (
                                 <p className="mt-1 text-sm text-red-600">
                                     {errors.password.message}
                                 </p>
                             )}
+                            <PasswordStrengthIndicator password={passwordValue} />
                         </div>
 
                         <div>
@@ -222,14 +268,26 @@ export default function Register() {
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
                                     {...register("confirmPassword")}
-                                    type="password"
+                                    type={showConfirmPassword ? "text" : "password"}
                                     placeholder="••••••••"
-                                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                                         errors.confirmPassword
                                             ? "border-red-300"
                                             : "border-gray-300"
                                     }`}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showConfirmPassword ? (
+                                        <EyeOff className="h-5 w-5" />
+                                    ) : (
+                                        <Eye className="h-5 w-5" />
+                                    )}
+                                </button>
                             </div>
                             {errors.confirmPassword && (
                                 <p className="mt-1 text-sm text-red-600">
@@ -238,118 +296,50 @@ export default function Register() {
                             )}
                         </div>
 
-                        {/* Simplified Legal Agreements Section */}
-                        <div className="space-y-4 border border-gray-300 rounded-lg p-4 bg-gray-50">
-                            <h3 className="font-semibold text-sm text-gray-900">Legal Agreements</h3>
-
-                            {/* Consolidated Agreement */}
-                            <div>
-                                <label className="flex items-start cursor-pointer group">
-                                    <input
-                                        {...register("terms")}
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-700">
-                                        I agree to the{" "}
-                                        <a
-                                            href="/terms"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
-                                        >
-                                            Terms
-                                        </a>,{" "}
-                                        <a
-                                            href="/privacy"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
-                                        >
-                                            Privacy Policy
-                                        </a>,{" "}
-                                        <a
-                                            href="/dmca"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
-                                        >
-                                            DMCA
-                                        </a>, and{" "}
-                                        <a
-                                            href="/acceptable-use"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-700 font-medium underline"
-                                        >
-                                            Acceptable Use Policy
-                                        </a>
-                                    </span>
-                                </label>
-                                {errors.terms && (
-                                    <p className="mt-1 text-sm text-red-600" role="alert">
-                                        {errors.terms.message}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Photo & Content Responsibility - Consolidated */}
-                            <div>
-                                <label className="flex items-start cursor-pointer">
-                                    <input
-                                        {...register("photoOwnership")}
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-700">
-                                        I certify I own or have proper authorization for all content I upload, and I accept full legal responsibility for my listings and photos
-                                    </span>
-                                </label>
-                                {errors.photoOwnership && (
-                                    <p className="mt-1 text-sm text-red-600" role="alert">
-                                        {errors.photoOwnership.message}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* MLS & Fair Housing - Consolidated */}
-                            <div>
-                                <label className="flex items-start cursor-pointer">
-                                    <input
-                                        {...register("mlsAcknowledgment")}
-                                        type="checkbox"
-                                        className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-700">
-                                        I understand MLS photo restrictions and will comply with Fair Housing laws
-                                    </span>
-                                </label>
-                                {errors.mlsAcknowledgment && (
-                                    <p className="mt-1 text-sm text-red-600" role="alert">
-                                        {errors.mlsAcknowledgment.message}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Combined Final Acknowledgment */}
-                            <div className="hidden">
+                        {/* Simplified Legal Agreement - Single Checkbox */}
+                        <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                            <label className="flex items-start cursor-pointer group">
                                 <input
-                                    {...register("fairHousing")}
+                                    {...register("agreedToTerms")}
                                     type="checkbox"
-                                    checked
-                                    readOnly
+                                    className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                                 />
-                                <input
-                                    {...register("fullResponsibility")}
-                                    type="checkbox"
-                                    checked
-                                    readOnly
-                                />
-                            </div>
-
-                            <p className="text-xs text-gray-500 italic mt-2">
-                                By creating an account, you agree to use AgentBio.net responsibly and in compliance with all applicable laws.
-                            </p>
+                                <span className="ml-2 text-sm text-gray-700">
+                                    I agree to the{" "}
+                                    <a
+                                        href="/terms"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 font-medium underline"
+                                    >
+                                        Terms of Service
+                                    </a>
+                                    ,{" "}
+                                    <a
+                                        href="/privacy"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 font-medium underline"
+                                    >
+                                        Privacy Policy
+                                    </a>
+                                    , and{" "}
+                                    <a
+                                        href="/legal/acceptable-use"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 font-medium underline"
+                                    >
+                                        Acceptable Use Policy
+                                    </a>
+                                    . I will comply with MLS photo restrictions and Fair Housing laws, and I accept responsibility for all content I upload.
+                                </span>
+                            </label>
+                            {errors.agreedToTerms && (
+                                <p className="mt-2 text-sm text-red-600" role="alert">
+                                    {errors.agreedToTerms.message}
+                                </p>
+                            )}
                         </div>
 
                         <button

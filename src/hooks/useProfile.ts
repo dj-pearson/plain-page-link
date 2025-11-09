@@ -9,6 +9,35 @@ export interface Profile {
   bio?: string;
   avatar_url?: string;
   theme?: string;
+
+  // Professional Information
+  title?: string;
+  license_number?: string;
+  license_state?: string;
+  brokerage_name?: string;
+  brokerage_logo?: string;
+  years_experience?: number;
+  specialties?: string[];
+  certifications?: string[];
+
+  // Contact Information
+  phone?: string;
+  email_display?: string;
+  website_url?: string;
+
+  // Service Areas
+  service_cities?: string[];
+  service_zip_codes?: string[];
+
+  // Social Media URLs
+  facebook_url?: string;
+  instagram_url?: string;
+  linkedin_url?: string;
+  tiktok_url?: string;
+  youtube_url?: string;
+  zillow_url?: string;
+  realtor_com_url?: string;
+
   created_at: string;
   updated_at: string;
 }

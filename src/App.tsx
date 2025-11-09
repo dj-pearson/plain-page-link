@@ -15,9 +15,16 @@ import Landing from "./pages/public/Landing";
 import ProfilePage from "./pages/public/FullProfilePage";
 import NotFound from "./pages/public/NotFound";
 
+// Lazy load public review page
+const SubmitReview = lazy(() => import("./pages/public/SubmitReview"));
+
 // Auth pages (eager load for better UX)
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+
+// Lazy load auth recovery pages
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
 
 // Lazy load legal pages
 const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
@@ -110,11 +117,14 @@ function App() {
                     <Route path="/blog/category/:category" element={<BlogCategory />} />
                     <Route path="/blog/:slug" element={<BlogArticle />} />
                     <Route path="/p/:slug" element={<PublicPage />} />
+                    <Route path="/:username/review" element={<SubmitReview />} />
                     <Route path="/:slug" element={<ProfilePage />} />
 
                     {/* Auth routes */}
                     <Route path="/auth/login" element={<Login />} />
                     <Route path="/auth/register" element={<Register />} />
+                    <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/auth/reset-password" element={<ResetPassword />} />
 
                     {/* Dashboard routes (protected) */}
                     <Route
