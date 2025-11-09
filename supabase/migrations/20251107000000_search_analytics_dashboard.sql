@@ -639,6 +639,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
   inserted_count INTEGER := 0;
+  row_count_temp INTEGER;
 BEGIN
   -- Insert/Update GSC data
   INSERT INTO public.unified_search_analytics (
@@ -670,7 +671,8 @@ BEGIN
     average_position = EXCLUDED.average_position,
     updated_at = now();
 
-  GET DIAGNOSTICS inserted_count = ROW_COUNT;
+  GET DIAGNOSTICS row_count_temp = ROW_COUNT;
+  inserted_count := inserted_count + row_count_temp;
 
   -- Insert/Update GA4 data
   INSERT INTO public.unified_search_analytics (
@@ -704,7 +706,8 @@ BEGIN
     engagement_rate = EXCLUDED.engagement_rate,
     updated_at = now();
 
-  GET DIAGNOSTICS inserted_count = inserted_count + ROW_COUNT;
+  GET DIAGNOSTICS row_count_temp = ROW_COUNT;
+  inserted_count := inserted_count + row_count_temp;
 
   -- Insert/Update Bing data
   INSERT INTO public.unified_search_analytics (
@@ -736,7 +739,8 @@ BEGIN
     average_position = EXCLUDED.average_position,
     updated_at = now();
 
-  GET DIAGNOSTICS inserted_count = inserted_count + ROW_COUNT;
+  GET DIAGNOSTICS row_count_temp = ROW_COUNT;
+  inserted_count := inserted_count + row_count_temp;
 
   -- Insert/Update Yandex data
   INSERT INTO public.unified_search_analytics (
@@ -767,7 +771,8 @@ BEGIN
     average_position = EXCLUDED.average_position,
     updated_at = now();
 
-  GET DIAGNOSTICS inserted_count = inserted_count + ROW_COUNT;
+  GET DIAGNOSTICS row_count_temp = ROW_COUNT;
+  inserted_count := inserted_count + row_count_temp;
 
   RETURN inserted_count;
 END;
