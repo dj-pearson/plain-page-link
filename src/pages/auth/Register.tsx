@@ -8,14 +8,16 @@ import { useEffect, useState } from "react";
 import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
 import { useUsernameCheck } from "@/hooks/useUsernameCheck";
 import { Check, X, Loader2 as UsernameLoader } from "lucide-react";
+import { passwordSchema, usernameSchema, emailSchema } from "@/utils/validation";
+import { validateRedirectPath } from "@/utils/navigation";
 
 const registerSchema = z
     .object({
-        username: z.string().min(3, "Username must be at least 3 characters").regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
+        username: usernameSchema,
         name: z.string().min(2, "Name must be at least 2 characters"),
-        email: z.string().email("Please enter a valid email address"),
-        password: z.string().min(6, "Password must be at least 6 characters"),
-        confirmPassword: z.string(),
+        email: emailSchema,
+        password: passwordSchema,
+        confirmPassword: z.string().min(1, "Please confirm your password"),
         agreedToTerms: z.boolean().refine((val) => val === true, {
             message: "You must agree to the terms to create an account",
         }),
@@ -49,11 +51,9 @@ export default function Register() {
 
     useEffect(() => {
         if (user) {
-            // Redirect to last visited route or default to dashboard
+            // SECURITY: Validate redirect path to prevent open redirect attacks
             const lastRoute = localStorage.getItem('lastVisitedRoute');
-            const redirectTo = lastRoute && lastRoute !== '/auth/login' && lastRoute !== '/auth/register'
-                ? lastRoute
-                : '/dashboard';
+            const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
             navigate(redirectTo, { replace: true });
         }
     }, [user, navigate]);

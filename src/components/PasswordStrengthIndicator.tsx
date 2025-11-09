@@ -7,10 +7,13 @@ export const PasswordStrengthIndicator = ({ password }: PasswordStrengthIndicato
     let strength = 0;
     if (pwd.length === 0) return 0;
 
+    // SECURITY FIX: Enforce minimum 12 characters
+    if (pwd.length < 12) return 0;
+
     // Length checks
-    if (pwd.length >= 6) strength++;
-    if (pwd.length >= 10) strength++;
+    if (pwd.length >= 12) strength++;
     if (pwd.length >= 14) strength++;
+    if (pwd.length >= 16) strength++;
 
     // Character variety checks
     if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) strength++; // Mixed case
@@ -21,6 +24,7 @@ export const PasswordStrengthIndicator = ({ password }: PasswordStrengthIndicato
   };
 
   const strength = getPasswordStrength(password);
+  const passwordTooShort = password.length > 0 && password.length < 12;
 
   const getStrengthLabel = (str: number): string => {
     if (str === 0) return '';
@@ -41,6 +45,11 @@ export const PasswordStrengthIndicator = ({ password }: PasswordStrengthIndicato
 
   return (
     <div className="mt-2">
+      {passwordTooShort && (
+        <p className="text-xs text-red-600 font-medium mb-2">
+          ⚠ Password must be at least 12 characters
+        </p>
+      )}
       <div className="flex gap-1">
         {[...Array(5)].map((_, i) => (
           <div

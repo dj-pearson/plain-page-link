@@ -23,8 +23,27 @@ export default function ResetPassword() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    // SECURITY FIX: Enforce 12 character minimum
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters");
+      return;
+    }
+
+    // Additional password strength checks
+    if (!/[a-z]/.test(password)) {
+      setError("Password must contain at least one lowercase letter");
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/\d/.test(password)) {
+      setError("Password must contain at least one number");
+      return;
+    }
+    if (!/[^a-zA-Z\d]/.test(password)) {
+      setError("Password must contain at least one special character");
       return;
     }
 

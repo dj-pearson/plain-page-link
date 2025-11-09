@@ -5,10 +5,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect, useState } from "react";
+import { emailSchema } from "@/utils/validation";
+import { validateRedirectPath } from "@/utils/navigation";
 
 const loginSchema = z.object({
-    email: z.string().email("Please enter a valid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    email: emailSchema,
+    password: z.string().min(1, "Password is required"),
     remember: z.boolean().optional(),
 });
 
@@ -29,11 +31,9 @@ export default function Login() {
 
     useEffect(() => {
         if (user) {
-            // Redirect to last visited route or default to dashboard
+            // SECURITY: Validate redirect path to prevent open redirect attacks
             const lastRoute = localStorage.getItem('lastVisitedRoute');
-            const redirectTo = lastRoute && lastRoute !== '/auth/login' && lastRoute !== '/auth/register'
-                ? lastRoute
-                : '/dashboard';
+            const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
             navigate(redirectTo, { replace: true });
         }
     }, [user, navigate]);

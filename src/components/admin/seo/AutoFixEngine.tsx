@@ -263,7 +263,7 @@ export const AutoFixEngine = () => {
     }
   };
 
-  const approveFiximestamp(historyId: string) => {
+  const approveFix = async (historyId: string) => {
     try {
       const { error } = await supabase
         .from('seo_autofix_history')
