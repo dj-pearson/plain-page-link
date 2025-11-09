@@ -21,10 +21,15 @@ CREATE TABLE IF NOT EXISTS error_logs (
 );
 
 -- Indexes
-CREATE INDEX idx_error_logs_created_at ON error_logs(created_at DESC);
-CREATE INDEX idx_error_logs_user_id ON error_logs(user_id);
-CREATE INDEX idx_error_logs_severity ON error_logs(severity) WHERE NOT resolved;
-CREATE INDEX idx_error_logs_resolved ON error_logs(resolved);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'error_logs' AND column_name = 'severity') THEN
+    CREATE INDEX IF NOT EXISTS idx_error_logs_created_at ON error_logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_error_logs_user_id ON error_logs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_error_logs_severity ON error_logs(severity) WHERE NOT resolved;
+    CREATE INDEX IF NOT EXISTS idx_error_logs_resolved ON error_logs(resolved);
+  END IF;
+END $$;
 
 COMMENT ON TABLE error_logs IS 'Centralized error logging for the entire application';
 
@@ -43,9 +48,14 @@ CREATE TABLE IF NOT EXISTS system_metrics (
 );
 
 -- Indexes
-CREATE INDEX idx_system_metrics_recorded_at ON system_metrics(recorded_at DESC);
-CREATE INDEX idx_system_metrics_type_name ON system_metrics(metric_type, metric_name);
-CREATE INDEX idx_system_metrics_type ON system_metrics(metric_type);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'system_metrics' AND column_name = 'metric_type') THEN
+    CREATE INDEX IF NOT EXISTS idx_system_metrics_recorded_at ON system_metrics(recorded_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_system_metrics_type_name ON system_metrics(metric_type, metric_name);
+    CREATE INDEX IF NOT EXISTS idx_system_metrics_type ON system_metrics(metric_type);
+  END IF;
+END $$;
 
 -- Partitioning hint: Consider partitioning by recorded_at for large datasets
 COMMENT ON TABLE system_metrics IS 'Real-time system health and performance metrics';
@@ -67,10 +77,15 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 );
 
 -- Indexes
-CREATE INDEX idx_admin_audit_log_admin_id ON admin_audit_log(admin_id);
-CREATE INDEX idx_admin_audit_log_created_at ON admin_audit_log(created_at DESC);
-CREATE INDEX idx_admin_audit_log_action ON admin_audit_log(action);
-CREATE INDEX idx_admin_audit_log_target ON admin_audit_log(target_type, target_id);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'admin_audit_log' AND column_name = 'admin_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_admin_audit_log_admin_id ON admin_audit_log(admin_id);
+    CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created_at ON admin_audit_log(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_admin_audit_log_action ON admin_audit_log(action);
+    CREATE INDEX IF NOT EXISTS idx_admin_audit_log_target ON admin_audit_log(target_type, target_id);
+  END IF;
+END $$;
 
 COMMENT ON TABLE admin_audit_log IS 'Complete audit trail of all admin operations';
 
@@ -88,9 +103,14 @@ CREATE TABLE IF NOT EXISTS user_activity_log (
 );
 
 -- Indexes
-CREATE INDEX idx_user_activity_log_user_id ON user_activity_log(user_id);
-CREATE INDEX idx_user_activity_log_created_at ON user_activity_log(created_at DESC);
-CREATE INDEX idx_user_activity_log_type ON user_activity_log(activity_type);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_activity_log' AND column_name = 'user_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_user_activity_log_user_id ON user_activity_log(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_activity_log_created_at ON user_activity_log(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_user_activity_log_type ON user_activity_log(activity_type);
+  END IF;
+END $$;
 
 COMMENT ON TABLE user_activity_log IS 'User activity tracking for debugging and support';
 
