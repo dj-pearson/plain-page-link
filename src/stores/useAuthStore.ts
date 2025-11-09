@@ -32,65 +32,109 @@ export const useAuthStore = create<AuthState>()(
       error: null,
 
       initialize: async () => {
-        set({ isLoading: true });
-        
+        // Check if we already have a valid session from Supabase storage
+        // This prevents unnecessary loading states on reload
+        const existingSession = await supabase.auth.getSession();
+
+        if (existingSession.data.session) {
+          // We have a session, optimistically set user to reduce flicker
+          set({
+            user: existingSession.data.session.user,
+            session: existingSession.data.session,
+            isLoading: true, // Still loading profile/role data
+          });
+        } else {
+          set({ isLoading: true });
+        }
+
         try {
-          // Get current session
+          // Get current session (this will also refresh if needed)
           const { data: { session } } = await supabase.auth.getSession();
-          
+
           if (session?.user) {
-            // Fetch profile
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            
-            // Fetch roles (prioritize admin)
-            const { data: userRoles } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .order('role', { ascending: true }); // 'admin' comes before 'user'
-            
-            const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
-            
+            // Fetch profile and roles in parallel for better performance
+            const [profileResult, rolesResult] = await Promise.all([
+              supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single(),
+              supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', session.user.id)
+                .order('role', { ascending: true })
+            ]);
+
+            const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+
             set({
               user: session.user,
               session,
-              profile: profile || null,
+              profile: profileResult.data || null,
               role: role,
               isLoading: false,
             });
           } else {
-            set({ isLoading: false });
+            set({
+              user: null,
+              session: null,
+              profile: null,
+              role: null,
+              isLoading: false
+            });
           }
         } catch (error: any) {
           console.error('Auth initialization error:', error);
-          set({ isLoading: false, error: error.message });
+          set({
+            user: null,
+            session: null,
+            profile: null,
+            role: null,
+            isLoading: false,
+            error: error.message
+          });
         }
 
-        // Set up auth state listener
+        // Set up auth state listener for session changes
         supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('Auth state change:', event, session?.user?.id);
+
+          if (event === 'SIGNED_OUT') {
+            set({
+              session: null,
+              user: null,
+              profile: null,
+              role: null
+            });
+            return;
+          }
+
+          if (event === 'TOKEN_REFRESHED') {
+            set({ session, user: session?.user ?? null });
+            return;
+          }
+
           set({ session, user: session?.user ?? null });
 
           if (session?.user) {
-            // Fetch user data immediately without setTimeout
+            // Fetch user data for new sessions or sign-ins
             try {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
+              const [profileResult, rolesResult] = await Promise.all([
+                supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', session.user.id)
+                  .single(),
+                supabase
+                  .from('user_roles')
+                  .select('role')
+                  .eq('user_id', session.user.id)
+                  .order('role', { ascending: true })
+              ]);
 
-              const { data: userRoles } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', session.user.id)
-                .order('role', { ascending: true });
-
-              const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
-              set({ profile: profile || null, role });
+              const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+              set({ profile: profileResult.data || null, role });
             } catch (error) {
               console.error('Error fetching user data in auth state listener:', error);
             }
@@ -229,7 +273,10 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        // Don't persist sensitive data, just let Supabase handle it
+        // Only persist non-sensitive metadata for faster initial load
+        // Supabase handles actual session/token storage
+        profile: state.profile,
+        role: state.role,
       }),
     }
   )

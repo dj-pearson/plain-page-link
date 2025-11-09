@@ -33,10 +33,11 @@ const ALLOWED_REDIRECT_PATHS = [
 /**
  * Validate and sanitize a redirect path
  * Prevents open redirect attacks by only allowing internal paths
+ * PRESERVES query parameters and hash fragments for better UX
  *
  * @param path - Untrusted redirect path (e.g., from localStorage or URL params)
  * @param defaultPath - Default safe path to use if validation fails
- * @returns Safe redirect path
+ * @returns Safe redirect path with preserved query params and hash
  */
 export function validateRedirectPath(
   path: string | null | undefined,
@@ -47,8 +48,9 @@ export function validateRedirectPath(
     return defaultPath;
   }
 
-  // Remove query params and hash
-  const cleanPath = path.split('?')[0].split('#')[0];
+  // Extract path, query params, and hash
+  const [pathWithQuery, hash] = path.split('#');
+  const [cleanPath, queryString] = pathWithQuery.split('?');
 
   // Must start with / and not with //
   if (!cleanPath.startsWith('/') || cleanPath.startsWith('//')) {
@@ -66,7 +68,16 @@ export function validateRedirectPath(
     return defaultPath;
   }
 
-  return cleanPath;
+  // Reconstruct path with preserved query params and hash
+  let result = cleanPath;
+  if (queryString) {
+    result += '?' + queryString;
+  }
+  if (hash) {
+    result += '#' + hash;
+  }
+
+  return result;
 }
 
 /**
