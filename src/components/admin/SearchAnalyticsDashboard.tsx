@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Download, Settings as SettingsIcon } from 'lucide-react';
+import { RefreshCw, Download, Settings as SettingsIcon, FileText } from 'lucide-react';
 import { PlatformConnections } from './searchAnalytics/PlatformConnections';
 import { MetricsOverview } from './searchAnalytics/MetricsOverview';
 import { AnalyticsCharts } from './searchAnalytics/AnalyticsCharts';
@@ -12,7 +12,14 @@ import { DateRangePicker } from './searchAnalytics/DateRangePicker';
 import { PlatformFilter } from './searchAnalytics/PlatformFilter';
 import { useAggregateAnalytics } from '@/hooks/useSearchAnalytics';
 import { useToast } from '@/hooks/use-toast';
+import { exportToCSV, exportToPDF, formatAnalyticsForExport } from '@/lib/exportUtils';
 import type { SearchPlatform } from '@/types/searchAnalytics';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export function SearchAnalyticsDashboard() {
   const { toast } = useToast();
@@ -39,12 +46,45 @@ export function SearchAnalyticsDashboard() {
     }
   };
 
-  const handleExportData = () => {
+  const handleExportCSV = () => {
+    // Mock data - replace with actual data from your analytics state/props
+    const mockQueries = [
+      { query: 'luxury homes Los Angeles', clicks: 245, impressions: 1230, ctr: 0.199, position: 3.2 },
+      { query: 'real estate agent near me', clicks: 189, impressions: 2100, ctr: 0.09, position: 5.8 },
+      { query: 'homes for sale Beverly Hills', clicks: 167, impressions: 890, ctr: 0.188, position: 2.1 },
+      { query: 'best realtor LA', clicks: 134, impressions: 1500, ctr: 0.089, position: 7.3 },
+      { query: 'property listings California', clicks: 98, impressions: 670, ctr: 0.146, position: 4.5 },
+    ];
+
+    const dateRangeText = `${dateRange.start} to ${dateRange.end}`;
+    const exportData = formatAnalyticsForExport(mockQueries, 'Search Analytics Report', dateRangeText);
+
+    exportToCSV(exportData);
+
     toast({
-      title: 'Export Started',
-      description: 'Your analytics data is being prepared for export...',
+      title: 'Exported to CSV',
+      description: 'Your analytics data has been downloaded.',
     });
-    // TODO: Implement export functionality
+  };
+
+  const handleExportPDF = () => {
+    const mockQueries = [
+      { query: 'luxury homes Los Angeles', clicks: 245, impressions: 1230, ctr: 0.199, position: 3.2 },
+      { query: 'real estate agent near me', clicks: 189, impressions: 2100, ctr: 0.09, position: 5.8 },
+      { query: 'homes for sale Beverly Hills', clicks: 167, impressions: 890, ctr: 0.188, position: 2.1 },
+      { query: 'best realtor LA', clicks: 134, impressions: 1500, ctr: 0.089, position: 7.3 },
+      { query: 'property listings California', clicks: 98, impressions: 670, ctr: 0.146, position: 4.5 },
+    ];
+
+    const dateRangeText = `${dateRange.start} to ${dateRange.end}`;
+    const exportData = formatAnalyticsForExport(mockQueries, 'Search Analytics Report', dateRangeText);
+
+    exportToPDF(exportData);
+
+    toast({
+      title: 'Opening PDF',
+      description: 'Your analytics report is being prepared for printing.',
+    });
   };
 
   return (
@@ -60,10 +100,24 @@ export function SearchAnalyticsDashboard() {
           <RefreshCw className={`h-4 w-4 mr-2 ${aggregateMutation.isPending ? 'animate-spin' : ''}`} />
           Refresh Data
         </Button>
-        <Button variant="outline" size="sm" onClick={handleExportData}>
-          <Download className="h-4 w-4 mr-2" />
-          Export
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportCSV}>
+              <FileText className="h-4 w-4 mr-2" />
+              Export to CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportPDF}>
+              <FileText className="h-4 w-4 mr-2" />
+              Export to PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button variant="outline" size="sm">
           <SettingsIcon className="h-4 w-4 mr-2" />
           Settings

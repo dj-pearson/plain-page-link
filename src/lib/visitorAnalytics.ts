@@ -325,21 +325,41 @@ class VisitorAnalyticsEngine {
         this.events = [];
 
         try {
-            // TODO: Implement actual API call
-            // await api.sendAnalytics(eventsToSend);
+            // Try to send to API
+            const { supabase } = await import("@/integrations/supabase/client");
 
-            // For now, store in localStorage
+            const { error } = await supabase.functions.invoke('ingest-analytics', {
+                body: { events: eventsToSend },
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            console.log("Analytics events sent to database:", eventsToSend.length);
+
+            // Also store in localStorage as backup for offline viewing
             const storageKey = `analytics_${this.getCurrentPageSlug()}`;
             const existing = localStorage.getItem(storageKey);
             const allEvents = existing
                 ? [...JSON.parse(existing), ...eventsToSend]
                 : eventsToSend;
-            localStorage.setItem(storageKey, JSON.stringify(allEvents));
 
-            console.log("Analytics events sent:", eventsToSend.length);
+            // Keep only last 1000 events in localStorage to prevent storage bloat
+            const recentEvents = allEvents.slice(-1000);
+            localStorage.setItem(storageKey, JSON.stringify(recentEvents));
         } catch (error) {
-            console.error("Failed to send analytics:", error);
-            // Put events back in queue
+            console.error("Failed to send analytics to database:", error);
+
+            // Fallback to localStorage only
+            const storageKey = `analytics_${this.getCurrentPageSlug()}`;
+            const existing = localStorage.getItem(storageKey);
+            const allEvents = existing
+                ? [...JSON.parse(existing), ...eventsToSend]
+                : eventsToSend;
+            localStorage.setItem(storageKey, JSON.stringify(allEvents.slice(-1000)));
+
+            // Put events back in queue for retry
             this.events.unshift(...eventsToSend);
         }
     }

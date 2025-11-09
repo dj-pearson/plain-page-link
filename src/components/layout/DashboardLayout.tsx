@@ -15,15 +15,23 @@ import {
     Shield,
     Zap,
     FileText,
+    Copy,
+    Check,
+    Share2,
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile/MobileNav";
 import { Badge } from "@/components/ui/badge";
 import { SkipLink } from "@/components/SkipLink";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function DashboardLayout() {
     const location = useLocation();
     const navigate = useNavigate();
     const { profile, signOut, role } = useAuthStore();
+    const { toast } = useToast();
+    const [copied, setCopied] = useState(false);
 
     const isActive = (path: string) => {
         return location.pathname === path;
@@ -42,6 +50,40 @@ export default function DashboardLayout() {
             .join("")
             .toUpperCase()
             .slice(0, 2);
+    };
+
+    const handleCopyProfileURL = async () => {
+        if (!profile?.username) return;
+
+        const profileURL = `${window.location.origin}/${profile.username}`;
+
+        try {
+            if (navigator.share && /mobile|android|ios|iphone|ipad/i.test(navigator.userAgent)) {
+                await navigator.share({
+                    title: `${profile.full_name || 'My'} AgentBio Profile`,
+                    url: profileURL,
+                });
+                toast({
+                    title: "Shared!",
+                    description: "Profile link shared successfully",
+                });
+            } else {
+                await navigator.clipboard.writeText(profileURL);
+                setCopied(true);
+                toast({
+                    title: "Copied!",
+                    description: "Profile link copied to clipboard",
+                });
+                setTimeout(() => setCopied(false), 2000);
+            }
+        } catch (error) {
+            console.error('Failed to copy/share:', error);
+            toast({
+                title: "Failed to copy",
+                description: "Please try again",
+                variant: "destructive",
+            });
+        }
     };
 
     return (
@@ -165,16 +207,51 @@ export default function DashboardLayout() {
                         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
                             Dashboard
                         </h1>
-                        <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                            {profile?.username && (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleCopyProfileURL}
+                                        className="gap-2 hidden md:flex"
+                                        aria-label="Copy profile URL to clipboard"
+                                    >
+                                        {copied ? (
+                                            <>
+                                                <Check className="h-4 w-4 text-green-600" />
+                                                <span>Copied!</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Copy className="h-4 w-4" />
+                                                <span>Copy Link</span>
+                                            </>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleCopyProfileURL}
+                                        className="md:hidden p-2"
+                                        aria-label="Share profile URL"
+                                    >
+                                        {copied ? (
+                                            <Check className="h-4 w-4 text-green-600" />
+                                        ) : (
+                                            <Share2 className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                </>
+                            )}
                             <Link
                                 to={`/${profile?.username || ""}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap min-h-[44px] flex items-center"
+                                className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap min-h-[44px] flex items-center hidden sm:flex"
                                 aria-label={`View your public profile page as ${profile?.username}`}
                             >
-                                <span className="hidden sm:inline">View My Public Profile</span>
-                                <span className="sm:hidden">Profile</span> →
+                                View Profile →
                             </Link>
                             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                                 <span className="text-sm sm:text-base text-blue-600 font-semibold">

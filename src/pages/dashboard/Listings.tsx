@@ -12,6 +12,9 @@ import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
 import { SocialShareDialog } from "@/components/listings/SocialShareDialog";
 import { useProfile } from "@/hooks/useProfile";
+import { KeyboardShortcutsHelper } from "@/components/dashboard/KeyboardShortcutsHelper";
+import { QuickStatusUpdate } from "@/components/dashboard/QuickStatusUpdate";
+import { useNavigate } from "react-router-dom";
 
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,6 +28,35 @@ export default function Listings() {
   const { uploadListingImages, uploading: uploadingImages } = useListingImageUpload();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
   const { profile } = useProfile();
+  const navigate = useNavigate();
+
+  // Define keyboard shortcuts
+  const shortcuts = [
+    {
+      key: "n",
+      description: "Add new listing",
+      action: () => handleAddClick(),
+      category: "Actions",
+    },
+    {
+      key: "d",
+      description: "Go to Dashboard",
+      action: () => navigate("/dashboard"),
+      category: "Navigation",
+    },
+    {
+      key: "l",
+      description: "Go to Leads",
+      action: () => navigate("/dashboard/leads"),
+      category: "Navigation",
+    },
+    {
+      key: "a",
+      description: "Go to Analytics",
+      action: () => navigate("/dashboard/analytics"),
+      category: "Navigation",
+    },
+  ];
 
   const handleAddClick = () => {
     if (!canAdd('listings')) {
@@ -236,15 +268,14 @@ export default function Listings() {
                 loading="lazy"
               />
               <div className="absolute top-2 sm:top-3 left-2 sm:left-3">
-                <span
-                  className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
-                    listing.status === "active"
-                      ? "bg-green-500 text-white shadow-md"
-                      : "bg-yellow-500 text-white shadow-md"
-                  }`}
-                >
-                  {listing.status}
-                </span>
+                <QuickStatusUpdate
+                  listingId={listing.id}
+                  currentStatus={listing.status}
+                  onStatusChange={(newStatus) => {
+                    // Optimistically update local state
+                    listing.status = newStatus;
+                  }}
+                />
               </div>
               <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 sm:gap-2">
                 <button
@@ -367,6 +398,9 @@ export default function Listings() {
           agentName={profile?.full_name}
         />
       )}
+
+      {/* Keyboard Shortcuts */}
+      <KeyboardShortcutsHelper shortcuts={shortcuts} />
     </div>
   );
 }

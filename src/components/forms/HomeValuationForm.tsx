@@ -19,7 +19,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { TrendingUp, Loader2, CheckCircle } from "lucide-react";
+import { TrendingUp, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { submitLead, trackFormSubmission } from "@/lib/leadSubmission";
+import { useToast } from "@/hooks/use-toast";
 
 const valuationSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -49,6 +51,8 @@ export function HomeValuationForm({
 }: HomeValuationFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const { toast } = useToast();
 
     const {
         register,
@@ -62,26 +66,55 @@ export function HomeValuationForm({
 
     const onSubmit = async (data: ValuationFormData) => {
         setIsSubmitting(true);
+        setError(null);
+
         try {
-            // TODO: Integrate with API
-            console.log("Valuation request submitted:", {
-                ...data,
+            const result = await submitLead({
                 agentId,
                 leadType: "valuation",
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                data: {
+                    address: data.address,
+                    propertyType: data.propertyType,
+                    bedrooms: data.bedrooms,
+                    bathrooms: data.bathrooms,
+                    squareFeet: data.squareFeet,
+                    yearBuilt: data.yearBuilt,
+                    condition: data.condition,
+                },
             });
 
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            if (result.success) {
+                trackFormSubmission("valuation_request", true);
+                toast({
+                    title: "Valuation Request Submitted!",
+                    description: `${agentName} will send you a detailed report within 24 hours.`,
+                });
+                setIsSuccess(true);
+                reset();
 
-            setIsSuccess(true);
-            reset();
-
-            setTimeout(() => {
-                setIsSuccess(false);
-                onSuccess?.();
-            }, 3000);
+                setTimeout(() => {
+                    setIsSuccess(false);
+                    onSuccess?.();
+                }, 3000);
+            } else {
+                throw new Error(result.error || "Failed to submit valuation request");
+            }
         } catch (error) {
             console.error("Error submitting valuation request:", error);
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : "Failed to submit valuation request. Please try again.";
+            setError(errorMessage);
+            trackFormSubmission("valuation_request", false);
+            toast({
+                title: "Submission Failed",
+                description: errorMessage,
+                variant: "destructive",
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -122,6 +155,18 @@ export function HomeValuationForm({
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <h4 className="font-semibold text-red-900 text-sm">
+                                    Submission Error
+                                </h4>
+                                <p className="text-sm text-red-700 mt-1">{error}</p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                             label="Your Name"

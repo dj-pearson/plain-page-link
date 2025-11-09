@@ -4,6 +4,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { sendEmail } from '../_shared/email.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -20,11 +21,11 @@ serve(async (req) => {
     )
 
     // Parse request body
-    const { name, email, phone, message, listingId, agentId } = await req.json()
+    const { name, email, phone, message, listingId, agentId, leadId, type, data } = await req.json()
 
     // Validate required fields
-    if (!name || !email || !message) {
-      throw new Error('Missing required fields: name, email, message')
+    if (!name || !email) {
+      throw new Error('Missing required fields: name, email')
     }
 
     // Validate email format
@@ -33,51 +34,101 @@ serve(async (req) => {
       throw new Error('Invalid email format')
     }
 
-    // Insert lead into database
-    const { data, error } = await supabaseClient
-      .from('leads')
-      .insert({
-        agent_id: agentId,
-        name,
-        email,
-        phone: phone || null,
-        type: 'contact',
-        data: {
-          message,
-          listingId,
-        },
-        source: 'website',
-        status: 'new',
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Database error:', error)
-      throw new Error('Failed to submit contact form')
+    // If leadId is provided, fetch the lead; otherwise it was already created by the client
+    let leadData = null
+    if (leadId) {
+      const { data: lead } = await supabaseClient
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .single()
+      leadData = lead
     }
 
-    // TODO: Send email notification to agent
-    // You can use Resend, SendGrid, or any email service here
-    // Example:
-    // await sendEmailNotification({
-    //   to: agentEmail,
-    //   subject: `New contact form submission from ${name}`,
-    //   body: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nMessage: ${message}`
-    // })
+    // Get agent info for personalized emails
+    const { data: agentProfile } = await supabaseClient
+      .from('profiles')
+      .select('full_name, email, phone')
+      .eq('id', agentId)
+      .single()
 
-    // TODO: Send auto-response email to lead
-    // await sendEmailNotification({
-    //   to: email,
-    //   subject: 'Thank you for contacting us',
-    //   body: 'We have received your message and will get back to you soon.'
-    // })
+    const agentName = agentProfile?.full_name || 'Your Agent'
+    const agentEmail = agentProfile?.email
+
+    // Send email notification to agent
+    if (agentEmail) {
+      try {
+        const leadTypeLabel = type === 'buyer' ? 'Buyer Inquiry' :
+                            type === 'seller' ? 'Seller Inquiry' :
+                            type === 'valuation' ? 'Home Valuation Request' :
+                            'Contact Form Submission'
+
+        let emailBody = `You have received a new ${leadTypeLabel}:\n\n`
+        emailBody += `Name: ${name}\n`
+        emailBody += `Email: ${email}\n`
+        if (phone) emailBody += `Phone: ${phone}\n`
+
+        // Add type-specific details
+        if (data) {
+          emailBody += '\n--- Details ---\n'
+          Object.entries(data).forEach(([key, value]) => {
+            if (value) {
+              const label = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')
+              emailBody += `${label}: ${value}\n`
+            }
+          })
+        }
+
+        emailBody += `\n---\nSubmitted via AgentBio.net\n`
+
+        await sendEmail({
+          to: agentEmail,
+          subject: `🎯 New ${leadTypeLabel} from ${name}`,
+          body: emailBody,
+        })
+      } catch (error) {
+        console.error('Failed to send agent notification:', error)
+        // Don't fail the whole request if email fails
+      }
+    }
+
+    // Send auto-response email to lead
+    try {
+      const responseSubject = type === 'valuation' ?
+        'Your Home Valuation Request' :
+        type === 'seller' ?
+        'Your Listing Inquiry' :
+        `Thank you for contacting ${agentName}`
+
+      let responseBody = `Hi ${name},\n\n`
+      responseBody += `Thank you for reaching out! I have received your ${
+        type === 'buyer' ? 'home buying inquiry' :
+        type === 'seller' ? 'listing inquiry' :
+        type === 'valuation' ? 'home valuation request' :
+        'message'
+      } and will get back to you within 24 hours.\n\n`
+
+      if (type === 'valuation') {
+        responseBody += `I'll prepare a detailed market analysis for your property and send it to you shortly.\n\n`
+      }
+
+      responseBody += `Best regards,\n${agentName}`
+
+      await sendEmail({
+        to: email,
+        subject: responseSubject,
+        body: responseBody,
+      })
+    } catch (error) {
+      console.error('Failed to send auto-response:', error)
+      // Don't fail the whole request if email fails
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Contact form submitted successfully',
-        leadId: data.id,
+        message: 'Lead submitted and notifications sent successfully',
+        leadId: leadData?.id || leadId,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
