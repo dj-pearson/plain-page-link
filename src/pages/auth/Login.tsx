@@ -34,6 +34,11 @@ export default function Login() {
             // SECURITY: Validate redirect path to prevent open redirect attacks
             const lastRoute = localStorage.getItem('lastVisitedRoute');
             const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
+
+            // Clear the saved route to prevent stale redirects
+            localStorage.removeItem('lastVisitedRoute');
+
+            // Navigate to the intended destination
             navigate(redirectTo, { replace: true });
         }
     }, [user, navigate]);
