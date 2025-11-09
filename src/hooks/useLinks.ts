@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useToast } from "./use-toast";
 import type { LinkFormData } from "@/components/modals/AddLinkModal";
 
 export interface Link {
@@ -19,6 +20,7 @@ export interface Link {
 export function useLinks() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: links = [], isLoading } = useQuery({
     queryKey: ["links", user?.id],
@@ -41,8 +43,8 @@ export function useLinks() {
     mutationFn: async (linkData: LinkFormData) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      const maxPosition = links.length > 0 
-        ? Math.max(...links.map(l => l.position)) 
+      const maxPosition = links.length > 0
+        ? Math.max(...links.map(l => l.position))
         : -1;
 
       const { data, error } = await supabase
@@ -63,6 +65,17 @@ export function useLinks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["links", user?.id] });
+      toast({
+        title: "Link Added",
+        description: "Your custom link has been added successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Add Link",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     },
   });
 
@@ -80,6 +93,17 @@ export function useLinks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["links", user?.id] });
+      toast({
+        title: "Link Updated",
+        description: "Your link has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Update Link",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     },
   });
 
@@ -94,6 +118,17 @@ export function useLinks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["links", user?.id] });
+      toast({
+        title: "Link Deleted",
+        description: "Your link has been deleted successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Delete Link",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     },
   });
 

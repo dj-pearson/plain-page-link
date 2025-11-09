@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useToast } from "./use-toast";
 
 export interface Testimonial {
   id: string;
@@ -17,6 +18,7 @@ export interface Testimonial {
 export function useTestimonials() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: testimonials = [], isLoading } = useQuery({
     queryKey: ["testimonials", user?.id],
@@ -53,6 +55,17 @@ export function useTestimonials() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["testimonials", user?.id] });
+      toast({
+        title: "Testimonial Added",
+        description: "Your testimonial has been added successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Add Testimonial",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     },
   });
 
@@ -70,6 +83,17 @@ export function useTestimonials() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["testimonials", user?.id] });
+      toast({
+        title: "Testimonial Updated",
+        description: "Your testimonial has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Update Testimonial",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     },
   });
 
@@ -84,6 +108,17 @@ export function useTestimonials() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["testimonials", user?.id] });
+      toast({
+        title: "Testimonial Deleted",
+        description: "Your testimonial has been deleted successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Delete Testimonial",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     },
   });
 

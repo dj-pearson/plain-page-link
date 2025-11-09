@@ -13,6 +13,7 @@ import { LimitBanner } from "@/components/LimitBanner";
 import { SocialShareDialog } from "@/components/listings/SocialShareDialog";
 import { useProfile } from "@/hooks/useProfile";
 import { KeyboardShortcutsHelper } from "@/components/dashboard/KeyboardShortcutsHelper";
+import { QuickStatusUpdate } from "@/components/dashboard/QuickStatusUpdate";
 import { useNavigate } from "react-router-dom";
 
 export default function Listings() {
@@ -267,15 +268,14 @@ export default function Listings() {
                 loading="lazy"
               />
               <div className="absolute top-2 sm:top-3 left-2 sm:left-3">
-                <span
-                  className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
-                    listing.status === "active"
-                      ? "bg-green-500 text-white shadow-md"
-                      : "bg-yellow-500 text-white shadow-md"
-                  }`}
-                >
-                  {listing.status}
-                </span>
+                <QuickStatusUpdate
+                  listingId={listing.id}
+                  currentStatus={listing.status}
+                  onStatusChange={(newStatus) => {
+                    // Optimistically update local state
+                    listing.status = newStatus;
+                  }}
+                />
               </div>
               <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 sm:gap-2">
                 <button
