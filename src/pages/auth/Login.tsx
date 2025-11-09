@@ -5,10 +5,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect, useState } from "react";
+import { emailSchema } from "@/utils/validation";
 
 const loginSchema = z.object({
-    email: z.string().email("Please enter a valid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    email: emailSchema,
+    password: z.string().min(1, "Password is required"),
     remember: z.boolean().optional(),
 });
 
