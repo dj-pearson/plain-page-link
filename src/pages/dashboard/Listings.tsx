@@ -59,15 +59,20 @@ export default function Listings() {
   ];
 
   const handleAddClick = () => {
+    console.log("🔥 handleAddClick fired!");
     const allowed = canAdd('listings');
     console.log("Add Property clicked - canAdd?", allowed);
+    console.log("Current listings count:", listings.length);
+    console.log("Subscription:", subscription);
     if (!allowed) {
+      console.log("❌ Not allowed - showing upgrade modal");
       setShowUpgradeModal(true);
       toast({ title: "Upgrade required", description: "Your plan limit has been reached for listings." });
       return;
     }
+    console.log("✅ Opening AddListingModal");
     setIsAddModalOpen(true);
-    console.log("AddListingModal open state set to true");
+    console.log("AddListingModal open state set to true, isAddModalOpen:", isAddModalOpen);
   };
 
   const handleAddListing = async (data: ListingFormData) => {
@@ -201,8 +206,15 @@ export default function Listings() {
           </p>
         </div>
         <button
-          onClick={handleAddClick}
+          id="add-property-button"
+          onClick={(e) => {
+            console.log("🎯 Button clicked! Event:", e);
+            e.preventDefault();
+            e.stopPropagation();
+            handleAddClick();
+          }}
           className="inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 active:scale-95 transition-all font-medium min-h-[44px] w-full sm:w-auto justify-center shadow-sm"
+          style={{ position: 'relative', zIndex: 10 }}
         >
           <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
           <span className="text-sm sm:text-base">Add Property</span>
