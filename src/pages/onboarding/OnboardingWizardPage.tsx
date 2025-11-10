@@ -152,10 +152,25 @@ export default function OnboardingWizardPage() {
         }
       }
 
+      // Send welcome email (non-blocking)
+      try {
+        await supabase.functions.invoke('send-welcome-email', {
+          body: {
+            user_id: user.id,
+            email: user.email,
+            full_name: wizardData.profileBasics.fullName || user.user_metadata?.full_name,
+            username: user.user_metadata?.username || 'agent'
+          }
+        });
+      } catch (emailError) {
+        console.error('Welcome email failed (non-critical):', emailError);
+        // Don't block navigation if email fails
+      }
+
       // Success!
       toast({
         title: '🎉 Welcome to AgentBio!',
-        description: 'Your profile is ready to share. Let\'s get started!',
+        description: 'Your profile is ready to share. Check your email for next steps!',
       });
 
       // Navigate to dashboard
