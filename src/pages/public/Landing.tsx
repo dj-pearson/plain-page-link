@@ -6,6 +6,9 @@ import { BlogSection } from "@/components/blog/BlogSection";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { HeroSection } from "@/components/hero";
+import { BeforeAfterComparison } from "@/components/landing/BeforeAfterComparison";
+import { DemoProfilesShowcase } from "@/components/landing/DemoProfilesShowcase";
+import { AgentTestimonials } from "@/components/landing/AgentTestimonials";
 
 export default function Landing() {
     const schema = {
@@ -156,15 +159,17 @@ export default function Landing() {
     return (
         <>
             <SEOHead
-                title="Professional Real Estate Agent Portfolio Link | AgentBio"
-                description="Create a professional real estate agent portfolio link to showcase listings, sold properties, and testimonials. Purpose-built for agents to capture qualified leads and grow their business."
+                title="Linktree for Real Estate Agents | AgentBio - Showcase Listings & Capture Leads"
+                description="AgentBio is Linktree built specifically for real estate agents. Showcase sold properties, capture qualified buyer & seller leads, and convert Instagram followers into clients with one shareable link."
                 keywords={[
-                    "professional real estate agent portfolio link",
+                    "linktree for real estate agents",
+                    "link in bio for realtors",
+                    "real estate agent link tool",
                     "agent property showcase link",
                     "realtor sold properties portfolio",
-                    "agent listing promotion link",
-                    "professional agent portfolio builder",
-                    "real estate agent bio link"
+                    "real estate lead capture",
+                    "agent bio link",
+                    "alternative to linktree for agents"
                 ]}
                 canonicalUrl={window.location.origin}
                 schema={schema}
@@ -175,6 +180,15 @@ export default function Landing() {
 
             {/* 3D Hero Section */}
             <HeroSection />
+
+            {/* Before/After Comparison */}
+            <BeforeAfterComparison />
+
+            {/* Demo Profiles Showcase */}
+            <DemoProfilesShowcase />
+
+            {/* Agent Testimonials */}
+            <AgentTestimonials />
 
             {/* Features Section */}
             <section id="features" className="py-20 bg-background/50" aria-labelledby="features-heading">

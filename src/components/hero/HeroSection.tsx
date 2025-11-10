@@ -26,20 +26,20 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({
-  title = 'Professional Real Estate Agent',
-  subtitle = 'Portfolio Link',
-  description = 'Create your professional agent portfolio link to showcase sold properties, active listings, and testimonials. Capture qualified leads and convert social media traffic into clients.',
+  title = 'Linktree for Real Estate Agents',
+  subtitle = 'One Link. All Your Listings.',
+  description = 'Stop using generic link-in-bio tools. AgentBio is purpose-built for real estate agents to showcase sold properties, capture qualified buyer & seller leads, and turn Instagram followers into clients.',
   primaryCta = {
-    text: 'Start Free Trial',
+    text: 'Create Your Free Profile',
     href: '/auth/register'
   },
   secondaryCta = {
-    text: 'See How It Works',
-    href: '#features'
+    text: 'View Live Demo',
+    href: '#demo-profiles'
   },
   badge = {
     icon: <Zap className="h-4 w-4" aria-hidden="true" />,
-    text: 'Built for Real Estate Professionals'
+    text: 'Purpose-Built for Realtors'
   },
   showStats = true
 }: HeroSectionProps) {
@@ -107,26 +107,26 @@ export function HeroSection({
             <div className="grid grid-cols-3 gap-6 pt-8 border-t border-glass-border">
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  5k+
+                  &lt;10 min
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
-                  Active Agents
+                  Setup Time
                 </div>
               </div>
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  50k+
+                  3x
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
-                  Properties Shown
+                  More Leads
                 </div>
               </div>
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  99.9%
+                  Free
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
-                  Uptime
+                  To Start
                 </div>
               </div>
             </div>

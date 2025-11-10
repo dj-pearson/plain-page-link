@@ -370,6 +370,7 @@ export default function FullProfilePage() {
                                 onListingClick={(listing) =>
                                     setSelectedListing(listing)
                                 }
+                                calendlyUrl={data?.profile?.calendly_url}
                             />
                         </section>
                     )}
@@ -498,6 +499,7 @@ export default function FullProfilePage() {
                     listing={selectedListing}
                     isOpen={!!selectedListing}
                     onClose={() => setSelectedListing(null)}
+                    calendlyUrl={data?.profile?.calendly_url}
                 />
             )}
 

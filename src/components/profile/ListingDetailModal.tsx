@@ -1,22 +1,26 @@
-import { X, Bed, Bath, Ruler, MapPin, Calendar, Share2, Heart } from "lucide-react";
+import { X, Bed, Bath, Ruler, MapPin, Calendar, Share2, Heart, CalendarCheck } from "lucide-react";
 import { useState } from "react";
 import type { Listing } from "@/types/listing";
 import { formatPrice, formatPropertyStats, formatAddress, formatDate, parsePrice } from "@/lib/format";
 import { getImageUrls } from "@/lib/images";
+import { CalendlyModal } from "@/components/integrations/CalendlyModal";
 
 interface ListingDetailModalProps {
     listing: Listing;
     isOpen: boolean;
     onClose: () => void;
+    calendlyUrl?: string;
 }
 
 export default function ListingDetailModal({
     listing,
     isOpen,
     onClose,
+    calendlyUrl,
 }: ListingDetailModalProps) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isFavorited, setIsFavorited] = useState(false);
+    const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
 
     if (!isOpen) return null;
 
@@ -287,13 +291,34 @@ export default function ListingDetailModal({
                                 Get in touch to schedule a viewing or learn more about this
                                 listing.
                             </p>
-                            <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                                Contact Agent
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                {calendlyUrl && listing.status === "active" && (
+                                    <button
+                                        onClick={() => setIsCalendlyModalOpen(true)}
+                                        className="flex-1 bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <CalendarCheck className="h-5 w-5" />
+                                        Book a Showing
+                                    </button>
+                                )}
+                                <button className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                                    Contact Agent
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Calendly Modal */}
+            {calendlyUrl && (
+                <CalendlyModal
+                    isOpen={isCalendlyModalOpen}
+                    onClose={() => setIsCalendlyModalOpen(false)}
+                    calendlyUrl={calendlyUrl}
+                    listingAddress={`${(listing as any).address || ''}${(listing as any).city ? `, ${(listing as any).city}` : ''}`}
+                />
+            )}
         </div>
     );
 }

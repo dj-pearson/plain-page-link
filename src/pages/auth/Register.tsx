@@ -51,15 +51,9 @@ export default function Register() {
 
     useEffect(() => {
         if (user) {
-            // SECURITY: Validate redirect path to prevent open redirect attacks
-            const lastRoute = localStorage.getItem('lastVisitedRoute');
-            const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
-
-            // Clear the saved route to prevent stale redirects
-            localStorage.removeItem('lastVisitedRoute');
-
-            // Navigate to the intended destination
-            navigate(redirectTo, { replace: true });
+            // New users go through onboarding wizard first
+            // This ensures fast time-to-first-share (<10 minutes)
+            navigate('/onboarding/wizard', { replace: true });
         }
     }, [user, navigate]);
 

@@ -2,12 +2,14 @@ import { useState } from "react";
 import ListingCard from "./ListingCard";
 import type { Listing } from "@/types";
 import { Building2 } from "lucide-react";
+import { CalendlyModal } from "@/components/integrations/CalendlyModal";
 
 interface ListingGalleryProps {
     listings: Listing[];
     title?: string;
     emptyMessage?: string;
     onListingClick?: (listing: Listing) => void;
+    calendlyUrl?: string;
 }
 
 export default function ListingGallery({
@@ -15,8 +17,17 @@ export default function ListingGallery({
     title = "Active Listings",
     emptyMessage = "No listings available at this time.",
     onListingClick,
+    calendlyUrl,
 }: ListingGalleryProps) {
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
+    const [selectedListingForShowing, setSelectedListingForShowing] = useState<Listing | null>(null);
+
+    const handleBookShowing = (e: React.MouseEvent, listing: Listing) => {
+        e.stopPropagation();
+        setSelectedListingForShowing(listing);
+        setIsCalendlyModalOpen(true);
+    };
 
     if (listings.length === 0) {
         return (
@@ -56,9 +67,24 @@ export default function ListingGallery({
                         key={listing.id}
                         listing={listing}
                         onClick={() => onListingClick?.(listing)}
+                        onBookShowing={(e) => handleBookShowing(e, listing)}
+                        hasCalendly={!!calendlyUrl}
                     />
                 ))}
             </div>
+
+            {/* Calendly Modal */}
+            {calendlyUrl && selectedListingForShowing && (
+                <CalendlyModal
+                    isOpen={isCalendlyModalOpen}
+                    onClose={() => {
+                        setIsCalendlyModalOpen(false);
+                        setSelectedListingForShowing(null);
+                    }}
+                    calendlyUrl={calendlyUrl}
+                    listingAddress={`${(selectedListingForShowing as any).address || ''}${(selectedListingForShowing as any).city ? `, ${(selectedListingForShowing as any).city}` : ''}`}
+                />
+            )}
         </div>
     );
 }
