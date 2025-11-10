@@ -59,11 +59,15 @@ export default function Listings() {
   ];
 
   const handleAddClick = () => {
-    if (!canAdd('listings')) {
+    const allowed = canAdd('listings');
+    console.log("Add Property clicked - canAdd?", allowed);
+    if (!allowed) {
       setShowUpgradeModal(true);
+      toast({ title: "Upgrade required", description: "Your plan limit has been reached for listings." });
       return;
     }
     setIsAddModalOpen(true);
+    console.log("AddListingModal open state set to true");
   };
 
   const handleAddListing = async (data: ListingFormData) => {
