@@ -44,6 +44,7 @@ const PublicPage = lazy(() => import("./pages/PublicPage"));
 
 // Lazy load tools
 const InstagramBioAnalyzer = lazy(() => import("./pages/tools/InstagramBioAnalyzer"));
+const ListingDescriptionGenerator = lazy(() => import("./pages/tools/ListingDescriptionGenerator"));
 
 // Lazy load dashboard pages (code splitting for better performance)
 const DashboardLayout = lazy(() => import("./components/layout/DashboardLayout"));
@@ -126,6 +127,7 @@ function App() {
 
                     {/* Tools */}
                     <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
+                    <Route path="/tools/listing-description-generator" element={<ListingDescriptionGenerator />} />
 
                     {/* User profiles */}
                     <Route path="/:username/review" element={<SubmitReview />} />
