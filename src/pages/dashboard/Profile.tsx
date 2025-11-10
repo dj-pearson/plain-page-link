@@ -30,6 +30,7 @@ export default function Profile() {
     phone: "",
     email_display: "",
     website_url: "",
+    calendly_url: "",
 
     // Service Areas
     service_cities: [] as string[],
@@ -77,6 +78,7 @@ export default function Profile() {
         phone: profile.phone || "",
         email_display: profile.email_display || "",
         website_url: profile.website_url || "",
+        calendly_url: profile.calendly_url || "",
 
         // Service Areas
         service_cities: profile.service_cities || [],
@@ -559,6 +561,22 @@ export default function Profile() {
                   placeholder="https://yourwebsite.com"
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Calendly Booking URL
+                </label>
+                <input
+                  type="url"
+                  name="calendly_url"
+                  value={formData.calendly_url}
+                  onChange={handleChange}
+                  placeholder="https://calendly.com/yourname/30min"
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add your Calendly link to enable "Book a Showing" on your listings
+                </p>
               </div>
             </div>
           </div>

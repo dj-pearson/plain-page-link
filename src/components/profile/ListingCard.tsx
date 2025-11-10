@@ -1,4 +1,4 @@
-import { Bed, Bath, Maximize, MapPin, Calendar } from "lucide-react";
+import { Bed, Bath, Maximize, MapPin, Calendar, CalendarCheck } from "lucide-react";
 import { formatPrice, formatPropertyStats, parsePrice } from "@/lib/format";
 import { getImageUrl } from "@/lib/images";
 import type { Listing } from "@/types";
@@ -6,6 +6,8 @@ import type { Listing } from "@/types";
 interface ListingCardProps {
     listing: Listing;
     onClick?: () => void;
+    onBookShowing?: (e: React.MouseEvent) => void;
+    hasCalendly?: boolean;
 }
 
 const statusColors = {
@@ -24,7 +26,7 @@ const statusLabels = {
     draft: "Draft",
 };
 
-export default function ListingCard({ listing, onClick }: ListingCardProps) {
+export default function ListingCard({ listing, onClick, onBookShowing, hasCalendly }: ListingCardProps) {
     const primaryPhoto = getImageUrl(
         (listing as any).image || listing.photos?.[0],
         'listings'
@@ -152,6 +154,19 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
                                 minute: "2-digit",
                             })}
                         </p>
+                    </div>
+                )}
+
+                {/* Book Showing Button */}
+                {hasCalendly && listing.status === "active" && onBookShowing && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                        <button
+                            onClick={onBookShowing}
+                            className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 text-sm"
+                        >
+                            <CalendarCheck className="h-4 w-4" />
+                            Book a Showing
+                        </button>
                     </div>
                 )}
             </div>
