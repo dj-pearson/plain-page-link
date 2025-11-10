@@ -100,13 +100,20 @@ export default function InstagramBioAnalyzer() {
   const handleEmailCapture = async (data: EmailCaptureData) => {
     try {
       // Save email capture to Supabase
-      await supabase.from('instagram_bio_email_captures').insert({
-        analysis_id: analysisId,
-        email: data.email,
-        first_name: data.firstName,
-        market: data.market,
-        brokerage: data.brokerage,
-      });
+      const { data: captureData, error: captureError } = await supabase
+        .from('instagram_bio_email_captures')
+        .insert({
+          analysis_id: analysisId,
+          email: data.email,
+          first_name: data.firstName,
+          market: data.market,
+          brokerage: data.brokerage,
+          email_sequence_started: true,
+        })
+        .select()
+        .single();
+
+      if (captureError) throw captureError;
 
       // Track analytics
       await trackEvent('email_captured', {
@@ -114,11 +121,39 @@ export default function InstagramBioAnalyzer() {
         brokerage: data.brokerage,
       });
 
+      // Send welcome email with bio rewrites via Resend
+      if (analysisResult) {
+        try {
+          const { data: functionData, error: functionError } = await supabase.functions.invoke(
+            'send-bio-analyzer-email',
+            {
+              body: {
+                analysisId: captureData?.id || analysisId,
+                email: data.email,
+                firstName: data.firstName,
+                market: data.market,
+                brokerage: data.brokerage,
+                score: analysisResult.overallScore,
+                bioRewrites: analysisResult.rewrittenBios.map(b => b.bio),
+              },
+            }
+          );
+
+          if (functionError) {
+            console.error('Error sending email:', functionError);
+            // Don't throw - email is nice to have but shouldn't block unlock
+          }
+        } catch (emailError) {
+          console.error('Email function error:', emailError);
+          // Don't throw - email failure shouldn't prevent unlock
+        }
+      }
+
       // Unlock content
       setIsUnlocked(true);
       setShowEmailModal(false);
 
-      toast.success('Success! All content is now unlocked.');
+      toast.success('Success! Check your email for all 3 bio rewrites.');
     } catch (error) {
       console.error('Email capture error:', error);
       throw error;
