@@ -353,9 +353,9 @@ export default function Listings() {
 
       {/* Add Listing Modal */}
       <AddListingModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSubmit={handleAddListing}
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        onSave={handleAddListing}
       />
 
       {/* Edit Listing Modal */}
