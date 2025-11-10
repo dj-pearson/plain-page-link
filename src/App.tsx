@@ -26,6 +26,9 @@ import Register from "./pages/auth/Register";
 const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
 
+// Lazy load onboarding
+const OnboardingWizardPage = lazy(() => import("./pages/onboarding/OnboardingWizardPage"));
+
 // Lazy load legal pages
 const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
@@ -125,6 +128,16 @@ function App() {
                     <Route path="/auth/register" element={<Register />} />
                     <Route path="/auth/forgot-password" element={<ForgotPassword />} />
                     <Route path="/auth/reset-password" element={<ResetPassword />} />
+
+                    {/* Onboarding (protected) */}
+                    <Route
+                        path="/onboarding/wizard"
+                        element={
+                            <ProtectedRoute>
+                                <OnboardingWizardPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* Dashboard routes (protected) */}
                     <Route

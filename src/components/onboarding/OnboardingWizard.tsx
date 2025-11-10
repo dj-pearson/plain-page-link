@@ -64,7 +64,7 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     } else {
-      onComplete();
+      onComplete(wizardData);
     }
   };
 
@@ -75,7 +75,7 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
   };
 
   const handleSkipToEnd = () => {
-    onComplete();
+    onComplete(wizardData);
   };
 
   const canProceed = () => {
