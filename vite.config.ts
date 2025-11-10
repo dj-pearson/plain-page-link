@@ -61,9 +61,11 @@ export default defineConfig(({ mode }) => ({
                         'recharts',
                     ],
 
-                    // 3D libraries (if used)
+                    // 3D libraries - split Three.js core separately
                     'three': [
                         'three',
+                    ],
+                    'three-addons': [
                         '@react-three/fiber',
                         '@react-three/drei',
                     ],
@@ -101,8 +103,8 @@ export default defineConfig(({ mode }) => ({
                 },
             },
         },
-        // Increase chunk size warning limit to avoid warnings for large chunks
-        chunkSizeWarningLimit: 600,
+        // Increase chunk size warning limit (Three.js is inherently large)
+        chunkSizeWarningLimit: 1000,
         // Enable minification
         minify: 'terser',
         terserOptions: {
