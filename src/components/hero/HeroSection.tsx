@@ -26,9 +26,9 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({
-  title = 'AI-Powered Lead Intelligence',
-  subtitle = 'Predict. Match. Close.',
-  description = 'AgentBio uses AI to predict which leads will convert, automatically matches properties to qualified buyers, and accelerates deals with market intelligence. Every interaction makes your predictions smarter—creating a competitive advantage that compounds over time.',
+  title = 'AgentBio Intelligence',
+  subtitle = 'Stop Guessing. Start Closing.',
+  description = 'AI-powered platform that predicts which leads will convert, automatically matches properties to qualified buyers, and accelerates deals with market intelligence. ML-scored leads convert 2x better. Agents save 5+ hours per week. Close deals 30% faster.',
   primaryCta = {
     text: 'Start Building Your Data Moat',
     href: '/auth/register'

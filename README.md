@@ -1,16 +1,16 @@
-# AgentBio - AI-Powered Lead Intelligence Platform
+# AgentBio Intelligence - AI-Powered Real Estate Platform
 
 <p align="center">
   <img src="https://agentbio.net/Cover.png" alt="AgentBio" width="600">
 </p>
 
-<h3 align="center">AI-Powered Lead Intelligence & Conversion Engine</h3>
+<h3 align="center">Stop Guessing. Start Closing.</h3>
 
 <p align="center">
-  AgentBio transforms real estate agents into data-driven closers. Using AI to predict which leads will convert, automatically match properties to qualified buyers, and accelerate deals with market intelligence—building a competitive data moat that gets stronger with every interaction.
+  AgentBio Intelligence transforms real estate agents into data-driven closers. AI predicts which leads will convert, automatically matches properties to qualified buyers, and accelerates deals with market intelligence. <strong>ML-scored leads convert 2x better. Agents save 5+ hours per week. Close deals 30% faster.</strong>
 </p>
 
-<h3 align="center">Predict. Match. Close.</h3>
+<h3 align="center">Building a competitive data moat that gets stronger with every interaction.</h3>
 
 ---
 

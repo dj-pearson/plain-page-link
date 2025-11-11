@@ -176,8 +176,8 @@ export default function Landing() {
     return (
         <>
             <SEOHead
-                title="AI-Powered Lead Intelligence for Real Estate | AgentBio - Predict, Match, Close"
-                description="AgentBio uses AI to predict which leads will convert, automatically match properties to qualified buyers, and accelerate deals with market intelligence. Build your competitive data moat that gets smarter over time."
+                title="AgentBio Intelligence: Stop Guessing. Start Closing. | AI Real Estate Platform"
+                description="AI-powered real estate platform. ML-scored leads convert 2x better. Save 5+ hours/week. Close deals 30% faster. Predicts conversions, matches properties to buyers, provides market intelligence. Build your data moat."
                 keywords={[
                     "AI real estate lead scoring",
                     "predictive lead conversion",
@@ -366,24 +366,24 @@ export default function Landing() {
 
                     <div className="grid md:grid-cols-4 gap-6 mb-12">
                         <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
-                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">75%+</div>
-                            <div className="text-sm text-muted-foreground">Match Accuracy</div>
-                            <div className="text-xs text-muted-foreground mt-2">Agents confirm relevance of AI-matched leads</div>
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">2x</div>
+                            <div className="text-sm text-muted-foreground">Better Conversion</div>
+                            <div className="text-xs text-muted-foreground mt-2">ML-scored leads convert 2x better than unscored</div>
                         </div>
                         <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
-                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">2-3x</div>
-                            <div className="text-sm text-muted-foreground">More Matches</div>
-                            <div className="text-xs text-muted-foreground mt-2">High-quality matches per new listing</div>
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">5+hrs</div>
+                            <div className="text-sm text-muted-foreground">Time Saved</div>
+                            <div className="text-xs text-muted-foreground mt-2">Per week on lead qualification and matching</div>
                         </div>
                         <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
-                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">&lt;30</div>
-                            <div className="text-sm text-muted-foreground">Days to Close</div>
-                            <div className="text-xs text-muted-foreground mt-2">From matched lead to closed deal</div>
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">30%</div>
+                            <div className="text-sm text-muted-foreground">Faster Closing</div>
+                            <div className="text-xs text-muted-foreground mt-2">Time-to-close on high-scored leads</div>
                         </div>
                         <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
-                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">0-100</div>
-                            <div className="text-sm text-muted-foreground">Lead Score</div>
-                            <div className="text-xs text-muted-foreground mt-2">ML-powered conversion prediction</div>
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">80%+</div>
+                            <div className="text-sm text-muted-foreground">Agent Satisfaction</div>
+                            <div className="text-xs text-muted-foreground mt-2">Report AI features as "very helpful"</div>
                         </div>
                     </div>
 
