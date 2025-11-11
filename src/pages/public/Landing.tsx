@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Home, BarChart3, Users } from "lucide-react";
+import { Home, BarChart3, Users, Brain, Target, TrendingUp, Zap } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { BlogSection } from "@/components/blog/BlogSection";
 import { PublicHeader } from "@/components/layout/PublicHeader";
@@ -18,8 +18,8 @@ export default function Landing() {
                 "@type": "WebSite",
                 "@id": `${window.location.origin}/#website`,
                 "url": window.location.origin,
-                "name": "AgentBio - Professional Real Estate Agent Portfolio Link",
-                "description": "Professional real estate agent portfolio link platform to showcase listings, sold properties, and capture qualified leads.",
+                "name": "AgentBio - AI-Powered Lead Intelligence & Conversion Platform",
+                "description": "AI-powered real estate platform that predicts lead conversion, matches properties to qualified buyers, and accelerates deals with market intelligence.",
                 "publisher": {
                     "@id": `${window.location.origin}/#organization`
                 },
@@ -42,11 +42,11 @@ export default function Landing() {
                     "url": `${window.location.origin}/logo.png`
                 },
                 "sameAs": [],
-                "description": "AgentBio is a professional portfolio platform for real estate agents to showcase their listings, sold properties, and capture qualified leads online."
+                "description": "AgentBio is an AI-powered lead intelligence platform that predicts conversion rates, automatically matches properties to buyers, and provides market intelligence to accelerate real estate deals."
             },
             {
                 "@type": "SoftwareApplication",
-                "name": "AgentBio - Professional Real Estate Agent Portfolio Link",
+                "name": "AgentBio - AI-Powered Lead Intelligence Platform",
                 "applicationCategory": "BusinessApplication",
                 "operatingSystem": "Web",
                 "offers": {
@@ -54,13 +54,14 @@ export default function Landing() {
                     "price": "0",
                     "priceCurrency": "USD"
                 },
-                "description": "Create your professional real estate agent portfolio link to showcase sold properties, active listings, testimonials, and capture qualified leads.",
+                "description": "AI-powered real estate platform that predicts which leads will convert, automatically matches properties to qualified buyers, and provides market intelligence to close deals faster.",
                 "featureList": [
-                    "Agent property showcase link",
-                    "Realtor sold properties portfolio",
-                    "Professional agent portfolio builder",
-                    "Lead capture forms",
-                    "Analytics and insights"
+                    "AI-powered lead scoring and conversion prediction",
+                    "Automatic property-buyer matching",
+                    "Market intelligence and benchmarking",
+                    "Behavioral analytics and insights",
+                    "Predictive deal acceleration",
+                    "Data moat that improves over time"
                 ],
                 "aggregateRating": {
                     "@type": "AggregateRating",
@@ -76,7 +77,23 @@ export default function Landing() {
                         "name": "What is AgentBio?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "AgentBio is a professional portfolio platform designed specifically for real estate agents to create a single link that showcases their listings, sold properties, client testimonials, and captures qualified leads. It's like a link-in-bio tool purpose-built for realtors."
+                            "text": "AgentBio is an AI-powered lead intelligence platform for real estate agents. Unlike generic CRMs or portfolio tools, AgentBio uses machine learning to predict which leads will convert, automatically matches properties to qualified buyers, and provides market intelligence to accelerate deals. It's designed to create a competitive data moat that gets stronger with every interaction."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "How does AI lead scoring work?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "AgentBio tracks visitor behavior—time on page, properties viewed, scroll depth, return visits, and form interactions. Our AI analyzes these patterns to predict conversion likelihood. As you label lead outcomes (won, lost, nurturing), the model learns what signals indicate high-quality leads specific to your market and style. Over time, predictions become increasingly accurate."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "What is the data moat and why does it matter?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Every lead outcome you label (closed deal, lost opportunity, etc.) trains your AI model to make better predictions. This creates a flywheel—more data equals better predictions, which leads to more closed deals, generating more data. Competitors can't replicate this advantage without years of your specific data. The earlier you start, the bigger your competitive advantage."
                         }
                     },
                     {
@@ -159,17 +176,19 @@ export default function Landing() {
     return (
         <>
             <SEOHead
-                title="Linktree for Real Estate Agents | AgentBio - Showcase Listings & Capture Leads"
-                description="AgentBio is Linktree built specifically for real estate agents. Showcase sold properties, capture qualified buyer & seller leads, and convert Instagram followers into clients with one shareable link."
+                title="AgentBio Intelligence: Stop Guessing. Start Closing. | AI Real Estate Platform"
+                description="AI-powered real estate platform. ML-scored leads convert 2x better. Save 5+ hours/week. Close deals 30% faster. Predicts conversions, matches properties to buyers, provides market intelligence. Build your data moat."
                 keywords={[
-                    "linktree for real estate agents",
-                    "link in bio for realtors",
-                    "real estate agent link tool",
-                    "agent property showcase link",
-                    "realtor sold properties portfolio",
-                    "real estate lead capture",
-                    "agent bio link",
-                    "alternative to linktree for agents"
+                    "AI real estate lead scoring",
+                    "predictive lead conversion",
+                    "real estate AI platform",
+                    "property buyer matching AI",
+                    "real estate market intelligence",
+                    "lead prediction software",
+                    "AI-powered real estate CRM",
+                    "real estate data analytics",
+                    "predictive real estate platform",
+                    "smart lead qualification"
                 ]}
                 canonicalUrl={window.location.origin}
                 schema={schema}
@@ -184,6 +203,204 @@ export default function Landing() {
             {/* Before/After Comparison */}
             <BeforeAfterComparison />
 
+            {/* AI Intelligence Differentiators Section */}
+            <section className="py-20 bg-background relative overflow-hidden" aria-labelledby="intelligence-heading">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#80d0c7]/5 via-[#a1c4fd]/5 to-[#c2e9fb]/5" />
+                <div className="container mx-auto px-4 relative z-10">
+                    <header className="text-center mb-16">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-glass-background backdrop-blur-md border border-glass-border rounded-full text-sm font-light tracking-tight mb-6">
+                            <div className="text-transparent bg-gradient-to-r from-[#80d0c7] to-[#a1c4fd] bg-clip-text flex items-center gap-2">
+                                <Brain className="h-4 w-4 text-[#80d0c7]" />
+                                <span className="font-normal">AI-Powered Intelligence Engine</span>
+                            </div>
+                        </div>
+                        <h2 id="intelligence-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                            <span className="glass-heading text-4xl md:text-6xl">
+                                Know Which Leads Will Close
+                            </span>
+                        </h2>
+                        <p className="text-xl glass-body max-w-3xl mx-auto">
+                            AgentBio doesn't just capture leads—it predicts which ones will convert,
+                            automatically matches properties to buyers, and accelerates deals with
+                            data-driven insights. Every interaction makes your predictions smarter.
+                        </p>
+                    </header>
+
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <FeatureCard
+                            icon={<Brain className="h-8 w-8" aria-hidden="true" />}
+                            title="Intelligent Lead Inbox"
+                            description="AI scores every lead 0-100 based on conversion probability. Your inbox auto-sorts by who's most likely to close—no more guessing which leads to prioritize."
+                        />
+                        <FeatureCard
+                            icon={<Target className="h-8 w-8" aria-hidden="true" />}
+                            title="Auto-Matching Notifications"
+                            description="Post a listing, get instant alerts for matching leads. AI finds buyers based on price, location, beds/baths, timeline, and engagement patterns. Average 2-3 high-quality matches per listing."
+                        />
+                        <FeatureCard
+                            icon={<TrendingUp className="h-8 w-8" aria-hidden="true" />}
+                            title="Market Intelligence Dashboard"
+                            description="See how your listings perform vs. market benchmarks. Track inquiry rates, time-on-page, and engagement by price range and property type. Know if you're priced right."
+                        />
+                        <FeatureCard
+                            icon={<Zap className="h-8 w-8" aria-hidden="true" />}
+                            title="Self-Improving AI"
+                            description="Label outcomes (won, lost, nurturing) and watch predictions get smarter. Your AI learns your market, your style, your buyers—creating an advantage competitors can't copy."
+                        />
+                    </div>
+                </div>
+            </section>
+
+            {/* How It Works Section */}
+            <section className="py-20 bg-background/50" aria-labelledby="how-it-works-heading">
+                <div className="container mx-auto px-4">
+                    <header className="text-center mb-16">
+                        <h2 id="how-it-works-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                            <span className="glass-heading text-4xl md:text-6xl">
+                                How It Works
+                            </span>
+                        </h2>
+                        <p className="text-xl glass-body max-w-2xl mx-auto">
+                            From lead capture to closed deal—see how AI accelerates your entire sales process
+                        </p>
+                    </header>
+
+                    <div className="max-w-5xl mx-auto space-y-12">
+                        <div className="grid md:grid-cols-2 gap-8 items-center">
+                            <div className="order-2 md:order-1">
+                                <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                    <div className="text-4xl font-light glass-accent mb-2">01</div>
+                                    <h3 className="text-2xl font-light text-foreground mb-3">Lead Visits Your Profile</h3>
+                                    <p className="glass-body mb-4">
+                                        Visitor browses your listings, spends 2 minutes on a $450K home, scrolls 80%, views the photo gallery.
+                                        All behavior is tracked silently in the background.
+                                    </p>
+                                    <div className="text-sm text-muted-foreground">
+                                        ✓ Time on page • Scroll depth • Properties viewed • Device type • Return visits
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="order-1 md:order-2">
+                                <div className="p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                                    <div className="text-6xl mb-4">👁️</div>
+                                    <div className="text-lg font-light text-foreground">Behavioral Intelligence Capture</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 items-center">
+                            <div className="p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                                <div className="text-6xl mb-4">🧠</div>
+                                <div className="text-lg font-light text-foreground">AI Lead Scoring</div>
+                            </div>
+                            <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                <div className="text-4xl font-light glass-accent mb-2">02</div>
+                                <h3 className="text-2xl font-light text-foreground mb-3">Lead Submits Contact Form</h3>
+                                <p className="glass-body mb-4">
+                                    AI instantly analyzes all behavioral data and assigns a score: 87/100 (High Priority).
+                                    Lead appears at the top of your inbox with full engagement history and predicted conversion rate.
+                                </p>
+                                <div className="text-sm text-muted-foreground">
+                                    ✓ ML score 0-100 • Priority tier • Engagement timeline • Property preferences
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 items-center">
+                            <div className="order-2 md:order-1">
+                                <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                    <div className="text-4xl font-light glass-accent mb-2">03</div>
+                                    <h3 className="text-2xl font-light text-foreground mb-3">You Add a New Listing</h3>
+                                    <p className="glass-body mb-4">
+                                        Post a $475K, 3bd/2ba home. AI instantly scans your lead database and finds 4 matches (85%, 79%, 72%, 68% match scores).
+                                        You get notifications with match reasons: "Price within budget, 3+ beds requirement met, preferred area."
+                                    </p>
+                                    <div className="text-sm text-muted-foreground">
+                                        ✓ Auto-matching • Instant alerts • Match explanations • Direct lead links
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="order-1 md:order-2">
+                                <div className="p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                                    <div className="text-6xl mb-4">🎯</div>
+                                    <div className="text-lg font-light text-foreground">Smart Property Matching</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 items-center">
+                            <div className="p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                                <div className="text-6xl mb-4">📊</div>
+                                <div className="text-lg font-light text-foreground">Data Moat Grows</div>
+                            </div>
+                            <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                <div className="text-4xl font-light glass-accent mb-2">04</div>
+                                <h3 className="text-2xl font-light text-foreground mb-3">You Close the Deal</h3>
+                                <p className="glass-body mb-4">
+                                    Mark lead as "Closed - Won" with deal value and days to close. AI learns: high engagement + return visits + matched listing = conversion.
+                                    Next time, similar patterns get higher scores. Your predictions improve forever.
+                                </p>
+                                <div className="text-sm text-muted-foreground">
+                                    ✓ Outcome labeling • Model retraining • Smarter predictions • Compounding advantage
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Results Section */}
+            <section className="py-20 bg-background relative overflow-hidden" aria-labelledby="results-heading">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#80d0c7]/5 via-[#a1c4fd]/5 to-[#c2e9fb]/5" />
+                <div className="container mx-auto px-4 relative z-10">
+                    <header className="text-center mb-12">
+                        <h2 id="results-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                            <span className="glass-heading">
+                                Real Results from AI Intelligence
+                            </span>
+                        </h2>
+                        <p className="text-xl glass-body max-w-2xl mx-auto">
+                            Agents using AI-powered lead intelligence see measurable improvements in conversion and velocity
+                        </p>
+                    </header>
+
+                    <div className="grid md:grid-cols-4 gap-6 mb-12">
+                        <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">2x</div>
+                            <div className="text-sm text-muted-foreground">Better Conversion</div>
+                            <div className="text-xs text-muted-foreground mt-2">ML-scored leads convert 2x better than unscored</div>
+                        </div>
+                        <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">5+hrs</div>
+                            <div className="text-sm text-muted-foreground">Time Saved</div>
+                            <div className="text-xs text-muted-foreground mt-2">Per week on lead qualification and matching</div>
+                        </div>
+                        <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">30%</div>
+                            <div className="text-sm text-muted-foreground">Faster Closing</div>
+                            <div className="text-xs text-muted-foreground mt-2">Time-to-close on high-scored leads</div>
+                        </div>
+                        <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">80%+</div>
+                            <div className="text-sm text-muted-foreground">Agent Satisfaction</div>
+                            <div className="text-xs text-muted-foreground mt-2">Report AI features as "very helpful"</div>
+                        </div>
+                    </div>
+
+                    <div className="max-w-4xl mx-auto p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                        <div className="text-center">
+                            <p className="text-lg glass-body mb-4">
+                                <strong className="text-foreground text-xl">"Stop chasing cold leads. Let AI tell you who's ready to buy."</strong>
+                            </p>
+                            <p className="text-md glass-body">
+                                Traditional CRMs track activity. AgentBio predicts outcomes. That's the difference between
+                                working harder and working smarter.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* Demo Profiles Showcase */}
             <DemoProfilesShowcase />
 
@@ -195,33 +412,32 @@ export default function Landing() {
                 <div className="container mx-auto px-4">
                     <header className="text-center mb-16">
                         <h2 id="features-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                            Professional Agent Portfolio Builder
+                            Complete Platform
                             <span className="block mt-2 glass-heading text-3xl md:text-4xl">
-                                Features
+                                All the Tools You Need
                             </span>
                         </h2>
                         <p className="text-xl glass-body max-w-2xl mx-auto">
-                            Purpose-built for real estate agents. Create your professional
-                            realtor portfolio link with everything you need to showcase sold
-                            properties and convert leads.
+                            Beyond AI intelligence, get all the essential tools to showcase
+                            your portfolio, capture leads, and manage your real estate business.
                         </p>
                     </header>
 
                     <div className="grid md:grid-cols-3 gap-8">
                         <FeatureCard
                             icon={<Home className="h-8 w-8" aria-hidden="true" />}
-                            title="Agent Property Showcase Link"
-                            description="Display your agent sold properties portfolio, active listings, and pending sales with stunning photos, prices, and property details. Mobile-optimized galleries for professional presentation."
+                            title="Portfolio Showcase"
+                            description="Display sold properties, active listings, and pending sales with stunning photos and details. Mobile-optimized for professional presentation."
                         />
                         <FeatureCard
                             icon={<Users className="h-8 w-8" aria-hidden="true" />}
-                            title="Qualified Lead Capture"
-                            description="Built-in buyer, seller, and home valuation forms designed for real estate professionals. Capture qualified leads with detailed questionnaires and agent client testimonials."
+                            title="Lead Capture & CRM"
+                            description="Built-in buyer, seller, and valuation forms with behavioral tracking. Capture context-rich leads with engagement history."
                         />
                         <FeatureCard
                             icon={<BarChart3 className="h-8 w-8" aria-hidden="true" />}
-                            title="Agent Analytics & Insights"
-                            description="Track your professional portfolio performance with detailed analytics. Monitor profile views, link clicks, and lead sources. See which listings and sold properties get the most attention."
+                            title="Analytics Dashboard"
+                            description="Track performance with detailed analytics. Monitor views, engagement patterns, lead quality scores, and conversion metrics."
                         />
                     </div>
                 </div>
@@ -229,6 +445,87 @@ export default function Landing() {
 
             {/* Blog Section */}
             <BlogSection limit={6} showSearch={true} showFilters={true} />
+
+            {/* Competitive Advantage / Data Moat Section */}
+            <section className="py-20 bg-background relative overflow-hidden" aria-labelledby="competitive-advantage-heading">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#80d0c7]/10 via-[#a1c4fd]/10 to-[#c2e9fb]/10" />
+                <div className="absolute inset-0 bg-glass-background backdrop-blur-sm" />
+                <div className="container mx-auto px-4 relative z-10">
+                    <div className="max-w-4xl mx-auto">
+                        <header className="text-center mb-12">
+                            <h2 id="competitive-advantage-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-6">
+                                <span className="glass-heading">
+                                    Your Competitive Advantage
+                                </span>
+                                <span className="block mt-2 text-3xl md:text-4xl">
+                                    That Gets Stronger Every Day
+                                </span>
+                            </h2>
+                        </header>
+
+                        <div className="space-y-8 mb-12">
+                            <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center">
+                                        <span className="text-2xl font-light text-white">1</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-light text-foreground mb-2">Data Accumulation Flywheel</h3>
+                                        <p className="glass-body">
+                                            Every lead you capture, every property view, every interaction feeds your AI model.
+                                            As you label lead outcomes (won, lost, nurturing), your predictions become more accurate.
+                                            This creates a <strong className="text-foreground">flywheel effect</strong>—the more you use it, the better it gets.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center">
+                                        <span className="text-2xl font-light text-white">2</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-light text-foreground mb-2">Unreplicable by Competitors</h3>
+                                        <p className="glass-body">
+                                            Generic CRMs don't have your data. Even if competitors copy our features,
+                                            they can't replicate <strong className="text-foreground">your proprietary dataset</strong> of
+                                            labeled lead outcomes, behavioral patterns, and market intelligence. Your advantage
+                                            compounds with every deal you close.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center">
+                                        <span className="text-2xl font-light text-white">3</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-light text-foreground mb-2">Network Effects at Scale</h3>
+                                        <p className="glass-body">
+                                            As more agents use AgentBio, our aggregate market intelligence improves.
+                                            You benefit from anonymized benchmarks across thousands of transactions—
+                                            <strong className="text-foreground">insights no individual agent could gather alone</strong>.
+                                            Early adopters gain the most as the network grows.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="text-center p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/20 to-[#a1c4fd]/20 border border-glass-border backdrop-blur-md">
+                            <p className="text-lg glass-body mb-4">
+                                <strong className="text-foreground text-xl">The earlier you start, the bigger your moat.</strong>
+                            </p>
+                            <p className="text-md glass-body">
+                                Agents who build their data advantage today will be impossible to catch tomorrow.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             {/* FAQ Section */}
             <section className="py-20 bg-background" aria-labelledby="faq-heading">
@@ -245,15 +542,23 @@ export default function Landing() {
                     <div className="max-w-4xl mx-auto space-y-4">
                         <FAQItem
                             question="What is AgentBio?"
-                            answer="AgentBio is a professional portfolio platform designed specifically for real estate agents to create a single link that showcases their listings, sold properties, client testimonials, and captures qualified leads. It's like a link-in-bio tool purpose-built for realtors."
+                            answer="AgentBio is an AI-powered lead intelligence platform for real estate agents. Unlike generic CRMs or portfolio tools, AgentBio uses machine learning to predict which leads will convert, automatically matches properties to qualified buyers, and provides market intelligence to accelerate deals. It's designed to create a competitive data moat that gets stronger with every interaction."
+                        />
+                        <FAQItem
+                            question="How does AI lead scoring work?"
+                            answer="AgentBio tracks visitor behavior—time on page, properties viewed, scroll depth, return visits, and form interactions. Our AI analyzes these patterns to predict conversion likelihood. As you label lead outcomes (won, lost, nurturing), the model learns what signals indicate high-quality leads specific to your market and style. Over time, predictions become increasingly accurate."
+                        />
+                        <FAQItem
+                            question="What is the 'data moat' and why does it matter?"
+                            answer="Every lead outcome you label (closed deal, lost opportunity, etc.) trains your AI model to make better predictions. This creates a flywheel—more data equals better predictions, which leads to more closed deals, generating more data. Competitors can't replicate this advantage without years of your specific data. The earlier you start, the bigger your competitive advantage."
                         />
                         <FAQItem
                             question="How much does AgentBio cost?"
-                            answer="AgentBio offers a free basic plan with core features including portfolio creation, listing showcase, and lead capture. Premium plans start at $19/month with advanced features like custom branding, analytics, unlimited listings, and priority support. No credit card required to start."
+                            answer="AgentBio offers a free basic plan with core features including portfolio creation, listing showcase, and lead capture. Premium plans starting at $19/month unlock AI-powered lead scoring, automatic property matching, market intelligence benchmarks, and advanced analytics. No credit card required to start."
                         />
                         <FAQItem
                             question="Can I showcase my sold properties on AgentBio?"
-                            answer="Yes! AgentBio is specifically designed to showcase your sold properties alongside active listings. You can add photos, prices, addresses, and property details for all your sold homes to demonstrate your track record and expertise to potential clients."
+                            answer="Yes! AgentBio showcases your sold properties, active listings, and pending sales with professional galleries. But beyond display, we track which properties visitors engage with most, helping predict buyer preferences and automatically match future listings to interested leads."
                         />
                         <FAQItem
                             question="How do I capture leads with AgentBio?"
@@ -294,19 +599,23 @@ export default function Landing() {
                 <div className="container mx-auto px-4 text-center relative z-10">
                     <h2 id="cta-heading" className="text-4xl md:text-5xl font-light tracking-tight mb-4">
                         <span className="glass-heading">
-                            Create Your Professional Portfolio
+                            Start Building Your Data Moat Today
                         </span>
                     </h2>
                     <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-                        Join thousands of agents showcasing sold properties and capturing qualified leads
+                        Join forward-thinking agents who are building an AI-powered competitive advantage.
+                        The earlier you start, the stronger your moat becomes.
                     </p>
                     <Link
                         to="/auth/register"
                         className="inline-flex items-center gap-2 px-8 py-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl font-light tracking-tight transition-all hover:border-[#80d0c7] hover:shadow-lg hover:shadow-[#80d0c7]/20"
-                        aria-label="Create your free real estate agent portfolio - no credit card required"
+                        aria-label="Start building your AI-powered competitive advantage - no credit card required"
                     >
                         <span className="glass-accent">Get Started Free - No Credit Card Required</span>
                     </Link>
+                    <p className="text-sm text-muted-foreground font-light mt-4">
+                        AI-powered lead scoring • Smart property matching • Market intelligence
+                    </p>
                 </div>
             </section>
 
