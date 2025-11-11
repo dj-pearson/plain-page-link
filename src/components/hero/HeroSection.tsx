@@ -26,20 +26,20 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({
-  title = 'Linktree for Real Estate Agents',
-  subtitle = 'One Link. All Your Listings.',
-  description = 'Stop using generic link-in-bio tools. AgentBio is purpose-built for real estate agents to showcase sold properties, capture qualified buyer & seller leads, and turn Instagram followers into clients.',
+  title = 'AI-Powered Lead Intelligence',
+  subtitle = 'Predict. Match. Close.',
+  description = 'AgentBio uses AI to predict which leads will convert, automatically matches properties to qualified buyers, and accelerates deals with market intelligence. Every interaction makes your predictions smarter—creating a competitive advantage that compounds over time.',
   primaryCta = {
-    text: 'Create Your Free Profile',
+    text: 'Start Building Your Data Moat',
     href: '/auth/register'
   },
   secondaryCta = {
-    text: 'View Live Demo',
+    text: 'See How It Works',
     href: '#demo-profiles'
   },
   badge = {
-    icon: <Zap className="h-4 w-4" aria-hidden="true" />,
-    text: 'Purpose-Built for Realtors'
+    icon: <Sparkles className="h-4 w-4" aria-hidden="true" />,
+    text: 'AI-Powered Sales Intelligence'
   },
   showStats = true
 }: HeroSectionProps) {
@@ -107,26 +107,26 @@ export function HeroSection({
             <div className="grid grid-cols-3 gap-6 pt-8 border-t border-glass-border">
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  &lt;10 min
+                  AI-Powered
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
-                  Setup Time
+                  Lead Scoring
                 </div>
               </div>
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  3x
+                  Smart
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
-                  More Leads
+                  Auto-Matching
                 </div>
               </div>
               <div className="space-y-1">
                 <div className="text-2xl md:text-3xl font-light glass-accent">
-                  Free
+                  Data Moat
                 </div>
                 <div className="text-sm text-muted-foreground font-light">
-                  To Start
+                  Gets Smarter
                 </div>
               </div>
             </div>
