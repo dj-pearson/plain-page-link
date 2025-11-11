@@ -229,24 +229,174 @@ export default function Landing() {
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <FeatureCard
                             icon={<Brain className="h-8 w-8" aria-hidden="true" />}
-                            title="Predictive Lead Scoring"
-                            description="AI analyzes behavioral patterns to predict which leads are most likely to convert. Focus your time on opportunities that matter."
+                            title="Intelligent Lead Inbox"
+                            description="AI scores every lead 0-100 based on conversion probability. Your inbox auto-sorts by who's most likely to close—no more guessing which leads to prioritize."
                         />
                         <FeatureCard
                             icon={<Target className="h-8 w-8" aria-hidden="true" />}
-                            title="Smart Property Matching"
-                            description="Automatically match your listings to qualified buyers based on preferences, behavior, and market signals. Close deals faster."
+                            title="Auto-Matching Notifications"
+                            description="Post a listing, get instant alerts for matching leads. AI finds buyers based on price, location, beds/baths, timeline, and engagement patterns. Average 2-3 high-quality matches per listing."
                         />
                         <FeatureCard
                             icon={<TrendingUp className="h-8 w-8" aria-hidden="true" />}
-                            title="Market Intelligence"
-                            description="Optimize listing performance with real-time benchmarks and insights. Know how your properties compare to market averages."
+                            title="Market Intelligence Dashboard"
+                            description="See how your listings perform vs. market benchmarks. Track inquiry rates, time-on-page, and engagement by price range and property type. Know if you're priced right."
                         />
                         <FeatureCard
                             icon={<Zap className="h-8 w-8" aria-hidden="true" />}
-                            title="Competitive Data Moat"
-                            description="Every labeled lead outcome improves your predictions. Build an advantage that compounds over time—one competitors can't replicate."
+                            title="Self-Improving AI"
+                            description="Label outcomes (won, lost, nurturing) and watch predictions get smarter. Your AI learns your market, your style, your buyers—creating an advantage competitors can't copy."
                         />
+                    </div>
+                </div>
+            </section>
+
+            {/* How It Works Section */}
+            <section className="py-20 bg-background/50" aria-labelledby="how-it-works-heading">
+                <div className="container mx-auto px-4">
+                    <header className="text-center mb-16">
+                        <h2 id="how-it-works-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                            <span className="glass-heading text-4xl md:text-6xl">
+                                How It Works
+                            </span>
+                        </h2>
+                        <p className="text-xl glass-body max-w-2xl mx-auto">
+                            From lead capture to closed deal—see how AI accelerates your entire sales process
+                        </p>
+                    </header>
+
+                    <div className="max-w-5xl mx-auto space-y-12">
+                        <div className="grid md:grid-cols-2 gap-8 items-center">
+                            <div className="order-2 md:order-1">
+                                <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                    <div className="text-4xl font-light glass-accent mb-2">01</div>
+                                    <h3 className="text-2xl font-light text-foreground mb-3">Lead Visits Your Profile</h3>
+                                    <p className="glass-body mb-4">
+                                        Visitor browses your listings, spends 2 minutes on a $450K home, scrolls 80%, views the photo gallery.
+                                        All behavior is tracked silently in the background.
+                                    </p>
+                                    <div className="text-sm text-muted-foreground">
+                                        ✓ Time on page • Scroll depth • Properties viewed • Device type • Return visits
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="order-1 md:order-2">
+                                <div className="p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                                    <div className="text-6xl mb-4">👁️</div>
+                                    <div className="text-lg font-light text-foreground">Behavioral Intelligence Capture</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 items-center">
+                            <div className="p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                                <div className="text-6xl mb-4">🧠</div>
+                                <div className="text-lg font-light text-foreground">AI Lead Scoring</div>
+                            </div>
+                            <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                <div className="text-4xl font-light glass-accent mb-2">02</div>
+                                <h3 className="text-2xl font-light text-foreground mb-3">Lead Submits Contact Form</h3>
+                                <p className="glass-body mb-4">
+                                    AI instantly analyzes all behavioral data and assigns a score: 87/100 (High Priority).
+                                    Lead appears at the top of your inbox with full engagement history and predicted conversion rate.
+                                </p>
+                                <div className="text-sm text-muted-foreground">
+                                    ✓ ML score 0-100 • Priority tier • Engagement timeline • Property preferences
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 items-center">
+                            <div className="order-2 md:order-1">
+                                <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                    <div className="text-4xl font-light glass-accent mb-2">03</div>
+                                    <h3 className="text-2xl font-light text-foreground mb-3">You Add a New Listing</h3>
+                                    <p className="glass-body mb-4">
+                                        Post a $475K, 3bd/2ba home. AI instantly scans your lead database and finds 4 matches (85%, 79%, 72%, 68% match scores).
+                                        You get notifications with match reasons: "Price within budget, 3+ beds requirement met, preferred area."
+                                    </p>
+                                    <div className="text-sm text-muted-foreground">
+                                        ✓ Auto-matching • Instant alerts • Match explanations • Direct lead links
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="order-1 md:order-2">
+                                <div className="p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                                    <div className="text-6xl mb-4">🎯</div>
+                                    <div className="text-lg font-light text-foreground">Smart Property Matching</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 items-center">
+                            <div className="p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                                <div className="text-6xl mb-4">📊</div>
+                                <div className="text-lg font-light text-foreground">Data Moat Grows</div>
+                            </div>
+                            <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+                                <div className="text-4xl font-light glass-accent mb-2">04</div>
+                                <h3 className="text-2xl font-light text-foreground mb-3">You Close the Deal</h3>
+                                <p className="glass-body mb-4">
+                                    Mark lead as "Closed - Won" with deal value and days to close. AI learns: high engagement + return visits + matched listing = conversion.
+                                    Next time, similar patterns get higher scores. Your predictions improve forever.
+                                </p>
+                                <div className="text-sm text-muted-foreground">
+                                    ✓ Outcome labeling • Model retraining • Smarter predictions • Compounding advantage
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Results Section */}
+            <section className="py-20 bg-background relative overflow-hidden" aria-labelledby="results-heading">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#80d0c7]/5 via-[#a1c4fd]/5 to-[#c2e9fb]/5" />
+                <div className="container mx-auto px-4 relative z-10">
+                    <header className="text-center mb-12">
+                        <h2 id="results-heading" className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                            <span className="glass-heading">
+                                Real Results from AI Intelligence
+                            </span>
+                        </h2>
+                        <p className="text-xl glass-body max-w-2xl mx-auto">
+                            Agents using AI-powered lead intelligence see measurable improvements in conversion and velocity
+                        </p>
+                    </header>
+
+                    <div className="grid md:grid-cols-4 gap-6 mb-12">
+                        <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">75%+</div>
+                            <div className="text-sm text-muted-foreground">Match Accuracy</div>
+                            <div className="text-xs text-muted-foreground mt-2">Agents confirm relevance of AI-matched leads</div>
+                        </div>
+                        <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">2-3x</div>
+                            <div className="text-sm text-muted-foreground">More Matches</div>
+                            <div className="text-xs text-muted-foreground mt-2">High-quality matches per new listing</div>
+                        </div>
+                        <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">&lt;30</div>
+                            <div className="text-sm text-muted-foreground">Days to Close</div>
+                            <div className="text-xs text-muted-foreground mt-2">From matched lead to closed deal</div>
+                        </div>
+                        <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border text-center">
+                            <div className="text-4xl md:text-5xl font-light glass-accent mb-2">0-100</div>
+                            <div className="text-sm text-muted-foreground">Lead Score</div>
+                            <div className="text-xs text-muted-foreground mt-2">ML-powered conversion prediction</div>
+                        </div>
+                    </div>
+
+                    <div className="max-w-4xl mx-auto p-8 rounded-xl bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 border border-glass-border">
+                        <div className="text-center">
+                            <p className="text-lg glass-body mb-4">
+                                <strong className="text-foreground text-xl">"Stop chasing cold leads. Let AI tell you who's ready to buy."</strong>
+                            </p>
+                            <p className="text-md glass-body">
+                                Traditional CRMs track activity. AgentBio predicts outcomes. That's the difference between
+                                working harder and working smarter.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </section>
