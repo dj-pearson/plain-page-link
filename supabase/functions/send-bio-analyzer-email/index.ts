@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { validateEmail, sanitizeString } from '../_shared/validation.ts'
+import { checkRateLimit } from '../_shared/rateLimit.ts'
+import { getErrorMessage } from '../_shared/errorHelpers.ts'
 
 interface BioAnalyzerEmailData {
   analysisId: string
@@ -32,17 +35,69 @@ serve(async (req) => {
       )
     }
 
+    // Validate email format
+    if (!validateEmail(data.email)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid email address' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate field lengths
+    if (data.firstName.length > 100 || data.market.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Field values too long' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Sanitize inputs
+    const sanitizedFirstName = sanitizeString(data.firstName)
+    const sanitizedMarket = sanitizeString(data.market)
+    const sanitizedBrokerage = data.brokerage ? sanitizeString(data.brokerage) : undefined
+
+    // Rate limiting - 5 requests per minute
+    const rateLimitResult = await checkRateLimit(req, `bio_email_${data.email}`, 5, 60)
+    if (!rateLimitResult.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+    // Verify analysis ID exists
+    const { data: analysis, error: analysisError } = await supabase
+      .from('instagram_bio_email_captures')
+      .select('id')
+      .eq('id', data.analysisId)
+      .single()
+
+    if (analysisError || !analysis) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid analysis ID' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Use sanitized data for email
+    const emailData = {
+      ...data,
+      firstName: sanitizedFirstName,
+      market: sanitizedMarket,
+      brokerage: sanitizedBrokerage
+    }
+
     // Send Email #1 - Immediate delivery with bio rewrites
     await sendEmail({
       to: data.email,
-      subject: `${data.firstName}, Your 3 Optimized Instagram Bios + Action Plan Inside`,
-      body: getEmail1PlainText(data),
-      html: getEmail1HTML(data)
+      subject: `${sanitizedFirstName}, Your 3 Optimized Instagram Bios + Action Plan Inside`,
+      body: getEmail1PlainText(emailData),
+      html: getEmail1HTML(emailData)
     })
 
     // Record email sent
@@ -56,7 +111,7 @@ serve(async (req) => {
       })
 
     // Schedule remaining emails (will be picked up by cron job)
-    await scheduleEmailSequence(supabase, data.analysisId, data.email, data.firstName, data.market, data.score)
+    await scheduleEmailSequence(supabase, data.analysisId, data.email, sanitizedFirstName, sanitizedMarket, data.score)
 
     return new Response(
       JSON.stringify({
@@ -69,7 +124,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in send-bio-analyzer-email function:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: getErrorMessage(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

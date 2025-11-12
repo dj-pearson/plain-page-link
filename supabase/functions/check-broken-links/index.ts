@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { getErrorMessage } from '../_shared/errorHelpers.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -47,7 +48,8 @@ serve(async (req) => {
     console.log(`Found ${linkElements.length} links to check`);
 
     for (const link of linkElements) {
-      const href = link.getAttribute('href') || '';
+      const element = link as any;
+      const href = element.getAttribute('href') || '';
       try {
         const absoluteUrl = new URL(href, url).toString();
         const linkDomain = new URL(absoluteUrl).hostname;
@@ -90,7 +92,7 @@ serve(async (req) => {
           statusCode: 0,
           isExternal: false,
           isBroken: true,
-          error: error.message,
+          error: getErrorMessage(error),
         });
       }
     }
@@ -130,7 +132,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error checking broken links:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: getErrorMessage(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

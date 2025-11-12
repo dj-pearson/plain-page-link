@@ -5,7 +5,7 @@ export const usePublicProfile = (username: string) => {
   return useQuery({
     queryKey: ['public-profile', username],
     queryFn: async () => {
-      // Fetch profile by username
+      // Fetch profile by username - ONLY PUBLIC FIELDS
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select(`
@@ -16,32 +16,18 @@ export const usePublicProfile = (username: string) => {
           avatar_url,
           theme,
           title,
-          license_number,
-          license_state,
           brokerage_name,
           brokerage_logo,
           years_experience,
-          specialties,
           certifications,
-          phone,
-          email_display,
-          website_url,
           service_cities,
           service_zip_codes,
-          facebook_url,
-          instagram_url,
-          linkedin_url,
-          tiktok_url,
-          youtube_url,
-          zillow_url,
-          realtor_com_url,
           city,
           seo_title,
           seo_description,
           og_image,
           display_name,
           created_at,
-          updated_at,
           is_published
         `)
         .eq('username', username)
@@ -68,7 +54,6 @@ export const usePublicProfile = (username: string) => {
           .from('listings')
           .select(`
             id,
-            user_id,
             image,
             photos,
             title,
@@ -95,7 +80,6 @@ export const usePublicProfile = (username: string) => {
           .from('testimonials')
           .select(`
             id,
-            user_id,
             author_name,
             author_role,
             content,
@@ -113,7 +97,6 @@ export const usePublicProfile = (username: string) => {
           .from('links')
           .select(`
             id,
-            user_id,
             title,
             url,
             icon,

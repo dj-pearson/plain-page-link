@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { getErrorMessage } from '../_shared/errorHelpers.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -57,6 +58,7 @@ serve(async (req) => {
       issues: [] as any[],
       usabilityScore: 0,
       passedMobileFriendlyTest: false,
+      usesResponsiveImages: false,
     };
 
     let score = 0;
@@ -99,7 +101,8 @@ serve(async (req) => {
     const images = doc.querySelectorAll('img');
     let responsiveImages = 0;
     for (const img of images) {
-      if (img.hasAttribute('srcset') || img.hasAttribute('sizes')) {
+      const element = img as any;
+      if (element.hasAttribute('srcset') || element.hasAttribute('sizes')) {
         responsiveImages++;
       }
     }
@@ -206,7 +209,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error checking mobile-first:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: getErrorMessage(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

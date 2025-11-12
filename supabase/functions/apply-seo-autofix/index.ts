@@ -126,7 +126,7 @@ serve(async (req) => {
         issue_type: rule.issue_type,
         fix_applied: { attempted: rule.fix_action },
         result: 'failed',
-        error_message: error.message,
+        error_message: getErrorMessage(error),
         approved_by: approved_by || null,
       })
 
@@ -141,7 +141,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in apply-seo-autofix:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: getErrorMessage(error) }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
