@@ -66,8 +66,13 @@ ${profiles?.map(profile => `  <url>
         a.download = 'sitemap.xml';
         a.click();
         
-        // Display the sitemap
-        document.body.innerHTML = `<pre style="font-family: monospace; padding: 20px;">${sitemap.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+        // Display the sitemap safely
+        const pre = document.createElement('pre');
+        pre.style.fontFamily = 'monospace';
+        pre.style.padding = '20px';
+        pre.textContent = sitemap; // textContent automatically escapes
+        document.body.innerHTML = ''; // Clear first
+        document.body.appendChild(pre);
         document.title = 'Sitemap.xml';
         
       } catch (error) {

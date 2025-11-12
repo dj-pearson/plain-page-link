@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { checkRateLimit, getRateLimitHeaders } from '../_shared/rateLimit.ts'
+import { validateLeadData, sanitizeString, getClientIP } from '../_shared/validation.ts'
 
 interface LeadData {
   user_id: string
@@ -31,15 +33,56 @@ serve(async (req) => {
   }
 
   try {
-    const leadData: LeadData = await req.json()
-
-    // Validate required fields
-    if (!leadData.user_id || !leadData.name || !leadData.email || !leadData.lead_type) {
+    // Rate limiting - 5 requests per minute per IP
+    const clientIP = getClientIP(req);
+    const rateLimit = checkRateLimit(clientIP, { maxRequests: 5, windowMs: 60000 });
+    
+    if (!rateLimit.allowed) {
+      console.warn(`Rate limit exceeded for IP: ${clientIP}`);
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            ...getRateLimitHeaders(rateLimit),
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
     }
+
+    const rawData = await req.json()
+    
+    // Validate input data
+    const validation = validateLeadData(rawData);
+    if (!validation.valid) {
+      console.error('Validation errors:', validation.errors);
+      return new Response(
+        JSON.stringify({ error: 'Invalid input data', details: validation.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Sanitize string inputs
+    const leadData: LeadData = {
+      user_id: rawData.user_id,
+      name: sanitizeString(rawData.name),
+      email: rawData.email.trim().toLowerCase(),
+      phone: rawData.phone ? sanitizeString(rawData.phone) : undefined,
+      message: rawData.message ? sanitizeString(rawData.message) : undefined,
+      lead_type: rawData.lead_type,
+      listing_id: rawData.listing_id,
+      price_range: rawData.price_range ? sanitizeString(rawData.price_range) : undefined,
+      timeline: rawData.timeline ? sanitizeString(rawData.timeline) : undefined,
+      property_address: rawData.property_address ? sanitizeString(rawData.property_address) : undefined,
+      preapproved: rawData.preapproved,
+      referrer_url: rawData.referrer_url,
+      utm_source: rawData.utm_source ? sanitizeString(rawData.utm_source) : undefined,
+      utm_medium: rawData.utm_medium ? sanitizeString(rawData.utm_medium) : undefined,
+      utm_campaign: rawData.utm_campaign ? sanitizeString(rawData.utm_campaign) : undefined,
+      device: rawData.device ? sanitizeString(rawData.device) : undefined,
+    };
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!

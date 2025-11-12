@@ -287,6 +287,172 @@ export type Database = {
           },
         ]
       }
+      bing_webmaster_oauth_credentials: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          is_active: boolean | null
+          last_refreshed_at: string | null
+          refresh_token: string
+          scope: string
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          refresh_token: string
+          scope: string
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          refresh_token?: string
+          scope?: string
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bing_webmaster_search_data: {
+        Row: {
+          average_position: number | null
+          clicks: number | null
+          clicks_change: number | null
+          country: string | null
+          created_at: string | null
+          ctr: number | null
+          ctr_change: number | null
+          date: string
+          device: string | null
+          id: string
+          impressions: number | null
+          impressions_change: number | null
+          page_url: string | null
+          position_change: number | null
+          query: string | null
+          site_id: string
+        }
+        Insert: {
+          average_position?: number | null
+          clicks?: number | null
+          clicks_change?: number | null
+          country?: string | null
+          created_at?: string | null
+          ctr?: number | null
+          ctr_change?: number | null
+          date: string
+          device?: string | null
+          id?: string
+          impressions?: number | null
+          impressions_change?: number | null
+          page_url?: string | null
+          position_change?: number | null
+          query?: string | null
+          site_id: string
+        }
+        Update: {
+          average_position?: number | null
+          clicks?: number | null
+          clicks_change?: number | null
+          country?: string | null
+          created_at?: string | null
+          ctr?: number | null
+          ctr_change?: number | null
+          date?: string
+          device?: string | null
+          id?: string
+          impressions?: number | null
+          impressions_change?: number | null
+          page_url?: string | null
+          position_change?: number | null
+          query?: string | null
+          site_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bing_webmaster_search_data_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "bing_webmaster_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bing_webmaster_sites: {
+        Row: {
+          auto_sync_enabled: boolean | null
+          created_at: string | null
+          credential_id: string | null
+          id: string
+          is_primary: boolean | null
+          is_verified: boolean | null
+          last_synced_at: string | null
+          site_name: string | null
+          site_url: string
+          sync_error: string | null
+          sync_frequency: string | null
+          sync_status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          credential_id?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          last_synced_at?: string | null
+          site_name?: string | null
+          site_url: string
+          sync_error?: string | null
+          sync_frequency?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          credential_id?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          last_synced_at?: string | null
+          site_name?: string | null
+          site_url?: string
+          sync_error?: string | null
+          sync_frequency?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bing_webmaster_sites_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "bing_webmaster_oauth_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_suggestions: {
         Row: {
           category: string | null
@@ -381,6 +547,217 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      ga4_oauth_credentials: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          is_active: boolean | null
+          last_refreshed_at: string | null
+          refresh_token: string
+          scope: string
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          refresh_token: string
+          scope: string
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          refresh_token?: string
+          scope?: string
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ga4_properties: {
+        Row: {
+          auto_sync_enabled: boolean | null
+          created_at: string | null
+          credential_id: string | null
+          currency_code: string | null
+          display_name: string | null
+          id: string
+          is_primary: boolean | null
+          last_synced_at: string | null
+          property_id: string
+          property_name: string
+          property_type: string | null
+          sync_error: string | null
+          sync_frequency: string | null
+          sync_status: string | null
+          time_zone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          credential_id?: string | null
+          currency_code?: string | null
+          display_name?: string | null
+          id?: string
+          is_primary?: boolean | null
+          last_synced_at?: string | null
+          property_id: string
+          property_name: string
+          property_type?: string | null
+          sync_error?: string | null
+          sync_frequency?: string | null
+          sync_status?: string | null
+          time_zone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          credential_id?: string | null
+          currency_code?: string | null
+          display_name?: string | null
+          id?: string
+          is_primary?: boolean | null
+          last_synced_at?: string | null
+          property_id?: string
+          property_name?: string
+          property_type?: string | null
+          sync_error?: string | null
+          sync_frequency?: string | null
+          sync_status?: string | null
+          time_zone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ga4_properties_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "ga4_oauth_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ga4_traffic_data: {
+        Row: {
+          average_session_duration: number | null
+          bounce_rate: number | null
+          campaign: string | null
+          city: string | null
+          conversion_rate: number | null
+          conversions: number | null
+          country: string | null
+          created_at: string | null
+          date: string
+          device_category: string | null
+          engaged_sessions: number | null
+          engagement_rate: number | null
+          events_per_session: number | null
+          id: string
+          landing_page: string | null
+          medium: string | null
+          new_users: number | null
+          page_path: string | null
+          page_title: string | null
+          pageviews: number | null
+          pageviews_change: number | null
+          property_id: string
+          sessions: number | null
+          sessions_change: number | null
+          source: string | null
+          total_revenue: number | null
+          users: number | null
+          users_change: number | null
+        }
+        Insert: {
+          average_session_duration?: number | null
+          bounce_rate?: number | null
+          campaign?: string | null
+          city?: string | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          country?: string | null
+          created_at?: string | null
+          date: string
+          device_category?: string | null
+          engaged_sessions?: number | null
+          engagement_rate?: number | null
+          events_per_session?: number | null
+          id?: string
+          landing_page?: string | null
+          medium?: string | null
+          new_users?: number | null
+          page_path?: string | null
+          page_title?: string | null
+          pageviews?: number | null
+          pageviews_change?: number | null
+          property_id: string
+          sessions?: number | null
+          sessions_change?: number | null
+          source?: string | null
+          total_revenue?: number | null
+          users?: number | null
+          users_change?: number | null
+        }
+        Update: {
+          average_session_duration?: number | null
+          bounce_rate?: number | null
+          campaign?: string | null
+          city?: string | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          country?: string | null
+          created_at?: string | null
+          date?: string
+          device_category?: string | null
+          engaged_sessions?: number | null
+          engagement_rate?: number | null
+          events_per_session?: number | null
+          id?: string
+          landing_page?: string | null
+          medium?: string | null
+          new_users?: number | null
+          page_path?: string | null
+          page_title?: string | null
+          pageviews?: number | null
+          pageviews_change?: number | null
+          property_id?: string
+          sessions?: number | null
+          sessions_change?: number | null
+          source?: string | null
+          total_revenue?: number | null
+          users?: number | null
+          users_change?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ga4_traffic_data_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "ga4_properties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gsc_keyword_performance: {
         Row: {
@@ -964,6 +1341,57 @@ export type Database = {
           years_experience?: number | null
           youtube_url?: string | null
           zillow_url?: string | null
+        }
+        Relationships: []
+      }
+      search_dashboard_config: {
+        Row: {
+          alert_thresholds: Json | null
+          created_at: string | null
+          dashboard_layout: Json | null
+          default_comparison_period: string | null
+          default_date_range: string | null
+          default_grouping: string | null
+          enable_alerts: boolean | null
+          enabled_platforms: Json | null
+          export_format: string | null
+          id: string
+          primary_platform: string | null
+          updated_at: string | null
+          user_id: string
+          visible_metrics: Json | null
+        }
+        Insert: {
+          alert_thresholds?: Json | null
+          created_at?: string | null
+          dashboard_layout?: Json | null
+          default_comparison_period?: string | null
+          default_date_range?: string | null
+          default_grouping?: string | null
+          enable_alerts?: boolean | null
+          enabled_platforms?: Json | null
+          export_format?: string | null
+          id?: string
+          primary_platform?: string | null
+          updated_at?: string | null
+          user_id: string
+          visible_metrics?: Json | null
+        }
+        Update: {
+          alert_thresholds?: Json | null
+          created_at?: string | null
+          dashboard_layout?: Json | null
+          default_comparison_period?: string | null
+          default_date_range?: string | null
+          default_grouping?: string | null
+          enable_alerts?: boolean | null
+          enabled_platforms?: Json | null
+          export_format?: string | null
+          id?: string
+          primary_platform?: string | null
+          updated_at?: string | null
+          user_id?: string
+          visible_metrics?: Json | null
         }
         Relationships: []
       }
@@ -1924,6 +2352,78 @@ export type Database = {
           },
         ]
       }
+      unified_search_analytics: {
+        Row: {
+          average_position: number | null
+          bounce_rate: number | null
+          clicks: number | null
+          country: string | null
+          created_at: string | null
+          ctr: number | null
+          date: string
+          device: string | null
+          engagement_rate: number | null
+          id: string
+          impressions: number | null
+          page_title: string | null
+          page_url: string | null
+          pageviews: number | null
+          query: string | null
+          sessions: number | null
+          source_platform: string
+          source_property_id: string | null
+          updated_at: string | null
+          user_id: string
+          users: number | null
+        }
+        Insert: {
+          average_position?: number | null
+          bounce_rate?: number | null
+          clicks?: number | null
+          country?: string | null
+          created_at?: string | null
+          ctr?: number | null
+          date: string
+          device?: string | null
+          engagement_rate?: number | null
+          id?: string
+          impressions?: number | null
+          page_title?: string | null
+          page_url?: string | null
+          pageviews?: number | null
+          query?: string | null
+          sessions?: number | null
+          source_platform: string
+          source_property_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          users?: number | null
+        }
+        Update: {
+          average_position?: number | null
+          bounce_rate?: number | null
+          clicks?: number | null
+          country?: string | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string
+          device?: string | null
+          engagement_rate?: number | null
+          id?: string
+          impressions?: number | null
+          page_title?: string | null
+          page_url?: string | null
+          pageviews?: number | null
+          query?: string | null
+          sessions?: number | null
+          source_platform?: string
+          source_property_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          users?: number | null
+        }
+        Relationships: []
+      }
       usage_tracking: {
         Row: {
           count: number | null
@@ -2070,6 +2570,169 @@ export type Database = {
           },
         ]
       }
+      yandex_webmaster_oauth_credentials: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          is_active: boolean | null
+          last_refreshed_at: string | null
+          refresh_token: string | null
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          refresh_token?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          refresh_token?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      yandex_webmaster_search_data: {
+        Row: {
+          clicks: number | null
+          clicks_change: number | null
+          created_at: string | null
+          ctr: number | null
+          ctr_change: number | null
+          date: string
+          device: string | null
+          id: string
+          page_url: string | null
+          position: number | null
+          position_change: number | null
+          query: string | null
+          shows: number | null
+          shows_change: number | null
+          site_id: string
+        }
+        Insert: {
+          clicks?: number | null
+          clicks_change?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          ctr_change?: number | null
+          date: string
+          device?: string | null
+          id?: string
+          page_url?: string | null
+          position?: number | null
+          position_change?: number | null
+          query?: string | null
+          shows?: number | null
+          shows_change?: number | null
+          site_id: string
+        }
+        Update: {
+          clicks?: number | null
+          clicks_change?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          ctr_change?: number | null
+          date?: string
+          device?: string | null
+          id?: string
+          page_url?: string | null
+          position?: number | null
+          position_change?: number | null
+          query?: string | null
+          shows?: number | null
+          shows_change?: number | null
+          site_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yandex_webmaster_search_data_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "yandex_webmaster_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yandex_webmaster_sites: {
+        Row: {
+          auto_sync_enabled: boolean | null
+          created_at: string | null
+          credential_id: string | null
+          host_display_name: string | null
+          host_id: string
+          host_url: string
+          id: string
+          is_primary: boolean | null
+          last_synced_at: string | null
+          sync_error: string | null
+          sync_frequency: string | null
+          sync_status: string | null
+          updated_at: string | null
+          user_id: string
+          verification_state: string | null
+        }
+        Insert: {
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          credential_id?: string | null
+          host_display_name?: string | null
+          host_id: string
+          host_url: string
+          id?: string
+          is_primary?: boolean | null
+          last_synced_at?: string | null
+          sync_error?: string | null
+          sync_frequency?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id: string
+          verification_state?: string | null
+        }
+        Update: {
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          credential_id?: string | null
+          host_display_name?: string | null
+          host_id?: string
+          host_url?: string
+          id?: string
+          is_primary?: boolean | null
+          last_synced_at?: string | null
+          sync_error?: string | null
+          sync_frequency?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          verification_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yandex_webmaster_sites_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "yandex_webmaster_oauth_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2087,6 +2750,15 @@ export type Database = {
         Args: { _current_user_id: string; _username: string }
         Returns: boolean
       }
+      get_connected_search_platforms: {
+        Args: { p_user_id: string }
+        Returns: {
+          credential_status: string
+          is_connected: boolean
+          last_sync: string
+          platform: string
+        }[]
+      }
       get_user_plan: { Args: { _user_id: string }; Returns: Json }
       has_role: {
         Args: {
@@ -2103,6 +2775,10 @@ export type Database = {
       increment_profile_views: {
         Args: { _profile_id: string }
         Returns: undefined
+      }
+      refresh_unified_analytics: {
+        Args: { p_end_date: string; p_start_date: string; p_user_id: string }
+        Returns: number
       }
     }
     Enums: {

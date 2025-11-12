@@ -5,6 +5,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail } from '../_shared/email.ts';
+import { checkRateLimit, getRateLimitHeaders } from '../_shared/rateLimit.ts';
+import { validateContactData, sanitizeString, getClientIP } from '../_shared/validation.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -14,6 +16,25 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting - 5 requests per minute per IP
+    const clientIP = getClientIP(req);
+    const rateLimit = checkRateLimit(clientIP, { maxRequests: 5, windowMs: 60000 });
+    
+    if (!rateLimit.allowed) {
+      console.warn(`Rate limit exceeded for IP: ${clientIP}`);
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            ...getRateLimitHeaders(rateLimit),
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
+    }
+
     // Create Supabase client (public access for contact forms)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -21,18 +42,24 @@ serve(async (req) => {
     )
 
     // Parse request body
-    const { name, email, phone, message, listingId, agentId, leadId, type, data } = await req.json()
-
-    // Validate required fields
-    if (!name || !email) {
-      throw new Error('Missing required fields: name, email')
+    const rawData = await req.json()
+    
+    // Validate input
+    const validation = validateContactData(rawData);
+    if (!validation.valid) {
+      console.error('Validation errors:', validation.errors);
+      return new Response(
+        JSON.stringify({ error: 'Invalid input data', details: validation.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      throw new Error('Invalid email format')
-    }
+    // Sanitize inputs
+    const name = sanitizeString(rawData.name);
+    const email = rawData.email.trim().toLowerCase();
+    const phone = rawData.phone ? sanitizeString(rawData.phone) : undefined;
+    const message = rawData.message ? sanitizeString(rawData.message) : undefined;
+    const { listingId, agentId, leadId, type, data } = rawData;
 
     // If leadId is provided, fetch the lead; otherwise it was already created by the client
     let leadData = null
