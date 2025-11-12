@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Home, BarChart3, Users, Brain, Target, TrendingUp, Zap } from "lucide-react";
+import { Home, BarChart3, Users, Brain, Target, TrendingUp, Zap, CheckCircle2, Building2, Calendar, Award } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { BlogSection } from "@/components/blog/BlogSection";
 import { PublicHeader } from "@/components/layout/PublicHeader";
@@ -9,6 +9,7 @@ import { HeroSection } from "@/components/hero";
 import { BeforeAfterComparison } from "@/components/landing/BeforeAfterComparison";
 import { DemoProfilesShowcase } from "@/components/landing/DemoProfilesShowcase";
 import { AgentTestimonials } from "@/components/landing/AgentTestimonials";
+import { FeatureCard } from "@/components/landing/FeatureCard";
 
 export default function Landing() {
     const schema = {
