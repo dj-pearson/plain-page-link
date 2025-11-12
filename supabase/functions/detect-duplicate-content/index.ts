@@ -1,7 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { createHash } from "https://deno.land/std@0.168.0/hash/mod.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
+
+// Simple hash function for content comparison
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16);
+}
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));

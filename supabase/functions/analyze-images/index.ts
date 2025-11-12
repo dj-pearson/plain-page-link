@@ -44,12 +44,14 @@ serve(async (req) => {
     console.log(`Found ${imageElements.length} images to analyze`);
 
     for (const img of imageElements) {
-      const src = img.getAttribute('src') || '';
-      const alt = img.getAttribute('alt') || '';
-      const title = img.getAttribute('title') || '';
-      const width = img.getAttribute('width');
-      const height = img.getAttribute('height');
-      const loading = img.getAttribute('loading');
+      // Type assertion for DOM element methods
+      const element = img as any;
+      const src = element.getAttribute('src') || '';
+      const alt = element.getAttribute('alt') || '';
+      const title = element.getAttribute('title') || '';
+      const width = element.getAttribute('width');
+      const height = element.getAttribute('height');
+      const loading = element.getAttribute('loading');
 
       try {
         const imageSrc = new URL(src, url).toString();
@@ -85,6 +87,7 @@ serve(async (req) => {
           isLazyLoaded: loading === 'lazy',
           supportLazyLoading: true,
           optimizationScore: 0,
+          isOptimized: false,
           issues: [] as string[],
         };
 
@@ -184,8 +187,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error analyzing images:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

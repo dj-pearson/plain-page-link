@@ -20,6 +20,7 @@ export interface CorsHeaders {
   'Access-Control-Allow-Headers': string;
   'Access-Control-Allow-Credentials': string;
   'Access-Control-Allow-Methods'?: string;
+  [key: string]: string | undefined;
 }
 
 /**
@@ -31,13 +32,13 @@ export interface CorsHeaders {
 export function getCorsHeaders(
   requestOrigin: string | null,
   allowMethods?: string
-): CorsHeaders {
+): Record<string, string> {
   // Check if the request origin is in the allowed list
   const origin = requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)
     ? requestOrigin
     : ALLOWED_ORIGINS[0]; // Default to primary domain
 
-  const headers: CorsHeaders = {
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Credentials': 'true',
