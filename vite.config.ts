@@ -72,17 +72,16 @@ export default defineConfig(({ mode }) => ({
                         return 'data';
                     }
 
-                    // Our app stores (depends on zustand)
-                    if (id.includes('/src/stores/')) {
-                        return 'stores';
-                    }
-
-                    // Supabase and lib files that depend on it (to prevent cross-chunk re-exports)
+                    // Supabase and all files that depend on it (to prevent cross-chunk re-exports)
                     if (id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/')) {
                         return 'supabase';
                     }
                     // Lib files that import from supabase
                     if (id.includes('/src/lib/autoPopulateBlocks') || id.includes('/src/lib/leadSubmission') || id.includes('/src/lib/usageTracking') || id.includes('/src/lib/sync-manager') || id.includes('/src/lib/images')) {
+                        return 'supabase';
+                    }
+                    // Stores that import from supabase (must be in same chunk)
+                    if (id.includes('/src/stores/')) {
                         return 'supabase';
                     }
 
