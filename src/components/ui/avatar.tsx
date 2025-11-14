@@ -15,7 +15,9 @@ const Avatar = React.forwardRef<
         {...props}
     />
 ));
-Avatar.displayName = AvatarPrimitive.Root.displayName;
+if (AvatarPrimitive.Root.displayName) {
+    Avatar.displayName = AvatarPrimitive.Root.displayName;
+}
 
 const AvatarImage = React.forwardRef<
     React.ElementRef<typeof AvatarPrimitive.Image>,
@@ -27,7 +29,9 @@ const AvatarImage = React.forwardRef<
         {...props}
     />
 ));
-AvatarImage.displayName = AvatarPrimitive.Image.displayName;
+if (AvatarPrimitive.Image.displayName) {
+    AvatarImage.displayName = AvatarPrimitive.Image.displayName;
+}
 
 const AvatarFallback = React.forwardRef<
     React.ElementRef<typeof AvatarPrimitive.Fallback>,
@@ -42,7 +46,9 @@ const AvatarFallback = React.forwardRef<
         {...props}
     />
 ));
-AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
+if (AvatarPrimitive.Fallback.displayName) {
+    AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
+}
 
 export { Avatar, AvatarImage, AvatarFallback };
 
