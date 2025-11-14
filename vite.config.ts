@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => ({
                     }
 
                     // Our custom UI components and theme utilities
-                    if (id.includes('/src/components/ui/') || id.includes('/src/lib/themes') || id.includes('/src/components/LoadingSpinner') || id.includes('/src/components/PasswordStrengthIndicator')) {
+                    if (id.includes('/src/components/ui/') || id.includes('/src/lib/themes') || id.includes('/src/components/LoadingSpinner') || id.includes('/src/components/PasswordStrengthIndicator') || id.includes('/src/components/SEOHead')) {
                         return 'ui-components';
                     }
 
