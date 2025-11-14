@@ -46,6 +46,7 @@ const PublicPage = lazy(() => import("./pages/PublicPage"));
 const ForRealEstateAgents = lazy(() => import("./pages/landing/ForRealEstateAgents"));
 const InstagramBioForRealtors = lazy(() => import("./pages/landing/InstagramBioForRealtors"));
 const VsLinktree = lazy(() => import("./pages/landing/VsLinktree"));
+const VsBeacons = lazy(() => import("./pages/landing/VsBeacons"));
 
 // Lazy load feature pages
 const PropertyListings = lazy(() => import("./pages/features/PropertyListings"));
@@ -141,6 +142,7 @@ function App() {
                     <Route path="/for-real-estate-agents" element={<ForRealEstateAgents />} />
                     <Route path="/instagram-bio-for-realtors" element={<InstagramBioForRealtors />} />
                     <Route path="/vs/linktree" element={<VsLinktree />} />
+                    <Route path="/vs/beacons" element={<VsBeacons />} />
 
                     {/* Feature pages */}
                     <Route path="/features/property-listings" element={<PropertyListings />} />
