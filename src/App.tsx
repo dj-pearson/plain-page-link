@@ -47,6 +47,11 @@ const ForRealEstateAgents = lazy(() => import("./pages/landing/ForRealEstateAgen
 const InstagramBioForRealtors = lazy(() => import("./pages/landing/InstagramBioForRealtors"));
 const VsLinktree = lazy(() => import("./pages/landing/VsLinktree"));
 
+// Lazy load feature pages
+const PropertyListings = lazy(() => import("./pages/features/PropertyListings"));
+const LeadCapture = lazy(() => import("./pages/features/LeadCapture"));
+const CalendarBooking = lazy(() => import("./pages/features/CalendarBooking"));
+
 // Lazy load tools
 const InstagramBioAnalyzer = lazy(() => import("./pages/tools/InstagramBioAnalyzer"));
 const ListingDescriptionGenerator = lazy(() => import("./pages/tools/ListingDescriptionGenerator"));
@@ -134,6 +139,11 @@ function App() {
                     <Route path="/for-real-estate-agents" element={<ForRealEstateAgents />} />
                     <Route path="/instagram-bio-for-realtors" element={<InstagramBioForRealtors />} />
                     <Route path="/vs/linktree" element={<VsLinktree />} />
+
+                    {/* Feature pages */}
+                    <Route path="/features/property-listings" element={<PropertyListings />} />
+                    <Route path="/features/lead-capture" element={<LeadCapture />} />
+                    <Route path="/features/calendar-booking" element={<CalendarBooking />} />
 
                     {/* Tools */}
                     <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
