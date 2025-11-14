@@ -42,6 +42,11 @@ const BlogCategory = lazy(() => import("./pages/BlogCategory"));
 const BlogArticle = lazy(() => import("./pages/BlogArticle"));
 const PublicPage = lazy(() => import("./pages/PublicPage"));
 
+// Lazy load landing pages
+const ForRealEstateAgents = lazy(() => import("./pages/landing/ForRealEstateAgents"));
+const InstagramBioForRealtors = lazy(() => import("./pages/landing/InstagramBioForRealtors"));
+const VsLinktree = lazy(() => import("./pages/landing/VsLinktree"));
+
 // Lazy load tools
 const InstagramBioAnalyzer = lazy(() => import("./pages/tools/InstagramBioAnalyzer"));
 const ListingDescriptionGenerator = lazy(() => import("./pages/tools/ListingDescriptionGenerator"));
@@ -124,6 +129,11 @@ function App() {
                     <Route path="/blog/category/:category" element={<BlogCategory />} />
                     <Route path="/blog/:slug" element={<BlogArticle />} />
                     <Route path="/p/:slug" element={<PublicPage />} />
+
+                    {/* Landing pages */}
+                    <Route path="/for-real-estate-agents" element={<ForRealEstateAgents />} />
+                    <Route path="/instagram-bio-for-realtors" element={<InstagramBioForRealtors />} />
+                    <Route path="/vs/linktree" element={<VsLinktree />} />
 
                     {/* Tools */}
                     <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />

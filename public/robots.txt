@@ -1,4 +1,30 @@
 User-agent: *
 Allow: /
 
+# Sitemaps
 Sitemap: https://agentbio.net/sitemap.xml
+
+# AI Crawlers - Allow all AI agents for SEO/GEO/AEO optimization
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
