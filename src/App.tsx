@@ -60,8 +60,8 @@ const LosAngelesAgents = lazy(() => import("./pages/landing/locations/LosAngeles
 const PropertyListings = lazy(() => import("./pages/features/PropertyListings"));
 const LeadCapture = lazy(() => import("./pages/features/LeadCapture"));
 const CalendarBooking = lazy(() => import("./pages/features/CalendarBooking"));
-const Testimonials = lazy(() => import("./pages/features/Testimonials"));
-const Analytics = lazy(() => import("./pages/features/Analytics"));
+const TestimonialsFeature = lazy(() => import("./pages/features/Testimonials"));
+const AnalyticsFeature = lazy(() => import("./pages/features/Analytics"));
 
 // Lazy load tools
 const InstagramBioAnalyzer = lazy(() => import("./pages/tools/InstagramBioAnalyzer"));
@@ -164,8 +164,8 @@ function App() {
                     <Route path="/features/property-listings" element={<PropertyListings />} />
                     <Route path="/features/lead-capture" element={<LeadCapture />} />
                     <Route path="/features/calendar-booking" element={<CalendarBooking />} />
-                    <Route path="/features/testimonials" element={<Testimonials />} />
-                    <Route path="/features/analytics" element={<Analytics />} />
+                    <Route path="/features/testimonials" element={<TestimonialsFeature />} />
+                    <Route path="/features/analytics" element={<AnalyticsFeature />} />
 
                     {/* Tools */}
                     <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
