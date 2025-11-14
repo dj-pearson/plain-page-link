@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { PropertyDetailsForm } from '@/components/tools/listing-description-generator/PropertyDetailsForm';
 import { DescriptionDisplay } from '@/components/tools/listing-description-generator/DescriptionDisplay';
 import { EmailCaptureModal } from '@/components/tools/listing-description-generator/EmailCaptureModal';
@@ -168,9 +169,15 @@ export default function ListingDescriptionGenerator() {
           AI Listing Description Generator
         </h1>
 
-        <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-          Generate professional listing descriptions in 3 different styles in under 60 seconds.
-          Get MLS descriptions, social media posts, emails, and SMS snippets - all optimized for your target buyer.
+        <p className="text-lg text-gray-700 mb-4 max-w-3xl mx-auto leading-relaxed">
+          <strong>The AI Listing Description Generator is a free tool that creates professional real estate property descriptions in three distinct writing styles (Luxury, Family-Friendly, and Investment) in under 60 seconds.</strong> Simply input your property details—address, price, beds/baths, square footage, and key features—and select your target buyer type. The AI instantly generates complete MLS listing copy (300-500 words) plus ready-to-use versions for Instagram, Facebook, LinkedIn, email marketing, and SMS campaigns. Real estate agents save 2+ hours per listing compared to writing descriptions from scratch, while getting professionally crafted copy that highlights key features, creates emotional connections, and drives more showings.
+        </p>
+
+        <p className="text-base text-gray-600 mb-8 max-w-2xl mx-auto">
+          Want to showcase your listings effectively?{' '}
+          <a href="/features/property-listings" className="text-purple-600 underline hover:text-purple-700 font-semibold">
+            Learn about AgentBio's property listing galleries →
+          </a>
         </p>
 
         <Button
@@ -394,7 +401,10 @@ export default function ListingDescriptionGenerator() {
         <div className="text-center">
           <h3 className="text-2xl font-bold mb-2">Want AI-Powered Marketing for Every Listing?</h3>
           <p className="text-gray-700 mb-6">
-            AgentBio creates your entire marketing presence - Instagram bios, link-in-bio pages,
+            <a href="/for-real-estate-agents" className="text-purple-600 underline hover:text-purple-700 font-semibold">
+              AgentBio
+            </a>{' '}
+            creates your entire marketing presence - Instagram bios, link-in-bio pages,
             content calendars, and automated follow-up - all optimized to convert followers to clients.
           </p>
           <Button
@@ -415,10 +425,114 @@ export default function ListingDescriptionGenerator() {
     </div>
   );
 
+  const toolUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/tools/listing-description-generator`
+    : 'https://agentbio.net/tools/listing-description-generator';
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "name": "Free AI Listing Description Generator for Real Estate",
+        "description": "Generate professional real estate listing descriptions in 3 styles using AI. Get MLS descriptions, social media posts, email copy, and SMS snippets in under 60 seconds.",
+        "url": toolUrl,
+      },
+      {
+        "@type": "HowTo",
+        "name": "How to Generate Real Estate Listing Descriptions with AI",
+        "description": "Step-by-step guide to creating professional property listing descriptions using AI for MLS, social media, and marketing.",
+        "step": [
+          {
+            "@type": "HowToStep",
+            "name": "Enter Property Details",
+            "text": "Input basic property information including address, price, bedrooms, bathrooms, square footage, property type, and key features.",
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Select Target Buyer",
+            "text": "Choose your target buyer type: luxury buyer, first-time homebuyer, family, investor, or downsizer to tailor the language and focus.",
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Generate 3 Professional Styles",
+            "text": "Receive three distinct listing description styles in seconds: Luxury (upscale, sophisticated), Family-Friendly (warm, lifestyle-focused), and Investment (ROI-driven, practical).",
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Copy & Use Across Channels",
+            "text": "Get ready-to-use descriptions for MLS, Instagram, Facebook, LinkedIn, email campaigns, and SMS marketing. One-click copy for each format.",
+          },
+        ],
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How does the AI listing description generator work?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The AI listing description generator uses advanced natural language processing to analyze your property details and create professional descriptions optimized for your target buyer. You input basic property information (address, price, beds/baths, features) and select your target buyer type. The AI then generates three distinct writing styles—Luxury, Family-Friendly, and Investment—each with complete MLS descriptions, social media posts, email copy, and SMS snippets. The entire process takes under 60 seconds.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "What formats do I get with the AI generator?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "For each of the 3 styles (Luxury, Family-Friendly, Investment), you receive: Full MLS listing description (300-500 words), Instagram post caption, Facebook post copy, LinkedIn professional summary, Email marketing template, and SMS text snippet. That's 15+ different formats total, all professionally written and ready to copy-paste into your marketing channels.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "Is the listing description generator free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, the AI listing description generator is completely free to use. You can generate descriptions for unlimited properties with no cost. Simply enter your property details and receive all 3 professional styles with 15+ ready-to-use formats. To receive your descriptions via email for future reference, you can optionally provide your email address.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "Can I edit the AI-generated descriptions?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, all generated descriptions are fully editable. The AI provides professional, compelling copy as your starting point, which you can customize with specific details, local market information, or your personal writing style. Most agents use the AI output as-is or with minor tweaks, saving 2+ hours per listing compared to writing from scratch.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "What makes a good real estate listing description?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "A good real estate listing description includes: an attention-grabbing opening line, specific property features (beds, baths, square footage, lot size), lifestyle benefits tailored to your target buyer, neighborhood and location highlights, unique selling points, emotional triggers that create desire, a strong call-to-action, and SEO-optimized keywords for online visibility. Our AI generator incorporates all these elements automatically based on your property details and target buyer selection.",
+            },
+          },
+        ],
+      },
+    ],
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12 px-4">
-      {/* Render current step */}
-      {currentStep === 'intro' && renderIntro()}
+    <>
+      <Helmet>
+        <title>Free AI Listing Description Generator for Real Estate | AgentBio</title>
+        <meta
+          name="description"
+          content="Generate professional real estate listing descriptions in 3 styles using AI. Get MLS descriptions, social media posts, email copy, and SMS snippets in under 60 seconds. Free tool for agents."
+        />
+        <meta
+          name="keywords"
+          content="AI listing description generator, real estate property description, MLS listing copy, property description generator, real estate AI tools"
+        />
+        <script type="application/ld+json">
+          {JSON.stringify(schema)}
+        </script>
+      </Helmet>
+
+      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12 px-4">
+        {/* Render current step */}
+        {currentStep === 'intro' && renderIntro()}
       {currentStep === 'form' && (
         <div className="max-w-4xl mx-auto">
           <PropertyDetailsForm onSubmit={handleFormSubmit} />
