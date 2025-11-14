@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => ({
                     }
 
                     // Our custom UI components and theme utilities
-                    if (id.includes('/src/components/ui/') || id.includes('/src/lib/themes') || id.includes('/src/components/LoadingSpinner') || id.includes('/src/components/PasswordStrengthIndicator') || id.includes('/src/components/SEOHead') || id.includes('/src/stores/')) {
+                    if (id.includes('/src/components/ui/') || id.includes('/src/lib/themes') || id.includes('/src/components/LoadingSpinner') || id.includes('/src/components/PasswordStrengthIndicator') || id.includes('/src/components/SEOHead')) {
                         return 'ui-components';
                     }
 
@@ -68,7 +68,7 @@ export default defineConfig(({ mode }) => ({
                     }
 
                     // State management and data fetching
-                    if (id.includes('@tanstack/react-query') || id.includes('zustand')) {
+                    if (id.includes('@tanstack/react-query') || id.includes('zustand') || id.includes('/src/stores/')) {
                         return 'data';
                     }
 
