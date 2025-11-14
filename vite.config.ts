@@ -41,7 +41,6 @@ export default defineConfig(({ mode }) => ({
                     'ui-components': [
                         '@radix-ui/react-accordion',
                         '@radix-ui/react-alert-dialog',
-                        '@radix-ui/react-avatar',
                         '@radix-ui/react-checkbox',
                         '@radix-ui/react-dialog',
                         '@radix-ui/react-dropdown-menu',
