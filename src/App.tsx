@@ -47,6 +47,14 @@ const ForRealEstateAgents = lazy(() => import("./pages/landing/ForRealEstateAgen
 const InstagramBioForRealtors = lazy(() => import("./pages/landing/InstagramBioForRealtors"));
 const VsLinktree = lazy(() => import("./pages/landing/VsLinktree"));
 const VsBeacons = lazy(() => import("./pages/landing/VsBeacons"));
+const VsLater = lazy(() => import("./pages/landing/VsLater"));
+
+// Lazy load location pages
+const MiamiAgents = lazy(() => import("./pages/landing/locations/MiamiAgents"));
+const AustinAgents = lazy(() => import("./pages/landing/locations/AustinAgents"));
+const PhoenixAgents = lazy(() => import("./pages/landing/locations/PhoenixAgents"));
+const DenverAgents = lazy(() => import("./pages/landing/locations/DenverAgents"));
+const LosAngelesAgents = lazy(() => import("./pages/landing/locations/LosAngelesAgents"));
 
 // Lazy load feature pages
 const PropertyListings = lazy(() => import("./pages/features/PropertyListings"));
@@ -143,6 +151,14 @@ function App() {
                     <Route path="/instagram-bio-for-realtors" element={<InstagramBioForRealtors />} />
                     <Route path="/vs/linktree" element={<VsLinktree />} />
                     <Route path="/vs/beacons" element={<VsBeacons />} />
+                    <Route path="/vs/later" element={<VsLater />} />
+
+                    {/* Location pages */}
+                    <Route path="/for/miami-real-estate-agents" element={<MiamiAgents />} />
+                    <Route path="/for/austin-real-estate-agents" element={<AustinAgents />} />
+                    <Route path="/for/phoenix-real-estate-agents" element={<PhoenixAgents />} />
+                    <Route path="/for/denver-real-estate-agents" element={<DenverAgents />} />
+                    <Route path="/for/los-angeles-real-estate-agents" element={<LosAngelesAgents />} />
 
                     {/* Feature pages */}
                     <Route path="/features/property-listings" element={<PropertyListings />} />
