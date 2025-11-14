@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => ({
                     }
 
                     // Our custom UI components and theme utilities
-                    if (id.includes('/src/components/ui/') || id.includes('/src/lib/themes') || id.includes('/src/components/LoadingSpinner') || id.includes('/src/components/PasswordStrengthIndicator') || id.includes('/src/components/SEOHead')) {
+                    if (id.includes('/src/components/ui/') || id.includes('/src/lib/themes') || id.includes('/src/lib/utils') || id.includes('/src/components/LoadingSpinner') || id.includes('/src/components/PasswordStrengthIndicator') || id.includes('/src/components/SEOHead')) {
                         return 'ui-components';
                     }
 
@@ -77,8 +77,13 @@ export default defineConfig(({ mode }) => ({
                         return 'stores';
                     }
 
+                    // Lib utilities (depends on supabase) - excluding themes and utils which are in ui-components
+                    if (id.includes('/src/lib/') && !id.includes('/src/lib/themes') && !id.includes('/src/lib/utils')) {
+                        return 'libs';
+                    }
+
                     // Supabase
-                    if (id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/client')) {
+                    if (id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/')) {
                         return 'supabase';
                     }
 
