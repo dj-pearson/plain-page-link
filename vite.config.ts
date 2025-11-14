@@ -78,7 +78,7 @@ export default defineConfig(({ mode }) => ({
                     }
 
                     // Supabase
-                    if (id.includes('@supabase/supabase-js')) {
+                    if (id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/client')) {
                         return 'supabase';
                     }
 
