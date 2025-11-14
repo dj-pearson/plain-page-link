@@ -68,8 +68,13 @@ export default defineConfig(({ mode }) => ({
                     }
 
                     // State management and data fetching
-                    if (id.includes('@tanstack/react-query') || id.includes('zustand') || id.includes('/src/stores/')) {
+                    if (id.includes('@tanstack/react-query') || id.includes('zustand')) {
                         return 'data';
+                    }
+
+                    // Our app stores (depends on zustand)
+                    if (id.includes('/src/stores/')) {
+                        return 'stores';
                     }
 
                     // Supabase
