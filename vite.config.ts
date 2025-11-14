@@ -44,8 +44,8 @@ export default defineConfig(({ mode }) => ({
                         return 'ui-components';
                     }
 
-                    // Our custom UI components (including Avatar)
-                    if (id.includes('/src/components/ui/')) {
+                    // Our custom UI components and theme utilities
+                    if (id.includes('/src/components/ui/') || id.includes('/src/lib/themes')) {
                         return 'ui-components';
                     }
 
