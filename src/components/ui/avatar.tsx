@@ -2,7 +2,7 @@ import * as React from "react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { cn } from "@/lib/utils";
 
-const AvatarRoot = React.forwardRef<
+const Avatar = React.forwardRef<
     React.ElementRef<typeof AvatarPrimitive.Root>,
     React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>
 >(({ className, ...props }, ref) => (
@@ -15,9 +15,8 @@ const AvatarRoot = React.forwardRef<
         {...props}
     />
 ));
-AvatarRoot.displayName = AvatarPrimitive.Root.displayName;
 
-const AvatarImageComponent = React.forwardRef<
+const AvatarImage = React.forwardRef<
     React.ElementRef<typeof AvatarPrimitive.Image>,
     React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
 >(({ className, ...props }, ref) => (
@@ -27,9 +26,8 @@ const AvatarImageComponent = React.forwardRef<
         {...props}
     />
 ));
-AvatarImageComponent.displayName = AvatarPrimitive.Image.displayName;
 
-const AvatarFallbackComponent = React.forwardRef<
+const AvatarFallback = React.forwardRef<
     React.ElementRef<typeof AvatarPrimitive.Fallback>,
     React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
 >(({ className, ...props }, ref) => (
@@ -42,7 +40,6 @@ const AvatarFallbackComponent = React.forwardRef<
         {...props}
     />
 ));
-AvatarFallbackComponent.displayName = AvatarPrimitive.Fallback.displayName;
 
-export { AvatarRoot as Avatar, AvatarImageComponent as AvatarImage, AvatarFallbackComponent as AvatarFallback };
+export { Avatar, AvatarImage, AvatarFallback };
 
