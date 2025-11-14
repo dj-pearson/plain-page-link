@@ -1,10 +1,10 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-interface AvatarProps extends React.HTMLAttributes<HTMLSpanElement> {}
+export interface AvatarProps extends React.HTMLAttributes<HTMLSpanElement> {}
 
-export const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
-  function Avatar({ className, ...props }, ref) {
+const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
+  ({ className, ...props }, ref) => {
     return (
       <span
         ref={ref}
@@ -17,11 +17,12 @@ export const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
     );
   }
 );
+Avatar.displayName = "Avatar";
 
-interface AvatarImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {}
+export interface AvatarImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {}
 
-export const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
-  function AvatarImage({ className, ...props }, ref) {
+const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
+  ({ className, ...props }, ref) => {
     return (
       <img
         ref={ref}
@@ -31,11 +32,12 @@ export const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
     );
   }
 );
+AvatarImage.displayName = "AvatarImage";
 
-interface AvatarFallbackProps extends React.HTMLAttributes<HTMLSpanElement> {}
+export interface AvatarFallbackProps extends React.HTMLAttributes<HTMLSpanElement> {}
 
-export const AvatarFallback = React.forwardRef<HTMLSpanElement, AvatarFallbackProps>(
-  function AvatarFallback({ className, ...props }, ref) {
+const AvatarFallback = React.forwardRef<HTMLSpanElement, AvatarFallbackProps>(
+  ({ className, ...props }, ref) => {
     return (
       <span
         ref={ref}
@@ -48,4 +50,7 @@ export const AvatarFallback = React.forwardRef<HTMLSpanElement, AvatarFallbackPr
     );
   }
 );
+AvatarFallback.displayName = "AvatarFallback";
+
+export { Avatar, AvatarImage, AvatarFallback };
 
