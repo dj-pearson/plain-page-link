@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
-import { Loader2, MessageCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { FullPageLoader } from "@/components/LoadingSpinner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ContactButtons from "@/components/profile/ContactButtons";
@@ -10,6 +10,8 @@ import SoldProperties from "@/components/profile/SoldProperties";
 import { LeadCaptureCTA } from "@/components/profile/LeadCaptureCTA";
 import { TestimonialSection } from "@/components/profile/TestimonialSection";
 import { SocialProofBanner } from "@/components/profile/SocialProofBanner";
+import { FeaturedListingsCarousel } from "@/components/profile/FeaturedListingsCarousel";
+import { StickyActionBar } from "@/components/profile/StickyActionBar";
 import ListingDetailModal from "@/components/profile/ListingDetailModal";
 import { LeadFormModal } from "@/components/profile/LeadFormModal";
 import { QuickNav } from "@/components/profile/QuickNav";
@@ -333,9 +335,16 @@ export default function FullProfilePage() {
                 <div className="space-y-4 sm:space-y-6">
                     {/* Profile Header */}
                     <section id="about" className="scroll-mt-16 sm:scroll-mt-20">
-                        <ProfileHeader profile={profile} />
+                        <ProfileHeader
+                            profile={profile}
+                            stats={{
+                                propertiesSold: soldListings.length,
+                                averageRating: averageRating,
+                                reviewCount: testimonials.length,
+                                responseTime: '< 1 hour',
+                            }}
+                        />
                     </section>
-
                     {/* Contact Buttons */}
                     {settings?.show_contact_buttons !== false && (
                         <ContactButtons
@@ -361,12 +370,24 @@ export default function FullProfilePage() {
                         </div>
                     )}
 
+                    {/* Featured Listings Carousel */}
+                    {settings?.show_listings !== false && activeListings.length > 0 && (
+                        <section className="pt-4 sm:pt-6">
+                            <FeaturedListingsCarousel
+                                listings={activeListings}
+                                onViewDetails={(listing) => setSelectedListing(listing)}
+                                autoRotate={true}
+                                interval={4000}
+                            />
+                        </section>
+                    )}
+
                     {/* Active Listings */}
                     {settings?.show_listings !== false && activeListings.length > 0 && (
-                        <section id="listings" className="pt-2 sm:pt-4 scroll-mt-16 sm:scroll-mt-20">
+                        <section id="listings" className="pt-4 sm:pt-6 scroll-mt-16 sm:scroll-mt-20">
                             <ListingGallery
                                 listings={activeListings}
-                                title="Featured Properties"
+                                title="All Properties"
                                 onListingClick={(listing) =>
                                     setSelectedListing(listing)
                                 }
@@ -512,16 +533,19 @@ export default function FullProfilePage() {
                 agentName={profile.full_name || profile.username}
             />
 
-            {/* Sticky Mobile Contact Button - Enhanced for mobile */}
-            <button
-                onClick={() => setIsLeadModalOpen(true)}
-                className="md:hidden fixed bottom-6 right-4 z-40 bg-blue-600 text-white rounded-full px-5 py-3.5 shadow-xl hover:bg-blue-700 hover:shadow-2xl transition-all active:scale-90 flex items-center gap-2 min-w-[56px] min-h-[56px] justify-center no-select safe-area-inset-bottom"
-                aria-label="Contact agent"
-                style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
-            >
-                <MessageCircle className="w-6 h-6 flex-shrink-0" />
-                <span className="text-sm font-semibold whitespace-nowrap">Contact Me</span>
-            </button>
+            {/* Sticky Action Bar */}
+            <StickyActionBar
+                profile={profile}
+                onScheduleShowing={() => {
+                    // TODO: Open Calendly modal if available, otherwise lead form
+                    setIsLeadModalOpen(true);
+                }}
+                onGetHomeValue={() => {
+                    // TODO: Open home valuation modal
+                    setIsLeadModalOpen(true);
+                }}
+                onContactFormOpen={() => setIsLeadModalOpen(true)}
+            />
         </div>
         </>
     );
