@@ -121,8 +121,8 @@ export default function Landing() {
     return (
         <>
             <SEOHead
-                title="Real Estate Agent Bio Page Builder | AgentBio"
-                description="Turn your Instagram into a lead-generating real estate portfolio. Showcase listings, capture inquiries & book showings from one mobile-optimized bio page."
+                title="Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads – AgentBio"
+                description="Purpose-built link-in-bio for real estate agents. Showcase properties, capture leads, and book appointments from Instagram. Start converting followers into clients today."
                 keywords={[
                     "real estate agent bio page",
                     "Instagram bio page for realtors",
@@ -141,6 +141,17 @@ export default function Landing() {
             <main className="min-h-screen bg-background">
             {/* Header */}
             <PublicHeader />
+
+            {/* Direct Answer for GEO/AEO - First 100 words */}
+            <section className="py-8 bg-background/95 border-b border-glass-border" aria-label="What is AgentBio">
+                <div className="container mx-auto px-4">
+                    <div className="max-w-4xl mx-auto">
+                        <p className="text-base md:text-lg glass-body leading-relaxed">
+                            <strong>AgentBio is a specialized link-in-bio platform designed specifically for real estate agents who want to convert Instagram followers into qualified buyer and seller leads.</strong> Unlike generic tools like Linktree, AgentBio includes property listing galleries, lead capture forms, calendar booking integration, and testimonial showcases—all optimized for mobile users coming from Instagram and other social platforms. Real estate agents use AgentBio to consolidate their portfolio, contact info, and lead generation tools into one shareable link that turns social media traffic into actual business.
+                        </p>
+                    </div>
+                </div>
+            </section>
 
             {/* Hero Section */}
             <HeroSection

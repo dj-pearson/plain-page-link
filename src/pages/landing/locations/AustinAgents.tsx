@@ -1,0 +1,30 @@
+import LocationTemplate, { LocationData } from "../LocationTemplate";
+
+const austinData: LocationData = {
+  city: "Austin",
+  state: "Texas",
+  stateAbbr: "TX",
+  slug: "austin-real-estate-agents",
+  medianPrice: "$550,000",
+  marketTrend: "Competitive",
+  agentCount: "4,200+",
+  marketDescription: "Austin's booming tech sector and population growth create high demand for agents who can effectively market to relocating professionals through social media.",
+  neighborhoods: [
+    "Downtown Austin",
+    "South Congress",
+    "East Austin",
+    "West Lake Hills",
+    "Tarrytown",
+    "Hyde Park",
+    "Mueller",
+    "Zilker",
+    "Barton Hills",
+    "Clarksville",
+    "Bouldin Creek",
+    "Travis Heights",
+  ],
+};
+
+export default function AustinAgents() {
+  return <LocationTemplate location={austinData} />;
+}

@@ -181,6 +181,82 @@ export default function InstagramBioAnalyzer() {
     return sessionId;
   };
 
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "name": "Free Instagram Bio Analyzer for Real Estate Agents",
+        "description": "Analyze your realtor Instagram bio in 60 seconds. Get your effectiveness score + 3 optimized bio rewrites. Free tool for agents.",
+        "url": toolUrl,
+      },
+      {
+        "@type": "HowTo",
+        "name": "How to Analyze Your Real Estate Instagram Bio",
+        "description": "Step-by-step guide to analyzing and optimizing your realtor Instagram bio for maximum lead generation.",
+        "step": [
+          {
+            "@type": "HowToStep",
+            "name": "Enter Your Current Instagram Bio",
+            "text": "Paste your current Instagram bio text into the analyzer tool. Include your full bio exactly as it appears on your profile.",
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Add Your Market Details",
+            "text": "Enter your location, years of experience, follower count, and monthly Instagram traffic to get personalized analysis.",
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Get Your Effectiveness Score",
+            "text": "Receive an instant score based on 6 key factors: clarity, call-to-action strength, keyword optimization, link strategy, credibility signals, and mobile readability.",
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Review Your Optimized Bios",
+            "text": "Get 3 professionally rewritten bio versions optimized for your specific market, experience level, and business goals.",
+          },
+        ],
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What does the Instagram bio analyzer check?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The Instagram bio analyzer evaluates your realtor bio across 6 critical factors: clarity of value proposition, call-to-action effectiveness, keyword optimization for your market, link strategy, credibility signals (years of experience, certifications), and mobile readability. Each factor is scored and you receive an overall effectiveness grade from F to A+.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "How long does the Instagram bio analysis take?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The Instagram bio analysis takes approximately 60 seconds. You simply enter your current bio text, add your market details, and receive instant results including your effectiveness score, category-by-category breakdown, and 3 professionally rewritten bio versions optimized for real estate lead generation.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "Is the Instagram bio analyzer really free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, the Instagram bio analyzer is 100% free to use with no signup required. You can analyze your bio and see your score immediately. To unlock all 3 optimized bio rewrites and detailed recommendations, simply enter your email to receive the full report.",
+            },
+          },
+          {
+            "@type": "Question",
+            "name": "What makes a good real estate Instagram bio?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "A good real estate Instagram bio includes: your specific market/location, years of experience or credentials, a clear value proposition (what makes you different), a strong call-to-action, and a strategic link to your portfolio or listings. Top-performing agent bios score 85+ on our analyzer by balancing these elements for mobile readability.",
+            },
+          },
+        ],
+      },
+    ],
+  };
+
   return (
     <>
       <Helmet>
@@ -193,6 +269,9 @@ export default function InstagramBioAnalyzer() {
           name="keywords"
           content="instagram bio for realtors, real estate instagram bio, realtor bio examples, instagram bio analyzer"
         />
+        <script type="application/ld+json">
+          {JSON.stringify(schema)}
+        </script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-pink-50">
@@ -217,6 +296,12 @@ export default function InstagramBioAnalyzer() {
                     Get your bio effectiveness score in 60 seconds + 3 professionally rewritten
                     versions optimized for your market and goals
                   </p>
+                  <p className="text-base text-purple-200 mb-6 max-w-2xl mx-auto">
+                    Want to learn more about optimizing your Instagram for leads?{' '}
+                    <a href="/instagram-bio-for-realtors" className="underline hover:text-white font-semibold">
+                      Read our complete Instagram bio guide for realtors →
+                    </a>
+                  </p>
 
                   <div className="flex flex-wrap justify-center gap-6 text-left">
                     {[
@@ -232,6 +317,15 @@ export default function InstagramBioAnalyzer() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Direct Answer for GEO/AEO - First 100 words */}
+            <div className="bg-white border-b border-gray-200 py-8">
+              <div className="container max-w-4xl mx-auto px-4">
+                <p className="text-base md:text-lg text-gray-700 leading-relaxed">
+                  <strong>The Instagram Bio Analyzer is a free tool designed specifically for real estate agents to evaluate and optimize their Instagram bio for maximum lead generation.</strong> In 60 seconds, you'll receive an effectiveness score (0-100) based on six key factors—clarity, call-to-action strength, keyword optimization, link strategy, credibility signals, and mobile readability—plus three professionally rewritten bio versions tailored to your market and experience level. Top-performing agent bios score 85+ and convert 3x more Instagram followers into qualified buyer and seller leads compared to generic, unoptimized bios.
+                </p>
               </div>
             </div>
 
@@ -410,8 +504,11 @@ export default function InstagramBioAnalyzer() {
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 md:p-12 text-white text-center">
               <h2 className="text-3xl font-bold mb-4">Ready to Convert More Instagram Followers?</h2>
               <p className="text-xl text-purple-100 mb-8 max-w-2xl mx-auto">
-                Your optimized bio is just the start. AgentBio gives you a complete link-in-bio
-                platform built specifically for real estate agents.
+                Your optimized bio is just the start.{' '}
+                <a href="/for-real-estate-agents" className="underline hover:text-white font-semibold">
+                  AgentBio gives you a complete link-in-bio platform
+                </a>{' '}
+                built specifically for real estate agents.
               </p>
 
               <div className="grid md:grid-cols-3 gap-6 mb-8">

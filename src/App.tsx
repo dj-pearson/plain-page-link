@@ -42,6 +42,27 @@ const BlogCategory = lazy(() => import("./pages/BlogCategory"));
 const BlogArticle = lazy(() => import("./pages/BlogArticle"));
 const PublicPage = lazy(() => import("./pages/PublicPage"));
 
+// Lazy load landing pages
+const ForRealEstateAgents = lazy(() => import("./pages/landing/ForRealEstateAgents"));
+const InstagramBioForRealtors = lazy(() => import("./pages/landing/InstagramBioForRealtors"));
+const VsLinktree = lazy(() => import("./pages/landing/VsLinktree"));
+const VsBeacons = lazy(() => import("./pages/landing/VsBeacons"));
+const VsLater = lazy(() => import("./pages/landing/VsLater"));
+
+// Lazy load location pages
+const MiamiAgents = lazy(() => import("./pages/landing/locations/MiamiAgents"));
+const AustinAgents = lazy(() => import("./pages/landing/locations/AustinAgents"));
+const PhoenixAgents = lazy(() => import("./pages/landing/locations/PhoenixAgents"));
+const DenverAgents = lazy(() => import("./pages/landing/locations/DenverAgents"));
+const LosAngelesAgents = lazy(() => import("./pages/landing/locations/LosAngelesAgents"));
+
+// Lazy load feature pages
+const PropertyListings = lazy(() => import("./pages/features/PropertyListings"));
+const LeadCapture = lazy(() => import("./pages/features/LeadCapture"));
+const CalendarBooking = lazy(() => import("./pages/features/CalendarBooking"));
+const Testimonials = lazy(() => import("./pages/features/Testimonials"));
+const Analytics = lazy(() => import("./pages/features/Analytics"));
+
 // Lazy load tools
 const InstagramBioAnalyzer = lazy(() => import("./pages/tools/InstagramBioAnalyzer"));
 const ListingDescriptionGenerator = lazy(() => import("./pages/tools/ListingDescriptionGenerator"));
@@ -124,6 +145,27 @@ function App() {
                     <Route path="/blog/category/:category" element={<BlogCategory />} />
                     <Route path="/blog/:slug" element={<BlogArticle />} />
                     <Route path="/p/:slug" element={<PublicPage />} />
+
+                    {/* Landing pages */}
+                    <Route path="/for-real-estate-agents" element={<ForRealEstateAgents />} />
+                    <Route path="/instagram-bio-for-realtors" element={<InstagramBioForRealtors />} />
+                    <Route path="/vs/linktree" element={<VsLinktree />} />
+                    <Route path="/vs/beacons" element={<VsBeacons />} />
+                    <Route path="/vs/later" element={<VsLater />} />
+
+                    {/* Location pages */}
+                    <Route path="/for/miami-real-estate-agents" element={<MiamiAgents />} />
+                    <Route path="/for/austin-real-estate-agents" element={<AustinAgents />} />
+                    <Route path="/for/phoenix-real-estate-agents" element={<PhoenixAgents />} />
+                    <Route path="/for/denver-real-estate-agents" element={<DenverAgents />} />
+                    <Route path="/for/los-angeles-real-estate-agents" element={<LosAngelesAgents />} />
+
+                    {/* Feature pages */}
+                    <Route path="/features/property-listings" element={<PropertyListings />} />
+                    <Route path="/features/lead-capture" element={<LeadCapture />} />
+                    <Route path="/features/calendar-booking" element={<CalendarBooking />} />
+                    <Route path="/features/testimonials" element={<Testimonials />} />
+                    <Route path="/features/analytics" element={<Analytics />} />
 
                     {/* Tools */}
                     <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
