@@ -33,72 +33,59 @@ export default defineConfig(({ mode }) => ({
     build: {
         rollupOptions: {
             output: {
-                manualChunks: {
+                manualChunks(id) {
                     // React core libraries
-                    'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+                    if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
+                        return 'react-vendor';
+                    }
 
-                    // UI component library
-                    'ui-components': [
-                        '@radix-ui/react-accordion',
-                        '@radix-ui/react-alert-dialog',
-                        '@radix-ui/react-checkbox',
-                        '@radix-ui/react-dialog',
-                        '@radix-ui/react-dropdown-menu',
-                        '@radix-ui/react-label',
-                        '@radix-ui/react-popover',
-                        '@radix-ui/react-progress',
-                        '@radix-ui/react-select',
-                        '@radix-ui/react-separator',
-                        '@radix-ui/react-slot',
-                        '@radix-ui/react-switch',
-                        '@radix-ui/react-tabs',
-                        '@radix-ui/react-toast',
-                    ],
+                    // Radix UI components
+                    if (id.includes('@radix-ui/react-')) {
+                        return 'ui-components';
+                    }
+
+                    // Our custom UI components (including Avatar)
+                    if (id.includes('/src/components/ui/')) {
+                        return 'ui-components';
+                    }
 
                     // Chart and visualization libraries
-                    'charts': [
-                        'recharts',
-                    ],
+                    if (id.includes('recharts')) {
+                        return 'charts';
+                    }
 
                     // 3D libraries - split Three.js core separately
-                    'three': [
-                        'three',
-                    ],
-                    'three-addons': [
-                        '@react-three/fiber',
-                        '@react-three/drei',
-                    ],
+                    if (id.includes('node_modules/three/')) {
+                        return 'three';
+                    }
+                    if (id.includes('@react-three/')) {
+                        return 'three-addons';
+                    }
 
                     // Form and validation
-                    'forms': [
-                        'react-hook-form',
-                        '@hookform/resolvers',
-                        'zod',
-                    ],
+                    if (id.includes('react-hook-form') || id.includes('@hookform/resolvers') || id.includes('node_modules/zod/')) {
+                        return 'forms';
+                    }
 
                     // State management and data fetching
-                    'data': [
-                        '@tanstack/react-query',
-                        'zustand',
-                    ],
+                    if (id.includes('@tanstack/react-query') || id.includes('zustand')) {
+                        return 'data';
+                    }
 
                     // Supabase
-                    'supabase': [
-                        '@supabase/supabase-js',
-                    ],
+                    if (id.includes('@supabase/supabase-js')) {
+                        return 'supabase';
+                    }
 
                     // Icons
-                    'icons': [
-                        'lucide-react',
-                    ],
+                    if (id.includes('lucide-react')) {
+                        return 'icons';
+                    }
 
                     // Utilities
-                    'utils': [
-                        'clsx',
-                        'tailwind-merge',
-                        'date-fns',
-                        'sonner',
-                    ],
+                    if (id.includes('clsx') || id.includes('tailwind-merge') || id.includes('date-fns') || id.includes('sonner')) {
+                        return 'utils';
+                    }
                 },
             },
         },
