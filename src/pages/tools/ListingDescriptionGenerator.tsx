@@ -533,20 +533,21 @@ export default function ListingDescriptionGenerator() {
       <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12 px-4">
         {/* Render current step */}
         {currentStep === 'intro' && renderIntro()}
-      {currentStep === 'form' && (
-        <div className="max-w-4xl mx-auto">
-          <PropertyDetailsForm onSubmit={handleFormSubmit} />
-        </div>
-      )}
-      {currentStep === 'generating' && renderGenerating()}
-      {currentStep === 'results' && renderResults()}
+        {currentStep === 'form' && (
+          <div className="max-w-4xl mx-auto">
+            <PropertyDetailsForm onSubmit={handleFormSubmit} />
+          </div>
+        )}
+        {currentStep === 'generating' && renderGenerating()}
+        {currentStep === 'results' && renderResults()}
 
-      {/* Email Capture Modal */}
-      <EmailCaptureModal
-        isOpen={showEmailModal}
-        onClose={() => setShowEmailModal(false)}
-        onSubmit={handleEmailCapture}
-      />
-    </div>
+        {/* Email Capture Modal */}
+        <EmailCaptureModal
+          isOpen={showEmailModal}
+          onClose={() => setShowEmailModal(false)}
+          onSubmit={handleEmailCapture}
+        />
+      </div>
+    </>
   );
 }
