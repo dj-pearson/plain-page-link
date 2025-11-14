@@ -77,13 +77,12 @@ export default defineConfig(({ mode }) => ({
                         return 'stores';
                     }
 
-                    // Lib utilities (depends on supabase) - excluding themes and utils which are in ui-components
-                    if (id.includes('/src/lib/') && !id.includes('/src/lib/themes') && !id.includes('/src/lib/utils')) {
-                        return 'libs';
-                    }
-
-                    // Supabase
+                    // Supabase and lib files that depend on it (to prevent cross-chunk re-exports)
                     if (id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/')) {
+                        return 'supabase';
+                    }
+                    // Lib files that import from supabase
+                    if (id.includes('/src/lib/autoPopulateBlocks') || id.includes('/src/lib/leadSubmission') || id.includes('/src/lib/usageTracking') || id.includes('/src/lib/sync-manager') || id.includes('/src/lib/images')) {
                         return 'supabase';
                     }
 
