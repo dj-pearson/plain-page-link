@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ThemeCard } from "@/components/dashboard/ThemeCard";
 import { ColorPicker } from "@/components/dashboard/ColorPicker";
+import { SavedThemesManager } from "@/components/theme/SavedThemesManager";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -301,11 +302,18 @@ export default function Theme() {
                 <TabsList>
                     <TabsTrigger value="presets">
                         <Palette className="w-4 h-4 mr-2" />
-                        Theme Presets
+                        <span className="hidden sm:inline">Theme Presets</span>
+                        <span className="sm:hidden">Presets</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="saved">
+                        <Save className="w-4 h-4 mr-2" />
+                        <span className="hidden sm:inline">My Themes</span>
+                        <span className="sm:hidden">Saved</span>
                     </TabsTrigger>
                     <TabsTrigger value="customize">
                         <Eye className="w-4 h-4 mr-2" />
-                        Customize
+                        <span className="hidden sm:inline">Customize</span>
+                        <span className="sm:hidden">Custom</span>
                     </TabsTrigger>
                 </TabsList>
 
@@ -347,6 +355,23 @@ export default function Theme() {
                             ))}
                         </div>
                     </div>
+                </TabsContent>
+
+                {/* Saved Themes Tab */}
+                <TabsContent value="saved">
+                    <SavedThemesManager
+                        currentTheme={{
+                            ...selectedTheme,
+                            colors: customColors,
+                            fonts: customFonts,
+                        }}
+                        onApplyTheme={(theme) => {
+                            setSelectedTheme(theme);
+                            setCustomColors(theme.colors);
+                            setCustomFonts(theme.fonts);
+                            applyTheme(theme);
+                        }}
+                    />
                 </TabsContent>
 
                 {/* Customize Tab - Mobile optimized */}
