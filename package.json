@@ -64,6 +64,7 @@
         "@types/node": "^20.11.27",
         "@types/react": "^18.2.66",
         "@types/react-dom": "^18.2.22",
+        "@vitejs/plugin-legacy": "^7.2.1",
         "@vitejs/plugin-react-swc": "^3.5.0",
         "autoprefixer": "^10.4.18",
         "lovable-tagger": "^1.1.11",

@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import legacy from '@vitejs/plugin-legacy';
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
@@ -10,6 +11,10 @@ export default defineConfig(({ mode }) => ({
     },
     plugins: [
         react(),
+        legacy({
+            targets: ['defaults', 'not IE 11'],
+            modernPolyfills: true,
+        }),
         mode === "development" && componentTagger(),
         // Security headers plugin for development
         {
@@ -33,6 +38,7 @@ export default defineConfig(({ mode }) => ({
     build: {
         rollupOptions: {
             output: {
+                format: 'es',
                 manualChunks(id) {
                     // React core libraries
                     if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
