@@ -3,6 +3,7 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDashboard";
+import { InsightsWidget } from "@/components/analytics/InsightsWidget";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -108,6 +109,13 @@ export default function Analytics() {
                     iconBgColor="bg-orange-100"
                 />
             </div>
+
+            {/* Insights & Recommendations */}
+            <InsightsWidget
+                stats={stats}
+                listingsCount={0}
+                linksCount={0}
+            />
 
             {/* Views Over Time Chart - Smaller height on mobile */}
             <AnalyticsChart

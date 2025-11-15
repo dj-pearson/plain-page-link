@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { ProfileCompletionWidget } from "@/components/dashboard/ProfileCompletionWidget";
+import { QuickActionsWidget } from "@/components/dashboard/QuickActionsWidget";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import {
     Dialog,
@@ -104,6 +105,9 @@ export default function Overview() {
 
             {/* Profile Completion Widget */}
             <ProfileCompletionWidget />
+
+            {/* Quick Actions Widget */}
+            <QuickActionsWidget />
 
             {/* Stats Grid - Mobile optimized with 2 columns on small screens */}
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
