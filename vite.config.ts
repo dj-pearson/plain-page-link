@@ -1,6 +1,5 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
-import legacy from '@vitejs/plugin-legacy';
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
@@ -11,10 +10,6 @@ export default defineConfig(({ mode }) => ({
     },
     plugins: [
         react(),
-        legacy({
-            targets: ['defaults', 'not IE 11'],
-            modernPolyfills: true,
-        }),
         mode === "development" && componentTagger(),
         // Security headers plugin for development
         {
@@ -38,77 +33,10 @@ export default defineConfig(({ mode }) => ({
     build: {
         rollupOptions: {
             output: {
-                format: 'es',
-                manualChunks(id) {
-                    // React core libraries
-                    if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
-                        return 'react-vendor';
-                    }
-
-                    // Radix UI components
-                    if (id.includes('@radix-ui/react-')) {
-                        return 'ui-components';
-                    }
-
-                    // Our custom UI components and theme utilities
-                    if (id.includes('/src/components/ui/') || id.includes('/src/lib/themes') || id.includes('/src/lib/utils') || id.includes('/src/components/LoadingSpinner') || id.includes('/src/components/PasswordStrengthIndicator') || id.includes('/src/components/SEOHead')) {
-                        return 'ui-components';
-                    }
-
-                    // Chart and visualization libraries
-                    if (id.includes('recharts')) {
-                        return 'charts';
-                    }
-
-                    // 3D libraries - split Three.js core separately
-                    if (id.includes('node_modules/three/')) {
-                        return 'three';
-                    }
-                    if (id.includes('@react-three/')) {
-                        return 'three-addons';
-                    }
-
-                    // Form and validation
-                    if (id.includes('react-hook-form') || id.includes('@hookform/resolvers') || id.includes('node_modules/zod/')) {
-                        return 'forms';
-                    }
-
-                    // State management and data fetching
-                    if (id.includes('@tanstack/react-query')) {
-                        return 'data';
-                    }
-
-                    // Supabase core
-                    if (id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/')) {
-                        return 'supabase';
-                    }
-
-                    // Zustand stores - keep separate for SES compatibility
-                    if (id.includes('zustand') || id.includes('/src/stores/')) {
-                        return 'state-stores';
-                    }
-
-                    // Lib files that import from supabase
-                    if (id.includes('/src/lib/autoPopulateBlocks') || id.includes('/src/lib/leadSubmission') || id.includes('/src/lib/usageTracking') || id.includes('/src/lib/sync-manager') || id.includes('/src/lib/images')) {
-                        return 'supabase';
-                    }
-
-                    // Icons
-                    if (id.includes('lucide-react')) {
-                        return 'icons';
-                    }
-
-                    // Utilities
-                    if (id.includes('clsx') || id.includes('tailwind-merge') || id.includes('date-fns') || id.includes('sonner')) {
-                        return 'utils';
-                    }
-                },
+                format: 'iife',
+                inlineDynamicImports: true,
             },
         },
-        // Increase chunk size warning limit (Three.js is inherently large)
-        chunkSizeWarningLimit: 1000,
-        // Disable minification for Cloudflare Pages SES compatibility
-        // SES (Secure ECMAScript) has strict evaluation rules that break with minified code
         minify: false,
         target: 'esnext',
     },
