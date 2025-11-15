@@ -68,12 +68,12 @@ export default defineConfig(({ mode }) => ({
                     }
 
                     // State management and data fetching
-                    if (id.includes('@tanstack/react-query') || id.includes('zustand')) {
+                    if (id.includes('@tanstack/react-query')) {
                         return 'data';
                     }
 
-                    // Supabase and all files that depend on it (to prevent cross-chunk re-exports)
-                    if (id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/')) {
+                    // Supabase and all files that depend on it (including zustand for stores)
+                    if (id.includes('zustand') || id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/')) {
                         return 'supabase';
                     }
                     // Lib files that import from supabase
