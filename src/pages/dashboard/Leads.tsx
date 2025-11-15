@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap } from "lucide-react";
+import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap, CheckSquare, Square, Trash2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,13 @@ import { LeadDetailModal } from "@/components/leads/LeadDetailModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Leads() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,6 +25,8 @@ export default function Leads() {
   const [showZapierModal, setShowZapierModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [showLeadDetail, setShowLeadDetail] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [isBulkActing, setIsBulkActing] = useState(false);
   const { user } = useAuthStore();
   const { toast } = useToast();
   const { subscription, hasFeature } = useSubscriptionLimits();
@@ -42,6 +51,94 @@ export default function Leads() {
   const handleLeadClick = (lead: any) => {
     setSelectedLead(lead);
     setShowLeadDetail(true);
+  };
+
+  // Bulk selection handlers
+  const toggleLeadSelection = (leadId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent opening the detail modal
+    setSelectedLeadIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(leadId)) {
+        newSet.delete(leadId);
+      } else {
+        newSet.add(leadId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLeadIds.size === filteredLeads?.length) {
+      setSelectedLeadIds(new Set());
+    } else {
+      setSelectedLeadIds(new Set(filteredLeads?.map(l => l.id) || []));
+    }
+  };
+
+  const handleBulkStatusUpdate = async (newStatus: string) => {
+    if (selectedLeadIds.size === 0) return;
+
+    setIsBulkActing(true);
+    try {
+      const { error } = await supabase
+        .from("leads")
+        .update({ status: newStatus })
+        .in("id", Array.from(selectedLeadIds));
+
+      if (error) throw error;
+
+      toast({
+        title: "Status updated",
+        description: `Updated ${selectedLeadIds.size} lead(s) to ${newStatus}`,
+      });
+
+      setSelectedLeadIds(new Set());
+      refetch();
+    } catch (error) {
+      console.error("Bulk status update failed:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update lead status",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkActing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLeadIds.size === 0) return;
+
+    if (!confirm(`Are you sure you want to delete ${selectedLeadIds.size} lead(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsBulkActing(true);
+    try {
+      const { error } = await supabase
+        .from("leads")
+        .delete()
+        .in("id", Array.from(selectedLeadIds));
+
+      if (error) throw error;
+
+      toast({
+        title: "Leads deleted",
+        description: `Deleted ${selectedLeadIds.size} lead(s)`,
+      });
+
+      setSelectedLeadIds(new Set());
+      refetch();
+    } catch (error) {
+      console.error("Bulk delete failed:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete leads",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkActing(false);
+    }
   };
 
   const handleExportLeads = () => {
@@ -193,17 +290,84 @@ export default function Leads() {
         </Card>
       </div>
 
-      {/* Search - Mobile optimized */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search leads by name or email..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base min-h-[44px]"
-        />
+      {/* Search & Bulk Actions - Mobile optimized */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search leads by name or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base min-h-[44px]"
+          />
+        </div>
+
+        {/* Bulk Actions Toolbar */}
+        {selectedLeadIds.size > 0 && (
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900">
+                    {selectedLeadIds.size} lead{selectedLeadIds.size !== 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Select onValueChange={handleBulkStatusUpdate} disabled={isBulkActing}>
+                    <SelectTrigger className="w-[140px] sm:w-[160px] h-9 bg-white">
+                      <SelectValue placeholder="Update status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="contacted">Contacted</SelectItem>
+                      <SelectItem value="qualified">Qualified</SelectItem>
+                      <SelectItem value="converted">Converted</SelectItem>
+                      <SelectItem value="lost">Lost</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    disabled={isBulkActing}
+                    className="gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedLeadIds(new Set())}
+                    disabled={isBulkActing}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Leads List Header with Select All */}
+      {filteredLeads && filteredLeads.length > 0 && (
+        <div className="flex items-center gap-2 px-2">
+          <button
+            onClick={toggleSelectAll}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-2"
+          >
+            {selectedLeadIds.size === filteredLeads.length ? (
+              <CheckSquare className="h-5 w-5 text-primary" />
+            ) : (
+              <Square className="h-5 w-5" />
+            )}
+            <span>Select all</span>
+          </button>
+        </div>
+      )}
 
       {/* Leads List - Mobile optimized */}
       <div className="space-y-2 sm:space-y-3">
@@ -223,6 +387,18 @@ export default function Leads() {
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                   <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                    {/* Checkbox */}
+                    <button
+                      onClick={(e) => toggleLeadSelection(lead.id, e)}
+                      className="flex-shrink-0 mt-1 hover:bg-gray-100 rounded p-1 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    >
+                      {selectedLeadIds.has(lead.id) ? (
+                        <CheckSquare className="h-5 w-5 text-primary" />
+                      ) : (
+                        <Square className="h-5 w-5 text-gray-400" />
+                      )}
+                    </button>
+
                     {/* Icon */}
                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                       {getLeadTypeIcon(lead.lead_type)}
