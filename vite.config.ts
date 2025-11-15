@@ -72,16 +72,18 @@ export default defineConfig(({ mode }) => ({
                         return 'data';
                     }
 
-                    // Supabase and all files that depend on it (including zustand for stores)
-                    if (id.includes('zustand') || id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/')) {
+                    // Supabase core
+                    if (id.includes('@supabase/supabase-js') || id.includes('/src/integrations/supabase/')) {
                         return 'supabase';
                     }
+
+                    // Zustand stores - keep separate for SES compatibility
+                    if (id.includes('zustand') || id.includes('/src/stores/')) {
+                        return 'state-stores';
+                    }
+
                     // Lib files that import from supabase
                     if (id.includes('/src/lib/autoPopulateBlocks') || id.includes('/src/lib/leadSubmission') || id.includes('/src/lib/usageTracking') || id.includes('/src/lib/sync-manager') || id.includes('/src/lib/images')) {
-                        return 'supabase';
-                    }
-                    // Stores that import from supabase (must be in same chunk)
-                    if (id.includes('/src/stores/')) {
                         return 'supabase';
                     }
 
@@ -99,13 +101,8 @@ export default defineConfig(({ mode }) => ({
         },
         // Increase chunk size warning limit (Three.js is inherently large)
         chunkSizeWarningLimit: 1000,
-        // Enable minification
-        minify: 'terser',
-        terserOptions: {
-            compress: {
-                drop_console: mode === 'production',
-                drop_debugger: mode === 'production',
-            },
-        },
+        // Use esbuild for minification (better SES compatibility than terser)
+        minify: 'esbuild',
+        target: 'esnext',
     },
 }));
