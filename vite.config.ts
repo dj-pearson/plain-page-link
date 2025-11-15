@@ -101,8 +101,9 @@ export default defineConfig(({ mode }) => ({
         },
         // Increase chunk size warning limit (Three.js is inherently large)
         chunkSizeWarningLimit: 1000,
-        // Use esbuild for minification (better SES compatibility than terser)
-        minify: 'esbuild',
+        // Disable minification for Cloudflare Pages SES compatibility
+        // SES (Secure ECMAScript) has strict evaluation rules that break with minified code
+        minify: false,
         target: 'esnext',
     },
 }));
