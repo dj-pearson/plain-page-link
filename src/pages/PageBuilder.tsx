@@ -9,6 +9,7 @@ import { createNewPage, getBlockTemplates } from "@/lib/pageBuilder";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { PageList } from "@/components/pageBuilder/PageList";
 import { BlockRenderer } from "@/components/pageBuilder/BlockRenderer";
+import { BlockSettings } from "@/components/pageBuilder/BlockSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ export default function PageBuilderEditor() {
         selectBlock,
         addBlockToPage,
         removeBlockFromPage,
+        updateBlockConfig,
         duplicatePageBlock,
         toggleBlockVisible,
         undo,
@@ -416,17 +418,12 @@ export default function PageBuilderEditor() {
                                 value="content"
                                 className="space-y-4 mt-4"
                             >
-                                <div className="space-y-2">
-                                    <Label>Block Type</Label>
-                                    <p className="text-sm text-gray-600 capitalize">
-                                        {selectedBlock.type}
-                                    </p>
-                                </div>
-
-                                {/* TODO: Add specific settings for each block type */}
-                                <div className="p-4 bg-gray-50 rounded text-sm text-gray-600">
-                                    Block-specific settings will appear here
-                                </div>
+                                <BlockSettings
+                                    block={selectedBlock}
+                                    onUpdate={(config) =>
+                                        updateBlockConfig(selectedBlock.id, config)
+                                    }
+                                />
                             </TabsContent>
 
                             <TabsContent
