@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { ZapierIntegrationModal } from "@/components/integrations/ZapierIntegrationModal";
+import { LeadDetailModal } from "@/components/leads/LeadDetailModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +16,13 @@ export default function Leads() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [showLeadDetail, setShowLeadDetail] = useState(false);
   const { user } = useAuthStore();
   const { toast } = useToast();
   const { subscription, hasFeature } = useSubscriptionLimits();
 
-  const { data: leads, isLoading } = useQuery({
+  const { data: leads, isLoading, refetch } = useQuery({
     queryKey: ["leads", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -35,6 +38,11 @@ export default function Leads() {
     },
     enabled: !!user?.id,
   });
+
+  const handleLeadClick = (lead: any) => {
+    setSelectedLead(lead);
+    setShowLeadDetail(true);
+  };
 
   const handleExportLeads = () => {
     // Check if user has export feature
@@ -207,7 +215,11 @@ export default function Leads() {
           </Card>
         ) : filteredLeads && filteredLeads.length > 0 ? (
           filteredLeads.map((lead) => (
-            <Card key={lead.id} className="hover:shadow-md active:shadow-lg transition-all">
+            <Card
+              key={lead.id}
+              className="hover:shadow-md active:shadow-lg transition-all cursor-pointer"
+              onClick={() => handleLeadClick(lead)}
+            >
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                   <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
@@ -290,6 +302,16 @@ export default function Leads() {
         open={showZapierModal}
         onOpenChange={setShowZapierModal}
       />
+
+      {/* Lead Detail Modal */}
+      {selectedLead && (
+        <LeadDetailModal
+          lead={selectedLead}
+          open={showLeadDetail}
+          onOpenChange={setShowLeadDetail}
+          onLeadUpdated={() => refetch()}
+        />
+      )}
     </div>
   );
 }
