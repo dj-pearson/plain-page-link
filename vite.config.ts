@@ -33,11 +33,10 @@ export default defineConfig(({ mode }) => ({
     build: {
         rollupOptions: {
             output: {
-                format: 'iife',
-                inlineDynamicImports: true,
+                format: 'es',
             },
         },
-        minify: false,
+        minify: 'esbuild',
         target: 'esnext',
     },
 }));
