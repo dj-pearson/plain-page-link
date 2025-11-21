@@ -229,6 +229,26 @@ html {
     .momentum-scroll {
         -webkit-overflow-scrolling: touch;
     }
+
+    /* Glass morphism design system */
+    .glass-heading {
+        @apply font-light tracking-tight text-foreground;
+        background: linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--foreground) / 0.7) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+    }
+
+    .glass-body {
+        @apply text-foreground/80 font-light;
+    }
+
+    .glass-background {
+        @apply bg-white/80 dark:bg-gray-900/80;
+    }
+
+    .glass-border {
+        @apply border-gray-200/50 dark:border-gray-700/50;
+    }
 }
 
 /* Page transitions */
