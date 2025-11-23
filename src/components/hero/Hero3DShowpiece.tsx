@@ -1,18 +1,16 @@
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
     Environment,
     Float,
     Text,
     RoundedBox,
-    Image,
     useTexture,
     PerspectiveCamera,
     ContactShadows,
     SpotLight
 } from '@react-three/drei';
 import * as THREE from 'three';
-import { Suspense } from 'react';
 
 // --- Assets & Constants ---
 const PROFILE_IMAGE = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&h=400";
@@ -55,17 +53,16 @@ function GlassCard({ position, rotation, args, children, color = 'white' }: any)
 }
 
 function ProfileBadge({ position }: { position: [number, number, number] }) {
+    const texture = useTexture(PROFILE_IMAGE);
+
     return (
         <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
             <GlassCard position={position} args={[2.5, 3.2, 0.1]}>
                 {/* Avatar */}
-                <Image
-                    url={PROFILE_IMAGE}
-                    position={[0, 0.5, 0.05]}
-                    scale={[1.2, 1.2, 1]}
-                    radius={0.6} // Circular mask
-                    transparent
-                />
+                <mesh position={[0, 0.5, 0.05]}>
+                    <circleGeometry args={[0.6, 64]} />
+                    <meshBasicMaterial map={texture} toneMapped={false} />
+                </mesh>
 
                 {/* Name & Title */}
                 <Text
@@ -130,15 +127,15 @@ function StatsCard({ position, label, value, color }: any) {
 }
 
 function ListingSnippet({ position }: { position: [number, number, number] }) {
+    const texture = useTexture(LISTING_IMAGE);
+
     return (
         <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.3}>
             <GlassCard position={position} args={[2.2, 1.6, 0.08]}>
-                <Image
-                    url={LISTING_IMAGE}
-                    position={[0, 0.2, 0.05]}
-                    scale={[2, 1, 1]}
-                    radius={0.05}
-                />
+                <mesh position={[0, 0.2, 0.05]}>
+                    <planeGeometry args={[2, 1]} />
+                    <meshBasicMaterial map={texture} toneMapped={false} />
+                </mesh>
                 <group position={[-0.9, -0.5, 0.05]}>
                     <Text
                         position={[0.1, 0.1, 0]}
