@@ -1,30 +1,24 @@
-import { useRef, useState, Suspense } from 'react';
+import { useRef, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
     Environment,
     Float,
     Text,
     RoundedBox,
-    useTexture,
     PerspectiveCamera,
     ContactShadows,
     SpotLight
 } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Assets & Constants ---
-const PROFILE_IMAGE = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&h=400";
-const LISTING_IMAGE = "https://images.unsplash.com/photo-1600596542815-e32870110274?auto=format&fit=crop&w=600&h=400";
-
 // --- Materials ---
-// Premium frosted glass material
 const GlassMaterial = ({ color = '#ffffff', opacity = 0.4, roughness = 0.2, metalness = 0.1 }) => (
     <meshPhysicalMaterial
         color={color}
         roughness={roughness}
         metalness={metalness}
-        transmission={0.95} // High transmission for glass effect
-        thickness={0.5} // Refraction thickness
+        transmission={0.95}
+        thickness={0.5}
         clearcoat={1}
         clearcoatRoughness={0.1}
         opacity={opacity}
@@ -34,14 +28,12 @@ const GlassMaterial = ({ color = '#ffffff', opacity = 0.4, roughness = 0.2, meta
 );
 
 // --- Components ---
-
 function GlassCard({ position, rotation, args, children, color = 'white' }: any) {
     return (
         <group position={position} rotation={rotation}>
             <RoundedBox args={args} radius={0.1}>
                 <GlassMaterial color={color} />
             </RoundedBox>
-            {/* Border/Rim Light */}
             <RoundedBox args={[args[0] + 0.02, args[1] + 0.02, args[2]]} radius={0.1} position={[0, 0, -0.01]}>
                 <meshBasicMaterial color="white" transparent opacity={0.2} />
             </RoundedBox>
@@ -53,15 +45,13 @@ function GlassCard({ position, rotation, args, children, color = 'white' }: any)
 }
 
 function ProfileBadge({ position }: { position: [number, number, number] }) {
-    const texture = useTexture(PROFILE_IMAGE);
-
     return (
         <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
             <GlassCard position={position} args={[2.5, 3.2, 0.1]}>
-                {/* Avatar */}
+                {/* Avatar - Gradient Circle */}
                 <mesh position={[0, 0.5, 0.05]}>
                     <circleGeometry args={[0.6, 64]} />
-                    <meshBasicMaterial map={texture} toneMapped={false} />
+                    <meshBasicMaterial color="#60a5fa" />
                 </mesh>
 
                 {/* Name & Title */}
@@ -127,15 +117,15 @@ function StatsCard({ position, label, value, color }: any) {
 }
 
 function ListingSnippet({ position }: { position: [number, number, number] }) {
-    const texture = useTexture(LISTING_IMAGE);
-
     return (
         <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.3}>
             <GlassCard position={position} args={[2.2, 1.6, 0.08]}>
+                {/* Property Image Placeholder - Gradient */}
                 <mesh position={[0, 0.2, 0.05]}>
                     <planeGeometry args={[2, 1]} />
-                    <meshBasicMaterial map={texture} toneMapped={false} />
+                    <meshBasicMaterial color="#94a3b8" />
                 </mesh>
+
                 <group position={[-0.9, -0.5, 0.05]}>
                     <Text
                         position={[0.1, 0.1, 0]}
@@ -175,7 +165,6 @@ function ListingSnippet({ position }: { position: [number, number, number] }) {
 function AbstractShapes() {
     return (
         <group>
-            {/* Floating Spheres */}
             <Float speed={4} rotationIntensity={1} floatIntensity={2}>
                 <mesh position={[-3, 2, -2]}>
                     <sphereGeometry args={[0.4, 32, 32]} />
@@ -193,12 +182,11 @@ function AbstractShapes() {
 }
 
 function Scene() {
-    const { mouse, viewport } = useThree();
+    const { viewport } = useThree();
     const groupRef = useRef<THREE.Group>(null);
 
     useFrame((state) => {
         if (groupRef.current) {
-            // Parallax effect based on mouse position
             const x = (state.mouse.x * viewport.width) / 10;
             const y = (state.mouse.y * viewport.height) / 10;
             groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -y * 0.2, 0.1);
@@ -210,18 +198,13 @@ function Scene() {
         <>
             <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={45} />
 
-            {/* Lighting */}
             <ambientLight intensity={0.5} />
             <SpotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
             <pointLight position={[-10, -10, -10]} intensity={0.5} color="#a1c4fd" />
             <Environment preset="city" />
 
-            {/* Main Content Group */}
             <group ref={groupRef}>
-                {/* Center: Profile */}
                 <ProfileBadge position={[0, 0, 0]} />
-
-                {/* Left: Stats */}
                 <StatsCard
                     position={[-2.5, 1, 0.5]}
                     label="Active Leads"
@@ -234,11 +217,7 @@ function Scene() {
                     value="28"
                     color="#3b82f6"
                 />
-
-                {/* Right: Listings */}
                 <ListingSnippet position={[2.5, 0.5, 0.2]} />
-
-                {/* Background Accents */}
                 <AbstractShapes />
             </group>
 
