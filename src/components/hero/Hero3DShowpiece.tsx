@@ -1,238 +1,5 @@
-import { useRef, Suspense } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import {
-    Environment,
-    Float,
-    Text,
-    RoundedBox,
-    PerspectiveCamera,
-    ContactShadows,
-    SpotLight
-} from '@react-three/drei';
-import * as THREE from 'three';
-
-// --- Materials ---
-const GlassMaterial = ({ color = '#ffffff', opacity = 0.4, roughness = 0.2, metalness = 0.1 }) => (
-    <meshPhysicalMaterial
-        color={color}
-        roughness={roughness}
-        metalness={metalness}
-        transmission={0.95}
-        thickness={0.5}
-        clearcoat={1}
-        clearcoatRoughness={0.1}
-        opacity={opacity}
-        transparent
-        side={THREE.DoubleSide}
-    />
-);
-
-// --- Components ---
-function GlassCard({ position, rotation, args, children, color = 'white' }: any) {
-    return (
-        <group position={position} rotation={rotation}>
-            <RoundedBox args={args} radius={0.1}>
-                <GlassMaterial color={color} />
-            </RoundedBox>
-            <RoundedBox args={[args[0] + 0.02, args[1] + 0.02, args[2]]} radius={0.1} position={[0, 0, -0.01]}>
-                <meshBasicMaterial color="white" transparent opacity={0.2} />
-            </RoundedBox>
-            <group position={[0, 0, args[2] / 2 + 0.01]}>
-                {children}
-            </group>
-        </group>
-    );
-}
-
-function ProfileBadge({ position }: { position: [number, number, number] }) {
-    return (
-        <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
-            <GlassCard position={position} args={[2.5, 3.2, 0.1]}>
-                {/* Avatar - Gradient Circle */}
-                <mesh position={[0, 0.5, 0.05]}>
-                    <circleGeometry args={[0.6, 64]} />
-                    <meshBasicMaterial color="#60a5fa" />
-                </mesh>
-
-                {/* Name & Title */}
-                <Text
-                    position={[0, -0.4, 0.05]}
-                    fontSize={0.2}
-                    color="#1a1a1a"
-                    anchorX="center"
-                    anchorY="middle"
-                    font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff"
-                >
-                    Sarah Johnson
-                </Text>
-                <Text
-                    position={[0, -0.7, 0.05]}
-                    fontSize={0.1}
-                    color="#666"
-                    anchorX="center"
-                    anchorY="middle"
-                >
-                    Luxury Real Estate Specialist
-                </Text>
-
-                {/* Verified Badge */}
-                <group position={[0.4, 0.9, 0.1]}>
-                    <mesh>
-                        <circleGeometry args={[0.15, 32]} />
-                        <meshBasicMaterial color="#3b82f6" />
-                    </mesh>
-                    <Text position={[0, 0, 0.01]} fontSize={0.15} color="white">✓</Text>
-                </group>
-            </GlassCard>
-        </Float>
-    );
-}
-
-function StatsCard({ position, label, value, color }: any) {
-    return (
-        <Float speed={3} rotationIntensity={0.3} floatIntensity={0.4}>
-            <GlassCard position={position} args={[1.8, 1.2, 0.08]}>
-                <Text
-                    position={[0, 0.1, 0.05]}
-                    fontSize={0.35}
-                    color={color}
-                    fontWeight="bold"
-                    anchorX="center"
-                    anchorY="middle"
-                >
-                    {value}
-                </Text>
-                <Text
-                    position={[0, -0.25, 0.05]}
-                    fontSize={0.12}
-                    color="#555"
-                    anchorX="center"
-                    anchorY="middle"
-                >
-                    {label}
-                </Text>
-            </GlassCard>
-        </Float>
-    );
-}
-
-function ListingSnippet({ position }: { position: [number, number, number] }) {
-    return (
-        <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.3}>
-            <GlassCard position={position} args={[2.2, 1.6, 0.08]}>
-                {/* Property Image Placeholder - Gradient */}
-                <mesh position={[0, 0.2, 0.05]}>
-                    <planeGeometry args={[2, 1]} />
-                    <meshBasicMaterial color="#94a3b8" />
-                </mesh>
-
-                <group position={[-0.9, -0.5, 0.05]}>
-                    <Text
-                        position={[0.1, 0.1, 0]}
-                        fontSize={0.12}
-                        color="#111"
-                        anchorX="left"
-                        anchorY="middle"
-                        fontWeight="bold"
-                    >
-                        Modern Hills Villa
-                    </Text>
-                    <Text
-                        position={[0.1, -0.1, 0]}
-                        fontSize={0.1}
-                        color="#666"
-                        anchorX="left"
-                        anchorY="middle"
-                    >
-                        $2,450,000 • Sold
-                    </Text>
-                </group>
-
-                {/* "Sold" Sticker */}
-                <group position={[0.7, 0.5, 0.1]} rotation={[0, 0, -0.2]}>
-                    <RoundedBox args={[0.8, 0.3, 0.02]} radius={0.05}>
-                        <meshBasicMaterial color="#e11d48" />
-                    </RoundedBox>
-                    <Text position={[0, 0, 0.02]} fontSize={0.15} color="white" fontWeight="bold">
-                        SOLD
-                    </Text>
-                </group>
-            </GlassCard>
-        </Float>
-    );
-}
-
-function AbstractShapes() {
-    return (
-        <group>
-            <Float speed={4} rotationIntensity={1} floatIntensity={2}>
-                <mesh position={[-3, 2, -2]}>
-                    <sphereGeometry args={[0.4, 32, 32]} />
-                    <meshStandardMaterial color="#80d0c7" roughness={0.1} metalness={0.8} />
-                </mesh>
-            </Float>
-            <Float speed={3} rotationIntensity={1} floatIntensity={1.5}>
-                <mesh position={[3, -2, -3]}>
-                    <icosahedronGeometry args={[0.5, 0]} />
-                    <meshStandardMaterial color="#a1c4fd" roughness={0.1} metalness={0.8} />
-                </mesh>
-            </Float>
-        </group>
-    );
-}
-
-function Scene() {
-    const { viewport } = useThree();
-    const groupRef = useRef<THREE.Group>(null);
-
-    useFrame((state) => {
-        if (groupRef.current) {
-            const x = (state.mouse.x * viewport.width) / 10;
-            const y = (state.mouse.y * viewport.height) / 10;
-            groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -y * 0.2, 0.1);
-            groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, x * 0.2, 0.1);
-        }
-    });
-
-    return (
-        <>
-            <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={45} />
-
-            <ambientLight intensity={0.5} />
-            <SpotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
-            <pointLight position={[-10, -10, -10]} intensity={0.5} color="#a1c4fd" />
-            <Environment preset="city" />
-
-            <group ref={groupRef}>
-                <ProfileBadge position={[0, 0, 0]} />
-                <StatsCard
-                    position={[-2.5, 1, 0.5]}
-                    label="Active Leads"
-                    value="142"
-                    color="#10b981"
-                />
-                <StatsCard
-                    position={[-2.2, -1.5, -0.5]}
-                    label="Deals Closed"
-                    value="28"
-                    color="#3b82f6"
-                />
-                <ListingSnippet position={[2.5, 0.5, 0.2]} />
-                <AbstractShapes />
-            </group>
-
-            <ContactShadows position={[0, -4, 0]} opacity={0.4} scale={20} blur={2.5} far={4} />
-        </>
-    );
-}
-
-function LoadingFallback() {
-    return (
-        <div className="flex items-center justify-center w-full h-full">
-            <div className="w-12 h-12 border-4 border-t-blue-400 border-r-transparent border-b-teal-400 border-l-transparent rounded-full animate-spin" />
-        </div>
-    );
-}
+import { useEffect, useRef } from 'react';
+import { CheckCircle2, TrendingUp, Home, Star } from 'lucide-react';
 
 interface Hero3DShowpieceProps {
     className?: string;
@@ -240,16 +7,226 @@ interface Hero3DShowpieceProps {
 }
 
 export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShowpieceProps) {
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const rect = container.getBoundingClientRect();
+            const x = (e.clientX - rect.left - rect.width / 2) / rect.width;
+            const y = (e.clientY - rect.top - rect.height / 2) / rect.height;
+
+            container.style.setProperty('--mouse-x', `${x * 20}deg`);
+            container.style.setProperty('--mouse-y', `${-y * 20}deg`);
+        };
+
+        container.addEventListener('mousemove', handleMouseMove);
+        return () => container.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
     return (
-        <div className={`relative w-full ${className}`} style={{ height }}>
-            <Suspense fallback={<LoadingFallback />}>
-                <Canvas
-                    gl={{ antialias: true, alpha: true }}
-                    dpr={[1, 2]}
+        <div
+            ref={containerRef}
+            className={`relative w-full overflow-hidden ${className}`}
+            style={{
+                height,
+                perspective: '1000px',
+                // @ts-ignore
+                '--mouse-x': '0deg',
+                '--mouse-y': '0deg'
+            }}
+        >
+            {/* Background Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50 dark:from-slate-900 dark:via-blue-950 dark:to-teal-950" />
+
+            {/* Floating Cards Container */}
+            <div className="absolute inset-0 flex items-center justify-center">
+                <div
+                    className="relative w-full max-w-4xl h-full flex items-center justify-center"
+                    style={{
+                        transform: 'rotateX(var(--mouse-y)) rotateY(var(--mouse-x))',
+                        transformStyle: 'preserve-3d',
+                        transition: 'transform 0.3s ease-out'
+                    }}
                 >
-                    <Scene />
-                </Canvas>
-            </Suspense>
+                    {/* Center Profile Card */}
+                    <div
+                        className="glass-card profile-card"
+                        style={{
+                            transform: 'translateZ(100px)',
+                            transformStyle: 'preserve-3d'
+                        }}
+                    >
+                        <div className="relative z-10 p-8 flex flex-col items-center">
+                            <div className="relative mb-4">
+                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-teal-400 flex items-center justify-center text-white text-3xl font-bold shadow-xl">
+                                    SJ
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-1.5 rounded-full border-4 border-white shadow-lg">
+                                    <CheckCircle2 size={16} />
+                                </div>
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Sarah Johnson</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Luxury Real Estate Specialist</p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full">
+                                <Home size={12} />
+                                <span>Beverly Hills, CA</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Left Stats Card - Active Leads */}
+                    <div
+                        className="glass-card stats-card-left"
+                        style={{
+                            transform: 'translateZ(50px) translateX(-280px) translateY(80px) rotateY(-15deg)',
+                            transformStyle: 'preserve-3d'
+                        }}
+                    >
+                        <div className="relative z-10 p-6 text-center">
+                            <div className="text-4xl font-bold text-emerald-500 mb-2">142</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
+                                <TrendingUp size={14} />
+                                <span>Active Leads</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Left Stats Card - Deals Closed */}
+                    <div
+                        className="glass-card stats-card-left-bottom"
+                        style={{
+                            transform: 'translateZ(30px) translateX(-260px) translateY(-100px) rotateY(-10deg)',
+                            transformStyle: 'preserve-3d'
+                        }}
+                    >
+                        <div className="relative z-10 p-6 text-center">
+                            <div className="text-4xl font-bold text-blue-500 mb-2">28</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
+                                <Star size={14} />
+                                <span>Deals Closed</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Listing Card */}
+                    <div
+                        className="glass-card listing-card"
+                        style={{
+                            transform: 'translateZ(60px) translateX(280px) translateY(40px) rotateY(15deg)',
+                            transformStyle: 'preserve-3d'
+                        }}
+                    >
+                        <div className="relative z-10">
+                            <div className="h-32 bg-gradient-to-br from-slate-300 to-slate-400 rounded-t-xl relative overflow-hidden">
+                                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50"></div>
+                                <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded font-bold">
+                                    $2,450,000
+                                </div>
+                                <div className="absolute top-2 right-2 bg-rose-500 text-white text-xs px-3 py-1 rounded-full font-bold shadow-lg transform rotate-12">
+                                    SOLD
+                                </div>
+                            </div>
+                            <div className="p-4">
+                                <h4 className="font-bold text-gray-900 dark:text-white text-sm mb-1">Modern Hills Villa</h4>
+                                <p className="text-xs text-gray-500">4 Bed • 3.5 Bath • 3,200 sqft</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Floating Accent Shapes */}
+                    <div
+                        className="floating-orb orb-1"
+                        style={{
+                            transform: 'translateZ(-50px) translateX(-350px) translateY(-150px)',
+                        }}
+                    />
+                    <div
+                        className="floating-orb orb-2"
+                        style={{
+                            transform: 'translateZ(-80px) translateX(350px) translateY(150px)',
+                        }}
+                    />
+                </div>
+            </div>
+
+            <style jsx>{`
+        .glass-card {
+          position: absolute;
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          border-radius: 20px;
+          box-shadow: 
+            0 8px 32px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.6);
+          animation: float 6s ease-in-out infinite;
+          transition: transform 0.3s ease-out;
+        }
+
+        .profile-card {
+          width: 320px;
+          animation-delay: 0s;
+        }
+
+        .stats-card-left,
+        .stats-card-left-bottom {
+          width: 200px;
+          animation-delay: 0.5s;
+        }
+
+        .listing-card {
+          width: 260px;
+          animation-delay: 1s;
+        }
+
+        .floating-orb {
+          position: absolute;
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(45, 212, 191, 0.3));
+          backdrop-filter: blur(10px);
+          animation: float 8s ease-in-out infinite, pulse 4s ease-in-out infinite;
+        }
+
+        .orb-1 {
+          animation-delay: 0s;
+        }
+
+        .orb-2 {
+          animation-delay: 2s;
+        }
+
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 0.6;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.1);
+          }
+        }
+
+        @media (prefers-color-scheme: dark) {
+          .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            border-color: rgba(148, 163, 184, 0.1);
+          }
+        }
+      `}</style>
         </div>
     );
 }
