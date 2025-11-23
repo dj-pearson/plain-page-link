@@ -1,11 +1,7 @@
+import { ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Zap, ArrowRight, Sparkles } from 'lucide-react';
 import { Hero3D } from './Hero3DLazy';
 
-/**
- * HeroSection Component
- * Professional hero section combining 3D visuals with Liquid Glass design system
- */
 interface HeroSectionProps {
   title?: string;
   subtitle?: string;
@@ -19,7 +15,7 @@ interface HeroSectionProps {
     href: string;
   };
   badge?: {
-    icon?: React.ReactNode;
+    icon: React.ReactNode;
     text: string;
   };
   showStats?: boolean;
@@ -44,135 +40,60 @@ export function HeroSection({
   showStats = true
 }: HeroSectionProps) {
   return (
-    <section className="relative container mx-auto px-4 py-12 md:py-20">
-      <div className="grid lg:grid-cols-2 gap-12 items-center">
-        {/* Content Column */}
-        <article className="space-y-8 z-10">
-          {/* Badge */}
-          {badge && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-glass-background backdrop-blur-md border border-glass-border rounded-full text-sm font-light tracking-tight">
-              <div className="text-transparent bg-gradient-to-r from-[#80d0c7] to-[#a1c4fd] bg-clip-text flex items-center gap-2">
-                {badge.icon}
-                <span className="font-normal">{badge.text}</span>
-              </div>
-            </div>
-          )}
+    <section className="relative w-full min-h-[90vh] flex items-center overflow-hidden bg-slate-50 dark:bg-slate-950">
 
-          {/* Heading */}
-          <div>
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-light tracking-tight mb-4 leading-tight">
-              {title}
-              <span className="block mt-2">
-                <span className="glass-heading text-5xl md:text-7xl lg:text-8xl">
-                  {subtitle}
-                </span>
-              </span>
-            </h1>
+      {/* 1. Full-Screen 3D Background */}
+      <div className="absolute inset-0 w-full h-full z-0">
+        <Hero3D height="100%" className="w-full h-full" />
+      </div>
+
+      {/* 2. Content Overlay */}
+      <div className="container relative z-10 mx-auto px-4 pointer-events-none">
+        <div className="max-w-3xl">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 mb-8 animate-fade-in pointer-events-auto">
+            {badge.icon}
+            <span>{badge.text}</span>
           </div>
 
+          {/* Headline */}
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-slate-900 dark:text-white mb-6 leading-[1.1] animate-slide-up">
+            Real Estate Agent <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-500">
+              Bio Page Builder
+            </span>
+          </h1>
+
+          {/* Subheadline */}
+          <h2 className="text-2xl md:text-3xl font-semibold text-slate-700 dark:text-slate-200 mb-6 animate-slide-up delay-100">
+            Turn Your Instagram Followers Into <br />
+            Qualified Buyer & Seller Leads
+          </h2>
+
           {/* Description */}
-          <p className="text-lg md:text-xl glass-body max-w-xl leading-relaxed">
-            {description}
+          <p className="text-lg text-slate-600 dark:text-slate-400 mb-10 max-w-2xl leading-relaxed animate-slide-up delay-200">
+            While your competitors use basic link-in-bio tools, you'll have a complete real estate portfolio with property galleries, lead capture forms, and appointment booking—all optimized to convert social media traffic into closings.
           </p>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          {/* CTAs */}
+          <div className="flex flex-col sm:flex-row gap-4 animate-slide-up delay-300 pointer-events-auto">
             <Link
               to={primaryCta.href}
-              className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl font-light tracking-tight transition-all hover:border-[#80d0c7] hover:shadow-lg hover:shadow-[#80d0c7]/20"
+              className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-gradient-to-r from-blue-600 to-teal-500 rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200"
             >
-              <span className="relative z-10 text-foreground group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-[#80d0c7] group-hover:to-[#a1c4fd] group-hover:bg-clip-text transition-all">
-                {primaryCta.text}
-              </span>
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#80d0c7]/10 to-[#a1c4fd]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              {primaryCta.text}
+              <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
 
             <a
               href={secondaryCta.href}
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent border-2 border-glass-border rounded-xl font-light tracking-tight text-foreground/90 hover:bg-glass-background hover:border-[#a1c4fd] backdrop-blur-sm transition-all"
+              className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all duration-200"
             >
               {secondaryCta.text}
-              <Sparkles className="h-4 w-4" />
             </a>
           </div>
-
-          {/* Sub-text */}
-          <p className="text-sm text-muted-foreground font-light">
-            No credit card required • Setup in 5 minutes
-          </p>
-
-          {/* Stats */}
-          {showStats && (
-            <div className="grid grid-cols-3 gap-6 pt-8 border-t border-glass-border">
-              <div className="space-y-1">
-                <div className="text-2xl md:text-3xl font-light glass-accent">
-                  AI-Powered
-                </div>
-                <div className="text-sm text-muted-foreground font-light">
-                  Lead Scoring
-                </div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-2xl md:text-3xl font-light glass-accent">
-                  Smart
-                </div>
-                <div className="text-sm text-muted-foreground font-light">
-                  Auto-Matching
-                </div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-2xl md:text-3xl font-light glass-accent">
-                  Data Moat
-                </div>
-                <div className="text-sm text-muted-foreground font-light">
-                  Gets Smarter
-                </div>
-              </div>
-            </div>
-          )}
-        </article>
-
-        {/* 3D Visual Column */}
-        <div className="relative">
-          {/* Main 3D Hero */}
-          <Hero3D height="500px" className="shadow-2xl" />
-
-          {/* Floating accent cards - REMOVED in favor of 3D elements */}
         </div>
       </div>
     </section>
   );
 }
-
-// Animation keyframes for floating elements
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes float-slow {
-    0%, 100% {
-      transform: translateY(0px);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
-  }
-
-  @keyframes float-delayed {
-    0%, 100% {
-      transform: translateY(0px);
-    }
-    50% {
-      transform: translateY(-15px);
-    }
-  }
-
-  .animate-float-slow {
-    animation: float-slow 6s ease-in-out infinite;
-  }
-
-  .animate-float-delayed {
-    animation: float-delayed 8s ease-in-out infinite;
-    animation-delay: 1s;
-  }
-`;
-document.head.appendChild(style);

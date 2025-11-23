@@ -18,8 +18,8 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
             const x = (e.clientX - rect.left - rect.width / 2) / rect.width;
             const y = (e.clientY - rect.top - rect.height / 2) / rect.height;
 
-            container.style.setProperty('--mouse-x', `${x * 20}deg`);
-            container.style.setProperty('--mouse-y', `${-y * 20}deg`);
+            container.style.setProperty('--mouse-x', `${x * 15}deg`);
+            container.style.setProperty('--mouse-y', `${-y * 15}deg`);
         };
 
         container.addEventListener('mousemove', handleMouseMove);
@@ -32,30 +32,30 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
             className={`relative w-full overflow-hidden ${className}`}
             style={{
                 height,
-                perspective: '1000px',
+                perspective: '1200px',
                 // @ts-ignore
                 '--mouse-x': '0deg',
                 '--mouse-y': '0deg'
             }}
         >
             {/* Background Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50 dark:from-slate-900 dark:via-blue-950 dark:to-teal-950" />
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/50 to-teal-50/50 dark:from-slate-950 dark:via-blue-950/30 dark:to-teal-950/30" />
 
             {/* Floating Cards Container */}
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div
-                    className="relative w-full max-w-4xl h-full flex items-center justify-center"
+                    className="relative w-full h-full max-w-[1400px] mx-auto"
                     style={{
                         transform: 'rotateX(var(--mouse-y)) rotateY(var(--mouse-x))',
                         transformStyle: 'preserve-3d',
-                        transition: 'transform 0.3s ease-out'
+                        transition: 'transform 0.1s ease-out'
                     }}
                 >
-                    {/* Center Profile Card */}
+                    {/* --- RIGHT SIDE: Main Profile Stack --- */}
                     <div
-                        className="glass-card profile-card"
+                        className="absolute right-[10%] top-[20%] glass-card profile-card"
                         style={{
-                            transform: 'translateZ(100px)',
+                            transform: 'translateZ(80px)',
                             transformStyle: 'preserve-3d'
                         }}
                     >
@@ -77,45 +77,11 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
                         </div>
                     </div>
 
-                    {/* Left Stats Card - Active Leads */}
+                    {/* --- FAR RIGHT: Listing Card --- */}
                     <div
-                        className="glass-card stats-card-left"
+                        className="absolute right-[2%] top-[55%] glass-card listing-card"
                         style={{
-                            transform: 'translateZ(50px) translateX(-280px) translateY(80px) rotateY(-15deg)',
-                            transformStyle: 'preserve-3d'
-                        }}
-                    >
-                        <div className="relative z-10 p-6 text-center">
-                            <div className="text-4xl font-bold text-emerald-500 mb-2">142</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
-                                <TrendingUp size={14} />
-                                <span>Active Leads</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Left Stats Card - Deals Closed */}
-                    <div
-                        className="glass-card stats-card-left-bottom"
-                        style={{
-                            transform: 'translateZ(30px) translateX(-260px) translateY(-100px) rotateY(-10deg)',
-                            transformStyle: 'preserve-3d'
-                        }}
-                    >
-                        <div className="relative z-10 p-6 text-center">
-                            <div className="text-4xl font-bold text-blue-500 mb-2">28</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
-                                <Star size={14} />
-                                <span>Deals Closed</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Listing Card */}
-                    <div
-                        className="glass-card listing-card"
-                        style={{
-                            transform: 'translateZ(60px) translateX(280px) translateY(40px) rotateY(15deg)',
+                            transform: 'translateZ(120px) rotateY(-10deg)',
                             transformStyle: 'preserve-3d'
                         }}
                     >
@@ -136,17 +102,56 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
                         </div>
                     </div>
 
-                    {/* Floating Accent Shapes */}
+                    {/* --- CENTER BOTTOM: Stats Card (Deals) --- */}
+                    <div
+                        className="absolute left-[45%] bottom-[15%] glass-card stats-card"
+                        style={{
+                            transform: 'translateZ(60px) rotateX(10deg)',
+                            transformStyle: 'preserve-3d'
+                        }}
+                    >
+                        <div className="relative z-10 p-6 text-center">
+                            <div className="text-4xl font-bold text-blue-500 mb-2">28</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
+                                <Star size={14} />
+                                <span>Deals Closed</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* --- LEFT SIDE: Stats Card (Leads) --- */}
+                    {/* Positioned to float behind/near the text area but not block it */}
+                    <div
+                        className="absolute left-[5%] bottom-[20%] glass-card stats-card opacity-80"
+                        style={{
+                            transform: 'translateZ(30px) rotateY(15deg)',
+                            transformStyle: 'preserve-3d'
+                        }}
+                    >
+                        <div className="relative z-10 p-6 text-center">
+                            <div className="text-4xl font-bold text-emerald-500 mb-2">142</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
+                                <TrendingUp size={14} />
+                                <span>Active Leads</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Floating Accent Orbs */}
                     <div
                         className="floating-orb orb-1"
                         style={{
-                            transform: 'translateZ(-50px) translateX(-350px) translateY(-150px)',
+                            right: '25%',
+                            top: '15%',
+                            transform: 'translateZ(-50px)',
                         }}
                     />
                     <div
                         className="floating-orb orb-2"
                         style={{
-                            transform: 'translateZ(-80px) translateX(350px) translateY(150px)',
+                            left: '10%',
+                            bottom: '30%',
+                            transform: 'translateZ(-80px)',
                         }}
                     />
                 </div>
@@ -154,75 +159,58 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
 
             <style jsx>{`
         .glass-card {
-          position: absolute;
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          border-radius: 20px;
+          background: rgba(255, 255, 255, 0.6);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          border-radius: 24px;
           box-shadow: 
-            0 8px 32px rgba(0, 0, 0, 0.1),
-            inset 0 1px 0 rgba(255, 255, 255, 0.6);
-          animation: float 6s ease-in-out infinite;
-          transition: transform 0.3s ease-out;
+            0 20px 40px rgba(0, 0, 0, 0.05),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+          animation: float 8s ease-in-out infinite;
+          transition: transform 0.1s ease-out;
         }
 
         .profile-card {
-          width: 320px;
+          width: 300px;
           animation-delay: 0s;
-        }
-
-        .stats-card-left,
-        .stats-card-left-bottom {
-          width: 200px;
-          animation-delay: 0.5s;
         }
 
         .listing-card {
           width: 260px;
-          animation-delay: 1s;
+          animation-delay: 1.5s;
+        }
+
+        .stats-card {
+          width: 180px;
+          animation-delay: 2.5s;
         }
 
         .floating-orb {
           position: absolute;
-          width: 80px;
-          height: 80px;
+          width: 120px;
+          height: 120px;
           border-radius: 50%;
-          background: linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(45, 212, 191, 0.3));
-          backdrop-filter: blur(10px);
-          animation: float 8s ease-in-out infinite, pulse 4s ease-in-out infinite;
+          background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(45, 212, 191, 0.2));
+          filter: blur(40px);
+          animation: pulse 6s ease-in-out infinite;
         }
 
-        .orb-1 {
-          animation-delay: 0s;
-        }
-
-        .orb-2 {
-          animation-delay: 2s;
-        }
+        .orb-1 { animation-delay: 0s; }
+        .orb-2 { animation-delay: 3s; }
 
         @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
+          0%, 100% { transform: translateY(0px) translateZ(var(--z, 0)); }
+          50% { transform: translateY(-15px) translateZ(var(--z, 0)); }
         }
 
         @keyframes pulse {
-          0%, 100% {
-            opacity: 0.6;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.8;
-            transform: scale(1.1);
-          }
+          0%, 100% { opacity: 0.4; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.2); }
         }
 
         @media (prefers-color-scheme: dark) {
           .glass-card {
-            background: rgba(30, 41, 59, 0.7);
+            background: rgba(30, 41, 59, 0.6);
             border-color: rgba(148, 163, 184, 0.1);
           }
         }
