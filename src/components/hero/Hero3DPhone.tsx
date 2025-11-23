@@ -77,8 +77,7 @@ function PremiumPhone() {
       */}
             <Html
                 transform
-                occlude="blending"
-                position={[0, 0, 0.192]}
+                position={[0, 0, 0.25]} // Moved forward to prevent z-fighting
                 scale={0.01}
                 style={{
                     width: '290px',
@@ -86,7 +85,7 @@ function PremiumPhone() {
                     backgroundColor: 'white',
                     borderRadius: '40px',
                     overflow: 'hidden',
-                    backfaceVisibility: 'hidden',
+                    // Removed backfaceVisibility to ensure it renders
                 }}
             >
                 <div className="w-full h-full flex flex-col font-sans bg-gray-50 select-none">
