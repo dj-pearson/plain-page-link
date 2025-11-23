@@ -14,6 +14,9 @@ import { FeaturedListingsCarousel } from "@/components/profile/FeaturedListingsC
 import { StickyActionBar } from "@/components/profile/StickyActionBar";
 import ListingDetailModal from "@/components/profile/ListingDetailModal";
 import { LeadFormModal } from "@/components/profile/LeadFormModal";
+import { CalendlyModal } from "@/components/integrations/CalendlyModal";
+import { HomeValuationForm } from "@/components/forms/HomeValuationForm";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { QuickNav } from "@/components/profile/QuickNav";
 import LinkStackBlocks from "@/components/profile/LinkStackBlocks";
 import { useProfileTracking, trackLinkClick } from "@/hooks/useProfileTracking";
@@ -35,6 +38,8 @@ export default function FullProfilePage() {
     const [customPageSlug, setCustomPageSlug] = useState<string | null>(null);
     const [checkingCustomPage, setCheckingCustomPage] = useState(true);
     const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+    const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
+    const [isHomeValuationModalOpen, setIsHomeValuationModalOpen] = useState(false);
 
     // Fetch profile and related data
     const { data, isLoading, error } = usePublicProfile(slug || '');
@@ -533,16 +538,42 @@ export default function FullProfilePage() {
                 agentName={profile.full_name || profile.username}
             />
 
+            {/* Calendly Modal */}
+            {profile.calendly_url && (
+                <CalendlyModal
+                    isOpen={isCalendlyModalOpen}
+                    onClose={() => setIsCalendlyModalOpen(false)}
+                    calendlyUrl={profile.calendly_url}
+                    title="Schedule a Showing"
+                    subtitle="Choose a time that works best for you"
+                />
+            )}
+
+            {/* Home Valuation Modal */}
+            <Dialog open={isHomeValuationModalOpen} onOpenChange={setIsHomeValuationModalOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <HomeValuationForm
+                        agentId={profile.id}
+                        agentName={profile.full_name || profile.username}
+                        onSuccess={() => setIsHomeValuationModalOpen(false)}
+                    />
+                </DialogContent>
+            </Dialog>
+
             {/* Sticky Action Bar */}
             <StickyActionBar
                 profile={profile}
                 onScheduleShowing={() => {
-                    // TODO: Open Calendly modal if available, otherwise lead form
-                    setIsLeadModalOpen(true);
+                    // Open Calendly modal if available, otherwise lead form
+                    if (profile.calendly_url) {
+                        setIsCalendlyModalOpen(true);
+                    } else {
+                        setIsLeadModalOpen(true);
+                    }
                 }}
                 onGetHomeValue={() => {
-                    // TODO: Open home valuation modal
-                    setIsLeadModalOpen(true);
+                    // Open home valuation modal
+                    setIsHomeValuationModalOpen(true);
                 }}
                 onContactFormOpen={() => setIsLeadModalOpen(true)}
             />

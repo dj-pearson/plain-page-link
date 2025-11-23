@@ -3,6 +3,7 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDashboard";
+import { InsightsWidget } from "@/components/analytics/InsightsWidget";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -13,6 +14,12 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     Eye,
     Users,
     UserPlus,
@@ -22,11 +29,11 @@ import {
     BarChart3,
     Search as SearchIcon,
 } from "lucide-react";
-import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAnalytics, type TimeRange } from "@/hooks/useAnalytics";
 
 export default function Analytics() {
-    const [dateRange, setDateRange] = useState("30d");
-    const { stats, viewsData, leadsData, recentLeads, isLoading } = useAnalytics();
+    const [dateRange, setDateRange] = useState<TimeRange>("30d");
+    const { stats, viewsData, leadsData, recentLeads, isLoading } = useAnalytics(dateRange);
 
     if (isLoading) {
         return <div className="flex items-center justify-center h-64">Loading...</div>;
@@ -43,16 +50,31 @@ export default function Analytics() {
                     </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        <span className="text-xs sm:text-sm">
-                            {dateRange === "7d"
-                                ? "Last 7 days"
-                                : dateRange === "30d"
-                                ? "Last 30 days"
-                                : "Last 90 days"}
-                        </span>
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+                                <Calendar className="w-4 h-4 mr-2" />
+                                <span className="text-xs sm:text-sm">
+                                    {dateRange === "7d"
+                                        ? "Last 7 days"
+                                        : dateRange === "30d"
+                                        ? "Last 30 days"
+                                        : "Last 90 days"}
+                                </span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setDateRange("7d")}>
+                                Last 7 days
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setDateRange("30d")}>
+                                Last 30 days
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setDateRange("90d")}>
+                                Last 90 days
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
                         <Download className="w-4 h-4 mr-2" />
                         <span className="text-xs sm:text-sm">Export</span>
@@ -108,6 +130,13 @@ export default function Analytics() {
                     iconBgColor="bg-orange-100"
                 />
             </div>
+
+            {/* Insights & Recommendations */}
+            <InsightsWidget
+                stats={stats}
+                listingsCount={0}
+                linksCount={0}
+            />
 
             {/* Views Over Time Chart - Smaller height on mobile */}
             <AnalyticsChart

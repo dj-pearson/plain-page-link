@@ -9,6 +9,7 @@ import { createNewPage, getBlockTemplates } from "@/lib/pageBuilder";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { PageList } from "@/components/pageBuilder/PageList";
 import { BlockRenderer } from "@/components/pageBuilder/BlockRenderer";
+import { BlockSettings } from "@/components/pageBuilder/BlockSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,8 @@ export default function PageBuilderEditor() {
     const [showPageList, setShowPageList] = useState(true);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [isMobilePreview, setIsMobilePreview] = useState(false);
+    const [draggedBlockIndex, setDraggedBlockIndex] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const {
         page,
         selectedBlockId,
@@ -49,6 +52,8 @@ export default function PageBuilderEditor() {
         selectBlock,
         addBlockToPage,
         removeBlockFromPage,
+        updateBlockConfig,
+        reorderPageBlocks,
         duplicatePageBlock,
         toggleBlockVisible,
         undo,
@@ -109,6 +114,54 @@ export default function PageBuilderEditor() {
         } catch (error) {
             toast.error("Failed to publish page");
         }
+    };
+
+    // Drag and drop handlers
+    const handleDragStart = (e: React.DragEvent, index: number) => {
+        setDraggedBlockIndex(index);
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/html", e.currentTarget.innerHTML);
+
+        // Add a slight opacity to the dragged element
+        if (e.currentTarget instanceof HTMLElement) {
+            e.currentTarget.style.opacity = "0.5";
+        }
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+        setDraggedBlockIndex(null);
+        setDragOverIndex(null);
+
+        // Reset opacity
+        if (e.currentTarget instanceof HTMLElement) {
+            e.currentTarget.style.opacity = "1";
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+
+        if (draggedBlockIndex !== null && draggedBlockIndex !== index) {
+            setDragOverIndex(index);
+        }
+    };
+
+    const handleDragLeave = () => {
+        setDragOverIndex(null);
+    };
+
+    const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (draggedBlockIndex !== null && draggedBlockIndex !== dropIndex) {
+            reorderPageBlocks(draggedBlockIndex, dropIndex);
+            toast.success("Block reordered");
+        }
+
+        setDraggedBlockIndex(null);
+        setDragOverIndex(null);
     };
 
     const selectedBlock = page?.blocks.find((b) => b.id === selectedBlockId);
@@ -313,20 +366,35 @@ export default function PageBuilderEditor() {
                                     </p>
                                 </div>
                             ) : (
-                                page.blocks.map((block) => (
+                                page.blocks.map((block, index) => (
                                     <div
                                         key={block.id}
-                                        className="relative group"
+                                        draggable={!isPreviewMode}
+                                        onDragStart={(e) => handleDragStart(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                        onDragOver={(e) => handleDragOver(e, index)}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={(e) => handleDrop(e, index)}
+                                        className={`relative group transition-all ${
+                                            draggedBlockIndex === index
+                                                ? "opacity-50"
+                                                : ""
+                                        } ${
+                                            dragOverIndex === index &&
+                                            draggedBlockIndex !== index
+                                                ? "border-t-4 border-primary pt-4"
+                                                : ""
+                                        }`}
                                     >
                                         {/* Block Actions (Edit Mode Only) */}
                                         {!isPreviewMode && (
                                             <div className="absolute -left-12 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
-                                                <button
-                                                    className="p-1 bg-white border rounded hover:bg-gray-50"
+                                                <div
+                                                    className="p-1 bg-white border rounded hover:bg-gray-50 cursor-grab active:cursor-grabbing"
                                                     title="Drag to reorder"
                                                 >
                                                     <GripVertical className="w-4 h-4" />
-                                                </button>
+                                                </div>
                                                 <button
                                                     onClick={() =>
                                                         duplicatePageBlock(
@@ -416,17 +484,12 @@ export default function PageBuilderEditor() {
                                 value="content"
                                 className="space-y-4 mt-4"
                             >
-                                <div className="space-y-2">
-                                    <Label>Block Type</Label>
-                                    <p className="text-sm text-gray-600 capitalize">
-                                        {selectedBlock.type}
-                                    </p>
-                                </div>
-
-                                {/* TODO: Add specific settings for each block type */}
-                                <div className="p-4 bg-gray-50 rounded text-sm text-gray-600">
-                                    Block-specific settings will appear here
-                                </div>
+                                <BlockSettings
+                                    block={selectedBlock}
+                                    onUpdate={(config) =>
+                                        updateBlockConfig(selectedBlock.id, config)
+                                    }
+                                />
                             </TabsContent>
 
                             <TabsContent
