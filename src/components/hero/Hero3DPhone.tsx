@@ -7,8 +7,7 @@ import {
     Html,
     RoundedBox,
     Cylinder,
-    ContactShadows,
-    useGLTF
+    ContactShadows
 } from '@react-three/drei';
 import * as THREE from 'three';
 import { CheckCircle2, Star, MapPin, ArrowRight, Home } from 'lucide-react';
@@ -58,8 +57,8 @@ function PremiumPhone() {
             <RoundedBox args={[3.05, 6.35, 0.05]} radius={0.45} position={[0, 0, 0.16]}>
                 <meshPhysicalMaterial
                     color="#000000"
-                    roughness={0.0}
-                    metalness={0.5}
+                    roughness={0.1}
+                    metalness={0.8}
                     clearcoat={1}
                 />
             </RoundedBox>
@@ -70,19 +69,27 @@ function PremiumPhone() {
             </RoundedBox>
 
             {/* --- The Actual Screen Content (HTML) --- */}
+            {/* 
+          Scale Calculation:
+          Phone width is ~3 units.
+          HTML width is 290px.
+          Scale = 3 / 290 ≈ 0.01
+      */}
             <Html
                 transform
-                occlude
-                position={[0, 0, 0.191]}
+                occlude="blending"
+                position={[0, 0, 0.192]}
+                scale={0.01}
                 style={{
                     width: '290px',
                     height: '615px',
                     backgroundColor: 'white',
                     borderRadius: '40px',
                     overflow: 'hidden',
+                    backfaceVisibility: 'hidden',
                 }}
             >
-                <div className="w-full h-full flex flex-col font-sans bg-gray-50">
+                <div className="w-full h-full flex flex-col font-sans bg-gray-50 select-none">
                     {/* Status Bar */}
                     <div className="h-8 w-full flex justify-between items-center px-6 pt-2">
                         <span className="text-[10px] font-bold text-gray-800">9:41</span>
@@ -283,7 +290,7 @@ export function Hero3DPhone({ className = '', height = '600px' }: Hero3DPhonePro
                 <Canvas
                     shadows
                     // Adjusted camera FOV and position to ensure everything fits
-                    camera={{ position: [0, 0, 9], fov: 40 }}
+                    camera={{ position: [0, 0, 7], fov: 45 }}
                     gl={{ antialias: true, alpha: true }}
                     dpr={[1, 2]}
                 >
