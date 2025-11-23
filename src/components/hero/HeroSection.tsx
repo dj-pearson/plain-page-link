@@ -138,38 +138,7 @@ export function HeroSection({
           {/* Main 3D Hero */}
           <Hero3D height="500px" className="shadow-2xl" />
 
-          {/* Floating accent cards */}
-          <div className="hidden lg:block absolute -top-8 -right-8 w-48 p-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl shadow-lg animate-float-slow">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center">
-                <Sparkles className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <div className="text-sm font-light text-foreground">
-                  Interactive 3D
-                </div>
-                <div className="text-xs text-muted-foreground font-light">
-                  Drag to explore
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="hidden lg:block absolute -bottom-6 -left-6 w-56 p-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl shadow-lg animate-float-delayed">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground font-light">
-                  Design Quality
-                </span>
-                <span className="text-xs glass-accent font-normal">
-                  98%
-                </span>
-              </div>
-              <div className="h-2 bg-glass-border rounded-full overflow-hidden">
-                <div className="h-full w-[98%] bg-gradient-to-r from-[#80d0c7] to-[#a1c4fd] rounded-full" />
-              </div>
-            </div>
-          </div>
+          {/* Floating accent cards - REMOVED in favor of 3D elements */}
         </div>
       </div>
     </section>

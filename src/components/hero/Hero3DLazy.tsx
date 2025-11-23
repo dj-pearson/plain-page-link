@@ -1,8 +1,8 @@
 import { lazy, Suspense } from 'react';
 
 // Lazy load the actual Three.js component
-const Hero3DCore = lazy(() => import('./Hero3D').then(module => ({
-  default: module.Hero3D
+const Hero3DCore = lazy(() => import('./Hero3DPhone').then(module => ({
+  default: module.Hero3DPhone
 })));
 
 interface Hero3DProps {
