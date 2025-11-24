@@ -53,7 +53,7 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
                 >
                     {/* --- RIGHT SIDE: Main Profile Stack --- */}
                     <div
-                        className="absolute right-[10%] top-[20%] glass-card profile-card"
+                        className="hidden md:block absolute right-[10%] top-[20%] glass-card profile-card"
                         style={{
                             transform: 'translateZ(80px)',
                             transformStyle: 'preserve-3d'
@@ -79,7 +79,7 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
 
                     {/* --- FAR RIGHT: Listing Card --- */}
                     <div
-                        className="absolute right-[2%] top-[55%] glass-card listing-card"
+                        className="hidden md:block absolute right-[2%] top-[55%] glass-card listing-card"
                         style={{
                             transform: 'translateZ(120px) rotateY(-10deg)',
                             transformStyle: 'preserve-3d'
@@ -104,7 +104,7 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
 
                     {/* --- CENTER BOTTOM: Stats Card (Deals) --- */}
                     <div
-                        className="absolute left-[45%] bottom-[15%] glass-card stats-card"
+                        className="hidden md:block absolute left-[45%] bottom-[15%] glass-card stats-card"
                         style={{
                             transform: 'translateZ(60px) rotateX(10deg)',
                             transformStyle: 'preserve-3d'
@@ -122,7 +122,7 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
                     {/* --- LEFT SIDE: Stats Card (Leads) --- */}
                     {/* Positioned to float behind/near the text area but not block it */}
                     <div
-                        className="absolute left-[5%] bottom-[20%] glass-card stats-card opacity-80"
+                        className="hidden md:block absolute left-[5%] bottom-[20%] glass-card stats-card opacity-80"
                         style={{
                             transform: 'translateZ(30px) rotateY(15deg)',
                             transformStyle: 'preserve-3d'
