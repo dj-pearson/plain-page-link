@@ -21,6 +21,7 @@ interface AuthState {
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -227,6 +228,30 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
+            options: {
+              redirectTo: `${window.location.origin}/dashboard`,
+            },
+          });
+          
+          if (error) throw error;
+          
+          // Note: The actual session will be established after redirect
+          set({ isLoading: false });
+        } catch (error: any) {
+          set({
+            error: error.message,
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      signInWithApple: async () => {
+        set({ isLoading: true, error: null });
+        
+        try {
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'apple',
             options: {
               redirectTo: `${window.location.origin}/dashboard`,
             },
