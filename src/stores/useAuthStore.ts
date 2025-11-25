@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
 
+// Auth store with Google Sign-In support
+
 interface AuthState {
   user: User | null;
   session: Session | null;
