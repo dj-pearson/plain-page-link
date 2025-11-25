@@ -16,9 +16,9 @@ interface AuthState {
   initialize: () => Promise<void>;
   signUp: (email: string, password: string, username: string, fullName?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   clearError: () => void;
 }
 
