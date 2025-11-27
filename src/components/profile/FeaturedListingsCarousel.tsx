@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Eye, Heart, Bed, Bath, Maximize, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Heart, Bed, Bath, Maximize, MapPin, Share2, Check, Copy } from "lucide-react";
 import { formatPrice, parsePrice } from "@/lib/format";
 import { getImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { Listing } from "@/types";
 
 interface FeaturedListingsCarouselProps {
@@ -29,6 +30,34 @@ const statusLabels = {
     draft: "Draft",
 };
 
+// Storage key for saved listings
+const SAVED_LISTINGS_KEY = 'agentbio_saved_listings';
+
+// Helper to get saved listings from localStorage
+const getSavedListings = (): string[] => {
+    try {
+        const saved = localStorage.getItem(SAVED_LISTINGS_KEY);
+        return saved ? JSON.parse(saved) : [];
+    } catch {
+        return [];
+    }
+};
+
+// Helper to save listings to localStorage
+const saveListing = (listingId: string): void => {
+    const saved = getSavedListings();
+    if (!saved.includes(listingId)) {
+        saved.push(listingId);
+        localStorage.setItem(SAVED_LISTINGS_KEY, JSON.stringify(saved));
+    }
+};
+
+// Helper to remove listing from saved
+const unsaveListing = (listingId: string): void => {
+    const saved = getSavedListings().filter(id => id !== listingId);
+    localStorage.setItem(SAVED_LISTINGS_KEY, JSON.stringify(saved));
+};
+
 export function FeaturedListingsCarousel({
     listings,
     onViewDetails,
@@ -37,6 +66,12 @@ export function FeaturedListingsCarousel({
 }: FeaturedListingsCarouselProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
+    const [savedListings, setSavedListings] = useState<string[]>([]);
+
+    // Load saved listings on mount
+    useEffect(() => {
+        setSavedListings(getSavedListings());
+    }, []);
 
     // Filter for featured listings
     const featuredListings = listings.filter((l) => l.is_featured);
@@ -47,6 +82,61 @@ export function FeaturedListingsCarousel({
     }
 
     const currentListing = featuredListings[currentIndex];
+    const isCurrentSaved = savedListings.includes(currentListing.id);
+
+    // Handle save/unsave listing
+    const handleSaveClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isCurrentSaved) {
+            unsaveListing(currentListing.id);
+            setSavedListings(prev => prev.filter(id => id !== currentListing.id));
+            toast.success("Removed from saved listings");
+        } else {
+            saveListing(currentListing.id);
+            setSavedListings(prev => [...prev, currentListing.id]);
+            toast.success("Saved to your favorites");
+        }
+    };
+
+    // Handle share listing
+    const handleShareClick = async () => {
+        const address = (currentListing as any).address || currentListing.title || 'Property';
+        const city = (currentListing as any).city || '';
+        const price = formatPrice(parsePrice((currentListing as any).price));
+
+        const shareTitle = `Check out this property: ${address}`;
+        const shareText = `${address}${city ? `, ${city}` : ''} - ${price}`;
+        const shareUrl = window.location.href;
+
+        // Try native share API first (mobile)
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: shareTitle,
+                    text: shareText,
+                    url: shareUrl,
+                });
+                toast.success("Shared successfully!");
+            } catch (err) {
+                // User cancelled or share failed - fallback to copy
+                if ((err as Error).name !== 'AbortError') {
+                    await copyToClipboard(shareUrl);
+                }
+            }
+        } else {
+            // Fallback to copy to clipboard
+            await copyToClipboard(shareUrl);
+        }
+    };
+
+    const copyToClipboard = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            toast.success("Link copied to clipboard!");
+        } catch {
+            toast.error("Failed to copy link");
+        }
+    };
 
     // Auto-advance carousel
     useEffect(() => {
@@ -124,14 +214,23 @@ export function FeaturedListingsCarousel({
 
                             {/* Save Button */}
                             <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    // TODO: Implement save functionality
-                                }}
-                                className="p-2 md:p-3 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full transition-all group"
-                                aria-label="Save property"
+                                onClick={handleSaveClick}
+                                className={cn(
+                                    "p-2 md:p-3 backdrop-blur-md rounded-full transition-all group",
+                                    isCurrentSaved
+                                        ? "bg-red-500 hover:bg-red-600"
+                                        : "bg-white/20 hover:bg-white/30"
+                                )}
+                                aria-label={isCurrentSaved ? "Remove from saved" : "Save property"}
                             >
-                                <Heart className="h-5 w-5 md:h-6 md:w-6 text-white group-hover:fill-white transition-all" />
+                                <Heart
+                                    className={cn(
+                                        "h-5 w-5 md:h-6 md:w-6 transition-all",
+                                        isCurrentSaved
+                                            ? "text-white fill-white"
+                                            : "text-white group-hover:fill-white"
+                                    )}
+                                />
                             </button>
                         </div>
 
@@ -218,11 +317,10 @@ export function FeaturedListingsCarousel({
                                     View Details
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        // TODO: Implement share functionality
-                                    }}
-                                    className="bg-white/10 backdrop-blur-md text-white px-6 py-3 md:px-8 md:py-4 rounded-lg font-semibold text-sm md:text-base hover:bg-white/20 transition-all border border-white/20"
+                                    onClick={handleShareClick}
+                                    className="bg-white/10 backdrop-blur-md text-white px-6 py-3 md:px-8 md:py-4 rounded-lg font-semibold text-sm md:text-base hover:bg-white/20 transition-all border border-white/20 flex items-center gap-2"
                                 >
+                                    <Share2 className="h-4 w-4 md:h-5 md:w-5" />
                                     Share
                                 </button>
                             </motion.div>

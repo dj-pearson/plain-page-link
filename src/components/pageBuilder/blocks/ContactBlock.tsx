@@ -19,26 +19,100 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Loader2, CheckCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ContactBlockProps {
     config: ContactBlockConfig;
     isEditing?: boolean;
+    userId?: string;
 }
 
-export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
-    const [formData, setFormData] = useState<Record<string, any>>({});
+interface FormDataState {
+    [key: string]: string | boolean | undefined;
+}
+
+export function ContactBlock({ config, isEditing = false, userId }: ContactBlockProps) {
+    const [formData, setFormData] = useState<FormDataState>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+    const validateForm = (): boolean => {
+        const errors: Record<string, string> = {};
+
+        for (const field of config.fields) {
+            const value = formData[field.id];
+
+            // Check required fields
+            if (field.required && (!value || (typeof value === 'string' && !value.trim()))) {
+                errors[field.id] = `${field.label} is required`;
+                continue;
+            }
+
+            // Validate email format
+            if (field.type === 'email' && value && typeof value === 'string') {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(value)) {
+                    errors[field.id] = 'Please enter a valid email address';
+                }
+            }
+
+            // Validate phone format (basic)
+            if (field.type === 'phone' && value && typeof value === 'string') {
+                const phoneRegex = /^[\d\s\-\+\(\)]{7,}$/;
+                if (!phoneRegex.test(value)) {
+                    errors[field.id] = 'Please enter a valid phone number';
+                }
+            }
+        }
+
+        setValidationErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isEditing) return;
 
+        // Validate form before submitting
+        if (!validateForm()) {
+            toast.error("Please fix the errors in the form");
+            return;
+        }
+
+        if (!userId) {
+            toast.error("Unable to submit form. Please try again later.");
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
-            // TODO: Implement actual form submission
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            // Extract common fields from form data
+            const nameField = config.fields.find(f => f.id === 'name' || f.label.toLowerCase().includes('name'));
+            const emailField = config.fields.find(f => f.type === 'email');
+            const phoneField = config.fields.find(f => f.type === 'phone');
+            const messageField = config.fields.find(f => f.type === 'textarea' || f.id === 'message');
+
+            const leadData = {
+                user_id: userId,
+                name: nameField ? String(formData[nameField.id] || '') : 'Anonymous',
+                email: emailField ? String(formData[emailField.id] || '') : '',
+                phone: phoneField ? String(formData[phoneField.id] || '') : undefined,
+                message: messageField ? String(formData[messageField.id] || '') : undefined,
+                lead_type: 'contact',
+                referrer_url: window.location.href,
+                device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+            };
+
+            // Call the submit-lead edge function
+            const { data, error } = await supabase.functions.invoke('submit-lead', {
+                body: leadData,
+            });
+
+            if (error) {
+                throw new Error(error.message || 'Failed to submit form');
+            }
 
             setIsSuccess(true);
             toast.success(
@@ -51,14 +125,23 @@ export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
                 setIsSuccess(false);
             }, 3000);
         } catch (error) {
-            toast.error("Failed to send message. Please try again.");
+            const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+            toast.error(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleChange = (fieldId: string, value: any) => {
+    const handleChange = (fieldId: string, value: string | boolean) => {
         setFormData((prev) => ({ ...prev, [fieldId]: value }));
+        // Clear validation error when user starts typing
+        if (validationErrors[fieldId]) {
+            setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors[fieldId];
+                return newErrors;
+            });
+        }
     };
 
     if (isSuccess) {
@@ -103,10 +186,11 @@ export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
                                 placeholder={field.placeholder}
                                 required={field.required}
                                 disabled={isEditing || isSubmitting}
-                                value={formData[field.id] || ""}
+                                value={String(formData[field.id] || "")}
                                 onChange={(e) =>
                                     handleChange(field.id, e.target.value)
                                 }
+                                className={validationErrors[field.id] ? "border-red-500" : ""}
                             />
                         )}
 
@@ -118,10 +202,11 @@ export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
                                 placeholder={field.placeholder}
                                 required={field.required}
                                 disabled={isEditing || isSubmitting}
-                                value={formData[field.id] || ""}
+                                value={String(formData[field.id] || "")}
                                 onChange={(e) =>
                                     handleChange(field.id, e.target.value)
                                 }
+                                className={validationErrors[field.id] ? "border-red-500" : ""}
                             />
                         )}
 
@@ -133,10 +218,11 @@ export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
                                 placeholder={field.placeholder}
                                 required={field.required}
                                 disabled={isEditing || isSubmitting}
-                                value={formData[field.id] || ""}
+                                value={String(formData[field.id] || "")}
                                 onChange={(e) =>
                                     handleChange(field.id, e.target.value)
                                 }
+                                className={validationErrors[field.id] ? "border-red-500" : ""}
                             />
                         )}
 
@@ -147,11 +233,12 @@ export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
                                 placeholder={field.placeholder}
                                 required={field.required}
                                 disabled={isEditing || isSubmitting}
-                                value={formData[field.id] || ""}
+                                value={String(formData[field.id] || "")}
                                 onChange={(e) =>
                                     handleChange(field.id, e.target.value)
                                 }
                                 rows={4}
+                                className={validationErrors[field.id] ? "border-red-500" : ""}
                             />
                         )}
 
@@ -159,12 +246,12 @@ export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
                         {field.type === "select" && field.options && (
                             <Select
                                 disabled={isEditing || isSubmitting}
-                                value={formData[field.id]}
+                                value={formData[field.id] as string | undefined}
                                 onValueChange={(value) =>
                                     handleChange(field.id, value)
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className={validationErrors[field.id] ? "border-red-500" : ""}>
                                     <SelectValue
                                         placeholder={field.placeholder}
                                     />
@@ -185,9 +272,9 @@ export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
                                 <Checkbox
                                     id={field.id}
                                     disabled={isEditing || isSubmitting}
-                                    checked={formData[field.id] || false}
+                                    checked={Boolean(formData[field.id]) || false}
                                     onCheckedChange={(checked) =>
-                                        handleChange(field.id, checked)
+                                        handleChange(field.id, Boolean(checked))
                                     }
                                 />
                                 <label
@@ -197,6 +284,11 @@ export function ContactBlock({ config, isEditing = false }: ContactBlockProps) {
                                     {field.label}
                                 </label>
                             </div>
+                        )}
+
+                        {/* Validation Error */}
+                        {validationErrors[field.id] && (
+                            <p className="text-sm text-red-500">{validationErrors[field.id]}</p>
                         )}
                     </div>
                 ))}

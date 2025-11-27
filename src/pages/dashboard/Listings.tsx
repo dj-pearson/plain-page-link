@@ -59,20 +59,13 @@ export default function Listings() {
   ];
 
   const handleAddClick = () => {
-    console.log("🔥 handleAddClick fired!");
     const allowed = canAdd('listings');
-    console.log("Add Property clicked - canAdd?", allowed);
-    console.log("Current listings count:", listings.length);
-    console.log("Subscription:", subscription);
     if (!allowed) {
-      console.log("❌ Not allowed - showing upgrade modal");
       setShowUpgradeModal(true);
       toast({ title: "Upgrade required", description: "Your plan limit has been reached for listings." });
       return;
     }
-    console.log("✅ Opening AddListingModal");
     setIsAddModalOpen(true);
-    console.log("AddListingModal open state set to true, isAddModalOpen:", isAddModalOpen);
   };
 
   const handleAddListing = async (data: ListingFormData) => {
@@ -208,7 +201,6 @@ export default function Listings() {
         <button
           id="add-property-button"
           onClick={(e) => {
-            console.log("🎯 Button clicked! Event:", e);
             e.preventDefault();
             e.stopPropagation();
             handleAddClick();

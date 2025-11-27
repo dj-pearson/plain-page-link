@@ -58,6 +58,7 @@ export function BlockRenderer({
                     <ContactBlock
                         config={block.config as any}
                         isEditing={isEditing}
+                        userId={userId}
                     />
                 );
             case "social":

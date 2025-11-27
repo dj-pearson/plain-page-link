@@ -90,11 +90,8 @@ const SEODashboard = lazy(() => import("./pages/SEODashboard"));
 function App() {
     const { initialize, user } = useAuthStore();
 
-    console.log('[App] Component rendering', { user: user?.id });
-
     // Initialize auth and PWA on mount
     useEffect(() => {
-        console.log('[App] Initializing...');
         initialize();
 
         const initPWA = async () => {
