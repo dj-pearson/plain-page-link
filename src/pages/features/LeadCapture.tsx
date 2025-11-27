@@ -1,13 +1,17 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Users, Mail, Home, TrendingUp, Check, Star } from "lucide-react";
+import { Users, Home, TrendingUp, Check, Star } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { HeroSection } from "@/components/hero";
+import { generateFAQSchema, generateCombinedSchema, FEATURE_FAQS } from "@/lib/faq-schema";
 
 export default function LeadCapture() {
-    const schema = {
+    // Generate FAQ schema for AI search optimization
+    const faqSchema = generateFAQSchema(FEATURE_FAQS.leadCapture);
+
+    const pageSchema = {
         "@context": "https://schema.org",
         "@type": "WebPage",
         "name": "Lead Capture Forms for Real Estate Agents - AgentBio",
@@ -15,6 +19,8 @@ export default function LeadCapture() {
         "mainEntity": {
             "@type": "SoftwareApplication",
             "name": "AgentBio Lead Capture",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
             "featureList": [
                 "Buyer inquiry forms with pre-qualification questions",
                 "Seller lead forms with timeline and motivation tracking",
@@ -25,6 +31,9 @@ export default function LeadCapture() {
             ]
         }
     };
+
+    // Combine page schema with FAQ schema for comprehensive structured data
+    const schema = generateCombinedSchema([pageSchema, faqSchema]);
 
     return (
         <>
@@ -40,6 +49,11 @@ export default function LeadCapture() {
                 ]}
                 canonicalUrl={`${window.location.origin}/features/lead-capture`}
                 schema={schema}
+                aiSearchOptimized={true}
+                speakableSelectors={["h1", "h2", ".glass-body"]}
+                citationTitle="Lead Capture Forms for Real Estate Agents"
+                citationAuthor="AgentBio"
+                citationDate={new Date().toISOString().split('T')[0]}
             />
             <main className="min-h-screen bg-background">
                 <PublicHeader />
@@ -277,6 +291,26 @@ export default function LeadCapture() {
                     </div>
                 </section>
 
+                {/* FAQ Section - Optimized for AI Search */}
+                <section className="py-20 bg-background" id="faq">
+                    <div className="container mx-auto px-4">
+                        <header className="text-center mb-16">
+                            <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                                <span className="glass-heading">Frequently Asked Questions</span>
+                            </h2>
+                            <p className="text-xl glass-body max-w-3xl mx-auto">
+                                Common questions about AgentBio's lead capture forms
+                            </p>
+                        </header>
+
+                        <div className="max-w-3xl mx-auto space-y-4">
+                            {FEATURE_FAQS.leadCapture.map((faq, index) => (
+                                <FAQCard key={index} question={faq.question} answer={faq.answer} />
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
                 {/* CTA */}
                 <section className="py-20 bg-background/50">
                     <div className="container mx-auto px-4 text-center">
@@ -359,6 +393,43 @@ function StepCard({ number, title, description }: { number: number; title: strin
                 <h3 className="text-xl font-light tracking-tight text-foreground mb-2">{title}</h3>
                 <p className="glass-body leading-relaxed">{description}</p>
             </div>
+        </div>
+    );
+}
+
+function FAQCard({ question, answer }: { question: string; answer: string }) {
+    const [isOpen, setIsOpen] = React.useState(false);
+
+    return (
+        <div
+            className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border cursor-pointer transition-all hover:border-[#80d0c7]/50"
+            onClick={() => setIsOpen(!isOpen)}
+            itemScope
+            itemType="https://schema.org/Question"
+        >
+            <div className="flex items-center justify-between">
+                <h3
+                    className="text-lg font-light tracking-tight text-foreground pr-4"
+                    itemProp="name"
+                >
+                    {question}
+                </h3>
+                <span className={`text-[#80d0c7] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </span>
+            </div>
+            {isOpen && (
+                <div
+                    className="mt-4 pt-4 border-t border-glass-border/50"
+                    itemScope
+                    itemType="https://schema.org/Answer"
+                    itemProp="acceptedAnswer"
+                >
+                    <p className="glass-body leading-relaxed" itemProp="text">{answer}</p>
+                </div>
+            )}
         </div>
     );
 }

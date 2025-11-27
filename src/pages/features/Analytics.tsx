@@ -1,18 +1,25 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Eye, MousePointer, TrendingUp, MapPin, Instagram, Check } from "lucide-react";
+import { BarChart3, Eye, MousePointer, TrendingUp, Instagram, Check } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { HeroSection } from "@/components/hero";
+import { generateFAQSchema, generateCombinedSchema, FEATURE_FAQS } from "@/lib/faq-schema";
 
 export default function Analytics() {
-    const schema = {
+    // Generate FAQ schema for AI search optimization
+    const faqSchema = generateFAQSchema(FEATURE_FAQS.analytics);
+
+    const pageSchema = {
         "@context": "https://schema.org",
         "@type": "WebPage",
         "name": "Real Estate Analytics & Insights - AgentBio",
         "description": "Track which listings get the most views, where leads come from, and which properties generate inquiries. Data-driven insights for real estate agents.",
     };
+
+    // Combine page schema with FAQ schema
+    const schema = generateCombinedSchema([pageSchema, faqSchema]);
 
     return (
         <>
@@ -28,6 +35,10 @@ export default function Analytics() {
                 ]}
                 canonicalUrl={`${window.location.origin}/features/analytics`}
                 schema={schema}
+                aiSearchOptimized={true}
+                speakableSelectors={["h1", "h2", ".glass-body"]}
+                citationTitle="Real Estate Analytics & Insights"
+                citationAuthor="AgentBio"
             />
             <main className="min-h-screen bg-background">
                 <PublicHeader />
@@ -287,8 +298,28 @@ export default function Analytics() {
                     </div>
                 </section>
 
+                {/* FAQ Section - Optimized for AI Search */}
+                <section className="py-20 bg-background" id="faq">
+                    <div className="container mx-auto px-4">
+                        <header className="text-center mb-16">
+                            <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+                                <span className="glass-heading">Frequently Asked Questions</span>
+                            </h2>
+                            <p className="text-xl glass-body max-w-3xl mx-auto">
+                                Common questions about AgentBio's analytics features
+                            </p>
+                        </header>
+
+                        <div className="max-w-3xl mx-auto space-y-4">
+                            {FEATURE_FAQS.analytics.map((faq, index) => (
+                                <FAQCard key={index} question={faq.question} answer={faq.answer} />
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
                 {/* CTA */}
-                <section className="py-20 bg-background">
+                <section className="py-20 bg-background/50">
                     <div className="container mx-auto px-4 text-center">
                         <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-4">
                             <span className="glass-heading">Start Making Data-Driven Decisions</span>
@@ -355,6 +386,43 @@ function MetricCard({
                 <p className="text-sm font-light text-foreground mb-1">💡 Insight:</p>
                 <p className="text-sm glass-body text-muted-foreground">{insight}</p>
             </div>
+        </div>
+    );
+}
+
+function FAQCard({ question, answer }: { question: string; answer: string }) {
+    const [isOpen, setIsOpen] = React.useState(false);
+
+    return (
+        <div
+            className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border cursor-pointer transition-all hover:border-[#80d0c7]/50"
+            onClick={() => setIsOpen(!isOpen)}
+            itemScope
+            itemType="https://schema.org/Question"
+        >
+            <div className="flex items-center justify-between">
+                <h3
+                    className="text-lg font-light tracking-tight text-foreground pr-4"
+                    itemProp="name"
+                >
+                    {question}
+                </h3>
+                <span className={`text-[#80d0c7] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </span>
+            </div>
+            {isOpen && (
+                <div
+                    className="mt-4 pt-4 border-t border-glass-border/50"
+                    itemScope
+                    itemType="https://schema.org/Answer"
+                    itemProp="acceptedAnswer"
+                >
+                    <p className="glass-body leading-relaxed" itemProp="text">{answer}</p>
+                </div>
+            )}
         </div>
     );
 }
