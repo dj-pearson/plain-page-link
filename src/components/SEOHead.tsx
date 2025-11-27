@@ -16,6 +16,12 @@ interface SEOHeadProps {
   twitterHandle?: string;
   noindex?: boolean;
   nofollow?: boolean;
+  // AI Search Optimization props
+  speakableSelectors?: string[];
+  citationTitle?: string;
+  citationAuthor?: string;
+  citationDate?: string;
+  aiSearchOptimized?: boolean;
 }
 
 /**
@@ -51,7 +57,13 @@ export const SEOHead = ({
   locale = 'en_US',
   twitterHandle = '@agentbio',
   noindex = false,
-  nofollow = false
+  nofollow = false,
+  // AI Search Optimization
+  speakableSelectors = [],
+  citationTitle,
+  citationAuthor,
+  citationDate,
+  aiSearchOptimized = false
 }: SEOHeadProps) => {
   // Truncate title and description to optimal lengths
   const fullTitle = title.length > 60 ? title.substring(0, 57) + '...' : title;
@@ -67,6 +79,36 @@ export const SEOHead = ({
     nofollow ? 'nofollow' : 'follow'
   ].join(', ');
 
+  // Generate speakable schema for voice search if selectors provided
+  const speakableSchema = speakableSelectors.length > 0 && canonicalUrl ? {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "speakable": {
+      "@type": "SpeakableSpecification",
+      "cssSelector": speakableSelectors
+    },
+    "url": canonicalUrl
+  } : null;
+
+  // Combine schemas if multiple exist
+  const combinedSchema = (() => {
+    const schemas: object[] = [];
+    if (schema) schemas.push(schema);
+    if (speakableSchema) schemas.push(speakableSchema);
+
+    if (schemas.length === 0) return null;
+    if (schemas.length === 1) return schemas[0];
+
+    // Use @graph for multiple schemas
+    return {
+      "@context": "https://schema.org",
+      "@graph": schemas.map(s => {
+        const { "@context": _, ...rest } = s as Record<string, unknown>;
+        return rest;
+      })
+    };
+  })();
+
   return (
     <Helmet>
       {/* Primary Meta Tags */}
@@ -76,6 +118,20 @@ export const SEOHead = ({
       {keywords.length > 0 && <meta name="keywords" content={keywords.join(', ')} />}
       {author && <meta name="author" content={author} />}
       <meta name="robots" content={robotsContent} />
+
+      {/* AI Search Optimization - Citation metadata for Perplexity, ChatGPT, Google SGE */}
+      {aiSearchOptimized && (
+        <>
+          {/* Enable AI crawlers to index and cite this content */}
+          <meta name="robots" content={`${robotsContent}, max-image-preview:large, max-snippet:-1`} />
+        </>
+      )}
+      {citationTitle && <meta name="citation_title" content={citationTitle} />}
+      {citationAuthor && <meta name="citation_author" content={citationAuthor} />}
+      {citationDate && <meta name="citation_publication_date" content={citationDate} />}
+
+      {/* Perplexity AI specific meta */}
+      <meta name="perplexity-verification" content="agentbio-verified" />
 
       {/* Canonical URL */}
       {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
@@ -123,10 +179,10 @@ export const SEOHead = ({
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
-      {/* Structured Data */}
-      {schema && (
+      {/* Structured Data (combines page schema with speakable if provided) */}
+      {combinedSchema && (
         <script type="application/ld+json">
-          {JSON.stringify(schema)}
+          {JSON.stringify(combinedSchema)}
         </script>
       )}
     </Helmet>
