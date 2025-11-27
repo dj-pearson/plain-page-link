@@ -127,6 +127,10 @@ export function BlogSection({
                         <img
                           src={article.featured_image_url}
                           alt={article.title}
+                          width={400}
+                          height={192}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       </div>

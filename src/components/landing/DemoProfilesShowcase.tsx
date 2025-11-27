@@ -76,6 +76,10 @@ export function DemoProfilesShowcase() {
                   <img
                     src={profile.avatar}
                     alt={profile.name}
+                    width={96}
+                    height={96}
+                    loading="lazy"
+                    decoding="async"
                     className="w-24 h-24 rounded-full mx-auto object-cover border-4 border-background shadow-lg"
                   />
                   <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold">

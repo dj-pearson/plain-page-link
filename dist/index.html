@@ -25,13 +25,34 @@
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
     <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(), camera=()">
 
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-PBYDSXT7DG"></script>
+    <!-- Preconnect to critical origins for faster resource loading -->
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
+    <link rel="dns-prefetch" href="https://images.unsplash.com">
+
+    <!-- Google Analytics - Deferred for better performance -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-PBYDSXT7DG');
+      // Defer GA loading until after page is interactive
+      function loadGA() {
+        var script = document.createElement('script');
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-PBYDSXT7DG';
+        script.async = true;
+        document.head.appendChild(script);
+
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        window.gtag = gtag;
+        gtag('js', new Date());
+        gtag('config', 'G-PBYDSXT7DG');
+      }
+
+      // Load GA after page is idle or after 3 seconds, whichever comes first
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(loadGA, { timeout: 3000 });
+      } else {
+        setTimeout(loadGA, 3000);
+      }
     </script>
 
     <link rel="icon" type="image/png" href="/Icon.png" />
@@ -59,8 +80,14 @@
     <meta property="twitter:image" content="https://agentbio.net/Cover.png" />
 
     <title>Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads – AgentBio</title>
-    <script type="module" crossorigin src="/assets/index-C8-3SfN2.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-B0-YfMzx.css">
+    <script type="module" crossorigin src="/assets/index-C6E-HzGX.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-charts-DwHIVLWv.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-react-Vgz0BWSF.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-data-D8Q-8Ib3.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-three-4sb3k4hC.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-ui-B_M8o0qd.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-animation-DTV5ZUuA.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CjRerHIl.css">
   </head>
   <body>
     <div id="root"></div>
