@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for AgentBio Platform
 
-**Last Updated:** 2025-11-16
+**Last Updated:** 2025-11-28
 **Platform:** AgentBio Intelligence - AI-Powered Real Estate Platform
 **Repository:** plain-page-link
 
@@ -96,18 +96,28 @@ plain-page-link/
 ├── src/
 │   ├── components/          # Reusable UI components
 │   │   ├── ui/             # Base UI components (Radix-based)
+│   │   ├── admin/          # Admin panel components
+│   │   ├── analytics/      # Analytics display components
+│   │   ├── auth/           # Authentication UI components
+│   │   ├── blog/           # Blog display components
+│   │   ├── dashboard/      # Dashboard widgets
+│   │   ├── features/       # Feature showcase components
 │   │   ├── forms/          # Form components
 │   │   ├── hero/           # Hero section components
+│   │   ├── integrations/   # Third-party integration components
+│   │   ├── landing/        # Landing page sections
 │   │   ├── layout/         # Layout components (headers, footers)
 │   │   ├── leads/          # Lead management components
 │   │   ├── listings/       # Property listing components
 │   │   ├── mobile/         # Mobile-specific components (PWA)
 │   │   ├── modals/         # Modal dialogs
+│   │   ├── onboarding/     # User onboarding components
 │   │   ├── pageBuilder/    # Page builder components
 │   │   ├── profile/        # Profile page components
 │   │   ├── settings/       # Settings components
 │   │   ├── testimonials/   # Testimonial components
-│   │   └── theme/          # Theme customization components
+│   │   ├── theme/          # Theme customization components
+│   │   └── tools/          # Free tools components
 │   │
 │   ├── pages/              # Route-level page components
 │   │   ├── admin/          # Admin dashboard pages
@@ -121,15 +131,21 @@ plain-page-link/
 │   │   ├── public/         # Public-facing pages
 │   │   └── tools/          # Free tools (Instagram analyzer, etc.)
 │   │
-│   ├── hooks/              # Custom React hooks
-│   │   ├── useAuth*.ts     # Authentication hooks
-│   │   ├── useProfile*.ts  # Profile management hooks
-│   │   ├── useListings*.ts # Listing management hooks
-│   │   ├── useLeads*.ts    # Lead management hooks
-│   │   └── use*.ts         # Other domain-specific hooks
+│   ├── hooks/              # Custom React hooks (30+ hooks)
+│   │   ├── useProfile.ts       # Profile management
+│   │   ├── useListings.ts      # Listing CRUD operations
+│   │   ├── useLeads.ts         # Lead management
+│   │   ├── useAnalytics.ts     # Analytics tracking
+│   │   ├── useSubscription.ts  # Subscription management
+│   │   ├── useArticles.ts      # Blog article management
+│   │   ├── useTestimonials.ts  # Testimonials management
+│   │   ├── useOfflineStorage.ts # PWA offline support
+│   │   ├── useAutoSave.ts      # Auto-save functionality
+│   │   └── use*.ts             # Other domain-specific hooks
 │   │
 │   ├── stores/             # Zustand global state stores
-│   │   └── useAuthStore.ts # Main auth store (persisted)
+│   │   ├── useAuthStore.ts    # Main auth store (persisted)
+│   │   └── pageBuilderStore.ts # Page builder state management
 │   │
 │   ├── integrations/       # External service integrations
 │   │   └── supabase/       # Supabase client & types
@@ -140,6 +156,13 @@ plain-page-link/
 │   │   ├── errorHandler.ts         # Centralized error handling
 │   │   ├── offline-storage.ts      # IndexedDB for offline PWA
 │   │   ├── push-notifications.ts   # FCM push notifications
+│   │   ├── analytics.ts            # Analytics utilities
+│   │   ├── lead-scoring.ts         # Lead scoring algorithms
+│   │   ├── seo.ts                  # SEO utilities
+│   │   ├── image-seo.ts            # Image SEO optimization
+│   │   ├── pageBuilder.ts          # Page builder utilities
+│   │   ├── themes.ts               # Theme definitions
+│   │   ├── sync-manager.ts         # Offline sync management
 │   │   ├── instagram-bio-analyzer/ # Instagram bio tool
 │   │   └── listing-description-generator/ # Listing generator tool
 │   │
@@ -165,7 +188,7 @@ plain-page-link/
 │   │   ├── send-welcome-email/
 │   │   ├── generate-article/
 │   │   ├── seo-audit/
-│   │   └── [50+ functions] # Various backend services
+│   │   └── [60+ functions] # Various backend services (SEO, AI, analytics, etc.)
 │   │
 │   └── migrations/         # Database migration SQL files
 │       └── *.sql           # Timestamped migration files
@@ -976,7 +999,7 @@ When making significant changes to the codebase:
 - **Update database schema** when tables are added/modified
 - **Update common tasks** when workflows change
 
-**Last major update:** 2025-11-16
+**Last major update:** 2025-11-28
 
 ---
 
