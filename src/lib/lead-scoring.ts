@@ -266,7 +266,7 @@ export class LeadScoringSystem {
     }
 }
 
-// Export convenience functions
-export const calculateLeadScore = LeadScoringSystem.calculateScore;
-export const getLeadPriority = LeadScoringSystem.getPriority;
-export const analyzeLead = LeadScoringSystem.analyzeLead;
+// Export convenience functions (bound to preserve `this` context)
+export const calculateLeadScore = LeadScoringSystem.calculateScore.bind(LeadScoringSystem);
+export const getLeadPriority = LeadScoringSystem.getPriority.bind(LeadScoringSystem);
+export const analyzeLead = LeadScoringSystem.analyzeLead.bind(LeadScoringSystem);
