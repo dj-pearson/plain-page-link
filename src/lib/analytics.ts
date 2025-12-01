@@ -515,14 +515,13 @@ export const trackPageView = (path: string) => {
     // gtag('event', 'page_view', { page_path: path });
 };
 
-// Export helper functions
-export const calculateKPIs = AnalyticsEngine.calculateKPIs;
-export const generateTimeSeries = AnalyticsEngine.generateTimeSeries;
-export const calculateFunnel = AnalyticsEngine.calculateFunnel;
-export const analyzeLeadSources = AnalyticsEngine.analyzeLeadSources;
-export const rankListings = AnalyticsEngine.rankListings;
-export const predictTrend = AnalyticsEngine.predictTrend;
-export const calculateEngagementScore =
-    AnalyticsEngine.calculateEngagementScore;
-export const generateInsights = AnalyticsEngine.generateInsights;
-export const exportToCSV = AnalyticsEngine.exportToCSV;
+// Export helper functions (bound to preserve `this` context)
+export const calculateKPIs = AnalyticsEngine.calculateKPIs.bind(AnalyticsEngine);
+export const generateTimeSeries = AnalyticsEngine.generateTimeSeries.bind(AnalyticsEngine);
+export const calculateFunnel = AnalyticsEngine.calculateFunnel.bind(AnalyticsEngine);
+export const analyzeLeadSources = AnalyticsEngine.analyzeLeadSources.bind(AnalyticsEngine);
+export const rankListings = AnalyticsEngine.rankListings.bind(AnalyticsEngine);
+export const predictTrend = AnalyticsEngine.predictTrend.bind(AnalyticsEngine);
+export const calculateEngagementScore = AnalyticsEngine.calculateEngagementScore.bind(AnalyticsEngine);
+export const generateInsights = AnalyticsEngine.generateInsights.bind(AnalyticsEngine);
+export const exportToCSV = AnalyticsEngine.exportToCSV.bind(AnalyticsEngine);
