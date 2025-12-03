@@ -83,6 +83,13 @@ const LeadManagementDashboard = lazy(() => import("./pages/LeadManagementDashboa
 const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
 const PageBuilderEditor = lazy(() => import("./pages/PageBuilder"));
 
+// Lazy load workflow pages
+const WorkflowsListPage = lazy(() => import("./pages/dashboard/workflows/WorkflowsListPage"));
+const WorkflowBuilderPage = lazy(() => import("./pages/dashboard/workflows/WorkflowBuilderPage"));
+
+// Lazy load SSO callback
+const SSOCallback = lazy(() => import("./components/auth/sso/SSOCallback"));
+
 // Lazy load admin pages (most users won't need these)
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard").then(m => ({ default: m.AdminDashboard })));
 const SEODashboard = lazy(() => import("./pages/SEODashboard"));
@@ -180,6 +187,7 @@ function App() {
                     <Route path="/auth/register" element={<Register />} />
                     <Route path="/auth/forgot-password" element={<ForgotPassword />} />
                     <Route path="/auth/reset-password" element={<ResetPassword />} />
+                    <Route path="/auth/sso/callback" element={<SSOCallback />} />
 
                     {/* Onboarding (protected) */}
                     <Route
@@ -225,7 +233,18 @@ function App() {
                         <Route path="testimonials" element={<Testimonials />} />
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="settings" element={<Settings />} />
+                        <Route path="workflows" element={<WorkflowsListPage />} />
                     </Route>
+
+                    {/* Workflow Builder (full screen, outside dashboard layout) */}
+                    <Route
+                        path="/dashboard/workflows/:workflowId"
+                        element={
+                            <ProtectedRoute>
+                                <WorkflowBuilderPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* Admin routes */}
                     <Route
