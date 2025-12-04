@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, Bell, CreditCard, User, Lock, Mail, Save, Eye } from "lucide-react";
+import { Shield, Bell, CreditCard, User, Lock, Mail, Save, Eye, KeyRound } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,9 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileDisplaySettings } from "@/components/settings/ProfileDisplaySettings";
+import { SessionManagement } from "@/components/settings/SessionManagement";
+import { AuditLogViewer } from "@/components/settings/AuditLogViewer";
+import { GDPRSettings } from "@/components/settings/GDPRSettings";
 
 export default function Settings() {
   const { user } = useAuthStore();
@@ -602,21 +605,25 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Danger Zone */}
-      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Shield className="h-5 w-5 text-red-600" />
-          <h2 className="text-lg font-semibold text-red-600">Danger Zone</h2>
+      {/* Security & Privacy Section Header */}
+      <div className="pt-6 border-t border-border">
+        <div className="flex items-center gap-3 mb-2">
+          <KeyRound className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-bold text-foreground">Security & Privacy</h2>
         </div>
-        <div className="space-y-3">
-          <p className="text-sm text-red-800 dark:text-red-200">
-            Once you delete your account, there is no going back. Please be certain.
-          </p>
-          <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
-            Delete Account
-          </button>
-        </div>
+        <p className="text-muted-foreground mb-6">
+          Manage your security settings, active sessions, and data privacy
+        </p>
       </div>
+
+      {/* Session Management */}
+      <SessionManagement />
+
+      {/* Security Activity / Audit Logs */}
+      <AuditLogViewer />
+
+      {/* GDPR Settings (Data Export & Account Deletion) */}
+      <GDPRSettings />
     </div>
   );
 }
