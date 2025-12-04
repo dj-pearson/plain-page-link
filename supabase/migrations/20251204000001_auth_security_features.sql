@@ -29,10 +29,10 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 
 -- Indexes for efficient queries
 CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
-CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at) WHERE revoked = false;
+CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
 CREATE INDEX idx_user_sessions_ip ON user_sessions(ip_address);
-CREATE INDEX idx_user_sessions_active ON user_sessions(user_id, revoked, expires_at)
-  WHERE revoked = false;
+CREATE INDEX idx_user_sessions_revoked ON user_sessions(revoked);
+CREATE INDEX idx_user_sessions_active ON user_sessions(user_id, revoked, expires_at);
 
 COMMENT ON TABLE user_sessions IS 'Tracks user sessions for session management UI with view/revoke capability';
 
@@ -58,7 +58,8 @@ CREATE INDEX idx_login_attempts_email ON login_attempts(email);
 CREATE INDEX idx_login_attempts_ip ON login_attempts(ip_address);
 CREATE INDEX idx_login_attempts_created_at ON login_attempts(created_at DESC);
 CREATE INDEX idx_login_attempts_email_ip_recent ON login_attempts(email, ip_address, created_at DESC);
-CREATE INDEX idx_login_attempts_failed ON login_attempts(email, created_at DESC) WHERE success = false;
+CREATE INDEX idx_login_attempts_success ON login_attempts(success);
+CREATE INDEX idx_login_attempts_failed ON login_attempts(email, created_at DESC);
 
 COMMENT ON TABLE login_attempts IS 'Records all login attempts for brute force protection and security analysis';
 
@@ -84,10 +85,7 @@ CREATE TABLE IF NOT EXISTS rate_limit_entries (
 CREATE INDEX idx_rate_limit_identifier ON rate_limit_entries(identifier);
 CREATE INDEX idx_rate_limit_type ON rate_limit_entries(limit_type);
 CREATE INDEX idx_rate_limit_window ON rate_limit_entries(window_end);
-CREATE INDEX idx_rate_limit_blocked ON rate_limit_entries(blocked_until) WHERE blocked_until IS NOT NULL;
-
--- Auto-cleanup expired entries
-CREATE INDEX idx_rate_limit_cleanup ON rate_limit_entries(window_end) WHERE window_end < now();
+CREATE INDEX idx_rate_limit_blocked ON rate_limit_entries(blocked_until);
 
 COMMENT ON TABLE rate_limit_entries IS 'Distributed rate limiting entries with configurable windows';
 
@@ -116,7 +114,7 @@ CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
 CREATE INDEX idx_audit_logs_status ON audit_logs(status);
-CREATE INDEX idx_audit_logs_risk ON audit_logs(risk_level) WHERE risk_level IN ('high', 'critical');
+CREATE INDEX idx_audit_logs_risk ON audit_logs(risk_level);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
 CREATE INDEX idx_audit_logs_ip ON audit_logs(ip_address);
 
@@ -154,8 +152,7 @@ CREATE TABLE IF NOT EXISTS gdpr_data_requests (
 CREATE INDEX idx_gdpr_requests_user_id ON gdpr_data_requests(user_id);
 CREATE INDEX idx_gdpr_requests_status ON gdpr_data_requests(status);
 CREATE INDEX idx_gdpr_requests_type ON gdpr_data_requests(request_type);
-CREATE INDEX idx_gdpr_requests_scheduled_deletion ON gdpr_data_requests(scheduled_deletion_at)
-  WHERE request_type = 'deletion' AND status = 'pending';
+CREATE INDEX idx_gdpr_requests_scheduled_deletion ON gdpr_data_requests(scheduled_deletion_at);
 
 -- Updated_at trigger
 CREATE TRIGGER update_gdpr_data_requests_updated_at
@@ -189,8 +186,9 @@ CREATE TABLE IF NOT EXISTS account_deletion_scheduled (
 );
 
 -- Indexes
-CREATE INDEX idx_account_deletion_scheduled_for ON account_deletion_scheduled(scheduled_for)
-  WHERE cancelled = false AND executed = false;
+CREATE INDEX idx_account_deletion_scheduled_for ON account_deletion_scheduled(scheduled_for);
+CREATE INDEX idx_account_deletion_cancelled ON account_deletion_scheduled(cancelled);
+CREATE INDEX idx_account_deletion_executed ON account_deletion_scheduled(executed);
 CREATE INDEX idx_account_deletion_user ON account_deletion_scheduled(user_id);
 
 COMMENT ON TABLE account_deletion_scheduled IS 'Scheduled account deletions with 30-day recovery period';
