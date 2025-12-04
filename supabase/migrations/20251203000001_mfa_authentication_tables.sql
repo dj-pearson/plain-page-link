@@ -106,9 +106,7 @@ CREATE TABLE IF NOT EXISTS mfa_temp_codes (
 -- Indexes
 CREATE INDEX idx_mfa_temp_codes_user_id ON mfa_temp_codes(user_id);
 CREATE INDEX idx_mfa_temp_codes_expires_at ON mfa_temp_codes(expires_at);
-
--- Auto-cleanup old codes
-CREATE INDEX idx_mfa_temp_codes_cleanup ON mfa_temp_codes(created_at) WHERE used = true OR expires_at < now();
+CREATE INDEX idx_mfa_temp_codes_used ON mfa_temp_codes(used);
 
 COMMENT ON TABLE mfa_temp_codes IS 'Temporary verification codes for email/SMS MFA';
 
