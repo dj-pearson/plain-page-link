@@ -23,3 +23,11 @@ supabase/.temp/project-ref
 supabase/.temp/rest-version
 supabase/.temp/storage-version
 generate-apple-secret.js
+migrate-to-coolify.ps1
+migrate-to-coolify.sh
+migrate-via-files.ps1
+SSH_MIGRATION_GUIDE.md
+test-db-connection.ps1
+deploy-migrations-ssh.ps1
+COOLIFY_MIGRATION_GUIDE.md
+migrate-from-container.sh
