@@ -63,9 +63,12 @@ export default defineConfig(({ mode }) => ({
                         return 'vendor-data';
                     }
                     // Charts - only loaded on dashboard/admin pages
-                    if (id.includes('node_modules/recharts/') ||
-                        id.includes('node_modules/d3-')) {
+                    if (id.includes('node_modules/recharts/')) {
                         return 'vendor-charts';
+                    }
+                    // D3 separately to avoid circular dependencies
+                    if (id.includes('node_modules/d3-')) {
+                        return 'vendor-d3';
                     }
                 },
             },
