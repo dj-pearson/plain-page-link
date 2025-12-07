@@ -63,14 +63,7 @@ export default defineConfig(({ mode }) => ({
                         id.includes('node_modules/zustand/')) {
                         return 'vendor-data';
                     }
-                    // D3 first - recharts depends on it
-                    if (id.includes('node_modules/d3-')) {
-                        return 'vendor-d3';
-                    }
-                    // Charts - only loaded on dashboard/admin pages
-                    if (id.includes('node_modules/recharts/')) {
-                        return 'vendor-charts';
-                    }
+                    // Skip recharts - let Vite handle it automatically to avoid circular deps
                 },
             },
         },
