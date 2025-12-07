@@ -43,8 +43,8 @@ async function handler(req: Request): Promise<Response> {
 
   // Health check
   if (path === "/" || path === "/health") {
-    return new Response(JSON.stringify({ 
-      status: "ok", 
+    return new Response(JSON.stringify({
+      status: "ok",
       functions: Object.keys(FUNCTIONS_MAP).length,
       available: Object.keys(FUNCTIONS_MAP)
     }), {
@@ -56,7 +56,7 @@ async function handler(req: Request): Promise<Response> {
   const functionName = path.replace(/^\/functions\//, "").replace(/^\//, "");
 
   if (!FUNCTIONS_MAP[functionName]) {
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: "Function not found",
       available: Object.keys(FUNCTIONS_MAP)
     }), {
@@ -69,7 +69,7 @@ async function handler(req: Request): Promise<Response> {
     // Dynamically import the function
     const functionPath = FUNCTIONS_MAP[functionName];
     const module = await import(functionPath);
-    
+
     // Set environment variables for the function
     Deno.env.set("SUPABASE_URL", SUPABASE_URL);
     Deno.env.set("SUPABASE_ANON_KEY", SUPABASE_ANON_KEY);
@@ -77,7 +77,7 @@ async function handler(req: Request): Promise<Response> {
 
     // Call the function's default export (handler)
     const response = await module.default(req);
-    
+
     // Add CORS headers to response
     const headers = new Headers(response.headers);
     Object.entries(corsHeaders).forEach(([key, value]) => {
@@ -91,9 +91,9 @@ async function handler(req: Request): Promise<Response> {
     });
   } catch (error) {
     console.error(`Error executing function ${functionName}:`, error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: "Function execution failed",
-      message: error.message 
+      message: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
