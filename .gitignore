@@ -31,3 +31,4 @@ test-db-connection.ps1
 deploy-migrations-ssh.ps1
 COOLIFY_MIGRATION_GUIDE.md
 migrate-from-container.sh
+db-backup/ai_models_rows.sql
