@@ -30,19 +30,19 @@ INSERT INTO articles (
   tags, seo_title, seo_description, seo_keywords, view_count, published_at, created_at, updated_at,
   generated_from_suggestion_id, keyword_id
 )
-SELECT 
-  id, title, slug, content, excerpt, featured_image_url, 
+SELECT
+  id, title, slug, content, excerpt, featured_image_url,
   NULL as author_id,  -- Set to NULL since we don't have users yet
   status, category,
-  CASE 
-    WHEN tags IS NOT NULL AND tags != '' THEN 
+  CASE
+    WHEN tags IS NOT NULL AND tags != '' THEN
       (SELECT array_agg(trim(both '"' from elem::text))::text[]
        FROM json_array_elements_text(tags::json) AS elem)
     ELSE NULL
   END,
   seo_title, seo_description,
-  CASE 
-    WHEN seo_keywords IS NOT NULL AND seo_keywords != '' THEN 
+  CASE
+    WHEN seo_keywords IS NOT NULL AND seo_keywords != '' THEN
       (SELECT array_agg(trim(both '"' from elem::text))::text[]
        FROM json_array_elements_text(seo_keywords::json) AS elem)
     ELSE NULL
