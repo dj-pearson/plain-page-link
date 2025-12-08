@@ -1,0 +1,36 @@
+# Edge Functions Server - Self-Cloning Version
+# This Dockerfile clones the repo itself (workaround for Coolify source issues)
+FROM denoland/deno:1.42.0
+
+# Set working directory
+WORKDIR /app
+
+# Install git
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# Clone the repository
+ARG GIT_REPO=https://github.com/dj-pearson/plain-page-link.git
+ARG GIT_BRANCH=main
+RUN git clone --depth 1 --branch ${GIT_BRANCH} ${GIT_REPO} /tmp/repo
+
+# Copy required files from cloned repo
+RUN cp -r /tmp/repo/supabase/functions ./functions && \
+    cp /tmp/repo/supabase/config.toml ./config.toml && \
+    cp /tmp/repo/edge-functions-server.ts ./server.ts
+
+# Clean up git repo to save space
+RUN rm -rf /tmp/repo
+
+# Cache dependencies
+RUN deno cache server.ts
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD deno eval "fetch('http://localhost:8000/health').then(r => r.ok ? Deno.exit(0) : Deno.exit(1))"
+
+# Run the server
+CMD ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "server.ts"]
+

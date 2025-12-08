@@ -32,3 +32,5 @@ deploy-migrations-ssh.ps1
 COOLIFY_MIGRATION_GUIDE.md
 migrate-from-container.sh
 db-backup/ai_models_rows.sql
+SSL_MIGRATION_COMPLETE.md
+SSL_MIGRATION_COMPLETE.md

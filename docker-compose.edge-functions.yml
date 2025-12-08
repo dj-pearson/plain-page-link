@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  edge-functions:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL:-https://api.agentbio.net}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "deno", "eval", "fetch('http://localhost:8000/health').then(r => r.ok ? Deno.exit(0) : Deno.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.edge-functions.entryPoints=http"
+      - "traefik.http.routers.edge-functions.middlewares=gzip"
+      - "traefik.http.services.edge-functions.loadbalancer.server.port=8000"
+      - "caddy_0.encode=zstd gzip"
+      - "caddy_0.handle_path.0.reverse_proxy={{upstreams 8000}}"
+      - "caddy_0.handle_path=/*"
+      - "caddy_0.header=-Server"
+      - "caddy_0.try_files={path} /index.html /index.php"
+
