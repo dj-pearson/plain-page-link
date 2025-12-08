@@ -1,0 +1,9 @@
+[start]
+cmd = "deno run --allow-net --allow-env --allow-read edge-functions-server.ts"
+
+[phases.build]
+cmds = ["deno cache edge-functions-server.ts"]
+
+[phases.setup]
+nixPkgs = ["deno"]
+
