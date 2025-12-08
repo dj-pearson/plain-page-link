@@ -1,0 +1,191 @@
+name: CD - Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+# Allow only one deployment at a time
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  # Job 1: Build for Production
+  build:
+    name: Build for ${{ inputs.environment || 'production' }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner: [ubuntu-latest] # Change to [self-hosted] when ready
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_EDGE_FUNCTIONS_URL: ${{ secrets.VITE_EDGE_FUNCTIONS_URL }}
+          VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
+
+      - name: Upload dist folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-dist
+          path: dist/
+          retention-days: 30
+
+  # Job 2: Deploy to Cloudflare Pages
+  deploy-frontend:
+    name: Deploy Frontend to Cloudflare
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment || 'production' }}
+      url: https://agentbio.net
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: production-dist
+          path: dist/
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: agentbio
+          directory: dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
+
+  # Job 3: Deploy Edge Functions (if needed)
+  deploy-edge-functions:
+    name: Deploy Edge Functions
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner: [ubuntu-latest] # Change to [self-hosted] for direct access
+    if: false # Set to true when you want to auto-deploy edge functions
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Coolify (placeholder)
+        run: |
+          echo "Edge functions deployment would happen here"
+          echo "This could trigger Coolify webhook or use SSH to redeploy"
+        # Uncomment when ready:
+        # - name: Trigger Coolify deployment
+        #   run: |
+        #     curl -X POST ${{ secrets.COOLIFY_WEBHOOK_URL }}
+
+  # Job 4: Database Migrations (if needed)
+  deploy-database:
+    name: Run Database Migrations
+    needs: deploy-frontend
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner: [ubuntu-latest] # Change to [self-hosted]
+    if: false # Set to true when you have migrations to run
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Supabase migrations
+        run: |
+          echo "Database migrations would run here"
+          # Install Supabase CLI
+          # npx supabase db push --db-url ${{ secrets.DATABASE_URL }}
+
+  # Job 5: Post-Deployment Tests
+  post-deployment:
+    name: Post-Deployment Verification
+    needs: [deploy-frontend]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Check website is up
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://agentbio.net)
+          if [ $STATUS -eq 200 ]; then
+            echo "✅ Website is accessible"
+          else
+            echo "❌ Website returned status $STATUS"
+            exit 1
+          fi
+
+      - name: Check edge functions health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://functions.agentbio.net/health)
+          if [ $STATUS -eq 200 ]; then
+            echo "✅ Edge functions are healthy"
+          else
+            echo "⚠️ Edge functions returned status $STATUS"
+          fi
+        continue-on-error: true
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "## 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend**: https://agentbio.net" >> $GITHUB_STEP_SUMMARY
+          echo "- **Edge Functions**: https://functions.agentbio.net" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+
+  # Job 6: Notify on Failure
+  notify-failure:
+    name: Notify on Failure
+    needs: [deploy-frontend, deploy-edge-functions, post-deployment]
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+      - name: Send failure notification
+        run: |
+          echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the logs for details." >> $GITHUB_STEP_SUMMARY
+        # Add webhook notification here if desired:
+        # - name: Send Slack/Discord notification
+        #   run: |
+        #     curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+        #       -d '{"text": "Deployment failed for commit ${{ github.sha }}"}'
+

@@ -1,0 +1,155 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  # Job 1: Dependency Scanning
+  dependency-scan:
+    name: Dependency Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=high --json > npm-audit.json || true
+          npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-results
+          path: npm-audit.json
+          retention-days: 30
+
+  # Job 2: Secret Scanning
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+        continue-on-error: true
+
+  # Job 3: CodeQL Analysis
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # Job 4: Docker Image Scanning (for edge functions)
+  docker-scan:
+    name: Docker Image Security Scan
+    runs-on: ubuntu-latest
+    if: false # Enable when you want to scan Docker images
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t agentbio-edge-functions:latest -f Dockerfile .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'agentbio-edge-functions:latest'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 5: SAST (Static Application Security Testing)
+  sast:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/typescript
+            p/react
+        continue-on-error: true
+
+  # Job 6: Summary
+  security-summary:
+    name: Security Summary
+    needs: [dependency-scan, secret-scan, codeql, sast]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dependency Scan**: ${{ needs.dependency-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Secret Scan**: ${{ needs.secret-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **CodeQL**: ${{ needs.codeql.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SAST**: ${{ needs.sast.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Scan completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+
