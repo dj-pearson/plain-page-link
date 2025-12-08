@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { useToast } from "@/hooks/use-toast";
 import {
   Search,
@@ -55,7 +56,7 @@ export const SEOManager = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("seo-audit", {
+      const { data, error } = await edgeFunctions.invoke("seo-audit", {
         body: { url: auditUrl, auditType: "full", saveResults: true },
       });
 

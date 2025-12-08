@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Loader2, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 
 interface ContactBlockProps {
     config: ContactBlockConfig;
@@ -106,7 +107,7 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
             };
 
             // Call the submit-lead edge function
-            const { data, error } = await supabase.functions.invoke('submit-lead', {
+            const { data, error } = await edgeFunctions.invoke('submit-lead', {
                 body: leadData,
             });
 

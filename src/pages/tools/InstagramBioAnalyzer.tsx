@@ -18,6 +18,7 @@ import { analyzeBio } from '@/lib/instagram-bio-analyzer/scoring';
 import { generateBioRewrites } from '@/lib/instagram-bio-analyzer/bio-generator';
 import { analyzeLinkStrategy, calculateLeadLoss } from '@/lib/instagram-bio-analyzer/link-strategy';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
 import {
   Instagram,
   TrendingUp,
@@ -124,7 +125,7 @@ export default function InstagramBioAnalyzer() {
       // Send welcome email with bio rewrites via Resend
       if (analysisResult) {
         try {
-          const { data: functionData, error: functionError } = await supabase.functions.invoke(
+          const { data: functionData, error: functionError } = await edgeFunctions.invoke(
             'send-bio-analyzer-email',
             {
               body: {

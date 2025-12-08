@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { toast } from "sonner";
 
 export interface SocialMediaPost {
@@ -82,7 +83,7 @@ export function useSocialMedia() {
       listingId?: string;
       customPrompt?: string;
     }) => {
-      const { data, error } = await supabase.functions.invoke('generate-social-post', {
+      const { data, error } = await edgeFunctions.invoke('generate-social-post', {
         body: params
       });
 
@@ -227,7 +228,7 @@ export function useSocialMedia() {
   // Test webhook
   const testWebhookMutation = useMutation({
     mutationFn: async (webhookId: string) => {
-      const { data, error } = await supabase.functions.invoke('test-social-webhook', {
+      const { data, error } = await edgeFunctions.invoke('test-social-webhook', {
         body: { webhookId }
       });
       
@@ -249,7 +250,7 @@ export function useSocialMedia() {
   // Generate marketing post
   const generateMarketingPostMutation = useMutation({
     mutationFn: async (webhookUrl?: string) => {
-      const { data, error } = await supabase.functions.invoke('generate-marketing-post', {
+      const { data, error } = await edgeFunctions.invoke('generate-marketing-post', {
         body: { webhookUrl }
       });
       

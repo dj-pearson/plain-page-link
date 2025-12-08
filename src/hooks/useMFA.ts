@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 export interface MFASettings {
@@ -100,7 +101,7 @@ export function useMFA() {
     mutationFn: async (): Promise<MFASetupResponse> => {
       if (!session?.access_token) throw new Error("Not authenticated");
 
-      const response = await supabase.functions.invoke("setup-mfa", {
+      const response = await edgeFunctions.invoke("setup-mfa", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -132,7 +133,7 @@ export function useMFA() {
     }): Promise<MFAVerifyResponse> => {
       if (!session?.access_token) throw new Error("Not authenticated");
 
-      const response = await supabase.functions.invoke("verify-mfa", {
+      const response = await edgeFunctions.invoke("verify-mfa", {
         body: {
           code,
           isSetupVerification,
@@ -161,7 +162,7 @@ export function useMFA() {
     mutationFn: async ({ code }: { code: string }) => {
       if (!session?.access_token) throw new Error("Not authenticated");
 
-      const response = await supabase.functions.invoke("disable-mfa", {
+      const response = await edgeFunctions.invoke("disable-mfa", {
         body: { code },
         headers: {
           Authorization: `Bearer ${session.access_token}`,

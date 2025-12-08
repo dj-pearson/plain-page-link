@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { toast } from "sonner";
 
 export interface ArticleWebhook {
@@ -96,7 +97,7 @@ export function useArticleWebhooks() {
   // Test webhook
   const testWebhookMutation = useMutation({
     mutationFn: async (webhookUrl: string) => {
-      const { data, error } = await supabase.functions.invoke('test-article-webhook', {
+      const { data, error } = await edgeFunctions.invoke('test-article-webhook', {
         body: { webhookUrl }
       });
 

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, ArrowLeft, FileText, TrendingUp, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
 import { PropertyDetails, GeneratedDescription, EmailCaptureData } from '@/lib/listing-description-generator/types';
 
 type FlowStep = 'intro' | 'form' | 'generating' | 'results';
@@ -58,7 +59,7 @@ export default function ListingDescriptionGenerator() {
 
     try {
       // Call OpenAI edge function to generate descriptions
-      const { data, error } = await supabase.functions.invoke('generate-listing-description', {
+      const { data, error } = await edgeFunctions.invoke('generate-listing-description', {
         body: { propertyDetails: details },
       });
 
@@ -115,7 +116,7 @@ export default function ListingDescriptionGenerator() {
 
       // Send welcome email via edge function
       try {
-        await supabase.functions.invoke('send-listing-generator-email', {
+        await edgeFunctions.invoke('send-listing-generator-email', {
           body: {
             email: data.email,
             firstName: data.firstName,

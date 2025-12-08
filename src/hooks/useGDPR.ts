@@ -52,7 +52,7 @@ export function useGDPR() {
   } = useQuery({
     queryKey: ['deletionStatus', user?.id],
     queryFn: async (): Promise<DeletionStatus> => {
-      const { data, error } = await supabase.functions.invoke('gdpr-deletion', {
+      const { data, error } = await edgeFunctions.invoke('gdpr-deletion', {
         method: 'GET',
       });
 
@@ -73,7 +73,7 @@ export function useGDPR() {
 
       try {
         // Request export and get data directly
-        const { data, error } = await supabase.functions.invoke('gdpr-export', {
+        const { data, error } = await edgeFunctions.invoke('gdpr-export', {
           method: 'GET',
         });
 
@@ -119,7 +119,7 @@ export function useGDPR() {
   // Request account deletion
   const requestDeletionMutation = useMutation({
     mutationFn: async (reason?: string): Promise<DeletionRequestResponse> => {
-      const { data, error } = await supabase.functions.invoke('gdpr-deletion', {
+      const { data, error } = await edgeFunctions.invoke('gdpr-deletion', {
         body: {
           action: 'request',
           reason,
@@ -151,7 +151,7 @@ export function useGDPR() {
   // Cancel account deletion
   const cancelDeletionMutation = useMutation({
     mutationFn: async (cancelReason?: string): Promise<DeletionRequestResponse> => {
-      const { data, error } = await supabase.functions.invoke('gdpr-deletion', {
+      const { data, error } = await edgeFunctions.invoke('gdpr-deletion', {
         body: {
           action: 'cancel',
           cancelReason,

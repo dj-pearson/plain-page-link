@@ -154,7 +154,7 @@ export default function OnboardingWizardPage() {
 
       // Send welcome email (non-blocking)
       try {
-        await supabase.functions.invoke('send-welcome-email', {
+        await edgeFunctions.invoke('send-welcome-email', {
           body: {
             user_id: user.id,
             email: user.email,

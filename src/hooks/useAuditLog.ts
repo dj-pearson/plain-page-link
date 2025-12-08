@@ -112,7 +112,7 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
       params.set('limit', limit.toString());
       params.set('offset', offset.toString());
 
-      const { data, error } = await supabase.functions.invoke('audit-log', {
+      const { data, error } = await edgeFunctions.invoke('audit-log', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -147,7 +147,7 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
   // Log a new audit event
   const logEventMutation = useMutation({
     mutationFn: async (params: LogEventParams): Promise<{ success: boolean; logId: string }> => {
-      const { data, error } = await supabase.functions.invoke('audit-log', {
+      const { data, error } = await edgeFunctions.invoke('audit-log', {
         body: params,
       });
 
@@ -217,7 +217,7 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
 // Standalone function for logging events without the hook
 export async function logAuditEvent(params: LogEventParams): Promise<void> {
   try {
-    await supabase.functions.invoke('audit-log', {
+    await edgeFunctions.invoke('audit-log', {
       body: params,
     });
   } catch (error) {

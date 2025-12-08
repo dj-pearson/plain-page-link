@@ -328,7 +328,7 @@ class VisitorAnalyticsEngine {
             // Try to send to API
             const { supabase } = await import("@/integrations/supabase/client");
 
-            const { error } = await supabase.functions.invoke('ingest-analytics', {
+            const { error } = await edgeFunctions.invoke('ingest-analytics', {
                 body: { events: eventsToSend },
             });
 

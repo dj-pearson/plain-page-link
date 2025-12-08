@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { toast } from "sonner";
 
 export interface Article {
@@ -49,7 +50,7 @@ export function useArticles() {
       customInstructions?: string;
       autoSelectKeyword?: boolean;
     }) => {
-      const { data, error } = await supabase.functions.invoke('generate-article', {
+      const { data, error } = await edgeFunctions.invoke('generate-article', {
         body: params
       });
 

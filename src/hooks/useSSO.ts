@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 export interface SSOConfig {
@@ -106,7 +107,7 @@ export function useSSO() {
   // Check if SSO is available for an email domain
   const checkSSOAvailability = useMutation({
     mutationFn: async (email: string): Promise<SSOInitiateResponse> => {
-      const response = await supabase.functions.invoke("sso-initiate", {
+      const response = await edgeFunctions.invoke("sso-initiate", {
         body: { email },
       });
 
@@ -124,7 +125,7 @@ export function useSSO() {
       email: string;
       redirectUri?: string;
     }): Promise<SSOInitiateResponse> => {
-      const response = await supabase.functions.invoke("sso-initiate", {
+      const response = await edgeFunctions.invoke("sso-initiate", {
         body: { email, redirectUri },
       });
 
@@ -143,7 +144,7 @@ export function useSSO() {
       error?: string;
       error_description?: string;
     }): Promise<SSOCallbackResponse> => {
-      const response = await supabase.functions.invoke("sso-callback", {
+      const response = await edgeFunctions.invoke("sso-callback", {
         body: params,
       });
 

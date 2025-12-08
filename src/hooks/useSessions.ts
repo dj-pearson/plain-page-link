@@ -50,7 +50,7 @@ export function useSessions() {
   } = useQuery({
     queryKey: ['sessions', user?.id],
     queryFn: async (): Promise<SessionsResponse> => {
-      const { data, error } = await supabase.functions.invoke('get-sessions');
+      const { data, error } = await edgeFunctions.invoke('get-sessions');
 
       if (error) {
         throw new Error(error.message);
@@ -66,7 +66,7 @@ export function useSessions() {
   // Revoke a specific session
   const revokeSessionMutation = useMutation({
     mutationFn: async (sessionId: string): Promise<RevokeResponse> => {
-      const { data, error } = await supabase.functions.invoke('revoke-session', {
+      const { data, error } = await edgeFunctions.invoke('revoke-session', {
         body: {
           sessionId,
           reason: 'user_revoked',
@@ -101,7 +101,7 @@ export function useSessions() {
       // Get current session ID for preservation
       const currentSessionId = sessionsData?.sessions.find(s => s.is_current)?.id;
 
-      const { data, error } = await supabase.functions.invoke('revoke-session', {
+      const { data, error } = await edgeFunctions.invoke('revoke-session', {
         body: {
           revokeAll: true,
           currentSessionId,

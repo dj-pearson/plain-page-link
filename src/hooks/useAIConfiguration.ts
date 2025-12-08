@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { toast } from "sonner";
 
 export interface AIModel {
@@ -117,7 +118,7 @@ export function useAIConfiguration() {
   // Test AI model
   const testModelMutation = useMutation({
     mutationFn: async (model?: string) => {
-      const { data, error } = await supabase.functions.invoke('test-ai-model', {
+      const { data, error } = await edgeFunctions.invoke('test-ai-model', {
         body: { model }
       });
 

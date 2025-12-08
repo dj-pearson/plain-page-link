@@ -112,7 +112,7 @@ export function useOAuthCallback() {
         ? 'bing-webmaster-oauth-callback'
         : 'yandex-webmaster-oauth-callback';
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
+      const { data, error } = await edgeFunctions.invoke(functionName, {
         body: { code, state },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -157,7 +157,7 @@ export function useSyncPlatform() {
         ? 'bing-webmaster-sync'
         : 'yandex-webmaster-sync';
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
+      const { data, error } = await edgeFunctions.invoke(functionName, {
         body: { property_id, site_id, start_date, end_date },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -194,7 +194,7 @@ export function useAggregateAnalytics() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase.functions.invoke('aggregate-search-analytics', {
+      const { data, error } = await edgeFunctions.invoke('aggregate-search-analytics', {
         body: { start_date, end_date, force_refresh },
         headers: {
           Authorization: `Bearer ${session.access_token}`,

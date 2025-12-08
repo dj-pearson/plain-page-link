@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { toast } from "sonner";
 
 export interface ContentSuggestion {
@@ -39,7 +40,7 @@ export function useContentSuggestions() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      const response = await supabase.functions.invoke('generate-content-suggestions', {
+      const response = await edgeFunctions.invoke('generate-content-suggestions', {
         body: { customInstructions, count }
       });
 
@@ -106,7 +107,7 @@ export function useContentSuggestions() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      const response = await supabase.functions.invoke('import-keywords', {
+      const response = await edgeFunctions.invoke('import-keywords', {
         body: { 
           keywords: keywordsToAdd.map(kw => ({
             keyword: kw,
@@ -150,7 +151,7 @@ export function useContentSuggestions() {
         .eq("id", suggestion.id);
 
       // Then trigger article generation
-      const response = await supabase.functions.invoke('generate-article', {
+      const response = await edgeFunctions.invoke('generate-article', {
         body: { 
           topic: suggestion.topic,
           category: suggestion.category,

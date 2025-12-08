@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
@@ -93,7 +94,7 @@ export const KeywordsTracker = () => {
   const checkKeywordPositions = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('check-keyword-positions', {
+      const { error } = await edgeFunctions.invoke('check-keyword-positions', {
         body: {},
       });
 

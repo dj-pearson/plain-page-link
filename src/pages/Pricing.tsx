@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Switch } from "@/components/ui/switch";
 import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
+import { edgeFunctions } from "@/lib/edgeFunctions";
 import { useToast } from "@/hooks/use-toast";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
@@ -157,7 +158,7 @@ export default function Pricing() {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      const { data, error } = await edgeFunctions.invoke('create-checkout-session', {
         body: {
           priceId: isYearly ? priceId.replace('monthly', 'yearly') : priceId,
           successUrl: `${window.location.origin}/dashboard?subscription=success`,

@@ -12,7 +12,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Mail, Loader2, CheckCircle, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { EdgeFunctions } from "@/lib/edgeFunctions";
 
 const contactSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -52,22 +52,13 @@ export function ContactForm({
         setError(null);
         try {
             // Submit lead via edge function (includes auto-response email)
-            const { data: result, error: submitError } = await supabase.functions.invoke('submit-lead', {
-                body: {
-                    user_id: agentId,
-                    name: data.name,
-                    email: data.email,
-                    phone: data.phone,
-                    message: data.message,
-                    lead_type: 'contact',
-                    referrer_url: window.location.href,
-                    device: /mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
-                },
+            await EdgeFunctions.submitLead({
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                message: data.message,
+                source: 'contact_form',
             });
-
-            if (submitError) {
-                throw submitError;
-            }
 
             setIsSuccess(true);
             reset();

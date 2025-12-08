@@ -194,7 +194,7 @@ export class UsageTrackingService {
       }
 
       // Report usage to Stripe
-      const { data, error } = await supabase.functions.invoke('report-stripe-usage', {
+      const { data, error } = await edgeFunctions.invoke('report-stripe-usage', {
         body: {
           subscription_item_id: subscriptionItemId,
           quantity: usage.usage_count,
@@ -268,7 +268,7 @@ export class UsageTrackingService {
       if (!profile) return null;
 
       // Create Stripe customer via Edge Function
-      const { data, error } = await supabase.functions.invoke('create-stripe-customer', {
+      const { data, error } = await edgeFunctions.invoke('create-stripe-customer', {
         body: {
           email: profile.email,
           name: profile.full_name || profile.username,

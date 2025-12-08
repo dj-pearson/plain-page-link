@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { EdgeFunctions } from "@/lib/edgeFunctions";
 import { validateUsername } from "@/lib/usernameValidation";
 import { debounce } from "lodash";
 
@@ -29,21 +29,14 @@ export const useUsernameCheck = () => {
       setError(null);
 
       try {
-        const { data, error: functionError } = await supabase.functions.invoke(
-          'check-username',
-          {
-            body: { username },
-          }
-        );
-
-        if (functionError) throw functionError;
+        const data = await EdgeFunctions.checkUsername(username);
 
         if (data.available) {
           setIsAvailable(true);
           setError(null);
         } else {
           setIsAvailable(false);
-          setError("Username is already taken");
+          setError(data.message || "Username is already taken");
         }
       } catch (err) {
         setError("Failed to check username availability");
