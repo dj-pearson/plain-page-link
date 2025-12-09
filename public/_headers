@@ -5,6 +5,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com https://esm.sh https://*.supabase.co https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.agentbio.net https://www.google-analytics.com https://api.stripe.com https://raw.githack.com https://raw.githubusercontent.com wss://*.supabase.co wss://*.agentbio.net https://cloudflareinsights.com; frame-src 'self' https://js.stripe.com; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; form-action 'self'; base-uri 'self'; upgrade-insecure-requests
 
 /*.js
   Content-Type: application/javascript
