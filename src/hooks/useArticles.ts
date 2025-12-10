@@ -119,12 +119,12 @@ export function useArticles() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('articles')
-        .update({ 
+        .update({
           status: 'published',
           published_at: new Date().toISOString()
         })
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -135,6 +135,21 @@ export function useArticles() {
       toast.error('Failed to publish article: ' + error.message);
     },
   });
+
+  // Helper function that accepts mutation options
+  const publishArticle = (id: string, options?: {
+    onSuccess?: () => void;
+    onError?: (error: Error) => void;
+  }) => {
+    publishArticleMutation.mutate(id, {
+      onSuccess: () => {
+        options?.onSuccess?.();
+      },
+      onError: (error) => {
+        options?.onError?.(error);
+      },
+    });
+  };
 
   // Re-publish article (trigger webhooks again)
   const republishArticleMutation = useMutation({
@@ -185,7 +200,8 @@ export function useArticles() {
     generatedArticle: generateArticleMutation.data,
     createArticle: createArticleMutation.mutate,
     updateArticle: updateArticleMutation.mutate,
-    publishArticle: publishArticleMutation.mutate,
+    publishArticle,
+    isPublishing: publishArticleMutation.isPending,
     republishArticle: republishArticleMutation.mutate,
     isRepublishing: republishArticleMutation.isPending,
     deleteArticle: deleteArticleMutation.mutate,

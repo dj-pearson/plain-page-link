@@ -4,7 +4,27 @@ import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
 
-// Auth store with Google Sign-In support
+// Auth store with Google Sign-In support and Single Sign-Out (SLO)
+
+// BroadcastChannel for cross-tab Single Sign-Out
+const AUTH_CHANNEL_NAME = 'agentbio-auth-channel';
+let authChannel: BroadcastChannel | null = null;
+
+// Initialize BroadcastChannel if supported
+if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+  try {
+    authChannel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+  } catch (e) {
+    console.warn('BroadcastChannel not available for SLO:', e);
+  }
+}
+
+// SLO message types
+interface SLOMessage {
+  type: 'SIGN_OUT' | 'SESSION_REVOKED';
+  timestamp: number;
+  userId?: string;
+}
 
 interface AuthState {
   user: User | null;
@@ -13,16 +33,18 @@ interface AuthState {
   role: AppRole | null;
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
   initialize: () => Promise<void>;
   signUp: (email: string, password: string, username: string, fullName?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (options?: { global?: boolean }) => Promise<void>;
+  signOutAllDevices: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   clearError: () => void;
+  _handleSLOMessage: (message: SLOMessage) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -36,6 +58,28 @@ export const useAuthStore = create<AuthState>()(
       error: null,
 
       initialize: async () => {
+        const { _handleSLOMessage } = get();
+
+        // Set up BroadcastChannel listener for Single Sign-Out (SLO)
+        if (authChannel) {
+          authChannel.onmessage = (event: MessageEvent<SLOMessage>) => {
+            _handleSLOMessage(event.data);
+          };
+        }
+
+        // Set up localStorage listener for SLO fallback (works in older browsers)
+        if (typeof window !== 'undefined') {
+          window.addEventListener('storage', (event) => {
+            if (event.key === 'agentbio-logout' && event.newValue) {
+              console.log('SLO: Received logout via localStorage event');
+              _handleSLOMessage({
+                type: 'SIGN_OUT',
+                timestamp: parseInt(event.newValue, 10),
+              });
+            }
+          });
+        }
+
         // Check if we already have a valid session from Supabase storage
         // This prevents unnecessary loading states on reload
         const existingSession = await supabase.auth.getSession();
@@ -270,11 +314,29 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      signOut: async () => {
+      signOut: async (options?: { global?: boolean }) => {
+        const { user } = get();
         set({ isLoading: true });
-        
+
         try {
-          await supabase.auth.signOut();
+          // Sign out from Supabase (optionally from all devices)
+          await supabase.auth.signOut({ scope: options?.global ? 'global' : 'local' });
+
+          // Broadcast logout event to other tabs via BroadcastChannel
+          if (authChannel) {
+            const message: SLOMessage = {
+              type: 'SIGN_OUT',
+              timestamp: Date.now(),
+              userId: user?.id,
+            };
+            authChannel.postMessage(message);
+          }
+
+          // Also use localStorage event for fallback cross-tab sync
+          // This works even if BroadcastChannel is not supported
+          localStorage.setItem('agentbio-logout', Date.now().toString());
+          localStorage.removeItem('agentbio-logout');
+
           set({
             user: null,
             session: null,
@@ -286,6 +348,61 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           console.error('Sign out error:', error);
           set({ isLoading: false });
+        }
+      },
+
+      signOutAllDevices: async () => {
+        const { user } = get();
+        set({ isLoading: true });
+
+        try {
+          // Sign out from all devices using Supabase global scope
+          await supabase.auth.signOut({ scope: 'global' });
+
+          // Broadcast logout event to other tabs
+          if (authChannel) {
+            const message: SLOMessage = {
+              type: 'SIGN_OUT',
+              timestamp: Date.now(),
+              userId: user?.id,
+            };
+            authChannel.postMessage(message);
+          }
+
+          // Fallback localStorage event
+          localStorage.setItem('agentbio-logout', Date.now().toString());
+          localStorage.removeItem('agentbio-logout');
+
+          set({
+            user: null,
+            session: null,
+            profile: null,
+            role: null,
+            isLoading: false,
+            error: null,
+          });
+        } catch (error: any) {
+          console.error('Sign out all devices error:', error);
+          set({ isLoading: false });
+        }
+      },
+
+      _handleSLOMessage: (message: SLOMessage) => {
+        const { user } = get();
+
+        // Only handle if we have a session and message is for our user or all users
+        if (user && (message.userId === user.id || !message.userId)) {
+          console.log('SLO: Received logout broadcast from another tab');
+          // Clear local state without re-calling Supabase signOut
+          // to avoid infinite broadcast loop
+          set({
+            user: null,
+            session: null,
+            profile: null,
+            role: null,
+            isLoading: false,
+            error: null,
+          });
         }
       },
 

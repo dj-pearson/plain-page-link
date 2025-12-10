@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { Download, Calendar, Filter, FileText } from "lucide-react";
+import { Download, Calendar, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { exportToCSV } from "@/lib/analytics";
+import { generatePDFReport } from "@/lib/exportUtils";
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 
 interface ReportBuilderProps {
@@ -46,7 +47,7 @@ export function ReportBuilder({
         useState<ReportConfig["reportType"]>("leads");
     const [dateRange, setDateRange] =
         useState<ReportConfig["dateRange"]>("30d");
-    const [format, setFormat] = useState<ReportConfig["format"]>("csv");
+    const [exportFormat, setExportFormat] = useState<ReportConfig["format"]>("csv");
     const [isGenerating, setIsGenerating] = useState(false);
 
     const reportTypes = [
@@ -66,8 +67,8 @@ export function ReportBuilder({
     ];
 
     const formats = [
-        { value: "csv", label: "CSV" },
-        { value: "pdf", label: "PDF (Coming Soon)", disabled: true },
+        { value: "csv", label: "CSV", disabled: false },
+        { value: "pdf", label: "PDF", disabled: false },
         { value: "excel", label: "Excel (Coming Soon)", disabled: true },
     ];
 
@@ -93,36 +94,104 @@ export function ReportBuilder({
         }
     };
 
+    const getReportTitle = (): string => {
+        const reportTitles: Record<string, string> = {
+            leads: "Leads Report",
+            listings: "Listings Performance Report",
+            conversions: "Conversion Analytics Report",
+            sources: "Lead Sources Report",
+            performance: "Overall Performance Report",
+        };
+        return reportTitles[reportType] || "Analytics Report";
+    };
+
     const handleGenerateReport = async () => {
         setIsGenerating(true);
 
         try {
             const { start, end } = getDateRangeForReport();
+            const dateRangeStr = `${format(start, "MMM d, yyyy")} - ${format(end, "MMM d, yyyy")}`;
 
             const config: ReportConfig = {
                 reportType,
                 dateRange,
                 metrics: [], // Will be filled based on report type
-                format,
+                format: exportFormat,
                 startDate: start,
                 endDate: end,
             };
 
             const data = await onGenerateReport(config);
 
-            if (format === "csv") {
+            if (exportFormat === "csv") {
                 const filename = `${reportType}_report_${format(
                     start,
                     "yyyy-MM-dd"
                 )}_to_${format(end, "yyyy-MM-dd")}`;
                 exportToCSV(data, filename);
-                toast.success("Report exported successfully!");
+                toast.success("CSV report exported successfully!");
+            } else if (exportFormat === "pdf") {
+                // Extract headers and rows from the data
+                // Assuming data is an array of objects
+                if (data && data.length > 0) {
+                    const headers = Object.keys(data[0]);
+                    const rows = data.map((item: Record<string, any>) =>
+                        headers.map((h) => item[h] ?? "")
+                    );
+
+                    // Calculate summary statistics based on report type
+                    const summary = getSummaryStats(data, reportType);
+
+                    generatePDFReport({
+                        title: getReportTitle(),
+                        dateRange: dateRangeStr,
+                        headers,
+                        rows,
+                        summary,
+                        orientation: headers.length > 5 ? "landscape" : "portrait",
+                    });
+                    toast.success("PDF report generated successfully!");
+                } else {
+                    toast.error("No data available for report");
+                }
             }
         } catch (error) {
             console.error("Report generation error:", error);
             toast.error("Failed to generate report");
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const getSummaryStats = (data: any[], type: string): { label: string; value: string | number }[] => {
+        switch (type) {
+            case "leads":
+                return [
+                    { label: "Total Leads", value: data.length },
+                    { label: "New Leads", value: data.filter((d: any) => d.status === "new").length },
+                    { label: "Qualified", value: data.filter((d: any) => d.status === "qualified").length },
+                ];
+            case "listings":
+                return [
+                    { label: "Total Listings", value: data.length },
+                    { label: "Active", value: data.filter((d: any) => d.status === "active").length },
+                    { label: "Sold", value: data.filter((d: any) => d.status === "sold").length },
+                ];
+            case "conversions":
+                const totalConversions = data.reduce((sum: number, d: any) => sum + (d.conversions || 0), 0);
+                return [
+                    { label: "Total Conversions", value: totalConversions },
+                    { label: "Records", value: data.length },
+                ];
+            case "sources":
+                return [
+                    { label: "Total Sources", value: data.length },
+                    { label: "Total Leads", value: data.reduce((sum: number, d: any) => sum + (d.count || 0), 0) },
+                ];
+            default:
+                return [
+                    { label: "Total Records", value: data.length },
+                ];
         }
     };
 
@@ -184,8 +253,8 @@ export function ReportBuilder({
                 <div>
                     <Label>Export Format</Label>
                     <Select
-                        value={format}
-                        onValueChange={(v: any) => setFormat(v)}
+                        value={exportFormat}
+                        onValueChange={(v: any) => setExportFormat(v)}
                     >
                         <SelectTrigger>
                             <SelectValue />
@@ -210,8 +279,17 @@ export function ReportBuilder({
                     disabled={isGenerating}
                     className="w-full gap-2"
                 >
-                    <Download className="w-4 h-4" />
-                    {isGenerating ? "Generating..." : "Generate Report"}
+                    {isGenerating ? (
+                        <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Generating {exportFormat.toUpperCase()}...
+                        </>
+                    ) : (
+                        <>
+                            <Download className="w-4 h-4" />
+                            Generate Report
+                        </>
+                    )}
                 </Button>
             </div>
 
@@ -235,7 +313,7 @@ export function ReportBuilder({
                     </p>
                     <p>
                         Format:{" "}
-                        <span className="font-medium uppercase">{format}</span>
+                        <span className="font-medium uppercase">{exportFormat}</span>
                     </p>
                 </div>
             </div>
