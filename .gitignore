@@ -34,3 +34,21 @@ migrate-from-container.sh
 db-backup/ai_models_rows.sql
 SSL_MIGRATION_COMPLETE.md
 SSL_MIGRATION_COMPLETE.md
+SUPABASE_URL_AUDIT_REPORT.md
+db-backup/db_cluster-15-12-2025@05-30-45.backup.gz
+VERIFY_SUPABASE_MIGRATION.md
+final-backup-2025-12-17.sql
+.gitignore
+MIGRATION_VERIFICATION_COMPLETE.md
+quick-verify.ps1
+READY_TO_DELETE_OLD_SUPABASE.md
+.env.local
+AUTH_BROKEN_SUMMARY.md
+AUTH_FIX_URGENT.md
+CRITICAL_AUTH_ISSUE_FOUND.md
+generate-supabase-keys.js
+Screenshot 2025-12-17 101035.png
+test-auth-endpoints.ps1
+.env.local
+.env
+
