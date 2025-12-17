@@ -3,11 +3,11 @@
  * Centralized utility for calling self-hosted edge functions
  */
 
-const EDGE_FUNCTIONS_URL = import.meta.env.VITE_EDGE_FUNCTIONS_URL || 'https://functions.agentbio.net';
+const EDGE_FUNCTIONS_URL = import.meta.env.VITE_FUNCTIONS_URL || 'https://functions.agentbio.net';
 
 // Validate edge functions URL
 if (!EDGE_FUNCTIONS_URL) {
-  console.warn('VITE_EDGE_FUNCTIONS_URL is not set. Edge functions may not work correctly.');
+  console.warn('VITE_FUNCTIONS_URL is not set. Edge functions may not work correctly.');
 }
 
 interface EdgeFunctionOptions {
