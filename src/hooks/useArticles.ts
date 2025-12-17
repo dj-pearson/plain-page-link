@@ -154,7 +154,7 @@ export function useArticles() {
   // Re-publish article (trigger webhooks again)
   const republishArticleMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase.functions.invoke('publish-article-to-social', {
+      const { data, error } = await edgeFunctions.invoke('publish-article-to-social', {
         body: { articleId: id }
       });
 

@@ -1,14 +1,16 @@
 /**
  * Edge Functions Client
  * Centralized utility for calling self-hosted edge functions
+ *
+ * For self-hosted Supabase:
+ * - API subdomain (api.agentbio.net) - REST API, Auth, Storage via Kong
+ * - Functions subdomain (functions.agentbio.net) - Edge Functions
  */
 
-const EDGE_FUNCTIONS_URL = import.meta.env.VITE_FUNCTIONS_URL || 'https://functions.agentbio.net';
+import { supabase, supabaseConfig } from '@/integrations/supabase/client';
 
-// Validate edge functions URL
-if (!EDGE_FUNCTIONS_URL) {
-  console.warn('VITE_FUNCTIONS_URL is not set. Edge functions may not work correctly.');
-}
+// Use the centralized config for edge functions URL
+const EDGE_FUNCTIONS_URL = supabaseConfig.functionsUrl;
 
 interface EdgeFunctionOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -44,9 +46,9 @@ export async function callEdgeFunction<T = any>(
 
   // Add authorization if requested
   if (auth) {
-    const token = localStorage.getItem('sb-access-token') || '';
-    if (token) {
-      requestHeaders['Authorization'] = `Bearer ${token}`;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      requestHeaders['Authorization'] = `Bearer ${session.access_token}`;
     }
   }
 
