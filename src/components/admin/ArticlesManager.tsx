@@ -6,19 +6,43 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Eye, Edit, Trash, CheckCircle, Plus, Hash, ExternalLink, Send, Zap } from "lucide-react";
 import { format } from "date-fns";
-import { useArticles } from "@/hooks/useArticles";
+import { useArticles, Article } from "@/hooks/useArticles";
 import { useKeywords } from "@/hooks/useKeywords";
 import { useArticleWebhooks } from "@/hooks/useArticleWebhooks";
 import { CreateArticleDialog } from "./CreateArticleDialog";
 import { ArticleWebhookDialog } from "./ArticleWebhookDialog";
 import { KeywordImportDialog } from "./KeywordImportDialog";
 import { ContentSuggestionsCard } from "./ContentSuggestionsCard";
+import { SEOValidationDialog } from "./SEOValidationDialog";
 
 export function ArticlesManager() {
   const [activeTab, setActiveTab] = useState("all");
+  const [seoValidationOpen, setSeoValidationOpen] = useState(false);
+  const [articleToPublish, setArticleToPublish] = useState<Article | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
   const { articles, isLoading, deleteArticle, publishArticle, republishArticle, isRepublishing } = useArticles();
   const { keywords, isLoading: isLoadingKeywords } = useKeywords();
   const { webhooks, isLoading: isLoadingWebhooks, updateWebhook, deleteWebhook, testWebhook, isTesting } = useArticleWebhooks();
+
+  const handlePublishClick = (article: Article) => {
+    setArticleToPublish(article);
+    setSeoValidationOpen(true);
+  };
+
+  const handlePublishConfirm = () => {
+    if (!articleToPublish) return;
+    setIsPublishing(true);
+    publishArticle(articleToPublish.id, {
+      onSuccess: () => {
+        setSeoValidationOpen(false);
+        setArticleToPublish(null);
+        setIsPublishing(false);
+      },
+      onError: () => {
+        setIsPublishing(false);
+      },
+    });
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -113,14 +137,10 @@ export function ArticlesManager() {
                           <Edit className="h-4 w-4" />
                         </Button>
                         {article.status === 'draft' && (
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
-                            onClick={() => {
-                              if (confirm('Publish this article?')) {
-                                publishArticle(article.id);
-                              }
-                            }}
+                            onClick={() => handlePublishClick(article)}
                             title="Publish"
                           >
                             <CheckCircle className="h-4 w-4" />
@@ -313,6 +333,18 @@ export function ArticlesManager() {
           )}
         </CardContent>
       </Card>
+
+      {/* SEO Validation Dialog */}
+      <SEOValidationDialog
+        article={articleToPublish}
+        open={seoValidationOpen}
+        onOpenChange={(open) => {
+          setSeoValidationOpen(open);
+          if (!open) setArticleToPublish(null);
+        }}
+        onPublish={handlePublishConfirm}
+        isPublishing={isPublishing}
+      />
     </div>
   );
 }

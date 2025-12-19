@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { callEdgeFunction } from "@/lib/edgeFunctions";
 import { toast } from "sonner";
 
 export interface Keyword {
@@ -54,27 +55,14 @@ export function useKeywords() {
   // Import keywords from CSV
   const importKeywordsMutation = useMutation({
     mutationFn: async (keywords: Array<string | Partial<Keyword>>) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/import-keywords`,
+      return callEdgeFunction<{ success: boolean; message: string; imported: number }>(
+        'import-keywords',
         {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ keywords }),
+          method: 'POST',
+          body: { keywords },
+          auth: true,
         }
       );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to import keywords");
-      }
-
-      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["keywords"] });
