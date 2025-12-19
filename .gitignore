@@ -34,3 +34,6 @@ migrate-from-container.sh
 db-backup/ai_models_rows.sql
 SSL_MIGRATION_COMPLETE.md
 SSL_MIGRATION_COMPLETE.md
+generate-supabase-keys.js
+SUPABASE_KEYS_GUIDE.md
+SUPABASE_KEYS_QUICK_ANSWER.md
