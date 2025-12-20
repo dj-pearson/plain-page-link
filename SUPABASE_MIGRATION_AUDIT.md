@@ -118,10 +118,12 @@ const testimonials = [
 - Report generation returns 50 fake leads with `lead${i}@example.com`
 
 **Remediation:**
-- [ ] **Task 3.7:** Replace `generateMockData()` with actual API call to analytics endpoint
-- [ ] **Task 3.8:** Replace `generateMockTimeSeriesData()` with real time-series data from `page_views` or `analytics_events` table
-- [ ] **Task 3.9:** Replace `generateMockLeadSources()` with actual lead source aggregation from `leads` table
-- [ ] **Task 3.10:** Replace report generation with real lead data export
+- [x] **Task 3.7-3.10:** ✅ COMPLETED - Replaced all mock data generators with real hooks
+  - Uses `useAnalytics()` hook for real views/leads stats
+  - Uses `useLeads()` hook for real lead data
+  - Time series data from real `viewsData`
+  - Lead sources aggregated from real leads table
+  - Report generation uses actual lead data
 
 ---
 
@@ -138,8 +140,10 @@ const mockListings = [
 ```
 
 **Remediation:**
-- [ ] **Task 3.11:** Replace `mockListings` with `useListings()` hook to fetch real data
-- [ ] **Task 3.12:** Handle empty state when user has no listings
+- [x] **Task 3.11-3.12:** ✅ COMPLETED - Uses real `useListings()` hook
+  - Fetches actual listings from database
+  - Includes loading state and empty state handling
+  - Uses `useAnalytics()` for real stats display
 
 ---
 
@@ -164,7 +168,9 @@ const mockListings = [
 **Issue:** Hardcoded `@sarahrealtor` demo Instagram handle
 
 **Remediation:**
-- [ ] **Task 3.14:** Use generic placeholder or make consistent with DemoProfilesShowcase
+- [x] **Task 3.14:** ✅ COMPLETED - Changed to generic `@youragent` placeholder
+  - Updated both "before" and "after" sections to use generic placeholders
+  - Makes it clear this is an illustrative example, not a real user
 
 ---
 
@@ -227,7 +233,7 @@ const mockListings = [
 
 **Remediation:**
 - [x] **Task 4.3:** ✅ COMPLETED - Updated `sitemap/index.ts` to use `Deno.env.get('SITE_URL') || Deno.env.get('APP_URL') || 'https://agentbio.net'`
-- [ ] **Task 4.4:** Update `publish-article-to-social/index.ts` to use environment variable
+- [x] **Task 4.4:** ✅ COMPLETED - Updated `publish-article-to-social/index.ts` to use `SITE_URL` env var for article URLs
 - [x] **Task 4.5:** ✅ COMPLETED - Fixed `schedule-seo-audit/index.ts` to use proper fallback chain
 
 ---
@@ -349,6 +355,8 @@ Use this section to track which files have been updated:
 | `supabase/functions/sitemap/index.ts` | ✅ Complete | Claude | 2025-12-20 |
 | `supabase/functions/schedule-seo-audit/index.ts` | ✅ Complete | Claude | 2025-12-20 |
 | `src/components/admin/SearchAnalyticsDashboard.tsx` | ✅ Complete | Claude | 2025-12-20 |
+| `supabase/functions/publish-article-to-social/index.ts` | ✅ Complete | Claude | 2025-12-20 |
+| `src/components/landing/BeforeAfterComparison.tsx` | ✅ Complete | Claude | 2025-12-20 |
 
 ---
 

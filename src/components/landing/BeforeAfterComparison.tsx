@@ -29,15 +29,15 @@ export function BeforeAfterComparison() {
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-20 h-20 rounded-full bg-gray-300" />
                   <div>
-                    <div className="font-semibold text-gray-900">@sarahrealtor</div>
+                    <div className="font-semibold text-gray-900">@youragent</div>
                     <div className="text-sm text-gray-600">Real Estate Agent 🏡</div>
                   </div>
                 </div>
                 <div className="text-sm text-gray-700 mb-3">
-                  Helping families find their dream homes in Austin, TX
+                  Helping families find their dream homes
                 </div>
                 <a href="#" className="text-blue-600 text-sm font-medium flex items-center gap-1">
-                  linktr.ee/sarahrealtor
+                  linktr.ee/youragent
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -83,15 +83,15 @@ export function BeforeAfterComparison() {
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-500" />
                   <div>
-                    <div className="font-semibold text-gray-900">@sarahrealtor</div>
+                    <div className="font-semibold text-gray-900">@youragent</div>
                     <div className="text-sm text-gray-600">Real Estate Agent 🏡</div>
                   </div>
                 </div>
                 <div className="text-sm text-gray-700 mb-3">
-                  Helping families find their dream homes in Austin, TX
+                  Helping families find their dream homes
                 </div>
                 <a href="#" className="text-blue-600 text-sm font-medium flex items-center gap-1">
-                  agentbio.net/sarahrealtor
+                  agentbio.net/youragent
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
