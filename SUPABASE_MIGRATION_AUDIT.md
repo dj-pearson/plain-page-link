@@ -78,9 +78,10 @@ const demoProfiles = [
 **Impact:** Links to `/p/{username}` that don't exist, breaking user experience
 
 **Remediation:**
-- [ ] **Task 3.1:** Create `featured_profiles` database table
-- [ ] **Task 3.2:** Fetch real featured profiles from database OR remove this section
-- [ ] **Task 3.3:** Alternatively, link to actual demo accounts if they exist
+- [x] **Task 3.1-3.3:** ✅ COMPLETED - Component now fetches real profiles from database
+  - Queries profiles table for users with username and full_name
+  - Shows "Be Among the First" CTA if no profiles exist
+  - Removed fake profiles and fabricated stats
 
 ---
 
@@ -98,9 +99,10 @@ const testimonials = [
 **Impact:** Misleading marketing claims with fabricated ROI metrics
 
 **Remediation:**
-- [ ] **Task 3.4:** Create `platform_testimonials` database table
-- [ ] **Task 3.5:** Collect real testimonials from users OR use generic, non-specific testimonials
-- [ ] **Task 3.6:** Remove specific fabricated metrics (5x leads, 47:1 ROI, etc.)
+- [x] **Task 3.4-3.6:** ✅ COMPLETED - Component redesigned as "Why Agents Choose AgentBio"
+  - Replaced fake user testimonials with platform benefits
+  - Removed all fabricated ROI metrics (5x leads, 47:1 ROI, etc.)
+  - Uses factual, verifiable stats (5 min setup, Free plan, SSL secure)
 
 ---
 
@@ -147,7 +149,10 @@ const mockListings = [
 **Issue:** `mockQueries` arrays used for CSV/PDF export functions
 
 **Remediation:**
-- [ ] **Task 3.13:** Replace mock queries with actual search analytics data from state/props
+- [x] **Task 3.13:** ✅ COMPLETED - Replaced mock queries with `useTopQueries` hook
+  - Now uses real query data from unified_search_analytics table
+  - Shows "No Data to Export" message if no data is available
+  - Exports display actual query count
 
 ---
 
@@ -221,9 +226,9 @@ const mockListings = [
 | `schedule-seo-audit/index.ts:83` | Uses `example.com` as fallback |
 
 **Remediation:**
-- [ ] **Task 4.3:** Update `sitemap/index.ts` to use `Deno.env.get('SITE_URL')`
+- [x] **Task 4.3:** ✅ COMPLETED - Updated `sitemap/index.ts` to use `Deno.env.get('SITE_URL') || Deno.env.get('APP_URL') || 'https://agentbio.net'`
 - [ ] **Task 4.4:** Update `publish-article-to-social/index.ts` to use environment variable
-- [ ] **Task 4.5:** Fix `schedule-seo-audit/index.ts` fallback from `example.com` to proper domain
+- [x] **Task 4.5:** ✅ COMPLETED - Fixed `schedule-seo-audit/index.ts` to use proper fallback chain
 
 ---
 
@@ -333,15 +338,17 @@ Use this section to track which files have been updated:
 |------|--------|------------|------|
 | `supabase/config.toml` | ✅ Complete | Claude | 2025-12-20 |
 | `public/sitemap.xml` | ✅ Complete | Claude | 2025-12-20 |
-| `src/components/landing/DemoProfilesShowcase.tsx` | ⬜ Pending | | |
-| `src/components/landing/AgentTestimonials.tsx` | ⬜ Pending | | |
+| `src/components/landing/DemoProfilesShowcase.tsx` | ✅ Complete | Claude | 2025-12-20 |
+| `src/components/landing/AgentTestimonials.tsx` | ✅ Complete | Claude | 2025-12-20 |
 | `src/pages/AnalyticsDashboard.tsx` | ✅ Complete | Claude | 2025-12-20 |
 | `src/pages/QuickActionsDashboard.tsx` | ✅ Complete | Claude | 2025-12-20 |
 | `supabase/functions/_shared/cors.ts` | ✅ Complete | Claude | 2025-12-20 |
 | `supabase/functions/generate-listing-description/index.ts` | ✅ Complete | Claude | 2025-12-20 |
 | `supabase/functions/send-listing-generator-email/index.ts` | ✅ Complete | Claude | 2025-12-20 |
 | `supabase/functions/send-scheduled-listing-emails/index.ts` | ✅ Complete | Claude | 2025-12-20 |
-| `supabase/functions/sitemap/index.ts` | ⬜ Pending | | |
+| `supabase/functions/sitemap/index.ts` | ✅ Complete | Claude | 2025-12-20 |
+| `supabase/functions/schedule-seo-audit/index.ts` | ✅ Complete | Claude | 2025-12-20 |
+| `src/components/admin/SearchAnalyticsDashboard.tsx` | ✅ Complete | Claude | 2025-12-20 |
 
 ---
 
