@@ -1,6 +1,6 @@
 import { Eye, Users, MousePointerClick, TrendingUp, PartyPopper, Check, Copy, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useLinks } from "@/hooks/useLinks";
 import { useProfile } from "@/hooks/useProfile";
@@ -220,12 +220,12 @@ export default function Overview() {
                                 <p className="text-xs text-muted-foreground mb-3 max-w-xs mx-auto">
                                     Add links to your website, social media, and other profiles
                                 </p>
-                                <a
-                                    href="/dashboard/links"
+                                <Link
+                                    to="/dashboard/links"
                                     className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
                                 >
                                     Manage Links <ExternalLink className="h-3 w-3" />
-                                </a>
+                                </Link>
                             </div>
                         )}
                     </CardContent>
