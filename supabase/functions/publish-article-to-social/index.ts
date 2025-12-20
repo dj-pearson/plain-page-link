@@ -69,7 +69,8 @@ serve(async (req) => {
 
     console.log('Generating social media content...');
 
-    const articleUrl = `https://agentbio.net/blog/${article.slug}`;
+    const siteUrl = Deno.env.get('SITE_URL') || Deno.env.get('APP_URL') || 'https://agentbio.net';
+    const articleUrl = `${siteUrl}/blog/${article.slug}`;
     
     const prompt = `Create social media posts to promote this article:
 Title: ${article.title}

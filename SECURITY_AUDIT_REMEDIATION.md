@@ -21,15 +21,17 @@ This security audit identified **16 security issues** across authentication, API
 
 ## CRITICAL Severity Issues
 
-### 🔴 CRITICAL-1: Hardcoded Supabase Credentials
+### 🔴 CRITICAL-1: Hardcoded Supabase Credentials ✅ RESOLVED
 **File:** `src/integrations/supabase/client.ts:6`
+**Status:** Fixed - Now uses environment variables without hardcoded fallbacks
 **Risk:** Exposed API keys and database URL in client-side code
 **Impact:** Anyone can extract credentials from production JavaScript bundles and potentially abuse API quotas or access public data.
 
-**Current Code:**
+**Previous Vulnerable Code (for reference):**
 ```typescript
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://axoqjwvqxgtzsdmlmnbv.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4b3Fqd3ZxeGd0enNkbWxtbmJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4Mzk1MzAsImV4cCI6MjA3NzQxNTUzMH0.O6gYAuqbY9xplmgCgP3e702xDXngVCnr5nL6QP2Umdg";
+// OLD - DO NOT USE: Example of vulnerable code with hardcoded credentials
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://[old-project].supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "[exposed-key]";
 ```
 
 **Remediation Code:**

@@ -5,6 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'noreply@agentbio.net';
@@ -23,15 +24,11 @@ const EMAIL_SCHEDULE = {
 };
 
 serve(async (req) => {
-  // CORS headers
+  const origin = req.headers.get('origin');
+
+  // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      },
-    });
+    return handleCorsPreFlight(origin);
   }
 
   try {
@@ -46,7 +43,7 @@ serve(async (req) => {
 
     if (!pendingEmails || pendingEmails.length === 0) {
       return new Response(JSON.stringify({ message: 'No pending emails to send', sent: 0 }), {
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) },
       });
     }
 
@@ -114,7 +111,7 @@ serve(async (req) => {
         errors: errors.length > 0 ? errors : undefined,
       }),
       {
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) },
       }
     );
   } catch (error) {
@@ -126,7 +123,7 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) },
       }
     );
   }

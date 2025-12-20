@@ -80,7 +80,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${supabaseServiceKey}`,
           },
           body: JSON.stringify({
-            url: Deno.env.get('PUBLIC_SITE_URL') || 'https://example.com',
+            url: Deno.env.get('PUBLIC_SITE_URL') || Deno.env.get('SITE_URL') || 'https://agentbio.net',
             options: schedule.audit_config,
           }),
         })

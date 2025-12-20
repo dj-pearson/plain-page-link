@@ -4,10 +4,12 @@
     <meta charset="UTF-8" />
     <!-- Build: 2025-11-03 -->
 
-    <!-- Security Headers -->
+    <!-- Security Headers - CSP Refined -->
+    <!-- Note: 'unsafe-inline' removed from script-src, kept for style-src due to React/Tailwind inline styles -->
+    <!-- TODO: Implement nonce-based CSP for style-src when inline styles are fully refactored -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://esm.sh https://*.supabase.co https://static.cloudflareinsights.com;
+      script-src 'self' https://www.googletagmanager.com https://esm.sh https://*.supabase.co https://static.cloudflareinsights.com;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: https: blob:;
       font-src 'self' data:;
@@ -31,29 +33,8 @@
     <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
     <link rel="dns-prefetch" href="https://images.unsplash.com">
 
-    <!-- Google Analytics - Deferred for better performance -->
-    <script>
-      // Defer GA loading until after page is interactive
-      function loadGA() {
-        var script = document.createElement('script');
-        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-PBYDSXT7DG';
-        script.async = true;
-        document.head.appendChild(script);
-
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        window.gtag = gtag;
-        gtag('js', new Date());
-        gtag('config', 'G-PBYDSXT7DG');
-      }
-
-      // Load GA after page is idle or after 3 seconds, whichever comes first
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(loadGA, { timeout: 3000 });
-      } else {
-        setTimeout(loadGA, 3000);
-      }
-    </script>
+    <!-- Google Analytics - Deferred loading via external script (CSP compliant) -->
+    <script src="/scripts/analytics.js" defer></script>
 
     <link rel="icon" type="image/png" href="/Icon.png" />
     <link rel="apple-touch-icon" href="/Icon.png" />
@@ -80,8 +61,8 @@
     <meta property="twitter:image" content="https://agentbio.net/Cover.png" />
 
     <title>Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads – AgentBio</title>
-    <script type="module" crossorigin src="/assets/index-Dg7t10xs.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-tpZEXIRS.css">
+    <script type="module" crossorigin src="/assets/index-DUW0N-ya.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BzMo2GiF.css">
   </head>
   <body>
     <div id="root"></div>

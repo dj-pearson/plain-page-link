@@ -11,6 +11,7 @@ import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { ProfileCompletionWidget } from "@/components/dashboard/ProfileCompletionWidget";
 import { QuickActionsWidget } from "@/components/dashboard/QuickActionsWidget";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { getPlanById } from "@/config/pricing-plans";
 import {
     Dialog,
     DialogContent,
@@ -50,35 +51,32 @@ export default function Overview() {
         }
     }, [searchParams, navigate]);
 
-    // Get features based on plan
+    // Get features from pricing config based on plan
     const getUnlockedFeatures = (planName: string | undefined) => {
-        const features: Record<string, string[]> = {
-            starter: [
-                "20 active listings",
-                "15 custom links",
-                "10 testimonials",
-                "90-day analytics",
-                "Lead export to CSV"
-            ],
-            professional: [
-                "Unlimited listings",
-                "Unlimited custom links",
-                "Unlimited testimonials",
-                "Unlimited analytics history",
-                "Custom domain support",
-                "Premium themes with 3D effects",
-                "Priority email support"
-            ],
-            team: [
-                "Everything in Professional",
-                "Multi-agent dashboard",
-                "Team analytics",
-                "White-label branding",
-                "API access",
-                "Dedicated account manager"
-            ]
-        };
-        return features[planName?.toLowerCase() || 'starter'] || [];
+        const planId = planName?.toLowerCase() || 'free';
+        const plan = getPlanById(planId);
+
+        if (!plan) return [];
+
+        const features: string[] = [];
+        const limits = plan.limits;
+
+        // Add limits-based features
+        features.push(limits.listings === -1 ? "Unlimited listings" : `${limits.listings} active listings`);
+        features.push(limits.links === -1 ? "Unlimited custom links" : `${limits.links} custom links`);
+        features.push(limits.testimonials === -1 ? "Unlimited testimonials" : `${limits.testimonials} testimonials`);
+        features.push(limits.analyticsRetentionDays === -1 ? "Unlimited analytics history" : `${limits.analyticsRetentionDays}-day analytics`);
+
+        // Add feature-based unlocks
+        if (plan.features.customDomain) features.push("Custom domain support");
+        if (plan.features.customThemes) features.push("Premium themes");
+        if (plan.features.prioritySupport) features.push("Priority support");
+        if (plan.features.leadScoring) features.push("Lead scoring");
+        if (plan.features.aiListingDescriptions) features.push("AI listing descriptions");
+        if (plan.features.followUpSequences) features.push("Follow-up sequences");
+        if (plan.features.predictiveAnalytics) features.push("Predictive analytics");
+
+        return features.slice(0, 7); // Return top 7 features
     };
 
     if (isLoading) {

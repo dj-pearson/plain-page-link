@@ -9,11 +9,24 @@
 const ALLOWED_ORIGINS = [
   'https://agentbio.net',
   'https://www.agentbio.net',
+  'https://api.agentbio.net',
+  'https://functions.agentbio.net',
   // Add development origins only in non-production environments
   ...(Deno.env.get('ENVIRONMENT') === 'development'
-    ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:4173']
+    ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:4173', 'http://localhost:8080']
     : [])
 ];
+
+/**
+ * Default CORS headers for simple responses
+ * Use getCorsHeaders() for dynamic origin handling
+ */
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Credentials': 'true',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+};
 
 export interface CorsHeaders {
   'Access-Control-Allow-Origin': string;

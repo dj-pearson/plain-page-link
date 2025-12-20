@@ -12,8 +12,8 @@ SELECT COUNT(*) FROM articles;
 -- 2. Use pg_dump to get just the articles table data
 -- 3. Or I can help you parse the backup file and create INSERT statements
 
--- To export from old Supabase:
--- 1. Go to https://supabase.com/dashboard/project/axoqjwvqxgtzsdmlmnbv
+-- To export from Supabase dashboard:
+-- 1. Go to your Supabase dashboard (api.agentbio.net or self-hosted instance)
 -- 2. Navigate to Table Editor → articles
 -- 3. Click the "..." menu → Export → CSV
 -- 4. Download the CSV file

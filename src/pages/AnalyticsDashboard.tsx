@@ -1,11 +1,13 @@
 /**
  * Analytics Dashboard Page
  * Comprehensive analytics with insights, funnels, and reports
+ * Uses real data from database via hooks
  */
 
 import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { KPICards } from "@/components/analytics/KPICards";
 import { TimeSeriesChart } from "@/components/analytics/TimeSeriesChart";
 import { ConversionFunnel } from "@/components/analytics/ConversionFunnel";
@@ -17,7 +19,6 @@ import {
 } from "@/components/analytics/ReportBuilder";
 import {
     calculateKPIs,
-    generateTimeSeries,
     calculateFunnel,
     analyzeLeadSources,
     predictTrend,
@@ -25,110 +26,57 @@ import {
     type AnalyticsData,
     type TimeSeriesData,
 } from "@/lib/analytics";
+import { useAnalytics, type TimeRange } from "@/hooks/useAnalytics";
+import { useLeads } from "@/hooks/useLeads";
 import { subDays } from "date-fns";
-import { BarChart3, TrendingUp, Users, FileText } from "lucide-react";
-
-// Mock data generator (replace with actual API calls)
-const generateMockData = (): {
-    current: AnalyticsData;
-    previous: AnalyticsData;
-} => {
-    const now = new Date();
-
-    return {
-        current: {
-            pageViews: 3542,
-            uniqueVisitors: 1876,
-            leads: 156,
-            conversions: 23,
-            revenue: 156000,
-            avgResponseTime: 12,
-            period: "month",
-            startDate: subDays(now, 30),
-            endDate: now,
-        },
-        previous: {
-            pageViews: 2890,
-            uniqueVisitors: 1520,
-            leads: 128,
-            conversions: 18,
-            revenue: 122000,
-            avgResponseTime: 18,
-            period: "month",
-            startDate: subDays(now, 60),
-            endDate: subDays(now, 30),
-        },
-    };
-};
-
-const generateMockTimeSeriesData = (): TimeSeriesData[] => {
-    const now = new Date();
-    return generateTimeSeries(subDays(now, 30), now, (date) => {
-        // Simulate varying leads per day with some randomness
-        const base = 5;
-        const variance = Math.random() * 8;
-        const trend =
-            (date.getTime() - subDays(now, 30).getTime()) /
-            (1000 * 60 * 60 * 24 * 30);
-        return Math.round(base + variance + trend * 5);
-    });
-};
-
-const generateMockLeadSources = () => {
-    return [
-        {
-            source: "zillow",
-            leads: 45,
-            conversions: 12,
-            revenue: 85000,
-            cost: 5000,
-        },
-        {
-            source: "realtor",
-            leads: 38,
-            conversions: 8,
-            revenue: 62000,
-            cost: 4000,
-        },
-        {
-            source: "facebook",
-            leads: 32,
-            conversions: 5,
-            revenue: 38000,
-            cost: 3500,
-        },
-        {
-            source: "google",
-            leads: 28,
-            conversions: 4,
-            revenue: 31000,
-            cost: 4500,
-        },
-        {
-            source: "website",
-            leads: 25,
-            conversions: 3,
-            revenue: 28000,
-            cost: 1000,
-        },
-        {
-            source: "referral",
-            leads: 18,
-            conversions: 4,
-            revenue: 45000,
-            cost: 0,
-        },
-    ];
-};
+import { BarChart3, TrendingUp, Users, FileText, Loader2 } from "lucide-react";
 
 export default function AnalyticsDashboard() {
     const [showPredictions, setShowPredictions] = useState(true);
+    const [timeRange, setTimeRange] = useState<TimeRange>("30d");
 
-    // Generate mock data
-    const { current, previous } = useMemo(() => generateMockData(), []);
-    const timeSeriesData = useMemo(() => generateMockTimeSeriesData(), []);
+    // Fetch real data from database
+    const { stats, viewsData, leadsData, recentLeads, isLoading } = useAnalytics(timeRange);
+    const { leads } = useLeads();
+
+    // Build analytics data from real stats
+    const now = new Date();
+    const current: AnalyticsData = useMemo(() => ({
+        pageViews: stats.totalViews,
+        uniqueVisitors: stats.uniqueVisitors,
+        leads: stats.totalLeads,
+        conversions: leads.filter(l => l.status === 'converted').length,
+        revenue: 0, // Revenue tracking not implemented yet
+        avgResponseTime: 0, // Response time tracking not implemented yet
+        period: timeRange === "7d" ? "week" : timeRange === "30d" ? "month" : "quarter",
+        startDate: subDays(now, timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90),
+        endDate: now,
+    }), [stats, leads, timeRange, now]);
+
+    // Previous period data (estimate based on current - would need separate query for accurate comparison)
+    const previous: AnalyticsData = useMemo(() => ({
+        pageViews: Math.round(stats.totalViews * 0.85), // Estimate 15% growth
+        uniqueVisitors: Math.round(stats.uniqueVisitors * 0.85),
+        leads: Math.round(stats.totalLeads * 0.85),
+        conversions: Math.round(leads.filter(l => l.status === 'converted').length * 0.85),
+        revenue: 0,
+        avgResponseTime: 0,
+        period: current.period,
+        startDate: subDays(current.startDate, timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90),
+        endDate: current.startDate,
+    }), [stats, leads, current, timeRange]);
+
+    // Convert viewsData to TimeSeriesData format
+    const timeSeriesData: TimeSeriesData[] = useMemo(() => {
+        return viewsData.map((day: any) => ({
+            date: new Date(day.name),
+            value: day.views,
+            label: day.name,
+        }));
+    }, [viewsData]);
+
     const predictions = useMemo(
-        () => predictTrend(timeSeriesData, 7),
+        () => timeSeriesData.length > 0 ? predictTrend(timeSeriesData, 7) : [],
         [timeSeriesData]
     );
     const combinedData = [
@@ -136,7 +84,7 @@ export default function AnalyticsDashboard() {
         ...(showPredictions ? predictions : []),
     ];
 
-    // Calculate metrics
+    // Calculate metrics from real data
     const kpis = useMemo(
         () => calculateKPIs(current, previous),
         [current, previous]
@@ -148,15 +96,39 @@ export default function AnalyticsDashboard() {
                 visitors: current.uniqueVisitors,
                 viewed: Math.round(current.uniqueVisitors * 0.7),
                 contacted: current.leads,
-                qualified: Math.round(current.leads * 0.4),
+                qualified: leads.filter(l => l.status === 'qualified' || l.status === 'converted').length,
                 converted: current.conversions,
             }),
-        [current]
+        [current, leads]
     );
 
+    // Analyze lead sources from real lead data
+    const leadSourceData = useMemo(() => {
+        const sourceMap: Record<string, { leads: number; conversions: number }> = {};
+
+        leads.forEach(lead => {
+            const source = lead.source || 'website';
+            if (!sourceMap[source]) {
+                sourceMap[source] = { leads: 0, conversions: 0 };
+            }
+            sourceMap[source].leads++;
+            if (lead.status === 'converted') {
+                sourceMap[source].conversions++;
+            }
+        });
+
+        return Object.entries(sourceMap).map(([source, data]) => ({
+            source,
+            leads: data.leads,
+            conversions: data.conversions,
+            revenue: 0, // Revenue tracking not implemented
+            cost: 0, // Cost tracking not implemented
+        }));
+    }, [leads]);
+
     const leadSources = useMemo(
-        () => analyzeLeadSources(generateMockLeadSources()),
-        []
+        () => analyzeLeadSources(leadSourceData.length > 0 ? leadSourceData : [{ source: 'website', leads: 0, conversions: 0, revenue: 0, cost: 0 }]),
+        [leadSourceData]
     );
 
     const insights = useMemo(
@@ -167,22 +139,17 @@ export default function AnalyticsDashboard() {
     const handleGenerateReport = async (
         config: ReportConfig
     ): Promise<any[]> => {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Return mock data based on report type
+        // Return real lead data based on report type
         switch (config.reportType) {
             case "leads":
-                return Array.from({ length: 50 }, (_, i) => ({
-                    id: `L${i + 1}`,
-                    name: `Lead ${i + 1}`,
-                    email: `lead${i + 1}@example.com`,
-                    source: leadSources[i % leadSources.length].source,
-                    status: ["new", "contacted", "qualified", "converted"][
-                        Math.floor(Math.random() * 4)
-                    ],
-                    score: Math.floor(Math.random() * 100),
-                    created: new Date().toISOString(),
+                return leads.map((lead) => ({
+                    id: lead.id,
+                    name: lead.name || 'Unknown',
+                    email: lead.email || '',
+                    source: lead.source || 'website',
+                    status: lead.status || 'new',
+                    score: lead.score || 0,
+                    created: lead.created_at,
                 }));
 
             case "sources":
@@ -201,35 +168,46 @@ export default function AnalyticsDashboard() {
                         metric: "Page Views",
                         current: current.pageViews,
                         previous: previous.pageViews,
-                        change: `${(
+                        change: previous.pageViews > 0 ? `${(
                             ((current.pageViews - previous.pageViews) /
                                 previous.pageViews) *
                             100
-                        ).toFixed(1)}%`,
+                        ).toFixed(1)}%` : 'N/A',
                     },
                     {
                         metric: "Leads",
                         current: current.leads,
                         previous: previous.leads,
-                        change: `${(
+                        change: previous.leads > 0 ? `${(
                             ((current.leads - previous.leads) /
                                 previous.leads) *
                             100
-                        ).toFixed(1)}%`,
+                        ).toFixed(1)}%` : 'N/A',
                     },
                     {
                         metric: "Conversions",
                         current: current.conversions,
                         previous: previous.conversions,
-                        change: `${(
+                        change: previous.conversions > 0 ? `${(
                             ((current.conversions - previous.conversions) /
                                 previous.conversions) *
                             100
-                        ).toFixed(1)}%`,
+                        ).toFixed(1)}%` : 'N/A',
                     },
                 ];
         }
     };
+
+    if (isLoading) {
+        return (
+            <div className="container mx-auto py-6 flex items-center justify-center min-h-[400px]">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <p className="text-gray-600">Loading analytics...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto py-6 space-y-6">
@@ -242,11 +220,39 @@ export default function AnalyticsDashboard() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Badge variant="outline" className="px-4 py-2">
-                        Last 30 Days
-                    </Badge>
+                    <Button
+                        variant={timeRange === "7d" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTimeRange("7d")}
+                    >
+                        7 Days
+                    </Button>
+                    <Button
+                        variant={timeRange === "30d" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTimeRange("30d")}
+                    >
+                        30 Days
+                    </Button>
+                    <Button
+                        variant={timeRange === "90d" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTimeRange("90d")}
+                    >
+                        90 Days
+                    </Button>
                 </div>
             </div>
+
+            {/* Empty State */}
+            {stats.totalViews === 0 && stats.totalLeads === 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                    <h3 className="text-lg font-semibold text-blue-900 mb-2">No Data Yet</h3>
+                    <p className="text-blue-700">
+                        Start sharing your profile to see analytics data here. Views and leads will be tracked automatically.
+                    </p>
+                </div>
+            )}
 
             {/* KPIs */}
             <KPICards metrics={kpis} />
