@@ -180,7 +180,10 @@ const mockListings = [
 **Issue:** Hardcoded feature lists for subscription tiers
 
 **Remediation:**
-- [ ] **Task 3.15:** Move feature lists to database or config file that syncs with actual subscription system
+- [x] **Task 3.15:** ✅ COMPLETED - Now uses `getPlanById()` from `pricing-plans.ts`
+  - Dynamically generates feature lists from centralized pricing config
+  - Features sync automatically with subscription system
+  - Removed all hardcoded feature arrays
 
 ---
 
@@ -357,6 +360,10 @@ Use this section to track which files have been updated:
 | `src/components/admin/SearchAnalyticsDashboard.tsx` | ✅ Complete | Claude | 2025-12-20 |
 | `supabase/functions/publish-article-to-social/index.ts` | ✅ Complete | Claude | 2025-12-20 |
 | `src/components/landing/BeforeAfterComparison.tsx` | ✅ Complete | Claude | 2025-12-20 |
+| `src/pages/dashboard/Overview.tsx` | ✅ Complete | Claude | 2025-12-20 |
+| `import-articles.sql` | ✅ Complete | Claude | 2025-12-20 |
+| `SECURITY_AUDIT_REMEDIATION.md` | ✅ Complete | Claude | 2025-12-20 |
+| `SECURITY_AUDIT_COMPREHENSIVE.md` | ✅ Complete | Claude | 2025-12-20 |
 
 ---
 

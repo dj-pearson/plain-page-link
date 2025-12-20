@@ -288,21 +288,21 @@ VITE_API_URL=https://your-api-url.com/api
 VITE_APP_URL=https://agentbio.net
 ```
 
-### 6.2 CRITICAL: Hardcoded Supabase Keys
+### 6.2 CRITICAL: Hardcoded Supabase Keys ✅ RESOLVED
 **File:** `/src/integrations/supabase/client.ts`
+**Status:** Fixed - Now requires environment variables, no hardcoded fallbacks
 
+**Previous Vulnerable Code (for reference only):**
 ```typescript
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 
-  "https://axoqjwvqxgtzsdmlmnbv.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4b3Fqd3ZxeGd0enNkbWxtbmJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4Mzk1MzAsImV4cCI6MjA3NzQxNTUzMH0.O6gYAuqbY9xplmgCgP3e702xDXngVCnr5nL6QP2Umdg";
+// OLD - DO NOT USE: Example of vulnerable pattern with hardcoded credentials
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "[hardcoded-url]";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "[exposed-key]";
 ```
 
-**SECURITY ISSUE:**
-- Supabase anon key is EXPOSED in source code (JWT token in plaintext)
-- URL is hardcoded as fallback
+**SECURITY ISSUE (now resolved):**
+- Supabase anon key was EXPOSED in source code (JWT token in plaintext)
+- URL was hardcoded as fallback
 - These are public keys, but compromised DB credentials can be exploited
-- Expiry: 2077-04-15 (52+ years from creation date 2024-09-30)
 
 **Impact:**
 - Attackers can make authenticated requests as "anon" role
@@ -425,13 +425,13 @@ export function checkRateLimit(
 
 **Recommendation:**
 ```html
-<meta http-equiv="Content-Security-Policy" 
-      content="default-src 'self'; 
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
                script-src 'self' https://www.googletagmanager.com https://cdn.jsdelivr.net;
                style-src 'self' 'unsafe-inline';
                img-src 'self' data: https:;
                font-src 'self' https:;
-               connect-src 'self' https://axoqjwvqxgtzsdmlmnbv.supabase.co;">
+               connect-src 'self' https://api.agentbio.net https://functions.agentbio.net;">
 ```
 
 ### 7.5 XSS Prevention
