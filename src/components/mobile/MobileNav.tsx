@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { Home, ListTodo, Users, BarChart3, Menu, Star, Link as LinkIcon, Zap, FileText, User, Palette, Settings, LogOut, Shield, ExternalLink } from "lucide-react";
+import { Home, ListTodo, Users, BarChart3, Menu, Star, Link as LinkIcon, Zap, FileText, User, Palette, Settings, LogOut, Shield, ExternalLink, Workflow } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -36,6 +36,7 @@ export function MobileNav() {
         { label: "Custom Links", icon: LinkIcon, href: "/dashboard/links" },
         { label: "Quick Actions", icon: Zap, href: "/dashboard/quick-actions" },
         { label: "Page Builder", icon: FileText, href: "/dashboard/page-builder" },
+        { label: "Workflows", icon: Workflow, href: "/dashboard/workflows" },
         { label: "Profile", icon: User, href: "/dashboard/profile" },
         { label: "Theme", icon: Palette, href: "/dashboard/theme" },
         { label: "Settings", icon: Settings, href: "/dashboard/settings" },

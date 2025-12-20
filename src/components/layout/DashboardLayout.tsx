@@ -18,6 +18,7 @@ import {
     Copy,
     Check,
     Share2,
+    Workflow,
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile/MobileNav";
 import { Badge } from "@/components/ui/badge";
@@ -149,6 +150,12 @@ export default function DashboardLayout() {
                         icon={<FileText className="h-5 w-5" />}
                         label="Page Builder"
                         active={isActive("/dashboard/page-builder")}
+                    />
+                    <NavLink
+                        to="/dashboard/workflows"
+                        icon={<Workflow className="h-5 w-5" />}
+                        label="Workflows"
+                        active={isActive("/dashboard/workflows")}
                     />
 
                     <div className="pt-4 mt-4 border-t border-gray-200">
