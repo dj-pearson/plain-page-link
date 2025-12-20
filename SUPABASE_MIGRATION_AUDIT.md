@@ -331,14 +331,16 @@ Use this section to track which files have been updated:
 
 | File | Status | Updated By | Date |
 |------|--------|------------|------|
-| `supabase/config.toml` | ⬜ Pending | | |
-| `public/sitemap.xml` | ⬜ Pending | | |
+| `supabase/config.toml` | ✅ Complete | Claude | 2025-12-20 |
+| `public/sitemap.xml` | ✅ Complete | Claude | 2025-12-20 |
 | `src/components/landing/DemoProfilesShowcase.tsx` | ⬜ Pending | | |
 | `src/components/landing/AgentTestimonials.tsx` | ⬜ Pending | | |
-| `src/pages/AnalyticsDashboard.tsx` | ⬜ Pending | | |
-| `src/pages/QuickActionsDashboard.tsx` | ⬜ Pending | | |
-| `supabase/functions/_shared/cors.ts` | ⬜ Pending | | |
-| `supabase/functions/generate-listing-description/index.ts` | ⬜ Pending | | |
+| `src/pages/AnalyticsDashboard.tsx` | ✅ Complete | Claude | 2025-12-20 |
+| `src/pages/QuickActionsDashboard.tsx` | ✅ Complete | Claude | 2025-12-20 |
+| `supabase/functions/_shared/cors.ts` | ✅ Complete | Claude | 2025-12-20 |
+| `supabase/functions/generate-listing-description/index.ts` | ✅ Complete | Claude | 2025-12-20 |
+| `supabase/functions/send-listing-generator-email/index.ts` | ✅ Complete | Claude | 2025-12-20 |
+| `supabase/functions/send-scheduled-listing-emails/index.ts` | ✅ Complete | Claude | 2025-12-20 |
 | `supabase/functions/sitemap/index.ts` | ⬜ Pending | | |
 
 ---
