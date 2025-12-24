@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getClientIP } from '../_shared/auth.ts';
+import { sanitizeRedirectUrl } from '../_shared/url-validation.ts';
 import { decode as base64Decode, encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 /**
@@ -352,12 +353,20 @@ serve(async (req) => {
       user_agent: userAgent,
     });
 
+    // Validate redirect URL before returning (defense in depth)
+    const finalRedirectUrl = sanitizeRedirectUrl(
+      sessionData.properties?.action_link || ssoSession.redirect_uri,
+      appUrl,
+      '/dashboard',
+      ['*.agentbio.net', 'localhost:8080', '127.0.0.1:8080'] // Whitelisted domains
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
         userId,
         email: userEmail,
-        redirectUrl: sessionData.properties?.action_link || ssoSession.redirect_uri,
+        redirectUrl: finalRedirectUrl,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
