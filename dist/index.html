@@ -31,7 +31,25 @@
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
     <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
     <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
+
+    <!-- DNS prefetch for third-party domains (Core Web Vitals optimization) -->
     <link rel="dns-prefetch" href="https://images.unsplash.com">
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    <link rel="dns-prefetch" href="https://www.google-analytics.com">
+    <link rel="dns-prefetch" href="https://static.cloudflareinsights.com">
+
+    <!-- Preconnect for Supabase (critical for app functionality) -->
+    <link rel="preconnect" href="https://supabase.co" crossorigin>
+
+    <!-- Preload critical assets for faster LCP (Largest Contentful Paint) -->
+    <link rel="preload" as="image" href="/Cover.png" fetchpriority="high" type="image/png">
+    <link rel="preload" as="image" href="/Icon.png" fetchpriority="high" type="image/png">
+
+    <!-- Prefetch likely next pages for faster navigation -->
+    <link rel="prefetch" href="/auth/login" as="document">
+    <link rel="prefetch" href="/auth/register" as="document">
 
     <!-- Google Analytics - Deferred loading via external script (CSP compliant) -->
     <script src="/scripts/analytics.js" defer></script>
@@ -61,7 +79,7 @@
     <meta property="twitter:image" content="https://agentbio.net/Cover.png" />
 
     <title>Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads – AgentBio</title>
-    <script type="module" crossorigin src="/assets/index-CIfNOF3i.js"></script>
+    <script type="module" crossorigin src="/assets/index-B1XbNfbR.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-BzMo2GiF.css">
   </head>
   <body>

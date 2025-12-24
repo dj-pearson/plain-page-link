@@ -10,8 +10,17 @@ import { BeforeAfterComparison } from "@/components/landing/BeforeAfterCompariso
 import { DemoProfilesShowcase } from "@/components/landing/DemoProfilesShowcase";
 import { AgentTestimonials } from "@/components/landing/AgentTestimonials";
 import { FeatureCard } from "@/components/landing/FeatureCard";
+import { generateBreadcrumbSchema, generateEnhancedLocalBusinessSchema } from "@/lib/seo";
 
 export default function Landing() {
+    // Generate breadcrumb schema for homepage
+    const breadcrumbSchema = generateBreadcrumbSchema([
+        { name: "Home", url: window.location.origin }
+    ]);
+
+    // Generate enhanced local business schema
+    const localBusinessSchema = generateEnhancedLocalBusinessSchema();
+
     const schema = {
         "@context": "https://schema.org",
         "@graph": [
@@ -70,6 +79,10 @@ export default function Landing() {
                     "reviewCount": "523"
                 }
             },
+            // Add BreadcrumbList schema
+            breadcrumbSchema,
+            // Add ProfessionalService/LocalBusiness schema for local SEO
+            localBusinessSchema,
             {
                 "@type": "FAQPage",
                 "mainEntity": [
