@@ -6,7 +6,6 @@ import type { ListingFormData } from "@/components/modals/AddListingModal";
 import { useToast } from "@/hooks/use-toast";
 import { useListings } from "@/hooks/useListings";
 import { useListingImageUpload } from "@/hooks/useListingImageUpload";
-import { supabase } from "@/integrations/supabase/client";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
@@ -24,7 +23,7 @@ export default function Listings() {
   const [showSocialShareDialog, setShowSocialShareDialog] = useState(false);
   const [newlyCreatedListing, setNewlyCreatedListing] = useState<any>(null);
   const { toast } = useToast();
-  const { listings, isLoading, addListing, deleteListing } = useListings();
+  const { listings, isLoading, addListing, updateListing, deleteListing } = useListings();
   const { uploadListingImages, uploading: uploadingImages } = useListingImageUpload();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
   const { profile } = useProfile();
@@ -146,39 +145,29 @@ export default function Listings() {
 
   const handleEditListing = async (data: EditListingFormData) => {
     if (!editingListing) return;
-    
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      await updateListing.mutateAsync({
+        id: editingListing.id,
+        address: data.address,
+        city: data.city,
+        price: data.price,
+        beds: data.beds,
+        baths: data.baths,
+        sqft: data.sqft,
+        status: data.status,
+        image: data.image,
+        description: data.description,
+        mls_number: data.mls_number,
+        property_type: data.property_type,
+        updated_at: new Date().toISOString()
+      });
 
-      const { error } = await supabase
-        .from('listings')
-        .update({
-          address: data.address,
-          city: data.city,
-          price: data.price,
-          beds: data.beds,
-          baths: data.baths,
-          sqft: data.sqft,
-          status: data.status,
-          image: data.image,
-          description: data.description,
-          mls_number: data.mls_number,
-          property_type: data.property_type,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingListing.id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
       toast({
         title: "Listing updated!",
         description: "Your property listing has been updated successfully.",
       });
       setEditingListing(null);
-      // Refetch listings
-      window.location.reload();
     } catch (error) {
       toast({
         title: "Error",

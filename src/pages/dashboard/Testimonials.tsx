@@ -5,7 +5,6 @@ import { EditTestimonialModal, EditTestimonialFormData } from "@/components/moda
 import type { TestimonialFormData } from "@/components/modals/AddTestimonialModal";
 import { useToast } from "@/hooks/use-toast";
 import { useTestimonials } from "@/hooks/useTestimonials";
-import { supabase } from "@/integrations/supabase/client";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
@@ -18,7 +17,7 @@ export default function Testimonials() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const { toast } = useToast();
-  const { testimonials, isLoading, addTestimonial, deleteTestimonial } = useTestimonials();
+  const { testimonials, isLoading, addTestimonial, updateTestimonial, deleteTestimonial } = useTestimonials();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
   const { profile } = useProfile();
 
@@ -67,39 +66,23 @@ export default function Testimonials() {
 
   const handleEditTestimonial = async (data: EditTestimonialFormData) => {
     if (!editingTestimonial) return;
-    
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('testimonials')
-        .update({
-          client_name: data.client_name,
-          client_title: data.client_title,
-          rating: data.rating,
-          review: data.review,
-          property_type: data.property_type,
-          transaction_type: data.transaction_type,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingTestimonial.id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
-      toast({
-        title: "Testimonial updated!",
-        description: "Client review has been updated successfully.",
+      await updateTestimonial.mutateAsync({
+        id: editingTestimonial.id,
+        client_name: data.client_name,
+        client_title: data.client_title,
+        rating: data.rating,
+        review: data.review,
+        property_type: data.property_type,
+        transaction_type: data.transaction_type,
+        updated_at: new Date().toISOString()
       });
+
       setEditingTestimonial(null);
-      window.location.reload();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update testimonial. Please try again.",
-        variant: "destructive",
-      });
+      // Error toast is already handled by the mutation
+      console.error('Failed to update testimonial:', error);
     }
   };
 
