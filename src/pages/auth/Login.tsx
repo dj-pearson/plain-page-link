@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect, useState } from "react";
 import { emailSchema } from "@/utils/validation";
 import { validateRedirectPath } from "@/utils/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
     email: emailSchema,
@@ -20,6 +21,7 @@ export default function Login() {
     const navigate = useNavigate();
     const { signIn, signInWithGoogle, signInWithApple, isLoading, error, clearError, user } = useAuthStore();
     const [showPassword, setShowPassword] = useState(false);
+    const { toast } = useToast();
 
     const {
         register,
@@ -63,6 +65,11 @@ export default function Login() {
             await signInWithGoogle();
         } catch (error) {
             console.error("Google sign-in failed:", error);
+            toast({
+                title: "Google Sign-In Failed",
+                description: "Unable to sign in with Google. Please try again or use email/password.",
+                variant: "destructive",
+            });
         }
     };
 
@@ -71,6 +78,11 @@ export default function Login() {
             await signInWithApple();
         } catch (error) {
             console.error("Apple sign-in failed:", error);
+            toast({
+                title: "Apple Sign-In Failed",
+                description: "Unable to sign in with Apple. Please try again or use email/password.",
+                variant: "destructive",
+            });
         }
     };
 
