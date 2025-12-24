@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -23,16 +24,13 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    const authHeader = req.headers.get('authorization');
+    // Securely authenticate user with JWT verification
     let userId = null;
-    if (authHeader) {
-      try {
-        const token = authHeader.replace('Bearer ', '');
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        userId = payload.sub;
-      } catch (e) {
-        console.error('Failed to decode JWT:', e);
-      }
+    try {
+      const user = await requireAuth(req, supabase);
+      userId = user.id;
+    } catch (e) {
+      console.error('Failed to authenticate user:', e);
     }
 
     const appliedFixes = [];

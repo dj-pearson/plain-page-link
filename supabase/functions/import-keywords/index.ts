@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAdmin } from '../_shared/auth.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -14,30 +15,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Verify admin role
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
-
-    // Check if user has admin role in user_roles table
-    const { data: userRoles, error: roleError } = await supabaseClient
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .single();
-
-    if (roleError || !userRoles) {
-      throw new Error('Admin access required');
-    }
+    // Securely verify admin role with requireAdmin helper
+    await requireAdmin(req, supabaseClient);
 
     const { keywords } = await req.json();
 
