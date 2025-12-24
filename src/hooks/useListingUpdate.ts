@@ -24,6 +24,22 @@ export const useListingUpdate = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Destructure data fields to use in the update
+      const {
+        id,
+        address,
+        city,
+        price,
+        beds,
+        baths,
+        sqft,
+        status,
+        image,
+        description,
+        mls_number,
+        property_type,
+      } = data;
+
       const { data: result, error } = await supabase
         .from('listings')
         .update({
@@ -40,7 +56,7 @@ export const useListingUpdate = () => {
           property_type,
           updated_at: new Date().toISOString()
         })
-        .eq('id', data.id)
+        .eq('id', id)
         .eq('user_id', user.id)
         .select()
         .single();

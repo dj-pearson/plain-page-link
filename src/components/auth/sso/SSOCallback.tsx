@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSSO } from "@/hooks/useSSO";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { sanitizeRedirectUrl } from "@/lib/url-validation";
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -48,8 +49,15 @@ export const SSOCallback = () => {
 
           // If we have a redirect URL with magic link, navigate there
           if (result.redirectUrl) {
+            // Validate redirect URL to prevent open redirect attacks (defense in depth)
+            const safeRedirectUrl = sanitizeRedirectUrl(
+              result.redirectUrl,
+              '/dashboard',
+              ['*.agentbio.net', 'localhost:8080', '127.0.0.1:8080']
+            );
+
             // The redirect URL might be a magic link - let Supabase handle it
-            window.location.href = result.redirectUrl;
+            window.location.href = safeRedirectUrl;
           } else {
             // Re-initialize auth state and redirect to dashboard
             await initialize();
