@@ -14,6 +14,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +48,7 @@ import {
     Phone,
     Mail,
     Download,
+    AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +60,7 @@ export default function LinkManager({ userId }: LinkManagerProps) {
     const [links, setLinks] = useState<LinkStackLink[]>([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingLink, setEditingLink] = useState<LinkStackLink | null>(null);
+    const [linkToDelete, setLinkToDelete] = useState<LinkStackLink | null>(null);
     const [isDragging, setIsDragging] = useState(false);
 
     // Form state
@@ -105,11 +117,11 @@ export default function LinkManager({ userId }: LinkManagerProps) {
         toast.success("Link updated successfully!");
     };
 
-    const handleDeleteLink = (id: number) => {
-        if (confirm("Are you sure you want to delete this link?")) {
-            setLinks(links.filter((link) => link.id !== id));
-            toast.success("Link deleted");
-        }
+    const handleDeleteLink = () => {
+        if (!linkToDelete) return;
+        setLinks(links.filter((link) => link.id !== linkToDelete.id));
+        toast.success("Link deleted");
+        setLinkToDelete(null);
     };
 
     const handleToggleVisibility = (id: number) => {
@@ -270,7 +282,7 @@ export default function LinkManager({ userId }: LinkManagerProps) {
                                         <Edit2 className="w-4 h-4 text-blue-600" />
                                     </button>
                                     <button
-                                        onClick={() => handleDeleteLink(link.id)}
+                                        onClick={() => setLinkToDelete(link)}
                                         className="p-2 hover:bg-gray-100 rounded-md"
                                     >
                                         <Trash2 className="w-4 h-4 text-red-600" />
@@ -570,6 +582,31 @@ export default function LinkManager({ userId }: LinkManagerProps) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!linkToDelete} onOpenChange={(open) => !open && setLinkToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-red-600" />
+                            Delete Link
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete <span className="font-semibold text-foreground">{linkToDelete?.title || "this link"}</span>?
+                            This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteLink}
+                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                        >
+                            Delete Link
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

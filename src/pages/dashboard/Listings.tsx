@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AddListingModal } from "@/components/modals/AddListingModal";
 import { EditListingModal, EditListingFormData } from "@/components/modals/EditListingModal";
 import type { ListingFormData } from "@/components/modals/AddListingModal";
@@ -22,6 +32,7 @@ export default function Listings() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showSocialShareDialog, setShowSocialShareDialog] = useState(false);
   const [newlyCreatedListing, setNewlyCreatedListing] = useState<any>(null);
+  const [listingToDelete, setListingToDelete] = useState<{ id: string; address: string } | null>(null);
   const { toast } = useToast();
   const { listings, isLoading, addListing, updateListing, deleteListing } = useListings();
   const { uploadListingImages, uploading: uploadingImages } = useListingImageUpload();
@@ -125,11 +136,11 @@ export default function Listings() {
     }
   };
 
-  const handleDeleteListing = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this listing?")) return;
-    
+  const handleDeleteListing = async () => {
+    if (!listingToDelete) return;
+
     try {
-      await deleteListing.mutateAsync(id);
+      await deleteListing.mutateAsync(listingToDelete.id);
       toast({
         title: "Listing deleted",
         description: "Property listing has been removed.",
@@ -140,6 +151,8 @@ export default function Listings() {
         description: "Failed to delete listing.",
         variant: "destructive",
       });
+    } finally {
+      setListingToDelete(null);
     }
   };
 
@@ -284,7 +297,7 @@ export default function Listings() {
                   <Edit className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => handleDeleteListing(listing.id)}
+                  onClick={() => setListingToDelete({ id: listing.id, address: listing.address })}
                   className="p-2 sm:p-2.5 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white active:scale-90 transition-all text-red-600 shadow-md min-w-[44px] min-h-[44px] flex items-center justify-center"
                   title="Delete listing"
                   aria-label="Delete listing"
@@ -395,6 +408,31 @@ export default function Listings() {
           agentName={profile?.full_name}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!listingToDelete} onOpenChange={(open) => !open && setListingToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Delete Listing
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-semibold text-foreground">{listingToDelete?.address}</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteListing}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete Listing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Keyboard Shortcuts */}
       <KeyboardShortcutsHelper shortcuts={shortcuts} />
