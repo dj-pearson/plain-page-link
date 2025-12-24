@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -13,19 +16,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Star, Upload, X } from "lucide-react";
 
+const testimonialSchema = z.object({
+  clientName: z.string().min(2, "Client name must be at least 2 characters"),
+  rating: z.number().min(1, "Rating is required").max(5, "Rating must be between 1 and 5"),
+  review: z.string().min(10, "Review must be at least 10 characters").max(500, "Review must be less than 500 characters"),
+  propertyType: z.string().min(1, "Property type is required"),
+  clientPhoto: z.instanceof(File).optional(),
+  featured: z.boolean(),
+});
+
+export type TestimonialFormData = z.infer<typeof testimonialSchema>;
+
 interface AddTestimonialModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave?: (data: TestimonialFormData) => void;
-}
-
-export interface TestimonialFormData {
-  clientName: string;
-  rating: number;
-  review: string;
-  propertyType: string;
-  clientPhoto?: File;
-  featured: boolean;
 }
 
 export function AddTestimonialModal({
@@ -33,27 +38,35 @@ export function AddTestimonialModal({
   onOpenChange,
   onSave,
 }: AddTestimonialModalProps) {
-  const [formData, setFormData] = useState<TestimonialFormData>({
-    clientName: "",
-    rating: 5,
-    review: "",
-    propertyType: "",
-    featured: false,
-  });
-
+  const [error, setError] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setValue,
+    watch,
+  } = useForm<TestimonialFormData>({
+    resolver: zodResolver(testimonialSchema),
+    defaultValues: {
+      clientName: "",
+      rating: 5,
+      review: "",
+      propertyType: "",
+      featured: false,
+    },
+  });
+
+  const rating = watch("rating");
+  const review = watch("review");
+  const featured = watch("featured");
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, clientPhoto: file }));
+      setValue("clientPhoto", file);
 
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -64,23 +77,21 @@ export function AddTestimonialModal({
   };
 
   const removePhoto = () => {
-    setFormData((prev) => ({ ...prev, clientPhoto: undefined }));
+    setValue("clientPhoto", undefined);
     setPhotoPreview(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave?.(formData);
-    onOpenChange(false);
-    // Reset form
-    setFormData({
-      clientName: "",
-      rating: 5,
-      review: "",
-      propertyType: "",
-      featured: false,
-    });
-    setPhotoPreview(null);
+  const onSubmit = async (data: TestimonialFormData) => {
+    try {
+      setError(null);
+      await onSave?.(data);
+      onOpenChange(false);
+      reset();
+      setPhotoPreview(null);
+    } catch (err) {
+      console.error("Failed to add testimonial:", err);
+      setError("Failed to add testimonial. Please try again.");
+    }
   };
 
   return (
@@ -93,19 +104,25 @@ export function AddTestimonialModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Client Information */}
           <div className="space-y-4">
             <div>
               <Label htmlFor="clientName">Client Name *</Label>
               <Input
                 id="clientName"
-                name="clientName"
-                value={formData.clientName}
-                onChange={handleChange}
+                {...register("clientName")}
                 placeholder="John Smith"
-                required
               />
+              {errors.clientName && (
+                <p className="text-sm text-red-600 mt-1">{errors.clientName.message}</p>
+              )}
               <p className="text-xs text-muted-foreground mt-1">
                 You can use initials for privacy (e.g., "John S.")
               </p>
@@ -115,12 +132,12 @@ export function AddTestimonialModal({
               <Label htmlFor="propertyType">Property Type *</Label>
               <Input
                 id="propertyType"
-                name="propertyType"
-                value={formData.propertyType}
-                onChange={handleChange}
+                {...register("propertyType")}
                 placeholder="Single Family Home, Condo, etc."
-                required
               />
+              {errors.propertyType && (
+                <p className="text-sm text-red-600 mt-1">{errors.propertyType.message}</p>
+              )}
             </div>
           </div>
 
@@ -132,14 +149,12 @@ export function AddTestimonialModal({
                 <button
                   key={star}
                   type="button"
-                  onClick={() =>
-                    setFormData((prev) => ({ ...prev, rating: star }))
-                  }
+                  onClick={() => setValue("rating", star)}
                   className="focus:outline-none"
                 >
                   <Star
                     className={`h-8 w-8 transition-colors ${
-                      star <= formData.rating
+                      star <= rating
                         ? "fill-yellow-400 text-yellow-400"
                         : "text-gray-300"
                     }`}
@@ -147,6 +162,9 @@ export function AddTestimonialModal({
                 </button>
               ))}
             </div>
+            {errors.rating && (
+              <p className="text-sm text-red-600 mt-1">{errors.rating.message}</p>
+            )}
           </div>
 
           {/* Review Text */}
@@ -154,16 +172,16 @@ export function AddTestimonialModal({
             <Label htmlFor="review">Testimonial Text *</Label>
             <Textarea
               id="review"
-              name="review"
-              value={formData.review}
-              onChange={handleChange}
+              {...register("review")}
               rows={6}
               maxLength={500}
               placeholder="Share what the client said about working with you..."
-              required
             />
+            {errors.review && (
+              <p className="text-sm text-red-600 mt-1">{errors.review.message}</p>
+            )}
             <p className="text-xs text-muted-foreground mt-1">
-              {formData.review.length}/500 characters
+              {review?.length || 0}/500 characters
             </p>
           </div>
 
@@ -212,10 +230,8 @@ export function AddTestimonialModal({
             <input
               type="checkbox"
               id="featured"
-              checked={formData.featured}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, featured: e.target.checked }))
-              }
+              checked={featured}
+              onChange={(e) => setValue("featured", e.target.checked)}
               className="rounded border-border"
             />
             <Label htmlFor="featured" className="cursor-pointer">

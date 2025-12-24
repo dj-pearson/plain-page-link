@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -20,28 +23,30 @@ import {
 } from "@/components/ui/select";
 import { Upload, X } from "lucide-react";
 
+const listingSchema = z.object({
+  address: z.string().min(1, "Street address is required"),
+  city: z.string().min(1, "City is required"),
+  state: z.string().length(2, "State must be 2 characters (e.g., CA)"),
+  zipCode: z.string().regex(/^\d{5}(-\d{4})?$/, "Invalid zip code format"),
+  price: z.string().min(1, "Price is required"),
+  beds: z.number().min(0, "Bedrooms must be at least 0"),
+  baths: z.number().min(0, "Bathrooms must be at least 0"),
+  sqft: z.string().min(1, "Square footage is required"),
+  lotSize: z.string().optional(),
+  propertyType: z.string(),
+  status: z.string(),
+  description: z.string(),
+  mlsNumber: z.string().optional(),
+  yearBuilt: z.string().optional(),
+  images: z.array(z.instanceof(File)).max(25, "Maximum 25 images allowed"),
+});
+
+export type ListingFormData = z.infer<typeof listingSchema>;
+
 interface AddListingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave?: (data: ListingFormData) => void;
-}
-
-export interface ListingFormData {
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  price: string;
-  beds: number;
-  baths: number;
-  sqft: string;
-  lotSize?: string;
-  propertyType: string;
-  status: string;
-  description: string;
-  mlsNumber?: string;
-  yearBuilt?: string;
-  images: File[];
 }
 
 export function AddListingModal({
@@ -49,66 +54,20 @@ export function AddListingModal({
   onOpenChange,
   onSave,
 }: AddListingModalProps) {
-  const [formData, setFormData] = useState<ListingFormData>({
-    address: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    price: "",
-    beds: 3,
-    baths: 2,
-    sqft: "",
-    lotSize: "",
-    propertyType: "single-family",
-    status: "active",
-    description: "",
-    mlsNumber: "",
-    yearBuilt: "",
-    images: [],
-  });
-
+  const [error, setError] = useState<string | null>(null);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleNumberChange = (name: string, value: string) => {
-    const numValue = parseInt(value) || 0;
-    setFormData((prev) => ({ ...prev, [name]: numValue }));
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setFormData((prev) => ({ ...prev, images: [...prev.images, ...files] }));
-
-    // Create previews
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreviews((prev) => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removeImage = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave?.(formData);
-    onOpenChange(false);
-    // Reset form
-    setFormData({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setValue,
+    watch,
+    control,
+  } = useForm<ListingFormData>({
+    resolver: zodResolver(listingSchema),
+    defaultValues: {
       address: "",
       city: "",
       state: "",
@@ -124,8 +83,46 @@ export function AddListingModal({
       mlsNumber: "",
       yearBuilt: "",
       images: [],
+    },
+  });
+
+  const images = watch("images");
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const currentImages = images || [];
+    setValue("images", [...currentImages, ...files]);
+
+    // Create previews
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews((prev) => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
     });
-    setImagePreviews([]);
+  };
+
+  const removeImage = (index: number) => {
+    const currentImages = images || [];
+    setValue(
+      "images",
+      currentImages.filter((_, i) => i !== index)
+    );
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const onSubmit = async (data: ListingFormData) => {
+    try {
+      setError(null);
+      await onSave?.(data);
+      onOpenChange(false);
+      reset();
+      setImagePreviews([]);
+    } catch (err) {
+      console.error("Failed to add listing:", err);
+      setError("Failed to add listing. Please try again.");
+    }
   };
 
   return (
@@ -138,7 +135,13 @@ export function AddListingModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Property Address */}
           <div className="space-y-4">
             <h3 className="font-semibold text-sm">Property Address</h3>
@@ -147,46 +150,46 @@ export function AddListingModal({
                 <Label htmlFor="address">Street Address *</Label>
                 <Input
                   id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
+                  {...register("address")}
                   placeholder="123 Main Street"
-                  required
                 />
+                {errors.address && (
+                  <p className="text-sm text-red-600 mt-1">{errors.address.message}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="city">City *</Label>
                 <Input
                   id="city"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  required
+                  {...register("city")}
                 />
+                {errors.city && (
+                  <p className="text-sm text-red-600 mt-1">{errors.city.message}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label htmlFor="state">State *</Label>
                   <Input
                     id="state"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
+                    {...register("state")}
                     maxLength={2}
                     placeholder="CA"
-                    required
                   />
+                  {errors.state && (
+                    <p className="text-sm text-red-600 mt-1">{errors.state.message}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="zipCode">Zip *</Label>
                   <Input
                     id="zipCode"
-                    name="zipCode"
-                    value={formData.zipCode}
-                    onChange={handleChange}
+                    {...register("zipCode")}
                     placeholder="94102"
-                    required
                   />
+                  {errors.zipCode && (
+                    <p className="text-sm text-red-600 mt-1">{errors.zipCode.message}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -200,104 +203,104 @@ export function AddListingModal({
                 <Label htmlFor="price">Price *</Label>
                 <Input
                   id="price"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
+                  {...register("price")}
                   placeholder="1,250,000"
-                  required
                 />
+                {errors.price && (
+                  <p className="text-sm text-red-600 mt-1">{errors.price.message}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="propertyType">Property Type *</Label>
-                <Select
-                  value={formData.propertyType}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, propertyType: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="single-family">Single Family</SelectItem>
-                    <SelectItem value="condo">Condo</SelectItem>
-                    <SelectItem value="townhouse">Townhouse</SelectItem>
-                    <SelectItem value="multi-family">Multi-Family</SelectItem>
-                    <SelectItem value="land">Land</SelectItem>
-                    <SelectItem value="commercial">Commercial</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="propertyType"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="single-family">Single Family</SelectItem>
+                        <SelectItem value="condo">Condo</SelectItem>
+                        <SelectItem value="townhouse">Townhouse</SelectItem>
+                        <SelectItem value="multi-family">Multi-Family</SelectItem>
+                        <SelectItem value="land">Land</SelectItem>
+                        <SelectItem value="commercial">Commercial</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
               <div>
                 <Label htmlFor="beds">Bedrooms *</Label>
                 <Input
                   id="beds"
                   type="number"
-                  value={formData.beds}
-                  onChange={(e) => handleNumberChange("beds", e.target.value)}
+                  {...register("beds", { valueAsNumber: true })}
                   min={0}
-                  required
                 />
+                {errors.beds && (
+                  <p className="text-sm text-red-600 mt-1">{errors.beds.message}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="baths">Bathrooms *</Label>
                 <Input
                   id="baths"
                   type="number"
-                  value={formData.baths}
-                  onChange={(e) => handleNumberChange("baths", e.target.value)}
+                  {...register("baths", { valueAsNumber: true })}
                   min={0}
                   step={0.5}
-                  required
                 />
+                {errors.baths && (
+                  <p className="text-sm text-red-600 mt-1">{errors.baths.message}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="sqft">Square Feet *</Label>
                 <Input
                   id="sqft"
-                  name="sqft"
-                  value={formData.sqft}
-                  onChange={handleChange}
+                  {...register("sqft")}
                   placeholder="2,400"
-                  required
                 />
+                {errors.sqft && (
+                  <p className="text-sm text-red-600 mt-1">{errors.sqft.message}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="lotSize">Lot Size</Label>
                 <Input
                   id="lotSize"
-                  name="lotSize"
-                  value={formData.lotSize}
-                  onChange={handleChange}
+                  {...register("lotSize")}
                   placeholder="0.25 acres"
                 />
               </div>
               <div>
                 <Label htmlFor="status">Status *</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, status: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="sold">Sold</SelectItem>
-                    <SelectItem value="off-market">Off Market</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="sold">Sold</SelectItem>
+                        <SelectItem value="off-market">Off Market</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
               <div>
                 <Label htmlFor="yearBuilt">Year Built</Label>
                 <Input
                   id="yearBuilt"
-                  name="yearBuilt"
-                  value={formData.yearBuilt}
-                  onChange={handleChange}
+                  {...register("yearBuilt")}
                   placeholder="2015"
                 />
               </div>
@@ -309,9 +312,7 @@ export function AddListingModal({
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
+              {...register("description")}
               rows={4}
               placeholder="Beautiful property with stunning views..."
             />
@@ -322,9 +323,7 @@ export function AddListingModal({
             <Label htmlFor="mlsNumber">MLS Number</Label>
             <Input
               id="mlsNumber"
-              name="mlsNumber"
-              value={formData.mlsNumber}
-              onChange={handleChange}
+              {...register("mlsNumber")}
               placeholder="ML81234567"
             />
           </div>
@@ -372,6 +371,9 @@ export function AddListingModal({
                   </div>
                 ))}
               </div>
+            )}
+            {errors.images && (
+              <p className="text-sm text-red-600 mt-1">{errors.images.message}</p>
             )}
           </div>
 
