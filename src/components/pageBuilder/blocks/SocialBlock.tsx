@@ -14,6 +14,7 @@ import {
     Home,
     Building,
 } from "lucide-react";
+import { sanitizeUrl } from "@/utils/sanitize";
 
 interface SocialBlockProps {
     config: SocialBlockConfig;
@@ -74,7 +75,11 @@ export function SocialBlock({ config, isEditing = false }: SocialBlockProps) {
 
     const handleClick = (url: string) => {
         if (!isEditing) {
-            window.open(url, "_blank", "noopener,noreferrer");
+            // Sanitize URL to prevent XSS via javascript: or data: protocols
+            const safeUrl = sanitizeUrl(url);
+            if (safeUrl) {
+                window.open(safeUrl, "_blank", "noopener,noreferrer");
+            }
         }
     };
 
