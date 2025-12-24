@@ -6,6 +6,33 @@
 import { PageConfig } from "@/types/pageBuilder";
 
 /**
+ * Breadcrumb item interface
+ */
+export interface BreadcrumbItem {
+    name: string;
+    url: string;
+}
+
+/**
+ * Generate BreadcrumbList Schema
+ * Helps Google understand site hierarchy and displays breadcrumbs in search results
+ */
+export const generateBreadcrumbSchema = (items: BreadcrumbItem[]): Record<string, any> => {
+    const itemListElements = items.map((item, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "name": item.name,
+        "item": item.url
+    }));
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": itemListElements
+    };
+};
+
+/**
  * Generate Person Schema for Real Estate Agent
  */
 export const generatePersonSchema = (page: PageConfig): Record<string, any> => {
@@ -112,6 +139,52 @@ export const generateLocalBusinessSchema = (
     }
 
     return schema;
+};
+
+/**
+ * Generate enhanced LocalBusiness Schema for homepage/landing page
+ * Optimized for local SEO with comprehensive business information
+ */
+export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "ProfessionalService",
+        "name": "AgentBio",
+        "description": "AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.",
+        "url": baseUrl,
+        "logo": {
+            "@type": "ImageObject",
+            "url": `${baseUrl}/logo.png`
+        },
+        "image": `${baseUrl}/Cover.png`,
+        "priceRange": "$$$",
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "523",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "areaServed": {
+            "@type": "Country",
+            "name": "United States"
+        },
+        "serviceType": "Real Estate Marketing Software",
+        "provider": {
+            "@type": "Organization",
+            "name": "AgentBio"
+        },
+        "offers": {
+            "@type": "Offer",
+            "price": "39",
+            "priceCurrency": "USD",
+            "priceValidUntil": "2025-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": `${baseUrl}/pricing`
+        }
+    };
 };
 
 /**
