@@ -2,6 +2,7 @@ import { ArrowRight, Home, TrendingUp, Users, Star, CheckCircle } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { Breadcrumb } from "@/components/seo/Breadcrumb";
 
 export interface LocationData {
   city: string;
@@ -96,8 +97,19 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
+        {/* Breadcrumb Navigation */}
+        <section className="container mx-auto px-4 pt-6">
+          <Breadcrumb
+            items={[
+              { name: "Home", url: window.location.origin },
+              { name: "Locations", url: "/for-real-estate-agents" },
+              { name: `${city} Real Estate Agents`, url: `/for/${slug}` }
+            ]}
+          />
+        </section>
+
         {/* Hero Section */}
-        <section className="container mx-auto px-4 pt-24 pb-16">
+        <section className="container mx-auto px-4 pt-12 pb-16">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
               <TrendingUp className="h-4 w-4" />
