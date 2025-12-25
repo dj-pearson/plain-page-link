@@ -10,13 +10,16 @@ import { BeforeAfterComparison } from "@/components/landing/BeforeAfterCompariso
 import { DemoProfilesShowcase } from "@/components/landing/DemoProfilesShowcase";
 import { AgentTestimonials } from "@/components/landing/AgentTestimonials";
 import { FeatureCard } from "@/components/landing/FeatureCard";
-import { generateBreadcrumbSchema, generateEnhancedLocalBusinessSchema } from "@/lib/seo";
+import { generateBreadcrumbSchema, generateEnhancedLocalBusinessSchema, generateEnhancedOrganizationSchema } from "@/lib/seo";
 
 export default function Landing() {
     // Generate breadcrumb schema for homepage
     const breadcrumbSchema = generateBreadcrumbSchema([
         { name: "Home", url: window.location.origin }
     ]);
+
+    // Generate enhanced organization schema with social signals
+    const organizationSchema = generateEnhancedOrganizationSchema();
 
     // Generate enhanced local business schema
     const localBusinessSchema = generateEnhancedLocalBusinessSchema();
@@ -42,18 +45,8 @@ export default function Landing() {
                     "query-input": "required name=search_term_string"
                 }
             },
-            {
-                "@type": "Organization",
-                "@id": `${window.location.origin}/#organization`,
-                "name": "AgentBio",
-                "url": window.location.origin,
-                "logo": {
-                    "@type": "ImageObject",
-                    "url": `${window.location.origin}/logo.png`
-                },
-                "sameAs": [],
-                "description": "AgentBio provides real estate agents with mobile-optimized bio page tools to showcase property listings, capture buyer and seller leads, and book showing appointments directly from Instagram and social media."
-            },
+            // Use centralized Organization schema with social signals
+            organizationSchema,
             {
                 "@type": "SoftwareApplication",
                 "name": "AgentBio",
