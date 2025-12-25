@@ -142,6 +142,59 @@ export const generateLocalBusinessSchema = (
 };
 
 /**
+ * Generate enhanced Organization Schema with social signals
+ * Includes social media profiles, contact info, and ratings for Knowledge Graph optimization
+ */
+export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": `${baseUrl}/#organization`,
+        "name": "AgentBio",
+        "legalName": "AgentBio Intelligence",
+        "url": baseUrl,
+        "logo": {
+            "@type": "ImageObject",
+            "url": `${baseUrl}/logo.png`,
+            "width": "512",
+            "height": "512"
+        },
+        "image": `${baseUrl}/Cover.png`,
+        "description": "AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.",
+        "foundingDate": "2024",
+        "slogan": "Transform Instagram followers into qualified leads",
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "Customer Service",
+            "email": "support@agentbio.net",
+            "url": `${baseUrl}/contact`,
+            "availableLanguage": ["English"]
+        },
+        "sameAs": [
+            "https://twitter.com/agentbio",
+            "https://www.facebook.com/agentbio",
+            "https://www.linkedin.com/company/agentbio",
+            "https://www.instagram.com/agentbio",
+            "https://www.youtube.com/@agentbio",
+            "https://github.com/agentbio"
+        ],
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "523",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "areaServed": {
+            "@type": "Country",
+            "name": "United States"
+        }
+    };
+};
+
+/**
  * Generate enhanced LocalBusiness Schema for homepage/landing page
  * Optimized for local SEO with comprehensive business information
  */

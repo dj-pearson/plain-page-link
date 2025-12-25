@@ -5,11 +5,14 @@ import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { HeroSection } from "@/components/hero";
+import { generateEnhancedOrganizationSchema } from "@/lib/seo";
 
 export default function VsBeacons() {
     const schema = {
         "@context": "https://schema.org",
         "@graph": [
+            // Enhanced Organization schema with social signals
+            generateEnhancedOrganizationSchema(),
             {
                 "@type": "WebPage",
                 "@id": `${window.location.origin}/vs/beacons`,

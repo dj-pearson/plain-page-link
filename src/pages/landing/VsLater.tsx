@@ -2,6 +2,7 @@ import { Check, X, ArrowRight, Star, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { generateEnhancedOrganizationSchema } from "@/lib/seo";
 
 export default function VsLater() {
   const canonicalUrl = `${window.location.origin}/vs/later`;
@@ -10,6 +11,8 @@ export default function VsLater() {
   const schema = {
     "@context": "https://schema.org",
     "@graph": [
+      // Enhanced Organization schema with social signals
+      generateEnhancedOrganizationSchema(),
       {
         "@type": "WebPage",
         "@id": toolUrl,

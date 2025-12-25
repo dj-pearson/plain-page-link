@@ -13,6 +13,7 @@ import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { generateEnhancedOrganizationSchema } from "@/lib/seo";
 
 export default function Pricing() {
   const [isYearly, setIsYearly] = useState(false);
@@ -26,6 +27,8 @@ export default function Pricing() {
     return {
       "@context": "https://schema.org",
       "@graph": [
+        // Enhanced Organization schema with social signals
+        generateEnhancedOrganizationSchema(),
         // Main Product for the service
         {
           "@type": "Product",
