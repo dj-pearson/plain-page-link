@@ -194,7 +194,7 @@ export const useAuthStore = create<AuthState>()(
 
       signUp: async (email: string, password: string, username: string, fullName?: string) => {
         set({ isLoading: true, error: null });
-        
+
         try {
           const { data, error } = await supabase.auth.signUp({
             email,
@@ -207,14 +207,60 @@ export const useAuthStore = create<AuthState>()(
               emailRedirectTo: `${window.location.origin}/`,
             },
           });
-          
+
           if (error) throw error;
-          
-          set({
-            user: data.user,
-            session: data.session,
-            isLoading: false,
-          });
+
+          // If user was created and we have a session, wait for profile to be created by DB trigger
+          // The handle_new_user trigger creates the profile, but there's a race condition
+          if (data.user && data.session) {
+            let profile = null;
+            let role = null;
+
+            // Retry fetching profile with exponential backoff (trigger may not have completed yet)
+            const maxRetries = 5;
+            const baseDelay = 100; // Start with 100ms
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+              const [profileResult, rolesResult] = await Promise.all([
+                supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', data.user.id)
+                  .single(),
+                supabase
+                  .from('user_roles')
+                  .select('role')
+                  .eq('user_id', data.user.id)
+                  .order('role', { ascending: true })
+              ]);
+
+              if (profileResult.data) {
+                profile = profileResult.data;
+                role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+                break;
+              }
+
+              // Wait before retrying (exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms)
+              if (attempt < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, attempt)));
+              }
+            }
+
+            set({
+              user: data.user,
+              session: data.session,
+              profile,
+              role,
+              isLoading: false,
+            });
+          } else {
+            // Email confirmation required - no session yet
+            set({
+              user: data.user,
+              session: data.session,
+              isLoading: false,
+            });
+          }
         } catch (error: any) {
           set({
             error: error.message,
@@ -226,34 +272,35 @@ export const useAuthStore = create<AuthState>()(
 
       signIn: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
-        
+
         try {
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
           });
-          
+
           if (error) throw error;
-          
-          // Fetch profile and role
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-          
-          const { data: userRoles } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', data.user.id)
-            .order('role', { ascending: true });
-          
-          const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
-          
+
+          // Fetch profile and roles in parallel for better performance
+          const [profileResult, rolesResult] = await Promise.all([
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', data.user.id)
+              .single(),
+            supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', data.user.id)
+              .order('role', { ascending: true })
+          ]);
+
+          const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+
           set({
             user: data.user,
             session: data.session,
-            profile: profile || null,
+            profile: profileResult.data || null,
             role: role,
             isLoading: false,
           });
