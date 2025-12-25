@@ -176,14 +176,41 @@ export const EdgeFunctions = {
       auth: false,
     }),
 
-  // Create Stripe checkout session
+  // Create Stripe checkout session (subscription or one-time)
   createCheckoutSession: (data: {
     priceId: string;
-    userId: string;
     successUrl: string;
     cancelUrl: string;
+    mode?: 'subscription' | 'payment';
+    productType?: string;
+    quantity?: number;
   }) =>
     callEdgeFunction<{ sessionId: string; url: string }>('create-checkout-session', {
+      body: data,
+      auth: true,
+    }),
+
+  // Create Stripe customer portal session
+  createPortalSession: (data: { returnUrl: string }) =>
+    callEdgeFunction<{ url: string }>('create-portal-session', {
+      body: data,
+      auth: true,
+    }),
+
+  // Create Stripe customer
+  createStripeCustomer: () =>
+    callEdgeFunction<{ id: string; email: string; exists: boolean }>('create-stripe-customer', {
+      auth: true,
+    }),
+
+  // Report usage to Stripe (for metered billing)
+  reportStripeUsage: (data: {
+    subscription_item_id: string;
+    quantity: number;
+    timestamp?: number;
+    action?: 'increment' | 'set';
+  }) =>
+    callEdgeFunction<{ id: string; quantity: number; timestamp: number }>('report-stripe-usage', {
       body: data,
       auth: true,
     }),
