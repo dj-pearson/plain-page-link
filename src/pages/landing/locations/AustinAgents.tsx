@@ -1,30 +1,11 @@
-import LocationTemplate, { LocationData } from "../LocationTemplate";
+import LocationTemplate from "../LocationTemplate";
+import { getLocationBySlug } from "@/data/locations";
 
-const austinData: LocationData = {
-  city: "Austin",
-  state: "Texas",
-  stateAbbr: "TX",
-  slug: "austin-real-estate-agents",
-  medianPrice: "$550,000",
-  marketTrend: "Competitive",
-  agentCount: "4,200+",
-  marketDescription: "Austin's booming tech sector and population growth create high demand for agents who can effectively market to relocating professionals through social media.",
-  neighborhoods: [
-    "Downtown Austin",
-    "South Congress",
-    "East Austin",
-    "West Lake Hills",
-    "Tarrytown",
-    "Hyde Park",
-    "Mueller",
-    "Zilker",
-    "Barton Hills",
-    "Clarksville",
-    "Bouldin Creek",
-    "Travis Heights",
-  ],
-};
+const austinData = getLocationBySlug("austin-real-estate-agents");
 
 export default function AustinAgents() {
+  if (!austinData) {
+    throw new Error("Austin location data not found");
+  }
   return <LocationTemplate location={austinData} />;
 }
