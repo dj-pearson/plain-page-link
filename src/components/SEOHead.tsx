@@ -69,8 +69,11 @@ export const SEOHead = ({
   const fullTitle = title.length > 60 ? title.substring(0, 57) + '...' : title;
   const metaDescription = description.length > 160 ? description.substring(0, 157) + '...' : description;
 
+  // Safe origin detection for SSR/crawlers
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
+
   // Default OG image if not provided
-  const defaultOgImage = `${window.location.origin}/Cover.png`;
+  const defaultOgImage = `${origin}/Cover.png`;
   const imageUrl = ogImage || defaultOgImage;
 
   // Generate robots meta tag

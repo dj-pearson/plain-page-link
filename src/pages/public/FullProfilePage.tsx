@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Navigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 import { FullPageLoader } from "@/components/LoadingSpinner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ContactButtons from "@/components/profile/ContactButtons";
@@ -80,16 +79,7 @@ export default function FullProfilePage() {
     // We pass the profile.id only when data is available
     useProfileTracking(data?.profile?.id, slug || "");
 
-    // Redirect to custom page if active
-    if (checkingCustomPage) {
-        return <FullPageLoader text="Loading profile..." />;
-    }
-
-    if (customPageSlug) {
-        return <Navigate to={`/p/${customPageSlug}`} replace />;
-    }
-
-    // Apply theme when profile loads
+    // Apply theme when profile loads - IMPORTANT: All hooks must be before conditional returns
     useEffect(() => {
         if (data?.profile?.theme) {
             try {
@@ -115,6 +105,15 @@ export default function FullProfilePage() {
         }
     }, [data]);
 
+    // Redirect to custom page if active
+    if (checkingCustomPage) {
+        return <FullPageLoader text="Loading profile..." />;
+    }
+
+    if (customPageSlug) {
+        return <Navigate to={`/p/${customPageSlug}`} replace />;
+    }
+
     if (isLoading) {
         return <FullPageLoader text="Loading profile..." />;
     }
@@ -139,10 +138,11 @@ export default function FullProfilePage() {
               testimonials.length
             : 0;
 
-    // Generate SEO data
+    // Generate SEO data with safe origin detection for SSR/crawlers
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
     const seoTitle = profile.seo_title || `${profile.full_name || profile.username} - Real Estate Agent`;
     const seoDescription = profile.seo_description || profile.bio || `Browse properties and connect with ${profile.full_name || profile.username}, a trusted real estate professional.`;
-    const currentUrl = `${window.location.origin}/${slug}`;
+    const currentUrl = `${origin}/${slug}`;
 
     // Generate comprehensive structured data for SEO (dual schema for better coverage)
     const personSchema = {
@@ -239,7 +239,7 @@ export default function FullProfilePage() {
                 "name": seoTitle,
                 "description": seoDescription,
                 "isPartOf": {
-                    "@id": `${window.location.origin}/#website`
+                    "@id": `${origin}/#website`
                 },
                 "about": {
                     "@id": `${currentUrl}#agent`
@@ -257,7 +257,7 @@ export default function FullProfilePage() {
                         "@type": "ListItem",
                         "position": 1,
                         "name": "Home",
-                        "item": window.location.origin
+                        "item": origin
                     },
                     {
                         "@type": "ListItem",

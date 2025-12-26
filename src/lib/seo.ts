@@ -4,6 +4,7 @@
  */
 
 import { PageConfig } from "@/types/pageBuilder";
+import { getSafeOrigin } from "@/lib/utils";
 
 /**
  * Breadcrumb item interface
@@ -47,7 +48,7 @@ export const generatePersonSchema = (page: PageConfig): Record<string, any> => {
         jobTitle:
             (bioBlock as any)?.config.subtitle || "Real Estate Professional",
         description: (bioBlock as any)?.config.description || page.description,
-        url: `${window.location.origin}/p/${page.slug}`,
+        url: `${getSafeOrigin()}/p/${page.slug}`,
     };
 
     // Add image if available
@@ -78,7 +79,7 @@ export const generateRealEstateAgentSchema = (
         "@type": "RealEstateAgent",
         name: bioBlock?.config.title || page.title,
         description: (bioBlock as any)?.config.description || page.description,
-        url: `${window.location.origin}/p/${page.slug}`,
+        url: `${getSafeOrigin()}/p/${page.slug}`,
     };
 
     // Add image if available
@@ -115,7 +116,7 @@ export const generateLocalBusinessSchema = (
         "@type": "RealEstateAgent",
         name: businessInfo.businessName || page.title,
         description: page.description,
-        url: `${window.location.origin}/p/${page.slug}`,
+        url: `${getSafeOrigin()}/p/${page.slug}`,
     };
 
     // Add address if available
@@ -146,7 +147,7 @@ export const generateLocalBusinessSchema = (
  * Includes social media profiles, contact info, and ratings for Knowledge Graph optimization
  */
 export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
+    const baseUrl = getSafeOrigin();
 
     return {
         "@context": "https://schema.org",
@@ -199,7 +200,7 @@ export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
  * Optimized for local SEO with comprehensive business information
  */
 export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
+    const baseUrl = getSafeOrigin();
 
     return {
         "@context": "https://schema.org",
@@ -263,7 +264,7 @@ export const generateStructuredData = (
  */
 export const generateSitemap = (pages: PageConfig[]): string => {
     const publishedPages = pages.filter((p) => p.published);
-    const baseUrl = window.location.origin;
+    const baseUrl = getSafeOrigin();
 
     const urlEntries = publishedPages
         .map(
@@ -358,7 +359,7 @@ export const generateSocialPreview = (page: PageConfig) => {
             page.seo.ogImage ||
             bioBlock?.config?.avatarUrl ||
             "/default-og-image.png",
-        url: `${window.location.origin}/p/${page.slug}`,
+        url: `${getSafeOrigin()}/p/${page.slug}`,
         siteName: "AgentBio",
         twitterCard: page.seo.twitterCard || "summary_large_image",
     };
@@ -368,7 +369,7 @@ export const generateSocialPreview = (page: PageConfig) => {
  * Generate canonical URL
  */
 export const generateCanonicalUrl = (slug: string): string => {
-    return `${window.location.origin}/p/${slug}`;
+    return `${getSafeOrigin()}/p/${slug}`;
 };
 
 /**
