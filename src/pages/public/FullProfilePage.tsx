@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { FullPageLoader } from "@/components/LoadingSpinner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
@@ -158,9 +158,9 @@ export default function FullProfilePage() {
                 "email": profile.email_display,
                 "image": profile.avatar_url,
                 "url": currentUrl,
-                "address": profile.city && profile.license_state ? {
+                "address": Array.isArray(profile.service_cities) && profile.service_cities[0] && profile.license_state ? {
                     "@type": "PostalAddress",
-                    "addressLocality": profile.city,
+                    "addressLocality": profile.service_cities[0] as string,
                     "addressRegion": profile.license_state,
                     "addressCountry": "US"
                 } : {
@@ -172,11 +172,11 @@ export default function FullProfilePage() {
                 ...(profile.years_experience && {
                     "yearsInBusiness": profile.years_experience
                 }),
-                ...(profile.specialties && profile.specialties.length > 0 && {
+                ...(Array.isArray(profile.specialties) && profile.specialties.length > 0 && {
                     "knowsAbout": profile.specialties
                 }),
-                ...(profile.service_cities && profile.service_cities.length > 0 && {
-                    "areaServed": profile.service_cities.map((city: string) => ({
+                ...(Array.isArray(profile.service_cities) && profile.service_cities.length > 0 && {
+                    "areaServed": (profile.service_cities as string[]).map((city: string) => ({
                         "@type": "City",
                         "name": city
                     }))
@@ -207,10 +207,10 @@ export default function FullProfilePage() {
                 "telephone": profile.phone,
                 "email": profile.email_display,
                 "url": currentUrl,
-                ...(profile.city && profile.license_state && {
+                ...(Array.isArray(profile.service_cities) && profile.service_cities[0] && profile.license_state && {
                     "address": {
                         "@type": "PostalAddress",
-                        "addressLocality": profile.city,
+                        "addressLocality": profile.service_cities[0] as string,
                         "addressRegion": profile.license_state,
                         "addressCountry": "US"
                     }
@@ -315,15 +315,15 @@ export default function FullProfilePage() {
             <SEOHead
                 title={seoTitle}
                 description={seoDescription}
-                ogImage={profile.og_image || profile.avatar_url}
+                ogImage={profile.og_image || profile.avatar_url || undefined}
                 canonicalUrl={currentUrl}
                 keywords={[
                     profile.full_name || profile.username,
                     "real estate agent",
                     profile.license_state || "",
-                    ...(profile.specialties || []),
-                    ...(profile.service_cities || [])
-                ].filter(Boolean)}
+                    ...(Array.isArray(profile.specialties) ? profile.specialties : []),
+                    ...(Array.isArray(profile.service_cities) ? profile.service_cities : [])
+                ].filter(Boolean) as string[]}
                 schema={personSchema}
             />
             {render3DBackground()}
@@ -478,7 +478,7 @@ export default function FullProfilePage() {
                             {profile.license_number && (
                                 <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-300">
                                     <p className="text-xs sm:text-sm text-gray-700 font-medium">
-                                        {profile.display_name}
+                                        {profile.full_name || profile.username}
                                         {profile.title && ` | ${profile.title}`}
                                     </p>
                                     <p className="text-xs text-gray-600 mt-1">
@@ -501,7 +501,7 @@ export default function FullProfilePage() {
 
                             {/* Copyright */}
                             <p className="text-xs text-gray-500">
-                                © {new Date().getFullYear()} {profile.display_name}. All rights reserved.
+                                © {new Date().getFullYear()} {profile.full_name || profile.username}. All rights reserved.
                             </p>
                             <p className="text-xs text-gray-400 mt-1 sm:mt-2">
                                 Powered by{" "}
