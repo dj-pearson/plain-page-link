@@ -7,7 +7,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { offlineStorage } from "./lib/offline-storage";
 import { pushNotifications } from "./lib/push-notifications";
 import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
-import { LoadingSpinner } from "./components/LoadingSpinner";
+import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
 
 // Public pages (eager load for better UX on landing)
@@ -135,7 +135,7 @@ function App() {
             <OfflineIndicator />
 
             <LazyLoadErrorBoundary>
-                <Suspense fallback={<LoadingSpinner />}>
+                <Suspense fallback={<FullPageLoader text="Loading page..." />}>
                     <Routes>
                     {/* Public routes */}
                     <Route path="/" element={<Landing />} />

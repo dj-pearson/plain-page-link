@@ -11,11 +11,15 @@ import { DemoProfilesShowcase } from "@/components/landing/DemoProfilesShowcase"
 import { AgentTestimonials } from "@/components/landing/AgentTestimonials";
 import { FeatureCard } from "@/components/landing/FeatureCard";
 import { generateBreadcrumbSchema, generateEnhancedLocalBusinessSchema, generateEnhancedOrganizationSchema } from "@/lib/seo";
+import { getSafeOrigin } from "@/lib/utils";
 
 export default function Landing() {
+    // Safe origin for SSR/crawler compatibility
+    const origin = getSafeOrigin();
+
     // Generate breadcrumb schema for homepage
     const breadcrumbSchema = generateBreadcrumbSchema([
-        { name: "Home", url: window.location.origin }
+        { name: "Home", url: origin }
     ]);
 
     // Generate enhanced organization schema with social signals
@@ -29,18 +33,18 @@ export default function Landing() {
         "@graph": [
             {
                 "@type": "WebSite",
-                "@id": `${window.location.origin}/#website`,
-                "url": window.location.origin,
+                "@id": `${origin}/#website`,
+                "url": origin,
                 "name": "AgentBio - Real Estate Agent Bio Page Builder",
                 "description": "Turn your Instagram into a lead-generating real estate portfolio. Showcase listings, capture inquiries & book showings from one mobile-optimized bio page.",
                 "publisher": {
-                    "@id": `${window.location.origin}/#organization`
+                    "@id": `${origin}/#organization`
                 },
                 "potentialAction": {
                     "@type": "SearchAction",
                     "target": {
                         "@type": "EntryPoint",
-                        "urlTemplate": `${window.location.origin}/search?q={search_term_string}`
+                        "urlTemplate": `${origin}/search?q={search_term_string}`
                     },
                     "query-input": "required name=search_term_string"
                 }
@@ -141,7 +145,7 @@ export default function Landing() {
                     "agent booking page for showings",
                     "real estate social media landing page"
                 ]}
-                canonicalUrl={window.location.origin}
+                canonicalUrl={origin}
                 schema={schema}
             />
             <main className="min-h-screen bg-background">

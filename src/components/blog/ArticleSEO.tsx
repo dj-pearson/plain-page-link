@@ -1,4 +1,5 @@
 import { Helmet } from "react-helmet-async";
+import { getSafeOrigin } from "@/lib/utils";
 
 interface ArticleSEOProps {
   title: string;
@@ -27,8 +28,8 @@ export function ArticleSEO({
   wordCount,
   readingTime,
 }: ArticleSEOProps) {
-  const siteName = "Plain Page Link";
-  const siteUrl = window.location.origin;
+  const siteName = "AgentBio";
+  const siteUrl = getSafeOrigin();
   const fullUrl = `${siteUrl}${url}`;
 
   // Use Cover.png as fallback if no featured image

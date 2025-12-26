@@ -1,4 +1,5 @@
 import { Helmet } from "react-helmet-async";
+import { getSafeOrigin } from "@/lib/utils";
 
 interface BlogListSEOProps {
   totalArticles: number;
@@ -6,8 +7,8 @@ interface BlogListSEOProps {
 }
 
 export function BlogListSEO({ totalArticles, latestArticleDate }: BlogListSEOProps) {
-  const siteName = "Plain Page Link";
-  const siteUrl = window.location.origin;
+  const siteName = "AgentBio";
+  const siteUrl = getSafeOrigin();
   const blogUrl = `${siteUrl}/blog`;
   const title = "Real Estate Blog - Tips, Guides & Market Insights";
   const description =
