@@ -105,6 +105,48 @@ These are automatically available in all Edge Functions - you don't need to set 
 | `STRIPE_PRICE_ENTERPRISE_MONTHLY` | No | String | Stripe price ID for Enterprise monthly plan | `stripe-webhook` |
 | `STRIPE_PRICE_ENTERPRISE_YEARLY` | No | String | Stripe price ID for Enterprise yearly plan | `stripe-webhook` |
 
+#### Stripe Product Pricing Reference
+
+| Plan | Monthly | Yearly (17% off) | Features |
+|------|---------|------------------|----------|
+| **Starter** | $19/month | $189/year | 10 listings, 15 links, 90-day analytics |
+| **Professional** | $39/month | $389/year | 25 listings, unlimited links, custom domain |
+| **Team** | $29/agent/month | $289/agent/year | Unlimited everything, priority support |
+| **Enterprise** | $99/month | $989/year | Custom solutions, API access, dedicated support |
+
+#### Setting Up Stripe Products
+
+Use the provided setup scripts in `/scripts/` to create all products, prices, and payment links:
+
+**PowerShell (Windows):**
+```powershell
+# Test mode
+.\scripts\setup-stripe-products.ps1
+
+# Production mode
+.\scripts\setup-stripe-products.ps1 -Live
+```
+
+**Bash (Linux/Mac):**
+```bash
+# Test mode
+./scripts/setup-stripe-products.sh
+
+# Production mode
+./scripts/setup-stripe-products.sh --live
+```
+
+The scripts will output all the environment variables you need to set.
+
+#### Stripe Payment Links (Optional)
+
+Payment links allow direct checkout without code integration. After running the setup script, you'll get URLs like:
+- `STRIPE_PAYMENT_LINK_STARTER_MONTHLY` - Direct checkout for Starter monthly
+- `STRIPE_PAYMENT_LINK_STARTER_YEARLY` - Direct checkout for Starter yearly
+- etc.
+
+These can be used in marketing emails, social media, or anywhere you want a quick checkout link.
+
 ### Email (Resend)
 
 | Variable | Required | Type | Description | Default | Used In |
