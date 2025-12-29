@@ -38,9 +38,24 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import type { Lead } from "@/types/lead";
+
+// Extended Lead type for modal with additional fields that may be present
+interface LeadWithExtras extends Lead {
+    property_address?: string | null;
+    budget?: string | null;
+}
+
+interface LeadNote {
+    id: string;
+    lead_id: string;
+    note: string;
+    is_system: boolean;
+    created_at: string;
+}
 
 interface LeadDetailModalProps {
-    lead: any;
+    lead: LeadWithExtras | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onLeadUpdated?: () => void;
@@ -85,7 +100,7 @@ export function LeadDetailModal({
 }: LeadDetailModalProps) {
     const [status, setStatus] = useState(lead?.status || "new");
     const [note, setNote] = useState("");
-    const [notes, setNotes] = useState<any[]>([]);
+    const [notes, setNotes] = useState<LeadNote[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [loadingNotes, setLoadingNotes] = useState(false);
     const [selectedResponse, setSelectedResponse] = useState<string>("");

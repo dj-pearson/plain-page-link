@@ -20,7 +20,7 @@ export function useTestimonials() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: testimonials = [], isLoading } = useQuery({
+  const { data: testimonials = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["testimonials", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -125,6 +125,9 @@ export function useTestimonials() {
   return {
     testimonials,
     isLoading,
+    isError,
+    error,
+    refetch,
     addTestimonial,
     updateTestimonial,
     deleteTestimonial,

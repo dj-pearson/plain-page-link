@@ -21,7 +21,7 @@ export function useListings() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data: listings = [], isLoading } = useQuery({
+  const { data: listings = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["listings", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -93,6 +93,9 @@ export function useListings() {
   return {
     listings,
     isLoading,
+    isError,
+    error,
+    refetch,
     addListing,
     updateListing,
     deleteListing,
