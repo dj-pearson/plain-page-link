@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap, CheckSquare, Square, Trash2, CheckCircle2 } from "lucide-react";
+import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap, CheckSquare, Square, Trash2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,12 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { Lead } from "@/types/lead";
 
 export default function Leads() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showLeadDetail, setShowLeadDetail] = useState(false);
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [isBulkActing, setIsBulkActing] = useState(false);
@@ -31,7 +32,7 @@ export default function Leads() {
   const { toast } = useToast();
   const { subscription, hasFeature } = useSubscriptionLimits();
 
-  const { data: leads, isLoading, refetch } = useQuery({
+  const { data: leads, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["leads", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -48,7 +49,7 @@ export default function Leads() {
     enabled: !!user?.id,
   });
 
-  const handleLeadClick = (lead: any) => {
+  const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead);
     setShowLeadDetail(true);
   };
@@ -371,7 +372,25 @@ export default function Leads() {
 
       {/* Leads List - Mobile optimized */}
       <div className="space-y-2 sm:space-y-3">
-        {isLoading ? (
+        {isError ? (
+          <Card>
+            <CardContent className="p-6 sm:p-8 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-red-100 rounded-full mb-3 sm:mb-4">
+                <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-600" />
+              </div>
+              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+                Failed to load leads
+              </h3>
+              <p className="text-sm sm:text-base text-muted-foreground mb-4 max-w-sm mx-auto">
+                {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+              </p>
+              <Button onClick={() => refetch()} variant="outline" className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        ) : isLoading ? (
           <Card>
             <CardContent className="p-6 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
               Loading leads...

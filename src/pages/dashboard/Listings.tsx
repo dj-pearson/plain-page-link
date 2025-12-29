@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, AlertTriangle, AlertCircle, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,8 +14,10 @@ import { AddListingModal } from "@/components/modals/AddListingModal";
 import { EditListingModal, EditListingFormData } from "@/components/modals/EditListingModal";
 import type { ListingFormData } from "@/components/modals/AddListingModal";
 import { useToast } from "@/hooks/use-toast";
-import { useListings } from "@/hooks/useListings";
+import { useListings, type Listing } from "@/hooks/useListings";
 import { useListingImageUpload } from "@/hooks/useListingImageUpload";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
@@ -25,16 +27,28 @@ import { KeyboardShortcutsHelper } from "@/components/dashboard/KeyboardShortcut
 import { QuickStatusUpdate } from "@/components/dashboard/QuickStatusUpdate";
 import { useNavigate } from "react-router-dom";
 
+// Type for newly created listing data used for social sharing
+interface SocialShareListingData {
+  address: string;
+  city: string;
+  price: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  property_type?: string;
+  image?: string;
+}
+
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingListing, setEditingListing] = useState<any>(null);
+  const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showSocialShareDialog, setShowSocialShareDialog] = useState(false);
-  const [newlyCreatedListing, setNewlyCreatedListing] = useState<any>(null);
+  const [newlyCreatedListing, setNewlyCreatedListing] = useState<SocialShareListingData | null>(null);
   const [listingToDelete, setListingToDelete] = useState<{ id: string; address: string } | null>(null);
   const { toast } = useToast();
-  const { listings, isLoading, addListing, updateListing, deleteListing } = useListings();
+  const { listings, isLoading, isError, error, refetch, addListing, updateListing, deleteListing } = useListings();
   const { uploadListingImages, uploading: uploadingImages } = useListingImageUpload();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
   const { profile } = useProfile();
@@ -262,9 +276,31 @@ export default function Listings() {
         </div>
       </div>
 
+      {/* Error State */}
+      {isError && (
+        <Card>
+          <CardContent className="p-6 sm:p-8 text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-red-100 rounded-full mb-3 sm:mb-4">
+              <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-600" />
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+              Failed to load listings
+            </h3>
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 max-w-sm mx-auto">
+              {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+            </p>
+            <Button onClick={() => refetch()} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Listings Grid - Mobile optimized */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {listings.map((listing) => (
+      {!isError && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {listings.map((listing) => (
           <div
             key={listing.id}
             className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg active:shadow-xl transition-all group"
@@ -336,11 +372,12 @@ export default function Listings() {
               </div>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Empty State (shown when no listings) - Mobile optimized */}
-      {listings.length === 0 && (
+      {!isError && listings.length === 0 && (
         <div className="text-center py-8 sm:py-12 px-4">
           <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-accent rounded-full mb-3 sm:mb-4">
             <Plus className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
