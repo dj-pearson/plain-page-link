@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
 
@@ -15,7 +16,7 @@ if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
   try {
     authChannel = new BroadcastChannel(AUTH_CHANNEL_NAME);
   } catch (e) {
-    console.warn('BroadcastChannel not available for SLO:', e);
+    logger.warn('BroadcastChannel not available for SLO');
   }
 }
 
@@ -71,7 +72,7 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           window.addEventListener('storage', (event) => {
             if (event.key === 'agentbio-logout' && event.newValue) {
-              console.log('SLO: Received logout via localStorage event');
+              logger.debug('SLO: Received logout via localStorage event');
               _handleSLOMessage({
                 type: 'SIGN_OUT',
                 timestamp: parseInt(event.newValue, 10),
@@ -133,7 +134,7 @@ export const useAuthStore = create<AuthState>()(
             });
           }
         } catch (error: any) {
-          console.error('Auth initialization error:', error);
+          logger.error('Auth initialization error', error);
           set({
             user: null,
             session: null,
@@ -146,7 +147,7 @@ export const useAuthStore = create<AuthState>()(
 
         // Set up auth state listener for session changes
         supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('Auth state change:', event, session?.user?.id);
+          logger.authEvent(event, session?.user?.id);
 
           if (event === 'SIGNED_OUT') {
             set({
@@ -184,7 +185,7 @@ export const useAuthStore = create<AuthState>()(
               const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
               set({ profile: profileResult.data || null, role });
             } catch (error) {
-              console.error('Error fetching user data in auth state listener:', error);
+              logger.error('Error fetching user data in auth state listener', error);
             }
           } else {
             set({ profile: null, role: null });
@@ -393,7 +394,7 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
         } catch (error: any) {
-          console.error('Sign out error:', error);
+          logger.error('Sign out error', error);
           set({ isLoading: false });
         }
       },
@@ -429,7 +430,7 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
         } catch (error: any) {
-          console.error('Sign out all devices error:', error);
+          logger.error('Sign out all devices error', error);
           set({ isLoading: false });
         }
       },
@@ -439,7 +440,7 @@ export const useAuthStore = create<AuthState>()(
 
         // Only handle if we have a session and message is for our user or all users
         if (user && (message.userId === user.id || !message.userId)) {
-          console.log('SLO: Received logout broadcast from another tab');
+          logger.debug('SLO: Received logout broadcast from another tab');
           // Clear local state without re-calling Supabase signOut
           // to avoid infinite broadcast loop
           set({
