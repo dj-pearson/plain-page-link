@@ -1,6 +1,7 @@
 /**
  * Mobile Bottom Navigation Component
  * Touch-friendly navigation for mobile devices with expanded menu
+ * Hides on scroll down, shows on scroll up for better content visibility
  */
 
 import { useState } from "react";
@@ -8,6 +9,7 @@ import { Home, ListTodo, Users, BarChart3, Menu, Star, Link as LinkIcon, Zap, Fi
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,6 +25,7 @@ export function MobileNav() {
     const navigate = useNavigate();
     const { profile, signOut, role } = useAuthStore();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { isVisible } = useScrollDirection({ threshold: 15, topThreshold: 50 });
 
     const navItems: NavItem[] = [
         { label: "Home", icon: Home, href: "/dashboard" },
@@ -59,7 +62,14 @@ export function MobileNav() {
 
     return (
         <>
-            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 md:hidden safe-area-inset-bottom shadow-lg" aria-label="Mobile navigation">
+            <nav
+                className={cn(
+                    "fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 md:hidden safe-area-inset-bottom shadow-lg",
+                    "transition-transform duration-300 ease-out",
+                    isVisible || isMenuOpen ? "translate-y-0" : "translate-y-full"
+                )}
+                aria-label="Mobile navigation"
+            >
                 <div className="flex justify-around items-center h-16 px-1">
                     {navItems.map((item) => {
                         const isItemActive = isActive(item.href);
