@@ -42,10 +42,14 @@ export function useLeads() {
 
   const updateLead = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Lead> & { id: string }) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // Security: Verify user owns this lead by requiring both id and user_id match
       const { data, error } = await supabase
         .from("leads")
         .update(updates)
         .eq("id", id)
+        .eq("user_id", user.id)
         .select()
         .single();
 
@@ -59,10 +63,14 @@ export function useLeads() {
 
   const deleteLead = useMutation({
     mutationFn: async (id: string) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // Security: Verify user owns this lead by requiring both id and user_id match
       const { error } = await supabase
         .from("leads")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", user.id);
 
       if (error) throw error;
     },

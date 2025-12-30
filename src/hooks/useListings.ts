@@ -61,10 +61,14 @@ export function useListings() {
 
   const updateListing = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Listing> & { id: string }) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // Security: Verify user owns this listing by requiring both id and user_id match
       const { data, error } = await supabase
         .from("listings")
         .update(updates)
         .eq("id", id)
+        .eq("user_id", user.id)
         .select()
         .single();
 
@@ -78,10 +82,14 @@ export function useListings() {
 
   const deleteListing = useMutation({
     mutationFn: async (id: string) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // Security: Verify user owns this listing by requiring both id and user_id match
       const { error } = await supabase
         .from("listings")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", user.id);
 
       if (error) throw error;
     },
