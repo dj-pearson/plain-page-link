@@ -34,12 +34,56 @@ export function validateUrl(url: string): boolean {
   }
 }
 
-// Sanitize string (remove potentially dangerous characters)
+// Sanitize string (remove potentially dangerous characters and XSS vectors)
 export function sanitizeString(str: string): string {
   return str
     .trim()
-    .replace(/[<>]/g, '') // Remove < and >
+    // Remove HTML tags and their contents for script/style
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    // Remove HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Decode and remove HTML entities that could be used for XSS
+    .replace(/&lt;/gi, '')
+    .replace(/&gt;/gi, '')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&amp;/gi, '&')
+    // Remove javascript: and data: URLs
+    .replace(/javascript:/gi, '')
+    .replace(/data:/gi, '')
+    .replace(/vbscript:/gi, '')
+    // Remove event handlers (onclick, onerror, etc.)
+    .replace(/on\w+\s*=/gi, '')
     .slice(0, 5000); // Hard limit
+}
+
+// Validate that a URL is safe (not javascript:, data:, or other dangerous protocols)
+export function isValidSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const safeProtocols = ['http:', 'https:'];
+    return safeProtocols.includes(parsed.protocol.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+// Validate webhook URL against allowed domains (for SSRF prevention)
+export function isValidWebhookUrl(url: string, allowedDomains: string[] = ['hooks.zapier.com', 'hook.us1.make.com', 'hook.eu1.make.com']): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol.toLowerCase())) {
+      return false;
+    }
+    // Check if the hostname matches any allowed domain
+    return allowedDomains.some(domain =>
+      parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
+    );
+  } catch {
+    return false;
+  }
 }
 
 // Lead data validation
