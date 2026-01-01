@@ -26,6 +26,7 @@ import { SkipLink } from "@/components/SkipLink";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { logger } from "@/lib/logger";
 
 export default function DashboardLayout() {
     const location = useLocation();
@@ -78,7 +79,7 @@ export default function DashboardLayout() {
                 setTimeout(() => setCopied(false), 2000);
             }
         } catch (error) {
-            console.error('Failed to copy/share:', error);
+            logger.error('Failed to copy/share profile URL', error);
             toast({
                 title: "Failed to copy",
                 description: "Please try again",
@@ -260,8 +261,12 @@ export default function DashboardLayout() {
                             >
                                 View Profile →
                             </Link>
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span className="text-sm sm:text-base text-blue-600 font-semibold">
+                            <div
+                                className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0"
+                                role="img"
+                                aria-label={`Profile avatar for ${profile?.full_name || 'user'}`}
+                            >
+                                <span className="text-sm sm:text-base text-blue-600 font-semibold" aria-hidden="true">
                                     {getInitials(profile?.full_name)}
                                 </span>
                             </div>
