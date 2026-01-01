@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap, CheckSquare, Square, Trash2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -49,6 +49,22 @@ export default function Leads() {
     },
     enabled: !!user?.id,
   });
+
+  // Memoize lead stats to avoid N+1 filtering on every render
+  const leadStats = useMemo(() => {
+    if (!leads) return { total: 0, new: 0, contacted: 0, converted: 0 };
+
+    return leads.reduce(
+      (acc, lead) => {
+        acc.total++;
+        if (lead.status === "new") acc.new++;
+        else if (lead.status === "contacted") acc.contacted++;
+        else if (lead.status === "converted") acc.converted++;
+        return acc;
+      },
+      { total: 0, new: 0, contacted: 0, converted: 0 }
+    );
+  }, [leads]);
 
   const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead);
@@ -262,14 +278,14 @@ export default function Leads() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-            <div className="text-xl sm:text-2xl font-bold text-foreground">{leads?.length || 0}</div>
+            <div className="text-xl sm:text-2xl font-bold text-foreground">{leadStats.total}</div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Total Leads</div>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
             <div className="text-xl sm:text-2xl font-bold text-green-600">
-              {leads?.filter((l) => l.status === "new").length || 0}
+              {leadStats.new}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">New</div>
           </CardContent>
@@ -277,7 +293,7 @@ export default function Leads() {
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
             <div className="text-xl sm:text-2xl font-bold text-blue-600">
-              {leads?.filter((l) => l.status === "contacted").length || 0}
+              {leadStats.contacted}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Contacted</div>
           </CardContent>
@@ -285,7 +301,7 @@ export default function Leads() {
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
             <div className="text-xl sm:text-2xl font-bold text-primary">
-              {leads?.filter((l) => l.status === "converted").length || 0}
+              {leadStats.converted}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Converted</div>
           </CardContent>
