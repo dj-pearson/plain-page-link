@@ -9,6 +9,7 @@ import { pushNotifications } from "./lib/push-notifications";
 import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
+import { SkipNavLink } from "./components/ui/skip-nav";
 
 // Public pages (eager load for better UX on landing)
 import Landing from "./pages/public/Landing";
@@ -131,6 +132,9 @@ function App() {
 
     return (
         <>
+            {/* Skip Navigation for Keyboard Accessibility (WCAG 2.4.1) */}
+            <SkipNavLink />
+
             {/* Offline Indicator */}
             <OfflineIndicator />
 

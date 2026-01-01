@@ -10,9 +10,11 @@ import "./index.css";
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            staleTime: 60 * 1000, // 1 minute
+            staleTime: 5 * 60 * 1000, // 5 minutes - reduces unnecessary refetches
+            gcTime: 10 * 60 * 1000, // 10 minutes cache time (formerly cacheTime)
             retry: 1,
             refetchOnWindowFocus: false,
+            refetchOnReconnect: true, // Refetch when network reconnects
         },
     },
 });

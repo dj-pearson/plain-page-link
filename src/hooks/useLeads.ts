@@ -7,7 +7,7 @@ export function useLeads() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data: leads = [], isLoading } = useQuery({
+  const { data: leads = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["leads", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -82,6 +82,9 @@ export function useLeads() {
   return {
     leads,
     isLoading,
+    isError,
+    error,
+    refetch,
     addLead,
     updateLead,
     deleteLead,
