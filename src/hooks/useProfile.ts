@@ -46,7 +46,7 @@ export function useProfile() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -85,6 +85,9 @@ export function useProfile() {
   return {
     profile,
     isLoading,
+    isError,
+    error,
+    refetch,
     updateProfile,
   };
 }

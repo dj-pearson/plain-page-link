@@ -22,7 +22,7 @@ export function useLinks() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: links = [], isLoading } = useQuery({
+  const { data: links = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["links", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -149,6 +149,9 @@ export function useLinks() {
   return {
     links,
     isLoading,
+    isError,
+    error,
+    refetch,
     addLink,
     updateLink,
     deleteLink,

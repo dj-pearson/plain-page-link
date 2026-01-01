@@ -6,6 +6,7 @@ import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDash
 import { InsightsWidget } from "@/components/analytics/InsightsWidget";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SkeletonAnalytics } from "@/components/ui/skeleton";
 import {
     Card,
     CardContent,
@@ -36,7 +37,7 @@ export default function Analytics() {
     const { stats, viewsData, leadsData, recentLeads, isLoading } = useAnalytics(dateRange);
 
     if (isLoading) {
-        return <div className="flex items-center justify-center h-64">Loading...</div>;
+        return <SkeletonAnalytics />;
     }
 
     return (
