@@ -4,6 +4,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAvatarUpload } from "@/hooks/useAvatarUpload";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SkeletonProfile } from "@/components/ui/skeleton";
 
 export default function Profile() {
   const { profile, isLoading, updateProfile } = useProfile();
@@ -196,7 +197,7 @@ export default function Profile() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>;
+    return <SkeletonProfile />;
   }
 
   return (
