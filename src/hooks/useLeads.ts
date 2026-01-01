@@ -22,6 +22,8 @@ export function useLeads() {
       return data as Lead[];
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
+    gcTime: 10 * 60 * 1000, // 10 minutes - cache retention
   });
 
   const addLead = useMutation({
