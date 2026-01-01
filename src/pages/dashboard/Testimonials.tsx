@@ -270,7 +270,7 @@ export default function Testimonials() {
       {/* Help Text */}
       <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
         <p className="text-sm text-blue-800 dark:text-blue-200">
-          💡 <strong>Tip:</strong> Featured testimonials will be prominently
+          <span role="img" aria-label="Tip">💡</span> <strong>Tip:</strong> Featured testimonials will be prominently
           displayed on your public profile. Ask satisfied clients for reviews
           after successful transactions!
         </p>

@@ -857,7 +857,7 @@ export default function Profile() {
               {/* SEO Tips */}
               <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4 mt-6">
                 <h4 className="font-semibold text-sm mb-3 text-blue-900 dark:text-blue-100">
-                  💡 SEO Best Practices
+                  <span role="img" aria-label="Tip">💡</span> SEO Best Practices
                 </h4>
                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                   <li className="flex items-start gap-2">

@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from './use-toast';
+import { logger } from '@/lib/logger';
 
 interface UseAutoSaveOptions {
     key: string; // Unique key for localStorage
@@ -46,7 +47,7 @@ export function useAutoSave({
                 }
             }
         } catch (error) {
-            console.error('Failed to load auto-saved data:', error);
+            logger.error('Failed to load auto-saved data', error);
         }
     }, [storageKey, enabled]);
 
@@ -83,9 +84,9 @@ export function useAutoSave({
             setLastSaved(new Date());
             setHasUnsavedChanges(false);
 
-            console.log(`Auto-saved: ${key}`);
+            logger.debug(`Auto-saved: ${key}`);
         } catch (error) {
-            console.error('Failed to auto-save:', error);
+            logger.error('Failed to auto-save', error);
         }
     };
 
@@ -123,7 +124,7 @@ export function useAutoSave({
                 description: 'The saved draft has been removed.',
             });
         } catch (error) {
-            console.error('Failed to discard draft:', error);
+            logger.error('Failed to discard draft', error);
         }
     };
 
@@ -135,7 +136,7 @@ export function useAutoSave({
             setLastSaved(null);
             setHasUnsavedChanges(false);
         } catch (error) {
-            console.error('Failed to clear saved data:', error);
+            logger.error('Failed to clear saved data', error);
         }
     };
 

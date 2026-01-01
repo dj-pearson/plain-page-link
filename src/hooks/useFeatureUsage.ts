@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { UsageTrackingService, canUseFeature, trackUsage } from '@/lib/usageTracking';
 import type { FeatureLimitCheck } from '@/types/features';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 /**
  * Hook to check if a feature can be used
@@ -159,7 +160,7 @@ export function useProjectedBill() {
       const data = await UsageTrackingService.calculateProjectedBill(user.id);
       setBill(data);
     } catch (err) {
-      console.error('Failed to calculate bill:', err);
+      logger.error('Failed to calculate bill', err);
     } finally {
       setLoading(false);
     }
@@ -268,7 +269,7 @@ export function useUsageHistory(featureKey?: string, limit: number = 50) {
         if (error) throw error;
         setHistory(data || []);
       } catch (err) {
-        console.error('Failed to load usage history:', err);
+        logger.error('Failed to load usage history', err);
       } finally {
         setLoading(false);
       }

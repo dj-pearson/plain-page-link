@@ -6,6 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { logger } from '@/lib/logger';
 
 export interface AuditLogEntry {
   id: string;
@@ -112,15 +113,7 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
       params.set('limit', limit.toString());
       params.set('offset', offset.toString());
 
-      const { data, error } = await edgeFunctions.invoke('audit-log', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: null,
-      });
-
-      // For GET requests, we need to use direct DB query since functions.invoke defaults to POST
+      // For GET requests, we use direct DB query since edge functions default to POST
       const { data: logs, error: dbError, count } = await supabase
         .from('audit_logs')
         .select('*', { count: 'exact' })
@@ -147,7 +140,7 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
   // Log a new audit event
   const logEventMutation = useMutation({
     mutationFn: async (params: LogEventParams): Promise<{ success: boolean; logId: string }> => {
-      const { data, error } = await edgeFunctions.invoke('audit-log', {
+      const { data, error } = await supabase.functions.invoke('audit-log', {
         body: params,
       });
 
@@ -217,10 +210,10 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
 // Standalone function for logging events without the hook
 export async function logAuditEvent(params: LogEventParams): Promise<void> {
   try {
-    await edgeFunctions.invoke('audit-log', {
+    await supabase.functions.invoke('audit-log', {
       body: params,
     });
   } catch (error) {
-    console.error('Failed to log audit event:', error);
+    logger.error('Failed to log audit event', error);
   }
 }

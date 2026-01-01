@@ -248,7 +248,7 @@ export default function Links() {
       {/* Help Text - Mobile optimized */}
       <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 sm:p-4">
         <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
-          💡 <strong>Tip:</strong> <span className="hidden sm:inline">Drag and drop links to reorder them.</span><span className="sm:hidden">Use the edit option to change link details.</span> The order here will reflect on your public profile page.
+          <span role="img" aria-label="Tip">💡</span> <strong>Tip:</strong> <span className="hidden sm:inline">Drag and drop links to reorder them.</span><span className="sm:hidden">Use the edit option to change link details.</span> The order here will reflect on your public profile page.
         </p>
       </div>
 
