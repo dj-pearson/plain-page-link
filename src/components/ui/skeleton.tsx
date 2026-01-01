@@ -279,6 +279,77 @@ function SkeletonListings() {
   );
 }
 
+/**
+ * Profile page skeleton
+ */
+function SkeletonProfile() {
+  return (
+    <div className="space-y-6" role="status" aria-label="Loading profile">
+      {/* Header skeleton */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-9 w-40 mb-2" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <Skeleton className="h-10 w-32" />
+      </div>
+
+      {/* Profile Photo section skeleton */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
+        <Skeleton className="h-5 w-28 mb-4" />
+        <div className="flex items-center gap-6">
+          <Skeleton className="w-24 h-24 rounded-full" />
+          <div>
+            <Skeleton className="h-5 w-28 mb-1" />
+            <Skeleton className="h-4 w-44 mb-3" />
+            <Skeleton className="h-9 w-28" />
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs skeleton */}
+      <div className="space-y-6">
+        <div className="flex gap-2 border-b border-gray-200 pb-2">
+          <Skeleton className="h-9 w-24" />
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-9 w-16" />
+        </div>
+
+        {/* Form section skeleton */}
+        <div className="rounded-lg border border-gray-200 bg-white p-6">
+          <Skeleton className="h-5 w-36 mb-4" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Skeleton className="h-4 w-20 mb-2" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div>
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="md:col-span-2">
+              <Skeleton className="h-4 w-32 mb-2" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </div>
+        </div>
+
+        {/* Bio section skeleton */}
+        <div className="rounded-lg border border-gray-200 bg-white p-6">
+          <Skeleton className="h-5 w-32 mb-4" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-4 w-28 mt-2" />
+        </div>
+      </div>
+
+      <span className="sr-only">Loading profile data...</span>
+    </div>
+  );
+}
+
 export {
   Skeleton,
   SkeletonText,
@@ -288,5 +359,6 @@ export {
   SkeletonChart,
   SkeletonAnalytics,
   SkeletonLeads,
-  SkeletonListings
+  SkeletonListings,
+  SkeletonProfile
 };
