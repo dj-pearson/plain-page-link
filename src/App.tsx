@@ -5,7 +5,6 @@ import { useAuthStore } from "./stores/useAuthStore";
 import { errorHandler } from "./lib/errorHandler";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { offlineStorage } from "./lib/offline-storage";
-import { pushNotifications } from "./lib/push-notifications";
 import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
@@ -94,22 +93,22 @@ const SEODashboard = lazy(() => import("./pages/SEODashboard"));
 function App() {
     const { initialize, user } = useAuthStore();
 
-    // Initialize auth and PWA on mount
+    // Initialize auth and offline storage on mount
     useEffect(() => {
         initialize();
 
-        const initPWA = async () => {
-            await offlineStorage.init();
-            await pushNotifications.init();
-        };
-
-        initPWA();
+        // Initialize offline storage (lightweight)
+        offlineStorage.init();
     }, [initialize]);
 
     // Handle push notification registration when user logs in
+    // Firebase is dynamically imported to avoid loading ~200KB on initial page load
     useEffect(() => {
-        const registerPushNotifications = async () => {
+        const initAndRegisterPushNotifications = async () => {
             if (user) {
+                // Dynamically import push notifications only when user is logged in
+                const { pushNotifications } = await import("./lib/push-notifications");
+                await pushNotifications.init();
                 const hasPermission = await pushNotifications.requestPermission();
                 if (hasPermission) {
                     await pushNotifications.registerToken(user.id);
@@ -117,7 +116,7 @@ function App() {
             }
         };
 
-        registerPushNotifications();
+        initAndRegisterPushNotifications();
     }, [user]);
 
 

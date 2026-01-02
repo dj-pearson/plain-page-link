@@ -1,17 +1,19 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Home, BarChart3, Users, Brain, Target, TrendingUp, Zap, CheckCircle2, Building2, Calendar, Award } from "lucide-react";
+import { Home, BarChart3, Users, Brain, Target, TrendingUp, Zap, CheckCircle2, Building2, Calendar, Award, Sparkles } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
-import { BlogSection } from "@/components/blog/BlogSection";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
 import { BeforeAfterComparison } from "@/components/landing/BeforeAfterComparison";
 import { DemoProfilesShowcase } from "@/components/landing/DemoProfilesShowcase";
 import { AgentTestimonials } from "@/components/landing/AgentTestimonials";
 import { FeatureCard } from "@/components/landing/FeatureCard";
 import { generateBreadcrumbSchema, generateEnhancedLocalBusinessSchema, generateEnhancedOrganizationSchema } from "@/lib/seo";
 import { getSafeOrigin } from "@/lib/utils";
+
+// Lazy load BlogSection since it's below the fold and requires Supabase
+const BlogSection = React.lazy(() => import("@/components/blog/BlogSection").then(m => ({ default: m.BlogSection })));
 
 export default function Landing() {
     // Safe origin for SSR/crawler compatibility
@@ -152,8 +154,8 @@ export default function Landing() {
             {/* Header */}
             <PublicHeader />
 
-            {/* Hero Section */}
-            <HeroSection
+            {/* Hero Section - Lazy loaded with lightweight fallback */}
+            <HeroSectionLazy
                 title="Real Estate Agent Bio Page Builder"
                 subtitle="Turn Your Instagram Followers Into Qualified Buyer & Seller Leads"
                 description="While your competitors use basic link-in-bio tools, you'll have a complete real estate portfolio with property galleries, lead capture forms, and appointment booking—all optimized to convert social media traffic into closings."
@@ -166,7 +168,7 @@ export default function Landing() {
                     href: "#demo-profiles"
                 }}
                 badge={{
-                    icon: <Home className="h-4 w-4" aria-hidden="true" />,
+                    icon: <Sparkles className="h-4 w-4" aria-hidden="true" />,
                     text: "Built for Real Estate Agents"
                 }}
                 showStats={false}
@@ -456,8 +458,26 @@ export default function Landing() {
                 </div>
             </section>
 
-            {/* Blog Section */}
-            <BlogSection limit={6} showSearch={true} showFilters={true} />
+            {/* Blog Section - Lazy loaded since it's below the fold */}
+            <React.Suspense fallback={
+                <section className="py-16 bg-muted/30">
+                    <div className="container mx-auto px-4">
+                        <div className="text-center mb-12">
+                            <h2 className="text-4xl font-bold mb-4">Latest Real Estate Insights</h2>
+                            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                                Expert advice, market trends, and guides to help you succeed in real estate
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="h-80 rounded-lg bg-gray-200 dark:bg-gray-800 animate-pulse" />
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            }>
+                <BlogSection limit={6} showSearch={true} showFilters={true} />
+            </React.Suspense>
 
             {/* FAQ Section */}
             <section className="py-20 bg-background" aria-labelledby="faq-heading">

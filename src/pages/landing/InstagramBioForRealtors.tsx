@@ -4,7 +4,7 @@ import { Instagram, Home, Users, Star, TrendingUp, Check } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
 import { generateEnhancedOrganizationSchema } from "@/lib/seo";
 
 export default function InstagramBioForRealtors() {
@@ -105,7 +105,7 @@ export default function InstagramBioForRealtors() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="Instagram Bio for Realtors That Actually Converts Followers into Leads"
                     subtitle="Stop Wasting Your Instagram Traffic on Basic Links"
                     description="Your Instagram followers are interested in buying or selling. Give them what they need: property listings, lead capture forms, and easy appointment booking—all from one mobile-optimized bio link."
