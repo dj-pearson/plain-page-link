@@ -4,7 +4,7 @@ import { Star, Users, Video, MessageSquare, Check, Trophy } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
 
 export default function Testimonials() {
     const schema = {
@@ -44,7 +44,7 @@ export default function Testimonials() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="Client Testimonials & Reviews"
                     subtitle="Turn Social Proof into Your Most Powerful Sales Tool"
                     description="Display 5-star reviews, client success stories, and video testimonials that convert skeptical visitors into confident clients."

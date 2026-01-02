@@ -4,7 +4,7 @@ import { BarChart3, Eye, MousePointer, TrendingUp, Instagram, Check } from "luci
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
 import { generateFAQSchema, generateCombinedSchema, FEATURE_FAQS } from "@/lib/faq-schema";
 
 export default function Analytics() {
@@ -55,7 +55,7 @@ export default function Analytics() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="Real Estate Analytics & Insights"
                     subtitle="Know What's Working—Double Down on What Converts"
                     description="Stop guessing. Track exactly which listings generate interest, where your best leads come from, and what content drives conversions."

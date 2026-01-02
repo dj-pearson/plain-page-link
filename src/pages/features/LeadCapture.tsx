@@ -4,7 +4,7 @@ import { Users, Home, TrendingUp, Check, Star } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
 import { generateFAQSchema, generateCombinedSchema, FEATURE_FAQS } from "@/lib/faq-schema";
 
@@ -84,7 +84,7 @@ export default function LeadCapture() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="Lead Capture Forms Built for Real Estate"
                     subtitle="Stop Getting Generic 'Contact Me' Submissions—Get Qualified Leads"
                     description="Capture buyer budgets, seller timelines, and pre-qualification details automatically. Know which leads to call first."

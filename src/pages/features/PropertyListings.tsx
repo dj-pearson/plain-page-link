@@ -4,7 +4,7 @@ import { Home, Image, DollarSign, MapPin, Check } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
 
 export default function PropertyListings() {
     const schema = {
@@ -57,7 +57,7 @@ export default function PropertyListings() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="Property Listing Galleries"
                     subtitle="Showcase Your Real Estate Portfolio Like Never Before"
                     description="Display unlimited properties with full photo galleries, pricing, and details. Turn your Instagram bio into a mobile-optimized real estate showroom."
