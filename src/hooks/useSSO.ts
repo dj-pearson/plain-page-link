@@ -130,7 +130,17 @@ export function useSSO() {
       });
 
       if (response.error) throw new Error(response.error.message);
-      return response.data as SSOInitiateResponse;
+
+      const data = response.data as SSOInitiateResponse;
+
+      // Store the state/requestId in sessionStorage for CSRF validation
+      // This will be verified when the callback is received
+      if (data.requestId) {
+        sessionStorage.setItem('sso_oauth_state', data.requestId);
+        sessionStorage.setItem('sso_oauth_timestamp', Date.now().toString());
+      }
+
+      return data;
     },
   });
 
@@ -247,6 +257,44 @@ export function useSSO() {
     return data as SSOConfig;
   };
 
+  /**
+   * Validate the OAuth state parameter to prevent CSRF attacks
+   * @param state - The state parameter received from the IdP callback
+   * @returns true if valid, throws error if invalid
+   */
+  const validateSSOState = (state: string | null): boolean => {
+    const storedState = sessionStorage.getItem('sso_oauth_state');
+    const storedTimestamp = sessionStorage.getItem('sso_oauth_timestamp');
+
+    // Clear stored state after validation attempt (one-time use)
+    sessionStorage.removeItem('sso_oauth_state');
+    sessionStorage.removeItem('sso_oauth_timestamp');
+
+    // State must match
+    if (!state || !storedState || state !== storedState) {
+      throw new Error('Invalid SSO state - possible CSRF attack detected');
+    }
+
+    // State must not be expired (15 minute timeout)
+    if (storedTimestamp) {
+      const elapsed = Date.now() - parseInt(storedTimestamp, 10);
+      const maxAge = 15 * 60 * 1000; // 15 minutes
+      if (elapsed > maxAge) {
+        throw new Error('SSO request expired - please try again');
+      }
+    }
+
+    return true;
+  };
+
+  /**
+   * Clear any stored SSO state (e.g., on logout or error)
+   */
+  const clearSSOState = () => {
+    sessionStorage.removeItem('sso_oauth_state');
+    sessionStorage.removeItem('sso_oauth_timestamp');
+  };
+
   return {
     // State
     ssoConfigs,
@@ -270,5 +318,7 @@ export function useSSO() {
 
     // Utilities
     getSSOConfigByDomain,
+    validateSSOState,
+    clearSSOState,
   };
 }

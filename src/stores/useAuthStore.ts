@@ -35,6 +35,10 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
+  // MFA state
+  requiresMFA: boolean;
+  mfaVerified: boolean;
+
   // Actions
   initialize: () => Promise<void>;
   signUp: (email: string, password: string, username: string, fullName?: string) => Promise<void>;
@@ -45,6 +49,7 @@ interface AuthState {
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   clearError: () => void;
+  setMFAVerified: (verified: boolean) => void;
   _handleSLOMessage: (message: SLOMessage) => void;
 }
 
@@ -57,6 +62,8 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       isLoading: true,
       error: null,
+      requiresMFA: false,
+      mfaVerified: false,
 
       initialize: async () => {
         const { _handleSLOMessage } = get();
@@ -272,7 +279,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       signIn: async (email: string, password: string) => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, requiresMFA: false, mfaVerified: false });
 
         try {
           const { data, error } = await supabase.auth.signInWithPassword({
@@ -282,8 +289,8 @@ export const useAuthStore = create<AuthState>()(
 
           if (error) throw error;
 
-          // Fetch profile and roles in parallel for better performance
-          const [profileResult, rolesResult] = await Promise.all([
+          // Fetch profile, roles, and MFA settings in parallel for better performance
+          const [profileResult, rolesResult, mfaResult] = await Promise.all([
             supabase
               .from('profiles')
               .select('*')
@@ -293,18 +300,43 @@ export const useAuthStore = create<AuthState>()(
               .from('user_roles')
               .select('role')
               .eq('user_id', data.user.id)
-              .order('role', { ascending: true })
+              .order('role', { ascending: true }),
+            supabase
+              .from('user_mfa_settings')
+              .select('mfa_enabled, verified_at')
+              .eq('user_id', data.user.id)
+              .maybeSingle()
           ]);
 
           const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
 
-          set({
-            user: data.user,
-            session: data.session,
-            profile: profileResult.data || null,
-            role: role,
-            isLoading: false,
-          });
+          // Check if MFA is enabled and verified for this user
+          const mfaEnabled = mfaResult.data?.mfa_enabled && mfaResult.data?.verified_at;
+
+          if (mfaEnabled) {
+            // User has MFA enabled - require verification before granting full access
+            // Note: The user will need to be redirected to MFA verification page
+            set({
+              user: data.user,
+              session: data.session,
+              profile: profileResult.data || null,
+              role: role,
+              isLoading: false,
+              requiresMFA: true,
+              mfaVerified: false,
+            });
+          } else {
+            // No MFA required - grant full access
+            set({
+              user: data.user,
+              session: data.session,
+              profile: profileResult.data || null,
+              role: role,
+              isLoading: false,
+              requiresMFA: false,
+              mfaVerified: true,
+            });
+          }
         } catch (error: any) {
           set({
             error: error.message,
@@ -392,6 +424,8 @@ export const useAuthStore = create<AuthState>()(
             role: null,
             isLoading: false,
             error: null,
+            requiresMFA: false,
+            mfaVerified: false,
           });
         } catch (error: any) {
           logger.error('Sign out error', error);
@@ -428,6 +462,8 @@ export const useAuthStore = create<AuthState>()(
             role: null,
             isLoading: false,
             error: null,
+            requiresMFA: false,
+            mfaVerified: false,
           });
         } catch (error: any) {
           logger.error('Sign out all devices error', error);
@@ -450,6 +486,8 @@ export const useAuthStore = create<AuthState>()(
             role: null,
             isLoading: false,
             error: null,
+            requiresMFA: false,
+            mfaVerified: false,
           });
         }
       },
@@ -485,6 +523,13 @@ export const useAuthStore = create<AuthState>()(
 
       clearError: () => {
         set({ error: null });
+      },
+
+      setMFAVerified: (verified: boolean) => {
+        set({
+          mfaVerified: verified,
+          requiresMFA: !verified,
+        });
       },
     }),
     {
