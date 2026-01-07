@@ -4,12 +4,15 @@ import { Check, X, Home, DollarSign, BarChart3, Calendar, Users, Star } from "lu
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
+import { generateEnhancedOrganizationSchema } from "@/lib/seo";
 
 export default function VsBeacons() {
     const schema = {
         "@context": "https://schema.org",
         "@graph": [
+            // Enhanced Organization schema with social signals
+            generateEnhancedOrganizationSchema(),
             {
                 "@type": "WebPage",
                 "@id": `${window.location.origin}/vs/beacons`,
@@ -79,7 +82,7 @@ export default function VsBeacons() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="AgentBio vs Beacons for Real Estate Agents"
                     subtitle="Creator Tools vs Real Estate Tools: Why the Difference Matters"
                     description="Beacons is built for content creators and influencers. AgentBio is built for real estate professionals. Discover why real estate-specific features convert more Instagram followers into qualified leads."

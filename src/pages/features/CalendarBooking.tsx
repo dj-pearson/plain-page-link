@@ -4,7 +4,7 @@ import { Calendar, Clock, MapPin, Check, Phone } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
 
 export default function CalendarBooking() {
     const schema = {
@@ -44,7 +44,7 @@ export default function CalendarBooking() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="Calendar Booking Integration"
                     subtitle="Stop Playing Phone Tag—Let Buyers Book Showings Automatically"
                     description="Integrated Calendly and Google Calendar support. Buyers self-schedule showings while you stay in control of your availability."

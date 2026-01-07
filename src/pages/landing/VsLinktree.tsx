@@ -4,12 +4,15 @@ import { Check, X, Home, DollarSign, BarChart3 } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
+import { generateEnhancedOrganizationSchema } from "@/lib/seo";
 
 export default function VsLinktree() {
     const schema = {
         "@context": "https://schema.org",
         "@graph": [
+            // Enhanced Organization schema with social signals
+            generateEnhancedOrganizationSchema(),
             {
                 "@type": "WebPage",
                 "@id": `${window.location.origin}/vs/linktree`,
@@ -71,7 +74,7 @@ export default function VsLinktree() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="AgentBio vs Linktree for Real Estate Agents"
                     subtitle="Why 2,000+ Agents Switched from Linktree to AgentBio"
                     description="Linktree wasn't designed for real estate. AgentBio was. Discover the features real estate professionals need that generic link tools can't provide."

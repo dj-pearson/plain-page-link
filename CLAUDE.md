@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for AgentBio Platform
 
-**Last Updated:** 2025-11-28
+**Last Updated:** 2026-01-01
 **Platform:** AgentBio Intelligence - AI-Powered Real Estate Platform
 **Repository:** plain-page-link
 
@@ -896,6 +896,74 @@ useQuery({
 
 ---
 
+## Recent Improvements (2025-2026)
+
+### Security Enhancements
+
+**Secure Logger (`src/lib/logger.ts`):**
+- Environment-aware logging that prevents sensitive data exposure in production
+- Automatic redaction of passwords, tokens, API keys, and other sensitive data
+- Truncated user IDs for privacy
+- Stack traces hidden in production mode
+
+```typescript
+import { logger } from '@/lib/logger';
+
+// Use instead of console.log
+logger.info('User logged in', { userId: user.id });
+logger.error('Operation failed', error, { action: 'update_profile' });
+logger.authEvent('login_success', user.id);
+```
+
+**IDOR Protection:**
+- All database queries validate user ownership
+- Row Level Security (RLS) enforced on all tables
+- Input sanitization with DOMPurify
+
+**Login Security (`src/hooks/useLoginSecurity.ts`):**
+- Brute force protection with login throttling
+- Device fingerprinting for session tracking
+- Failed login attempt tracking
+
+### Mobile Optimization
+
+**PWA Features:**
+- `usePullToRefresh` hook for mobile refresh patterns
+- Offline storage with IndexedDB (`src/lib/offline-storage.ts`)
+- Sync manager for offline data synchronization
+- 44px minimum touch targets for iOS compliance
+
+**Mobile Components (`src/components/mobile/`):**
+- `MobileNav` with responsive navigation
+- `PullToRefresh` component
+- Mobile-optimized form inputs with proper `inputMode`
+
+### Error Handling Patterns
+
+**Preferred Pattern:**
+```typescript
+import { errorHandler } from '@/lib/errorHandler';
+import { logger } from '@/lib/logger';
+
+try {
+  await riskyOperation();
+} catch (error) {
+  // For errors that need tracking/monitoring
+  errorHandler.captureException(error as Error, {
+    action: 'operation_name',
+    component: 'ComponentName',
+  });
+
+  // For debug logging
+  logger.error('Operation failed', error);
+
+  // User feedback
+  toast.error('Something went wrong. Please try again.');
+}
+```
+
+---
+
 ## Key Files to Reference
 
 ### Configuration
@@ -921,6 +989,19 @@ useQuery({
 
 - `src/types/database.ts` - Database schema types
 - `src/integrations/supabase/types.ts` - Auto-generated Supabase types
+
+### Security & Logging
+
+- `src/lib/logger.ts` - Secure logger with auto-redaction
+- `src/lib/errorHandler.ts` - Centralized error handling
+- `src/hooks/useLoginSecurity.ts` - Login throttling and protection
+
+### Mobile & PWA
+
+- `src/hooks/usePullToRefresh.ts` - Pull-to-refresh functionality
+- `src/lib/offline-storage.ts` - IndexedDB offline storage
+- `src/lib/sync-manager.ts` - Offline sync management
+- `src/components/mobile/MobileNav.tsx` - Mobile navigation
 
 ---
 
@@ -999,7 +1080,7 @@ When making significant changes to the codebase:
 - **Update database schema** when tables are added/modified
 - **Update common tasks** when workflows change
 
-**Last major update:** 2025-11-28
+**Last major update:** 2026-01-01
 
 ---
 

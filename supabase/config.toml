@@ -1,4 +1,5 @@
-project_id = "axoqjwvqxgtzsdmlmnbv"
+# Self-hosted Supabase - project_id not required for local deployment
+# project_id = "self-hosted"
 
 [functions.test-ai-model]
 verify_jwt = true

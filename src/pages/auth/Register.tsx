@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Home, Mail, Lock, User, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
+import { Home, Mail, Lock, User, AlertCircle, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,7 +9,6 @@ import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicato
 import { useUsernameCheck } from "@/hooks/useUsernameCheck";
 import { Check, X, Loader2 as UsernameLoader } from "lucide-react";
 import { passwordSchema, usernameSchema, emailSchema } from "@/utils/validation";
-import { validateRedirectPath } from "@/utils/navigation";
 
 const registerSchema = z
     .object({
@@ -31,12 +30,14 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function Register() {
     const navigate = useNavigate();
-    const { signUp, signInWithGoogle, signInWithApple, isLoading, error, clearError, user } = useAuthStore();
+    const { signUp, signInWithGoogle, signInWithApple, isLoading, error, clearError, user, session } = useAuthStore();
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [passwordValue, setPasswordValue] = useState("");
     const { checkUsername, isChecking, error: usernameError, isAvailable } = useUsernameCheck();
     const [usernameTouched, setUsernameTouched] = useState(false);
+    const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+    const [registeredEmail, setRegisteredEmail] = useState("");
 
     const {
         register,
@@ -50,12 +51,13 @@ export default function Register() {
     const usernameValue = watch("username");
 
     useEffect(() => {
-        if (user) {
+        // Only redirect if we have both user and session (verified)
+        if (user && session) {
             // New users go through onboarding wizard first
             // This ensures fast time-to-first-share (<10 minutes)
             navigate('/onboarding/wizard', { replace: true });
         }
-    }, [user, navigate]);
+    }, [user, session, navigate]);
 
     useEffect(() => {
         return () => {
@@ -74,6 +76,18 @@ export default function Register() {
     const onSubmit = async (data: RegisterFormData) => {
         try {
             await signUp(data.email, data.password, data.username, data.name);
+
+            // Check if email verification is required (no session means confirmation pending)
+            // The auth store will have user but no session if email confirmation is needed
+            const currentSession = await import('@/integrations/supabase/client').then(
+                m => m.supabase.auth.getSession()
+            );
+
+            if (!currentSession.data.session) {
+                // Email verification is required
+                setEmailVerificationSent(true);
+                setRegisteredEmail(data.email);
+            }
         } catch (error) {
             // Error is handled by the store
             console.error("Registration failed:", error);
@@ -115,6 +129,45 @@ export default function Register() {
 
             <div className="flex items-center justify-center px-4 py-12">
                 <div className="w-full max-w-md">
+                    {/* Email Verification Sent Success State */}
+                    {emailVerificationSent ? (
+                        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+                            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                                <CheckCircle className="w-8 h-8 text-green-600" />
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                                Check Your Email
+                            </h1>
+                            <p className="text-gray-600 mb-4">
+                                We've sent a verification link to:
+                            </p>
+                            <p className="font-medium text-gray-900 mb-6 break-all">
+                                {registeredEmail}
+                            </p>
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+                                <p className="text-sm text-blue-800">
+                                    <strong>Next steps:</strong>
+                                </p>
+                                <ol className="text-sm text-blue-700 mt-2 list-decimal list-inside space-y-1">
+                                    <li>Check your email inbox (and spam folder)</li>
+                                    <li>Click the verification link in the email</li>
+                                    <li>You'll be redirected to complete your profile</li>
+                                </ol>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-4">
+                                The verification link expires in 1 hour.
+                            </p>
+                            <div className="flex flex-col gap-2">
+                                <Link
+                                    to="/auth/login"
+                                    className="text-blue-600 hover:text-blue-700 font-semibold"
+                                >
+                                    Back to Login
+                                </Link>
+                            </div>
+                        </div>
+                    ) : (
+                    <>
                     <div className="text-center mb-8">
                         <h1 className="text-3xl font-bold text-gray-900 mb-2">
                             Create Your Account
@@ -437,6 +490,8 @@ export default function Register() {
                         </p>
                     </div>
                 </div>
+                </>
+                )}
             </div>
             </div>
         </div>

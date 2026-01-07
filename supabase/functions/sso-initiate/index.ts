@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getClientIP } from '../_shared/auth.ts';
+import { sanitizeRedirectUrl } from '../_shared/url-validation.ts';
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 /**
@@ -105,6 +106,14 @@ serve(async (req) => {
     const state = generateSecureRandom(32);
     const nonce = generateSecureRandom(32);
 
+    // Validate and sanitize redirect URL to prevent open redirect attacks
+    const safeRedirectUri = sanitizeRedirectUrl(
+      redirectUri,
+      appUrl,
+      '/dashboard',
+      ['*.agentbio.net', 'localhost:8080', '127.0.0.1:8080'] // Whitelisted domains
+    );
+
     // Store session for validation on callback
     const { error: sessionError } = await supabase
       .from('sso_login_sessions')
@@ -116,7 +125,7 @@ serve(async (req) => {
         oidc_nonce: nonce,
         ip_address: clientIP,
         user_agent: userAgent,
-        redirect_uri: redirectUri || `${appUrl}/dashboard`,
+        redirect_uri: safeRedirectUri,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
       });
 

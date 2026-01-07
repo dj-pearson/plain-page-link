@@ -5,10 +5,10 @@ import { useAuthStore } from "./stores/useAuthStore";
 import { errorHandler } from "./lib/errorHandler";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { offlineStorage } from "./lib/offline-storage";
-import { pushNotifications } from "./lib/push-notifications";
 import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
-import { LoadingSpinner } from "./components/LoadingSpinner";
+import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
+import { SkipNavLink } from "./components/ui/skip-nav";
 
 // Public pages (eager load for better UX on landing)
 import Landing from "./pages/public/Landing";
@@ -49,12 +49,8 @@ const VsLinktree = lazy(() => import("./pages/landing/VsLinktree"));
 const VsBeacons = lazy(() => import("./pages/landing/VsBeacons"));
 const VsLater = lazy(() => import("./pages/landing/VsLater"));
 
-// Lazy load location pages
-const MiamiAgents = lazy(() => import("./pages/landing/locations/MiamiAgents"));
-const AustinAgents = lazy(() => import("./pages/landing/locations/AustinAgents"));
-const PhoenixAgents = lazy(() => import("./pages/landing/locations/PhoenixAgents"));
-const DenverAgents = lazy(() => import("./pages/landing/locations/DenverAgents"));
-const LosAngelesAgents = lazy(() => import("./pages/landing/locations/LosAngelesAgents"));
+// Lazy load location pages - Dynamic handler for all 22+ cities (programmatic SEO)
+const DynamicLocationPage = lazy(() => import("./pages/landing/locations/DynamicLocationPage"));
 
 // Lazy load feature pages
 const PropertyListings = lazy(() => import("./pages/features/PropertyListings"));
@@ -97,22 +93,22 @@ const SEODashboard = lazy(() => import("./pages/SEODashboard"));
 function App() {
     const { initialize, user } = useAuthStore();
 
-    // Initialize auth and PWA on mount
+    // Initialize auth and offline storage on mount
     useEffect(() => {
         initialize();
 
-        const initPWA = async () => {
-            await offlineStorage.init();
-            await pushNotifications.init();
-        };
-
-        initPWA();
+        // Initialize offline storage (lightweight)
+        offlineStorage.init();
     }, [initialize]);
 
     // Handle push notification registration when user logs in
+    // Firebase is dynamically imported to avoid loading ~200KB on initial page load
     useEffect(() => {
-        const registerPushNotifications = async () => {
+        const initAndRegisterPushNotifications = async () => {
             if (user) {
+                // Dynamically import push notifications only when user is logged in
+                const { pushNotifications } = await import("./lib/push-notifications");
+                await pushNotifications.init();
                 const hasPermission = await pushNotifications.requestPermission();
                 if (hasPermission) {
                     await pushNotifications.registerToken(user.id);
@@ -120,7 +116,7 @@ function App() {
             }
         };
 
-        registerPushNotifications();
+        initAndRegisterPushNotifications();
     }, [user]);
 
 
@@ -135,11 +131,14 @@ function App() {
 
     return (
         <>
+            {/* Skip Navigation for Keyboard Accessibility (WCAG 2.4.1) */}
+            <SkipNavLink />
+
             {/* Offline Indicator */}
             <OfflineIndicator />
 
             <LazyLoadErrorBoundary>
-                <Suspense fallback={<LoadingSpinner />}>
+                <Suspense fallback={<FullPageLoader text="Loading page..." />}>
                     <Routes>
                     {/* Public routes */}
                     <Route path="/" element={<Landing />} />
@@ -160,12 +159,8 @@ function App() {
                     <Route path="/vs/beacons" element={<VsBeacons />} />
                     <Route path="/vs/later" element={<VsLater />} />
 
-                    {/* Location pages */}
-                    <Route path="/for/miami-real-estate-agents" element={<MiamiAgents />} />
-                    <Route path="/for/austin-real-estate-agents" element={<AustinAgents />} />
-                    <Route path="/for/phoenix-real-estate-agents" element={<PhoenixAgents />} />
-                    <Route path="/for/denver-real-estate-agents" element={<DenverAgents />} />
-                    <Route path="/for/los-angeles-real-estate-agents" element={<LosAngelesAgents />} />
+                    {/* Location pages - Dynamic route for all 22+ cities (programmatic SEO) */}
+                    <Route path="/for/:slug" element={<DynamicLocationPage />} />
 
                     {/* Feature pages */}
                     <Route path="/features/property-listings" element={<PropertyListings />} />

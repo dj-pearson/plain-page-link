@@ -20,7 +20,7 @@ export function useTestimonials() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: testimonials = [], isLoading } = useQuery({
+  const { data: testimonials = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["testimonials", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -71,10 +71,14 @@ export function useTestimonials() {
 
   const updateTestimonial = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Testimonial> & { id: string }) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // Security: Verify user owns this testimonial by requiring both id and user_id match
       const { data, error } = await supabase
         .from("testimonials")
         .update(updates)
         .eq("id", id)
+        .eq("user_id", user.id)
         .select()
         .single();
 
@@ -99,10 +103,14 @@ export function useTestimonials() {
 
   const deleteTestimonial = useMutation({
     mutationFn: async (id: string) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // Security: Verify user owns this testimonial by requiring both id and user_id match
       const { error } = await supabase
         .from("testimonials")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", user.id);
 
       if (error) throw error;
     },
@@ -125,6 +133,9 @@ export function useTestimonials() {
   return {
     testimonials,
     isLoading,
+    isError,
+    error,
+    refetch,
     addTestimonial,
     updateTestimonial,
     deleteTestimonial,

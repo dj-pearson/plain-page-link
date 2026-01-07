@@ -2,15 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSSO } from "@/hooks/useSSO";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { sanitizeRedirectUrl } from "@/lib/url-validation";
+import { Loader2, AlertCircle, CheckCircle, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const SSOCallback = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { handleSSOCallback } = useSSO();
+  const { handleSSOCallback, validateSSOState, clearSSOState } = useSSO();
   const { initialize } = useAuthStore();
-  const [status, setStatus] = useState<"processing" | "success" | "error">(
+  const [status, setStatus] = useState<"processing" | "success" | "error" | "csrf_error">(
     "processing"
   );
   const [error, setError] = useState("");
@@ -28,11 +29,25 @@ export const SSOCallback = () => {
 
         // Handle OAuth errors
         if (errorParam) {
+          clearSSOState();
           throw new Error(errorDescription || errorParam);
         }
 
         if (!SAMLResponse && !code) {
+          clearSSOState();
           throw new Error("Invalid SSO callback - missing required parameters");
+        }
+
+        // CSRF Protection: Validate state parameter for OIDC flows
+        // Note: SAML flows use RelayState which is validated differently
+        if (code && state) {
+          try {
+            validateSSOState(state);
+          } catch (csrfError) {
+            setStatus("csrf_error");
+            setError(csrfError instanceof Error ? csrfError.message : "Security validation failed");
+            return;
+          }
         }
 
         // Process callback
@@ -48,8 +63,15 @@ export const SSOCallback = () => {
 
           // If we have a redirect URL with magic link, navigate there
           if (result.redirectUrl) {
+            // Validate redirect URL to prevent open redirect attacks (defense in depth)
+            const safeRedirectUrl = sanitizeRedirectUrl(
+              result.redirectUrl,
+              '/dashboard',
+              ['*.agentbio.net', 'localhost:8080', '127.0.0.1:8080']
+            );
+
             // The redirect URL might be a magic link - let Supabase handle it
-            window.location.href = result.redirectUrl;
+            window.location.href = safeRedirectUrl;
           } else {
             // Re-initialize auth state and redirect to dashboard
             await initialize();
@@ -100,6 +122,37 @@ export const SSOCallback = () => {
             <p className="text-gray-600">
               Redirecting you to the dashboard...
             </p>
+          </div>
+        )}
+
+        {status === "csrf_error" && (
+          <div className="space-y-4">
+            <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+              <ShieldAlert className="w-8 h-8 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Security Check Failed
+            </h2>
+            <p className="text-amber-600">{error}</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-4 text-left">
+              <p className="text-sm text-amber-800">
+                <strong>What happened?</strong>
+              </p>
+              <p className="text-sm text-amber-700 mt-1">
+                This security check protects against cross-site request forgery attacks.
+                This can happen if:
+              </p>
+              <ul className="text-sm text-amber-700 mt-2 list-disc list-inside space-y-1">
+                <li>The SSO request took too long (over 15 minutes)</li>
+                <li>You opened the login link in a different browser/tab</li>
+                <li>Your browser cleared session data</li>
+              </ul>
+            </div>
+            <div className="flex flex-col gap-2 pt-4">
+              <Button onClick={() => navigate("/auth/login")}>
+                Try Again
+              </Button>
+            </div>
           </div>
         )}
 

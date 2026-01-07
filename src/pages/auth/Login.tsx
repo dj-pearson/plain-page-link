@@ -7,11 +7,17 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect, useState } from "react";
 import { emailSchema } from "@/utils/validation";
 import { validateRedirectPath } from "@/utils/navigation";
+import { useToast } from "@/hooks/use-toast";
+import {
+    checkLoginThrottle,
+    recordLoginAttempt,
+    formatBlockedUntil,
+    getDeviceFingerprint,
+} from "@/hooks/useLoginSecurity";
 
 const loginSchema = z.object({
     email: emailSchema,
     password: z.string().min(1, "Password is required"),
-    remember: z.boolean().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -20,6 +26,9 @@ export default function Login() {
     const navigate = useNavigate();
     const { signIn, signInWithGoogle, signInWithApple, isLoading, error, clearError, user } = useAuthStore();
     const [showPassword, setShowPassword] = useState(false);
+    const [isThrottled, setIsThrottled] = useState(false);
+    const [throttleMessage, setThrottleMessage] = useState<string | null>(null);
+    const { toast } = useToast();
 
     const {
         register,
@@ -50,11 +59,52 @@ export default function Login() {
     }, [clearError]);
 
     const onSubmit = async (data: LoginFormData) => {
+        const email = data.email.toLowerCase().trim();
+
+        // Check if login is throttled (brute force protection)
         try {
-            await signIn(data.email, data.password);
+            const throttleResult = await checkLoginThrottle(email);
+
+            if (throttleResult.blocked) {
+                const timeLeft = throttleResult.blockedUntil
+                    ? formatBlockedUntil(throttleResult.blockedUntil)
+                    : '15 minutes';
+                setIsThrottled(true);
+                setThrottleMessage(`Too many login attempts. Please try again in ${timeLeft}.`);
+                toast({
+                    title: "Account Temporarily Locked",
+                    description: `Too many failed login attempts. Try again in ${timeLeft}.`,
+                    variant: "destructive",
+                });
+                return;
+            }
+        } catch (throttleError) {
+            // Continue with login if throttle check fails (fail-open for UX)
+            console.error("Throttle check failed:", throttleError);
+        }
+
+        // Clear any previous throttle state
+        setIsThrottled(false);
+        setThrottleMessage(null);
+
+        try {
+            await signIn(email, data.password);
+
+            // Record successful login attempt
+            await recordLoginAttempt(email, true, undefined, undefined, getDeviceFingerprint());
         } catch (error) {
-            // Error is handled by the store
-            console.error("Login failed:", error);
+            // Record failed login attempt with generic reason
+            // Never log the actual password or specific failure reason
+            await recordLoginAttempt(
+                email,
+                false,
+                undefined,
+                'invalid_credentials',
+                getDeviceFingerprint()
+            );
+
+            // Don't log specific error details to console in production
+            // The error is handled by the store
         }
     };
 
@@ -63,6 +113,11 @@ export default function Login() {
             await signInWithGoogle();
         } catch (error) {
             console.error("Google sign-in failed:", error);
+            toast({
+                title: "Google Sign-In Failed",
+                description: "Unable to sign in with Google. Please try again or use email/password.",
+                variant: "destructive",
+            });
         }
     };
 
@@ -71,6 +126,11 @@ export default function Login() {
             await signInWithApple();
         } catch (error) {
             console.error("Apple sign-in failed:", error);
+            toast({
+                title: "Apple Sign-In Failed",
+                description: "Unable to sign in with Apple. Please try again or use email/password.",
+                variant: "destructive",
+            });
         }
     };
 
@@ -103,7 +163,23 @@ export default function Login() {
                     </div>
 
                 <div className="bg-white rounded-lg shadow-lg p-8">
-                    {error && (
+                    {/* Throttle warning */}
+                    {isThrottled && throttleMessage && (
+                        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-amber-800">
+                                    Account Temporarily Locked
+                                </p>
+                                <p className="text-sm text-amber-600 mt-1">
+                                    {throttleMessage}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Auth error - normalized message to prevent user enumeration */}
+                    {error && !isThrottled && (
                         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                             <div className="flex-1">
@@ -111,7 +187,8 @@ export default function Login() {
                                     Login Failed
                                 </p>
                                 <p className="text-sm text-red-600 mt-1">
-                                    {error}
+                                    {/* Normalize error message to prevent user enumeration attacks */}
+                                    Invalid email or password. Please check your credentials and try again.
                                 </p>
                             </div>
                         </div>
@@ -178,17 +255,7 @@ export default function Login() {
                             )}
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    {...register("remember")}
-                                    type="checkbox"
-                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="ml-2 text-sm text-gray-600">
-                                    Remember me
-                                </span>
-                            </label>
+                        <div className="flex items-center justify-end">
                             <Link
                                 to="/auth/forgot-password"
                                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -199,7 +266,7 @@ export default function Login() {
 
                         <button
                             type="submit"
-                            disabled={isLoading}
+                            disabled={isLoading || isThrottled}
                             className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
@@ -207,6 +274,8 @@ export default function Login() {
                                     <Loader2 className="h-5 w-5 animate-spin" />
                                     Logging in...
                                 </>
+                            ) : isThrottled ? (
+                                "Account Locked"
                             ) : (
                                 "Log In"
                             )}

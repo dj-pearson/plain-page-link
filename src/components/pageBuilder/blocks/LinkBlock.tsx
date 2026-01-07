@@ -6,6 +6,7 @@
 import { LinkBlockConfig } from "@/types/pageBuilder";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, ChevronRight } from "lucide-react";
+import { sanitizeUrl } from "@/utils/sanitize";
 
 interface LinkBlockProps {
     config: LinkBlockConfig;
@@ -15,10 +16,15 @@ interface LinkBlockProps {
 export function LinkBlock({ config, isEditing = false }: LinkBlockProps) {
     const handleClick = () => {
         if (isEditing) return;
+
+        // Sanitize URL to prevent XSS via javascript: or data: protocols
+        const safeUrl = sanitizeUrl(config.url);
+        if (!safeUrl) return;
+
         if (config.openInNewTab) {
-            window.open(config.url, "_blank", "noopener,noreferrer");
+            window.open(safeUrl, "_blank", "noopener,noreferrer");
         } else {
-            window.location.href = config.url;
+            window.location.href = safeUrl;
         }
     };
 

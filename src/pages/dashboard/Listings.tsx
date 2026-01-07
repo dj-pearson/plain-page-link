@@ -1,12 +1,23 @@
 import { useState } from "react";
-import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, AlertTriangle, AlertCircle, RefreshCw } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AddListingModal } from "@/components/modals/AddListingModal";
 import { EditListingModal, EditListingFormData } from "@/components/modals/EditListingModal";
 import type { ListingFormData } from "@/components/modals/AddListingModal";
 import { useToast } from "@/hooks/use-toast";
-import { useListings } from "@/hooks/useListings";
+import { useListings, type Listing } from "@/hooks/useListings";
 import { useListingImageUpload } from "@/hooks/useListingImageUpload";
-import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
@@ -16,15 +27,28 @@ import { KeyboardShortcutsHelper } from "@/components/dashboard/KeyboardShortcut
 import { QuickStatusUpdate } from "@/components/dashboard/QuickStatusUpdate";
 import { useNavigate } from "react-router-dom";
 
+// Type for newly created listing data used for social sharing
+interface SocialShareListingData {
+  address: string;
+  city: string;
+  price: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  property_type?: string;
+  image?: string;
+}
+
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingListing, setEditingListing] = useState<any>(null);
+  const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showSocialShareDialog, setShowSocialShareDialog] = useState(false);
-  const [newlyCreatedListing, setNewlyCreatedListing] = useState<any>(null);
+  const [newlyCreatedListing, setNewlyCreatedListing] = useState<SocialShareListingData | null>(null);
+  const [listingToDelete, setListingToDelete] = useState<{ id: string; address: string } | null>(null);
   const { toast } = useToast();
-  const { listings, isLoading, addListing, deleteListing } = useListings();
+  const { listings, isLoading, isError, error, refetch, addListing, updateListing, deleteListing } = useListings();
   const { uploadListingImages, uploading: uploadingImages } = useListingImageUpload();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
   const { profile } = useProfile();
@@ -126,11 +150,11 @@ export default function Listings() {
     }
   };
 
-  const handleDeleteListing = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this listing?")) return;
-    
+  const handleDeleteListing = async () => {
+    if (!listingToDelete) return;
+
     try {
-      await deleteListing.mutateAsync(id);
+      await deleteListing.mutateAsync(listingToDelete.id);
       toast({
         title: "Listing deleted",
         description: "Property listing has been removed.",
@@ -141,44 +165,36 @@ export default function Listings() {
         description: "Failed to delete listing.",
         variant: "destructive",
       });
+    } finally {
+      setListingToDelete(null);
     }
   };
 
   const handleEditListing = async (data: EditListingFormData) => {
     if (!editingListing) return;
-    
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      await updateListing.mutateAsync({
+        id: editingListing.id,
+        address: data.address,
+        city: data.city,
+        price: data.price,
+        beds: data.beds,
+        baths: data.baths,
+        sqft: data.sqft,
+        status: data.status,
+        image: data.image,
+        description: data.description,
+        mls_number: data.mls_number,
+        property_type: data.property_type,
+        updated_at: new Date().toISOString()
+      });
 
-      const { error } = await supabase
-        .from('listings')
-        .update({
-          address: data.address,
-          city: data.city,
-          price: data.price,
-          beds: data.beds,
-          baths: data.baths,
-          sqft: data.sqft,
-          status: data.status,
-          image: data.image,
-          description: data.description,
-          mls_number: data.mls_number,
-          property_type: data.property_type,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingListing.id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
       toast({
         title: "Listing updated!",
         description: "Your property listing has been updated successfully.",
       });
       setEditingListing(null);
-      // Refetch listings
-      window.location.reload();
     } catch (error) {
       toast({
         title: "Error",
@@ -260,9 +276,31 @@ export default function Listings() {
         </div>
       </div>
 
+      {/* Error State */}
+      {isError && (
+        <Card>
+          <CardContent className="p-6 sm:p-8 text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-red-100 rounded-full mb-3 sm:mb-4">
+              <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-600" />
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+              Failed to load listings
+            </h3>
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 max-w-sm mx-auto">
+              {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+            </p>
+            <Button onClick={() => refetch()} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Listings Grid - Mobile optimized */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {listings.map((listing) => (
+      {!isError && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {listings.map((listing) => (
           <div
             key={listing.id}
             className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg active:shadow-xl transition-all group"
@@ -295,7 +333,7 @@ export default function Listings() {
                   <Edit className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => handleDeleteListing(listing.id)}
+                  onClick={() => setListingToDelete({ id: listing.id, address: listing.address })}
                   className="p-2 sm:p-2.5 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white active:scale-90 transition-all text-red-600 shadow-md min-w-[44px] min-h-[44px] flex items-center justify-center"
                   title="Delete listing"
                   aria-label="Delete listing"
@@ -334,11 +372,12 @@ export default function Listings() {
               </div>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Empty State (shown when no listings) - Mobile optimized */}
-      {listings.length === 0 && (
+      {!isError && listings.length === 0 && (
         <div className="text-center py-8 sm:py-12 px-4">
           <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-accent rounded-full mb-3 sm:mb-4">
             <Plus className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
@@ -406,6 +445,31 @@ export default function Listings() {
           agentName={profile?.full_name}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!listingToDelete} onOpenChange={(open) => !open && setListingToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Delete Listing
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-semibold text-foreground">{listingToDelete?.address}</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteListing}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete Listing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Keyboard Shortcuts */}
       <KeyboardShortcutsHelper shortcuts={shortcuts} />

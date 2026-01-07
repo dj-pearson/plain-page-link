@@ -1227,6 +1227,7 @@ export type Database = {
           bio: string | null
           brokerage_logo: string | null
           brokerage_name: string | null
+          calendly_url: string | null
           certifications: Json | null
           created_at: string | null
           custom_css: string | null
@@ -1267,6 +1268,7 @@ export type Database = {
           bio?: string | null
           brokerage_logo?: string | null
           brokerage_name?: string | null
+          calendly_url?: string | null
           certifications?: Json | null
           created_at?: string | null
           custom_css?: string | null
@@ -1307,6 +1309,7 @@ export type Database = {
           bio?: string | null
           brokerage_logo?: string | null
           brokerage_name?: string | null
+          calendly_url?: string | null
           certifications?: Json | null
           created_at?: string | null
           custom_css?: string | null

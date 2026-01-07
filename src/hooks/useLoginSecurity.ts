@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 interface ThrottleCheckResult {
   success: boolean;
@@ -28,7 +29,7 @@ interface RegisterSessionResult {
  */
 export async function checkLoginThrottle(email: string): Promise<ThrottleCheckResult> {
   try {
-    const { data, error } = await edgeFunctions.invoke('login-security', {
+    const { data, error } = await supabase.functions.invoke('login-security', {
       body: {
         action: 'check_throttle',
         email: email.toLowerCase().trim(),
@@ -36,7 +37,7 @@ export async function checkLoginThrottle(email: string): Promise<ThrottleCheckRe
     });
 
     if (error) {
-      console.error('Throttle check error:', error);
+      logger.error('Throttle check error', error);
       // Allow login on error to avoid blocking legitimate users
       return {
         success: false,
@@ -49,7 +50,7 @@ export async function checkLoginThrottle(email: string): Promise<ThrottleCheckRe
 
     return data;
   } catch (error) {
-    console.error('Throttle check error:', error);
+    logger.error('Throttle check error', error);
     return {
       success: false,
       blocked: false,
@@ -71,7 +72,7 @@ export async function recordLoginAttempt(
   deviceFingerprint?: string
 ): Promise<RecordAttemptResult | null> {
   try {
-    const { data, error } = await edgeFunctions.invoke('login-security', {
+    const { data, error } = await supabase.functions.invoke('login-security', {
       body: {
         action: 'record_attempt',
         email: email.toLowerCase().trim(),
@@ -83,13 +84,13 @@ export async function recordLoginAttempt(
     });
 
     if (error) {
-      console.error('Failed to record login attempt:', error);
+      logger.error('Failed to record login attempt', error);
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Failed to record login attempt:', error);
+    logger.error('Failed to record login attempt', error);
     return null;
   }
 }
@@ -108,7 +109,7 @@ export async function registerSession(
     // Generate a session token hash (in production, use actual session token)
     const sessionTokenHash = await generateSessionTokenHash();
 
-    const { data, error } = await edgeFunctions.invoke('login-security', {
+    const { data, error } = await supabase.functions.invoke('login-security', {
       body: {
         action: 'register_session',
         userId,
@@ -121,13 +122,13 @@ export async function registerSession(
     });
 
     if (error) {
-      console.error('Failed to register session:', error);
+      logger.error('Failed to register session', error);
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Failed to register session:', error);
+    logger.error('Failed to register session', error);
     return null;
   }
 }

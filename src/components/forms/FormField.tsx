@@ -4,6 +4,28 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
+/**
+ * Mobile-optimized input type mapping
+ * Maps field types to proper HTML input types and attributes for mobile keyboards
+ */
+type MobileInputType = 'text' | 'email' | 'tel' | 'url' | 'number' | 'password' | 'search';
+
+interface MobileInputConfig {
+    inputMode?: 'text' | 'email' | 'tel' | 'url' | 'numeric' | 'decimal' | 'search' | 'none';
+    autoComplete?: string;
+    pattern?: string;
+}
+
+const mobileInputConfigs: Record<MobileInputType, MobileInputConfig> = {
+    text: { inputMode: 'text' },
+    email: { inputMode: 'email', autoComplete: 'email' },
+    tel: { inputMode: 'tel', autoComplete: 'tel', pattern: '[0-9\\-\\+\\s\\(\\)]*' },
+    url: { inputMode: 'url', autoComplete: 'url' },
+    number: { inputMode: 'numeric' },
+    password: { autoComplete: 'current-password' },
+    search: { inputMode: 'search' },
+};
+
 interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label: string;
     error?: string;
@@ -12,7 +34,10 @@ interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
-    ({ label, error, helperText, required, className, ...props }, ref) => {
+    ({ label, error, helperText, required, className, type = 'text', ...props }, ref) => {
+        // Get mobile-optimized input configuration
+        const mobileConfig = mobileInputConfigs[type as MobileInputType] || {};
+
         return (
             <div className="space-y-2">
                 <Label htmlFor={props.id} className="text-sm font-medium">
@@ -21,6 +46,10 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
                 </Label>
                 <Input
                     ref={ref}
+                    type={type}
+                    inputMode={props.inputMode || mobileConfig.inputMode}
+                    autoComplete={props.autoComplete || mobileConfig.autoComplete}
+                    pattern={props.pattern || mobileConfig.pattern}
                     className={cn(
                         error && "border-red-500 focus-visible:ring-red-500",
                         className

@@ -4,6 +4,34 @@
  */
 
 import { PageConfig } from "@/types/pageBuilder";
+import { getSafeOrigin } from "@/lib/utils";
+
+/**
+ * Breadcrumb item interface
+ */
+export interface BreadcrumbItem {
+    name: string;
+    url: string;
+}
+
+/**
+ * Generate BreadcrumbList Schema
+ * Helps Google understand site hierarchy and displays breadcrumbs in search results
+ */
+export const generateBreadcrumbSchema = (items: BreadcrumbItem[]): Record<string, any> => {
+    const itemListElements = items.map((item, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "name": item.name,
+        "item": item.url
+    }));
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": itemListElements
+    };
+};
 
 /**
  * Generate Person Schema for Real Estate Agent
@@ -20,7 +48,7 @@ export const generatePersonSchema = (page: PageConfig): Record<string, any> => {
         jobTitle:
             (bioBlock as any)?.config.subtitle || "Real Estate Professional",
         description: (bioBlock as any)?.config.description || page.description,
-        url: `${window.location.origin}/p/${page.slug}`,
+        url: `${getSafeOrigin()}/p/${page.slug}`,
     };
 
     // Add image if available
@@ -51,7 +79,7 @@ export const generateRealEstateAgentSchema = (
         "@type": "RealEstateAgent",
         name: bioBlock?.config.title || page.title,
         description: (bioBlock as any)?.config.description || page.description,
-        url: `${window.location.origin}/p/${page.slug}`,
+        url: `${getSafeOrigin()}/p/${page.slug}`,
     };
 
     // Add image if available
@@ -88,7 +116,7 @@ export const generateLocalBusinessSchema = (
         "@type": "RealEstateAgent",
         name: businessInfo.businessName || page.title,
         description: page.description,
-        url: `${window.location.origin}/p/${page.slug}`,
+        url: `${getSafeOrigin()}/p/${page.slug}`,
     };
 
     // Add address if available
@@ -115,6 +143,105 @@ export const generateLocalBusinessSchema = (
 };
 
 /**
+ * Generate enhanced Organization Schema with social signals
+ * Includes social media profiles, contact info, and ratings for Knowledge Graph optimization
+ */
+export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
+    const baseUrl = getSafeOrigin();
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": `${baseUrl}/#organization`,
+        "name": "AgentBio",
+        "legalName": "AgentBio Intelligence",
+        "url": baseUrl,
+        "logo": {
+            "@type": "ImageObject",
+            "url": `${baseUrl}/logo.png`,
+            "width": "512",
+            "height": "512"
+        },
+        "image": `${baseUrl}/Cover.png`,
+        "description": "AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.",
+        "foundingDate": "2024",
+        "slogan": "Transform Instagram followers into qualified leads",
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "Customer Service",
+            "email": "support@agentbio.net",
+            "url": `${baseUrl}/contact`,
+            "availableLanguage": ["English"]
+        },
+        "sameAs": [
+            "https://twitter.com/agentbio",
+            "https://www.facebook.com/agentbio",
+            "https://www.linkedin.com/company/agentbio",
+            "https://www.instagram.com/agentbio",
+            "https://www.youtube.com/@agentbio",
+            "https://github.com/agentbio"
+        ],
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "523",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "areaServed": {
+            "@type": "Country",
+            "name": "United States"
+        }
+    };
+};
+
+/**
+ * Generate enhanced LocalBusiness Schema for homepage/landing page
+ * Optimized for local SEO with comprehensive business information
+ */
+export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
+    const baseUrl = getSafeOrigin();
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "ProfessionalService",
+        "name": "AgentBio",
+        "description": "AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.",
+        "url": baseUrl,
+        "logo": {
+            "@type": "ImageObject",
+            "url": `${baseUrl}/logo.png`
+        },
+        "image": `${baseUrl}/Cover.png`,
+        "priceRange": "$$$",
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "523",
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "areaServed": {
+            "@type": "Country",
+            "name": "United States"
+        },
+        "serviceType": "Real Estate Marketing Software",
+        "provider": {
+            "@type": "Organization",
+            "name": "AgentBio"
+        },
+        "offers": {
+            "@type": "Offer",
+            "price": "39",
+            "priceCurrency": "USD",
+            "priceValidUntil": "2025-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": `${baseUrl}/pricing`
+        }
+    };
+};
+
+/**
  * Generate all structured data for a page
  */
 export const generateStructuredData = (
@@ -137,7 +264,7 @@ export const generateStructuredData = (
  */
 export const generateSitemap = (pages: PageConfig[]): string => {
     const publishedPages = pages.filter((p) => p.published);
-    const baseUrl = window.location.origin;
+    const baseUrl = getSafeOrigin();
 
     const urlEntries = publishedPages
         .map(
@@ -232,7 +359,7 @@ export const generateSocialPreview = (page: PageConfig) => {
             page.seo.ogImage ||
             bioBlock?.config?.avatarUrl ||
             "/default-og-image.png",
-        url: `${window.location.origin}/p/${page.slug}`,
+        url: `${getSafeOrigin()}/p/${page.slug}`,
         siteName: "AgentBio",
         twitterCard: page.seo.twitterCard || "summary_large_image",
     };
@@ -242,7 +369,7 @@ export const generateSocialPreview = (page: PageConfig) => {
  * Generate canonical URL
  */
 export const generateCanonicalUrl = (slug: string): string => {
-    return `${window.location.origin}/p/${slug}`;
+    return `${getSafeOrigin()}/p/${slug}`;
 };
 
 /**

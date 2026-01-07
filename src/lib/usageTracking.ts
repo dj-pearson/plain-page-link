@@ -4,6 +4,7 @@
 // Tracks feature usage and manages billing/metering
 
 import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
 import type {
   FeatureUsage,
   FeatureLimitCheck,

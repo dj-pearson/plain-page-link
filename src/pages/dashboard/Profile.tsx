@@ -4,6 +4,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAvatarUpload } from "@/hooks/useAvatarUpload";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SkeletonProfile } from "@/components/ui/skeleton";
 
 export default function Profile() {
   const { profile, isLoading, updateProfile } = useProfile();
@@ -196,7 +197,7 @@ export default function Profile() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>;
+    return <SkeletonProfile />;
   }
 
   return (
@@ -857,7 +858,7 @@ export default function Profile() {
               {/* SEO Tips */}
               <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4 mt-6">
                 <h4 className="font-semibold text-sm mb-3 text-blue-900 dark:text-blue-100">
-                  💡 SEO Best Practices
+                  <span role="img" aria-label="Tip">💡</span> SEO Best Practices
                 </h4>
                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                   <li className="flex items-start gap-2">

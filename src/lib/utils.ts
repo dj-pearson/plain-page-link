@@ -44,3 +44,15 @@ export function throttle<T extends (...args: any[]) => any>(
         }
     };
 }
+
+/**
+ * Get the site origin in a way that's safe for SSR/prerendering/crawlers
+ * Falls back to the production URL when window is not available
+ */
+export function getSafeOrigin(): string {
+    if (typeof window !== 'undefined') {
+        return window.location.origin;
+    }
+    // Fallback for SSR/prerendering/crawler contexts
+    return import.meta.env.VITE_APP_URL || 'https://agentbio.net';
+}

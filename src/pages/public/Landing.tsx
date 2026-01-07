@@ -1,50 +1,58 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Home, BarChart3, Users, Brain, Target, TrendingUp, Zap, CheckCircle2, Building2, Calendar, Award } from "lucide-react";
+import { Home, BarChart3, Users, Brain, Target, TrendingUp, Zap, CheckCircle2, Building2, Calendar, Award, Sparkles } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
-import { BlogSection } from "@/components/blog/BlogSection";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
 import { BeforeAfterComparison } from "@/components/landing/BeforeAfterComparison";
 import { DemoProfilesShowcase } from "@/components/landing/DemoProfilesShowcase";
 import { AgentTestimonials } from "@/components/landing/AgentTestimonials";
 import { FeatureCard } from "@/components/landing/FeatureCard";
+import { generateBreadcrumbSchema, generateEnhancedLocalBusinessSchema, generateEnhancedOrganizationSchema } from "@/lib/seo";
+import { getSafeOrigin } from "@/lib/utils";
+
+// Lazy load BlogSection since it's below the fold and requires Supabase
+const BlogSection = React.lazy(() => import("@/components/blog/BlogSection").then(m => ({ default: m.BlogSection })));
 
 export default function Landing() {
+    // Safe origin for SSR/crawler compatibility
+    const origin = getSafeOrigin();
+
+    // Generate breadcrumb schema for homepage
+    const breadcrumbSchema = generateBreadcrumbSchema([
+        { name: "Home", url: origin }
+    ]);
+
+    // Generate enhanced organization schema with social signals
+    const organizationSchema = generateEnhancedOrganizationSchema();
+
+    // Generate enhanced local business schema
+    const localBusinessSchema = generateEnhancedLocalBusinessSchema();
+
     const schema = {
         "@context": "https://schema.org",
         "@graph": [
             {
                 "@type": "WebSite",
-                "@id": `${window.location.origin}/#website`,
-                "url": window.location.origin,
+                "@id": `${origin}/#website`,
+                "url": origin,
                 "name": "AgentBio - Real Estate Agent Bio Page Builder",
                 "description": "Turn your Instagram into a lead-generating real estate portfolio. Showcase listings, capture inquiries & book showings from one mobile-optimized bio page.",
                 "publisher": {
-                    "@id": `${window.location.origin}/#organization`
+                    "@id": `${origin}/#organization`
                 },
                 "potentialAction": {
                     "@type": "SearchAction",
                     "target": {
                         "@type": "EntryPoint",
-                        "urlTemplate": `${window.location.origin}/search?q={search_term_string}`
+                        "urlTemplate": `${origin}/search?q={search_term_string}`
                     },
                     "query-input": "required name=search_term_string"
                 }
             },
-            {
-                "@type": "Organization",
-                "@id": `${window.location.origin}/#organization`,
-                "name": "AgentBio",
-                "url": window.location.origin,
-                "logo": {
-                    "@type": "ImageObject",
-                    "url": `${window.location.origin}/logo.png`
-                },
-                "sameAs": [],
-                "description": "AgentBio provides real estate agents with mobile-optimized bio page tools to showcase property listings, capture buyer and seller leads, and book showing appointments directly from Instagram and social media."
-            },
+            // Use centralized Organization schema with social signals
+            organizationSchema,
             {
                 "@type": "SoftwareApplication",
                 "name": "AgentBio",
@@ -70,6 +78,10 @@ export default function Landing() {
                     "reviewCount": "523"
                 }
             },
+            // Add BreadcrumbList schema
+            breadcrumbSchema,
+            // Add ProfessionalService/LocalBusiness schema for local SEO
+            localBusinessSchema,
             {
                 "@type": "FAQPage",
                 "mainEntity": [
@@ -135,15 +147,15 @@ export default function Landing() {
                     "agent booking page for showings",
                     "real estate social media landing page"
                 ]}
-                canonicalUrl={window.location.origin}
+                canonicalUrl={origin}
                 schema={schema}
             />
             <main className="min-h-screen bg-background">
             {/* Header */}
             <PublicHeader />
 
-            {/* Hero Section */}
-            <HeroSection
+            {/* Hero Section - Lazy loaded with lightweight fallback */}
+            <HeroSectionLazy
                 title="Real Estate Agent Bio Page Builder"
                 subtitle="Turn Your Instagram Followers Into Qualified Buyer & Seller Leads"
                 description="While your competitors use basic link-in-bio tools, you'll have a complete real estate portfolio with property galleries, lead capture forms, and appointment booking—all optimized to convert social media traffic into closings."
@@ -156,7 +168,7 @@ export default function Landing() {
                     href: "#demo-profiles"
                 }}
                 badge={{
-                    icon: <Home className="h-4 w-4" aria-hidden="true" />,
+                    icon: <Sparkles className="h-4 w-4" aria-hidden="true" />,
                     text: "Built for Real Estate Agents"
                 }}
                 showStats={false}
@@ -446,8 +458,26 @@ export default function Landing() {
                 </div>
             </section>
 
-            {/* Blog Section */}
-            <BlogSection limit={6} showSearch={true} showFilters={true} />
+            {/* Blog Section - Lazy loaded since it's below the fold */}
+            <React.Suspense fallback={
+                <section className="py-16 bg-muted/30">
+                    <div className="container mx-auto px-4">
+                        <div className="text-center mb-12">
+                            <h2 className="text-4xl font-bold mb-4">Latest Real Estate Insights</h2>
+                            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                                Expert advice, market trends, and guides to help you succeed in real estate
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="h-80 rounded-lg bg-gray-200 dark:bg-gray-800 animate-pulse" />
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            }>
+                <BlogSection limit={6} showSearch={true} showFilters={true} />
+            </React.Suspense>
 
             {/* FAQ Section */}
             <section className="py-20 bg-background" aria-labelledby="faq-heading">

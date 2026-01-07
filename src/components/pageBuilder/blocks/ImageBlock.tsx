@@ -5,6 +5,7 @@
 
 import { ImageBlockConfig } from "@/types/pageBuilder";
 import { ImageIcon } from "lucide-react";
+import { sanitizeUrl } from "@/utils/sanitize";
 
 interface ImageBlockProps {
     config: ImageBlockConfig;
@@ -29,9 +30,16 @@ export function ImageBlock({ config, isEditing = false }: ImageBlockProps) {
 
     const handleClick = () => {
         if (!isEditing && config.link) {
-            window.open(config.link, "_blank", "noopener,noreferrer");
+            // Sanitize URL to prevent XSS via javascript: or data: protocols
+            const safeUrl = sanitizeUrl(config.link);
+            if (safeUrl) {
+                window.open(safeUrl, "_blank", "noopener,noreferrer");
+            }
         }
     };
+
+    // Sanitize image URL
+    const safeImageUrl = sanitizeUrl(config.imageUrl || "");
 
     if (!config.imageUrl && isEditing) {
         return (
@@ -61,7 +69,7 @@ export function ImageBlock({ config, isEditing = false }: ImageBlockProps) {
                 `}
             >
                 <img
-                    src={config.imageUrl}
+                    src={safeImageUrl}
                     alt={config.alt}
                     className="w-full h-auto"
                 />

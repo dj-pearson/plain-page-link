@@ -46,7 +46,7 @@ export function useProfile() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -61,6 +61,8 @@ export function useProfile() {
       return data as Profile;
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
+    gcTime: 10 * 60 * 1000, // 10 minutes - cache retention
   });
 
   const updateProfile = useMutation({
@@ -85,6 +87,9 @@ export function useProfile() {
   return {
     profile,
     isLoading,
+    isError,
+    error,
+    refetch,
     updateProfile,
   };
 }

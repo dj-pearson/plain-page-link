@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
 
@@ -15,7 +16,7 @@ if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
   try {
     authChannel = new BroadcastChannel(AUTH_CHANNEL_NAME);
   } catch (e) {
-    console.warn('BroadcastChannel not available for SLO:', e);
+    logger.warn('BroadcastChannel not available for SLO');
   }
 }
 
@@ -34,6 +35,10 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
+  // MFA state
+  requiresMFA: boolean;
+  mfaVerified: boolean;
+
   // Actions
   initialize: () => Promise<void>;
   signUp: (email: string, password: string, username: string, fullName?: string) => Promise<void>;
@@ -44,6 +49,7 @@ interface AuthState {
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   clearError: () => void;
+  setMFAVerified: (verified: boolean) => void;
   _handleSLOMessage: (message: SLOMessage) => void;
 }
 
@@ -56,6 +62,8 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       isLoading: true,
       error: null,
+      requiresMFA: false,
+      mfaVerified: false,
 
       initialize: async () => {
         const { _handleSLOMessage } = get();
@@ -71,7 +79,7 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           window.addEventListener('storage', (event) => {
             if (event.key === 'agentbio-logout' && event.newValue) {
-              console.log('SLO: Received logout via localStorage event');
+              logger.debug('SLO: Received logout via localStorage event');
               _handleSLOMessage({
                 type: 'SIGN_OUT',
                 timestamp: parseInt(event.newValue, 10),
@@ -133,7 +141,7 @@ export const useAuthStore = create<AuthState>()(
             });
           }
         } catch (error: any) {
-          console.error('Auth initialization error:', error);
+          logger.error('Auth initialization error', error);
           set({
             user: null,
             session: null,
@@ -146,7 +154,7 @@ export const useAuthStore = create<AuthState>()(
 
         // Set up auth state listener for session changes
         supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('Auth state change:', event, session?.user?.id);
+          logger.authEvent(event, session?.user?.id);
 
           if (event === 'SIGNED_OUT') {
             set({
@@ -184,7 +192,7 @@ export const useAuthStore = create<AuthState>()(
               const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
               set({ profile: profileResult.data || null, role });
             } catch (error) {
-              console.error('Error fetching user data in auth state listener:', error);
+              logger.error('Error fetching user data in auth state listener', error);
             }
           } else {
             set({ profile: null, role: null });
@@ -194,7 +202,7 @@ export const useAuthStore = create<AuthState>()(
 
       signUp: async (email: string, password: string, username: string, fullName?: string) => {
         set({ isLoading: true, error: null });
-        
+
         try {
           const { data, error } = await supabase.auth.signUp({
             email,
@@ -207,14 +215,60 @@ export const useAuthStore = create<AuthState>()(
               emailRedirectTo: `${window.location.origin}/`,
             },
           });
-          
+
           if (error) throw error;
-          
-          set({
-            user: data.user,
-            session: data.session,
-            isLoading: false,
-          });
+
+          // If user was created and we have a session, wait for profile to be created by DB trigger
+          // The handle_new_user trigger creates the profile, but there's a race condition
+          if (data.user && data.session) {
+            let profile = null;
+            let role = null;
+
+            // Retry fetching profile with exponential backoff (trigger may not have completed yet)
+            const maxRetries = 5;
+            const baseDelay = 100; // Start with 100ms
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+              const [profileResult, rolesResult] = await Promise.all([
+                supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', data.user.id)
+                  .single(),
+                supabase
+                  .from('user_roles')
+                  .select('role')
+                  .eq('user_id', data.user.id)
+                  .order('role', { ascending: true })
+              ]);
+
+              if (profileResult.data) {
+                profile = profileResult.data;
+                role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+                break;
+              }
+
+              // Wait before retrying (exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms)
+              if (attempt < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, attempt)));
+              }
+            }
+
+            set({
+              user: data.user,
+              session: data.session,
+              profile,
+              role,
+              isLoading: false,
+            });
+          } else {
+            // Email confirmation required - no session yet
+            set({
+              user: data.user,
+              session: data.session,
+              isLoading: false,
+            });
+          }
         } catch (error: any) {
           set({
             error: error.message,
@@ -225,38 +279,64 @@ export const useAuthStore = create<AuthState>()(
       },
 
       signIn: async (email: string, password: string) => {
-        set({ isLoading: true, error: null });
-        
+        set({ isLoading: true, error: null, requiresMFA: false, mfaVerified: false });
+
         try {
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
           });
-          
+
           if (error) throw error;
-          
-          // Fetch profile and role
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-          
-          const { data: userRoles } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', data.user.id)
-            .order('role', { ascending: true });
-          
-          const role = userRoles?.find(r => r.role === 'admin')?.role || userRoles?.[0]?.role || null;
-          
-          set({
-            user: data.user,
-            session: data.session,
-            profile: profile || null,
-            role: role,
-            isLoading: false,
-          });
+
+          // Fetch profile, roles, and MFA settings in parallel for better performance
+          const [profileResult, rolesResult, mfaResult] = await Promise.all([
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', data.user.id)
+              .single(),
+            supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', data.user.id)
+              .order('role', { ascending: true }),
+            supabase
+              .from('user_mfa_settings')
+              .select('mfa_enabled, verified_at')
+              .eq('user_id', data.user.id)
+              .maybeSingle()
+          ]);
+
+          const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+
+          // Check if MFA is enabled and verified for this user
+          const mfaEnabled = mfaResult.data?.mfa_enabled && mfaResult.data?.verified_at;
+
+          if (mfaEnabled) {
+            // User has MFA enabled - require verification before granting full access
+            // Note: The user will need to be redirected to MFA verification page
+            set({
+              user: data.user,
+              session: data.session,
+              profile: profileResult.data || null,
+              role: role,
+              isLoading: false,
+              requiresMFA: true,
+              mfaVerified: false,
+            });
+          } else {
+            // No MFA required - grant full access
+            set({
+              user: data.user,
+              session: data.session,
+              profile: profileResult.data || null,
+              role: role,
+              isLoading: false,
+              requiresMFA: false,
+              mfaVerified: true,
+            });
+          }
         } catch (error: any) {
           set({
             error: error.message,
@@ -344,9 +424,11 @@ export const useAuthStore = create<AuthState>()(
             role: null,
             isLoading: false,
             error: null,
+            requiresMFA: false,
+            mfaVerified: false,
           });
         } catch (error: any) {
-          console.error('Sign out error:', error);
+          logger.error('Sign out error', error);
           set({ isLoading: false });
         }
       },
@@ -380,9 +462,11 @@ export const useAuthStore = create<AuthState>()(
             role: null,
             isLoading: false,
             error: null,
+            requiresMFA: false,
+            mfaVerified: false,
           });
         } catch (error: any) {
-          console.error('Sign out all devices error:', error);
+          logger.error('Sign out all devices error', error);
           set({ isLoading: false });
         }
       },
@@ -392,7 +476,7 @@ export const useAuthStore = create<AuthState>()(
 
         // Only handle if we have a session and message is for our user or all users
         if (user && (message.userId === user.id || !message.userId)) {
-          console.log('SLO: Received logout broadcast from another tab');
+          logger.debug('SLO: Received logout broadcast from another tab');
           // Clear local state without re-calling Supabase signOut
           // to avoid infinite broadcast loop
           set({
@@ -402,6 +486,8 @@ export const useAuthStore = create<AuthState>()(
             role: null,
             isLoading: false,
             error: null,
+            requiresMFA: false,
+            mfaVerified: false,
           });
         }
       },
@@ -437,6 +523,13 @@ export const useAuthStore = create<AuthState>()(
 
       clearError: () => {
         set({ error: null });
+      },
+
+      setMFAVerified: (verified: boolean) => {
+        set({
+          mfaVerified: verified,
+          requiresMFA: !verified,
+        });
       },
     }),
     {

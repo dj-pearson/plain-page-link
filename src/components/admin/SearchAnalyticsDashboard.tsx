@@ -10,7 +10,7 @@ import { TopQueriesTable } from './searchAnalytics/TopQueriesTable';
 import { TopPagesTable } from './searchAnalytics/TopPagesTable';
 import { DateRangePicker } from './searchAnalytics/DateRangePicker';
 import { PlatformFilter } from './searchAnalytics/PlatformFilter';
-import { useAggregateAnalytics } from '@/hooks/useSearchAnalytics';
+import { useAggregateAnalytics, useTopQueries } from '@/hooks/useSearchAnalytics';
 import { useToast } from '@/hooks/use-toast';
 import { exportToCSV, exportToPDF, formatAnalyticsForExport } from '@/lib/exportUtils';
 import type { SearchPlatform } from '@/types/searchAnalytics';
@@ -34,6 +34,14 @@ export function SearchAnalyticsDashboard() {
 
   const aggregateMutation = useAggregateAnalytics();
 
+  // Fetch real query data for exports
+  const topQueries = useTopQueries({
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    platforms: selectedPlatforms,
+    limit: 100,
+  });
+
   const handleRefreshData = async () => {
     try {
       await aggregateMutation.mutateAsync({
@@ -47,43 +55,46 @@ export function SearchAnalyticsDashboard() {
   };
 
   const handleExportCSV = () => {
-    // Mock data - replace with actual data from your analytics state/props
-    const mockQueries = [
-      { query: 'luxury homes Los Angeles', clicks: 245, impressions: 1230, ctr: 0.199, position: 3.2 },
-      { query: 'real estate agent near me', clicks: 189, impressions: 2100, ctr: 0.09, position: 5.8 },
-      { query: 'homes for sale Beverly Hills', clicks: 167, impressions: 890, ctr: 0.188, position: 2.1 },
-      { query: 'best realtor LA', clicks: 134, impressions: 1500, ctr: 0.089, position: 7.3 },
-      { query: 'property listings California', clicks: 98, impressions: 670, ctr: 0.146, position: 4.5 },
-    ];
+    // Use real query data from the hook
+    if (!topQueries || topQueries.length === 0) {
+      toast({
+        title: 'No Data to Export',
+        description: 'Connect a platform and sync data before exporting.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const dateRangeText = `${dateRange.start} to ${dateRange.end}`;
-    const exportData = formatAnalyticsForExport(mockQueries, 'Search Analytics Report', dateRangeText);
+    const exportData = formatAnalyticsForExport(topQueries, 'Search Analytics Report', dateRangeText);
 
     exportToCSV(exportData);
 
     toast({
       title: 'Exported to CSV',
-      description: 'Your analytics data has been downloaded.',
+      description: `Exported ${topQueries.length} queries to CSV.`,
     });
   };
 
   const handleExportPDF = () => {
-    const mockQueries = [
-      { query: 'luxury homes Los Angeles', clicks: 245, impressions: 1230, ctr: 0.199, position: 3.2 },
-      { query: 'real estate agent near me', clicks: 189, impressions: 2100, ctr: 0.09, position: 5.8 },
-      { query: 'homes for sale Beverly Hills', clicks: 167, impressions: 890, ctr: 0.188, position: 2.1 },
-      { query: 'best realtor LA', clicks: 134, impressions: 1500, ctr: 0.089, position: 7.3 },
-      { query: 'property listings California', clicks: 98, impressions: 670, ctr: 0.146, position: 4.5 },
-    ];
+    // Use real query data from the hook
+    if (!topQueries || topQueries.length === 0) {
+      toast({
+        title: 'No Data to Export',
+        description: 'Connect a platform and sync data before exporting.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const dateRangeText = `${dateRange.start} to ${dateRange.end}`;
-    const exportData = formatAnalyticsForExport(mockQueries, 'Search Analytics Report', dateRangeText);
+    const exportData = formatAnalyticsForExport(topQueries, 'Search Analytics Report', dateRangeText);
 
     exportToPDF(exportData);
 
     toast({
       title: 'Opening PDF',
-      description: 'Your analytics report is being prepared for printing.',
+      description: `Preparing PDF report with ${topQueries.length} queries.`,
     });
   };
 

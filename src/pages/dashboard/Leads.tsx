@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap, CheckSquare, Square, Trash2, CheckCircle2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap, CheckSquare, Square, Trash2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ import { LeadDetailModal } from "@/components/leads/LeadDetailModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SkeletonLeads } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -18,12 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { Lead } from "@/types/lead";
 
 export default function Leads() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showLeadDetail, setShowLeadDetail] = useState(false);
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [isBulkActing, setIsBulkActing] = useState(false);
@@ -31,7 +33,7 @@ export default function Leads() {
   const { toast } = useToast();
   const { subscription, hasFeature } = useSubscriptionLimits();
 
-  const { data: leads, isLoading, refetch } = useQuery({
+  const { data: leads, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["leads", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -48,7 +50,23 @@ export default function Leads() {
     enabled: !!user?.id,
   });
 
-  const handleLeadClick = (lead: any) => {
+  // Memoize lead stats to avoid N+1 filtering on every render
+  const leadStats = useMemo(() => {
+    if (!leads) return { total: 0, new: 0, contacted: 0, converted: 0 };
+
+    return leads.reduce(
+      (acc, lead) => {
+        acc.total++;
+        if (lead.status === "new") acc.new++;
+        else if (lead.status === "contacted") acc.contacted++;
+        else if (lead.status === "converted") acc.converted++;
+        return acc;
+      },
+      { total: 0, new: 0, contacted: 0, converted: 0 }
+    );
+  }, [leads]);
+
+  const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead);
     setShowLeadDetail(true);
   };
@@ -260,14 +278,14 @@ export default function Leads() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-            <div className="text-xl sm:text-2xl font-bold text-foreground">{leads?.length || 0}</div>
+            <div className="text-xl sm:text-2xl font-bold text-foreground">{leadStats.total}</div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Total Leads</div>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
             <div className="text-xl sm:text-2xl font-bold text-green-600">
-              {leads?.filter((l) => l.status === "new").length || 0}
+              {leadStats.new}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">New</div>
           </CardContent>
@@ -275,7 +293,7 @@ export default function Leads() {
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
             <div className="text-xl sm:text-2xl font-bold text-blue-600">
-              {leads?.filter((l) => l.status === "contacted").length || 0}
+              {leadStats.contacted}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Contacted</div>
           </CardContent>
@@ -283,7 +301,7 @@ export default function Leads() {
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
             <div className="text-xl sm:text-2xl font-bold text-primary">
-              {leads?.filter((l) => l.status === "converted").length || 0}
+              {leadStats.converted}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Converted</div>
           </CardContent>
@@ -371,12 +389,46 @@ export default function Leads() {
 
       {/* Leads List - Mobile optimized */}
       <div className="space-y-2 sm:space-y-3">
-        {isLoading ? (
+        {isError ? (
           <Card>
-            <CardContent className="p-6 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
-              Loading leads...
+            <CardContent className="p-6 sm:p-8 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-red-100 rounded-full mb-3 sm:mb-4">
+                <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-600" />
+              </div>
+              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+                Failed to load leads
+              </h3>
+              <p className="text-sm sm:text-base text-muted-foreground mb-4 max-w-sm mx-auto">
+                {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+              </p>
+              <Button onClick={() => refetch()} variant="outline" className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Try Again
+              </Button>
             </CardContent>
           </Card>
+        ) : isLoading ? (
+          <div className="space-y-2 sm:space-y-3" role="status" aria-label="Loading leads">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-start gap-4 animate-pulse">
+                    <div className="h-10 w-10 rounded-full bg-gray-200 flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-32 bg-gray-200 rounded" />
+                        <div className="h-5 w-16 bg-gray-200 rounded-full" />
+                      </div>
+                      <div className="h-4 w-48 bg-gray-200 rounded" />
+                      <div className="h-4 w-36 bg-gray-200 rounded" />
+                    </div>
+                    <div className="h-4 w-20 bg-gray-200 rounded" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            <span className="sr-only">Loading leads...</span>
+          </div>
         ) : filteredLeads && filteredLeads.length > 0 ? (
           filteredLeads.map((lead) => (
             <Card

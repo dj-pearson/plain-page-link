@@ -4,12 +4,15 @@ import { Home, Users, Calendar, Star, TrendingUp, Check, X } from "lucide-react"
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
+import { generateEnhancedOrganizationSchema } from "@/lib/seo";
 
 export default function ForRealEstateAgents() {
     const schema = {
         "@context": "https://schema.org",
         "@graph": [
+            // Add Organization schema with social signals
+            generateEnhancedOrganizationSchema(),
             {
                 "@type": "WebPage",
                 "@id": `${window.location.origin}/for-real-estate-agents`,
@@ -71,7 +74,7 @@ export default function ForRealEstateAgents() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="Link in Bio Built for Real Estate Agents"
                     subtitle="Everything Generic Tools Are Missing for Converting Social Media Traffic"
                     description="AgentBio isn't just another link tool—it's a complete real estate portfolio designed specifically for agents who need more than basic link organization."

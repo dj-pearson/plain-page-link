@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { BioAnalyzerForm } from '@/components/tools/instagram-bio-analyzer/BioAnalyzerForm';
 import { ScoreDisplay } from '@/components/tools/instagram-bio-analyzer/ScoreDisplay';
 import { CategoryBreakdown } from '@/components/tools/instagram-bio-analyzer/CategoryBreakdown';
@@ -276,6 +277,19 @@ export default function InstagramBioAnalyzer() {
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-pink-50">
+        {/* Breadcrumb Navigation */}
+        <div className="bg-white/80 border-b border-gray-200 py-3">
+          <div className="container mx-auto px-4">
+            <Breadcrumb
+              items={[
+                { name: "Home", url: window.location.origin },
+                { name: "Free Tools", url: "/tools/instagram-bio-analyzer" },
+                { name: "Instagram Bio Analyzer", url: "/tools/instagram-bio-analyzer" }
+              ]}
+            />
+          </div>
+        </div>
+
         {/* Hero Section */}
         {currentStep === 'form' && (
           <>

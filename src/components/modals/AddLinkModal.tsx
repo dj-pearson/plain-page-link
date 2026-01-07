@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -35,17 +38,19 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+const linkSchema = z.object({
+  title: z.string().min(1, "Title is required").max(100, "Title must be less than 100 characters"),
+  url: z.string().url("Please enter a valid URL"),
+  icon: z.string(),
+  active: z.boolean(),
+});
+
+export type LinkFormData = z.infer<typeof linkSchema>;
+
 interface AddLinkModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave?: (data: LinkFormData) => void;
-}
-
-export interface LinkFormData {
-  title: string;
-  url: string;
-  icon: string;
-  active: boolean;
 }
 
 const SOCIAL_ICONS: { value: string; label: string; icon: LucideIcon }[] = [
@@ -66,29 +71,38 @@ const SOCIAL_ICONS: { value: string; label: string; icon: LucideIcon }[] = [
 ];
 
 export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) {
-  const [formData, setFormData] = useState<LinkFormData>({
-    title: "",
-    url: "",
-    icon: "link",
-    active: true,
-  });
+  const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave?.(formData);
-    onOpenChange(false);
-    // Reset form
-    setFormData({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setValue,
+    watch,
+  } = useForm<LinkFormData>({
+    resolver: zodResolver(linkSchema),
+    defaultValues: {
       title: "",
       url: "",
       icon: "link",
       active: true,
-    });
+    },
+  });
+
+  const icon = watch("icon");
+  const active = watch("active");
+
+  const onSubmit = async (data: LinkFormData) => {
+    try {
+      setError(null);
+      await onSave?.(data);
+      onOpenChange(false);
+      reset();
+    } catch (err) {
+      console.error("Failed to add link:", err);
+      setError("Failed to add link. Please try again.");
+    }
   };
 
   return (
@@ -101,44 +115,47 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
           <div>
             <Label htmlFor="title">Link Title *</Label>
             <Input
               id="title"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
+              {...register("title")}
               placeholder="Schedule a Consultation"
-              required
             />
+            {errors.title && (
+              <p className="text-sm text-red-600 mt-1">{errors.title.message}</p>
+            )}
           </div>
 
           <div>
             <Label htmlFor="url">URL *</Label>
             <Input
               id="url"
-              name="url"
-              type="url"
-              value={formData.url}
-              onChange={handleChange}
+              {...register("url")}
               placeholder="https://example.com"
-              required
             />
+            {errors.url && (
+              <p className="text-sm text-red-600 mt-1">{errors.url.message}</p>
+            )}
           </div>
 
           <div>
             <Label htmlFor="icon">Icon</Label>
             <Select
-              value={formData.icon}
-              onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, icon: value }))
-              }
+              value={icon}
+              onValueChange={(value) => setValue("icon", value)}
             >
               <SelectTrigger>
                 <SelectValue>
                   {(() => {
-                    const selected = SOCIAL_ICONS.find((i) => i.value === formData.icon);
+                    const selected = SOCIAL_ICONS.find((i) => i.value === icon);
                     const IconComponent = selected?.icon || LinkIcon;
                     return (
                       <span className="flex items-center gap-2">
@@ -169,10 +186,8 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
             <input
               type="checkbox"
               id="active"
-              checked={formData.active}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, active: e.target.checked }))
-              }
+              checked={active}
+              onChange={(e) => setValue("active", e.target.checked)}
               className="rounded border-border"
             />
             <Label htmlFor="active" className="cursor-pointer">

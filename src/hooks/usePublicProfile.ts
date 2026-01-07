@@ -20,13 +20,25 @@ export const usePublicProfile = (username: string) => {
           brokerage_logo,
           years_experience,
           certifications,
+          specialties,
           service_cities,
           service_zip_codes,
-          city,
+          license_number,
+          license_state,
+          phone,
+          email_display,
+          calendly_url,
+          instagram_url,
+          facebook_url,
+          linkedin_url,
+          tiktok_url,
+          youtube_url,
+          zillow_url,
+          realtor_com_url,
+          website_url,
           seo_title,
           seo_description,
           og_image,
-          display_name,
           created_at,
           is_published
         `)
@@ -56,20 +68,21 @@ export const usePublicProfile = (username: string) => {
             id,
             image,
             photos,
-            title,
             address,
             city,
             price,
-            original_price,
+            beds,
+            baths,
             bedrooms,
             bathrooms,
+            sqft,
             square_feet,
             status,
             sort_order,
             is_featured,
             days_on_market,
             description,
-            open_house_date
+            property_type
           `)
           .eq('user_id', profile.id)
           .in('status', ['active', 'pending', 'under_contract', 'sold'])
@@ -80,11 +93,16 @@ export const usePublicProfile = (username: string) => {
           .from('testimonials')
           .select(`
             id,
-            author_name,
-            author_role,
-            content,
+            client_name,
+            client_title,
+            client_photo,
+            review,
             rating,
             sort_order,
+            date,
+            is_featured,
+            transaction_type,
+            property_type,
             created_at,
             is_published
           `)
@@ -121,10 +139,26 @@ export const usePublicProfile = (username: string) => {
       if (linksError) throw linksError;
       if (settingsError) throw settingsError;
 
+      // Transform testimonials to match expected type (review -> review_text)
+      const transformedTestimonials = (testimonials || []).map(t => ({
+        ...t,
+        review_text: t.review,
+        date: t.date || t.created_at, // Fallback to created_at if date is null
+      }));
+
+      // Transform listings to add expected fields
+      const transformedListings = (listings || []).map(l => ({
+        ...l,
+        title: l.address, // Use address as title since title column doesn't exist
+        bedrooms: l.bedrooms ?? l.beds,
+        bathrooms: l.bathrooms ?? l.baths,
+        square_feet: l.square_feet ?? l.sqft,
+      }));
+
       return {
         profile,
-        listings: listings || [],
-        testimonials: testimonials || [],
+        listings: transformedListings,
+        testimonials: transformedTestimonials,
         links: links || [],
         settings: settings || {
           show_listings: true,

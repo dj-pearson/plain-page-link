@@ -6,6 +6,8 @@ import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDash
 import { InsightsWidget } from "@/components/analytics/InsightsWidget";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SkeletonAnalytics } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import {
     Card,
     CardContent,
@@ -34,9 +36,82 @@ import { useAnalytics, type TimeRange } from "@/hooks/useAnalytics";
 export default function Analytics() {
     const [dateRange, setDateRange] = useState<TimeRange>("30d");
     const { stats, viewsData, leadsData, recentLeads, isLoading } = useAnalytics(dateRange);
+    const { toast } = useToast();
+
+    const handleExportAnalytics = () => {
+        // Check if there's data to export
+        if (stats.totalViews === 0 && stats.totalLeads === 0) {
+            toast({
+                title: "No data to export",
+                description: "There's no analytics data for the selected time period.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const dateRangeLabel = dateRange === "7d" ? "7 days" : dateRange === "30d" ? "30 days" : "90 days";
+
+        // Build CSV content
+        const lines: string[] = [];
+
+        // Summary section
+        lines.push("Analytics Summary");
+        lines.push(`Date Range,Last ${dateRangeLabel}`);
+        lines.push(`Export Date,${new Date().toLocaleDateString()}`);
+        lines.push("");
+
+        // Key metrics
+        lines.push("Key Metrics");
+        lines.push("Metric,Value");
+        lines.push(`Total Views,${stats.totalViews}`);
+        lines.push(`Unique Visitors,${stats.uniqueVisitors}`);
+        lines.push(`Total Leads,${stats.totalLeads}`);
+        lines.push(`Conversion Rate,${stats.conversionRate}%`);
+        lines.push("");
+
+        // Views over time
+        if (viewsData.length > 0) {
+            lines.push("Views Over Time");
+            lines.push("Date,Views,Visitors");
+            viewsData.forEach((item) => {
+                lines.push(`${item.name},${item.views},${item.visitors}`);
+            });
+            lines.push("");
+        }
+
+        // Leads by type
+        if (leadsData.length > 0) {
+            lines.push("Leads by Type");
+            lines.push("Type,Count,Percentage");
+            leadsData.forEach((item) => {
+                const percentage = stats.totalLeads > 0
+                    ? ((item.value / stats.totalLeads) * 100).toFixed(1)
+                    : "0";
+                lines.push(`${item.name},${item.value},${percentage}%`);
+            });
+        }
+
+        const csvContent = lines.join("\n");
+
+        // Download
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `analytics-${dateRange}-${new Date().toISOString().split("T")[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast({
+            title: "Analytics exported",
+            description: `Successfully exported analytics data for the last ${dateRangeLabel}`,
+        });
+    };
 
     if (isLoading) {
-        return <div className="flex items-center justify-center h-64">Loading...</div>;
+        return <SkeletonAnalytics />;
     }
 
     return (
@@ -75,7 +150,12 @@ export default function Analytics() {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none"
+                        onClick={handleExportAnalytics}
+                    >
                         <Download className="w-4 h-4 mr-2" />
                         <span className="text-xs sm:text-sm">Export</span>
                     </Button>

@@ -7,7 +7,7 @@ export function useLeads() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data: leads = [], isLoading } = useQuery({
+  const { data: leads = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["leads", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -22,6 +22,8 @@ export function useLeads() {
       return data as Lead[];
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
+    gcTime: 10 * 60 * 1000, // 10 minutes - cache retention
   });
 
   const addLead = useMutation({
@@ -42,10 +44,14 @@ export function useLeads() {
 
   const updateLead = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Lead> & { id: string }) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // Security: Verify user owns this lead by requiring both id and user_id match
       const { data, error } = await supabase
         .from("leads")
         .update(updates)
         .eq("id", id)
+        .eq("user_id", user.id)
         .select()
         .single();
 
@@ -59,10 +65,14 @@ export function useLeads() {
 
   const deleteLead = useMutation({
     mutationFn: async (id: string) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      // Security: Verify user owns this lead by requiring both id and user_id match
       const { error } = await supabase
         .from("leads")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", user.id);
 
       if (error) throw error;
     },
@@ -74,6 +84,9 @@ export function useLeads() {
   return {
     leads,
     isLoading,
+    isError,
+    error,
+    refetch,
     addLead,
     updateLead,
     deleteLead,

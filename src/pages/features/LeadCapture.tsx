@@ -4,7 +4,8 @@ import { Users, Home, TrendingUp, Check, Star } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { HeroSection } from "@/components/hero";
+import { HeroSectionLazy } from "@/components/hero";
+import { Breadcrumb } from "@/components/seo/Breadcrumb";
 import { generateFAQSchema, generateCombinedSchema, FEATURE_FAQS } from "@/lib/faq-schema";
 
 export default function LeadCapture() {
@@ -58,6 +59,19 @@ export default function LeadCapture() {
             <main className="min-h-screen bg-background">
                 <PublicHeader />
 
+                {/* Breadcrumb Navigation */}
+                <section className="py-4 bg-background/50 border-b border-glass-border">
+                    <div className="container mx-auto px-4">
+                        <Breadcrumb
+                            items={[
+                                { name: "Home", url: window.location.origin },
+                                { name: "Features", url: "/features/property-listings" },
+                                { name: "Lead Capture", url: "/features/lead-capture" }
+                            ]}
+                        />
+                    </div>
+                </section>
+
                 {/* Direct Answer */}
                 <section className="py-8 bg-background/95 border-b border-glass-border">
                     <div className="container mx-auto px-4">
@@ -70,7 +84,7 @@ export default function LeadCapture() {
                 </section>
 
                 {/* Hero */}
-                <HeroSection
+                <HeroSectionLazy
                     title="Lead Capture Forms Built for Real Estate"
                     subtitle="Stop Getting Generic 'Contact Me' Submissions—Get Qualified Leads"
                     description="Capture buyer budgets, seller timelines, and pre-qualification details automatically. Know which leads to call first."

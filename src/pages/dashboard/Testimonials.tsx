@@ -1,24 +1,25 @@
 import { useState } from "react";
-import { Plus, Star, Edit, Trash2, Quote, Share2 } from "lucide-react";
+import { Plus, Star, Edit, Trash2, Quote, Share2, AlertCircle, RefreshCw } from "lucide-react";
 import { AddTestimonialModal } from "@/components/modals/AddTestimonialModal";
 import { EditTestimonialModal, EditTestimonialFormData } from "@/components/modals/EditTestimonialModal";
 import type { TestimonialFormData } from "@/components/modals/AddTestimonialModal";
 import { useToast } from "@/hooks/use-toast";
-import { useTestimonials } from "@/hooks/useTestimonials";
-import { supabase } from "@/integrations/supabase/client";
+import { useTestimonials, type Testimonial } from "@/hooks/useTestimonials";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
 import { RequestTestimonialModal } from "@/components/testimonials/RequestTestimonialModal";
 import { useProfile } from "@/hooks/useProfile";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function Testimonials() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingTestimonial, setEditingTestimonial] = useState<any>(null);
+  const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const { toast } = useToast();
-  const { testimonials, isLoading, addTestimonial, deleteTestimonial } = useTestimonials();
+  const { testimonials, isLoading, isError, error, refetch, addTestimonial, updateTestimonial, deleteTestimonial } = useTestimonials();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
   const { profile } = useProfile();
 
@@ -67,39 +68,23 @@ export default function Testimonials() {
 
   const handleEditTestimonial = async (data: EditTestimonialFormData) => {
     if (!editingTestimonial) return;
-    
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('testimonials')
-        .update({
-          client_name: data.client_name,
-          client_title: data.client_title,
-          rating: data.rating,
-          review: data.review,
-          property_type: data.property_type,
-          transaction_type: data.transaction_type,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingTestimonial.id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
-      toast({
-        title: "Testimonial updated!",
-        description: "Client review has been updated successfully.",
+      await updateTestimonial.mutateAsync({
+        id: editingTestimonial.id,
+        client_name: data.client_name,
+        client_title: data.client_title,
+        rating: data.rating,
+        review: data.review,
+        property_type: data.property_type,
+        transaction_type: data.transaction_type,
+        updated_at: new Date().toISOString()
       });
+
       setEditingTestimonial(null);
-      window.location.reload();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update testimonial. Please try again.",
-        variant: "destructive",
-      });
+      // Error toast is already handled by the mutation
+      console.error('Failed to update testimonial:', error);
     }
   };
 
@@ -184,9 +169,31 @@ export default function Testimonials() {
         </div>
       </div>
 
+      {/* Error State */}
+      {isError && (
+        <Card>
+          <CardContent className="p-6 sm:p-8 text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-red-100 rounded-full mb-3 sm:mb-4">
+              <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-600" />
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+              Failed to load testimonials
+            </h3>
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 max-w-sm mx-auto">
+              {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+            </p>
+            <Button onClick={() => refetch()} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Testimonials Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {testimonials.map((testimonial) => (
+      {!isError && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {testimonials.map((testimonial) => (
           <div
             key={testimonial.id}
             className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow relative"
@@ -237,11 +244,12 @@ export default function Testimonials() {
               </div>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Empty State */}
-      {testimonials.length === 0 && (
+      {!isError && testimonials.length === 0 && (
         <div className="text-center py-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-accent rounded-full mb-4">
             <Star className="h-8 w-8 text-muted-foreground" />
@@ -262,7 +270,7 @@ export default function Testimonials() {
       {/* Help Text */}
       <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
         <p className="text-sm text-blue-800 dark:text-blue-200">
-          💡 <strong>Tip:</strong> Featured testimonials will be prominently
+          <span role="img" aria-label="Tip">💡</span> <strong>Tip:</strong> Featured testimonials will be prominently
           displayed on your public profile. Ask satisfied clients for reviews
           after successful transactions!
         </p>
