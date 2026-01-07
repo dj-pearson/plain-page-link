@@ -219,9 +219,14 @@ export default function Pricing() {
           </p>
 
           <div className="flex items-center justify-center gap-4">
-            <span className={!isYearly ? "font-semibold" : "text-muted-foreground"}>Monthly</span>
-            <Switch checked={isYearly} onCheckedChange={setIsYearly} />
-            <span className={isYearly ? "font-semibold" : "text-muted-foreground"}>
+            <span id="billing-monthly" className={!isYearly ? "font-semibold" : "text-muted-foreground"}>Monthly</span>
+            <Switch
+              checked={isYearly}
+              onCheckedChange={setIsYearly}
+              aria-label="Toggle between monthly and yearly billing"
+              aria-describedby="billing-monthly billing-yearly"
+            />
+            <span id="billing-yearly" className={isYearly ? "font-semibold" : "text-muted-foreground"}>
               Yearly <span className="text-primary text-sm">(Save 17%)</span>
             </span>
           </div>

@@ -116,6 +116,7 @@ export default function Blog() {
         </div>
 
         {/* Category Cards */}
+        <h2 className="text-2xl font-bold mb-4">Browse by Category</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
           {categories.slice(1).map((category) => (
             <Link
