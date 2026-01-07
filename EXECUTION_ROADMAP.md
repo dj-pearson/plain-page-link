@@ -1327,7 +1327,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- Call edge function asynchronously via pg_net
   PERFORM net.http_post(
-    url := 'https://your-project.supabase.co/functions/v1/score-lead-intelligence',
+    url := 'https://functions.agentbio.net/score-lead-intelligence',
     headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SERVICE_KEY"}'::jsonb,
     body := json_build_object('leadId', NEW.id, 'profileId', NEW.profile_id)::jsonb
   );
@@ -1923,7 +1923,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.status = 'active' AND (OLD.status IS NULL OR OLD.status != 'active') THEN
     PERFORM net.http_post(
-      url := 'https://your-project.supabase.co/functions/v1/match-listing-to-leads',
+      url := 'https://functions.agentbio.net/match-listing-to-leads',
       headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SERVICE_KEY"}'::jsonb,
       body := json_build_object('listingId', NEW.id, 'profileId', NEW.profile_id)::jsonb
     );

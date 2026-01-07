@@ -25,7 +25,7 @@ Make sure these are set in your Supabase project:
 RESEND_API_KEY=re_xxxxxxxxxxxx
 FROM_EMAIL=noreply@agentbio.net  # Or your verified domain
 SITE_URL=https://agentbio.net
-SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_URL=https://api.agentbio.net  # Self-hosted Supabase API
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
 ```
 
@@ -57,7 +57,7 @@ SELECT cron.schedule(
   $$
   SELECT
     net.http_post(
-      url:='https://your-project.supabase.co/functions/v1/send-scheduled-bio-emails',
+      url:='https://functions.agentbio.net/send-scheduled-bio-emails',
       headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
       body:='{}'::jsonb
     ) AS request_id;
@@ -69,7 +69,7 @@ SELECT cron.schedule(
 
 Set up a daily trigger to call:
 ```bash
-curl -X POST https://your-project.supabase.co/functions/v1/send-scheduled-bio-emails \
+curl -X POST https://functions.agentbio.net/send-scheduled-bio-emails \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json"
 ```
@@ -88,7 +88,7 @@ Make sure your sending domain is verified in Resend:
 Test the immediate email:
 
 ```bash
-curl -X POST https://your-project.supabase.co/functions/v1/send-bio-analyzer-email \
+curl -X POST https://functions.agentbio.net/send-bio-analyzer-email \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -108,7 +108,7 @@ curl -X POST https://your-project.supabase.co/functions/v1/send-bio-analyzer-ema
 Test the scheduled emails function:
 
 ```bash
-curl -X POST https://your-project.supabase.co/functions/v1/send-scheduled-bio-emails \
+curl -X POST https://functions.agentbio.net/send-scheduled-bio-emails \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json"
 ```

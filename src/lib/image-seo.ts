@@ -151,8 +151,8 @@ export function generateImageSchema(
  * Checks if an image URL is likely to support WebP transformation
  */
 export function supportsWebPTransformation(url: string): boolean {
-  // Supabase storage URLs
-  if (url.includes('.supabase.co/storage')) return true;
+  // Supabase storage URLs (cloud or self-hosted)
+  if (url.includes('/storage/v1/') || url.includes('.supabase.co/storage')) return true;
 
   // Cloudinary
   if (url.includes('cloudinary.com')) return true;
@@ -170,8 +170,8 @@ export function supportsWebPTransformation(url: string): boolean {
  * Transforms an image URL to WebP format if supported
  */
 export function getWebPUrl(url: string): string | null {
-  // Supabase storage
-  if (url.includes('.supabase.co/storage')) {
+  // Supabase storage (cloud or self-hosted)
+  if (url.includes('/storage/v1/') || url.includes('.supabase.co/storage')) {
     const separator = url.includes('?') ? '&' : '?';
     return `${url}${separator}format=webp`;
   }

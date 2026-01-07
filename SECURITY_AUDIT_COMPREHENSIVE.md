@@ -281,33 +281,41 @@ Concern: Any XSS vulnerability exposes localStorage data.
 **File:** `/home/user/plain-page-link/.env.example`
 
 ```
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
+# Self-Hosted Supabase Configuration
+VITE_SUPABASE_URL=https://api.agentbio.net
 VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_FUNCTIONS_URL=https://functions.agentbio.net
 VITE_FIREBASE_API_KEY=
-VITE_API_URL=https://your-api-url.com/api
+VITE_API_URL=https://api.agentbio.net
 VITE_APP_URL=https://agentbio.net
 ```
 
-### 6.2 CRITICAL: Hardcoded Supabase Keys
+### 6.2 Supabase Configuration (RESOLVED)
 **File:** `/src/integrations/supabase/client.ts`
 
+**Status:** FIXED - Now uses environment variables without fallback to hardcoded values:
+
 ```typescript
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 
-  "https://axoqjwvqxgtzsdmlmnbv.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4b3Fqd3ZxeGd0enNkbWxtbmJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4Mzk1MzAsImV4cCI6MjA3NzQxNTUzMH0.O6gYAuqbY9xplmgCgP3e702xDXngVCnr5nL6QP2Umdg";
+// Self-hosted Supabase configuration
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const EDGE_FUNCTIONS_URL = import.meta.env.VITE_FUNCTIONS_URL;
+
+// Validates required environment variables at startup
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error('Missing required environment variables');
+}
 ```
 
-**SECURITY ISSUE:**
-- Supabase anon key is EXPOSED in source code (JWT token in plaintext)
-- URL is hardcoded as fallback
-- These are public keys, but compromised DB credentials can be exploited
-- Expiry: 2077-04-15 (52+ years from creation date 2024-09-30)
+**RESOLVED (December 2024):**
+- Hardcoded fallback values have been removed
+- Environment variables are now required (app throws error if missing)
+- Self-hosted Supabase configuration uses custom domains:
+  - API/Auth/Storage: `https://api.agentbio.net`
+  - Edge Functions: `https://functions.agentbio.net`
+- RLS policies remain critical for security
 
-**Impact:**
-- Attackers can make authenticated requests as "anon" role
-- Depends entirely on RLS policies for security
-- RLS policies are the only line of defense
+**Note:** Anon keys are designed to be public; RLS policies provide the security layer.
 
 ### 6.3 Supabase Edge Functions Secrets
 **File:** `/supabase/config.toml`
@@ -431,7 +439,7 @@ export function checkRateLimit(
                style-src 'self' 'unsafe-inline';
                img-src 'self' data: https:;
                font-src 'self' https:;
-               connect-src 'self' https://axoqjwvqxgtzsdmlmnbv.supabase.co;">
+               connect-src 'self' https://api.agentbio.net https://functions.agentbio.net;">
 ```
 
 ### 7.5 XSS Prevention

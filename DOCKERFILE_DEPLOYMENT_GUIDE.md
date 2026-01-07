@@ -46,7 +46,7 @@ In your Coolify service configuration:
 Add these required environment variables:
 
 ```
-SUPABASE_URL=https://your-supabase-project.supabase.co
+SUPABASE_URL=https://api.agentbio.net
 SUPABASE_ANON_KEY=your-anon-key-here
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 ```

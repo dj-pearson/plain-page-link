@@ -347,9 +347,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 Create or update your `.env` file:
 
 ```bash
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
+# Self-Hosted Supabase Configuration
+VITE_SUPABASE_URL=https://api.agentbio.net
 VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_FUNCTIONS_URL=https://functions.agentbio.net
 
 # Required for Core Web Vitals (FREE)
 PAGESPEED_INSIGHTS_API_KEY=your_google_pagespeed_api_key
@@ -581,9 +582,9 @@ SELECT cron.schedule(
   '0 2 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://your-project.supabase.co/functions/v1/run-scheduled-audit',
+    url := 'https://functions.agentbio.net/run-scheduled-audit',
     headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
-    body := '{"url": "https://yourdomain.com"}'::jsonb
+    body := '{"url": "https://agentbio.net"}'::jsonb
   ) AS request_id;
   $$
 );
@@ -750,7 +751,7 @@ AND resolved_at < NOW() - INTERVAL '30 days';
 
 ```bash
 # Daily backup of SEO tables
-pg_dump -h db.your-project.supabase.co \
+pg_dump -h db.agentbio.net \
         -U postgres \
         -t "seo_*" \
         -t "gsc_*" \
@@ -807,16 +808,17 @@ LIMIT 100;
 
 ### Custom Domain for Edge Functions
 
-Use your own domain for Edge Functions:
+AgentBio uses self-hosted Supabase with custom domains:
 
-1. Add CNAME record:
-   ```
-   api.yourdomain.com → your-project.supabase.co
-   ```
+1. **Self-Hosted Configuration:**
+   - API/Auth/Storage: `https://api.agentbio.net` (Kong gateway)
+   - Edge Functions: `https://functions.agentbio.net`
 
-2. Update function URLs in frontend:
+2. **Frontend Configuration:**
    ```typescript
-   const FUNCTION_BASE_URL = 'https://api.yourdomain.com/functions/v1';
+   // Set in environment variables (.env.local)
+   VITE_SUPABASE_URL=https://api.agentbio.net
+   VITE_FUNCTIONS_URL=https://functions.agentbio.net
    ```
 
 ### Rate Limiting

@@ -43,9 +43,10 @@ cp .env.example .env
 Edit `.env` with your Supabase credentials:
 
 ```env
-SUPABASE_URL=https://your-project-id.supabase.co
+# Self-Hosted Supabase Configuration
+SUPABASE_URL=https://api.agentbio.net
 SUPABASE_ANON_KEY=your-anon-key-here
-API_URL=https://your-api-url.com/api
+API_URL=https://api.agentbio.net
 APP_URL=https://agentbio.net
 ```
 

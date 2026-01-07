@@ -89,7 +89,7 @@ The integration uses existing environment variables:
 RESEND_API_KEY=re_xxxxxxxxxxxx        # Already set in Cloudflare & Supabase
 FROM_EMAIL=noreply@agentbio.net       # Verified sender domain
 SITE_URL=https://agentbio.net         # For links in emails
-SUPABASE_URL=https://xxx.supabase.co  # For database access
+SUPABASE_URL=https://api.agentbio.net # Self-hosted Supabase API
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...  # For privileged operations
 ```
 
@@ -116,7 +116,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...  # For privileged operations
     '0 9 * * *',
     $$
     SELECT net.http_post(
-      url:='https://your-project.supabase.co/functions/v1/send-scheduled-bio-emails',
+      url:='https://functions.agentbio.net/send-scheduled-bio-emails',
       headers:='{"Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb
     );
     $$
@@ -133,7 +133,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...  # For privileged operations
 ```bash
 # Use the bio analyzer tool on staging/production
 # Or manually invoke:
-curl -X POST https://your-project.supabase.co/functions/v1/send-bio-analyzer-email \
+curl -X POST https://functions.agentbio.net/send-bio-analyzer-email \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -150,7 +150,7 @@ curl -X POST https://your-project.supabase.co/functions/v1/send-bio-analyzer-ema
 
 ```bash
 # Trigger the cron job manually
-curl -X POST https://your-project.supabase.co/functions/v1/send-scheduled-bio-emails \
+curl -X POST https://functions.agentbio.net/send-scheduled-bio-emails \
   -H "Authorization: Bearer YOUR_ANON_KEY"
 ```
 

@@ -204,7 +204,7 @@
 6. **Test Email Flow**:
    ```bash
    # Test lead notification
-   curl -i --location --request POST 'https://[project-ref].supabase.co/functions/v1/send-email' \
+   curl -i --location --request POST 'https://functions.agentbio.net/send-email' \
      --header 'Authorization: Bearer [anon-key]' \
      --header 'Content-Type: application/json' \
      --data '{"to":"test@example.com","subject":"Test","html":"<p>Test</p>"}'

@@ -110,8 +110,8 @@ RESEND_API_KEY=re_...
 FROM_EMAIL=noreply@agentbio.net
 SITE_URL=https://agentbio.net
 
-# Supabase (for database)
-SUPABASE_URL=https://your-project.supabase.co
+# Supabase (self-hosted)
+SUPABASE_URL=https://api.agentbio.net
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
 ```
 
@@ -159,7 +159,7 @@ SELECT cron.schedule(
   '0 9 * * *',  -- Daily at 9 AM UTC
   $$
   SELECT net.http_post(
-    url:='https://your-project.supabase.co/functions/v1/send-scheduled-listing-emails',
+    url:='https://functions.agentbio.net/send-scheduled-listing-emails',
     headers:=jsonb_build_object(
       'Authorization', 'Bearer YOUR_ANON_KEY',
       'Content-Type', 'application/json'
@@ -184,7 +184,7 @@ Ensure `agentbio.net` is verified in Resend:
 
 ```bash
 # Test OpenAI generation
-curl -X POST https://your-project.supabase.co/functions/v1/generate-listing-description \
+curl -X POST https://functions.agentbio.net/generate-listing-description \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -203,7 +203,7 @@ curl -X POST https://your-project.supabase.co/functions/v1/generate-listing-desc
   }'
 
 # Test welcome email
-curl -X POST https://your-project.supabase.co/functions/v1/send-listing-generator-email \
+curl -X POST https://functions.agentbio.net/send-listing-generator-email \
   -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -215,7 +215,7 @@ curl -X POST https://your-project.supabase.co/functions/v1/send-listing-generato
   }'
 
 # Test scheduled emails
-curl -X POST https://your-project.supabase.co/functions/v1/send-scheduled-listing-emails \
+curl -X POST https://functions.agentbio.net/send-scheduled-listing-emails \
   -H "Authorization: Bearer YOUR_ANON_KEY"
 ```
 

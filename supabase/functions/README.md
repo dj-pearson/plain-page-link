@@ -149,11 +149,21 @@ curl -i --location --request POST 'http://localhost:54321/functions/v1/submit-co
 Update your frontend API URLs to point to your Edge Functions:
 
 ```typescript
-// src/lib/constants.ts
-export const API_URL = 'https://your-project-ref.supabase.co/functions/v1'
+// For self-hosted Supabase, use VITE_FUNCTIONS_URL environment variable
+// src/integrations/supabase/client.ts already configures this:
+export const supabaseConfig = {
+  url: SUPABASE_URL,
+  anonKey: SUPABASE_PUBLISHABLE_KEY,
+  functionsUrl: EDGE_FUNCTIONS_URL || `${SUPABASE_URL}/functions/v1`,
+};
+
+// Self-hosted production URLs:
+// - API/Auth/Storage: https://api.agentbio.net
+// - Edge Functions: https://functions.agentbio.net
 
 // Example usage in push-notifications.ts
-const response = await fetch(`${API_URL}/register-push-token`, {
+const functionsUrl = import.meta.env.VITE_FUNCTIONS_URL || 'https://functions.agentbio.net';
+const response = await fetch(`${functionsUrl}/register-push-token`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

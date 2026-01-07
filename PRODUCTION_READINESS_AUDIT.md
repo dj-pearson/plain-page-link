@@ -564,13 +564,13 @@ Sentry.init({
 
 #### Frontend (.env.production)
 ```bash
-# Supabase
-VITE_SUPABASE_URL=https://your-project.supabase.co
+# Self-Hosted Supabase
+VITE_SUPABASE_URL=https://api.agentbio.net
 VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_FUNCTIONS_URL=https://functions.agentbio.net
 
 # App
 VITE_APP_URL=https://agentbio.net
-VITE_API_URL=https://your-project.supabase.co
 
 # Analytics (Optional)
 VITE_GA_TRACKING_ID=G-XXXXXXXXXX

@@ -26,11 +26,14 @@ This security audit identified **16 security issues** across authentication, API
 **Risk:** Exposed API keys and database URL in client-side code
 **Impact:** Anyone can extract credentials from production JavaScript bundles and potentially abuse API quotas or access public data.
 
-**Current Code:**
+**Previous Code (RESOLVED):**
 ```typescript
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://axoqjwvqxgtzsdmlmnbv.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4b3Fqd3ZxeGd0enNkbWxtbmJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4Mzk1MzAsImV4cCI6MjA3NzQxNTUzMH0.O6gYAuqbY9xplmgCgP3e702xDXngVCnr5nL6QP2Umdg";
+// OLD - Hardcoded fallback (security risk)
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://[project].supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "[hardcoded-key]";
 ```
+
+**STATUS: FIXED** - The current implementation no longer includes hardcoded fallbacks.
 
 **Remediation Code:**
 ```typescript
@@ -143,11 +146,11 @@ mkdir -p supabase/functions/_shared
     <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://esm.sh https://*.supabase.co;
+      script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://esm.sh;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: https: blob:;
       font-src 'self' data:;
-      connect-src 'self' https://*.supabase.co https://www.google-analytics.com https://api.stripe.com;
+      connect-src 'self' https://api.agentbio.net https://functions.agentbio.net https://www.google-analytics.com https://api.stripe.com;
       frame-src 'self' https://js.stripe.com;
       media-src 'self' blob:;
       worker-src 'self' blob:;
@@ -1138,9 +1141,10 @@ After implementing fixes, verify:
 
 Add to `.env.local`:
 ```bash
-# Required
-VITE_SUPABASE_URL=https://your-project.supabase.co
+# Required - Self-Hosted Supabase Configuration
+VITE_SUPABASE_URL=https://api.agentbio.net
 VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_FUNCTIONS_URL=https://functions.agentbio.net
 
 # Security
 VITE_SENTRY_DSN=https://your-sentry-dsn

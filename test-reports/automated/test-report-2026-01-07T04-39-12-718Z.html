@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automated Test Report - 1/6/2026</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; background: #f9fafb; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.5rem; margin: 2rem 0 1rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; }
+    h3 { font-size: 1.25rem; margin: 1.5rem 0 0.75rem; }
+    .header { background: #1f2937; color: white; padding: 2rem; margin-bottom: 2rem; border-radius: 8px; }
+    .header p { opacity: 0.8; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .stat-card .value { font-size: 2rem; font-weight: bold; }
+    .stat-card .label { color: #6b7280; font-size: 0.875rem; }
+    .stat-card.success .value { color: #22c55e; }
+    .stat-card.danger .value { color: #ef4444; }
+    .stat-card.warning .value { color: #f59e0b; }
+    .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+    .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+    .badge-passed { background: #dcfce7; color: #166534; }
+    .badge-failed { background: #fee2e2; color: #991b1b; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-critical { background: #fee2e2; color: #991b1b; }
+    .badge-high { background: #ffedd5; color: #9a3412; }
+    .badge-medium { background: #fef3c7; color: #92400e; }
+    .badge-low { background: #e0f2fe; color: #075985; }
+    .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 0.5rem 0; }
+    .progress-bar .fill { height: 100%; transition: width 0.3s; }
+    .progress-bar .fill.success { background: #22c55e; }
+    .progress-bar .fill.danger { background: #ef4444; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f9fafb; font-weight: 600; }
+    .error-item { border-left: 4px solid #ef4444; padding-left: 1rem; margin-bottom: 1rem; }
+    .error-item.warning { border-color: #f59e0b; }
+    .error-message { font-family: monospace; font-size: 0.875rem; background: #f3f4f6; padding: 0.5rem; border-radius: 4px; overflow-x: auto; }
+    .recommendation { padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+    .recommendation.critical { background: #fee2e2; border-left: 4px solid #ef4444; }
+    .recommendation.high { background: #ffedd5; border-left: 4px solid #f97316; }
+    .recommendation.medium { background: #fef3c7; border-left: 4px solid #f59e0b; }
+    .recommendation.low { background: #e0f2fe; border-left: 4px solid #0ea5e9; }
+    .collapsible { cursor: pointer; }
+    .collapsible::after { content: ' ▼'; font-size: 0.75rem; }
+    .collapsible.collapsed::after { content: ' ▶'; }
+    .content { overflow: hidden; transition: max-height 0.3s; }
+    .content.collapsed { max-height: 0 !important; }
+    code { background: #f3f4f6; padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.875rem; }
+    .footer { text-align: center; padding: 2rem; color: #6b7280; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🧪 Automated Test Report</h1>
+      <p>Generated: 1/6/2026, 10:39:12 PM</p>
+      <p>Duration: 2m 8s | Browser: chromium | Pages: 31</p>
+    </div>
+
+    <div class="summary-grid">
+      <div class="stat-card success">
+        <div class="value">42.9%</div>
+        <div class="label">Pass Rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">1665</div>
+        <div class="label">Total Tests</div>
+      </div>
+      <div class="stat-card success">
+        <div class="value">715</div>
+        <div class="label">Passed</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="value">628</div>
+        <div class="label">Failed</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="value">322</div>
+        <div class="label">Warnings</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">940ms</div>
+        <div class="label">Avg Load Time</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Test Results Distribution</h3>
+      <div class="progress-bar" style="height: 24px;">
+        <div class="fill success" style="width: 42.94294294294294%; display: inline-block;"></div>
+        <div class="fill danger" style="width: 37.71771771771772%; display: inline-block;"></div>
+      </div>
+      <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+        <span><span style="color: #22c55e">■</span> Passed: 715</span>
+        <span><span style="color: #ef4444">■</span> Failed: 628</span>
+        <span><span style="color: #f59e0b">■</span> Warnings: 322</span>
+        <span><span style="color: #6b7280">■</span> Skipped: 0</span>
+      </div>
+    </div>
+
+    
+    <h2>📋 Recommendations</h2>
+    
+      <div class="recommendation high">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <strong>Fix Network Request Failures</strong>
+          <span class="badge badge-high">HIGH</span>
+        </div>
+        <p>12 network request(s) failed, indicating potential API or connectivity issues.</p>
+        <p style="margin-top: 0.5rem;"><strong>Suggested Fix:</strong> Review API endpoints, ensure proper error handling, and check server availability.</p>
+        <p style="margin-top: 0.5rem;"><strong>Affected Pages:</strong> 6</p>
+      </div>
+    
+      <div class="recommendation high">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <strong>Improve Overall Test Pass Rate</strong>
+          <span class="badge badge-high">HIGH</span>
+        </div>
+        <p>Test pass rate is 42.9%, which is below the recommended 80% threshold.</p>
+        <p style="margin-top: 0.5rem;"><strong>Suggested Fix:</strong> Review failing tests and prioritize fixes based on severity and user impact.</p>
+        <p style="margin-top: 0.5rem;"><strong>Affected Pages:</strong> 31</p>
+      </div>
+    
+      <div class="recommendation medium">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <strong>Address Accessibility Issues</strong>
+          <span class="badge badge-medium">MEDIUM</span>
+        </div>
+        <p>12 accessibility violation(s) found that may prevent users with disabilities from using the application.</p>
+        <p style="margin-top: 0.5rem;"><strong>Suggested Fix:</strong> Ensure all images have alt text, form inputs have labels, buttons have accessible names, and color contrast meets WCAG guidelines.</p>
+        <p style="margin-top: 0.5rem;"><strong>Affected Pages:</strong> 9</p>
+      </div>
+    
+      <div class="recommendation medium">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <strong>Resolve Console Errors</strong>
+          <span class="badge badge-medium">MEDIUM</span>
+        </div>
+        <p>7 JavaScript error(s) logged to the console.</p>
+        <p style="margin-top: 0.5rem;"><strong>Suggested Fix:</strong> Check browser console for error details, add proper error handling, and fix any undefined variable issues.</p>
+        <p style="margin-top: 0.5rem;"><strong>Affected Pages:</strong> 4</p>
+      </div>
+    
+    
+
+    
+    <h2>❌ Errors (35)</h2>
+    
+      <div class="error-item ">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>NETWORK</strong>
+          <span class="badge badge-failed">Severity 2</span>
+        </div>
+        <p class="error-message">1 network error(s) detected</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL:  | Occurrences: 41</p>
+      </div>
+    
+      <div class="error-item ">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>NETWORK</strong>
+          <span class="badge badge-failed">Severity 2</span>
+        </div>
+        <p class="error-message">28 HTTP error(s) detected</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL:  | Occurrences: 31</p>
+      </div>
+    
+      <div class="error-item ">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>NETWORK</strong>
+          <span class="badge badge-failed">Severity 2</span>
+        </div>
+        <p class="error-message">2 HTTP error(s) detected</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080 | Occurrences: 153</p>
+      </div>
+    
+      <div class="error-item ">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>NETWORK</strong>
+          <span class="badge badge-failed">Severity 2</span>
+        </div>
+        <p class="error-message">1 HTTP error(s) detected</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/p/sarahjohnson | Occurrences: 48</p>
+      </div>
+    
+      <div class="error-item ">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>NETWORK</strong>
+          <span class="badge badge-failed">Severity 2</span>
+        </div>
+        <p class="error-message">Failed to fetch page: {message: Invalid authentication credentials}</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/p/sarahjohnson | Occurrences: 3</p>
+      </div>
+    
+      <div class="error-item ">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>NETWORK</strong>
+          <span class="badge badge-failed">Severity 2</span>
+        </div>
+        <p class="error-message">Connecting to &#39;https://www.googletagmanager.com/td?id=G-PBYDSXT7DG&amp;v=3&amp;t=t&amp;pid=903019422&amp;seq=2&amp;exp=103116026~103200004~104527907~104528500~104684208~104684211~105391253~115583767~115938465~115938468~116744867&amp;dl=localhost%2Facceptable-use&amp;tdp=G-PBYDSXT7DG;234219147;0;0;0&amp;mde=G-PBYDSXT7DG;16_2;61_1&amp;fin=1&amp;z=0&#39; violates the following Content Security Policy directive: &quot;connect-src &#39;self&#39; https://api.agentbio.net https://functions.agentbio.net https://*.agentbio.net https://www.google-analytics.com </p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/auth/forgot-password | Occurrences: 2</p>
+      </div>
+    
+      <div class="error-item ">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>NETWORK</strong>
+          <span class="badge badge-failed">Severity 2</span>
+        </div>
+        <p class="error-message">Fetch API cannot load https://www.googletagmanager.com/td?id=G-PBYDSXT7DG&amp;v=3&amp;t=t&amp;pid=903019422&amp;seq=2&amp;exp=103116026~103200004~104527907~104528500~104684208~104684211~105391253~115583767~115938465~115938468~116744867&amp;dl=localhost%2Facceptable-use&amp;tdp=G-PBYDSXT7DG;234219147;0;0;0&amp;mde=G-PBYDSXT7DG;16_2;61_1&amp;fin=1&amp;z=0. Refused to connect because it violates the document&#39;s Content Security Policy.</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/auth/forgot-password | Occurrences: 1</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">1 element(s) have form inputs must have labels</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080 | Occurrences: 12</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">10 element(s) have elements must have sufficient color contrast</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080 | Occurrences: 1</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">10 element(s) have interactive elements must have visible focus</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080 | Occurrences: 20</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">3 element(s) have interactive elements must have visible focus</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/admin\AdminDashboard | Occurrences: 5</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">1 element(s) have page content should be in landmark regions</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/admin\AdminDashboard | Occurrences: 30</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">1 element(s) have interactive elements must have visible focus</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/AnalyticsDashboard | Occurrences: 2</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">2 element(s) have form inputs must have labels</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/auth\Login | Occurrences: 2</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">5 element(s) have form inputs must have labels</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/auth\Register | Occurrences: 2</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">1 element(s) have heading levels should increase by one</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/Blog | Occurrences: 3</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">1 element(s) have buttons must have discernible text</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/pricing | Occurrences: 1</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">2 element(s) have interactive elements must have visible focus</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/p/sarahjohnson | Occurrences: 3</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>ACCESSIBILITY</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">4 element(s) have interactive elements must have visible focus</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080/auth/forgot-password | Occurrences: 1</p>
+      </div>
+    
+      <div class="error-item warning">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>NETWORK</strong>
+          <span class="badge badge-warning">Severity 3</span>
+        </div>
+        <p class="error-message">HTTP 401: https://api.agentbio.net/rest/v1/articles?select=*&amp;status=eq.published&amp;order=published_at.desc&amp;limit=6</p>
+        <p style="font-size: 0.75rem; color: #6b7280;">URL: http://localhost:8080 | Occurrences: 22</p>
+      </div>
+    
+    <p>... and 15 more errors</p>
+    
+
+    <h2>📄 Pages Tested (31)</h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>URL</th>
+            <th>Load Time</th>
+            <th>Tests</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td><code>http://localhost:8080</code></td>
+              <td>735ms</td>
+              <td>27/37</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/admin\AdminDashboard</code></td>
+              <td>766ms</td>
+              <td>16/26</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/admin\index</code></td>
+              <td>838ms</td>
+              <td>16/27</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/AnalyticsDashboard</code></td>
+              <td>1.09s</td>
+              <td>16/27</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/auth\ForgotPassword</code></td>
+              <td>739ms</td>
+              <td>16/29</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/auth\Login</code></td>
+              <td>728ms</td>
+              <td>26/43</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/auth\Register</code></td>
+              <td>804ms</td>
+              <td>33/51</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/auth\ResetPassword</code></td>
+              <td>879ms</td>
+              <td>16/32</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/Blog</code></td>
+              <td>1.02s</td>
+              <td>31/52</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/BlogArticle</code></td>
+              <td>977ms</td>
+              <td>16/35</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog</code></td>
+              <td>962ms</td>
+              <td>31/56</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/pricing</code></td>
+              <td>1.22s</td>
+              <td>23/50</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/auth/login</code></td>
+              <td>764ms</td>
+              <td>26/54</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/auth/register</code></td>
+              <td>804ms</td>
+              <td>33/62</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/p/sarahjohnson</code></td>
+              <td>1.00s</td>
+              <td>18/45</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/p/michaelchen</code></td>
+              <td>1.07s</td>
+              <td>18/47</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/p/jessicamartinez</code></td>
+              <td>932ms</td>
+              <td>18/49</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/privacy</code></td>
+              <td>966ms</td>
+              <td>25/58</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/terms</code></td>
+              <td>903ms</td>
+              <td>25/59</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/dmca</code></td>
+              <td>934ms</td>
+              <td>25/60</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/acceptable-use</code></td>
+              <td>911ms</td>
+              <td>25/61</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/auth/forgot-password</code></td>
+              <td>847ms</td>
+              <td>21/60</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/legal/acceptable-use</code></td>
+              <td>835ms</td>
+              <td>16/55</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog/category/real-estate-tips</code></td>
+              <td>1.10s</td>
+              <td>25/67</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog/category/market-insights</code></td>
+              <td>1.06s</td>
+              <td>25/69</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog/category/buying-guide</code></td>
+              <td>1.12s</td>
+              <td>25/71</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog/category/selling-guide</code></td>
+              <td>1.13s</td>
+              <td>24/72</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog/category/investment</code></td>
+              <td>946ms</td>
+              <td>24/74</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog/category/neighborhood-guides</code></td>
+              <td>964ms</td>
+              <td>25/77</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog/category/home-improvement</code></td>
+              <td>1.01s</td>
+              <td>25/79</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+            <tr>
+              <td><code>http://localhost:8080/blog/category/general</code></td>
+              <td>1.07s</td>
+              <td>25/81</td>
+              <td><span class="badge badge-failed">failed</span></td>
+            </tr>
+          
+        </tbody>
+      </table>
+      
+    </div>
+
+    
+    <h2>⚡ Edge Functions (75)</h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>Status</th>
+            <th>Response Time</th>
+            <th>Auth Required</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td><code>aggregate-search-analytics</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5.27s</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>analyze-blog-posts-seo</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>analyze-content</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>analyze-images</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>analyze-internal-links</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>analyze-semantic-keywords</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>apply-seo-autofix</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>apply-seo-fixes</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>audit-log</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>7ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>bing-webmaster-oauth-callback</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>2ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>bing-webmaster-sync</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>check-broken-links</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>check-core-web-vitals</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>check-keyword-positions</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>check-mobile-first</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>check-security-headers</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>check-username</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>crawl-site</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>create-checkout-session</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>detect-duplicate-content</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>detect-redirect-chains</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>disable-mfa</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>execute-workflow</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>gdpr-deletion</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>gdpr-export</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>2ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>generate-article</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>2ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>generate-blog-content</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>generate-content-suggestions</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>generate-listing-description</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>generate-marketing-post</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>generate-sitemap</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>generate-social-post</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>get-sessions</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>google-analytics-oauth-callback</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>google-analytics-sync</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>gsc-fetch-core-web-vitals</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>gsc-fetch-properties</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>gsc-oauth</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>gsc-sync-data</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>import-keywords</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>ingest-analytics</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>login-security</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>manage-blog-titles</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>monitor-performance-budget</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>7ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>optimize-page-content</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>publish-article-to-social</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>rate-limit</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>register-push-token</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>revoke-session</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>run-scheduled-audit</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>schedule-seo-audit</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>send-bio-analyzer-email</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>send-listing-generator-email</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>send-scheduled-bio-emails</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>send-scheduled-listing-emails</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>send-seo-notification</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>send-welcome-email</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>seo-audit</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>setup-mfa</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>sitemap</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>6ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>sso-callback</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>sso-initiate</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>stripe-webhook</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>submit-contact</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>1ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>submit-lead</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>sync-backlinks</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>test-ai-model</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>7ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>test-article-webhook</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>test-social-webhook</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>track-serp-positions</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>unregister-push-token</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>validate-structured-data</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>verify-mfa</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>yandex-webmaster-oauth-callback</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>4ms</td>
+              <td>No</td>
+            </tr>
+          
+            <tr>
+              <td><code>yandex-webmaster-sync</code></td>
+              <td><span class="badge badge-failed">503</span></td>
+              <td>5ms</td>
+              <td>No</td>
+            </tr>
+          
+        </tbody>
+      </table>
+    </div>
+    
+
+    <div class="footer">
+      <p>Generated by Automated Testing Tool</p>
+      <p>Test run completed in 2m 8s</p>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.collapsible').forEach(el => {
+      el.addEventListener('click', () => {
+        el.classList.toggle('collapsed');
+        const content = el.nextElementSibling;
+        if (content) content.classList.toggle('collapsed');
+      });
+    });
+  </script>
+</body>
+</html>

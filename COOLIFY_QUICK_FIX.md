@@ -31,7 +31,7 @@ Ports Mappings: (leave empty)
 #### Environment Variables Tab
 Add these variables:
 ```
-SUPABASE_URL=https://z4owkscok0o8c40c00co0k8k.supabase.co
+SUPABASE_URL=https://api.agentbio.net
 SUPABASE_ANON_KEY=<your-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 ```
@@ -56,7 +56,7 @@ After deployment succeeds, test it:
 
 ```bash
 # Replace with your actual domain
-curl https://z4owkscok0o8c40c00co0k8k.209.145.59.219.sslip.io/health
+curl https://functions.agentbio.net/health
 ```
 
 Expected response:
@@ -73,11 +73,11 @@ Expected response:
 Once working, update your frontend `.env` file:
 
 ```env
-# Edge Functions URL
-VITE_EDGE_FUNCTIONS_URL=https://z4owkscok0o8c40c00co0k8k.209.145.59.219.sslip.io
+# Self-Hosted Supabase Configuration
+VITE_SUPABASE_URL=https://api.agentbio.net
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_FUNCTIONS_URL=https://functions.agentbio.net
 ```
-
-Or use the direct domain if you've configured one.
 
 ## What Changed?
 
