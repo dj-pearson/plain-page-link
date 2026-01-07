@@ -7,27 +7,34 @@ import type { Lead } from '@/types/lead';
 // Mock Supabase
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          order: vi.fn(() => ({
-            limit: vi.fn(() => ({
-              maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    from: vi.fn((table: string) => {
+      // Return different mock based on table
+      const limitResult = table === 'ab_test_results'
+        ? Promise.resolve({ data: [], error: null }) // Array for ab_test_results
+        : {
+            maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+          };
+
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            order: vi.fn(() => ({
+              limit: vi.fn(() => limitResult),
             })),
           })),
         })),
-      })),
-      upsert: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(() => Promise.resolve({ data: { id: '1' }, error: null })),
+        upsert: vi.fn(() => ({
+          select: vi.fn(() => ({
+            single: vi.fn(() => Promise.resolve({ data: { id: '1' }, error: null })),
+          })),
         })),
-      })),
-      insert: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(() => Promise.resolve({ data: { id: '1' }, error: null })),
+        insert: vi.fn(() => ({
+          select: vi.fn(() => ({
+            single: vi.fn(() => Promise.resolve({ data: { id: '1' }, error: null })),
+          })),
         })),
-      })),
-    })),
+      };
+    }),
   },
 }));
 
@@ -444,7 +451,7 @@ describe('useABTest', () => {
     vi.clearAllMocks();
   });
 
-  it('should start and track test state', () => {
+  it('should start and track test state', async () => {
     const { result } = renderHook(() => useABTest(), {
       wrapper: createWrapper(),
     });
@@ -457,12 +464,14 @@ describe('useABTest', () => {
     expect(result.current.isRunning).toBe(true);
 
     // Stop the test
-    act(() => {
-      result.current.stop();
+    await act(async () => {
+      await result.current.stop();
     });
 
-    // Note: stop() is async but we can verify the state eventually updates
-    result.current.refresh();
+    // Wrap refresh in act() since it updates state
+    act(() => {
+      result.current.refresh();
+    });
   });
 
   it('should return config', () => {
