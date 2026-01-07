@@ -194,13 +194,14 @@ export default function Register() {
 
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="register-username" className="block text-sm font-medium text-gray-700 mb-2">
                                 Username
                             </label>
                             <div className="relative">
                                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
                                     {...register("username")}
+                                    id="register-username"
                                     type="text"
                                     placeholder="johndoe"
                                     className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
@@ -242,13 +243,14 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="register-name" className="block text-sm font-medium text-gray-700 mb-2">
                                 Full Name
                             </label>
                             <div className="relative">
                                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
                                     {...register("name")}
+                                    id="register-name"
                                     type="text"
                                     placeholder="John Doe"
                                     className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
@@ -266,13 +268,14 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-2">
                                 Email
                             </label>
                             <div className="relative">
                                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
                                     {...register("email")}
+                                    id="register-email"
                                     type="email"
                                     placeholder="you@example.com"
                                     className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
@@ -290,7 +293,7 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 mb-2">
                                 Password
                             </label>
                             <div className="relative">
@@ -299,6 +302,7 @@ export default function Register() {
                                     {...register("password", {
                                         onChange: (e) => setPasswordValue(e.target.value)
                                     })}
+                                    id="register-password"
                                     type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
                                     className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
@@ -329,13 +333,14 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="register-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
                                 Confirm Password
                             </label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
                                     {...register("confirmPassword")}
+                                    id="register-confirm-password"
                                     type={showConfirmPassword ? "text" : "password"}
                                     placeholder="••••••••"
                                     className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
