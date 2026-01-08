@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Home, Mail, Lock, User, AlertCircle, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Home, Mail, Lock, User, AlertCircle, Loader2, Eye, EyeOff, CheckCircle, ArrowLeft } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +9,9 @@ import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicato
 import { useUsernameCheck } from "@/hooks/useUsernameCheck";
 import { Check, X, Loader2 as UsernameLoader } from "lucide-react";
 import { passwordSchema, usernameSchema, emailSchema } from "@/utils/validation";
+import { OTPInput } from "@/components/auth/OTPInput";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const registerSchema = z
     .object({
@@ -38,6 +41,11 @@ export default function Register() {
     const [usernameTouched, setUsernameTouched] = useState(false);
     const [emailVerificationSent, setEmailVerificationSent] = useState(false);
     const [registeredEmail, setRegisteredEmail] = useState("");
+    const [otpCode, setOtpCode] = useState("");
+    const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+    const [otpError, setOtpError] = useState("");
+    const [resendCooldown, setResendCooldown] = useState(0);
+    const { toast } = useToast();
 
     const {
         register,
@@ -73,6 +81,14 @@ export default function Register() {
         }
     }, [usernameValue, checkUsername]);
 
+    // Resend cooldown timer
+    useEffect(() => {
+        if (resendCooldown > 0) {
+            const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [resendCooldown]);
+
     const onSubmit = async (data: RegisterFormData) => {
         try {
             await signUp(data.email, data.password, data.username, data.name);
@@ -84,14 +100,93 @@ export default function Register() {
             );
 
             if (!currentSession.data.session) {
-                // Email verification is required
+                // Email verification is required - show OTP screen
                 setEmailVerificationSent(true);
                 setRegisteredEmail(data.email);
+                setResendCooldown(60); // 60 second cooldown
             }
         } catch (error) {
             // Error is handled by the store
             console.error("Registration failed:", error);
         }
+    };
+
+    const handleVerifyOtp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (otpCode.length !== 6) {
+            setOtpError("Please enter the 6-digit code");
+            return;
+        }
+
+        setIsVerifyingOtp(true);
+        setOtpError("");
+
+        try {
+            const { error } = await supabase.auth.verifyOtp({
+                email: registeredEmail,
+                token: otpCode,
+                type: "signup",
+            });
+
+            if (error) {
+                setOtpError(error.message || "Verification failed. Please check your code.");
+                setIsVerifyingOtp(false);
+                return;
+            }
+
+            // Success! Session automatically created, onAuthStateChange will fire
+            toast({
+                title: "Email Verified!",
+                description: "Welcome to AgentBio. Setting up your profile...",
+            });
+
+            // The useEffect watching user/session will handle redirect to onboarding
+        } catch (error: any) {
+            setOtpError("Something went wrong. Please try again.");
+            setIsVerifyingOtp(false);
+        }
+    };
+
+    const handleResendCode = async () => {
+        if (resendCooldown > 0) return;
+
+        try {
+            const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: registeredEmail,
+            });
+
+            if (error) {
+                toast({
+                    title: "Failed to Resend",
+                    description: error.message,
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            toast({
+                title: "Code Resent",
+                description: "Check your email for a new verification code.",
+            });
+
+            setResendCooldown(60); // Reset cooldown
+            setOtpCode(""); // Clear old code
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Failed to resend code. Please try again.",
+                variant: "destructive",
+            });
+        }
+    };
+
+    const handleBackToSignup = () => {
+        setEmailVerificationSent(false);
+        setRegisteredEmail("");
+        setOtpCode("");
+        setOtpError("");
     };
 
     const handleGoogleSignIn = async () => {
@@ -129,41 +224,89 @@ export default function Register() {
 
             <div className="flex items-center justify-center px-4 py-12">
                 <div className="w-full max-w-md">
-                    {/* Email Verification Sent Success State */}
+                    {/* OTP Verification Screen */}
                     {emailVerificationSent ? (
-                        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-                            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
-                                <CheckCircle className="w-8 h-8 text-green-600" />
-                            </div>
-                            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                                Check Your Email
-                            </h1>
-                            <p className="text-gray-600 mb-4">
-                                We've sent a verification link to:
-                            </p>
-                            <p className="font-medium text-gray-900 mb-6 break-all">
-                                {registeredEmail}
-                            </p>
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-                                <p className="text-sm text-blue-800">
-                                    <strong>Next steps:</strong>
+                        <div className="bg-white rounded-lg shadow-lg p-8">
+                            <button
+                                onClick={handleBackToSignup}
+                                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                Back to Sign Up
+                            </button>
+
+                            <div className="text-center mb-8">
+                                <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                                    <Mail className="w-8 h-8 text-blue-600" />
+                                </div>
+                                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                                    Check Your Email
+                                </h1>
+                                <p className="text-gray-600 mb-2">
+                                    We've sent a 6-digit verification code to:
                                 </p>
-                                <ol className="text-sm text-blue-700 mt-2 list-decimal list-inside space-y-1">
-                                    <li>Check your email inbox (and spam folder)</li>
-                                    <li>Click the verification link in the email</li>
-                                    <li>You'll be redirected to complete your profile</li>
-                                </ol>
+                                <p className="font-medium text-gray-900 break-all">
+                                    {registeredEmail}
+                                </p>
                             </div>
-                            <p className="text-xs text-gray-500 mb-4">
-                                The verification link expires in 1 hour.
-                            </p>
-                            <div className="flex flex-col gap-2">
-                                <Link
-                                    to="/auth/login"
-                                    className="text-blue-600 hover:text-blue-700 font-semibold"
+
+                            <form onSubmit={handleVerifyOtp} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-4 text-center">
+                                        Enter Verification Code
+                                    </label>
+                                    <OTPInput
+                                        length={6}
+                                        value={otpCode}
+                                        onChange={setOtpCode}
+                                        disabled={isVerifyingOtp}
+                                        error={!!otpError}
+                                        autoFocus
+                                    />
+                                    {otpError && (
+                                        <p className="mt-3 text-sm text-red-600 text-center">
+                                            {otpError}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isVerifyingOtp || otpCode.length !== 6}
+                                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
-                                    Back to Login
-                                </Link>
+                                    {isVerifyingOtp ? (
+                                        <>
+                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                            Verifying...
+                                        </>
+                                    ) : (
+                                        "Verify Email"
+                                    )}
+                                </button>
+
+                                <div className="text-center">
+                                    <p className="text-sm text-gray-600 mb-2">
+                                        Didn't receive the code?
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={handleResendCode}
+                                        disabled={resendCooldown > 0}
+                                        className="text-sm text-blue-600 hover:text-blue-700 font-semibold disabled:text-gray-400 disabled:cursor-not-allowed"
+                                    >
+                                        {resendCooldown > 0
+                                            ? `Resend in ${resendCooldown}s`
+                                            : "Resend Code"}
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-xs text-blue-800">
+                                    <strong>Tip:</strong> Check your spam folder if you don't see the email.
+                                    The code expires in 1 hour.
+                                </p>
                             </div>
                         </div>
                     ) : (

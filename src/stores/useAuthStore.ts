@@ -350,10 +350,22 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         
         try {
+          // Get the intended redirect path from localStorage or default to dashboard
+          // This preserves the user's intended destination before OAuth redirect
+          const lastRoute = localStorage.getItem('lastVisitedRoute') || '/dashboard';
+          
+          // Build callback URL with redirect parameter
+          // OAuth flow: Google → Supabase → /auth/callback → intended route
+          const callbackUrl = `${window.location.origin}/auth/login?redirect=${encodeURIComponent(lastRoute)}`;
+          
           const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-              redirectTo: `${window.location.origin}/dashboard`,
+              redirectTo: callbackUrl,
+              queryParams: {
+                access_type: 'offline',
+                prompt: 'consent',
+              },
             },
           });
           
@@ -374,10 +386,16 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         
         try {
+          // Get the intended redirect path from localStorage or default to dashboard
+          const lastRoute = localStorage.getItem('lastVisitedRoute') || '/dashboard';
+          
+          // Build callback URL with redirect parameter
+          const callbackUrl = `${window.location.origin}/auth/login?redirect=${encodeURIComponent(lastRoute)}`;
+          
           const { error } = await supabase.auth.signInWithOAuth({
             provider: 'apple',
             options: {
-              redirectTo: `${window.location.origin}/dashboard`,
+              redirectTo: callbackUrl,
             },
           });
           

@@ -1,11 +1,11 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Home, Mail, Lock, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect, useState } from "react";
-import { emailSchema } from "@/utils/validation";
+import { emailSchema, sanitizeURL } from "@/utils/validation";
 import { validateRedirectPath } from "@/utils/navigation";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -24,11 +24,18 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { signIn, signInWithGoogle, signInWithApple, isLoading, error, clearError, user } = useAuthStore();
     const [showPassword, setShowPassword] = useState(false);
     const [isThrottled, setIsThrottled] = useState(false);
     const [throttleMessage, setThrottleMessage] = useState<string | null>(null);
     const { toast } = useToast();
+
+    // Get and sanitize redirect URL from query params
+    // This is used after OAuth callback to redirect to intended destination
+    const rawRedirect = searchParams.get("redirect") || "/dashboard";
+    const sanitizedRedirect = sanitizeURL(rawRedirect);
+    const redirectTo = validateRedirectPath(sanitizedRedirect, "/dashboard");
 
     const {
         register,
@@ -40,17 +47,16 @@ export default function Login() {
 
     useEffect(() => {
         if (user) {
-            // SECURITY: Validate redirect path to prevent open redirect attacks
-            const lastRoute = localStorage.getItem('lastVisitedRoute');
-            const redirectTo = validateRedirectPath(lastRoute, '/dashboard');
-
+            // User is authenticated, redirect to intended destination
+            // Priority: URL param > localStorage > default dashboard
+            
             // Clear the saved route to prevent stale redirects
             localStorage.removeItem('lastVisitedRoute');
 
-            // Navigate to the intended destination
+            // Navigate to the intended destination (already sanitized above)
             navigate(redirectTo, { replace: true });
         }
-    }, [user, navigate]);
+    }, [user, navigate, redirectTo]);
 
     useEffect(() => {
         return () => {

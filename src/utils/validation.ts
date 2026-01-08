@@ -79,3 +79,144 @@ export const passwordResetSchema = z.object({
 export type SignUpFormData = z.infer<typeof signUpSchema>;
 export type SignInFormData = z.infer<typeof signInSchema>;
 export type PasswordResetFormData = z.infer<typeof passwordResetSchema>;
+
+/**
+ * XSS Prevention Utilities
+ * From AUTH_SETUP_DOCUMENTATION.md security best practices
+ */
+
+/**
+ * Sanitize HTML content to prevent XSS attacks
+ * Removes script tags, event handlers, and dangerous attributes
+ * 
+ * @param html - Untrusted HTML content
+ * @returns Sanitized HTML string
+ */
+export function sanitizeHTML(html: string): string {
+  if (!html || typeof html !== 'string') return '';
+
+  // Remove script tags and their content
+  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  
+  // Remove event handlers (onclick, onerror, etc.)
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]*/gi, '');
+  
+  // Remove javascript: protocol
+  sanitized = sanitized.replace(/javascript:/gi, '');
+  
+  // Remove data: protocol (can be used for XSS)
+  sanitized = sanitized.replace(/data:text\/html/gi, '');
+  
+  return sanitized.trim();
+}
+
+/**
+ * Sanitize general input to prevent XSS and SQL injection
+ * Removes HTML tags and dangerous characters
+ * 
+ * @param input - Untrusted user input
+ * @returns Sanitized string
+ */
+export function sanitizeInput(input: string): string {
+  if (!input || typeof input !== 'string') return '';
+
+  // Remove all HTML tags
+  let sanitized = input.replace(/<[^>]*>/g, '');
+  
+  // Remove potential SQL injection patterns
+  sanitized = sanitized.replace(/['";\\]/g, '');
+  
+  // Remove null bytes
+  sanitized = sanitized.replace(/\0/g, '');
+  
+  return sanitized.trim();
+}
+
+/**
+ * Sanitize email to prevent email header injection
+ * 
+ * @param email - Email address
+ * @returns Sanitized email
+ */
+export function sanitizeEmail(email: string): string {
+  if (!email || typeof email !== 'string') return '';
+
+  // Remove newlines and carriage returns (email header injection)
+  let sanitized = email.replace(/[\r\n]/g, '');
+  
+  // Remove any whitespace
+  sanitized = sanitized.trim();
+  
+  // Basic email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(sanitized)) {
+    return '';
+  }
+  
+  return sanitized.toLowerCase();
+}
+
+/**
+ * Sanitize URL to prevent open redirect and XSS attacks
+ * Only allows http, https, mailto, and tel protocols
+ * 
+ * @param url - URL to sanitize
+ * @returns Sanitized URL or empty string if invalid
+ */
+export function sanitizeURL(url: string): string {
+  if (!url || typeof url !== 'string') return '';
+
+  const trimmed = url.trim();
+  
+  // Remove dangerous protocols
+  const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+  const lowerUrl = trimmed.toLowerCase();
+  
+  for (const protocol of dangerousProtocols) {
+    if (lowerUrl.startsWith(protocol)) {
+      return '';
+    }
+  }
+  
+  // Only allow safe protocols
+  const safeProtocols = ['http://', 'https://', 'mailto:', 'tel:', '/'];
+  const isAllowed = safeProtocols.some(protocol => 
+    lowerUrl.startsWith(protocol) || (protocol === '/' && trimmed.startsWith('/'))
+  );
+  
+  if (!isAllowed) {
+    return '';
+  }
+  
+  // For relative URLs, ensure they don't start with //
+  if (trimmed.startsWith('/') && trimmed.startsWith('//')) {
+    return '';
+  }
+  
+  return trimmed;
+}
+
+/**
+ * Sanitize filename to prevent directory traversal attacks
+ * 
+ * @param filename - Filename to sanitize
+ * @returns Safe filename
+ */
+export function sanitizeFilename(filename: string): string {
+  if (!filename || typeof filename !== 'string') return '';
+
+  // Remove directory traversal attempts
+  let sanitized = filename.replace(/\.\./g, '');
+  
+  // Remove path separators
+  sanitized = sanitized.replace(/[\/\\]/g, '');
+  
+  // Remove null bytes
+  sanitized = sanitized.replace(/\0/g, '');
+  
+  // Only allow alphanumeric, dash, underscore, and dot
+  sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, '_');
+  
+  return sanitized.trim();
+}
