@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertCircle, RefreshCcw, Home } from "lucide-react";
+import { captureException, addBreadcrumb } from "@/lib/sentry";
 
 interface Props {
     children: ReactNode;
@@ -10,6 +11,7 @@ interface State {
     hasError: boolean;
     error: Error | null;
     errorInfo: ErrorInfo | null;
+    eventId: string | null;
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
@@ -17,9 +19,10 @@ export default class ErrorBoundary extends Component<Props, State> {
         hasError: false,
         error: null,
         errorInfo: null,
+        eventId: null,
     };
 
-    public static getDerivedStateFromError(error: Error): State {
+    public static getDerivedStateFromError(error: Error): Partial<State> {
         return {
             hasError: true,
             error,
@@ -28,11 +31,32 @@ export default class ErrorBoundary extends Component<Props, State> {
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error("Uncaught error:", error, errorInfo);
+        // Add breadcrumb for component stack
+        addBreadcrumb({
+            category: 'react.error',
+            message: 'React Error Boundary caught an error',
+            level: 'error',
+            data: {
+                componentStack: errorInfo.componentStack?.slice(0, 500), // Truncate for privacy
+            },
+        });
+
+        // Capture exception with Sentry
+        const eventId = captureException(error, {
+            componentStack: errorInfo.componentStack,
+            errorBoundary: true,
+        });
+
         this.setState({
             error,
             errorInfo,
+            eventId,
         });
+
+        // Log to console in development
+        if (import.meta.env.DEV) {
+            console.error("Uncaught error:", error, errorInfo);
+        }
     }
 
     private handleReset = () => {
@@ -40,6 +64,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             hasError: false,
             error: null,
             errorInfo: null,
+            eventId: null,
         });
     };
 
@@ -81,6 +106,18 @@ export default class ErrorBoundary extends Component<Props, State> {
                                         </pre>
                                     </details>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Show event ID in production for support reference */}
+                        {import.meta.env.PROD && this.state.eventId && (
+                            <div className="mb-6 p-4 bg-gray-100 rounded-lg">
+                                <p className="text-sm text-gray-600">
+                                    Error ID: <span className="font-mono">{this.state.eventId}</span>
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Please include this ID when contacting support.
+                                </p>
                             </div>
                         )}
 
@@ -140,4 +177,3 @@ export function ErrorMessage({
         </div>
     );
 }
-
