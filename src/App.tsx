@@ -9,6 +9,7 @@ import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
 import { SkipNavLink } from "./components/ui/skip-nav";
+import { AnnouncerProvider } from "./components/ui/live-region";
 
 // Public pages (eager load for better UX on landing)
 import Landing from "./pages/public/Landing";
@@ -131,7 +132,7 @@ function App() {
     }, [user]);
 
     return (
-        <>
+        <AnnouncerProvider>
             {/* Skip Navigation for Keyboard Accessibility (WCAG 2.4.1) */}
             <SkipNavLink />
 
@@ -268,7 +269,7 @@ function App() {
             </LazyLoadErrorBoundary>
 
             <Toaster position="top-right" richColors />
-        </>
+        </AnnouncerProvider>
     );
 }
 
