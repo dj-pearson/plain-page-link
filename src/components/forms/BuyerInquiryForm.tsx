@@ -154,8 +154,12 @@ export function BuyerInquiryForm({
             <CardContent>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div
+                            role="alert"
+                            aria-live="assertive"
+                            className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3"
+                        >
+                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
                             <div className="flex-1">
                                 <h4 className="font-semibold text-red-900 text-sm">
                                     Submission Error
@@ -200,14 +204,20 @@ export function BuyerInquiryForm({
                         <div className="space-y-2">
                             <Label htmlFor="propertyType">
                                 Property Type{" "}
-                                <span className="text-red-500">*</span>
+                                <span className="text-red-500" aria-hidden="true">*</span>
+                                <span className="sr-only">(required)</span>
                             </Label>
                             <Select
                                 onValueChange={(value) =>
                                     setValue("propertyType", value)
                                 }
                             >
-                                <SelectTrigger id="propertyType">
+                                <SelectTrigger
+                                    id="propertyType"
+                                    aria-required="true"
+                                    aria-invalid={!!errors.propertyType}
+                                    aria-describedby={errors.propertyType ? "propertyType-error" : undefined}
+                                >
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -229,7 +239,7 @@ export function BuyerInquiryForm({
                                 </SelectContent>
                             </Select>
                             {errors.propertyType && (
-                                <p className="text-sm text-red-500 font-medium">
+                                <p id="propertyType-error" role="alert" className="text-sm text-red-500 font-medium">
                                     {errors.propertyType.message}
                                 </p>
                             )}
@@ -238,14 +248,20 @@ export function BuyerInquiryForm({
                         <div className="space-y-2">
                             <Label htmlFor="priceRange">
                                 Price Range{" "}
-                                <span className="text-red-500">*</span>
+                                <span className="text-red-500" aria-hidden="true">*</span>
+                                <span className="sr-only">(required)</span>
                             </Label>
                             <Select
                                 onValueChange={(value) =>
                                     setValue("priceRange", value)
                                 }
                             >
-                                <SelectTrigger id="priceRange">
+                                <SelectTrigger
+                                    id="priceRange"
+                                    aria-required="true"
+                                    aria-invalid={!!errors.priceRange}
+                                    aria-describedby={errors.priceRange ? "priceRange-error" : undefined}
+                                >
                                     <SelectValue placeholder="Select range" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -268,7 +284,7 @@ export function BuyerInquiryForm({
                                 </SelectContent>
                             </Select>
                             {errors.priceRange && (
-                                <p className="text-sm text-red-500 font-medium">
+                                <p id="priceRange-error" role="alert" className="text-sm text-red-500 font-medium">
                                     {errors.priceRange.message}
                                 </p>
                             )}
@@ -278,14 +294,21 @@ export function BuyerInquiryForm({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="bedrooms">
-                                Bedrooms <span className="text-red-500">*</span>
+                                Bedrooms{" "}
+                                <span className="text-red-500" aria-hidden="true">*</span>
+                                <span className="sr-only">(required)</span>
                             </Label>
                             <Select
                                 onValueChange={(value) =>
                                     setValue("bedrooms", value)
                                 }
                             >
-                                <SelectTrigger id="bedrooms">
+                                <SelectTrigger
+                                    id="bedrooms"
+                                    aria-required="true"
+                                    aria-invalid={!!errors.bedrooms}
+                                    aria-describedby={errors.bedrooms ? "bedrooms-error" : undefined}
+                                >
                                     <SelectValue placeholder="Select" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -297,7 +320,7 @@ export function BuyerInquiryForm({
                                 </SelectContent>
                             </Select>
                             {errors.bedrooms && (
-                                <p className="text-sm text-red-500 font-medium">
+                                <p id="bedrooms-error" role="alert" className="text-sm text-red-500 font-medium">
                                     {errors.bedrooms.message}
                                 </p>
                             )}
@@ -305,14 +328,21 @@ export function BuyerInquiryForm({
 
                         <div className="space-y-2">
                             <Label htmlFor="timeline">
-                                Timeline <span className="text-red-500">*</span>
+                                Timeline{" "}
+                                <span className="text-red-500" aria-hidden="true">*</span>
+                                <span className="sr-only">(required)</span>
                             </Label>
                             <Select
                                 onValueChange={(value) =>
                                     setValue("timeline", value)
                                 }
                             >
-                                <SelectTrigger id="timeline">
+                                <SelectTrigger
+                                    id="timeline"
+                                    aria-required="true"
+                                    aria-invalid={!!errors.timeline}
+                                    aria-describedby={errors.timeline ? "timeline-error" : undefined}
+                                >
                                     <SelectValue placeholder="When are you buying?" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -334,7 +364,7 @@ export function BuyerInquiryForm({
                                 </SelectContent>
                             </Select>
                             {errors.timeline && (
-                                <p className="text-sm text-red-500 font-medium">
+                                <p id="timeline-error" role="alert" className="text-sm text-red-500 font-medium">
                                     {errors.timeline.message}
                                 </p>
                             )}
@@ -344,14 +374,20 @@ export function BuyerInquiryForm({
                     <div className="space-y-2">
                         <Label htmlFor="preApproved">
                             Pre-Approval Status{" "}
-                            <span className="text-red-500">*</span>
+                            <span className="text-red-500" aria-hidden="true">*</span>
+                            <span className="sr-only">(required)</span>
                         </Label>
                         <Select
                             onValueChange={(value) =>
                                 setValue("preApproved", value)
                             }
                         >
-                            <SelectTrigger id="preApproved">
+                            <SelectTrigger
+                                id="preApproved"
+                                aria-required="true"
+                                aria-invalid={!!errors.preApproved}
+                                aria-describedby={errors.preApproved ? "preApproved-error" : undefined}
+                            >
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -368,7 +404,7 @@ export function BuyerInquiryForm({
                             </SelectContent>
                         </Select>
                         {errors.preApproved && (
-                            <p className="text-sm text-red-500 font-medium">
+                            <p id="preApproved-error" role="alert" className="text-sm text-red-500 font-medium">
                                 {errors.preApproved.message}
                             </p>
                         )}

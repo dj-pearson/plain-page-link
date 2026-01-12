@@ -9,6 +9,7 @@ import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
 import { SkipNavLink } from "./components/ui/skip-nav";
+import { AnnouncerProvider } from "./components/ui/live-region";
 
 // Public pages (eager load for better UX on landing)
 import Landing from "./pages/public/Landing";
@@ -34,6 +35,7 @@ const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
 const DMCAPolicy = lazy(() => import("./pages/legal/DMCAPolicy"));
 const AcceptableUse = lazy(() => import("./pages/legal/AcceptableUse"));
+const AccessibilityStatement = lazy(() => import("./pages/legal/AccessibilityStatement"));
 
 // Lazy load marketing pages
 const Pricing = lazy(() => import("./pages/Pricing"));
@@ -130,7 +132,7 @@ function App() {
     }, [user]);
 
     return (
-        <>
+        <AnnouncerProvider>
             {/* Skip Navigation for Keyboard Accessibility (WCAG 2.4.1) */}
             <SkipNavLink />
 
@@ -147,6 +149,7 @@ function App() {
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/dmca" element={<DMCAPolicy />} />
                     <Route path="/acceptable-use" element={<AcceptableUse />} />
+                    <Route path="/accessibility" element={<AccessibilityStatement />} />
                     <Route path="/blog" element={<Blog />} />
                     <Route path="/blog/category/:category" element={<BlogCategory />} />
                     <Route path="/blog/:slug" element={<BlogArticle />} />
@@ -266,7 +269,7 @@ function App() {
             </LazyLoadErrorBoundary>
 
             <Toaster position="top-right" richColors />
-        </>
+        </AnnouncerProvider>
     );
 }
 

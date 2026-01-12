@@ -3,7 +3,11 @@ import { Home, Mail, Facebook, Instagram, Linkedin } from "lucide-react";
 
 export function PublicFooter() {
   return (
-    <footer className="bg-gray-900 text-gray-400 py-12 mt-auto">
+    <footer
+      className="bg-gray-900 text-gray-400 py-12 mt-auto"
+      role="contentinfo"
+      aria-label="Site footer"
+    >
       <div className="container mx-auto px-4">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
@@ -130,6 +134,11 @@ export function PublicFooter() {
                 </Link>
               </li>
               <li>
+                <Link to="/accessibility" className="text-gray-400 hover:text-white transition-colors">
+                  Accessibility
+                </Link>
+              </li>
+              <li>
                 <a href="mailto:legal@agentbio.net" className="text-gray-400 hover:text-white transition-colors">
                   Legal Inquiries
                 </a>
@@ -219,6 +228,10 @@ export function PublicFooter() {
               <span className="text-gray-600">•</span>
               <Link to="/acceptable-use" className="text-gray-400 hover:text-white transition-colors">
                 Acceptable Use
+              </Link>
+              <span className="text-gray-600">•</span>
+              <Link to="/accessibility" className="text-gray-400 hover:text-white transition-colors">
+                Accessibility
               </Link>
             </div>
           </div>

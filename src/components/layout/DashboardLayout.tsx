@@ -92,7 +92,11 @@ export default function DashboardLayout() {
         <div className="min-h-screen bg-gray-50">
             <SkipLink />
             {/* Sidebar - Hidden on mobile */}
-            <aside className="hidden md:fixed md:block left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40">
+            <aside
+                className="hidden md:fixed md:block left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40"
+                role="navigation"
+                aria-label="Main navigation"
+            >
                 <div className="p-6">
                     <Link
                         to="/"
@@ -210,7 +214,10 @@ export default function DashboardLayout() {
             {/* Main Content */}
             <div className="md:ml-64 min-h-screen">
                 {/* Top Bar - Mobile optimized with better touch targets */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30 safe-area-inset-top">
+                <header
+                    className="bg-white border-b border-gray-200 sticky top-0 z-30 safe-area-inset-top"
+                    role="banner"
+                >
                     <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
                         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
                             Dashboard
