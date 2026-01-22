@@ -185,12 +185,22 @@ export function SavedThemesManager({ currentTheme, onApplyTheme }: SavedThemesMa
                         {savedThemes.map((savedTheme) => (
                             <Card
                                 key={savedTheme.id}
-                                className={`cursor-pointer transition-all hover:shadow-md ${
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Apply theme: ${savedTheme.name}${activatedThemeId === savedTheme.id ? ' (currently active)' : ''}`}
+                                aria-pressed={activatedThemeId === savedTheme.id}
+                                className={`cursor-pointer transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                                     activatedThemeId === savedTheme.id
                                         ? "ring-2 ring-primary"
                                         : ""
                                 }`}
                                 onClick={() => handleApplyTheme(savedTheme)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        handleApplyTheme(savedTheme);
+                                    }
+                                }}
                             >
                                 <CardContent className="p-4">
                                     <div className="space-y-3">

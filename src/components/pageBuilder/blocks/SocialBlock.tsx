@@ -106,22 +106,29 @@ export function SocialBlock({ config, isEditing = false }: SocialBlockProps) {
 
             {/* Social Links */}
             <div className={`flex gap-3 ${getLayoutClass()}`}>
-                {config.links.map((link) => (
-                    <button
-                        key={link.id}
-                        onClick={() => handleClick(link.url)}
-                        disabled={isEditing}
-                        className={`
-                            p-3 rounded-full bg-gray-800 text-white
-                            transition-all hover:scale-110
-                            ${getPlatformColor(link.platform)}
-                            ${isEditing ? "cursor-default" : "cursor-pointer"}
-                        `}
-                        title={link.username || link.platform}
-                    >
-                        {getIcon(link.platform)}
-                    </button>
-                ))}
+                {config.links.map((link) => {
+                    const platformLabel = link.platform.charAt(0).toUpperCase() + link.platform.slice(1);
+                    const accessibleLabel = link.username
+                        ? `${platformLabel}: ${link.username}`
+                        : `Visit our ${platformLabel} profile`;
+                    return (
+                        <button
+                            key={link.id}
+                            onClick={() => handleClick(link.url)}
+                            disabled={isEditing}
+                            aria-label={accessibleLabel}
+                            className={`
+                                p-3 rounded-full bg-gray-800 text-white
+                                transition-all hover:scale-110
+                                ${getPlatformColor(link.platform)}
+                                ${isEditing ? "cursor-default" : "cursor-pointer"}
+                            `}
+                        >
+                            <span aria-hidden="true">{getIcon(link.platform)}</span>
+                            <span className="sr-only">{accessibleLabel}</span>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Empty State */}

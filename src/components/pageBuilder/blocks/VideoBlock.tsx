@@ -101,11 +101,13 @@ export function VideoBlock({ config, isEditing = false }: VideoBlockProps) {
                         <button
                             onClick={handlePlay}
                             disabled={isEditing}
+                            aria-label={`Play video: ${config.title || 'Video'}`}
                             className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors group"
                         >
                             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Play className="w-8 h-8 text-primary ml-1" />
+                                <Play className="w-8 h-8 text-primary ml-1" aria-hidden="true" />
                             </div>
+                            <span className="sr-only">Play video: {config.title || 'Video'}</span>
                         </button>
                     </div>
                 ) : (

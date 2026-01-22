@@ -1,9 +1,10 @@
 import { X, Bed, Bath, Ruler, MapPin, Calendar, Share2, Heart, CalendarCheck } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { Listing } from "@/types/listing";
 import { formatPrice, formatPropertyStats, formatAddress, formatDate, parsePrice } from "@/lib/format";
 import { getImageUrls } from "@/lib/images";
 import { CalendlyModal } from "@/components/integrations/CalendlyModal";
+import { useFocusTrap, useEscapeKey } from "@/hooks/useAccessibility";
 
 interface ListingDetailModalProps {
     listing: Listing;
@@ -21,6 +22,11 @@ export default function ListingDetailModal({
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isFavorited, setIsFavorited] = useState(false);
     const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
+    const modalRef = useRef<HTMLDivElement>(null);
+
+    // Accessibility hooks for focus trap and escape key
+    useFocusTrap(modalRef, isOpen && !isCalendlyModalOpen);
+    useEscapeKey(onClose, isOpen && !isCalendlyModalOpen);
 
     if (!isOpen) return null;
 
@@ -59,12 +65,27 @@ export default function ListingDetailModal({
         }
     };
 
+    const handleBackdropClick = (e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) {
+            onClose();
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={handleBackdropClick}
+        >
+            <div
+                ref={modalRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="listing-detail-modal-title"
+                className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
+            >
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
-                    <h2 className="text-xl font-bold text-gray-900 truncate pr-4">
+                    <h2 id="listing-detail-modal-title" className="text-xl font-bold text-gray-900 truncate pr-4">
                         {listing.title}
                     </h2>
                     <div className="flex items-center gap-2">
