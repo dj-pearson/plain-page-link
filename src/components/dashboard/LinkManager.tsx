@@ -264,28 +264,28 @@ export default function LinkManager({ userId }: LinkManagerProps) {
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => handleToggleVisibility(link.id)}
-                                        className="p-2 hover:bg-gray-100 rounded-md"
-                                        title={
-                                            link.up_link === "yes" ? "Hide" : "Show"
-                                        }
+                                        className="p-2 hover:bg-gray-100 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                        aria-label={link.up_link === "yes" ? `Hide link: ${link.title || 'Untitled'}` : `Show link: ${link.title || 'Untitled'}`}
                                     >
                                         {link.up_link === "yes" ? (
-                                            <Eye className="w-4 h-4 text-green-600" />
+                                            <Eye className="w-4 h-4 text-green-600" aria-hidden="true" />
                                         ) : (
-                                            <EyeOff className="w-4 h-4 text-gray-400" />
+                                            <EyeOff className="w-4 h-4 text-gray-400" aria-hidden="true" />
                                         )}
                                     </button>
                                     <button
                                         onClick={() => openEditModal(link)}
-                                        className="p-2 hover:bg-gray-100 rounded-md"
+                                        className="p-2 hover:bg-gray-100 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                        aria-label={`Edit link: ${link.title || 'Untitled'}`}
                                     >
-                                        <Edit2 className="w-4 h-4 text-blue-600" />
+                                        <Edit2 className="w-4 h-4 text-blue-600" aria-hidden="true" />
                                     </button>
                                     <button
                                         onClick={() => setLinkToDelete(link)}
-                                        className="p-2 hover:bg-gray-100 rounded-md"
+                                        className="p-2 hover:bg-gray-100 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                        aria-label={`Delete link: ${link.title || 'Untitled'}`}
                                     >
-                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                        <Trash2 className="w-4 h-4 text-red-600" aria-hidden="true" />
                                     </button>
                                 </div>
                             </div>

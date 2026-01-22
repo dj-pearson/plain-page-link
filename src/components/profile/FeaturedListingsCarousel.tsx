@@ -161,17 +161,40 @@ export function FeaturedListingsCarousel({
         setCurrentIndex(index);
     };
 
+    // Keyboard navigation for carousel
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            goToPrev();
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            goToNext();
+        }
+    };
+
     const primaryPhoto = getImageUrl(
         (currentListing as any).image || currentListing.photos?.[0],
         'listings'
     );
 
+    // Get current listing description for accessibility
+    const currentListingLabel = `Property ${currentIndex + 1} of ${featuredListings.length}: ${currentListing.title || (currentListing as any).address || 'Featured Property'}`;
+
     return (
         <div
-            className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden rounded-xl shadow-2xl bg-gray-900"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label="Featured properties carousel"
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+            className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden rounded-xl shadow-2xl bg-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
         >
+            {/* Live region for screen reader announcements */}
+            <div aria-live="polite" aria-atomic="true" className="sr-only">
+                {currentListingLabel}
+            </div>
             <AnimatePresence mode="wait">
                 <motion.div
                     key={currentIndex}
@@ -357,12 +380,13 @@ export function FeaturedListingsCarousel({
                             key={idx}
                             onClick={() => goToSlide(idx)}
                             className={cn(
-                                'h-2 rounded-full transition-all',
+                                'h-2 rounded-full transition-all min-w-[44px] min-h-[44px] flex items-center justify-center',
                                 idx === currentIndex
                                     ? 'w-8 bg-white'
                                     : 'w-2 bg-white/50 hover:bg-white/75'
                             )}
                             aria-label={`Go to property ${idx + 1}`}
+                            aria-current={idx === currentIndex ? 'true' : undefined}
                         />
                     ))}
                 </div>

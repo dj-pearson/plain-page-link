@@ -31,6 +31,10 @@ const statusLabels = {
 export default function ListingCard({ listing, onClick, onBookShowing, hasCalendly }: ListingCardProps) {
     const [isSaved, setIsSaved] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
+
+    // Combined state for hover/focus visibility
+    const showQuickActions = isHovered || isFocused;
 
     // Load saved state from localStorage
     useEffect(() => {
@@ -75,15 +79,29 @@ export default function ListingCard({ listing, onClick, onBookShowing, hasCalend
         'listings'
     );
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick?.();
+        }
+    };
+
     return (
         <div
+            role="button"
+            tabIndex={0}
+            aria-label={`View property: ${listing.title || (listing as any).address || 'Property'}`}
             onClick={onClick}
+            onKeyDown={handleKeyDown}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             className={cn(
                 "bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 group",
                 "hover:shadow-2xl hover:-translate-y-1",
-                isHovered ? "shadow-2xl -translate-y-1" : "shadow-md"
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                showQuickActions ? "shadow-2xl -translate-y-1" : "shadow-md"
             )}
         >
             {/* Image */}
@@ -101,7 +119,7 @@ export default function ListingCard({ listing, onClick, onBookShowing, hasCalend
                 {/* Gradient Overlay on Hover */}
                 <div className={cn(
                     "absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent transition-opacity duration-300",
-                    isHovered ? "opacity-100" : "opacity-0"
+                    showQuickActions ? "opacity-100" : "opacity-0"
                 )} />
 
                 {/* Status Badge */}
@@ -128,7 +146,7 @@ export default function ListingCard({ listing, onClick, onBookShowing, hasCalend
                 {/* Quick Actions - Show on Hover */}
                 <div className={cn(
                     "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-3 transition-all duration-300",
-                    isHovered ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
+                    showQuickActions ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
                 )}>
                     <button
                         onClick={onClick}
