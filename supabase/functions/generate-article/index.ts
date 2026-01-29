@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth } from '../_shared/auth.ts';
-import { flexibleAuth } from '../_shared/webhook-auth.ts';
+import { getAuthenticatedUser } from '../_shared/service-auth.ts';
 
 // Timeout constants
 const AI_API_TIMEOUT_MS = 120000; // 2 minutes for AI generation
@@ -94,19 +93,18 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Securely authenticate user with JWT or API key (flexible auth for webhooks)
+    // Authenticate: Accept service role key (for Make.com) or JWT (for web app)
     let userId = null;
     try {
-      // First try flexible auth (JWT or API key)
-      userId = await flexibleAuth(req, supabase);
+      userId = await getAuthenticatedUser(req, supabase);
       
       if (userId) {
-        console.log('[generate-article] User authenticated via flexible auth:', userId);
+        console.log('[generate-article] User authenticated with ID:', userId);
       } else {
-        console.warn('[generate-article] No authentication provided (proceeding as public request)');
+        console.log('[generate-article] Authenticated via service role key (no user ID)');
       }
     } catch (e) {
-      console.warn('[generate-article] Auth failed (proceeding without user):', e instanceof Error ? e.message : e);
+      console.warn('[generate-article] Auth check failed (proceeding without user):', e instanceof Error ? e.message : e);
     }
 
     // Priority order: 1) Queued suggestions, 2) Unused keywords, 3) AI suggestions
