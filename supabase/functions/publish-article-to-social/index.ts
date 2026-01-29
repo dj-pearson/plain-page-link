@@ -2,14 +2,23 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from '../_shared/cors.ts';
 
 export default async (req: Request) => {
+  console.log('[publish-article-to-social] Function invoked');
+  
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { articleId } = await req.json();
-    console.log('Publishing article to social:', articleId);
+    const bodyText = await req.text();
+    console.log('[publish-article-to-social] Request body:', bodyText);
+    
+    const { articleId } = JSON.parse(bodyText || '{}');
+    console.log('[publish-article-to-social] Publishing article to social:', articleId);
+    
+    if (!articleId) {
+      throw new Error('articleId is required');
+    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -205,7 +214,8 @@ Return ONLY valid JSON with this exact structure:
     );
 
   } catch (error) {
-    console.error('Error in publish-article-to-social:', error);
+    console.error('[publish-article-to-social] Error:', error);
+    console.error('[publish-article-to-social] Error stack:', error instanceof Error ? error.stack : 'No stack');
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
