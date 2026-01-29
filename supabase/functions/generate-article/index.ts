@@ -374,11 +374,23 @@ mobile real estate marketing`;
     const titleMatch = content.match(/^#\s+(.+)$/m);
     const title = titleMatch ? titleMatch[1] : selectedTopic;
 
-    // Generate slug from title
-    const slug = title
+    // Generate base slug from title
+    let slug = title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
+
+    // Check if slug exists and append timestamp if needed
+    const { data: existingSlugs } = await supabase
+      .from('articles')
+      .select('slug')
+      .like('slug', `${slug}%`);
+
+    if (existingSlugs && existingSlugs.length > 0) {
+      const timestamp = Date.now().toString(36); // Base36 for shorter string
+      slug = `${slug}-${timestamp}`;
+      console.log(`[generate-article] Slug collision detected, using: ${slug}`);
+    }
 
     // Extract excerpt (first paragraph after title)
     const excerptMatch = content.match(/^#.+?\n\n(.+?)(?:\n\n|$)/s);
