@@ -70,13 +70,13 @@ export default async (req: Request) => {
 
     const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = requestBody;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const CLAUDE_API_KEY = Deno.env.get("CLAUDE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     // Detailed environment variable validation for debugging
     const missingEnvVars: string[] = [];
-    if (!LOVABLE_API_KEY) missingEnvVars.push('LOVABLE_API_KEY');
+    if (!CLAUDE_API_KEY) missingEnvVars.push('CLAUDE_API_KEY');
     if (!SUPABASE_URL) missingEnvVars.push('SUPABASE_URL');
     if (!SUPABASE_SERVICE_ROLE_KEY) missingEnvVars.push('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -190,41 +190,10 @@ export default async (req: Request) => {
       console.log("[generate-article] No content sources found; using fallback topic");
     }
 
-    // Get AI configuration
-    const { data: configData } = await supabase
-      .from('ai_configuration')
-      .select('setting_key, setting_value')
-      .in('setting_key', ['default_model', 'temperature_creative', 'max_tokens_large']);
-    
-    const config: Record<string, any> = {};
-    configData?.forEach(item => {
-      config[item.setting_key] = JSON.parse(item.setting_value);
-    });
-
-    // Get the selected model's details from ai_models table
-    const defaultModelId = config.default_model || "google/gemini-2.5-flash";
-    const { data: modelData, error: modelError } = await supabase
-      .from('ai_models')
-      .select('*')
-      .eq('model_id', defaultModelId)
-      .eq('is_active', true)
-      .single();
-
-    if (modelError || !modelData) {
-      console.error('[generate-article] Model not found:', defaultModelId, modelError);
-      return new Response(
-        JSON.stringify({ success: false, error: `Model ${defaultModelId} not configured` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const apiKey = Deno.env.get(modelData.secret_name || 'LOVABLE_API_KEY');
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: `API key ${modelData.secret_name} not configured` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Claude configuration
+    const claudeModel = "claude-sonnet-4-5-20250929";
+    const maxTokens = 8000;
+    const apiEndpoint = "https://api.anthropic.com/v1/messages";
 
     console.log("[generate-article] Generating article:", { topic: selectedTopic, category: articleCategory });
 
@@ -301,51 +270,30 @@ real estate link in bio, agent bio page, real estate Instagram marketing,
 property showcase, listing portfolio, real estate lead generation, agent profile,
 mobile real estate marketing`;
 
-    // Determine provider helpers and build headers
-    const isAnthropic = (modelData.provider?.toLowerCase?.() === 'anthropic') || (modelData.api_endpoint?.includes('anthropic.com'));
-
+    // Build Claude API request
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "x-api-key": CLAUDE_API_KEY,
+      "anthropic-version": "2023-06-01"
     };
 
-    if (modelData.auth_type === 'x-api-key') {
-      headers['x-api-key'] = apiKey;
-      if (isAnthropic) headers['anthropic-version'] = '2023-06-01';
-    } else {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-
-    // Build request body based on provider
     const systemMessage = "You are an expert real estate marketing content writer specializing in agent education and lead generation strategies. Write practical, actionable content that helps real estate agents grow their business through modern digital marketing tactics.";
-    let aiRequestBody: any;
+    
+    const aiRequestBody = {
+      model: claudeModel,
+      max_tokens: maxTokens,
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      system: systemMessage,
+    };
 
-    if (isAnthropic) {
-      aiRequestBody = {
-        model: modelData.model_name,
-        max_tokens: config.max_tokens_large || 8000,
-        messages: [
-          { role: "user", content: prompt }
-        ],
-        system: systemMessage,
-      };
-    } else {
-      aiRequestBody = {
-        model: modelData.model_name,
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: prompt }
-        ],
-        temperature: config.temperature_creative || 0.7,
-        max_tokens: config.max_tokens_large || 8000,
-      };
-    }
-
-    // Call AI to generate article with timeout
-    console.log(`[generate-article] Calling AI API: ${modelData.api_endpoint}`);
+    // Call Claude API to generate article with timeout
+    console.log(`[generate-article] Calling Claude API: ${apiEndpoint}`);
     let aiResponse: Response;
     try {
       aiResponse = await fetchWithTimeout(
-        modelData.api_endpoint,
+        apiEndpoint,
         {
           method: "POST",
           headers,
@@ -373,15 +321,15 @@ mobile real estate marketing`;
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("[generate-article] AI generation error:", aiResponse.status, errorText);
-      let friendly = "AI gateway error";
+      console.error("[generate-article] Claude API error:", aiResponse.status, errorText);
+      let friendly = "Claude API error";
       const status = aiResponse.status;
-      if (status === 402) {
-        friendly = "Payment required, please add Lovable AI credits.";
-      } else if (status === 429) {
+      if (status === 429) {
         friendly = "Rate limit exceeded, please try again shortly.";
       } else if (status === 400) {
-        friendly = "Invalid AI request. Please try a simpler topic or fewer instructions.";
+        friendly = "Invalid request. Please try a simpler topic or fewer instructions.";
+      } else if (status === 401) {
+        friendly = "Invalid API key. Please check your CLAUDE_API_KEY.";
       }
       return new Response(
         JSON.stringify({ success: false, error: `${friendly}: ${status}` }),
@@ -400,24 +348,20 @@ mobile real estate marketing`;
       );
     }
 
-    // Extract content based on provider format
+    // Extract content from Claude response
     let content = '';
-    if (isAnthropic) {
-      content = (aiData.content as Array<{ text?: string }>)?.[0]?.text || '';
-    } else {
-      content = (aiData.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || '';
-    }
+    content = (aiData.content as Array<{ text?: string }>)?.[0]?.text || '';
 
     // Validate that content was actually generated
     if (!content || content.trim().length < 100) {
-      console.error('[generate-article] AI returned empty or too short content:', content?.length || 0);
+      console.error('[generate-article] Claude returned empty or too short content:', content?.length || 0);
       return new Response(
-        JSON.stringify({ success: false, error: 'AI service returned insufficient content. Please try again.' }),
+        JSON.stringify({ success: false, error: 'Claude API returned insufficient content. Please try again.' }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`[generate-article] AI returned ${content.length} chars of content`);
+    console.log(`[generate-article] Claude returned ${content.length} chars of content`);
 
     // Extract title from content (first # heading)
     const titleMatch = content.match(/^#\s+(.+)$/m);
