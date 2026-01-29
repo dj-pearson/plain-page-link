@@ -3,22 +3,93 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 
+// Timeout constants
+const AI_API_TIMEOUT_MS = 120000; // 2 minutes for AI generation
+const FUNCTION_INVOKE_TIMEOUT_MS = 30000; // 30 seconds for cascading functions
+
+/**
+ * Fetch with timeout using AbortController
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Invoke a Supabase function with timeout
+ */
+async function invokeFunctionWithTimeout(
+  supabase: ReturnType<typeof createClient>,
+  functionName: string,
+  body: Record<string, unknown>,
+  timeoutMs: number
+): Promise<{ data: unknown; error: Error | null }> {
+  return Promise.race([
+    supabase.functions.invoke(functionName, { body }),
+    new Promise<{ data: null; error: Error }>((_, reject) =>
+      setTimeout(() => reject(new Error(`Function ${functionName} timed out after ${timeoutMs}ms`)), timeoutMs)
+    ).catch(error => ({ data: null, error }))
+  ]);
+}
+
 serve(async (req) => {
+  console.log(`[generate-article] Request received: ${req.method} from ${req.headers.get('origin') || 'no-origin'}`);
+
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = await req.json();
+    // Parse request body with error handling
+    let requestBody: Record<string, unknown>;
+    try {
+      const bodyText = await req.text();
+      console.log(`[generate-article] Request body length: ${bodyText.length} chars`);
+      requestBody = bodyText ? JSON.parse(bodyText) : {};
+    } catch (parseError) {
+      console.error('[generate-article] Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = requestBody;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Missing required environment variables");
+    // Detailed environment variable validation for debugging
+    const missingEnvVars: string[] = [];
+    if (!LOVABLE_API_KEY) missingEnvVars.push('LOVABLE_API_KEY');
+    if (!SUPABASE_URL) missingEnvVars.push('SUPABASE_URL');
+    if (!SUPABASE_SERVICE_ROLE_KEY) missingEnvVars.push('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (missingEnvVars.length > 0) {
+      console.error(`[generate-article] Missing environment variables: ${missingEnvVars.join(', ')}`);
+      return new Response(
+        JSON.stringify({ success: false, error: `Missing required environment variables: ${missingEnvVars.join(', ')}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    console.log(`[generate-article] Environment validated. SUPABASE_URL: ${SUPABASE_URL}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -27,9 +98,9 @@ serve(async (req) => {
     try {
       const user = await requireAuth(req, supabase);
       userId = user.id;
-      console.log('User ID from JWT:', userId);
+      console.log('[generate-article] User authenticated:', userId);
     } catch (e) {
-      console.error('Failed to authenticate user:', e);
+      console.warn('[generate-article] Auth failed (proceeding without user):', e instanceof Error ? e.message : e);
     }
 
     // Priority order: 1) Queued suggestions, 2) Unused keywords, 3) AI suggestions
@@ -54,7 +125,7 @@ serve(async (req) => {
         selectedKeywords = suggestion.keywords || [];
         selectedSuggestionId = suggestion.id;
         articleCategory = articleCategory || suggestion.category;
-        console.log('Auto-selected queued suggestion:', suggestion.topic);
+        console.log('[generate-article] Auto-selected queued suggestion:', suggestion.topic);
 
         // Mark suggestion as in progress
         await supabase
@@ -72,28 +143,32 @@ serve(async (req) => {
           .limit(1);
 
         if (keywordError) {
-          console.error('Error fetching keyword:', keywordError);
+          console.error('[generate-article] Error fetching keyword:', keywordError);
         } else if (unusedKeywords && unusedKeywords.length > 0) {
           const selectedKeyword = unusedKeywords[0];
           selectedTopic = selectedKeyword.keyword;
           selectedKeywordId = selectedKeyword.id;
           selectedKeywords = [selectedKeyword.keyword];
-          console.log('Auto-selected keyword:', selectedKeyword.keyword);
+          console.log('[generate-article] Auto-selected keyword:', selectedKeyword.keyword);
         } else {
           // PRIORITY 3: No keywords or suggestions, generate AI suggestion on-the-fly
-          console.log('No queued suggestions or keywords, generating AI suggestion...');
-          
-          const suggestResponse = await supabase.functions.invoke('generate-content-suggestions', {
-            body: { count: 1 }
-          });
+          console.log('[generate-article] No queued suggestions or keywords, generating AI suggestion...');
 
-          if (!suggestResponse.error && suggestResponse.data?.suggestions?.[0]) {
-            const aiSuggestion = suggestResponse.data.suggestions[0];
+          const suggestResponse = await invokeFunctionWithTimeout(
+            supabase,
+            'generate-content-suggestions',
+            { count: 1 },
+            FUNCTION_INVOKE_TIMEOUT_MS
+          );
+
+          const suggestData = suggestResponse.data as { suggestions?: Array<{ topic: string; keywords?: string[]; id: string; category?: string }> } | null;
+          if (!suggestResponse.error && suggestData?.suggestions?.[0]) {
+            const aiSuggestion = suggestData.suggestions[0];
             selectedTopic = aiSuggestion.topic;
             selectedKeywords = aiSuggestion.keywords || [];
             selectedSuggestionId = aiSuggestion.id;
             articleCategory = articleCategory || aiSuggestion.category;
-            console.log('Generated AI suggestion:', aiSuggestion.topic);
+            console.log('[generate-article] Generated AI suggestion:', aiSuggestion.topic);
 
             // Mark as in progress
             await supabase
@@ -109,7 +184,7 @@ serve(async (req) => {
       // Final fallback
       selectedTopic = "Professional real estate agent portfolio link";
       selectedKeywords = [selectedTopic];
-      console.log("No content sources found; using fallback topic");
+      console.log("[generate-article] No content sources found; using fallback topic");
     }
 
     // Get AI configuration
@@ -133,7 +208,7 @@ serve(async (req) => {
       .single();
 
     if (modelError || !modelData) {
-      console.error('Model not found:', defaultModelId, modelError);
+      console.error('[generate-article] Model not found:', defaultModelId, modelError);
       return new Response(
         JSON.stringify({ success: false, error: `Model ${defaultModelId} not configured` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -148,7 +223,7 @@ serve(async (req) => {
       );
     }
 
-    console.log("Generating article:", { topic: selectedTopic, category });
+    console.log("[generate-article] Generating article:", { topic: selectedTopic, category: articleCategory });
 
     // Build prompt for article generation
     let prompt = `Write a comprehensive, SEO-optimized blog article about: ${selectedTopic}`;
@@ -262,16 +337,40 @@ mobile real estate marketing`;
       };
     }
 
-    // Call AI to generate article
-    const aiResponse = await fetch(modelData.api_endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-    });
+    // Call AI to generate article with timeout
+    console.log(`[generate-article] Calling AI API: ${modelData.api_endpoint}`);
+    let aiResponse: Response;
+    try {
+      aiResponse = await fetchWithTimeout(
+        modelData.api_endpoint,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(requestBody),
+        },
+        AI_API_TIMEOUT_MS
+      );
+    } catch (fetchError) {
+      const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+      console.error('[generate-article] AI API fetch failed:', errorMessage);
+
+      // Check if it was a timeout (AbortError)
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'AI service timed out. Please try again.' }),
+          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: false, error: `AI service unavailable: ${errorMessage}` }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("AI generation error:", aiResponse.status, errorText);
+      console.error("[generate-article] AI generation error:", aiResponse.status, errorText);
       let friendly = "AI gateway error";
       const status = aiResponse.status;
       if (status === 402) {
@@ -287,15 +386,35 @@ mobile real estate marketing`;
       );
     }
 
-    const aiData = await aiResponse.json();
-    
+    let aiData: Record<string, unknown>;
+    try {
+      aiData = await aiResponse.json();
+    } catch (jsonError) {
+      console.error('[generate-article] Failed to parse AI response as JSON:', jsonError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'AI service returned invalid response format' }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Extract content based on provider format
     let content = '';
     if (isAnthropic) {
-      content = aiData.content?.[0]?.text || '';
+      content = (aiData.content as Array<{ text?: string }>)?.[0]?.text || '';
     } else {
-      content = aiData.choices?.[0]?.message?.content || '';
+      content = (aiData.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || '';
     }
+
+    // Validate that content was actually generated
+    if (!content || content.trim().length < 100) {
+      console.error('[generate-article] AI returned empty or too short content:', content?.length || 0);
+      return new Response(
+        JSON.stringify({ success: false, error: 'AI service returned insufficient content. Please try again.' }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[generate-article] AI returned ${content.length} chars of content`);
 
     // Extract title from content (first # heading)
     const titleMatch = content.match(/^#\s+(.+)$/m);
@@ -338,14 +457,14 @@ mobile real estate marketing`;
       .single();
 
     if (insertError) {
-      console.error("Error saving article:", insertError);
+      console.error("[generate-article] Error saving article:", insertError);
       return new Response(
         JSON.stringify({ success: false, error: `Failed to save article: ${insertError.message}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Article generated and saved successfully");
+    console.log("[generate-article] Article generated and saved successfully");
 
     // Update suggestion status if article was generated from a suggestion
     if (selectedSuggestionId) {
@@ -358,20 +477,23 @@ mobile real estate marketing`;
         .eq('id', selectedSuggestionId);
     }
 
-    // Trigger social media post generation and webhook distribution
+    // Trigger social media post generation and webhook distribution (with timeout)
     try {
-      console.log('Triggering social media post generation...');
-      const socialResponse = await supabase.functions.invoke('publish-article-to-social', {
-        body: { articleId: insertedArticle.id }
-      });
+      console.log('[generate-article] Triggering social media post generation...');
+      const socialResponse = await invokeFunctionWithTimeout(
+        supabase,
+        'publish-article-to-social',
+        { articleId: insertedArticle.id },
+        FUNCTION_INVOKE_TIMEOUT_MS
+      );
 
       if (socialResponse.error) {
-        console.error('Error triggering social post:', socialResponse.error);
+        console.error('[generate-article] Error triggering social post:', socialResponse.error);
       } else {
-        console.log('Social post triggered successfully:', socialResponse.data);
+        console.log('[generate-article] Social post triggered successfully:', socialResponse.data);
       }
     } catch (socialError) {
-      console.error('Failed to trigger social post:', socialError);
+      console.error('[generate-article] Failed to trigger social post (may have timed out):', socialError);
       // Don't fail the article generation if social posting fails
     }
 
@@ -384,7 +506,7 @@ mobile real estate marketing`;
     );
 
   } catch (error) {
-    console.error("Error generating article:", error);
+    console.error("[generate-article] Error generating article:", error);
     return new Response(
       JSON.stringify({
         success: false,
