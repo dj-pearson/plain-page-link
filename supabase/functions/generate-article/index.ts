@@ -89,6 +89,8 @@ export default async (req: Request) => {
     }
 
     console.log(`[generate-article] Environment validated. SUPABASE_URL: ${SUPABASE_URL}`);
+    console.log(`[generate-article] Service Role Key present: ${!!SUPABASE_SERVICE_ROLE_KEY}, length: ${SUPABASE_SERVICE_ROLE_KEY?.length}`);
+    console.log(`[generate-article] Service Role Key prefix: ${SUPABASE_SERVICE_ROLE_KEY?.substring(0, 20)}...`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
