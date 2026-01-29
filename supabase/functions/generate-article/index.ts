@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getAuthenticatedUser } from '../_shared/service-auth.ts';
@@ -46,7 +45,7 @@ async function invokeFunctionWithTimeout(
   ]);
 }
 
-serve(async (req) => {
+export default async (req: Request) => {
   console.log(`[generate-article] Request received: ${req.method} from ${req.headers.get('origin') || 'no-origin'}`);
 
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -519,4 +518,4 @@ mobile real estate marketing`;
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+};
