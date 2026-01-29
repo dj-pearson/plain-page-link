@@ -446,16 +446,30 @@ mobile real estate marketing`;
     // Trigger social media post generation and webhook distribution (with timeout)
     try {
       console.log('[generate-article] Triggering social media post generation...');
-      const socialResponse = await invokeFunctionWithTimeout(
-        supabase,
-        'publish-article-to-social',
-        { articleId: insertedArticle.id },
+      
+      // Direct HTTP call instead of supabase.functions.invoke for better error handling
+      const functionsUrl = `${SUPABASE_URL}/functions/v1/publish-article-to-social`;
+      console.log('[generate-article] Calling:', functionsUrl);
+      
+      const socialResponse = await fetchWithTimeout(
+        functionsUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({ articleId: insertedArticle.id }),
+        },
         FUNCTION_INVOKE_TIMEOUT_MS
       );
 
-      if (socialResponse.error) {
-        console.warn('[generate-article] Social post trigger failed (non-critical):', socialResponse.error.message);
+      if (!socialResponse.ok) {
+        const errorText = await socialResponse.text();
+        console.warn('[publish-article-to-social] Failed with status:', socialResponse.status);
+        console.warn('[publish-article-to-social] Error response:', errorText);
       } else {
+        const result = await socialResponse.json();
         console.log('[generate-article] Social post triggered successfully');
       }
     } catch (socialError) {
