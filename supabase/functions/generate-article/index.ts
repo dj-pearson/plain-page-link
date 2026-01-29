@@ -90,7 +90,12 @@ export default async (req: Request) => {
 
     console.log(`[generate-article] Environment validated. SUPABASE_URL: ${SUPABASE_URL}`);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      }
+    });
 
     // Authenticate: Accept service role key (for Make.com) or JWT (for web app)
     let userId = null;
