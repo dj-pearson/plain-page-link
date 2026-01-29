@@ -318,10 +318,10 @@ mobile real estate marketing`;
 
     // Build request body based on provider
     const systemMessage = "You are an expert real estate marketing content writer specializing in agent education and lead generation strategies. Write practical, actionable content that helps real estate agents grow their business through modern digital marketing tactics.";
-    let requestBody: any;
+    let aiRequestBody: any;
 
     if (isAnthropic) {
-      requestBody = {
+      aiRequestBody = {
         model: modelData.model_name,
         max_tokens: config.max_tokens_large || 8000,
         messages: [
@@ -330,7 +330,7 @@ mobile real estate marketing`;
         system: systemMessage,
       };
     } else {
-      requestBody = {
+      aiRequestBody = {
         model: modelData.model_name,
         messages: [
           { role: "system", content: systemMessage },
@@ -350,7 +350,7 @@ mobile real estate marketing`;
         {
           method: "POST",
           headers,
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify(aiRequestBody),
         },
         AI_API_TIMEOUT_MS
       );
