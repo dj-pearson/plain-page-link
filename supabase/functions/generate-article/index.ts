@@ -454,12 +454,12 @@ mobile real estate marketing`;
       );
 
       if (socialResponse.error) {
-        console.error('[generate-article] Error triggering social post:', socialResponse.error);
+        console.warn('[generate-article] Social post trigger failed (non-critical):', socialResponse.error.message);
       } else {
-        console.log('[generate-article] Social post triggered successfully:', socialResponse.data);
+        console.log('[generate-article] Social post triggered successfully');
       }
     } catch (socialError) {
-      console.error('[generate-article] Failed to trigger social post (may have timed out):', socialError);
+      console.warn('[generate-article] Social post trigger failed (non-critical):', socialError instanceof Error ? socialError.message : socialError);
       // Don't fail the article generation if social posting fails
     }
 
