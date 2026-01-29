@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { flexibleAuth } from '../_shared/webhook-auth.ts';
 
 // Timeout constants
 const AI_API_TIMEOUT_MS = 120000; // 2 minutes for AI generation
@@ -93,12 +94,17 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Securely authenticate user with JWT verification
+    // Securely authenticate user with JWT or API key (flexible auth for webhooks)
     let userId = null;
     try {
-      const user = await requireAuth(req, supabase);
-      userId = user.id;
-      console.log('[generate-article] User authenticated:', userId);
+      // First try flexible auth (JWT or API key)
+      userId = await flexibleAuth(req, supabase);
+      
+      if (userId) {
+        console.log('[generate-article] User authenticated via flexible auth:', userId);
+      } else {
+        console.warn('[generate-article] No authentication provided (proceeding as public request)');
+      }
     } catch (e) {
       console.warn('[generate-article] Auth failed (proceeding without user):', e instanceof Error ? e.message : e);
     }
