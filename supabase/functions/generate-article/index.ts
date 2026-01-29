@@ -447,8 +447,9 @@ mobile real estate marketing`;
     try {
       console.log('[generate-article] Triggering social media post generation...');
       
-      // Direct HTTP call instead of supabase.functions.invoke for better error handling
-      const functionsUrl = `${SUPABASE_URL}/functions/v1/publish-article-to-social`;
+      // Call edge functions server directly (not through Kong/API)
+      const EDGE_FUNCTIONS_URL = Deno.env.get('EDGE_FUNCTIONS_URL') || 'https://functions.agentbio.net';
+      const functionsUrl = `${EDGE_FUNCTIONS_URL}/publish-article-to-social`;
       console.log('[generate-article] Calling:', functionsUrl);
       
       const socialResponse = await fetchWithTimeout(
