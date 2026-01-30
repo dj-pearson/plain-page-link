@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export interface SampleDataOptions {
   skipDuplicateCheck?: boolean;
@@ -40,33 +41,50 @@ export async function checkExistingData(userId: string): Promise<{
     links: number;
   };
 }> {
-  const [listingsResult, leadsResult, testimonialsResult, linksResult] = await Promise.all([
-    supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-    supabase.from('testimonials').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-    supabase.from('links').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-  ]);
+  logger.info('Checking existing data for user', { userId });
 
-  const counts = {
-    listings: listingsResult.count || 0,
-    leads: leadsResult.count || 0,
-    testimonials: testimonialsResult.count || 0,
-    links: linksResult.count || 0,
-  };
+  try {
+    const [listingsResult, leadsResult, testimonialsResult, linksResult] = await Promise.all([
+      supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('leads').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('testimonials').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('links').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    ]);
 
-  return {
-    hasListings: counts.listings > 0,
-    hasLeads: counts.leads > 0,
-    hasTestimonials: counts.testimonials > 0,
-    hasLinks: counts.links > 0,
-    counts,
-  };
+    // Log any errors from the queries
+    if (listingsResult.error) logger.error('Error checking listings', { error: listingsResult.error });
+    if (leadsResult.error) logger.error('Error checking leads', { error: leadsResult.error });
+    if (testimonialsResult.error) logger.error('Error checking testimonials', { error: testimonialsResult.error });
+    if (linksResult.error) logger.error('Error checking links', { error: linksResult.error });
+
+    const counts = {
+      listings: listingsResult.count || 0,
+      leads: leadsResult.count || 0,
+      testimonials: testimonialsResult.count || 0,
+      links: linksResult.count || 0,
+    };
+
+    logger.info('Existing data counts retrieved', { userId, counts });
+
+    return {
+      hasListings: counts.listings > 0,
+      hasLeads: counts.leads > 0,
+      hasTestimonials: counts.testimonials > 0,
+      hasLinks: counts.links > 0,
+      counts,
+    };
+  } catch (error) {
+    logger.error('Error in checkExistingData', { userId, error });
+    throw error;
+  }
 }
 
 /**
  * Generate sample listings
  */
 async function generateSampleListings(userId: string): Promise<number> {
+  logger.info('Generating sample listings', { userId });
+
   const sampleListings = [
     {
       user_id: userId,
@@ -166,20 +184,27 @@ async function generateSampleListings(userId: string): Promise<number> {
     },
   ];
 
-  const { data, error } = await supabase.from('listings').insert(sampleListings).select();
+  try {
+    const { data, error } = await supabase.from('listings').insert(sampleListings).select();
 
-  if (error) {
-    console.error('Error creating sample listings:', error);
+    if (error) {
+      logger.error('Error creating sample listings', { userId, error });
+      throw error;
+    }
+
+    logger.info('Sample listings created', { userId, count: data?.length || 0 });
+    return data?.length || 0;
+  } catch (error) {
+    logger.error('Exception in generateSampleListings', { userId, error });
     throw error;
   }
-
-  return data?.length || 0;
 }
 
 /**
  * Generate sample leads
  */
 async function generateSampleLeads(userId: string): Promise<number> {
+  logger.info('Generating sample leads', { userId });
   const sampleLeads = [
     {
       user_id: userId,
@@ -245,20 +270,27 @@ async function generateSampleLeads(userId: string): Promise<number> {
     },
   ];
 
-  const { data, error } = await supabase.from('leads').insert(sampleLeads).select();
+  try {
+    const { data, error } = await supabase.from('leads').insert(sampleLeads).select();
 
-  if (error) {
-    console.error('Error creating sample leads:', error);
+    if (error) {
+      logger.error('Error creating sample leads', { userId, error });
+      throw error;
+    }
+
+    logger.info('Sample leads created', { userId, count: data?.length || 0 });
+    return data?.length || 0;
+  } catch (error) {
+    logger.error('Exception in generateSampleLeads', { userId, error });
     throw error;
   }
-
-  return data?.length || 0;
 }
 
 /**
  * Generate sample testimonials
  */
 async function generateSampleTestimonials(userId: string): Promise<number> {
+  logger.info('Generating sample testimonials', { userId });
   const sampleTestimonials = [
     {
       user_id: userId,
@@ -310,20 +342,27 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
     },
   ];
 
-  const { data, error } = await supabase.from('testimonials').insert(sampleTestimonials).select();
+  try {
+    const { data, error } = await supabase.from('testimonials').insert(sampleTestimonials).select();
 
-  if (error) {
-    console.error('Error creating sample testimonials:', error);
+    if (error) {
+      logger.error('Error creating sample testimonials', { userId, error });
+      throw error;
+    }
+
+    logger.info('Sample testimonials created', { userId, count: data?.length || 0 });
+    return data?.length || 0;
+  } catch (error) {
+    logger.error('Exception in generateSampleTestimonials', { userId, error });
     throw error;
   }
-
-  return data?.length || 0;
 }
 
 /**
  * Generate sample custom links
  */
 async function generateSampleLinks(userId: string): Promise<number> {
+  logger.info('Generating sample links', { userId });
   const sampleLinks = [
     {
       user_id: userId,
@@ -381,14 +420,20 @@ async function generateSampleLinks(userId: string): Promise<number> {
     },
   ];
 
-  const { data, error } = await supabase.from('links').insert(sampleLinks).select();
+  try {
+    const { data, error } = await supabase.from('links').insert(sampleLinks).select();
 
-  if (error) {
-    console.error('Error creating sample links:', error);
+    if (error) {
+      logger.error('Error creating sample links', { userId, error });
+      throw error;
+    }
+
+    logger.info('Sample links created', { userId, count: data?.length || 0 });
+    return data?.length || 0;
+  } catch (error) {
+    logger.error('Exception in generateSampleLinks', { userId, error });
     throw error;
   }
-
-  return data?.length || 0;
 }
 
 /**
@@ -398,6 +443,8 @@ export async function generateSampleData(
   userId: string,
   options: SampleDataOptions = {}
 ): Promise<SampleDataCounts> {
+  logger.info('Starting generateSampleData', { userId, options });
+
   const {
     skipDuplicateCheck = false,
     includeListings = true,
@@ -417,58 +464,66 @@ export async function generateSampleData(
     addedLinks: 0,
   };
 
-  // Check for existing data unless skip is specified
-  if (!skipDuplicateCheck) {
-    const existingData = await checkExistingData(userId);
-    counts.existingListings = existingData.counts.listings;
-    counts.existingLeads = existingData.counts.leads;
-    counts.existingTestimonials = existingData.counts.testimonials;
-    counts.existingLinks = existingData.counts.links;
+  try {
+    // Check for existing data unless skip is specified
+    if (!skipDuplicateCheck) {
+      const existingData = await checkExistingData(userId);
+      counts.existingListings = existingData.counts.listings;
+      counts.existingLeads = existingData.counts.leads;
+      counts.existingTestimonials = existingData.counts.testimonials;
+      counts.existingLinks = existingData.counts.links;
 
-    // Skip categories that already have data
-    if (existingData.hasListings && includeListings) {
-      console.log('User already has listings, skipping sample listings generation');
-    }
-    if (existingData.hasLeads && includeLeads) {
-      console.log('User already has leads, skipping sample leads generation');
-    }
-    if (existingData.hasTestimonials && includeTestimonials) {
-      console.log('User already has testimonials, skipping sample testimonials generation');
-    }
-    if (existingData.hasLinks && includeLinks) {
-      console.log('User already has links, skipping sample links generation');
+      // Skip categories that already have data
+      if (existingData.hasListings && includeListings) {
+        logger.info('User already has listings, skipping');
+      }
+      if (existingData.hasLeads && includeLeads) {
+        logger.info('User already has leads, skipping');
+      }
+      if (existingData.hasTestimonials && includeTestimonials) {
+        logger.info('User already has testimonials, skipping');
+      }
+      if (existingData.hasLinks && includeLinks) {
+        logger.info('User already has links, skipping');
+      }
+
+      // Generate sample data only for categories without existing data
+      if (!existingData.hasListings && includeListings) {
+        counts.addedListings = await generateSampleListings(userId);
+      }
+      if (!existingData.hasLeads && includeLeads) {
+        counts.addedLeads = await generateSampleLeads(userId);
+      }
+      if (!existingData.hasTestimonials && includeTestimonials) {
+        counts.addedTestimonials = await generateSampleTestimonials(userId);
+      }
+      if (!existingData.hasLinks && includeLinks) {
+        counts.addedLinks = await generateSampleLinks(userId);
+      }
+    } else {
+      logger.info('Skipping duplicate check, generating all requested data');
+      
+      // Skip duplicate check - generate all requested data
+      if (includeListings) {
+        counts.addedListings = await generateSampleListings(userId);
+      }
+      if (includeLeads) {
+        counts.addedLeads = await generateSampleLeads(userId);
+      }
+      if (includeTestimonials) {
+        counts.addedTestimonials = await generateSampleTestimonials(userId);
+      }
+      if (includeLinks) {
+        counts.addedLinks = await generateSampleLinks(userId);
+      }
     }
 
-    // Generate sample data only for categories without existing data
-    if (!existingData.hasListings && includeListings) {
-      counts.addedListings = await generateSampleListings(userId);
-    }
-    if (!existingData.hasLeads && includeLeads) {
-      counts.addedLeads = await generateSampleLeads(userId);
-    }
-    if (!existingData.hasTestimonials && includeTestimonials) {
-      counts.addedTestimonials = await generateSampleTestimonials(userId);
-    }
-    if (!existingData.hasLinks && includeLinks) {
-      counts.addedLinks = await generateSampleLinks(userId);
-    }
-  } else {
-    // Skip duplicate check - generate all requested data
-    if (includeListings) {
-      counts.addedListings = await generateSampleListings(userId);
-    }
-    if (includeLeads) {
-      counts.addedLeads = await generateSampleLeads(userId);
-    }
-    if (includeTestimonials) {
-      counts.addedTestimonials = await generateSampleTestimonials(userId);
-    }
-    if (includeLinks) {
-      counts.addedLinks = await generateSampleLinks(userId);
-    }
+    logger.info('Sample data generation completed', { userId, counts });
+    return counts;
+  } catch (error) {
+    logger.error('Error in generateSampleData', { userId, error });
+    throw error;
   }
-
-  return counts;
 }
 
 /**

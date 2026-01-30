@@ -20,11 +20,13 @@ import {
 import { generateSampleData, checkExistingData } from "@/lib/sample-data-service";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 export function SampleDataManager() {
   const { user } = useAuthStore();
-  const [targetUserId, setTargetUserId] = useState("");
-  const [targetEmail, setTargetEmail] = useState("");
+  const [emailOrUsername, setEmailOrUsername] = useState("");
+  const [resolvedUserId, setResolvedUserId] = useState("");
+  const [resolvedUserInfo, setResolvedUserInfo] = useState<{ email?: string; username?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingUser, setIsCheckingUser] = useState(false);
   const [existingDataInfo, setExistingDataInfo] = useState<any>(null);
@@ -36,71 +38,108 @@ export function SampleDataManager() {
   const [includeLinks, setIncludeLinks] = useState(true);
   const [skipDuplicateCheck, setSkipDuplicateCheck] = useState(false);
 
+  /**
+   * Lookup user by email or username and resolve to UUID
+   */
+  const lookupUser = async (identifier: string): Promise<{ id: string; email?: string; username?: string } | null> => {
+    logger.info('Looking up user', { identifier });
+
+    try {
+      // Try looking up by username first (profiles table)
+      const { data: profileByUsername, error: usernameError } = await supabase
+        .from('profiles')
+        .select('id, username, email_display')
+        .eq('username', identifier)
+        .maybeSingle();
+
+      if (profileByUsername) {
+        logger.info('Found user by username', { id: profileByUsername.id, username: profileByUsername.username });
+        return {
+          id: profileByUsername.id,
+          username: profileByUsername.username,
+          email: profileByUsername.email_display || undefined
+        };
+      }
+
+      // Try looking up by email_display (profiles table)
+      const { data: profileByEmail, error: emailError } = await supabase
+        .from('profiles')
+        .select('id, username, email_display')
+        .eq('email_display', identifier)
+        .maybeSingle();
+
+      if (profileByEmail) {
+        logger.info('Found user by email_display', { id: profileByEmail.id, email: profileByEmail.email_display });
+        return {
+          id: profileByEmail.id,
+          username: profileByEmail.username,
+          email: profileByEmail.email_display || undefined
+        };
+      }
+
+      logger.warn('User not found in profiles table', { identifier, usernameError, emailError });
+      return null;
+    } catch (error) {
+      logger.error('Error looking up user', { identifier, error });
+      throw error;
+    }
+  };
+
   const handleCheckUser = async () => {
-    if (!targetEmail && !targetUserId) {
-      toast.error("Please enter a user email or ID");
+    if (!emailOrUsername.trim()) {
+      toast.error("Please enter a user email or username");
       return;
     }
 
     setIsCheckingUser(true);
     setExistingDataInfo(null);
+    setResolvedUserId("");
+    setResolvedUserInfo(null);
 
     try {
-      let userId = targetUserId;
+      logger.info('Starting user lookup', { emailOrUsername });
 
-      // If email is provided, look up the user ID
-      if (targetEmail && !targetUserId) {
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email_display', targetEmail)
-          .single();
-
-        if (userError || !userData) {
-          // Try auth.users table
-          const { data: authData } = await supabase.auth.admin.listUsers();
-          const foundUser = authData?.users.find(u => u.email === targetEmail);
-          
-          if (!foundUser) {
-            toast.error("User not found with that email");
-            return;
-          }
-          userId = foundUser.id;
-        } else {
-          userId = userData.id;
-        }
-        
-        setTargetUserId(userId);
+      const userInfo = await lookupUser(emailOrUsername.trim());
+      
+      if (!userInfo) {
+        logger.warn('User not found', { emailOrUsername });
+        toast.error(`User not found: ${emailOrUsername}`);
+        return;
       }
 
-      // Check existing data
-      const existingData = await checkExistingData(userId);
-      setExistingDataInfo(existingData);
+      logger.info('User found, checking existing data', { userId: userInfo.id });
+      setResolvedUserId(userInfo.id);
+      setResolvedUserInfo(userInfo);
 
-      toast.success("User data checked successfully");
+      // Check existing data
+      const existingData = await checkExistingData(userInfo.id);
+      setExistingDataInfo(existingData);
+      
+      logger.info('User data checked successfully', { userId: userInfo.id, existingData });
+      toast.success(`Found user: ${userInfo.username || userInfo.email}`);
     } catch (error: any) {
-      console.error('Error checking user:', error);
+      logger.error('Error checking user', { emailOrUsername, error });
       toast.error(error.message || "Failed to check user data");
     } finally {
       setIsCheckingUser(false);
     }
   };
 
+
   const handleGenerateSampleData = async () => {
-    if (!targetUserId && !targetEmail) {
+    if (!resolvedUserId) {
       toast.error("Please check a user first");
       return;
     }
 
-    if (!targetUserId) {
-      await handleCheckUser();
-      return;
-    }
-
     setIsLoading(true);
+    logger.info('Starting sample data generation', { 
+      userId: resolvedUserId, 
+      options: { includeListings, includeLeads, includeTestimonials, includeLinks, skipDuplicateCheck }
+    });
 
     try {
-      const counts = await generateSampleData(targetUserId, {
+      const counts = await generateSampleData(resolvedUserId, {
         includeListings,
         includeLeads,
         includeTestimonials,
@@ -108,8 +147,10 @@ export function SampleDataManager() {
         skipDuplicateCheck,
       });
 
+      logger.info('Sample data generated successfully', { userId: resolvedUserId, counts });
+
       // Refresh existing data check
-      const existingData = await checkExistingData(targetUserId);
+      const existingData = await checkExistingData(resolvedUserId);
       setExistingDataInfo(existingData);
 
       const summary = [
@@ -125,7 +166,7 @@ export function SampleDataManager() {
         toast.info("No new data was added (user may already have sample data)");
       }
     } catch (error: any) {
-      console.error('Error generating sample data:', error);
+      logger.error('Error generating sample data', { userId: resolvedUserId, error });
       toast.error(error.message || "Failed to generate sample data");
     } finally {
       setIsLoading(false);
@@ -138,11 +179,15 @@ export function SampleDataManager() {
       return;
     }
 
-    setTargetUserId(user.id);
-    setTargetEmail(user.email || "");
-    
-    // Check existing data first
+    setIsLoading(true);
+    logger.info('Adding sample data to current user', { userId: user.id });
+
     try {
+      // Set resolved info
+      setResolvedUserId(user.id);
+      setResolvedUserInfo({ email: user.email, username: user.user_metadata?.username });
+      
+      // Check existing data first
       const existingData = await checkExistingData(user.id);
       setExistingDataInfo(existingData);
       
@@ -154,6 +199,8 @@ export function SampleDataManager() {
         includeLinks,
         skipDuplicateCheck,
       });
+
+      logger.info('Sample data added to current user', { userId: user.id, counts });
 
       const summary = [
         counts.addedListings > 0 ? `${counts.addedListings} listings` : null,
@@ -168,8 +215,10 @@ export function SampleDataManager() {
         toast.info("No new data was added (you may already have sample data)");
       }
     } catch (error: any) {
-      console.error('Error adding sample data to self:', error);
+      logger.error('Error adding sample data to self', { userId: user?.id, error });
       toast.error(error.message || "Failed to add sample data");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -213,40 +262,47 @@ export function SampleDataManager() {
 
         {/* User Selection */}
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="email">User Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="user@example.com"
-                value={targetEmail}
-                onChange={(e) => setTargetEmail(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="userId">User ID (UUID)</Label>
-              <Input
-                id="userId"
-                placeholder="123e4567-e89b-12d3-a456-426614174000"
-                value={targetUserId}
-                onChange={(e) => setTargetUserId(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="emailOrUsername">User Email or Username</Label>
+            <Input
+              id="emailOrUsername"
+              placeholder="username or user@example.com"
+              value={emailOrUsername}
+              onChange={(e) => setEmailOrUsername(e.target.value)}
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleCheckUser();
+                }
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Enter a username (e.g. "johnsmith") or email address to look up the user
+            </p>
           </div>
+
+          {resolvedUserInfo && (
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-900">
+                <strong>User Found:</strong> {resolvedUserInfo.username || resolvedUserInfo.email}
+                {resolvedUserInfo.email && resolvedUserInfo.username && (
+                  <span className="text-sm text-green-700"> ({resolvedUserInfo.email})</span>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Button
             onClick={handleCheckUser}
-            disabled={isCheckingUser || isLoading}
+            disabled={isCheckingUser || isLoading || !emailOrUsername.trim()}
             variant="outline"
             className="w-full"
           >
             {isCheckingUser ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Checking...
+                Looking up user...
               </>
             ) : (
               <>
@@ -378,7 +434,7 @@ export function SampleDataManager() {
         {/* Generate Button */}
         <Button
           onClick={handleGenerateSampleData}
-          disabled={isLoading || isCheckingUser || !targetUserId}
+          disabled={isLoading || isCheckingUser || !resolvedUserId}
           className="w-full"
           size="lg"
         >
@@ -395,7 +451,7 @@ export function SampleDataManager() {
           )}
         </Button>
 
-        {!targetUserId && (
+        {!resolvedUserId && (
           <p className="text-sm text-center text-muted-foreground">
             Check a user first to enable generation
           </p>
