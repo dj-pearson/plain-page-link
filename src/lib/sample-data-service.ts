@@ -508,33 +508,91 @@ export async function generateSampleData(
       }
 
       // Generate sample data only for categories without existing data
+      // Try each category independently so one failure doesn't stop others
       if (!existingData.hasListings && includeListings) {
-        counts.addedListings = await generateSampleListings(userId);
+        try {
+          counts.addedListings = await generateSampleListings(userId);
+        } catch (error: any) {
+          logger.error('Failed to generate listings, continuing with other types', { 
+            userId, 
+            error: error.message 
+          });
+        }
       }
       if (!existingData.hasLeads && includeLeads) {
-        counts.addedLeads = await generateSampleLeads(userId);
+        try {
+          counts.addedLeads = await generateSampleLeads(userId);
+        } catch (error: any) {
+          logger.error('Failed to generate leads, continuing with other types', { 
+            userId, 
+            error: error.message 
+          });
+        }
       }
       if (!existingData.hasTestimonials && includeTestimonials) {
-        counts.addedTestimonials = await generateSampleTestimonials(userId);
+        try {
+          counts.addedTestimonials = await generateSampleTestimonials(userId);
+        } catch (error: any) {
+          logger.error('Failed to generate testimonials, continuing with other types', { 
+            userId, 
+            error: error.message 
+          });
+        }
       }
       if (!existingData.hasLinks && includeLinks) {
-        counts.addedLinks = await generateSampleLinks(userId);
+        try {
+          counts.addedLinks = await generateSampleLinks(userId);
+        } catch (error: any) {
+          logger.error('Failed to generate links, continuing with other types', { 
+            userId, 
+            error: error.message 
+          });
+        }
       }
     } else {
       logger.info('Skipping duplicate check, generating all requested data');
       
       // Skip duplicate check - generate all requested data
+      // Try each category independently so one failure doesn't stop others
       if (includeListings) {
-        counts.addedListings = await generateSampleListings(userId);
+        try {
+          counts.addedListings = await generateSampleListings(userId);
+        } catch (error: any) {
+          logger.error('Failed to generate listings, continuing with other types', { 
+            userId, 
+            error: error.message 
+          });
+        }
       }
       if (includeLeads) {
-        counts.addedLeads = await generateSampleLeads(userId);
+        try {
+          counts.addedLeads = await generateSampleLeads(userId);
+        } catch (error: any) {
+          logger.error('Failed to generate leads, continuing with other types', { 
+            userId, 
+            error: error.message 
+          });
+        }
       }
       if (includeTestimonials) {
-        counts.addedTestimonials = await generateSampleTestimonials(userId);
+        try {
+          counts.addedTestimonials = await generateSampleTestimonials(userId);
+        } catch (error: any) {
+          logger.error('Failed to generate testimonials, continuing with other types', { 
+            userId, 
+            error: error.message 
+          });
+        }
       }
       if (includeLinks) {
-        counts.addedLinks = await generateSampleLinks(userId);
+        try {
+          counts.addedLinks = await generateSampleLinks(userId);
+        } catch (error: any) {
+          logger.error('Failed to generate links, continuing with other types', { 
+            userId, 
+            error: error.message 
+          });
+        }
       }
     }
 
