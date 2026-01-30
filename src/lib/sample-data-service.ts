@@ -268,7 +268,6 @@ async function generateSampleLeads(userId: string): Promise<number> {
       lead_type: 'contact',
       status: 'closed',
       contacted_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-      closed_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
     },
   ];
 
