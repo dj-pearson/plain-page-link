@@ -89,9 +89,7 @@ async function generateSampleListings(userId: string): Promise<number> {
     {
       user_id: userId,
       address: '123 Sunset Boulevard',
-      city: 'Los Angeles',
-      state: 'CA',
-      zip_code: '90001',
+      city: 'Los Angeles, CA 90001',
       price: '1250000',
       beds: 4,
       baths: 3.5,
@@ -114,9 +112,7 @@ async function generateSampleListings(userId: string): Promise<number> {
     {
       user_id: userId,
       address: '456 Oakwood Drive',
-      city: 'San Francisco',
-      state: 'CA',
-      zip_code: '94102',
+      city: 'San Francisco, CA 94102',
       price: '2850000',
       beds: 5,
       baths: 4,
@@ -138,9 +134,7 @@ async function generateSampleListings(userId: string): Promise<number> {
     {
       user_id: userId,
       address: '789 Maple Avenue',
-      city: 'San Diego',
-      state: 'CA',
-      zip_code: '92101',
+      city: 'San Diego, CA 92101',
       price: '875000',
       beds: 3,
       baths: 2.5,
@@ -161,9 +155,7 @@ async function generateSampleListings(userId: string): Promise<number> {
     {
       user_id: userId,
       address: '321 Palm Street',
-      city: 'Santa Monica',
-      state: 'CA',
-      zip_code: '90401',
+      city: 'Santa Monica, CA 90401',
       price: '1450000',
       beds: 3,
       baths: 2,
