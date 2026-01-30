@@ -5,6 +5,7 @@ import { useAuthStore } from "./stores/useAuthStore";
 import { errorHandler } from "./lib/errorHandler";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { offlineStorage } from "./lib/offline-storage";
+import { cleanupServiceWorkers } from "./lib/sw-cleanup";
 import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
@@ -97,6 +98,9 @@ function App() {
 
     // Initialize auth and offline storage on mount
     useEffect(() => {
+        // Clean up any interfering service workers first
+        cleanupServiceWorkers();
+        
         initialize();
 
         // Initialize offline storage (lightweight)

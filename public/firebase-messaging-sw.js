@@ -26,6 +26,34 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// CRITICAL: Bypass service worker for authentication and API requests
+// This prevents the SW from interfering with Supabase auth and API calls
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  
+  // List of patterns to bypass (let browser handle directly)
+  const bypassPatterns = [
+    'supabase.co',           // Supabase API/Auth
+    'auth/v1',               // Auth endpoints
+    '/rest/v1/',             // Supabase REST API
+    '/storage/v1/',          // Supabase Storage
+    'api.agentbio.net',      // Your backend API
+    'functions.agentbio.net' // Edge functions
+  ];
+  
+  // If the request matches any bypass pattern, let it pass through without caching
+  const shouldBypass = bypassPatterns.some(pattern => url.href.includes(pattern));
+  
+  if (shouldBypass) {
+    // Return immediately - don't cache, don't intercept
+    return;
+  }
+  
+  // For all other requests, also let them pass through
+  // This SW is only for Firebase messaging, not for caching
+  return;
+});
+
 // Handle background messages
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received', event);
