@@ -166,7 +166,11 @@ export function SampleDataManager() {
         toast.info("No new data was added (user may already have sample data)");
       }
     } catch (error: any) {
-      logger.error('Error generating sample data', { userId: resolvedUserId, error });
+      logger.error('Error generating sample data', { 
+        userId: resolvedUserId, 
+        message: error?.message,
+        stack: error?.stack 
+      });
       toast.error(error.message || "Failed to generate sample data");
     } finally {
       setIsLoading(false);
@@ -215,7 +219,11 @@ export function SampleDataManager() {
         toast.info("No new data was added (you may already have sample data)");
       }
     } catch (error: any) {
-      logger.error('Error adding sample data to self', { userId: user?.id, error });
+      logger.error('Error adding sample data to self', { 
+        userId: user?.id, 
+        message: error?.message,
+        stack: error?.stack 
+      });
       toast.error(error.message || "Failed to add sample data");
     } finally {
       setIsLoading(false);

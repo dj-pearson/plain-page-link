@@ -180,14 +180,24 @@ async function generateSampleListings(userId: string): Promise<number> {
     const { data, error } = await supabase.from('listings').insert(sampleListings).select();
 
     if (error) {
-      logger.error('Error creating sample listings', { userId, error });
-      throw error;
+      logger.error('Error creating sample listings', { 
+        userId, 
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code 
+      });
+      throw new Error(`Failed to create listings: ${error.message} - ${error.details || ''}`);
     }
 
     logger.info('Sample listings created', { userId, count: data?.length || 0 });
     return data?.length || 0;
-  } catch (error) {
-    logger.error('Exception in generateSampleListings', { userId, error });
+  } catch (error: any) {
+    logger.error('Exception in generateSampleListings', { 
+      userId, 
+      message: error?.message,
+      stack: error?.stack 
+    });
     throw error;
   }
 }
@@ -266,14 +276,24 @@ async function generateSampleLeads(userId: string): Promise<number> {
     const { data, error } = await supabase.from('leads').insert(sampleLeads).select();
 
     if (error) {
-      logger.error('Error creating sample leads', { userId, error });
-      throw error;
+      logger.error('Error creating sample leads', { 
+        userId, 
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code 
+      });
+      throw new Error(`Failed to create leads: ${error.message} - ${error.details || ''}`);
     }
 
     logger.info('Sample leads created', { userId, count: data?.length || 0 });
     return data?.length || 0;
-  } catch (error) {
-    logger.error('Exception in generateSampleLeads', { userId, error });
+  } catch (error: any) {
+    logger.error('Exception in generateSampleLeads', { 
+      userId, 
+      message: error?.message,
+      stack: error?.stack 
+    });
     throw error;
   }
 }
@@ -338,14 +358,24 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
     const { data, error } = await supabase.from('testimonials').insert(sampleTestimonials).select();
 
     if (error) {
-      logger.error('Error creating sample testimonials', { userId, error });
-      throw error;
+      logger.error('Error creating sample testimonials', { 
+        userId, 
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code 
+      });
+      throw new Error(`Failed to create testimonials: ${error.message} - ${error.details || ''}`);
     }
 
     logger.info('Sample testimonials created', { userId, count: data?.length || 0 });
     return data?.length || 0;
-  } catch (error) {
-    logger.error('Exception in generateSampleTestimonials', { userId, error });
+  } catch (error: any) {
+    logger.error('Exception in generateSampleTestimonials', { 
+      userId, 
+      message: error?.message,
+      stack: error?.stack 
+    });
     throw error;
   }
 }
@@ -416,14 +446,24 @@ async function generateSampleLinks(userId: string): Promise<number> {
     const { data, error } = await supabase.from('links').insert(sampleLinks).select();
 
     if (error) {
-      logger.error('Error creating sample links', { userId, error });
-      throw error;
+      logger.error('Error creating sample links', { 
+        userId, 
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code 
+      });
+      throw new Error(`Failed to create links: ${error.message} - ${error.details || ''}`);
     }
 
     logger.info('Sample links created', { userId, count: data?.length || 0 });
     return data?.length || 0;
-  } catch (error) {
-    logger.error('Exception in generateSampleLinks', { userId, error });
+  } catch (error: any) {
+    logger.error('Exception in generateSampleLinks', { 
+      userId, 
+      message: error?.message,
+      stack: error?.stack 
+    });
     throw error;
   }
 }
@@ -512,8 +552,12 @@ export async function generateSampleData(
 
     logger.info('Sample data generation completed', { userId, counts });
     return counts;
-  } catch (error) {
-    logger.error('Error in generateSampleData', { userId, error });
+  } catch (error: any) {
+    logger.error('Error in generateSampleData', { 
+      userId, 
+      message: error?.message,
+      stack: error?.stack 
+    });
     throw error;
   }
 }
