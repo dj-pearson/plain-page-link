@@ -7,7 +7,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   encryptData,
@@ -169,7 +169,7 @@ export function useEncryption(): UseEncryptionResult {
     setIsProcessing(true);
 
     try {
-      const { data: response, error: funcError } = await supabase.functions.invoke(
+      const { data: response, error: funcError } = await edgeFunctions.invoke(
         'encrypt-pii',
         {
           body: {
@@ -213,7 +213,7 @@ export function useEncryption(): UseEncryptionResult {
     setIsProcessing(true);
 
     try {
-      const { data: response, error: funcError } = await supabase.functions.invoke(
+      const { data: response, error: funcError } = await edgeFunctions.invoke(
         'encrypt-pii',
         {
           body: {

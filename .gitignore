@@ -1,5 +1,6 @@
 /assets/favicon/icons
 /node_modules
+/dist
 /public/hot
 /public/storage
 /storage/*.key
