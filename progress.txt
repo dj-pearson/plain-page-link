@@ -1,0 +1,79 @@
+# AgentBio Enterprise Readiness — Ralph Progress Log
+
+## Project Context
+- **Platform**: AgentBio Intelligence — AI-powered real estate link-in-bio SaaS
+- **Tech Stack**: React 18 + TypeScript + Vite 7 + Supabase + Tailwind CSS + Radix UI
+- **Goal**: Transform MVP (62% production-ready) into enterprise-grade production platform
+- **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
+
+## Current Status
+- All 50 stories pending (passes: false)
+- Starting from Priority 1 (US-001: ESLint + Prettier)
+
+## Codebase Patterns
+
+### Project Structure
+- Frontend source: src/ (components, pages, hooks, stores, lib, types, config)
+- Backend: supabase/functions/ (82+ Deno edge functions)
+- Database migrations: supabase/migrations/ (65+ SQL files)
+- Tests: src/**/*.test.ts (4 existing files), tests/security/ (Playwright)
+- Config: vite.config.ts, tsconfig.json, tailwind.config.ts, vitest.config.ts, playwright.config.ts
+
+### Import Conventions
+- Path alias: @/ maps to src/
+- Type imports: use `import type { ... }` syntax
+- Component imports: PascalCase file names, named exports preferred
+
+### Supabase Patterns
+- Client at src/integrations/supabase/client.ts
+- Auto-generated types at src/integrations/supabase/types.ts
+- All tables use RLS (Row Level Security)
+- UUID primary keys, timestamptz for dates
+- Edge functions use Deno runtime with TypeScript
+
+### State Management
+- Zustand stores in src/stores/ (persisted auth state)
+- TanStack Query v5 for server state (5-min staleTime typical)
+- React Hook Form + Zod for form state and validation
+
+### Styling
+- Tailwind CSS with HSL CSS variables for theming
+- cn() utility from src/lib/utils for conditional classes
+- Radix UI primitives for accessible components
+
+### Error Handling
+- errorHandler from src/lib/errorHandler.ts (Sentry integration)
+- logger from src/lib/logger.ts (secure, auto-redacting)
+- Always handle Supabase { data, error } responses
+
+### Build & Deploy
+- Vite build with manual chunk splitting (see vite.config.ts)
+- Deployment target: Cloudflare Pages
+- Dev server: localhost:8080
+- TypeScript strict mode enabled
+
+### Testing
+- Unit: Vitest + @testing-library/react (jsdom environment)
+- E2E/Security: Playwright
+- Test setup: src/test/setup.ts (mocks for matchMedia, ResizeObserver, IntersectionObserver)
+- Run: npm run test (vitest), npm run test:security (playwright)
+
+### Edge Function Patterns
+- Located in supabase/functions/{name}/index.ts
+- Shared utils in supabase/functions/_shared/
+- Import from https://deno.land/std and https://esm.sh/
+- CORS headers required for all responses
+- Environment variables via Deno.env.get()
+
+## Gotchas & Warnings
+- 84+ `as any` casts exist — avoid adding more, fix when touching those files
+- .github/workflows/ is EMPTY — no CI/CD exists yet
+- Only 4 test files for ~33k lines of code
+- CSP uses 'unsafe-inline' for styles (needed for Tailwind)
+- PII (phone, address) stored in plaintext — encryption migration needed
+- Some edge functions have inconsistent error response formats
+- skipLibCheck: true in tsconfig — may hide dependency type issues
+- No ESLint or Prettier configured yet
+
+## Completed Stories
+(None yet — Ralph will update this section as stories are completed)
