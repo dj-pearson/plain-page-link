@@ -24,9 +24,10 @@ const SubmitReview = lazy(() => import("./pages/public/SubmitReview"));
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 
-// Lazy load auth recovery pages
+// Lazy load auth recovery & callback pages
 const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
+const AuthCallback = lazy(() => import("./pages/auth/AuthCallback"));
 
 // Lazy load onboarding
 const OnboardingWizardPage = lazy(() => import("./pages/onboarding/OnboardingWizardPage"));
@@ -187,6 +188,7 @@ function App() {
                     {/* Auth routes */}
                     <Route path="/auth/login" element={<Login />} />
                     <Route path="/auth/register" element={<Register />} />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/auth/forgot-password" element={<ForgotPassword />} />
                     <Route path="/auth/reset-password" element={<ResetPassword />} />
                     <Route path="/auth/sso/callback" element={<SSOCallback />} />

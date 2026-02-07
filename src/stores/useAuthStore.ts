@@ -358,30 +358,33 @@ export const useAuthStore = create<AuthState>()(
 
       signInWithGoogle: async () => {
         set({ isLoading: true, error: null });
-        
+
         try {
-          // Get the intended redirect path from localStorage or default to dashboard
-          // This preserves the user's intended destination before OAuth redirect
+          // Use oauth-proxy edge function to bypass GOTRUE_SITE_URL limitation
+          // Flow: Frontend → oauth-proxy → Google → oauth-proxy callback → /auth/callback
+          const functionsUrl = import.meta.env.VITE_FUNCTIONS_URL;
           const lastRoute = localStorage.getItem('lastVisitedRoute') || '/dashboard';
-          
-          // Build callback URL with redirect parameter
-          // OAuth flow: Google → Supabase → /auth/callback → intended route
-          const callbackUrl = `${window.location.origin}/auth/login?redirect=${encodeURIComponent(lastRoute)}`;
-          
-          const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-              redirectTo: callbackUrl,
-              queryParams: {
-                access_type: 'offline',
-                prompt: 'consent',
+
+          if (functionsUrl) {
+            // Self-hosted: use oauth-proxy edge function
+            const oauthUrl = `${functionsUrl}/oauth-proxy?action=authorize&provider=google&redirect_to=${encodeURIComponent(lastRoute)}`;
+            window.location.href = oauthUrl;
+          } else {
+            // Fallback: use standard Supabase OAuth (for hosted Supabase)
+            const callbackUrl = `${window.location.origin}/auth/callback`;
+            const { error } = await supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: {
+                redirectTo: callbackUrl,
+                queryParams: {
+                  access_type: 'offline',
+                  prompt: 'consent',
+                },
               },
-            },
-          });
-          
-          if (error) throw error;
-          
-          // Note: The actual session will be established after redirect
+            });
+            if (error) throw error;
+          }
+
           set({ isLoading: false });
         } catch (error: any) {
           set({
@@ -394,24 +397,28 @@ export const useAuthStore = create<AuthState>()(
 
       signInWithApple: async () => {
         set({ isLoading: true, error: null });
-        
+
         try {
-          // Get the intended redirect path from localStorage or default to dashboard
+          // Use oauth-proxy edge function to bypass GOTRUE_SITE_URL limitation
+          const functionsUrl = import.meta.env.VITE_FUNCTIONS_URL;
           const lastRoute = localStorage.getItem('lastVisitedRoute') || '/dashboard';
-          
-          // Build callback URL with redirect parameter
-          const callbackUrl = `${window.location.origin}/auth/login?redirect=${encodeURIComponent(lastRoute)}`;
-          
-          const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'apple',
-            options: {
-              redirectTo: callbackUrl,
-            },
-          });
-          
-          if (error) throw error;
-          
-          // Note: The actual session will be established after redirect
+
+          if (functionsUrl) {
+            // Self-hosted: use oauth-proxy edge function
+            const oauthUrl = `${functionsUrl}/oauth-proxy?action=authorize&provider=apple&redirect_to=${encodeURIComponent(lastRoute)}`;
+            window.location.href = oauthUrl;
+          } else {
+            // Fallback: use standard Supabase OAuth (for hosted Supabase)
+            const callbackUrl = `${window.location.origin}/auth/callback`;
+            const { error } = await supabase.auth.signInWithOAuth({
+              provider: 'apple',
+              options: {
+                redirectTo: callbackUrl,
+              },
+            });
+            if (error) throw error;
+          }
+
           set({ isLoading: false });
         } catch (error: any) {
           set({
