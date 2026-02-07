@@ -22,6 +22,7 @@ const FUNCTIONS_MAP: { [key: string]: string } = {
   "seo-audit": "./functions/seo-audit/index.ts",
   "generate-article": "./functions/generate-article/index.ts",
   "generate-social-post": "./functions/generate-social-post/index.ts",
+  "publish-article-to-social": "./functions/publish-article-to-social/index.ts",
   // Add more functions as needed
 };
 

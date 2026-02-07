@@ -1,5 +1,5 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Home, Mail, Lock, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
+import { Home, Mail, Lock, AlertCircle, Loader2, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { emailSchema, sanitizeURL } from "@/utils/validation";
 import { validateRedirectPath } from "@/utils/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { cleanupAndReload } from "@/lib/sw-cleanup";
 import {
     checkLoginThrottle,
     recordLoginAttempt,
@@ -98,14 +99,33 @@ export default function Login() {
 
             // Record successful login attempt
             await recordLoginAttempt(email, true, undefined, undefined, getDeviceFingerprint());
-        } catch (error) {
+        } catch (error: any) {
+            // Check if this is a service worker / network error
+            const isNetworkError = error?.message?.includes('fetch') || 
+                                    error?.message?.includes('network') ||
+                                    error?.name === 'AuthRetryableFetchError';
+            
+            if (isNetworkError) {
+                // Show user-friendly message with option to clear cache
+                toast({
+                    title: "Connection Issue Detected",
+                    description: "Your browser cache may be interfering. Try refreshing the page or clearing your browser cache.",
+                    variant: "destructive",
+                });
+                
+                // Automatically attempt cleanup
+                setTimeout(() => {
+                    cleanupAndReload();
+                }, 3000);
+            }
+            
             // Record failed login attempt with generic reason
             // Never log the actual password or specific failure reason
             await recordLoginAttempt(
                 email,
                 false,
                 undefined,
-                'invalid_credentials',
+                isNetworkError ? 'network_error' : 'invalid_credentials',
                 getDeviceFingerprint()
             );
 

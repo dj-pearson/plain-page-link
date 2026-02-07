@@ -1,7 +1,8 @@
 // Centralized error handling utility
-// Can be integrated with Sentry or other error monitoring services
+// Integrated with Sentry for production error monitoring
 
 import { logger, sanitizeObject, truncateId } from '@/lib/logger';
+import * as SentryLib from '@/lib/sentry';
 
 interface ErrorContext {
   user?: {
@@ -27,14 +28,26 @@ class ErrorHandler {
     const sanitizedContext = context ? sanitizeObject(context) : undefined;
     logger.error('Error captured', error, sanitizedContext as Record<string, unknown>);
 
-    if (!this.enabled) return;
+    // Send to Sentry in production
+    if (this.enabled) {
+      SentryLib.captureException(error, {
+        action: context?.action,
+        component: context?.component,
+        userId: context?.user?.id ? truncateId(context.user.id) : undefined,
+        ...sanitizedContext,
+      });
 
-    // Future: Send to error monitoring service (Sentry, etc.)
-    // Sentry.captureException(error, {
-    //   contexts: {
-    //     custom: context
-    //   }
-    // });
+      // Add breadcrumb for debugging
+      SentryLib.addBreadcrumb({
+        category: 'error',
+        message: error.message,
+        level: 'error',
+        data: {
+          action: context?.action,
+          component: context?.component,
+        },
+      });
+    }
 
     // Store error in localStorage for debugging (only non-sensitive data)
     this.storeError(error, context);
@@ -54,10 +67,11 @@ class ErrorHandler {
         logger.info(message, sanitizedContext as Record<string, unknown>);
     }
 
-    if (!this.enabled) return;
-
-    // Future: Send to error monitoring service
-    // Sentry.captureMessage(message, level);
+    // Send to Sentry in production
+    if (this.enabled) {
+      const sentryLevel = level === 'warning' ? 'warning' : level === 'error' ? 'error' : 'info';
+      SentryLib.captureMessage(message, sentryLevel, sanitizedContext as Record<string, unknown>);
+    }
   }
 
   private storeError(error: Error, context?: ErrorContext) {
@@ -89,23 +103,59 @@ class ErrorHandler {
     }
   }
 
-  setUser(userId: string, email?: string) {
-    if (!this.enabled) return;
-
+  setUser(userId: string, email?: string, username?: string) {
     // Log user context change (with truncated ID for privacy)
     logger.debug('Error handler: User context set', { userId: truncateId(userId) });
 
-    // Future: Set user context for error monitoring
-    // Sentry.setUser({ id: userId, email });
+    // Set user context in Sentry
+    if (this.enabled) {
+      SentryLib.setUser({
+        id: userId,
+        email,
+        username,
+      });
+    }
   }
 
   clearUser() {
-    if (!this.enabled) return;
-
     logger.debug('Error handler: User context cleared');
 
-    // Future: Clear user context
-    // Sentry.setUser(null);
+    // Clear user context in Sentry
+    if (this.enabled) {
+      SentryLib.clearUser();
+    }
+  }
+
+  /**
+   * Set additional context for error tracking
+   */
+  setContext(name: string, context: Record<string, unknown>) {
+    if (this.enabled) {
+      SentryLib.setContext(name, context);
+    }
+  }
+
+  /**
+   * Set a tag for filtering errors
+   */
+  setTag(key: string, value: string) {
+    if (this.enabled) {
+      SentryLib.setTag(key, value);
+    }
+  }
+
+  /**
+   * Add a breadcrumb for debugging
+   */
+  addBreadcrumb(category: string, message: string, data?: Record<string, unknown>) {
+    if (this.enabled) {
+      SentryLib.addBreadcrumb({
+        category,
+        message,
+        level: 'info',
+        data,
+      });
+    }
   }
 }
 
@@ -125,13 +175,16 @@ export async function withErrorHandling<T>(
 }
 
 // Helper to handle API errors
-export function handleApiError(error: any, context?: ErrorContext): string {
+export function handleApiError(error: unknown, context?: ErrorContext): string {
   let message = 'An unexpected error occurred';
 
-  if (error?.message) {
-    message = error.message;
-  } else if (error?.error) {
-    message = error.error;
+  if (error && typeof error === 'object') {
+    const err = error as { message?: string; error?: string };
+    if (err.message) {
+      message = err.message;
+    } else if (err.error) {
+      message = err.error;
+    }
   } else if (typeof error === 'string') {
     message = error;
   }

@@ -1,35 +1,116 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth } from '../_shared/auth.ts';
+import { getAuthenticatedUser } from '../_shared/service-auth.ts';
 
-serve(async (req) => {
+// Timeout constants
+const AI_API_TIMEOUT_MS = 120000; // 2 minutes for AI generation
+const FUNCTION_INVOKE_TIMEOUT_MS = 30000; // 30 seconds for cascading functions
+
+/**
+ * Fetch with timeout using AbortController
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Invoke a Supabase function with timeout
+ */
+async function invokeFunctionWithTimeout(
+  supabase: ReturnType<typeof createClient>,
+  functionName: string,
+  body: Record<string, unknown>,
+  timeoutMs: number
+): Promise<{ data: unknown; error: Error | null }> {
+  return Promise.race([
+    supabase.functions.invoke(functionName, { body }),
+    new Promise<{ data: null; error: Error }>((_, reject) =>
+      setTimeout(() => reject(new Error(`Function ${functionName} timed out after ${timeoutMs}ms`)), timeoutMs)
+    ).catch(error => ({ data: null, error }))
+  ]);
+}
+
+export default async (req: Request) => {
+  console.log(`[generate-article] Request received: ${req.method} from ${req.headers.get('origin') || 'no-origin'}`);
+
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = await req.json();
+    // Parse request body with error handling
+    let requestBody: Record<string, unknown>;
+    try {
+      const bodyText = await req.text();
+      console.log(`[generate-article] Request body length: ${bodyText.length} chars`);
+      requestBody = bodyText ? JSON.parse(bodyText) : {};
+    } catch (parseError) {
+      console.error('[generate-article] Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = requestBody;
+
+    const CLAUDE_API_KEY = Deno.env.get("CLAUDE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Missing required environment variables");
+    // Detailed environment variable validation for debugging
+    const missingEnvVars: string[] = [];
+    if (!CLAUDE_API_KEY) missingEnvVars.push('CLAUDE_API_KEY');
+    if (!SUPABASE_URL) missingEnvVars.push('SUPABASE_URL');
+    if (!SUPABASE_SERVICE_ROLE_KEY) missingEnvVars.push('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (missingEnvVars.length > 0) {
+      console.error(`[generate-article] Missing environment variables: ${missingEnvVars.join(', ')}`);
+      return new Response(
+        JSON.stringify({ success: false, error: `Missing required environment variables: ${missingEnvVars.join(', ')}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    console.log(`[generate-article] Environment validated. SUPABASE_URL: ${SUPABASE_URL}`);
+    console.log(`[generate-article] Service Role Key present: ${!!SUPABASE_SERVICE_ROLE_KEY}, length: ${SUPABASE_SERVICE_ROLE_KEY?.length}`);
+    console.log(`[generate-article] Service Role Key prefix: ${SUPABASE_SERVICE_ROLE_KEY?.substring(0, 20)}...`);
 
-    // Securely authenticate user with JWT verification
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      }
+    });
+
+    // Authenticate: Accept service role key (for Make.com) or JWT (for web app)
     let userId = null;
     try {
-      const user = await requireAuth(req, supabase);
-      userId = user.id;
-      console.log('User ID from JWT:', userId);
+      userId = await getAuthenticatedUser(req, supabase);
+      
+      if (userId) {
+        console.log('[generate-article] User authenticated with ID:', userId);
+      } else {
+        console.log('[generate-article] Authenticated via service role key (no user ID)');
+      }
     } catch (e) {
-      console.error('Failed to authenticate user:', e);
+      console.warn('[generate-article] Auth check failed (proceeding without user):', e instanceof Error ? e.message : e);
     }
 
     // Priority order: 1) Queued suggestions, 2) Unused keywords, 3) AI suggestions
@@ -54,7 +135,7 @@ serve(async (req) => {
         selectedKeywords = suggestion.keywords || [];
         selectedSuggestionId = suggestion.id;
         articleCategory = articleCategory || suggestion.category;
-        console.log('Auto-selected queued suggestion:', suggestion.topic);
+        console.log('[generate-article] Auto-selected queued suggestion:', suggestion.topic);
 
         // Mark suggestion as in progress
         await supabase
@@ -72,28 +153,32 @@ serve(async (req) => {
           .limit(1);
 
         if (keywordError) {
-          console.error('Error fetching keyword:', keywordError);
+          console.error('[generate-article] Error fetching keyword:', keywordError);
         } else if (unusedKeywords && unusedKeywords.length > 0) {
           const selectedKeyword = unusedKeywords[0];
           selectedTopic = selectedKeyword.keyword;
           selectedKeywordId = selectedKeyword.id;
           selectedKeywords = [selectedKeyword.keyword];
-          console.log('Auto-selected keyword:', selectedKeyword.keyword);
+          console.log('[generate-article] Auto-selected keyword:', selectedKeyword.keyword);
         } else {
           // PRIORITY 3: No keywords or suggestions, generate AI suggestion on-the-fly
-          console.log('No queued suggestions or keywords, generating AI suggestion...');
-          
-          const suggestResponse = await supabase.functions.invoke('generate-content-suggestions', {
-            body: { count: 1 }
-          });
+          console.log('[generate-article] No queued suggestions or keywords, generating AI suggestion...');
 
-          if (!suggestResponse.error && suggestResponse.data?.suggestions?.[0]) {
-            const aiSuggestion = suggestResponse.data.suggestions[0];
+          const suggestResponse = await invokeFunctionWithTimeout(
+            supabase,
+            'generate-content-suggestions',
+            { count: 1 },
+            FUNCTION_INVOKE_TIMEOUT_MS
+          );
+
+          const suggestData = suggestResponse.data as { suggestions?: Array<{ topic: string; keywords?: string[]; id: string; category?: string }> } | null;
+          if (!suggestResponse.error && suggestData?.suggestions?.[0]) {
+            const aiSuggestion = suggestData.suggestions[0];
             selectedTopic = aiSuggestion.topic;
             selectedKeywords = aiSuggestion.keywords || [];
             selectedSuggestionId = aiSuggestion.id;
             articleCategory = articleCategory || aiSuggestion.category;
-            console.log('Generated AI suggestion:', aiSuggestion.topic);
+            console.log('[generate-article] Generated AI suggestion:', aiSuggestion.topic);
 
             // Mark as in progress
             await supabase
@@ -109,46 +194,15 @@ serve(async (req) => {
       // Final fallback
       selectedTopic = "Professional real estate agent portfolio link";
       selectedKeywords = [selectedTopic];
-      console.log("No content sources found; using fallback topic");
+      console.log("[generate-article] No content sources found; using fallback topic");
     }
 
-    // Get AI configuration
-    const { data: configData } = await supabase
-      .from('ai_configuration')
-      .select('setting_key, setting_value')
-      .in('setting_key', ['default_model', 'temperature_creative', 'max_tokens_large']);
-    
-    const config: Record<string, any> = {};
-    configData?.forEach(item => {
-      config[item.setting_key] = JSON.parse(item.setting_value);
-    });
+    // Claude configuration
+    const claudeModel = "claude-sonnet-4-5-20250929";
+    const maxTokens = 8000;
+    const apiEndpoint = "https://api.anthropic.com/v1/messages";
 
-    // Get the selected model's details from ai_models table
-    const defaultModelId = config.default_model || "google/gemini-2.5-flash";
-    const { data: modelData, error: modelError } = await supabase
-      .from('ai_models')
-      .select('*')
-      .eq('model_id', defaultModelId)
-      .eq('is_active', true)
-      .single();
-
-    if (modelError || !modelData) {
-      console.error('Model not found:', defaultModelId, modelError);
-      return new Response(
-        JSON.stringify({ success: false, error: `Model ${defaultModelId} not configured` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const apiKey = Deno.env.get(modelData.secret_name || 'LOVABLE_API_KEY');
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: `API key ${modelData.secret_name} not configured` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Generating article:", { topic: selectedTopic, category });
+    console.log("[generate-article] Generating article:", { topic: selectedTopic, category: articleCategory });
 
     // Build prompt for article generation
     let prompt = `Write a comprehensive, SEO-optimized blog article about: ${selectedTopic}`;
@@ -223,63 +277,66 @@ real estate link in bio, agent bio page, real estate Instagram marketing,
 property showcase, listing portfolio, real estate lead generation, agent profile,
 mobile real estate marketing`;
 
-    // Determine provider helpers and build headers
-    const isAnthropic = (modelData.provider?.toLowerCase?.() === 'anthropic') || (modelData.api_endpoint?.includes('anthropic.com'));
-
+    // Build Claude API request
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "x-api-key": CLAUDE_API_KEY,
+      "anthropic-version": "2023-06-01"
     };
 
-    if (modelData.auth_type === 'x-api-key') {
-      headers['x-api-key'] = apiKey;
-      if (isAnthropic) headers['anthropic-version'] = '2023-06-01';
-    } else {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-
-    // Build request body based on provider
     const systemMessage = "You are an expert real estate marketing content writer specializing in agent education and lead generation strategies. Write practical, actionable content that helps real estate agents grow their business through modern digital marketing tactics.";
-    let requestBody: any;
+    
+    const aiRequestBody = {
+      model: claudeModel,
+      max_tokens: maxTokens,
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      system: systemMessage,
+    };
 
-    if (isAnthropic) {
-      requestBody = {
-        model: modelData.model_name,
-        max_tokens: config.max_tokens_large || 8000,
-        messages: [
-          { role: "user", content: prompt }
-        ],
-        system: systemMessage,
-      };
-    } else {
-      requestBody = {
-        model: modelData.model_name,
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: prompt }
-        ],
-        temperature: config.temperature_creative || 0.7,
-        max_tokens: config.max_tokens_large || 8000,
-      };
+    // Call Claude API to generate article with timeout
+    console.log(`[generate-article] Calling Claude API: ${apiEndpoint}`);
+    let aiResponse: Response;
+    try {
+      aiResponse = await fetchWithTimeout(
+        apiEndpoint,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(aiRequestBody),
+        },
+        AI_API_TIMEOUT_MS
+      );
+    } catch (fetchError) {
+      const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+      console.error('[generate-article] AI API fetch failed:', errorMessage);
+
+      // Check if it was a timeout (AbortError)
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'AI service timed out. Please try again.' }),
+          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: false, error: `AI service unavailable: ${errorMessage}` }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-
-    // Call AI to generate article
-    const aiResponse = await fetch(modelData.api_endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-    });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("AI generation error:", aiResponse.status, errorText);
-      let friendly = "AI gateway error";
+      console.error("[generate-article] Claude API error:", aiResponse.status, errorText);
+      let friendly = "Claude API error";
       const status = aiResponse.status;
-      if (status === 402) {
-        friendly = "Payment required, please add Lovable AI credits.";
-      } else if (status === 429) {
+      if (status === 429) {
         friendly = "Rate limit exceeded, please try again shortly.";
       } else if (status === 400) {
-        friendly = "Invalid AI request. Please try a simpler topic or fewer instructions.";
+        friendly = "Invalid request. Please try a simpler topic or fewer instructions.";
+      } else if (status === 401) {
+        friendly = "Invalid API key. Please check your CLAUDE_API_KEY.";
       }
       return new Response(
         JSON.stringify({ success: false, error: `${friendly}: ${status}` }),
@@ -287,25 +344,53 @@ mobile real estate marketing`;
       );
     }
 
-    const aiData = await aiResponse.json();
-    
-    // Extract content based on provider format
-    let content = '';
-    if (isAnthropic) {
-      content = aiData.content?.[0]?.text || '';
-    } else {
-      content = aiData.choices?.[0]?.message?.content || '';
+    let aiData: Record<string, unknown>;
+    try {
+      aiData = await aiResponse.json();
+    } catch (jsonError) {
+      console.error('[generate-article] Failed to parse AI response as JSON:', jsonError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'AI service returned invalid response format' }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    // Extract content from Claude response
+    let content = '';
+    content = (aiData.content as Array<{ text?: string }>)?.[0]?.text || '';
+
+    // Validate that content was actually generated
+    if (!content || content.trim().length < 100) {
+      console.error('[generate-article] Claude returned empty or too short content:', content?.length || 0);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Claude API returned insufficient content. Please try again.' }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[generate-article] Claude returned ${content.length} chars of content`);
 
     // Extract title from content (first # heading)
     const titleMatch = content.match(/^#\s+(.+)$/m);
     const title = titleMatch ? titleMatch[1] : selectedTopic;
 
-    // Generate slug from title
-    const slug = title
+    // Generate base slug from title
+    let slug = title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
+
+    // Check if slug exists and append timestamp if needed
+    const { data: existingSlugs } = await supabase
+      .from('articles')
+      .select('slug')
+      .like('slug', `${slug}%`);
+
+    if (existingSlugs && existingSlugs.length > 0) {
+      const timestamp = Date.now().toString(36); // Base36 for shorter string
+      slug = `${slug}-${timestamp}`;
+      console.log(`[generate-article] Slug collision detected, using: ${slug}`);
+    }
 
     // Extract excerpt (first paragraph after title)
     const excerptMatch = content.match(/^#.+?\n\n(.+?)(?:\n\n|$)/s);
@@ -338,14 +423,14 @@ mobile real estate marketing`;
       .single();
 
     if (insertError) {
-      console.error("Error saving article:", insertError);
+      console.error("[generate-article] Error saving article:", insertError);
       return new Response(
         JSON.stringify({ success: false, error: `Failed to save article: ${insertError.message}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Article generated and saved successfully");
+    console.log("[generate-article] Article generated and saved successfully");
 
     // Update suggestion status if article was generated from a suggestion
     if (selectedSuggestionId) {
@@ -358,20 +443,38 @@ mobile real estate marketing`;
         .eq('id', selectedSuggestionId);
     }
 
-    // Trigger social media post generation and webhook distribution
+    // Trigger social media post generation and webhook distribution (with timeout)
     try {
-      console.log('Triggering social media post generation...');
-      const socialResponse = await supabase.functions.invoke('publish-article-to-social', {
-        body: { articleId: insertedArticle.id }
-      });
+      console.log('[generate-article] Triggering social media post generation...');
+      
+      // Call edge functions server directly (not through Kong/API)
+      const EDGE_FUNCTIONS_URL = Deno.env.get('EDGE_FUNCTIONS_URL') || 'https://functions.agentbio.net';
+      const functionsUrl = `${EDGE_FUNCTIONS_URL}/publish-article-to-social`;
+      console.log('[generate-article] Calling:', functionsUrl);
+      
+      const socialResponse = await fetchWithTimeout(
+        functionsUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({ articleId: insertedArticle.id }),
+        },
+        FUNCTION_INVOKE_TIMEOUT_MS
+      );
 
-      if (socialResponse.error) {
-        console.error('Error triggering social post:', socialResponse.error);
+      if (!socialResponse.ok) {
+        const errorText = await socialResponse.text();
+        console.warn('[publish-article-to-social] Failed with status:', socialResponse.status);
+        console.warn('[publish-article-to-social] Error response:', errorText);
       } else {
-        console.log('Social post triggered successfully:', socialResponse.data);
+        const result = await socialResponse.json();
+        console.log('[generate-article] Social post triggered successfully');
       }
     } catch (socialError) {
-      console.error('Failed to trigger social post:', socialError);
+      console.warn('[generate-article] Social post trigger failed (non-critical):', socialError instanceof Error ? socialError.message : socialError);
       // Don't fail the article generation if social posting fails
     }
 
@@ -384,7 +487,7 @@ mobile real estate marketing`;
     );
 
   } catch (error) {
-    console.error("Error generating article:", error);
+    console.error("[generate-article] Error generating article:", error);
     return new Response(
       JSON.stringify({
         success: false,
@@ -393,4 +496,4 @@ mobile real estate marketing`;
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+};

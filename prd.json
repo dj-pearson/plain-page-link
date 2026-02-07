@@ -1,0 +1,850 @@
+{
+  "project": "AgentBio Enterprise Readiness",
+  "branchName": "ralph/enterprise-readiness",
+  "description": "Transform AgentBio Intelligence from a functional MVP into an enterprise-grade, production-ready real estate SaaS platform. Covers CI/CD, testing, security hardening, compliance, monitoring, performance, and code quality — systematically closing every gap identified in the production readiness audit.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Configure ESLint and Prettier for consistent code quality",
+      "description": "As a developer, I need automated code linting and formatting so that all contributions follow consistent standards and common bugs are caught early.",
+      "acceptanceCriteria": [
+        "Install eslint, @typescript-eslint/parser, @typescript-eslint/eslint-plugin, eslint-plugin-react, eslint-plugin-react-hooks, prettier, eslint-config-prettier",
+        "Create .eslintrc.cjs with TypeScript strict rules, React hooks rules, and import ordering",
+        "Create .prettierrc with singleQuote: true, semi: true, trailingComma: 'es5', printWidth: 100, tabWidth: 2",
+        "Add 'lint' and 'format' scripts to package.json",
+        "Running 'npm run lint' completes without crashing (warnings are acceptable for existing code, no new errors introduced)",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Do NOT auto-fix existing code in this story. Only set up the tooling. Existing violations will be addressed incrementally."
+    },
+    {
+      "id": "US-002",
+      "title": "Set up Husky pre-commit hooks with lint-staged",
+      "description": "As a developer, I need pre-commit hooks that automatically lint and format staged files so that broken or inconsistent code never enters the repository.",
+      "acceptanceCriteria": [
+        "Install husky and lint-staged as devDependencies",
+        "Configure husky with a pre-commit hook that runs lint-staged",
+        "lint-staged config: run eslint --fix and prettier --write on staged .ts/.tsx files",
+        "Add 'prepare' script to package.json: 'husky'",
+        "Creating a test commit with a staged .ts file triggers the hook successfully",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Depends on US-001 (ESLint/Prettier must be configured first)."
+    },
+    {
+      "id": "US-003",
+      "title": "Create GitHub Actions CI workflow for type checking and build verification",
+      "description": "As a developer, I need automated CI checks on every pull request so that type errors and build failures are caught before merge.",
+      "acceptanceCriteria": [
+        "Create .github/workflows/ci.yml triggered on push to main and on pull_request",
+        "Job 1: 'typecheck' — runs tsc --noEmit on Node 20",
+        "Job 2: 'build' — runs npm run build, fails if build errors occur",
+        "Both jobs use npm ci for deterministic installs",
+        "Both jobs cache node_modules using actions/cache with package-lock.json hash",
+        "Workflow file is valid YAML (use actionlint or manual validation)",
+        "Typecheck passes: tsc --noEmit succeeds locally"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "This is the most critical infrastructure gap. The .github/workflows/ directory currently exists but is empty."
+    },
+    {
+      "id": "US-004",
+      "title": "Add automated test execution to CI pipeline",
+      "description": "As a developer, I need tests to run automatically in CI so that regressions are caught on every pull request.",
+      "acceptanceCriteria": [
+        "Add 'test' job to .github/workflows/ci.yml that runs after typecheck passes",
+        "Job runs 'npm run test:run' (vitest in non-watch mode)",
+        "Job uploads coverage report as an artifact",
+        "Test job uses same Node 20 and npm ci caching pattern",
+        "If any existing tests fail, fix them so CI passes green",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Currently 4 test files exist: analytics.test.ts, lead-scoring.test.ts, ml-lead-scoring.test.ts, useMLLeadScoring.test.ts. All must pass."
+    },
+    {
+      "id": "US-005",
+      "title": "Add security and dependency audit to CI pipeline",
+      "description": "As a security-conscious developer, I need automated vulnerability scanning in CI so that known dependency vulnerabilities are flagged before deployment.",
+      "acceptanceCriteria": [
+        "Add 'security' job to .github/workflows/ci.yml",
+        "Job runs 'npm audit --audit-level=high' — fails on high/critical vulnerabilities",
+        "Job runs the existing lint script if available",
+        "Add Dependabot auto-merge for patch updates in .github/dependabot.yml (file may already exist — update it)",
+        "Document any existing high/critical vulnerabilities found in a SECURITY_NOTES.md file if they cannot be resolved immediately",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "A dependabot.yml may already exist. Check before creating."
+    },
+    {
+      "id": "US-006",
+      "title": "Create comprehensive test utilities and component test helpers",
+      "description": "As a developer, I need a test utility module with render helpers, mock providers, and common fixtures so that writing component tests is fast and consistent.",
+      "acceptanceCriteria": [
+        "Create src/test/test-utils.tsx that exports a custom render function wrapping components in required providers (QueryClientProvider, BrowserRouter, etc.)",
+        "Create src/test/mocks/supabase.ts with a mock Supabase client that stubs auth, from(), storage",
+        "Create src/test/mocks/auth.ts with mock user objects (authenticated user, unauthenticated, admin)",
+        "Create src/test/fixtures/profile.ts with sample profile data matching the profiles table schema",
+        "Create src/test/fixtures/listing.ts with sample listing data",
+        "Create src/test/fixtures/lead.ts with sample lead data",
+        "Existing tests in src/lib/*.test.ts still pass after changes",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "src/test/setup.ts already exists with basic mocks (matchMedia, ResizeObserver, IntersectionObserver). Build on that foundation."
+    },
+    {
+      "id": "US-007",
+      "title": "Add unit tests for core utility libraries",
+      "description": "As a developer, I need thorough unit tests for critical utility modules so that core business logic has verified correctness.",
+      "acceptanceCriteria": [
+        "Create src/lib/errorHandler.test.ts — test captureException, handleApiError, sanitization of sensitive data",
+        "Create src/lib/logger.test.ts — test log levels, PII redaction (passwords, tokens, emails), environment-aware behavior",
+        "Create src/lib/encryption.test.ts — test encrypt/decrypt round-trip, handling of empty strings and special characters",
+        "Create src/lib/seo.test.ts — test meta tag generation, slug creation, canonical URL building",
+        "All new tests pass with 'npm run test:run'",
+        "Combined test coverage for src/lib/ reaches at least 40%",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Focus on testing pure functions and utilities — these are the easiest to test and highest value."
+    },
+    {
+      "id": "US-008",
+      "title": "Add component tests for core UI components",
+      "description": "As a developer, I need component tests for foundational UI components so that visual regressions and interaction bugs are caught automatically.",
+      "acceptanceCriteria": [
+        "Create tests for at least 5 core UI components from src/components/ui/ (e.g., button, input, dialog, select, toast)",
+        "Tests verify rendering, user interaction (click, type, select), accessibility attributes (role, aria-label)",
+        "Tests use the custom render helper from src/test/test-utils.tsx",
+        "Tests use @testing-library/react for queries (getByRole, getByText, etc.)",
+        "All tests pass with 'npm run test:run'",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "UI components are built on Radix UI primitives. Test the composed behavior, not Radix internals."
+    },
+    {
+      "id": "US-009",
+      "title": "Add component tests for authentication flow",
+      "description": "As a developer, I need tests covering login, registration, and auth guards so that authentication—the most security-critical flow—is verified.",
+      "acceptanceCriteria": [
+        "Create tests for the login page component — renders form, validates inputs, handles submit, shows errors",
+        "Create tests for the registration page component — renders form, validates inputs, handles submit",
+        "Create tests for the ProtectedRoute component — redirects unauthenticated users, renders for authenticated users",
+        "Mock Supabase auth methods (signInWithPassword, signUp, getSession) using the mock from src/test/mocks/supabase.ts",
+        "All tests pass with 'npm run test:run'",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Auth pages may be in src/pages/auth/. Check App.tsx for route definitions and component imports."
+    },
+    {
+      "id": "US-010",
+      "title": "Add hook tests for critical custom hooks",
+      "description": "As a developer, I need tests for core custom hooks so that data fetching, state management, and side effects are verified.",
+      "acceptanceCriteria": [
+        "Create src/hooks/useProfile.test.ts — test profile fetching, caching, error states",
+        "Create src/hooks/useListings.test.ts — test CRUD operations, query invalidation",
+        "Create src/hooks/useLeads.test.ts — test lead fetching, status updates",
+        "Use @testing-library/react renderHook for all hook tests",
+        "Mock Supabase responses for each test scenario (success, error, empty)",
+        "All tests pass with 'npm run test:run'",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "These hooks use TanStack Query. Wrap renderHook in a QueryClientProvider with a fresh QueryClient per test."
+    },
+    {
+      "id": "US-011",
+      "title": "Enforce test coverage thresholds in CI",
+      "description": "As a tech lead, I need minimum test coverage thresholds enforced in CI so that coverage does not regress as the codebase grows.",
+      "acceptanceCriteria": [
+        "Configure vitest.config.ts with coverage thresholds: lines: 15, functions: 15, branches: 15, statements: 15",
+        "Update the CI test job to run 'npm run test:coverage' instead of 'npm run test:run'",
+        "CI fails if coverage drops below thresholds",
+        "Document the current coverage baseline in a comment in vitest.config.ts",
+        "All existing tests pass with coverage enabled",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "Starting thresholds are deliberately low (15%) to avoid blocking development. Increase incrementally as more tests are added."
+    },
+    {
+      "id": "US-012",
+      "title": "Implement centralized API rate limiting for edge functions",
+      "description": "As a platform operator, I need rate limiting on all public API endpoints so that the system is protected from abuse and DDoS attacks.",
+      "acceptanceCriteria": [
+        "Create a SQL migration adding a rate_limits table: id, ip_address, endpoint, request_count, window_start, created_at",
+        "Add indexes on (ip_address, endpoint, window_start) for fast lookups",
+        "Create supabase/functions/_shared/rate-limiter.ts utility that checks rate limits using the rate_limits table",
+        "Rate limiter supports configurable limits per endpoint (e.g., 60 requests/minute for general, 5/minute for auth)",
+        "Rate limiter returns 429 Too Many Requests with Retry-After header when limit exceeded",
+        "Add rate limiting to at least 3 public-facing edge functions (submit-lead, submit-contact, and one auth function)",
+        "Typecheck passes on edge function code"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "Current rate limiting is in-memory only and does not persist across function instances. Database-backed approach scales."
+    },
+    {
+      "id": "US-013",
+      "title": "Create audit logging database schema and trigger system",
+      "description": "As a compliance officer, I need an audit log of all significant user and admin actions so that we can investigate incidents and demonstrate compliance.",
+      "acceptanceCriteria": [
+        "Create SQL migration with audit_logs table: id (uuid), user_id (uuid nullable), action (text), resource_type (text), resource_id (uuid nullable), details (jsonb), ip_address (inet), user_agent (text), created_at (timestamptz)",
+        "Add index on (user_id, created_at) and (resource_type, resource_id)",
+        "Enable RLS: admins can read all logs, users can read only their own logs",
+        "Create a reusable SQL function log_audit_event(user_id, action, resource_type, resource_id, details) that inserts into audit_logs",
+        "Add triggers on profiles, listings, and leads tables for INSERT, UPDATE, DELETE that call log_audit_event",
+        "Create a partition strategy comment (partition by month when table grows)",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "This is a compliance blocker for enterprise customers. The audit_logs table is the foundation for SOC 2 and GDPR compliance."
+    },
+    {
+      "id": "US-014",
+      "title": "Create audit logging edge function and frontend integration",
+      "description": "As a developer, I need an edge function for recording audit events from the frontend so that client-side actions (login, logout, settings changes) are logged.",
+      "acceptanceCriteria": [
+        "Create supabase/functions/audit-log/index.ts edge function (or update if it exists) that accepts {action, resource_type, resource_id, details} and inserts into audit_logs with user context from JWT",
+        "Create src/lib/audit.ts client utility with logAuditEvent(action, resourceType, resourceId, details) function",
+        "Integrate audit logging into login success, logout, profile update, and listing create/update/delete flows",
+        "Audit events include relevant context (what changed, old/new values for updates)",
+        "All audit log calls are fire-and-forget (do not block the UI if logging fails)",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "The edge function may already exist at supabase/functions/audit-log/. Check and update rather than recreate."
+    },
+    {
+      "id": "US-015",
+      "title": "Implement PII encryption utilities for sensitive data at rest",
+      "description": "As a security engineer, I need client-side encryption for PII fields so that sensitive data (phone numbers, addresses) is encrypted in the database.",
+      "acceptanceCriteria": [
+        "Review and enhance src/lib/encryption.ts — ensure it uses AES-256-GCM with a proper key derivation from environment variable",
+        "Create src/lib/pii.ts with encryptPII(plaintext) and decryptPII(ciphertext) functions that wrap the encryption library",
+        "Add VITE_PII_ENCRYPTION_KEY to .env.example with documentation",
+        "PII functions handle edge cases: null, undefined, empty string (return as-is)",
+        "Add unit tests in src/lib/pii.test.ts: encrypt/decrypt round-trip, null handling, different data types",
+        "Tests pass with 'npm run test:run'",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "An encryption.ts already exists in src/lib/. Review it first and build on what's there. Key management in production should use Supabase Vault, but env var is acceptable for now."
+    },
+    {
+      "id": "US-016",
+      "title": "Apply PII encryption to leads and profiles tables",
+      "description": "As a data protection officer, I need phone numbers, addresses, and other PII encrypted at rest so that a database breach does not expose customer data.",
+      "acceptanceCriteria": [
+        "Update the leads hook (src/hooks/useLeads.ts) to encrypt phone and email fields before insert/update using pii.ts",
+        "Update the leads hook to decrypt phone and email fields after fetch",
+        "Update the profile hook (src/hooks/useProfile.ts) to encrypt phone_number field before save and decrypt after fetch",
+        "Create a SQL migration adding encrypted_phone and encrypted_email columns to leads table (keep original columns during migration period)",
+        "Add a migration note explaining the transition strategy: encrypt new data, backfill existing data separately",
+        "Existing functionality is not broken — forms still display decrypted values",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "This is a gradual migration. Do NOT delete original plaintext columns in this story. A separate backfill + column swap will happen later."
+    },
+    {
+      "id": "US-017",
+      "title": "Add React Error Boundaries for all major route sections",
+      "description": "As a user, I need graceful error recovery instead of white screens so that a crash in one section does not take down the entire application.",
+      "acceptanceCriteria": [
+        "Create src/components/ui/error-boundary.tsx — a reusable ErrorBoundary component with fallback UI showing error message and 'Try Again' button",
+        "ErrorBoundary logs errors to errorHandler.captureException and logger.error",
+        "ErrorBoundary fallback UI is styled with Tailwind, includes the AgentBio branding, and offers navigation back to dashboard",
+        "Wrap each major route section in App.tsx with ErrorBoundary: dashboard routes, auth routes, admin routes, public profile routes",
+        "Existing lazy-loaded components wrapped in Suspense+ErrorBoundary pattern",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "A LazyLoadErrorBoundary may already exist. Check first and consolidate into one reusable component."
+    },
+    {
+      "id": "US-018",
+      "title": "Standardize error responses across all edge functions",
+      "description": "As a frontend developer, I need consistent error response formats from all API endpoints so that error handling is predictable and user-friendly.",
+      "acceptanceCriteria": [
+        "Create supabase/functions/_shared/response.ts with helpers: successResponse(data, status?), errorResponse(message, code, status?), validationError(errors)",
+        "Response format: {success: boolean, data?: any, error?: {code: string, message: string, details?: any}}",
+        "Error codes follow pattern: RESOURCE_ACTION_REASON (e.g., LEAD_CREATE_VALIDATION, AUTH_LOGIN_RATE_LIMITED)",
+        "Update at least 10 edge functions to use the standardized response helpers",
+        "Document all error codes in a comment block at the top of response.ts",
+        "Typecheck passes on edge function code"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "A _shared/ directory already exists in supabase/functions/. Check what utilities are already there."
+    },
+    {
+      "id": "US-019",
+      "title": "Implement GDPR data export endpoint",
+      "description": "As a user, I need to export all my personal data in a machine-readable format so that the platform complies with GDPR Article 20 (right to data portability).",
+      "acceptanceCriteria": [
+        "Create supabase/functions/gdpr-export/index.ts that exports all user data as JSON",
+        "Export includes: profile, listings, leads, links, analytics, testimonials, blog posts, and any other user-owned data",
+        "Endpoint requires authentication (valid JWT)",
+        "Response is a JSON file with Content-Disposition: attachment header",
+        "PII fields are decrypted before export (use pii.ts decrypt utilities)",
+        "Add rate limiting: max 1 export per hour per user",
+        "Log the export event to audit_logs",
+        "Typecheck passes on edge function code"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": "GDPR compliance is a legal requirement for serving EU users. This is a blocker for enterprise sales."
+    },
+    {
+      "id": "US-020",
+      "title": "Implement GDPR data deletion endpoint",
+      "description": "As a user, I need to request deletion of all my personal data so that the platform complies with GDPR Article 17 (right to erasure).",
+      "acceptanceCriteria": [
+        "Create supabase/functions/gdpr-delete/index.ts that soft-deletes all user data",
+        "Deletion covers: profile (anonymize), listings (soft-delete), leads (soft-delete), links (delete), analytics (anonymize), testimonials (soft-delete)",
+        "User account is deactivated but auth record retained for 30 days (to prevent re-registration abuse)",
+        "Endpoint requires authentication and a confirmation token (sent via email or passed as parameter)",
+        "Log the deletion request to audit_logs (with anonymized user reference)",
+        "Create a corresponding frontend page at /dashboard/settings/delete-account with confirmation flow",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": "Soft-delete with 30-day retention is standard practice. Full purge can be a separate scheduled job."
+    },
+    {
+      "id": "US-021",
+      "title": "Create Terms of Service page",
+      "description": "As a legal stakeholder, I need a Terms of Service page so that the platform has clear legal terms governing its use.",
+      "acceptanceCriteria": [
+        "Create src/pages/legal/TermsOfService.tsx with comprehensive ToS content",
+        "Content covers: account terms, acceptable use, intellectual property, payment terms, limitation of liability, termination, governing law",
+        "Page is styled consistently with existing pages using Tailwind",
+        "Add route /terms in App.tsx (public, no auth required)",
+        "Add link to Terms in the site footer component",
+        "Add last updated date header",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": "Content should be specific to AgentBio's real estate SaaS context. Include sections about listing data accuracy and lead data handling."
+    },
+    {
+      "id": "US-022",
+      "title": "Create Privacy Policy page",
+      "description": "As a legal stakeholder, I need a Privacy Policy page so that users understand how their data is collected, used, and protected.",
+      "acceptanceCriteria": [
+        "Create src/pages/legal/PrivacyPolicy.tsx with comprehensive privacy policy content",
+        "Content covers: data collected (profile, listings, leads, analytics), how data is used, third-party sharing, cookies, data retention, user rights (access, deletion, portability), security measures, contact information",
+        "Includes GDPR-specific sections (legal basis, DPO contact, EU user rights)",
+        "Includes CCPA-specific sections (California user rights, do not sell)",
+        "Page styled consistently with Tailwind",
+        "Add route /privacy in App.tsx (public, no auth required)",
+        "Add link in site footer",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": "Check if legal pages directory already exists at src/pages/legal/. Build on existing structure."
+    },
+    {
+      "id": "US-023",
+      "title": "Create Cookie Policy page and consent banner",
+      "description": "As a user visiting the site, I need to be informed about cookie usage and give consent so that the platform complies with ePrivacy and GDPR cookie rules.",
+      "acceptanceCriteria": [
+        "Create src/pages/legal/CookiePolicy.tsx listing all cookies used (session, analytics, preferences)",
+        "Create src/components/ui/cookie-consent.tsx banner component that appears on first visit",
+        "Banner offers: Accept All, Reject Non-Essential, Manage Preferences",
+        "Store consent choice in localStorage with timestamp",
+        "Only initialize Google Analytics if analytics consent is given",
+        "Add route /cookies in App.tsx",
+        "Add CookieConsent component to App.tsx (renders globally)",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": "Cookie consent state should be checked before loading any analytics/tracking scripts."
+    },
+    {
+      "id": "US-024",
+      "title": "Implement Web Vitals monitoring and reporting",
+      "description": "As a performance engineer, I need Core Web Vitals tracking so that we can monitor and optimize LCP, FID, CLS, and TTFB in production.",
+      "acceptanceCriteria": [
+        "Install web-vitals package",
+        "Create src/lib/web-vitals.ts that captures LCP, FID, CLS, TTFB, and INP metrics",
+        "Report metrics to Google Analytics as custom events (use existing GA integration)",
+        "Report metrics to console in development mode for debugging",
+        "Initialize web vitals reporting in src/main.tsx",
+        "Add performance budget constants: LCP < 2.5s, FID < 100ms, CLS < 0.1",
+        "Log a warning when metrics exceed budgets in development",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": "Web Vitals are Google's official page experience metrics and affect SEO ranking."
+    },
+    {
+      "id": "US-025",
+      "title": "Configure Sentry performance monitoring and alerting",
+      "description": "As a platform operator, I need Sentry properly configured with alerting thresholds so that production errors and performance regressions are detected and escalated.",
+      "acceptanceCriteria": [
+        "Review and update src/lib/sentry.ts — ensure performance monitoring sample rate is at least 10% in production",
+        "Add Sentry.setTag for environment, release version (from package.json), and deployment region",
+        "Configure Sentry breadcrumbs for navigation, console, fetch, and DOM events",
+        "Add Sentry.captureMessage for critical business events: subscription created, subscription cancelled, lead scored > 90",
+        "Create MONITORING.md documenting: what's tracked, alert thresholds, escalation procedures, dashboard URLs",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": "Sentry is already partially integrated (src/lib/sentry.ts exists). Enhance rather than rebuild."
+    },
+    {
+      "id": "US-026",
+      "title": "Add bundle analysis and size budgets to build pipeline",
+      "description": "As a performance engineer, I need automated bundle size tracking so that we can prevent bundle bloat and maintain fast load times.",
+      "acceptanceCriteria": [
+        "Install rollup-plugin-visualizer as a devDependency",
+        "Add visualizer plugin to vite.config.ts (generates stats.html on build, disabled in CI by default)",
+        "Add 'analyze' script to package.json that builds with ANALYZE=true and opens stats.html",
+        "Add bundle size check to CI: fail if any chunk exceeds 500KB (except vendor chunks which can be 600KB)",
+        "Document current chunk sizes as a baseline in a comment in vite.config.ts",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": "vite.config.ts already has manualChunks configured. Build on that by adding visibility into sizes."
+    },
+    {
+      "id": "US-027",
+      "title": "Implement service worker for offline support and caching",
+      "description": "As a mobile user, I need the app to work offline for previously visited pages so that I can access my profile and listings without connectivity.",
+      "acceptanceCriteria": [
+        "Install workbox-precaching, workbox-routing, workbox-strategies, and workbox-build as devDependencies",
+        "Create public/sw.js (or src/sw.ts compiled to public/) with workbox strategies: CacheFirst for static assets, NetworkFirst for API calls, StaleWhileRevalidate for images",
+        "Register the service worker in src/main.tsx with update detection and notification",
+        "Precache the app shell (index.html, main JS/CSS bundles)",
+        "Cache API responses for profile, listings with 5-minute TTL",
+        "Add offline fallback page that displays when network is unavailable",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": "PWA manifest already exists at public/manifest.json. IndexedDB offline storage exists at src/lib/offline-storage.ts. Service worker is the missing piece."
+    },
+    {
+      "id": "US-028",
+      "title": "Fix critical type safety issues — eliminate high-risk 'as any' casts",
+      "description": "As a developer, I need the most dangerous 'as any' type casts removed so that TypeScript can catch bugs in critical code paths.",
+      "acceptanceCriteria": [
+        "Audit all files in src/lib/, src/hooks/, and src/stores/ for 'as any' usage",
+        "Fix at least 30 'as any' casts by adding proper type definitions",
+        "For Supabase query results, use the generated types from src/integrations/supabase/types.ts",
+        "For event handlers, use proper React event types (React.ChangeEvent, React.FormEvent, etc.)",
+        "For third-party libraries without types, add type declarations in src/types/ rather than casting to any",
+        "No new 'as any' introduced",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": "84+ 'as any' usages found across the codebase. Focus on src/lib/, src/hooks/, src/stores/ first — these are highest risk."
+    },
+    {
+      "id": "US-029",
+      "title": "Implement session management and session revocation UI",
+      "description": "As a security-conscious user, I need to view and revoke active sessions so that I can secure my account if a device is lost or compromised.",
+      "acceptanceCriteria": [
+        "Create SQL migration for sessions table: id, user_id, device_info (jsonb), ip_address, last_active_at, created_at, revoked_at",
+        "Create src/hooks/useSessions.ts hook that fetches active sessions for the current user",
+        "Create src/components/settings/SessionManager.tsx component showing active sessions with device info, location, and 'Revoke' button",
+        "Revoking a session calls Supabase auth.admin.deleteSession or marks session as revoked",
+        "Add SessionManager to the security section of dashboard settings page",
+        "Log session revocations to audit_logs",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": "Supabase Auth manages JWTs. Session management may need to work with Supabase's session API or implement a custom session tracking layer."
+    },
+    {
+      "id": "US-030",
+      "title": "Add MFA/2FA support — backend schema and TOTP verification",
+      "description": "As an enterprise user, I need multi-factor authentication so that my account is protected even if my password is compromised.",
+      "acceptanceCriteria": [
+        "Create SQL migration for mfa_factors table: id, user_id, factor_type ('totp'), secret_encrypted, verified, created_at",
+        "Create supabase/functions/setup-mfa/index.ts that generates a TOTP secret, returns QR code URI",
+        "Create supabase/functions/verify-mfa/index.ts that validates a TOTP code against the stored secret",
+        "TOTP secrets are encrypted at rest using the PII encryption utilities",
+        "Rate limit MFA verification attempts (max 5 per minute)",
+        "Log MFA setup and verification events to audit_logs",
+        "Edge function typecheck passes"
+      ],
+      "priority": 30,
+      "passes": false,
+      "notes": "MFA edge functions may already exist (setup-mfa, verify-mfa found in the functions directory). Check and update existing implementations."
+    },
+    {
+      "id": "US-031",
+      "title": "Add MFA/2FA support — frontend enrollment and verification UI",
+      "description": "As a user, I need a UI to set up and use two-factor authentication so that I can protect my account with a second factor.",
+      "acceptanceCriteria": [
+        "Create src/components/settings/MFASetup.tsx with QR code display (using qrcode.react), manual secret display, and 6-digit verification input",
+        "Create src/components/auth/MFAChallenge.tsx that prompts for TOTP code during login when MFA is enabled",
+        "Integrate MFA challenge into the login flow — after password success, check if MFA is enabled, show challenge",
+        "Add MFA setup section to dashboard settings page with enable/disable toggle",
+        "Show recovery codes (8 single-use codes) during setup and allow regeneration",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 31,
+      "passes": false,
+      "notes": "qrcode.react is already installed as a dependency. Supabase has built-in MFA support — check if we should use Supabase MFA API instead of custom implementation."
+    },
+    {
+      "id": "US-032",
+      "title": "Add image optimization pipeline with WebP conversion",
+      "description": "As a performance engineer, I need automatic image optimization so that property photos and avatars load fast without manual compression.",
+      "acceptanceCriteria": [
+        "Create supabase/functions/optimize-image/index.ts that accepts an image upload, converts to WebP, generates thumbnails (200px, 400px, 800px widths), and stores all variants in Supabase Storage",
+        "Original image is preserved alongside optimized variants",
+        "Function returns URLs for all generated variants",
+        "Integrate with listing image upload flow — call optimize-image after upload",
+        "Create src/components/ui/optimized-image.tsx component that uses srcSet with WebP variants and falls back to original",
+        "Add loading='lazy' and proper width/height attributes to prevent CLS",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 32,
+      "passes": false,
+      "notes": "Sharp is already a devDependency. Deno edge functions may need a different image library (sharp may not work in Deno). Research alternatives like ImageMagick WASM or Supabase image transformation."
+    },
+    {
+      "id": "US-033",
+      "title": "Create comprehensive E2E test for authentication flow",
+      "description": "As a QA engineer, I need end-to-end tests for the complete auth flow so that critical user journeys are verified in a real browser.",
+      "acceptanceCriteria": [
+        "Create tests/e2e/auth.spec.ts using Playwright",
+        "Test login flow: navigate to /auth/login, fill credentials, submit, verify redirect to dashboard",
+        "Test registration flow: navigate to /auth/register, fill form, submit, verify success",
+        "Test logout flow: click logout, verify redirect to login page",
+        "Test protected route: navigate to /dashboard without auth, verify redirect to login",
+        "Add 'test:e2e' script to package.json running Playwright with a separate e2e config",
+        "Create playwright-e2e.config.ts for E2E tests (separate from security tests)",
+        "All tests pass against the dev server"
+      ],
+      "priority": 33,
+      "passes": false,
+      "notes": "playwright.config.ts is currently configured for security tests only (tests/security). Create a separate config for E2E tests."
+    },
+    {
+      "id": "US-034",
+      "title": "Implement email service integration for transactional emails",
+      "description": "As a platform operator, I need a transactional email service so that users receive welcome emails, lead notifications, and password reset emails.",
+      "acceptanceCriteria": [
+        "Install @resend/node or configure existing email edge function to use Resend API",
+        "Create supabase/functions/_shared/email.ts with sendEmail(to, subject, html, text) utility",
+        "Update supabase/functions/send-welcome-email/index.ts to use the email utility with a branded HTML template",
+        "Create email template for lead notification: 'New Lead: {name} is interested in {listing}'",
+        "Add RESEND_API_KEY to .env.example with documentation",
+        "Edge functions handle email send failures gracefully (log error, don't crash)",
+        "Typecheck passes on edge function code"
+      ],
+      "priority": 34,
+      "passes": false,
+      "notes": "Edge functions for email may already exist (send-welcome-email, send-scheduled-emails). Check what's there and build on it. Resend is preferred for its developer experience."
+    },
+    {
+      "id": "US-035",
+      "title": "Create lead notification email system",
+      "description": "As a real estate agent, I need instant email notifications when a new lead submits a form so that I can follow up quickly and close deals.",
+      "acceptanceCriteria": [
+        "Create supabase/functions/notify-lead/index.ts that sends an email to the agent when a new lead is captured",
+        "Email includes: lead name, email, phone, message, source page, lead score (if available), and a direct link to the lead in the dashboard",
+        "Create a database trigger on the leads table (INSERT) that invokes the notify-lead function via Supabase webhook or pg_net",
+        "Agent can configure notification preferences (instant, daily digest, off) in their profile settings",
+        "Add notification_preferences (jsonb) column to profiles table via migration",
+        "Email template is responsive HTML with AgentBio branding",
+        "Typecheck passes on edge function code"
+      ],
+      "priority": 35,
+      "passes": false,
+      "notes": "Lead notifications are a core value proposition for the platform. Fast notification = higher conversion rates."
+    },
+    {
+      "id": "US-036",
+      "title": "Implement Stripe subscription billing integration",
+      "description": "As a SaaS operator, I need Stripe subscription billing so that users can upgrade to paid plans and the platform generates revenue.",
+      "acceptanceCriteria": [
+        "Install @stripe/stripe-js (frontend) — check if already present",
+        "Create supabase/functions/create-checkout-session/index.ts (or update existing) that creates a Stripe Checkout session for Professional ($39/mo), Team ($29/agent/mo), and Enterprise ($69/agent/mo) plans",
+        "Create supabase/functions/create-portal-session/index.ts (or update existing) that creates a Stripe Customer Portal session for managing subscriptions",
+        "Create SQL migration for subscriptions table if it doesn't exist: user_id, stripe_customer_id, stripe_subscription_id, plan_id, status, current_period_start, current_period_end, cancel_at",
+        "Add STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to .env.example",
+        "Typecheck passes on edge function code"
+      ],
+      "priority": 36,
+      "passes": false,
+      "notes": "Stripe edge functions may already exist (create-checkout-session, stripe-webhook found in functions directory). Check and update."
+    },
+    {
+      "id": "US-037",
+      "title": "Implement Stripe webhook handler for subscription lifecycle",
+      "description": "As a billing system, I need to process Stripe webhook events so that subscription statuses, invoices, and payment failures are tracked in real-time.",
+      "acceptanceCriteria": [
+        "Create or update supabase/functions/stripe-webhook/index.ts to handle: checkout.session.completed, customer.subscription.updated, customer.subscription.deleted, invoice.payment_succeeded, invoice.payment_failed",
+        "Verify webhook signatures using STRIPE_WEBHOOK_SECRET",
+        "On checkout.session.completed: create/update subscription record in database",
+        "On subscription.deleted: mark subscription as cancelled, downgrade user to free plan",
+        "On invoice.payment_failed: send notification email, log event",
+        "Log all webhook events to audit_logs",
+        "Typecheck passes on edge function code"
+      ],
+      "priority": 37,
+      "passes": false,
+      "notes": "A stripe-webhook function directory already exists. Review and enhance the existing implementation."
+    },
+    {
+      "id": "US-038",
+      "title": "Create subscription management UI in dashboard",
+      "description": "As a user, I need to view my current plan, upgrade/downgrade, and manage billing so that I can control my subscription without contacting support.",
+      "acceptanceCriteria": [
+        "Create src/pages/dashboard/SubscriptionPage.tsx showing current plan, billing period, next renewal date",
+        "Display plan comparison table (Free vs Professional vs Team vs Enterprise) with feature checkmarks",
+        "Add 'Upgrade' buttons that call create-checkout-session edge function and redirect to Stripe Checkout",
+        "Add 'Manage Billing' button that opens Stripe Customer Portal via create-portal-session",
+        "Show billing history / recent invoices if available",
+        "Add route /dashboard/subscription in App.tsx (protected)",
+        "Add navigation link in dashboard sidebar",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 38,
+      "passes": false,
+      "notes": "Pricing tiers from PRD.md: Free ($0), Professional ($39/mo), Team ($29/agent/mo), Enterprise ($69/agent/mo)."
+    },
+    {
+      "id": "US-039",
+      "title": "Implement accessibility testing with axe-core in CI",
+      "description": "As an accessibility advocate, I need automated a11y testing so that WCAG 2.1 AA violations are caught before they reach production.",
+      "acceptanceCriteria": [
+        "Install @axe-core/playwright as a devDependency",
+        "Create tests/a11y/accessibility.spec.ts using Playwright + axe-core",
+        "Test at least 5 key pages: landing page, login, register, dashboard, public profile",
+        "Each test runs axe.analyze() and fails on any 'critical' or 'serious' violations",
+        "Add 'test:a11y' script to package.json",
+        "Add accessibility test job to CI workflow (allowed to warn but not fail initially)",
+        "Document current violation count as baseline in test file comments",
+        "All tests execute without crashing"
+      ],
+      "priority": 39,
+      "passes": false,
+      "notes": "Radix UI components should be mostly compliant. Focus on custom components and page-level composition."
+    },
+    {
+      "id": "US-040",
+      "title": "Create deployment runbook and environment configuration docs",
+      "description": "As a DevOps engineer, I need a deployment runbook so that deployments are repeatable, documented, and any team member can deploy safely.",
+      "acceptanceCriteria": [
+        "Create DEPLOYMENT.md covering: prerequisites, environment setup, deployment steps (Cloudflare Pages), rollback procedures, edge function deployment (Supabase), database migration process",
+        "Document all environment variables with descriptions, required/optional status, and where to obtain values",
+        "Document the deployment verification checklist (what to check after deploying)",
+        "Document the incident response process: who to contact, how to rollback, how to check logs",
+        "Include staging vs production differences",
+        "Document database backup and restore procedures",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 40,
+      "passes": false,
+      "notes": "Various deployment docs already exist (PRODUCTION_FIX_DEPLOYMENT.md, etc.) — consolidate into one authoritative runbook."
+    },
+    {
+      "id": "US-041",
+      "title": "Add database performance indexes and query optimization",
+      "description": "As a database administrator, I need proper indexes on high-traffic queries so that page loads and API responses remain fast as data grows.",
+      "acceptanceCriteria": [
+        "Create SQL migration adding composite indexes for common query patterns: listings(user_id, status, created_at), leads(user_id, status, created_at), links(user_id, is_active, position), analytics(user_id, created_at)",
+        "Add partial indexes where beneficial: listings WHERE status = 'active', leads WHERE status = 'new'",
+        "Add EXPLAIN ANALYZE comments documenting expected query plans for the top 5 most common queries",
+        "Review existing migrations for any missing indexes",
+        "No existing functionality is broken by new indexes",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 41,
+      "passes": false,
+      "notes": "Some indexes may already exist from prior migrations. Check before adding duplicates. Focus on queries used in dashboard, public profiles, and listing pages."
+    },
+    {
+      "id": "US-042",
+      "title": "Implement feature flags system for safe rollouts",
+      "description": "As a product manager, I need feature flags so that new features can be rolled out gradually and disabled instantly if issues arise.",
+      "acceptanceCriteria": [
+        "Create SQL migration for feature_flags table: id, name (unique), description, enabled (boolean), rollout_percentage (int 0-100), user_ids (uuid[] for targeted rollout), created_at, updated_at",
+        "Create src/hooks/useFeatureFlag.ts that checks if a flag is enabled for the current user (considers global enable, rollout percentage, and user targeting)",
+        "Create src/lib/feature-flags.ts with isFeatureEnabled(flagName, userId) utility",
+        "Seed initial flags: 'mfa_enabled', 'new_dashboard', 'ai_lead_scoring', 'stripe_billing'",
+        "Create simple admin UI component for toggling flags (admin-only)",
+        "Cache flag values in TanStack Query with 5-minute staleTime",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 42,
+      "passes": false,
+      "notes": "Feature flags are essential for enterprise deployments — they allow gradual rollouts and instant kill switches."
+    },
+    {
+      "id": "US-043",
+      "title": "Create admin audit log viewer",
+      "description": "As an admin, I need to view and search the audit log so that I can investigate security incidents and monitor platform usage.",
+      "acceptanceCriteria": [
+        "Create src/pages/admin/AuditLogPage.tsx showing audit events in a sortable, filterable table",
+        "Filters: date range, user, action type, resource type",
+        "Table columns: timestamp, user (with link to profile), action, resource, IP address",
+        "Expandable rows showing full event details (jsonb)",
+        "Pagination with 50 events per page",
+        "Admin-only route at /admin/audit-log (protected by role check)",
+        "Add navigation link in admin sidebar",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 43,
+      "passes": false,
+      "notes": "Depends on US-013 (audit logging schema). Admin pages exist at src/pages/admin/."
+    },
+    {
+      "id": "US-044",
+      "title": "Add API key system for programmatic access",
+      "description": "As an enterprise developer, I need API keys so that I can integrate AgentBio data with external CRM systems and workflows.",
+      "acceptanceCriteria": [
+        "Create SQL migration for api_keys table: id, user_id, name, key_hash (text), key_prefix (text, first 8 chars for identification), permissions (jsonb), last_used_at, expires_at, created_at, revoked_at",
+        "Create supabase/functions/api-keys/index.ts with CRUD operations: create (returns full key once), list, revoke",
+        "API key is generated as a secure random string, only the hash is stored",
+        "Create src/pages/dashboard/ApiKeysPage.tsx with key management UI: create, list, revoke",
+        "Create supabase/functions/_shared/api-auth.ts middleware that validates API key from Authorization: Bearer header as alternative to JWT",
+        "Rate limit API key creation (max 10 per user)",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 44,
+      "passes": false,
+      "notes": "API keys are a core enterprise feature — they enable CRM integrations (Salesforce, HubSpot, Follow Up Boss)."
+    },
+    {
+      "id": "US-045",
+      "title": "Implement team/organization management for multi-seat billing",
+      "description": "As a brokerage admin, I need to create a team and invite agents so that I can manage billing and permissions for my entire office.",
+      "acceptanceCriteria": [
+        "Create SQL migration for teams table: id, name, owner_id, plan_id, stripe_subscription_id, max_seats, created_at",
+        "Create SQL migration for team_members table: id, team_id, user_id, role ('owner', 'admin', 'member'), invited_at, accepted_at",
+        "Create supabase/functions/teams/index.ts with: create team, invite member (by email), accept invite, remove member, update member role",
+        "Create src/pages/dashboard/TeamPage.tsx showing team members, roles, and invite form",
+        "Team owner can see aggregate analytics across all team members",
+        "RLS policies: team members can read team data, only owners/admins can modify",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 45,
+      "passes": false,
+      "notes": "Team pricing from PRD: Team plan $29/agent/mo, Enterprise $69/agent/mo. This is critical for brokerage sales."
+    },
+    {
+      "id": "US-046",
+      "title": "Add comprehensive SEO meta tags and structured data",
+      "description": "As an SEO specialist, I need dynamic meta tags and JSON-LD structured data on all public pages so that search engines can properly index and display our content.",
+      "acceptanceCriteria": [
+        "Add dynamic meta tags (title, description, og:*, twitter:*) to all public-facing pages using react-helmet-async",
+        "Add JSON-LD structured data for: landing page (Organization), public profiles (Person/RealEstateAgent), listings (RealEstateListing), blog posts (Article)",
+        "Create src/lib/structured-data.ts with helper functions for generating JSON-LD schemas",
+        "Verify structured data is valid using Google's structured data testing format",
+        "Each public profile page has unique, descriptive meta title and description",
+        "Each listing page includes price, address, and property details in structured data",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 46,
+      "passes": false,
+      "notes": "react-helmet-async is already installed. SEO utilities exist at src/lib/seo.ts and src/lib/image-seo.ts. Build on existing code."
+    },
+    {
+      "id": "US-047",
+      "title": "Implement database connection pooling and query performance monitoring",
+      "description": "As a platform operator, I need database query monitoring so that slow queries are identified and connection resources are used efficiently.",
+      "acceptanceCriteria": [
+        "Create supabase/functions/_shared/db-monitor.ts that wraps Supabase queries with timing instrumentation",
+        "Log queries exceeding 500ms to a slow_queries table or structured log",
+        "Create SQL migration for query_metrics table: id, query_hash, duration_ms, endpoint, created_at (with auto-cleanup of records older than 30 days)",
+        "Add a database health check edge function at supabase/functions/health-check/index.ts that verifies connectivity and returns latency",
+        "Create a simple admin widget showing top 10 slowest queries in the last 24 hours",
+        "Typecheck passes on edge function code"
+      ],
+      "priority": 47,
+      "passes": false,
+      "notes": "Supabase manages connection pooling via PgBouncer. Focus on query monitoring and slow query identification."
+    },
+    {
+      "id": "US-048",
+      "title": "Create onboarding flow for new user setup",
+      "description": "As a new user, I need a guided onboarding flow so that I can set up my profile, add listings, and configure my page quickly after registration.",
+      "acceptanceCriteria": [
+        "Create src/pages/onboarding/OnboardingFlow.tsx with a multi-step wizard: 1) Profile basics (name, photo, bio), 2) Brokerage info (company, license#), 3) First listing, 4) Choose theme, 5) Review & publish",
+        "Each step saves progress to the database immediately (auto-save)",
+        "Users can skip steps and return later",
+        "Track onboarding completion in profiles table (onboarding_completed_at column, add via migration)",
+        "Redirect new users to onboarding after first login (check onboarding_completed_at in auth flow)",
+        "Progress indicator showing current step and completion status",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 48,
+      "passes": false,
+      "notes": "Onboarding components may already exist at src/components/onboarding/ and src/pages/onboarding/. Check and enhance."
+    },
+    {
+      "id": "US-049",
+      "title": "Implement real-time notifications system",
+      "description": "As a real estate agent, I need in-app notifications for new leads, messages, and system alerts so that I never miss important events.",
+      "acceptanceCriteria": [
+        "Create SQL migration for notifications table: id, user_id, type, title, message, data (jsonb), read_at, created_at",
+        "Create src/hooks/useNotifications.ts that subscribes to Supabase Realtime for new notifications",
+        "Create src/components/ui/notification-bell.tsx showing unread count badge in the header",
+        "Create src/components/ui/notification-dropdown.tsx with notification list, mark-as-read, and mark-all-as-read",
+        "Notification types: 'new_lead', 'lead_scored', 'subscription_event', 'system_alert'",
+        "Add notification creation triggers for lead insert and subscription changes",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 49,
+      "passes": false,
+      "notes": "Supabase Realtime is already available via the client. Firebase Cloud Messaging (FCM) is installed for push notifications — this is for in-app notifications."
+    },
+    {
+      "id": "US-050",
+      "title": "Create platform health dashboard for admin monitoring",
+      "description": "As a platform admin, I need a health dashboard so that I can monitor system status, user metrics, and operational health at a glance.",
+      "acceptanceCriteria": [
+        "Create src/pages/admin/HealthDashboard.tsx showing: total users, active users (7d), new signups (7d), total listings, total leads, error rate (from Sentry API or local tracking)",
+        "Add system health indicators: database connectivity (via health-check endpoint), edge function status, storage usage",
+        "Show revenue metrics if Stripe is configured: MRR, active subscriptions by plan, churn rate",
+        "Auto-refresh every 60 seconds",
+        "Add route at /admin/health (admin-only)",
+        "Charts using recharts for trends (users over time, leads over time)",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 50,
+      "passes": false,
+      "notes": "Admin pages exist at src/pages/admin/. Recharts is already installed. Build on existing admin infrastructure."
+    }
+  ]
+}

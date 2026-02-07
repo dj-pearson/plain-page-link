@@ -5,7 +5,11 @@ import { BrowserRouter } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
+import { initSentry } from "./lib/sentry";
 import "./index.css";
+
+// Initialize Sentry as early as possible for error monitoring
+initSentry();
 
 const queryClient = new QueryClient({
     defaultOptions: {

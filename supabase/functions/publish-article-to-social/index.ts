@@ -1,22 +1,35 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from '../_shared/cors.ts';
 
-serve(async (req) => {
+export default async (req: Request) => {
+  console.log('[publish-article-to-social] Function invoked');
+  
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { articleId } = await req.json();
-    console.log('Publishing article to social:', articleId);
+    const bodyText = await req.text();
+    console.log('[publish-article-to-social] Request body:', bodyText);
+    
+    const { articleId } = JSON.parse(bodyText || '{}');
+    console.log('[publish-article-to-social] Publishing article to social:', articleId);
+    
+    if (!articleId) {
+      throw new Error('articleId is required');
+    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const claudeApiKey = Deno.env.get('CLAUDE_API_KEY');
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      }
+    });
 
     // Fetch the article
     const { data: article, error: articleError } = await supabase
@@ -63,8 +76,8 @@ serve(async (req) => {
     }
 
     // Generate social media content using AI
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!claudeApiKey) {
+      throw new Error('CLAUDE_API_KEY not configured');
     }
 
     console.log('Generating social media content...');
@@ -89,16 +102,18 @@ Return ONLY valid JSON with this exact structure:
   "hashtags": ["hashtag1", "hashtag2", ...]
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'x-api-key': claudeApiKey,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 1024,
+        system: 'You are a social media marketing expert. You MUST respond ONLY with valid JSON, no markdown formatting, no code blocks, just pure JSON.',
         messages: [
-          { role: 'system', content: 'You are a social media marketing expert. You MUST respond ONLY with valid JSON, no markdown formatting, no code blocks, just pure JSON.' },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
@@ -112,7 +127,7 @@ Return ONLY valid JSON with this exact structure:
     }
 
     const aiData = await aiResponse.json();
-    const generatedContent = aiData.choices[0].message.content;
+    const generatedContent = (aiData.content as Array<{ text?: string }>)?.[0]?.text || '';
     
     console.log('AI Raw response:', generatedContent);
 
@@ -199,7 +214,8 @@ Return ONLY valid JSON with this exact structure:
     );
 
   } catch (error) {
-    console.error('Error in publish-article-to-social:', error);
+    console.error('[publish-article-to-social] Error:', error);
+    console.error('[publish-article-to-social] Error stack:', error instanceof Error ? error.stack : 'No stack');
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
@@ -209,4 +225,4 @@ Return ONLY valid JSON with this exact structure:
       }
     );
   }
-});
+};

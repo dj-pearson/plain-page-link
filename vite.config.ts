@@ -32,6 +32,9 @@ export default defineConfig(({ mode }) => ({
         },
     },
     build: {
+        // Enable source maps for production (needed for Sentry error tracking)
+        // These are hidden source maps that won't expose source code to users
+        sourcemap: 'hidden',
         rollupOptions: {
             output: {
                 format: 'es',

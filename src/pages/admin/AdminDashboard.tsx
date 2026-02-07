@@ -9,6 +9,7 @@ import { ArticlesManager } from "@/components/admin/ArticlesManager";
 import { KeywordImportDialog } from "@/components/admin/KeywordImportDialog";
 import { SEOManager } from "@/components/admin/SEOManager";
 import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDashboard";
+import { SampleDataManager } from "@/components/admin/SampleDataManager";
 
 export function AdminDashboard() {
   const { user, role } = useAuthStore();
@@ -42,7 +43,7 @@ export function AdminDashboard() {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="ai" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 lg:w-auto">
+          <TabsList className="grid w-full grid-cols-9 lg:w-auto">
             <TabsTrigger value="ai" className="gap-2">
               <BrainCircuit className="h-4 w-4" />
               AI Settings
@@ -66,6 +67,10 @@ export function AdminDashboard() {
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Search Analytics
+            </TabsTrigger>
+            <TabsTrigger value="sample-data" className="gap-2">
+              <Database className="h-4 w-4" />
+              Sample Data
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="h-4 w-4" />
@@ -111,6 +116,10 @@ export function AdminDashboard() {
 
           <TabsContent value="analytics" className="space-y-6">
             <SearchAnalyticsDashboard />
+          </TabsContent>
+
+          <TabsContent value="sample-data" className="space-y-6">
+            <SampleDataManager />
           </TabsContent>
 
           <TabsContent value="users" className="space-y-6">

@@ -1,7 +1,9 @@
 // API Configuration
+// For self-hosted Supabase, use the Supabase URL from environment
+// Falls back to the production app URL when not explicitly set
 export const API_URL =
-    import.meta.env.VITE_API_URL || "http://localhost:8000/api";
-export const APP_URL = import.meta.env.VITE_APP_URL || "http://localhost:5173";
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_SUPABASE_URL || "https://api.agentbio.net";
+export const APP_URL = import.meta.env.VITE_APP_URL || "https://agentbio.net";
 
 // Property Types
 export const PROPERTY_TYPES = [

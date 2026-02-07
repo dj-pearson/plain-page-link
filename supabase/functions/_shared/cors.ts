@@ -11,6 +11,11 @@ const ALLOWED_ORIGINS = [
   'https://www.agentbio.net',
   'https://api.agentbio.net',
   'https://functions.agentbio.net',
+  // Webhook and automation platforms
+  'https://hook.us1.make.com',
+  'https://hook.eu1.make.com',
+  'https://hook.eu2.make.com',
+  'https://hook.integromat.com',
   // Add development origins only in non-production environments
   ...(Deno.env.get('ENVIRONMENT') === 'development'
     ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:4173', 'http://localhost:8080']
@@ -38,7 +43,7 @@ export interface CorsHeaders {
 
 /**
  * Get CORS headers for a request
- * @param requestOrigin - The Origin header from the request
+ * @param requestOrigin - The Origin header from the request (null for non-browser requests like webhooks)
  * @param allowMethods - Optional methods to allow (defaults to common methods)
  * @returns CORS headers object
  */
@@ -46,16 +51,21 @@ export function getCorsHeaders(
   requestOrigin: string | null,
   allowMethods?: string
 ): Record<string, string> {
-  // Check if the request origin is in the allowed list
-  const origin = requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)
-    ? requestOrigin
-    : ALLOWED_ORIGINS[0]; // Default to primary domain
+  // For webhook/server-to-server requests (no Origin header), use wildcard
+  // For browser requests, validate against whitelist
+  const origin = requestOrigin 
+    ? (ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0])
+    : '*'; // Allow webhooks without Origin header
 
   const headers: Record<string, string> = {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Credentials': 'true',
   };
+
+  // Only set credentials for browser requests with specific origin
+  if (origin !== '*') {
+    headers['Access-Control-Allow-Credentials'] = 'true';
+  }
 
   if (allowMethods) {
     headers['Access-Control-Allow-Methods'] = allowMethods;
