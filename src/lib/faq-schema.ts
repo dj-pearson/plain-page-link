@@ -147,4 +147,97 @@ export const FEATURE_FAQS = {
   ]
 } as const;
 
+/**
+ * Homepage / Product FAQ set optimized for GEO citation
+ * Direct answers under 300 characters for AI extraction
+ */
+export const HOMEPAGE_FAQS: FAQItem[] = [
+  {
+    question: "What is AgentBio?",
+    answer: "AgentBio is a purpose-built link-in-bio platform for real estate agents. It includes property listing galleries, lead capture forms with pre-qualification, calendar booking, and testimonial showcases — designed to convert Instagram followers into qualified buyer and seller leads."
+  },
+  {
+    question: "How much does AgentBio cost?",
+    answer: "AgentBio offers a free plan with 3 listings and 5 links. Paid plans start at $39/month with unlimited listings, lead capture forms, calendar integration, and analytics. Enterprise plans with white-label and custom domain are $299/month."
+  },
+  {
+    question: "How is AgentBio different from Linktree?",
+    answer: "AgentBio includes real estate-specific features that Linktree doesn't offer: property listing galleries with MLS details, buyer/seller lead capture forms with pre-qualification scoring, appointment booking for showings, and testimonial showcases with schema markup."
+  },
+  {
+    question: "Can I showcase property listings on AgentBio?",
+    answer: "Yes. AgentBio lets you showcase unlimited property listings (on paid plans) with full photo galleries, pricing, square footage, beds/baths, MLS numbers, property descriptions, and virtual tour links. Mark properties as active, pending, or sold."
+  },
+  {
+    question: "Does AgentBio capture leads?",
+    answer: "Yes. AgentBio includes built-in lead capture forms for buyer inquiries, seller leads, and home valuation requests. Leads are automatically scored as Hot, Warm, or Cold based on responses like budget, timeline, and pre-approval status."
+  },
+  {
+    question: "Does AgentBio work with Instagram?",
+    answer: "Yes. Place your AgentBio link in your Instagram bio, and followers land on a mobile-optimized page with property listings, lead forms, and booking. AgentBio is designed for the 80%+ of Instagram traffic from mobile devices."
+  },
+];
+
+/**
+ * Pricing page FAQ set
+ */
+export const PRICING_FAQS: FAQItem[] = [
+  {
+    question: "Is there a free plan for AgentBio?",
+    answer: "Yes. AgentBio's free plan includes 3 property listings, 5 custom links, basic analytics, and a mobile-optimized bio page. No credit card required to get started."
+  },
+  {
+    question: "What's included in the $39/month Professional plan?",
+    answer: "The Professional plan includes unlimited property listings, lead capture forms for buyers/sellers/valuations, calendar booking integration, advanced analytics, custom branding, and QR code generation for marketing materials."
+  },
+  {
+    question: "Can I cancel my AgentBio subscription anytime?",
+    answer: "Yes. AgentBio subscriptions can be cancelled anytime with no cancellation fees. Your page remains accessible on the free plan after cancellation."
+  },
+  {
+    question: "Is AgentBio cheaper than a traditional real estate website?",
+    answer: "Yes. Traditional real estate websites cost $3,000-$15,000 upfront plus $100-$300/month for hosting and maintenance. AgentBio starts at $39/month with no setup fees and includes hosting, updates, and support."
+  },
+];
+
+/**
+ * Comparison page FAQ sets
+ */
+export const COMPARISON_FAQS = {
+  linktree: [
+    {
+      question: "Is AgentBio better than Linktree for real estate agents?",
+      answer: "Yes. AgentBio is purpose-built for real estate with property galleries, lead forms, and MLS compliance. Linktree is a generic link tool that doesn't support listing photos, buyer inquiries, or appointment booking — features critical for real estate lead generation."
+    },
+    {
+      question: "Can Linktree display property listings like AgentBio?",
+      answer: "No. Linktree only displays simple links and basic media embeds. AgentBio includes full property listing galleries with photos, pricing, beds/baths, MLS numbers, and status tracking (active/pending/sold) — designed specifically for real estate agents."
+    },
+    {
+      question: "Does Linktree have lead capture for real estate?",
+      answer: "No. Linktree has basic email collection but no real estate-specific lead forms. AgentBio offers buyer inquiry forms, seller lead forms, and home valuation requests with automatic lead scoring based on budget, timeline, and pre-approval status."
+    },
+  ],
+  beacons: [
+    {
+      question: "How does AgentBio compare to Beacons for real estate?",
+      answer: "Beacons is designed for content creators and e-commerce. AgentBio is built specifically for real estate agents with property galleries, MLS compliance, lead scoring, and appointment booking — features Beacons doesn't offer."
+    },
+    {
+      question: "Can Beacons handle property listings?",
+      answer: "No. Beacons focuses on digital products and creator monetization. AgentBio provides dedicated property listing galleries with photos, pricing, MLS details, and status tracking designed for real estate marketing."
+    },
+  ],
+  later: [
+    {
+      question: "Should real estate agents use Later or AgentBio?",
+      answer: "For link-in-bio specifically, AgentBio is better for real estate agents. Later excels at social media scheduling but its bio link feature is basic. AgentBio offers property galleries, lead capture, and booking designed for real estate conversions."
+    },
+    {
+      question: "Does Later Link in Bio support property listings?",
+      answer: "No. Later's link-in-bio feature supports basic links and social feeds but not real estate-specific features like property galleries, lead capture forms, or appointment booking that AgentBio provides."
+    },
+  ],
+} as const;
+
 export type FeatureFAQKey = keyof typeof FEATURE_FAQS;
