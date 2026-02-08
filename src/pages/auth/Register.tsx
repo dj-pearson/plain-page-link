@@ -12,6 +12,7 @@ import { passwordSchema, usernameSchema, emailSchema } from "@/utils/validation"
 import { OTPInput } from "@/components/auth/OTPInput";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 const registerSchema = z
     .object({
@@ -98,7 +99,7 @@ export default function Register() {
                 setResendCooldown(60);
             }
         } catch (error) {
-            console.error("Registration failed:", error);
+            logger.error("Registration failed", error as Error);
         }
     };
 
@@ -181,7 +182,7 @@ export default function Register() {
         try {
             await signInWithGoogle();
         } catch (error) {
-            console.error("Google sign-in failed:", error);
+            logger.error("Google sign-in failed", error as Error);
         }
     };
 
@@ -189,7 +190,7 @@ export default function Register() {
         try {
             await signInWithApple();
         } catch (error) {
-            console.error("Apple sign-in failed:", error);
+            logger.error("Apple sign-in failed", error as Error);
         }
     };
 

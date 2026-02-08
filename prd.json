@@ -845,6 +845,92 @@
       "priority": 50,
       "passes": false,
       "notes": "Admin pages exist at src/pages/admin/. Recharts is already installed. Build on existing admin infrastructure."
+    },
+    {
+      "id": "US-051",
+      "title": "Complete console.log to secure logger migration across codebase",
+      "description": "As a security engineer, I need all console.log/error/warn statements replaced with the secure logger so that sensitive data is never leaked to the browser console in production.",
+      "acceptanceCriteria": [
+        "Audit all files in src/ for console.log, console.error, console.warn, console.info, console.debug usage",
+        "Replace all instances with the appropriate logger method from src/lib/logger.ts (logger.debug, logger.info, logger.warn, logger.error)",
+        "Critical files already migrated: Login.tsx, Register.tsx, Leads.tsx, LeadDetailModal.tsx, useMLLeadScoring.ts",
+        "Remaining ~200+ console statements across ~85 files must be migrated",
+        "No raw console statements remain in src/hooks/, src/stores/, src/pages/, or src/components/ (except src/lib/logger.ts itself)",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 51,
+      "passes": false,
+      "notes": "Partial migration completed: auth pages, leads dashboard, lead detail modal, and ML scoring hook. Remaining files need systematic migration. Run: grep -rn 'console\\.' src/ --include='*.ts' --include='*.tsx' | grep -v logger.ts to find remaining instances."
+    },
+    {
+      "id": "US-052",
+      "title": "Add lead response time tracking and SLA alerts",
+      "description": "As a real estate agent, I need to see how quickly I respond to leads and get alerts for aging leads so that I can improve my response time and close more deals.",
+      "acceptanceCriteria": [
+        "Add first_responded_at (timestamptz) column to leads table via SQL migration",
+        "Auto-populate first_responded_at when lead status changes from 'new' to any other status",
+        "Calculate and display response time on each lead card in the leads dashboard (e.g., 'Responded in 2h 15m')",
+        "Add average response time metric to the leads stats section",
+        "Highlight leads that have been in 'new' status for more than 2 hours with a warning indicator",
+        "Add a 'Needs Attention' filter option that shows leads with no response after configurable SLA threshold",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 52,
+      "passes": false,
+      "notes": "Response time is the #1 predictor of lead conversion in real estate. Agents who respond in <5 minutes are 21x more likely to convert. This directly impacts the platform's core value proposition."
+    },
+    {
+      "id": "US-053",
+      "title": "Add conversion funnel analytics widget to dashboard",
+      "description": "As a real estate agent, I need a visual conversion funnel showing lead progression so that I can identify bottlenecks in my sales pipeline and improve my process.",
+      "acceptanceCriteria": [
+        "Create src/components/dashboard/ConversionFunnel.tsx showing a visual funnel: Visitors -> Leads -> Contacted -> Qualified -> Converted",
+        "Each funnel stage shows count and percentage drop-off from the previous stage",
+        "Funnel data is derived from leads table status distribution and page analytics",
+        "Add a time period selector (7d, 30d, 90d, all time)",
+        "Add the funnel widget to the main dashboard page",
+        "Use recharts or a custom SVG funnel visualization",
+        "Responsive design for mobile viewing",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 53,
+      "passes": false,
+      "notes": "Recharts is already installed. Dashboard page exists at src/pages/dashboard/. The funnel should be prominently placed to drive agent engagement with the platform."
+    },
+    {
+      "id": "US-054",
+      "title": "Optimize public profile page performance with image lazy loading and skeleton states",
+      "description": "As a visitor viewing an agent's public profile, I need the page to load fast even with many property images so that I don't bounce due to slow loading.",
+      "acceptanceCriteria": [
+        "Add IntersectionObserver-based lazy loading to all listing images on public profile pages",
+        "Implement skeleton placeholder states for profile avatar, listing cards, and testimonials during loading",
+        "Add proper width/height attributes to all images to prevent Cumulative Layout Shift (CLS)",
+        "Implement progressive image loading: show low-quality placeholder, then swap to full image",
+        "Public profile Largest Contentful Paint (LCP) should be under 2.5 seconds on 3G",
+        "Test with Chrome DevTools Lighthouse - Performance score should be 80+ on mobile",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 54,
+      "passes": false,
+      "notes": "Public profiles are the most visited pages (they're shared on social media). A ProgressiveImage component may already exist. Check src/components/ui/ and build on it."
+    },
+    {
+      "id": "US-055",
+      "title": "Implement lead auto-assignment and routing rules for teams",
+      "description": "As a brokerage admin, I need leads to be automatically assigned to agents based on configurable rules so that no lead falls through the cracks and response times stay low.",
+      "acceptanceCriteria": [
+        "Create SQL migration for lead_routing_rules table: id, team_id, name, criteria (jsonb), assigned_to (uuid), is_active, priority, created_at",
+        "Criteria supports: lead_type, source, geographic area (zip code), price range, round-robin rotation",
+        "Create src/hooks/useLeadRouting.ts for managing routing rules",
+        "Create src/components/settings/LeadRoutingRules.tsx UI for creating and managing routing rules",
+        "When a new lead is captured for a team, evaluate routing rules in priority order and auto-assign",
+        "If no rule matches, use round-robin among active team members",
+        "Log all auto-assignments to audit_logs with the matched rule",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 55,
+      "passes": false,
+      "notes": "Depends on US-045 (team management). This is a high-value enterprise feature that differentiates AgentBio from simple link-in-bio tools."
     }
   ]
 }
