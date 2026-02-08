@@ -47,7 +47,7 @@ export const SEO_CONFIG = {
   pricing: {
     startingPrice: '39',
     currency: 'USD',
-    priceValidUntil: '2025-12-31',
+    priceValidUntil: '2026-12-31',
   },
 
   // Default keywords
@@ -164,6 +164,123 @@ export const PAGE_SEO_TEMPLATES = {
       title: 'AgentBio vs Later | Best Bio Page for Real Estate Marketing',
       description: 'Compare AgentBio to Later Link in Bio for real estate. See why agents prefer specialized bio pages with property listings and lead capture.',
       keywords: ['AgentBio vs Later', 'Later alternative', 'link in bio comparison'],
+    },
+  },
+} as const;
+
+/**
+ * Pricing tier definitions for schema generation
+ */
+export const PRICING_TIERS = [
+  {
+    name: 'Free',
+    description: 'Get started with 3 property listings and 5 links. Perfect for trying AgentBio.',
+    price: '0',
+    priceCurrency: 'USD',
+    billingPeriod: 'P1M',
+    features: [
+      '3 property listings',
+      '5 custom links',
+      'Basic analytics',
+      'Mobile-optimized page',
+    ],
+  },
+  {
+    name: 'Professional',
+    description: 'Unlimited listings, lead capture forms, calendar booking, and advanced analytics for growing agents.',
+    price: '39',
+    priceCurrency: 'USD',
+    billingPeriod: 'P1M',
+    features: [
+      'Unlimited property listings',
+      'Lead capture forms',
+      'Calendar booking integration',
+      'Advanced analytics',
+      'Custom branding',
+      'QR code generation',
+    ],
+  },
+  {
+    name: 'Team',
+    description: 'Team collaboration, advanced analytics, and priority support for real estate teams and brokerages.',
+    price: '99',
+    priceCurrency: 'USD',
+    billingPeriod: 'P1M',
+    features: [
+      'Everything in Professional',
+      'Team collaboration',
+      'Advanced analytics',
+      'Priority support',
+      'Team management dashboard',
+    ],
+  },
+  {
+    name: 'Enterprise',
+    description: 'White-label solution with custom domain, dedicated support, and API access for large brokerages.',
+    price: '299',
+    priceCurrency: 'USD',
+    billingPeriod: 'P1M',
+    features: [
+      'Everything in Team',
+      'White-label branding',
+      'Custom domain',
+      'Dedicated support',
+      'API access',
+      'Custom integrations',
+    ],
+  },
+] as const;
+
+/**
+ * Comparison data for structured schema on vs. pages
+ */
+export const COMPARISON_DATA = {
+  linktree: {
+    competitor: {
+      name: 'Linktree',
+      description: 'Generic link-in-bio tool for sharing multiple links from a single page. Popular across all industries but lacks real estate-specific features.',
+      url: 'https://linktr.ee',
+      price: '5',
+      rating: '4.2',
+    },
+    agentbio: {
+      name: 'AgentBio',
+      description: 'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
+      url: 'https://agentbio.net',
+      price: '39',
+      rating: '4.8',
+    },
+  },
+  beacons: {
+    competitor: {
+      name: 'Beacons',
+      description: 'Link-in-bio and creator monetization platform focused on content creators and e-commerce sellers.',
+      url: 'https://beacons.ai',
+      price: '10',
+      rating: '4.0',
+    },
+    agentbio: {
+      name: 'AgentBio',
+      description: 'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
+      url: 'https://agentbio.net',
+      price: '39',
+      rating: '4.8',
+    },
+  },
+  later: {
+    competitor: {
+      name: 'Later',
+      description: 'Social media scheduling and link-in-bio tool. Primarily focused on content scheduling with basic bio link functionality.',
+      url: 'https://later.com',
+      price: '25',
+      rating: '4.1',
+    },
+    agentbio: {
+      name: 'AgentBio',
+      description: 'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
+      url: 'https://agentbio.net',
+      price: '39',
+      rating: '4.8',
     },
   },
 } as const;
