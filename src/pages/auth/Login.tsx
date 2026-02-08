@@ -15,6 +15,7 @@ import {
     formatBlockedUntil,
     getDeviceFingerprint,
 } from "@/hooks/useLoginSecurity";
+import { logger } from "@/lib/logger";
 
 const loginSchema = z.object({
     email: emailSchema,
@@ -77,7 +78,7 @@ export default function Login() {
                 return;
             }
         } catch (throttleError) {
-            console.error("Throttle check failed:", throttleError);
+            logger.error("Login throttle check failed", throttleError as Error);
         }
 
         setIsThrottled(false);
@@ -116,7 +117,7 @@ export default function Login() {
         try {
             await signInWithGoogle();
         } catch (error) {
-            console.error("Google sign-in failed:", error);
+            logger.error("Google sign-in failed", error as Error);
             toast({
                 title: "Google Sign-In Failed",
                 description: "Unable to sign in with Google. Please try again or use email/password.",
@@ -129,7 +130,7 @@ export default function Login() {
         try {
             await signInWithApple();
         } catch (error) {
-            console.error("Apple sign-in failed:", error);
+            logger.error("Apple sign-in failed", error as Error);
             toast({
                 title: "Apple Sign-In Failed",
                 description: "Unable to sign in with Apple. Please try again or use email/password.",

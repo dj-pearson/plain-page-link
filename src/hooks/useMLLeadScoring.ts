@@ -23,6 +23,7 @@ import {
   getUnifiedScorer,
 } from '@/lib/ml-lead-scoring';
 import type { Lead } from '@/types/lead';
+import { logger } from '@/lib/logger';
 
 // ============================================================================
 // Types
@@ -108,7 +109,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
         .maybeSingle();
 
       if (error) {
-        console.error('Error fetching model weights:', error);
+        logger.error('Error fetching model weights', error as Error);
         return null;
       }
 
@@ -129,7 +130,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
       try {
         scorer.importModel(savedModel.weights);
       } catch (error) {
-        console.error('Error loading saved model:', error);
+        logger.error('Error loading saved model', error as Error);
       }
     }
   }, [savedModel, scorer]);
@@ -181,7 +182,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
         .limit(10);
 
       if (error) {
-        console.error('Error fetching A/B test results:', error);
+        logger.error('Error fetching A/B test results', error as Error);
         return [];
       }
 
@@ -353,7 +354,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
 
       return metrics;
     } catch (error) {
-      console.error('Error retraining model:', error);
+      logger.error('Error retraining model', error as Error);
       throw error;
     }
   }, [scorer, saveModelMutation]);
