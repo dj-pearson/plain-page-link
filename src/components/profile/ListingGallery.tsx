@@ -1,325 +1,208 @@
 import { useState, useMemo } from "react";
+import { Search, SlidersHorizontal, ArrowUpDown, Home, X } from "lucide-react";
 import ListingCard from "./ListingCard";
-import type { Listing } from "@/types";
-import { Building2, Search, SlidersHorizontal, X } from "lucide-react";
-import { CalendlyModal } from "@/components/integrations/CalendlyModal";
-import { cn } from "@/lib/utils";
 import { parsePrice } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import type { Listing } from "@/types";
 
 interface ListingGalleryProps {
-    listings: Listing[];
-    title?: string;
-    emptyMessage?: string;
-    onListingClick?: (listing: Listing) => void;
-    calendlyUrl?: string;
+  listings: Listing[];
+  title?: string;
+  onListingClick?: (listing: Listing) => void;
+  calendlyUrl?: string;
 }
 
-type PriceRange = "all" | "under-300k" | "300k-500k" | "500k-750k" | "750k-1m" | "over-1m";
-type BedroomFilter = "all" | "1+" | "2+" | "3+" | "4+";
 type SortOption = "newest" | "price-low" | "price-high" | "beds-high";
+type PropertyTypeFilter = "all" | "single_family" | "condo" | "townhouse" | "multi_family" | "land" | "commercial";
 
-export default function ListingGallery({
-    listings,
-    title = "Active Listings",
-    emptyMessage = "No listings available at this time.",
-    onListingClick,
-    calendlyUrl,
-}: ListingGalleryProps) {
-    const [searchQuery, setSearchQuery] = useState("");
-    const [priceRange, setPriceRange] = useState<PriceRange>("all");
-    const [bedroomFilter, setBedroomFilter] = useState<BedroomFilter>("all");
-    const [sortBy, setSortBy] = useState<SortOption>("newest");
-    const [showFilters, setShowFilters] = useState(false);
-    const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
-    const [selectedListingForShowing, setSelectedListingForShowing] = useState<Listing | null>(null);
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  all: "All Types",
+  single_family: "Houses",
+  condo: "Condos",
+  townhouse: "Townhomes",
+  multi_family: "Multi-Family",
+  land: "Land",
+  commercial: "Commercial",
+};
 
-    const handleBookShowing = (e: React.MouseEvent, listing: Listing) => {
-        e.stopPropagation();
-        setSelectedListingForShowing(listing);
-        setIsCalendlyModalOpen(true);
-    };
+const SORT_LABELS: Record<SortOption, string> = {
+  newest: "Newest First",
+  "price-low": "Price: Low to High",
+  "price-high": "Price: High to Low",
+  "beds-high": "Most Bedrooms",
+};
 
-    // Filter and sort listings
-    const filteredListings = useMemo(() => {
-        let filtered = [...listings];
+export default function ListingGallery({ listings, title, onListingClick, calendlyUrl }: ListingGalleryProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState<PropertyTypeFilter>("all");
+  const [bedroomFilter, setBedroomFilter] = useState<number>(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSort, setShowSort] = useState(false);
 
-        // Search filter
-        if (searchQuery) {
-            filtered = filtered.filter((listing) => {
-                const searchLower = searchQuery.toLowerCase();
-                const address = ((listing as any).address || "").toLowerCase();
-                const city = ((listing as any).city || "").toLowerCase();
-                const state = ((listing as any).state || "").toLowerCase();
-                return (
-                    address.includes(searchLower) ||
-                    city.includes(searchLower) ||
-                    state.includes(searchLower)
-                );
-            });
-        }
+  const availableTypes = useMemo(() => {
+    const types = new Set<string>();
+    listings.forEach(l => {
+      const pt = (l as any).property_type;
+      if (pt) types.add(pt);
+    });
+    return types;
+  }, [listings]);
 
-        // Price range filter
-        if (priceRange !== "all") {
-            filtered = filtered.filter((listing) => {
-                const price = parsePrice((listing as any).price);
-                switch (priceRange) {
-                    case "under-300k":
-                        return price < 300000;
-                    case "300k-500k":
-                        return price >= 300000 && price < 500000;
-                    case "500k-750k":
-                        return price >= 500000 && price < 750000;
-                    case "750k-1m":
-                        return price >= 750000 && price < 1000000;
-                    case "over-1m":
-                        return price >= 1000000;
-                    default:
-                        return true;
-                }
-            });
-        }
+  const filteredListings = useMemo(() => {
+    let result = [...listings];
 
-        // Bedroom filter
-        if (bedroomFilter !== "all") {
-            const minBeds = parseInt(bedroomFilter);
-            filtered = filtered.filter(
-                (listing) => (listing.bedrooms || 0) >= minBeds
-            );
-        }
-
-        // Sort
-        filtered.sort((a, b) => {
-            switch (sortBy) {
-                case "price-low":
-                    return parsePrice((a as any).price) - parsePrice((b as any).price);
-                case "price-high":
-                    return parsePrice((b as any).price) - parsePrice((a as any).price);
-                case "beds-high":
-                    return (b.bedrooms || 0) - (a.bedrooms || 0);
-                case "newest":
-                default:
-                    return (
-                        new Date((b as any).listed_date || b.created_at || 0).getTime() -
-                        new Date((a as any).listed_date || a.created_at || 0).getTime()
-                    );
-            }
-        });
-
-        return filtered;
-    }, [listings, searchQuery, priceRange, bedroomFilter, sortBy]);
-
-    const hasActiveFilters =
-        searchQuery || priceRange !== "all" || bedroomFilter !== "all" || sortBy !== "newest";
-
-    const clearFilters = () => {
-        setSearchQuery("");
-        setPriceRange("all");
-        setBedroomFilter("all");
-        setSortBy("newest");
-    };
-
-    if (listings.length === 0) {
-        return (
-            <div className="bg-white rounded-lg shadow-sm p-8 md:p-12 text-center">
-                <Building2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">{emptyMessage}</p>
-            </div>
-        );
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(l => {
+        const la = l as any;
+        return (la.address?.toLowerCase().includes(q) ||
+                la.city?.toLowerCase().includes(q) ||
+                la.description?.toLowerCase().includes(q));
+      });
     }
 
-    return (
-        <div className="space-y-4">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <h2 className="text-2xl font-bold text-gray-900">
-                    {title}
-                    <span className="ml-2 text-lg font-normal text-gray-500">
-                        ({filteredListings.length})
-                    </span>
-                </h2>
+    if (propertyTypeFilter !== "all") {
+      result = result.filter(l => (l as any).property_type === propertyTypeFilter);
+    }
 
-                <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all",
-                        showFilters
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    )}
-                >
-                    <SlidersHorizontal className="h-4 w-4" />
-                    <span>Filters</span>
-                    {hasActiveFilters && (
-                        <span className="bg-white text-blue-600 px-2 py-0.5 rounded-full text-xs font-bold">
-                            {[searchQuery, priceRange !== "all", bedroomFilter !== "all", sortBy !== "newest"]
-                                .filter(Boolean).length}
-                        </span>
-                    )}
-                </button>
-            </div>
+    if (bedroomFilter > 0) {
+      result = result.filter(l => {
+        const beds = l.bedrooms ?? (l as any).beds ?? 0;
+        return beds >= bedroomFilter;
+      });
+    }
 
-            {/* Filters Panel */}
-            {showFilters && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 space-y-4">
-                    {/* Search */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Search by location
-                        </label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Enter address, city, or zip..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                        </div>
-                    </div>
+    result.sort((a, b) => {
+      const aa = a as any;
+      const ba = b as any;
+      switch (sortBy) {
+        case "price-low": return parsePrice(aa.price) - parsePrice(ba.price);
+        case "price-high": return parsePrice(ba.price) - parsePrice(aa.price);
+        case "beds-high": return ((b.bedrooms ?? ba.beds ?? 0) - (a.bedrooms ?? aa.beds ?? 0));
+        default: return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+    });
 
-                    {/* Price Range */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Price Range
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                            {[
-                                { value: "all", label: "All Prices" },
-                                { value: "under-300k", label: "Under $300K" },
-                                { value: "300k-500k", label: "$300K - $500K" },
-                                { value: "500k-750k", label: "$500K - $750K" },
-                                { value: "750k-1m", label: "$750K - $1M" },
-                                { value: "over-1m", label: "Over $1M" },
-                            ].map((option) => (
-                                <button
-                                    key={option.value}
-                                    onClick={() => setPriceRange(option.value as PriceRange)}
-                                    className={cn(
-                                        "px-4 py-2 rounded-lg font-medium text-sm transition-all border",
-                                        priceRange === option.value
-                                            ? "bg-blue-600 text-white border-blue-600"
-                                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
-                                    )}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+    return result;
+  }, [listings, searchQuery, sortBy, propertyTypeFilter, bedroomFilter]);
 
-                    {/* Bedrooms */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Bedrooms
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                            {[
-                                { value: "all", label: "Any" },
-                                { value: "1+", label: "1+" },
-                                { value: "2+", label: "2+" },
-                                { value: "3+", label: "3+" },
-                                { value: "4+", label: "4+" },
-                            ].map((option) => (
-                                <button
-                                    key={option.value}
-                                    onClick={() => setBedroomFilter(option.value as BedroomFilter)}
-                                    className={cn(
-                                        "px-4 py-2 rounded-lg font-medium text-sm transition-all border",
-                                        bedroomFilter === option.value
-                                            ? "bg-blue-600 text-white border-blue-600"
-                                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
-                                    )}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+  const hasActiveFilters = propertyTypeFilter !== "all" || bedroomFilter > 0;
 
-                    {/* Sort */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Sort By
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                            {[
-                                { value: "newest", label: "Newest First" },
-                                { value: "price-low", label: "Price: Low to High" },
-                                { value: "price-high", label: "Price: High to Low" },
-                                { value: "beds-high", label: "Most Bedrooms" },
-                            ].map((option) => (
-                                <button
-                                    key={option.value}
-                                    onClick={() => setSortBy(option.value as SortOption)}
-                                    className={cn(
-                                        "px-4 py-2 rounded-lg font-medium text-sm transition-all border",
-                                        sortBy === option.value
-                                            ? "bg-blue-600 text-white border-blue-600"
-                                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
-                                    )}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+  const clearFilters = () => {
+    setPropertyTypeFilter("all");
+    setBedroomFilter(0);
+    setSearchQuery("");
+  };
 
-                    {/* Clear Filters */}
-                    {hasActiveFilters && (
-                        <div className="pt-4 border-t border-gray-200">
-                            <button
-                                onClick={clearFilters}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all"
-                            >
-                                <X className="h-4 w-4" />
-                                Clear All Filters
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
+  return (
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+          {title || "Properties"}
+          <span className="text-sm font-normal text-gray-500 ml-2">({filteredListings.length})</span>
+        </h2>
+      </div>
 
-            {/* Results */}
-            {filteredListings.length === 0 ? (
-                <div className="bg-white rounded-lg shadow-sm p-8 md:p-12 text-center">
-                    <Building2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 mb-4">
-                        No properties match your filters.
-                    </p>
-                    <button
-                        onClick={clearFilters}
-                        className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                        Clear filters to see all properties
-                    </button>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredListings.map((listing) => (
-                        <ListingCard
-                            key={listing.id}
-                            listing={listing}
-                            onClick={() => onListingClick?.(listing)}
-                            onBookShowing={(e) => handleBookShowing(e, listing)}
-                            hasCalendly={!!calendlyUrl}
-                        />
-                    ))}
-                </div>
-            )}
-
-            {/* Calendly Modal */}
-            {calendlyUrl && selectedListingForShowing && (
-                <CalendlyModal
-                    isOpen={isCalendlyModalOpen}
-                    onClose={() => {
-                        setIsCalendlyModalOpen(false);
-                        setSelectedListingForShowing(null);
-                    }}
-                    calendlyUrl={calendlyUrl}
-                    listingAddress={`${(selectedListingForShowing as any).address || ''}${(selectedListingForShowing as any).city ? `, ${(selectedListingForShowing as any).city}` : ''}`}
-                />
-            )}
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input type="text" placeholder="Search properties..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm min-h-[44px]" />
         </div>
-    );
+        <div className="flex gap-2">
+          <button onClick={() => setShowFilters(!showFilters)}
+            className={cn("inline-flex items-center gap-2 px-3.5 py-2.5 border rounded-lg text-sm font-medium transition-all min-h-[44px]",
+              showFilters || hasActiveFilters ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 hover:bg-gray-50")}>
+            <SlidersHorizontal className="h-4 w-4" />
+            <span className="hidden sm:inline">Filters</span>
+            {hasActiveFilters && (
+              <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">
+                {(propertyTypeFilter !== "all" ? 1 : 0) + (bedroomFilter > 0 ? 1 : 0)}
+              </span>
+            )}
+          </button>
+          <div className="relative">
+            <button onClick={() => setShowSort(!showSort)}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all min-h-[44px]">
+              <ArrowUpDown className="h-4 w-4" />
+              <span className="hidden sm:inline">{SORT_LABELS[sortBy]}</span>
+            </button>
+            {showSort && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowSort(false)} />
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 w-48 py-1">
+                  {Object.entries(SORT_LABELS).map(([key, label]) => (
+                    <button key={key} onClick={() => { setSortBy(key as SortOption); setShowSort(false); }}
+                      className={cn("w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors min-h-[44px]",
+                        sortBy === key && "font-semibold text-blue-600 bg-blue-50")}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showFilters && (
+        <div className="bg-gray-50 rounded-xl p-4 space-y-4 border border-gray-100">
+          {availableTypes.size > 0 && (
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">Property Type</label>
+              <div className="flex flex-wrap gap-2">
+                {(["all", ...Array.from(availableTypes)] as PropertyTypeFilter[]).map(type => (
+                  <button key={type} onClick={() => setPropertyTypeFilter(type)}
+                    className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+                      propertyTypeFilter === type ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-200 hover:border-blue-300")}>
+                    {PROPERTY_TYPE_LABELS[type] || type}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">Minimum Bedrooms</label>
+            <div className="flex gap-2">
+              {[0, 1, 2, 3, 4, 5].map(n => (
+                <button key={n} onClick={() => setBedroomFilter(n)}
+                  className={cn("w-10 h-10 rounded-lg text-sm font-medium border transition-all flex items-center justify-center",
+                    bedroomFilter === n ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-200 hover:border-blue-300")}>
+                  {n === 0 ? "Any" : `${n}+`}
+                </button>
+              ))}
+            </div>
+          </div>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium">
+              <X className="h-3.5 w-3.5" /> Clear all filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {filteredListings.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+          {filteredListings.map((listing) => (
+            <ListingCard key={listing.id} listing={listing} onClick={() => onListingClick?.(listing)} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Home className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">No properties found</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            {hasActiveFilters ? "Try adjusting your filters to see more properties." : "Check back soon for new listings."}
+          </p>
+          {hasActiveFilters && (
+            <button onClick={clearFilters}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+              Clear Filters
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

@@ -1,270 +1,222 @@
 import { useState, useEffect } from "react";
-import { Bed, Bath, Maximize, MapPin, Calendar, CalendarCheck, Heart, Eye, Share2 } from "lucide-react";
-import { formatPrice, formatPropertyStats, parsePrice } from "@/lib/format";
+import { Bed, Bath, Maximize, MapPin, Heart, Eye, Share2, Star } from "lucide-react";
+import { formatPrice, parsePrice, formatNumber } from "@/lib/format";
 import { getImageUrl } from "@/lib/images";
-import type { Listing } from "@/types";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import type { Listing } from "@/types";
 
 interface ListingCardProps {
-    listing: Listing;
-    onClick?: () => void;
-    onBookShowing?: (e: React.MouseEvent) => void;
-    hasCalendly?: boolean;
+  listing: Listing;
+  onClick?: () => void;
 }
 
-const statusColors = {
-    active: "bg-green-100 text-green-800",
-    pending: "bg-yellow-100 text-yellow-800",
-    under_contract: "bg-orange-100 text-orange-800",
-    sold: "bg-blue-100 text-blue-800",
-    draft: "bg-gray-100 text-gray-800",
+const statusColors: Record<string, string> = {
+  active: "bg-green-500",
+  pending: "bg-yellow-500",
+  under_contract: "bg-orange-500",
+  sold: "bg-blue-500",
+  draft: "bg-gray-500",
 };
 
-const statusLabels = {
-    active: "Active",
-    pending: "Pending",
-    under_contract: "Under Contract",
-    sold: "Sold",
-    draft: "Draft",
+const statusLabels: Record<string, string> = {
+  active: "Active",
+  pending: "Pending",
+  under_contract: "Under Contract",
+  sold: "Sold",
+  draft: "Draft",
 };
 
-export default function ListingCard({ listing, onClick, onBookShowing, hasCalendly }: ListingCardProps) {
-    const [isSaved, setIsSaved] = useState(false);
-    const [isHovered, setIsHovered] = useState(false);
+const SAVED_LISTINGS_KEY = 'agentbio_saved_listings';
 
-    // Load saved state from localStorage
-    useEffect(() => {
-        const savedListings = JSON.parse(localStorage.getItem('savedListings') || '[]');
-        setIsSaved(savedListings.includes(listing.id));
-    }, [listing.id]);
+export default function ListingCard({ listing, onClick }: ListingCardProps) {
+  const [isSaved, setIsSaved] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-    const handleSave = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const savedListings = JSON.parse(localStorage.getItem('savedListings') || '[]');
+  const listingAny = listing as any;
+  const address = listingAny.address || listing.title || 'Property';
+  const city = listingAny.city || '';
+  const state = listingAny.state || '';
+  const price = parsePrice(listingAny.price);
+  const beds = listing.bedrooms ?? listingAny.beds ?? 0;
+  const baths = listing.bathrooms ?? listingAny.baths ?? 0;
+  const sqft = listing.square_feet ?? listingAny.sqft ?? 0;
+  const isFeatured = listingAny.is_featured;
+  const photoCount = listingAny.photos?.length || 1;
 
-        if (isSaved) {
-            // Remove from saved
-            const updated = savedListings.filter((id: string) => id !== listing.id);
-            localStorage.setItem('savedListings', JSON.stringify(updated));
-            setIsSaved(false);
-        } else {
-            // Add to saved
-            savedListings.push(listing.id);
-            localStorage.setItem('savedListings', JSON.stringify(savedListings));
-            setIsSaved(true);
-        }
-    };
+  const primaryImage = getImageUrl(
+    listingAny.image || listingAny.photos?.[0],
+    'listings'
+  );
 
-    const handleShare = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (navigator.share) {
-            navigator.share({
-                title: `${(listing as any).address || 'Property'} - ${formatPrice(parsePrice((listing as any).price))}`,
-                text: `Check out this property: ${listing.bedrooms} bed, ${listing.bathrooms} bath`,
-                url: window.location.href,
-            }).catch((err) => console.log('Error sharing:', err));
-        } else {
-            // Fallback: copy to clipboard
-            navigator.clipboard.writeText(window.location.href);
-            alert('Link copied to clipboard!');
-        }
-    };
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVED_LISTINGS_KEY) || '[]') as string[];
+      setIsSaved(saved.includes(listing.id));
+    } catch { /* ignore */ }
+  }, [listing.id]);
 
-    const primaryPhoto = getImageUrl(
-        (listing as any).image || listing.photos?.[0],
-        'listings'
-    );
+  const handleSave = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVED_LISTINGS_KEY) || '[]') as string[];
+      if (isSaved) {
+        const updated = saved.filter(id => id !== listing.id);
+        localStorage.setItem(SAVED_LISTINGS_KEY, JSON.stringify(updated));
+        setIsSaved(false);
+        toast.success("Removed from saved");
+      } else {
+        saved.push(listing.id);
+        localStorage.setItem(SAVED_LISTINGS_KEY, JSON.stringify(saved));
+        setIsSaved(true);
+        toast.success("Saved to favorites!");
+      }
+    } catch { /* ignore */ }
+  };
 
-    return (
-        <div
-            onClick={onClick}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            className={cn(
-                "bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 group",
-                "hover:shadow-2xl hover:-translate-y-1",
-                isHovered ? "shadow-2xl -translate-y-1" : "shadow-md"
-            )}
-        >
-            {/* Image */}
-            <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
-                <img
-                    src={primaryPhoto}
-                    alt={listing.title || (listing as any).address || 'Property'}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    loading="lazy"
-                    onError={(e) => {
-                        e.currentTarget.src = '/placeholder-property.jpg';
-                    }}
-                />
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareText = `${address}${city ? `, ${city}` : ''} - ${formatPrice(price)}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: shareText, url: window.location.href });
+        return;
+      } catch { /* ignore */ }
+    }
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link copied!");
+    } catch { /* ignore */ }
+  };
 
-                {/* Gradient Overlay on Hover */}
-                <div className={cn(
-                    "absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent transition-opacity duration-300",
-                    isHovered ? "opacity-100" : "opacity-0"
-                )} />
+  return (
+    <div
+      onClick={onClick}
+      className="group bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-label={`View ${address} - ${formatPrice(price)}`}
+      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+    >
+      {/* Image Container */}
+      <div className="relative h-52 sm:h-56 overflow-hidden">
+        {/* Skeleton while loading */}
+        {!imageLoaded && (
+          <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+        )}
+        <img
+          src={primaryImage}
+          alt={address}
+          className={cn(
+            "w-full h-full object-cover transition-transform duration-700 group-hover:scale-110",
+            imageLoaded ? "opacity-100" : "opacity-0"
+          )}
+          loading="lazy"
+          onLoad={() => setImageLoaded(true)}
+          onError={(e) => {
+            e.currentTarget.src = '/placeholder-property.jpg';
+            setImageLoaded(true);
+          }}
+        />
 
-                {/* Status Badge */}
-                <div className="absolute top-3 left-3">
-                    <span
-                        className={cn(
-                            "px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg",
-                            statusColors[listing.status]
-                        )}
-                    >
-                        {statusLabels[listing.status]}
-                    </span>
-                </div>
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
-                {/* Featured Badge */}
-                {listing.is_featured && (
-                    <div className="absolute top-3 right-3">
-                        <span className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-xs font-semibold shadow-lg">
-                            Featured
-                        </span>
-                    </div>
-                )}
-
-                {/* Quick Actions - Show on Hover */}
-                <div className={cn(
-                    "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-3 transition-all duration-300",
-                    isHovered ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
-                )}>
-                    <button
-                        onClick={onClick}
-                        className="p-3 bg-white rounded-full shadow-xl hover:bg-blue-50 transition-all hover:scale-110"
-                        aria-label="View details"
-                    >
-                        <Eye className="h-5 w-5 text-blue-600" />
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className="p-3 bg-white rounded-full shadow-xl hover:bg-red-50 transition-all hover:scale-110"
-                        aria-label={isSaved ? "Unsave property" : "Save property"}
-                    >
-                        <Heart className={cn(
-                            "h-5 w-5",
-                            isSaved ? "fill-red-500 text-red-500" : "text-gray-600"
-                        )} />
-                    </button>
-                    <button
-                        onClick={handleShare}
-                        className="p-3 bg-white rounded-full shadow-xl hover:bg-green-50 transition-all hover:scale-110"
-                        aria-label="Share property"
-                    >
-                        <Share2 className="h-5 w-5 text-green-600" />
-                    </button>
-                </div>
-
-                {/* Days on Market */}
-                {listing.days_on_market !== null &&
-                    listing.status === "active" && (
-                        <div className="absolute bottom-3 right-3">
-                            <span className="px-3 py-1.5 bg-black/70 backdrop-blur-sm text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-lg">
-                                <Calendar className="h-3.5 w-3.5" />
-                                {listing.days_on_market} days
-                            </span>
-                        </div>
-                    )}
-
-                {/* Saved Indicator (top-left corner) */}
-                {isSaved && !isHovered && (
-                    <div className="absolute top-3 left-3">
-                        <Heart className="h-6 w-6 fill-red-500 text-red-500 drop-shadow-lg" />
-                    </div>
-                )}
-            </div>
-
-            {/* Content */}
-            <div className="p-5">
-                {/* Price */}
-                <div className="mb-3">
-                    <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                        {formatPrice(parsePrice((listing as any).price))}
-                    </p>
-                    {((listing as any).original_price &&
-                        parsePrice((listing as any).original_price) !== parsePrice((listing as any).price)) && (
-                        <p className="text-sm text-gray-500 line-through mt-1">
-                            {formatPrice(parsePrice((listing as any).original_price))}
-                        </p>
-                    )}
-                </div>
-
-                {/* Property Stats */}
-                {(listing.bedrooms ||
-                    listing.bathrooms ||
-                    listing.square_feet) && (
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-3 pb-3 border-b border-gray-200">
-                        {listing.bedrooms && (
-                            <div className="flex items-center gap-1.5 font-medium">
-                                <Bed className="h-4 w-4 text-blue-600" />
-                                <span>{listing.bedrooms} bd</span>
-                            </div>
-                        )}
-                        {listing.bathrooms && (
-                            <div className="flex items-center gap-1.5 font-medium">
-                                <Bath className="h-4 w-4 text-blue-600" />
-                                <span>{listing.bathrooms} ba</span>
-                            </div>
-                        )}
-                        {listing.square_feet && (
-                            <div className="flex items-center gap-1.5 font-medium">
-                                <Maximize className="h-4 w-4 text-blue-600" />
-                                <span>
-                                    {listing.square_feet.toLocaleString()} sqft
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Address */}
-                <div className="flex items-start gap-2 text-sm text-gray-700 mb-2">
-                    <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-gray-500" />
-                    <p className="line-clamp-2 font-medium">
-                        {(listing as any).address || ''}{(listing as any).city ? `, ${(listing as any).city}` : ''}
-                    </p>
-                </div>
-
-                {/* Description (optional, truncated) */}
-                {listing.description && (
-                    <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
-                        {listing.description}
-                    </p>
-                )}
-
-                {/* Open House */}
-                {listing.open_house_date && listing.status === "active" && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-xs text-blue-600 font-semibold flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5" />
-                            Open House:{" "}
-                            {new Date(
-                                listing.open_house_date
-                            ).toLocaleDateString("en-US", {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit",
-                            })}
-                        </p>
-                    </div>
-                )}
-
-                {/* Book Showing Button */}
-                {hasCalendly && listing.status === "active" && onBookShowing && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                        <button
-                            onClick={onBookShowing}
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg"
-                        >
-                            <CalendarCheck className="h-4 w-4" />
-                            Book a Showing
-                        </button>
-                    </div>
-                )}
-            </div>
+        {/* Top badges */}
+        <div className="absolute top-3 left-3 flex items-center gap-2">
+          <span className={cn(
+            "px-2.5 py-1 text-white text-xs font-semibold rounded-full shadow-sm backdrop-blur-sm",
+            statusColors[listing.status] || "bg-gray-500"
+          )}>
+            {statusLabels[listing.status] || listing.status}
+          </span>
+          {isFeatured && (
+            <span className="px-2.5 py-1 bg-purple-600/90 backdrop-blur-sm text-white text-xs font-semibold rounded-full flex items-center gap-1">
+              <Star className="h-3 w-3 fill-current" /> Featured
+            </span>
+          )}
         </div>
-    );
+
+        {/* Photo count badge */}
+        {photoCount > 1 && (
+          <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-sm rounded-full text-white text-xs font-medium">
+            {photoCount} photos
+          </div>
+        )}
+
+        {/* Action buttons - visible on hover */}
+        <div className="absolute bottom-3 right-3 flex gap-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+          <button onClick={handleSave}
+            className={cn("p-2.5 rounded-full shadow-lg transition-all min-h-[40px] min-w-[40px] flex items-center justify-center",
+              isSaved ? "bg-red-500 text-white" : "bg-white/90 backdrop-blur-sm text-gray-700 hover:bg-white")}
+            aria-label={isSaved ? "Remove from saved" : "Save property"}>
+            <Heart className={cn("h-4 w-4", isSaved && "fill-current")} />
+          </button>
+          <button onClick={handleShare}
+            className="p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-lg text-gray-700 hover:bg-white transition-all min-h-[40px] min-w-[40px] flex items-center justify-center"
+            aria-label="Share property">
+            <Share2 className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Price overlay */}
+        <div className="absolute bottom-3 left-3">
+          <div className="text-2xl font-bold text-white drop-shadow-lg">
+            {formatPrice(price)}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-4">
+        {/* Address */}
+        <div className="flex items-start gap-1.5 mb-3">
+          <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate group-hover:text-blue-600 transition-colors">
+              {address}
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {city}{state && `, ${state}`}
+            </p>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-4 text-gray-600">
+          {beds > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Bed className="h-4 w-4 text-gray-400" />
+              <span className="text-sm font-medium">{beds}</span>
+              <span className="text-xs text-gray-400">bd</span>
+            </div>
+          )}
+          {baths > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Bath className="h-4 w-4 text-gray-400" />
+              <span className="text-sm font-medium">{baths}</span>
+              <span className="text-xs text-gray-400">ba</span>
+            </div>
+          )}
+          {sqft > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Maximize className="h-4 w-4 text-gray-400" />
+              <span className="text-sm font-medium">{formatNumber(sqft)}</span>
+              <span className="text-xs text-gray-400">sqft</span>
+            </div>
+          )}
+        </div>
+
+        {/* View Details prompt */}
+        <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+          <span className="text-xs text-gray-400 group-hover:text-blue-500 transition-colors flex items-center gap-1">
+            <Eye className="h-3.5 w-3.5" /> View Details
+          </span>
+          {sqft > 0 && price > 0 && (
+            <span className="text-xs text-gray-400">${Math.round(price / sqft)}/sqft</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
