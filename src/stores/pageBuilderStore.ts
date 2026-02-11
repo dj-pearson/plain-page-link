@@ -27,7 +27,7 @@ interface PageBuilderStore {
     isSaving: boolean;
 
     // Actions
-    setPage: (page: PageConfig) => void;
+    setPage: (page: PageConfig | null) => void;
     loadPage: (pageId: string) => Promise<void>;
     loadUserPages: () => Promise<PageConfig[]>;
     selectBlock: (blockId: string | null) => void;
@@ -62,12 +62,21 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
 
     // Set the current page
     setPage: (page) => {
-        set({
-            page,
-            history: [page],
-            historyIndex: 0,
-            selectedBlockId: null,
-        });
+        if (page === null) {
+            set({
+                page: null,
+                history: [],
+                historyIndex: -1,
+                selectedBlockId: null,
+            });
+        } else {
+            set({
+                page,
+                history: [page],
+                historyIndex: 0,
+                selectedBlockId: null,
+            });
+        }
     },
 
     // Load a page from the database
