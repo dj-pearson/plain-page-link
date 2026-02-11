@@ -17,7 +17,7 @@ import { CalendlyModal } from "@/components/integrations/CalendlyModal";
 import { HomeValuationForm } from "@/components/forms/HomeValuationForm";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { QuickNav } from "@/components/profile/QuickNav";
-import LinkStackBlocks from "@/components/profile/LinkStackBlocks";
+import CustomLinks from "@/components/profile/CustomLinks";
 import { useProfileTracking, trackLinkClick } from "@/hooks/useProfileTracking";
 import { usePublicProfile } from "@/hooks/usePublicProfile";
 import { supabase } from "@/integrations/supabase/client";
@@ -428,14 +428,12 @@ export default function FullProfilePage() {
                         </section>
                     )}
 
-                    {/* Custom LinkStack Blocks */}
+                    {/* Custom Links */}
                     {links.length > 0 && (
-                        <LinkStackBlocks
-                            links={links as any}
-                            onLinkClick={async (link: any) => {
-                                // Track link click analytics
+                        <CustomLinks
+                            links={links}
+                            onLinkClick={async (link) => {
                                 trackLinkClick(link.id.toString());
-                                // Increment click count
                                 await supabase.rpc('increment_link_clicks', {
                                     link_id: link.id
                                 });
