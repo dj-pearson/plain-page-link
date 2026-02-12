@@ -56,7 +56,7 @@ export default function LeadCapture() {
                 citationAuthor="AgentBio"
                 citationDate={new Date().toISOString().split('T')[0]}
             />
-            <main className="min-h-screen bg-background">
+            <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>
                 <PublicHeader />
 
                 {/* Breadcrumb Navigation */}

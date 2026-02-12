@@ -150,7 +150,7 @@ export default function Landing() {
                 canonicalUrl={origin}
                 schema={schema}
             />
-            <main className="min-h-screen bg-background">
+            <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>
             {/* Header */}
             <PublicHeader />
 

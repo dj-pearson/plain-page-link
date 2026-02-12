@@ -140,7 +140,7 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex">
+        <main id="main-content" tabIndex={-1} className="min-h-screen flex">
             {/* Left Panel - Branding & Social Proof */}
             <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
                 {/* Animated gradient orbs */}
@@ -402,6 +402,6 @@ export default function Login() {
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

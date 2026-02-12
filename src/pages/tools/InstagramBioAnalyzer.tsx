@@ -276,7 +276,7 @@ export default function InstagramBioAnalyzer() {
         </script>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-pink-50">
+      <main id="main-content" className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-pink-50" tabIndex={-1}>
         {/* Breadcrumb Navigation */}
         <div className="bg-white/80 border-b border-gray-200 py-3">
           <div className="container mx-auto px-4">
@@ -584,7 +584,7 @@ export default function InstagramBioAnalyzer() {
           onSubmit={handleEmailCapture}
           analysisId={analysisId}
         />
-      </div>
+      </main>
     </>
   );
 }

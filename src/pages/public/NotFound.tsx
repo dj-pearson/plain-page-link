@@ -3,7 +3,7 @@ import { Home, ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center px-4">
+        <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center px-4">
             <div className="text-center">
                 <div className="mb-8">
                     <Home className="h-20 w-20 text-blue-600 mx-auto mb-4" />
@@ -35,6 +35,6 @@ export default function NotFound() {
                     </button>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

@@ -203,6 +203,7 @@ export default function Pricing() {
       <div className="min-h-screen flex flex-col">
       {/* Header */}
       <PublicHeader />
+      <main id="main-content" tabIndex={-1}>
       <div className="bg-gradient-to-br from-background via-background to-primary/5 py-20 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumbs */}
@@ -390,6 +391,7 @@ export default function Pricing() {
         </div>
         </div>
       </div>
+      </main>
 
       {/* Footer */}
       <PublicFooter />

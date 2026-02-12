@@ -531,7 +531,7 @@ export default function ListingDescriptionGenerator() {
         </script>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12 px-4">
+      <main id="main-content" className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12 px-4" tabIndex={-1}>
         {/* Render current step */}
         {currentStep === 'intro' && renderIntro()}
         {currentStep === 'form' && (
@@ -548,7 +548,7 @@ export default function ListingDescriptionGenerator() {
           onClose={() => setShowEmailModal(false)}
           onSubmit={handleEmailCapture}
         />
-      </div>
+      </main>
     </>
   );
 }

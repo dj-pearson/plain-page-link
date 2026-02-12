@@ -11,6 +11,8 @@ import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
 import { SkipNavLink } from "./components/ui/skip-nav";
 import { AnnouncerProvider } from "./components/ui/live-region";
+import { RouteAnnouncer } from "./components/ui/route-announcer";
+import { AccessibilityWidget } from "./components/ui/accessibility-widget";
 
 // Public pages (eager load for better UX on landing)
 import Landing from "./pages/public/Landing";
@@ -140,6 +142,9 @@ function App() {
         <AnnouncerProvider>
             {/* Skip Navigation for Keyboard Accessibility (WCAG 2.4.1) */}
             <SkipNavLink />
+
+            {/* Route change announcements for screen readers (WCAG 2.4.2, 4.1.3) */}
+            <RouteAnnouncer />
 
             {/* Offline Indicator */}
             <OfflineIndicator />
@@ -275,6 +280,9 @@ function App() {
             </LazyLoadErrorBoundary>
 
             <Toaster position="top-right" richColors />
+
+            {/* Accessibility widget for user preferences (WCAG 1.4.4, 1.4.3, 2.3.3) */}
+            <AccessibilityWidget />
         </AnnouncerProvider>
     );
 }
