@@ -72,6 +72,7 @@ export default function Blog() {
       {/* Header */}
       <PublicHeader />
 
+      <main id="main-content" tabIndex={-1}>
       {/* Page Title Section */}
       <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-b">
         <div className="container mx-auto px-4 py-12">
@@ -189,6 +190,7 @@ export default function Blog() {
           </div>
         )}
       </div>
+      </main>
 
       {/* Footer */}
       <PublicFooter />

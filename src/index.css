@@ -290,7 +290,7 @@ html {
         scroll-snap-align: start;
     }
 
-    /* Reduced motion support */
+    /* Reduced motion support (WCAG 2.3.3) */
     @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
@@ -299,6 +299,34 @@ html {
             animation-iteration-count: 1 !important;
             transition-duration: 0.01ms !important;
             scroll-behavior: auto !important;
+        }
+    }
+
+    /* High contrast mode support (WCAG 1.4.3, 1.4.11) */
+    @media (prefers-contrast: more) {
+        :root {
+            --primary: 222.2 84% 8%;
+            --primary-foreground: 0 0% 100%;
+            --muted-foreground: 215 25% 30%;
+            --border: 0 0% 20%;
+            --ring: 222.2 84% 8%;
+        }
+    }
+
+    /* Forced colors / Windows High Contrast Mode (WCAG 1.4.11) */
+    @media (forced-colors: active) {
+        *:focus-visible {
+            outline: 2px solid LinkText !important;
+            outline-offset: 2px !important;
+        }
+
+        a {
+            color: LinkText;
+        }
+
+        button,
+        [role="button"] {
+            border: 1px solid ButtonText;
         }
     }
 
@@ -354,6 +382,70 @@ html {
 
     .glass-border {
         @apply border-gray-200/50 dark:border-gray-700/50;
+    }
+
+    /* Accessibility: Text size scaling classes (WCAG 1.4.4 Resize Text) */
+    .a11y-text-scale-100 {
+        font-size: 100%;
+    }
+    .a11y-text-scale-125 {
+        font-size: 125%;
+    }
+    .a11y-text-scale-150 {
+        font-size: 150%;
+    }
+    .a11y-text-scale-175 {
+        font-size: 175%;
+    }
+    .a11y-text-scale-200 {
+        font-size: 200%;
+    }
+
+    /* Accessibility: High contrast class (applied via JS) */
+    .a11y-high-contrast {
+        --primary: 222.2 84% 8%;
+        --primary-foreground: 0 0% 100%;
+        --muted-foreground: 215 25% 30%;
+        --border: 0 0% 20%;
+        --ring: 222.2 84% 8%;
+    }
+    .a11y-high-contrast * {
+        border-color: hsl(0 0% 20%) !important;
+    }
+    .a11y-high-contrast a,
+    .a11y-high-contrast button {
+        text-decoration-thickness: 2px;
+    }
+    .a11y-high-contrast img {
+        outline: 1px solid hsl(0 0% 20%);
+    }
+
+    /* Accessibility: Large cursor class */
+    .a11y-large-cursor,
+    .a11y-large-cursor * {
+        cursor: default;
+    }
+    .a11y-large-cursor a,
+    .a11y-large-cursor button,
+    .a11y-large-cursor [role="button"],
+    .a11y-large-cursor input,
+    .a11y-large-cursor select,
+    .a11y-large-cursor textarea,
+    .a11y-large-cursor label {
+        cursor: pointer;
+    }
+
+    /* Accessibility: Underline all links */
+    .a11y-underline-links a:not([role="button"]) {
+        text-decoration: underline !important;
+        text-underline-offset: 2px;
+    }
+
+    /* Accessibility: Highlight focus for all interactive elements */
+    .a11y-focus-highlight *:focus-visible {
+        outline: 3px solid #ff6b00 !important;
+        outline-offset: 3px !important;
+        box-shadow: 0 0 0 6px rgba(255, 107, 0, 0.25) !important;
     }
 }
 

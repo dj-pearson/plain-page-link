@@ -101,6 +101,7 @@ export default function BlogArticle() {
         {/* Header */}
         <PublicHeader />
 
+        <main id="main-content" tabIndex={-1}>
         {/* Breadcrumb Bar */}
         <div className="bg-gray-50 border-b">
           <div className="container mx-auto px-4 py-3">
@@ -310,6 +311,7 @@ export default function BlogArticle() {
             tags={article.tags || []}
           />
         </article>
+        </main>
 
         {/* Footer */}
         <PublicFooter />

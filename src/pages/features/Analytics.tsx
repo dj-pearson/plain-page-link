@@ -40,7 +40,7 @@ export default function Analytics() {
                 citationTitle="Real Estate Analytics & Insights"
                 citationAuthor="AgentBio"
             />
-            <main className="min-h-screen bg-background">
+            <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>
                 <PublicHeader />
 
                 {/* Direct Answer */}
