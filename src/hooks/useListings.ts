@@ -5,14 +5,27 @@ import { useAuthStore } from "@/stores/useAuthStore";
 export interface Listing {
   id: string;
   user_id: string;
-  image?: string;
+  image?: string | null;
+  photos?: string[] | null;
   address: string;
   city: string;
+  state?: string | null;
+  zip_code?: string | null;
   price: string;
   beds: number;
   baths: number;
-  sqft?: number;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  sqft?: number | null;
+  square_feet?: number | null;
   status: string;
+  description?: string | null;
+  property_type?: string | null;
+  mls_number?: string | null;
+  lot_size_acres?: number | null;
+  virtual_tour_url?: string | null;
+  open_house_date?: string | null;
+  is_featured?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -41,7 +54,7 @@ export function useListings() {
   });
 
   const addListing = useMutation({
-    mutationFn: async (listingData: Omit<Listing, "id" | "user_id" | "created_at" | "updated_at">) => {
+    mutationFn: async (listingData: Partial<Omit<Listing, "id" | "user_id" | "created_at" | "updated_at">>) => {
       if (!user?.id) throw new Error("User not authenticated");
 
       const { data, error } = await supabase

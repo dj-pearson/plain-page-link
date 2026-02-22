@@ -30,12 +30,14 @@ import {
     Download,
     BarChart3,
     Search as SearchIcon,
+    AlertCircle,
+    RefreshCw,
 } from "lucide-react";
 import { useAnalytics, type TimeRange } from "@/hooks/useAnalytics";
 
 export default function Analytics() {
     const [dateRange, setDateRange] = useState<TimeRange>("30d");
-    const { stats, viewsData, leadsData, recentLeads, isLoading } = useAnalytics(dateRange);
+    const { stats, viewsData, leadsData, recentLeads, isLoading, isError, error, refetch } = useAnalytics(dateRange);
     const { toast } = useToast();
 
     const handleExportAnalytics = () => {
@@ -109,6 +111,36 @@ export default function Analytics() {
             description: `Successfully exported analytics data for the last ${dateRangeLabel}`,
         });
     };
+
+    if (isError) {
+        return (
+            <div className="space-y-4 sm:space-y-6">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold">Analytics</h1>
+                    <p className="text-sm sm:text-base text-muted-foreground mt-0.5 sm:mt-1">
+                        Track your profile performance, lead generation, and search visibility
+                    </p>
+                </div>
+                <Card>
+                    <CardContent className="p-6 sm:p-8 text-center">
+                        <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-red-100 rounded-full mb-3 sm:mb-4">
+                            <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-600" />
+                        </div>
+                        <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+                            Failed to load analytics
+                        </h3>
+                        <p className="text-sm sm:text-base text-muted-foreground mb-4 max-w-sm mx-auto">
+                            {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+                        </p>
+                        <Button onClick={() => refetch()} variant="outline" className="gap-2">
+                            <RefreshCw className="h-4 w-4" />
+                            Try Again
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     if (isLoading) {
         return <SkeletonAnalytics />;

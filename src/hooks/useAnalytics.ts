@@ -18,7 +18,7 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
   const cutoffDate = getCutoffDate(timeRange);
 
   // Fetch analytics views with optimizations
-  const { data: views = [], isLoading: viewsLoading } = useQuery({
+  const { data: views = [], isLoading: viewsLoading, isError: viewsError, error: viewsErrorObj, refetch: refetchViews } = useQuery({
     queryKey: ["analytics-views", user?.id, timeRange],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -40,7 +40,7 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
   });
 
   // Fetch leads for analytics with optimizations
-  const { data: leads = [], isLoading: leadsLoading } = useQuery({
+  const { data: leads = [], isLoading: leadsLoading, isError: leadsError, error: leadsErrorObj, refetch: refetchLeads } = useQuery({
     queryKey: ["analytics-leads", user?.id, timeRange],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -106,6 +106,9 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     leadsData,
     recentLeads: leads.slice(0, 10),
     isLoading: viewsLoading || leadsLoading,
+    isError: viewsError || leadsError,
+    error: viewsErrorObj || leadsErrorObj,
+    refetch: () => { refetchViews(); refetchLeads(); },
     timeRange,
   };
 }

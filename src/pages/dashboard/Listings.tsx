@@ -108,7 +108,7 @@ export default function Listings() {
         if (imageUrls.length === 0) return;
       }
 
-      const listingData: Record<string, unknown> = {
+      const listingData: Partial<Omit<Listing, "id" | "user_id" | "created_at" | "updated_at">> = {
         address: data.address,
         city: data.city,
         state: data.state,
@@ -129,11 +129,10 @@ export default function Listings() {
         lot_size_acres: data.lotSize ? parseFloat(data.lotSize) : null,
         virtual_tour_url: data.virtualTourUrl || null,
         is_featured: data.isFeatured || false,
+        open_house_date: data.openHouseDate || null,
       };
 
-      if (data.openHouseDate) listingData.open_house_date = data.openHouseDate;
-
-      await addListing.mutateAsync(listingData as any);
+      await addListing.mutateAsync(listingData);
 
       setNewlyCreatedListing({
         address: data.address, city: data.city, price: data.price,
@@ -149,44 +148,48 @@ export default function Listings() {
     }
   };
 
-  const handleCSVImport = async (importedListings: any[]) => {
+  const handleCSVImport = async (importedListings: Record<string, unknown>[]) => {
     let successCount = 0;
+    let failCount = 0;
     for (const listing of importedListings) {
       try {
         await addListing.mutateAsync({
-          address: listing.address, city: listing.city, state: listing.state,
-          zip_code: listing.zip_code, price: String(listing.price),
-          beds: listing.bedrooms, baths: listing.bathrooms,
-          bedrooms: listing.bedrooms, bathrooms: listing.bathrooms,
-          sqft: listing.square_feet, square_feet: listing.square_feet,
-          status: listing.status, description: listing.description,
-          mls_number: listing.mls_number, property_type: listing.property_type,
-          lot_size_acres: listing.lot_size_acres, is_featured: listing.is_featured,
-          virtual_tour_url: listing.virtual_tour_url,
-        } as any);
+          address: listing.address as string, city: listing.city as string, state: listing.state as string,
+          zip_code: listing.zip_code as string, price: String(listing.price),
+          beds: listing.bedrooms as number, baths: listing.bathrooms as number,
+          bedrooms: listing.bedrooms as number, bathrooms: listing.bathrooms as number,
+          sqft: listing.square_feet as number, square_feet: listing.square_feet as number,
+          status: listing.status as string, description: listing.description as string,
+          mls_number: listing.mls_number as string, property_type: listing.property_type as string,
+          lot_size_acres: listing.lot_size_acres as number, is_featured: listing.is_featured as boolean,
+          virtual_tour_url: listing.virtual_tour_url as string,
+        });
         successCount++;
       } catch {
-        // Continue with remaining listings
+        failCount++;
       }
     }
     toast({
       title: "Import complete",
-      description: `Successfully imported ${successCount} of ${importedListings.length} listings.`,
+      description: failCount > 0
+        ? `Imported ${successCount} of ${importedListings.length} listings. ${failCount} failed.`
+        : `Successfully imported ${successCount} of ${importedListings.length} listings.`,
+      variant: failCount > 0 ? "destructive" : "default",
     });
   };
 
-  const handleURLImport = (importedListing: any) => {
+  const handleURLImport = (importedListing: Record<string, unknown>) => {
     addListing.mutateAsync({
-      address: importedListing.address, city: importedListing.city,
-      state: importedListing.state, zip_code: importedListing.zip_code,
-      price: importedListing.price,
-      beds: importedListing.bedrooms, baths: importedListing.bathrooms,
-      bedrooms: importedListing.bedrooms, bathrooms: importedListing.bathrooms,
-      sqft: importedListing.square_feet, square_feet: importedListing.square_feet,
-      status: importedListing.status || "active",
-      description: importedListing.description, mls_number: importedListing.mls_number,
-      property_type: importedListing.property_type, lot_size_acres: importedListing.lot_size_acres,
-    } as any).then(() => {
+      address: importedListing.address as string, city: importedListing.city as string,
+      state: importedListing.state as string, zip_code: importedListing.zip_code as string,
+      price: importedListing.price as string,
+      beds: importedListing.bedrooms as number, baths: importedListing.bathrooms as number,
+      bedrooms: importedListing.bedrooms as number, bathrooms: importedListing.bathrooms as number,
+      sqft: importedListing.square_feet as number, square_feet: importedListing.square_feet as number,
+      status: (importedListing.status as string) || "active",
+      description: importedListing.description as string, mls_number: importedListing.mls_number as string,
+      property_type: importedListing.property_type as string, lot_size_acres: importedListing.lot_size_acres as number,
+    }).then(() => {
       toast({ title: "Listing imported!", description: "Property has been added to your listings." });
     }).catch(() => {
       toast({ title: "Error", description: "Failed to import listing.", variant: "destructive" });
@@ -374,14 +377,14 @@ export default function Listings() {
           {filteredListings.map((listing) => (
             <div key={listing.id} className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group">
               <div className="relative h-48 sm:h-52 overflow-hidden">
-                <img src={getImageUrl((listing as any).image || (listing as any).photos?.[0], 'listings')} alt={listing.address}
+                <img src={getImageUrl(listing.image || listing.photos?.[0], 'listings')} alt={listing.address}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy"
                   onError={(e) => { e.currentTarget.src = '/placeholder-property.jpg'; }} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="absolute top-2 left-2">
                   <QuickStatusUpdate listingId={listing.id} currentStatus={listing.status} onStatusChange={(s) => { listing.status = s; }} />
                 </div>
-                {(listing as any).is_featured && (
+                {listing.is_featured && (
                   <div className="absolute top-2 right-2">
                     <span className="px-2 py-1 bg-purple-600 text-white rounded-full text-[10px] font-semibold flex items-center gap-1">
                       <Star className="h-3 w-3 fill-current" /> Featured
@@ -403,19 +406,19 @@ export default function Listings() {
                 <div className="mb-2">
                   <div className="text-xl font-bold text-primary mb-0.5">{formatPrice(parsePrice(listing.price))}</div>
                   <div className="font-medium text-sm text-foreground truncate">{listing.address}</div>
-                  <div className="text-xs text-muted-foreground">{listing.city}{(listing as any).state ? `, ${(listing as any).state}` : ''}</div>
+                  <div className="text-xs text-muted-foreground">{listing.city}{listing.state ? `, ${listing.state}` : ''}</div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                  <span>{listing.beds || (listing as any).bedrooms || 0} beds</span>
+                  <span>{listing.beds || listing.bedrooms || 0} beds</span>
                   <span className="text-border">|</span>
-                  <span>{listing.baths || (listing as any).bathrooms || 0} baths</span>
-                  {(listing.sqft || (listing as any).square_feet) && (
-                    <><span className="text-border">|</span><span>{(listing.sqft || (listing as any).square_feet || 0).toLocaleString()} sqft</span></>
+                  <span>{listing.baths || listing.bathrooms || 0} baths</span>
+                  {(listing.sqft || listing.square_feet) && (
+                    <><span className="text-border">|</span><span>{(listing.sqft || listing.square_feet || 0).toLocaleString()} sqft</span></>
                   )}
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <div className="text-xs text-muted-foreground">Listed {new Date(listing.created_at).toLocaleDateString()}</div>
-                  {(listing as any).mls_number && <div className="text-xs text-muted-foreground">MLS# {(listing as any).mls_number}</div>}
+                  {listing.mls_number && <div className="text-xs text-muted-foreground">MLS# {listing.mls_number}</div>}
                 </div>
               </div>
             </div>
@@ -443,12 +446,12 @@ export default function Listings() {
                 <tr key={listing.id} className="hover:bg-accent/50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <img src={getImageUrl((listing as any).image || (listing as any).photos?.[0], 'listings')} alt={listing.address}
+                      <img src={getImageUrl(listing.image || listing.photos?.[0], 'listings')} alt={listing.address}
                         className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                         onError={(e) => { e.currentTarget.src = '/placeholder-property.jpg'; }} />
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate">{listing.address}</div>
-                        <div className="text-xs text-muted-foreground">{listing.city}{(listing as any).state ? `, ${(listing as any).state}` : ''}</div>
+                        <div className="text-xs text-muted-foreground">{listing.city}{listing.state ? `, ${listing.state}` : ''}</div>
                       </div>
                     </div>
                   </td>
@@ -456,10 +459,10 @@ export default function Listings() {
                     <QuickStatusUpdate listingId={listing.id} currentStatus={listing.status} onStatusChange={(s) => { listing.status = s; }} />
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-sm">{formatPrice(parsePrice(listing.price))}</td>
-                  <td className="px-4 py-3 text-center text-sm hidden sm:table-cell">{listing.beds || (listing as any).bedrooms || '-'}</td>
-                  <td className="px-4 py-3 text-center text-sm hidden sm:table-cell">{listing.baths || (listing as any).bathrooms || '-'}</td>
+                  <td className="px-4 py-3 text-center text-sm hidden sm:table-cell">{listing.beds || listing.bedrooms || '-'}</td>
+                  <td className="px-4 py-3 text-center text-sm hidden sm:table-cell">{listing.baths || listing.bathrooms || '-'}</td>
                   <td className="px-4 py-3 text-right text-sm hidden lg:table-cell">
-                    {(listing.sqft || (listing as any).square_feet) ? (listing.sqft || (listing as any).square_feet).toLocaleString() : '-'}
+                    {(listing.sqft || listing.square_feet) ? (listing.sqft || listing.square_feet).toLocaleString() : '-'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -525,8 +528,8 @@ export default function Listings() {
             address: editingListing.address, city: editingListing.city, price: editingListing.price,
             beds: editingListing.beds, baths: editingListing.baths, sqft: editingListing.sqft,
             status: editingListing.status, image: editingListing.image,
-            description: (editingListing as any).description, mls_number: (editingListing as any).mls_number,
-            property_type: (editingListing as any).property_type,
+            description: editingListing.description, mls_number: editingListing.mls_number,
+            property_type: editingListing.property_type,
           }} />
       )}
 
