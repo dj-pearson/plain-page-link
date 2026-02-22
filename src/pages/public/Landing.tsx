@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Home, BarChart3, Users, Brain, Target, TrendingUp, Zap, CheckCircle2, Building2, Calendar, Award, Sparkles } from "lucide-react";
+import { Home, BarChart3, Users, Brain, Target, Zap, Sparkles } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
@@ -8,12 +8,56 @@ import { HeroSectionLazy } from "@/components/hero";
 import { BeforeAfterComparison } from "@/components/landing/BeforeAfterComparison";
 import { DemoProfilesShowcase } from "@/components/landing/DemoProfilesShowcase";
 import { AgentTestimonials } from "@/components/landing/AgentTestimonials";
-import { FeatureCard } from "@/components/landing/FeatureCard";
+import { LazyLoadErrorBoundary } from "@/components/LazyLoadErrorBoundary";
 import { generateBreadcrumbSchema, generateEnhancedLocalBusinessSchema, generateEnhancedOrganizationSchema } from "@/lib/seo";
 import { getSafeOrigin } from "@/lib/utils";
 
 // Lazy load BlogSection since it's below the fold and requires Supabase
 const BlogSection = React.lazy(() => import("@/components/blog/BlogSection").then(m => ({ default: m.BlogSection })));
+
+// Single source of truth for FAQ data - used in both JSON-LD schema and UI
+const LANDING_FAQS = [
+    {
+        question: "What is a real estate bio page?",
+        answer: "A real estate bio page is a mobile-optimized landing page specifically designed for real estate agents to showcase their property listings, capture buyer and seller leads, and book showing appointments. Unlike generic link-in-bio tools, real estate bio pages include features like property galleries, lead capture forms, MLS compliance, and appointment booking\u2014all optimized for converting social media followers into qualified leads."
+    },
+    {
+        question: "How do real estate agents use Instagram for leads?",
+        answer: "Real estate agents use Instagram to attract followers by posting property photos, market updates, and neighborhood content. To convert those followers into leads, agents place a bio page link in their Instagram profile. When followers click the link, they land on a dedicated portfolio page where they can view listings, submit inquiries, request home valuations, and book showing appointments\u2014all without leaving their mobile device."
+    },
+    {
+        question: "What's the difference between AgentBio and Linktree?",
+        answer: "Linktree is a generic link organization tool, while AgentBio is purpose-built for real estate agents. AgentBio includes property listing galleries, lead capture forms with pre-qualification questions, sold property showcase, client testimonials, MLS compliance features, and appointment booking integration. You also get lead tracking, analytics on which listings get the most interest, and mobile optimization specifically designed for real estate marketing."
+    },
+    {
+        question: "How much does a real estate agent website cost?",
+        answer: "Traditional real estate agent websites cost $3,000-$15,000 upfront plus $100-$300 per month for hosting, maintenance, booking systems, and lead capture tools. AgentBio provides all these features for $39/month with $0 setup costs. You get property galleries, lead capture forms, appointment booking, analytics, and mobile optimization\u2014everything a traditional website offers, but optimized specifically for social media traffic and mobile users."
+    },
+    {
+        question: "Can I showcase sold properties on my bio page?",
+        answer: "Yes! Showcasing sold properties is one of the most powerful social proof elements for real estate agents. AgentBio lets you create a dedicated sold properties section with photos, addresses, sale prices, and closing dates. This demonstrates your track record and expertise to potential clients browsing your Instagram bio page."
+    },
+    {
+        question: "How do I capture leads with AgentBio?",
+        answer: "AgentBio includes built-in lead capture forms for buyers, sellers, and home valuations. Interested clients can submit their information directly from your portfolio link. You'll receive email notifications and can manage all leads from your dashboard with detailed analytics about lead sources."
+    },
+    {
+        question: "Is AgentBio mobile-friendly?",
+        answer: "Yes, all AgentBio portfolios are fully mobile-optimized and responsive. Your portfolio will look professional on any device - smartphones, tablets, and desktop computers. Most home buyers browse on mobile devices, so mobile optimization is a core feature."
+    },
+    {
+        question: "Can I customize my AgentBio portfolio?",
+        answer: "Absolutely! You can customize colors, fonts, layout, profile photo, bio, social media links, and all content. Premium plans offer additional customization options including custom domains, advanced themes, and white-label branding to match your brokerage or personal brand."
+    },
+    {
+        question: "Do I need technical skills to use AgentBio?",
+        answer: "No technical skills required! AgentBio is designed to be simple and intuitive. You can create your professional portfolio in minutes by filling out your profile, uploading photos, and adding listings. Our drag-and-drop interface makes customization easy for anyone."
+    },
+    {
+        question: "How do I share my AgentBio portfolio?",
+        answer: "You'll get a unique link (agentbio.net/yourname) that you can share anywhere - social media profiles, email signatures, business cards, listing presentations, or text messages. You can also share individual listings directly from your portfolio."
+    },
+];
 
 export default function Landing() {
     // Safe origin for SSR/crawler compatibility
@@ -84,48 +128,14 @@ export default function Landing() {
             localBusinessSchema,
             {
                 "@type": "FAQPage",
-                "mainEntity": [
-                    {
-                        "@type": "Question",
-                        "name": "What is a real estate bio page?",
-                        "acceptedAnswer": {
-                            "@type": "Answer",
-                            "text": "A real estate bio page is a mobile-optimized landing page specifically designed for real estate agents to showcase their property listings, capture buyer and seller leads, and book showing appointments. Unlike generic link-in-bio tools, real estate bio pages include features like property galleries, lead capture forms, MLS compliance, and appointment booking—all optimized for converting social media followers into qualified leads."
-                        }
-                    },
-                    {
-                        "@type": "Question",
-                        "name": "How do real estate agents use Instagram for leads?",
-                        "acceptedAnswer": {
-                            "@type": "Answer",
-                            "text": "Real estate agents use Instagram to attract followers by posting property photos, market updates, and neighborhood content. To convert those followers into leads, agents place a bio page link in their Instagram profile. When followers click the link, they land on a dedicated portfolio page where they can view listings, submit inquiries, request home valuations, and book showing appointments—all without leaving their mobile device."
-                        }
-                    },
-                    {
-                        "@type": "Question",
-                        "name": "What's the difference between AgentBio and Linktree?",
-                        "acceptedAnswer": {
-                            "@type": "Answer",
-                            "text": "Linktree is a generic link organization tool, while AgentBio is purpose-built for real estate agents. AgentBio includes property listing galleries, lead capture forms with pre-qualification questions, sold property showcase, client testimonials, MLS compliance features, and appointment booking integration. You also get lead tracking, analytics on which listings get the most interest, and mobile optimization specifically designed for real estate marketing."
-                        }
-                    },
-                    {
-                        "@type": "Question",
-                        "name": "How much does a real estate agent website cost?",
-                        "acceptedAnswer": {
-                            "@type": "Answer",
-                            "text": "Traditional real estate agent websites cost $3,000-$15,000 upfront plus $100-$300 per month for hosting, maintenance, booking systems, and lead capture tools. AgentBio provides all these features for $39/month with $0 setup costs. You get property galleries, lead capture forms, appointment booking, analytics, and mobile optimization—everything a traditional website offers, but optimized specifically for social media traffic and mobile users."
-                        }
-                    },
-                    {
-                        "@type": "Question",
-                        "name": "Can I showcase sold properties on my bio page?",
-                        "acceptedAnswer": {
-                            "@type": "Answer",
-                            "text": "Yes! Showcasing sold properties is one of the most powerful social proof elements for real estate agents. AgentBio lets you create a dedicated sold properties section with photos, addresses, sale prices, and closing dates. This demonstrates your track record and expertise to potential clients browsing your Instagram bio page."
-                        }
+                "mainEntity": LANDING_FAQS.slice(0, 5).map(faq => ({
+                    "@type": "Question",
+                    "name": faq.question,
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": faq.answer
                     }
-                ]
+                }))
             }
         ]
     };
@@ -459,25 +469,27 @@ export default function Landing() {
             </section>
 
             {/* Blog Section - Lazy loaded since it's below the fold */}
-            <React.Suspense fallback={
-                <section className="py-16 bg-muted/30">
-                    <div className="container mx-auto px-4">
-                        <div className="text-center mb-12">
-                            <h2 className="text-4xl font-bold mb-4">Latest Real Estate Insights</h2>
-                            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                                Expert advice, market trends, and guides to help you succeed in real estate
-                            </p>
+            <LazyLoadErrorBoundary>
+                <React.Suspense fallback={
+                    <section className="py-16 bg-muted/30">
+                        <div className="container mx-auto px-4">
+                            <div className="text-center mb-12">
+                                <h2 className="text-4xl font-bold mb-4">Latest Real Estate Insights</h2>
+                                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                                    Expert advice, market trends, and guides to help you succeed in real estate
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="h-80 rounded-lg bg-muted animate-pulse" />
+                                ))}
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {[1, 2, 3].map((i) => (
-                                <div key={i} className="h-80 rounded-lg bg-gray-200 dark:bg-gray-800 animate-pulse" />
-                            ))}
-                        </div>
-                    </div>
-                </section>
-            }>
-                <BlogSection limit={6} showSearch={true} showFilters={true} />
-            </React.Suspense>
+                    </section>
+                }>
+                    <BlogSection limit={6} showSearch={true} showFilters={true} />
+                </React.Suspense>
+            </LazyLoadErrorBoundary>
 
             {/* FAQ Section */}
             <section className="py-20 bg-background" aria-labelledby="faq-heading">
@@ -492,46 +504,9 @@ export default function Landing() {
                     </header>
 
                     <div className="max-w-4xl mx-auto space-y-4">
-                        <FAQItem
-                            question="What is a real estate bio page?"
-                            answer="A real estate bio page is a mobile-optimized landing page specifically designed for real estate agents to showcase their property listings, capture buyer and seller leads, and book showing appointments. Unlike generic link-in-bio tools, real estate bio pages include features like property galleries, lead capture forms, MLS compliance, and appointment booking—all optimized for converting social media followers into qualified leads."
-                        />
-                        <FAQItem
-                            question="How do real estate agents use Instagram for leads?"
-                            answer="Real estate agents use Instagram to attract followers by posting property photos, market updates, and neighborhood content. To convert those followers into leads, agents place a bio page link in their Instagram profile. When followers click the link, they land on a dedicated portfolio page where they can view listings, submit inquiries, request home valuations, and book showing appointments—all without leaving their mobile device."
-                        />
-                        <FAQItem
-                            question="What's the difference between AgentBio and Linktree?"
-                            answer="Linktree is a generic link organization tool, while AgentBio is purpose-built for real estate agents. AgentBio includes property listing galleries, lead capture forms with pre-qualification questions, sold property showcase, client testimonials, MLS compliance features, and appointment booking integration. You also get lead tracking, analytics on which listings get the most interest, and mobile optimization specifically designed for real estate marketing."
-                        />
-                        <FAQItem
-                            question="How much does a real estate agent website cost?"
-                            answer="Traditional real estate agent websites cost $3,000-$15,000 upfront plus $100-$300 per month for hosting, maintenance, booking systems, and lead capture tools. AgentBio provides all these features for $39/month with $0 setup costs. You get property galleries, lead capture forms, appointment booking, analytics, and mobile optimization—everything a traditional website offers, but optimized specifically for social media traffic and mobile users."
-                        />
-                        <FAQItem
-                            question="Can I showcase sold properties on my bio page?"
-                            answer="Yes! Showcasing sold properties is one of the most powerful social proof elements for real estate agents. AgentBio lets you create a dedicated sold properties section with photos, addresses, sale prices, and closing dates. This demonstrates your track record and expertise to potential clients browsing your Instagram bio page."
-                        />
-                        <FAQItem
-                            question="How do I capture leads with AgentBio?"
-                            answer="AgentBio includes built-in lead capture forms for buyers, sellers, and home valuations. Interested clients can submit their information directly from your portfolio link. You'll receive email notifications and can manage all leads from your dashboard with detailed analytics about lead sources."
-                        />
-                        <FAQItem
-                            question="Is AgentBio mobile-friendly?"
-                            answer="Yes, all AgentBio portfolios are fully mobile-optimized and responsive. Your portfolio will look professional on any device - smartphones, tablets, and desktop computers. Most home buyers browse on mobile devices, so mobile optimization is a core feature."
-                        />
-                        <FAQItem
-                            question="Can I customize my AgentBio portfolio?"
-                            answer="Absolutely! You can customize colors, fonts, layout, profile photo, bio, social media links, and all content. Premium plans offer additional customization options including custom domains, advanced themes, and white-label branding to match your brokerage or personal brand."
-                        />
-                        <FAQItem
-                            question="Do I need technical skills to use AgentBio?"
-                            answer="No technical skills required! AgentBio is designed to be simple and intuitive. You can create your professional portfolio in minutes by filling out your profile, uploading photos, and adding listings. Our drag-and-drop interface makes customization easy for anyone."
-                        />
-                        <FAQItem
-                            question="How do I share my AgentBio portfolio?"
-                            answer="You'll get a unique link (agentbio.net/yourname) that you can share anywhere - social media profiles, email signatures, business cards, listing presentations, or text messages. You can also share individual listings directly from your portfolio."
-                        />
+                        {LANDING_FAQS.map((faq, index) => (
+                            <FAQItem key={index} question={faq.question} answer={faq.answer} />
+                        ))}
                     </div>
                 </div>
             </section>

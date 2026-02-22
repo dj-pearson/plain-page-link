@@ -90,13 +90,13 @@ export default function Overview() {
     return (
         <div className="space-y-4 sm:space-y-6">
             <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
+                <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
                     {greeting}
                     {profile?.full_name && !isNewUser && (
-                        <span className="text-gray-600">, {profile.full_name.split(' ')[0]}</span>
+                        <span className="text-muted-foreground">, {profile.full_name.split(' ')[0]}</span>
                     )}
                 </h2>
-                <p className="text-sm sm:text-base text-gray-600">
+                <p className="text-sm sm:text-base text-muted-foreground">
                     {subtitle}
                 </p>
             </div>
@@ -289,13 +289,13 @@ function StatCard({
     value: string;
 }) {
     return (
-        <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 md:p-6 hover:shadow-md transition-shadow active:scale-[0.98] cursor-pointer">
+        <div className="bg-card rounded-lg border border-border p-3 sm:p-4 md:p-6 hover:shadow-md transition-shadow active:scale-[0.98] cursor-pointer">
             <div className="flex items-center mb-2 sm:mb-3 md:mb-4">
-                <div className="p-1.5 sm:p-2 bg-gray-50 rounded-lg">{icon}</div>
+                <div className="p-1.5 sm:p-2 bg-muted rounded-lg">{icon}</div>
             </div>
             <div>
-                <p className="text-xs sm:text-sm text-gray-600 mb-1">{label}</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 break-all">{value}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">{label}</p>
+                <p className="text-xl sm:text-2xl font-bold text-foreground break-all">{value}</p>
             </div>
         </div>
     );

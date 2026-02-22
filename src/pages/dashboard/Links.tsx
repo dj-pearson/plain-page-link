@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   Plus,
   Edit,
@@ -30,6 +30,8 @@ import {
   ArrowUp,
   ArrowDown,
   MousePointerClick,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { AddLinkModal } from "@/components/modals/AddLinkModal";
 import { EditLinkModal } from "@/components/modals/EditLinkModal";
@@ -41,9 +43,11 @@ import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { LimitBanner } from "@/components/LimitBanner";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 const getIconComponent = (iconName: string) => {
-  const iconMap: Record<string, any> = {
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
     calendar: Calendar,
     instagram: Instagram,
     facebook: Facebook,
@@ -76,7 +80,7 @@ export default function Links() {
   const [editingLink, setEditingLink] = useState<Link | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { toast } = useToast();
-  const { links, isLoading, addLink, updateLink, deleteLink, toggleActive } = useLinks();
+  const { links, isLoading, isError, error, refetch, addLink, updateLink, deleteLink, toggleActive } = useLinks();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
 
   // Set up soft delete with undo
@@ -248,7 +252,29 @@ export default function Links() {
         </div>
       </div>
 
+      {/* Error State */}
+      {isError && (
+        <Card>
+          <CardContent className="p-6 sm:p-8 text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-red-100 rounded-full mb-3 sm:mb-4">
+              <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-600" />
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
+              Failed to load links
+            </h3>
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 max-w-sm mx-auto">
+              {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+            </p>
+            <Button onClick={() => refetch()} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Links List */}
+      {!isError && (
       <div className="bg-card border border-border rounded-lg divide-y divide-border">
         {isLoading ? (
           <div className="p-6 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
@@ -367,9 +393,10 @@ export default function Links() {
           })
         )}
       </div>
+      )}
 
       {/* Help Text */}
-      {visibleLinks.length > 0 && (
+      {!isError && visibleLinks.length > 0 && (
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
             <strong>Tips:</strong> Use the arrow buttons to reorder links. Toggle the switch to show/hide links on your profile. The order here matches what visitors see.
