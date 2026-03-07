@@ -243,6 +243,23 @@ export const EdgeFunctions = {
       body: data,
       auth: true,
     }),
+
+  // Google Indexing API - submit URLs for indexing/removal
+  submitGoogleIndexing: (data: {
+    urls: string[];
+    action?: 'URL_UPDATED' | 'URL_DELETED';
+  }) =>
+    callEdgeFunction<{
+      success: boolean;
+      total: number;
+      succeeded: number;
+      failed: number;
+      action: string;
+      results: Array<{ url: string; success: boolean; error?: string }>;
+    }>('google-indexing', {
+      body: data,
+      auth: true,
+    }),
 };
 
 export default EdgeFunctions;
