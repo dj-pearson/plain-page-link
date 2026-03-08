@@ -3,6 +3,8 @@
  * Security: Prevents open redirect vulnerabilities
  */
 
+import { logger } from "@/lib/logger";
+
 /**
  * List of allowed internal redirect paths
  * Only paths in this list (or starting with these paths) are allowed
@@ -54,7 +56,7 @@ export function validateRedirectPath(
 
   // Must start with / and not with //
   if (!cleanPath.startsWith('/') || cleanPath.startsWith('//')) {
-    console.warn('Invalid redirect path blocked:', path);
+    logger.warn('Invalid redirect path blocked', { path });
     return defaultPath;
   }
 
@@ -64,7 +66,7 @@ export function validateRedirectPath(
   );
 
   if (!isAllowed) {
-    console.warn('Redirect path not in whitelist:', path);
+    logger.warn('Redirect path not in whitelist', { path });
     return defaultPath;
   }
 

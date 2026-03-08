@@ -5,6 +5,7 @@
 
 import { offlineStorage } from "./offline-storage";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 export class SyncManager {
     private static instance: SyncManager;
@@ -26,12 +27,12 @@ export class SyncManager {
 
     private setupOnlineListener() {
         window.addEventListener("online", () => {
-            console.log("[SyncManager] Network connection restored");
+            logger.info("[SyncManager] Network connection restored");
             this.syncNow();
         });
 
         window.addEventListener("offline", () => {
-            console.log("[SyncManager] Network connection lost");
+            logger.info("[SyncManager] Network connection lost");
         });
     }
 
@@ -60,14 +61,12 @@ export class SyncManager {
 
         try {
             const queue = await offlineStorage.getSyncQueue();
-            console.log(`[SyncManager] Processing ${queue.length} items`);
+            logger.info(`[SyncManager] Processing ${queue.length} items`);
 
             for (const item of queue) {
                 // Skip if too many attempts
                 if (item.attempts >= 5) {
-                    console.warn(
-                        `[SyncManager] Max attempts reached for item ${item.id}`
-                    );
+                    logger.warn(`[SyncManager] Max attempts reached for item ${item.id}`);
                     // You might want to move this to a failed queue or alert the user
                     await offlineStorage.removeFromSyncQueue(item.id);
                     continue;
@@ -76,14 +75,9 @@ export class SyncManager {
                 try {
                     await this.syncItem(item);
                     await offlineStorage.removeFromSyncQueue(item.id);
-                    console.log(
-                        `[SyncManager] Successfully synced item ${item.id}`
-                    );
+                    logger.info(`[SyncManager] Successfully synced item ${item.id}`);
                 } catch (error) {
-                    console.error(
-                        `[SyncManager] Failed to sync item ${item.id}:`,
-                        error
-                    );
+                    logger.error(`[SyncManager] Failed to sync item ${item.id}:`, error as Error);
                     await offlineStorage.incrementSyncAttempts(item.id);
                 }
             }
@@ -109,7 +103,7 @@ export class SyncManager {
                 return await this.syncLeadResponse(data);
 
             default:
-                console.warn(`[SyncManager] Unknown sync type: ${type}`);
+                logger.warn(`[SyncManager] Unknown sync type: ${type}`);
         }
     }
 
@@ -173,7 +167,7 @@ export class SyncManager {
     private async syncLeadResponse(data: any) {
         // Implement lead response sync
         // This would typically involve sending an email or updating lead status
-        console.log("[SyncManager] Syncing lead response:", data);
+        logger.info("[SyncManager] Syncing lead response:", { data });
     }
 
     async queueListingUpdate(listing: any) {

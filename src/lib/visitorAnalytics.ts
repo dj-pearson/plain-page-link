@@ -3,6 +3,8 @@
  * Track visitor behavior on public pages
  */
 
+import { logger } from "@/lib/logger";
+
 // Analytics Event Types
 export type AnalyticsEvent =
     | "page_view"
@@ -336,7 +338,7 @@ class VisitorAnalyticsEngine {
                 throw error;
             }
 
-            console.log("Analytics events sent to database:", eventsToSend.length);
+            logger.info("Analytics events sent to database:", { count: eventsToSend.length });
 
             // Also store in localStorage as backup for offline viewing
             const storageKey = `analytics_${this.getCurrentPageSlug()}`;
@@ -349,7 +351,7 @@ class VisitorAnalyticsEngine {
             const recentEvents = allEvents.slice(-1000);
             localStorage.setItem(storageKey, JSON.stringify(recentEvents));
         } catch (error) {
-            console.error("Failed to send analytics to database:", error);
+            logger.error("Failed to send analytics to database:", error as Error);
 
             // Fallback to localStorage only
             const storageKey = `analytics_${this.getCurrentPageSlug()}`;

@@ -5,11 +5,11 @@ import { formatPrice, parsePrice } from "@/lib/format";
 import { getImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { Listing } from "@/types";
+import type { PublicListing } from "@/types";
 
 interface FeaturedListingsCarouselProps {
-    listings: Listing[];
-    onViewDetails?: (listing: Listing) => void;
+    listings: PublicListing[];
+    onViewDetails?: (listing: PublicListing) => void;
     autoRotate?: boolean;
     interval?: number;
 }
@@ -100,9 +100,9 @@ export function FeaturedListingsCarousel({
 
     // Handle share listing
     const handleShareClick = async () => {
-        const address = (currentListing as any).address || currentListing.title || 'Property';
-        const city = (currentListing as any).city || '';
-        const price = formatPrice(parsePrice((currentListing as any).price));
+        const address = currentListing.address || currentListing.title || 'Property';
+        const city = currentListing.city || '';
+        const price = formatPrice(parsePrice(currentListing.price));
 
         const shareTitle = `Check out this property: ${address}`;
         const shareText = `${address}${city ? `, ${city}` : ''} - ${price}`;
@@ -162,7 +162,7 @@ export function FeaturedListingsCarousel({
     };
 
     const primaryPhoto = getImageUrl(
-        (currentListing as any).image || currentListing.photos?.[0],
+        currentListing.image || currentListing.photos?.[0],
         'listings'
     );
 
@@ -184,7 +184,7 @@ export function FeaturedListingsCarousel({
                     {/* Background Image */}
                     <img
                         src={primaryPhoto}
-                        alt={currentListing.title || (currentListing as any).address || 'Featured Property'}
+                        alt={currentListing.title || currentListing.address || 'Featured Property'}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                             e.currentTarget.src = '/placeholder-property.jpg';
@@ -244,12 +244,12 @@ export function FeaturedListingsCarousel({
                                     transition={{ delay: 0.2 }}
                                     className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2"
                                 >
-                                    {formatPrice(parsePrice((currentListing as any).price))}
+                                    {formatPrice(parsePrice(currentListing.price))}
                                 </motion.h2>
-                                {((currentListing as any).original_price &&
-                                    parsePrice((currentListing as any).original_price) !== parsePrice((currentListing as any).price)) && (
+                                {(currentListing.original_price &&
+                                    parsePrice(currentListing.original_price) !== parsePrice(currentListing.price)) && (
                                     <p className="text-lg md:text-xl text-white/70 line-through">
-                                        {formatPrice(parsePrice((currentListing as any).original_price))}
+                                        {formatPrice(parsePrice(currentListing.original_price))}
                                     </p>
                                 )}
                             </div>
@@ -263,9 +263,9 @@ export function FeaturedListingsCarousel({
                             >
                                 <MapPin className="h-5 w-5 md:h-6 md:w-6 text-white flex-shrink-0 mt-1" />
                                 <p className="text-base md:text-lg lg:text-xl text-white font-medium">
-                                    {(currentListing as any).address || ''}
-                                    {(currentListing as any).city && `, ${(currentListing as any).city}`}
-                                    {(currentListing as any).state && `, ${(currentListing as any).state}`}
+                                    {currentListing.address || ''}
+                                    {currentListing.city && `, ${currentListing.city}`}
+                                    {currentListing.state && `, ${currentListing.state}`}
                                 </p>
                             </motion.div>
 

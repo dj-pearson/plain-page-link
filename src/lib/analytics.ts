@@ -10,6 +10,7 @@ import {
     endOfDay,
     eachDayOfInterval,
 } from "date-fns";
+import { logger } from "@/lib/logger";
 
 // Types
 export interface AnalyticsData {
@@ -508,7 +509,7 @@ export class AnalyticsEngine {
 // Track page views (client-side analytics)
 export const trackPageView = (path: string) => {
     // Log page view
-    console.log('[Analytics] Page view:', path);
+    logger.info('[Analytics] Page view:', { path });
     
     // Future: Send to analytics service
     // Example: Google Analytics, PostHog, etc.

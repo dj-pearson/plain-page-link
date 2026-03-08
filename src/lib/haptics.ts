@@ -3,6 +3,8 @@
  * Provides tactile feedback for better user experience on touch devices
  */
 
+import { logger } from "@/lib/logger";
+
 type HapticPattern = 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'selection';
 
 /**
@@ -59,7 +61,7 @@ export function haptic(pattern: HapticPattern = 'light'): void {
         navigator.vibrate(10);
     }
   } catch (error) {
-    console.warn('Haptic feedback failed:', error);
+    logger.warn('Haptic feedback failed:', { error });
   }
 }
 

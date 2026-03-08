@@ -21,6 +21,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 interface SocialShareButtonsProps {
     url: string;
@@ -83,7 +84,7 @@ export function SocialShareButtons({
                 });
             } catch (error) {
                 // User cancelled share
-                console.log("Share cancelled");
+                logger.debug("Share cancelled");
             }
         }
     };

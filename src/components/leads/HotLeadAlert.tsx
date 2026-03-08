@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 interface HotLead {
     id: string;
@@ -336,6 +337,6 @@ function playNotificationSound() {
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5);
     } catch (error) {
-        console.warn("Could not play notification sound:", error);
+        logger.warn("Could not play notification sound", { error });
     }
 }

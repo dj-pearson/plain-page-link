@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { edgeFunctions } from "@/lib/edgeFunctions";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { logger } from "@/lib/logger";
 
 export interface MFASettings {
   id: string;
@@ -209,7 +210,7 @@ export function useMFA() {
     });
 
     if (error) {
-      console.error("Error checking device trust:", error);
+      logger.error("Error checking device trust", error as Error);
       return false;
     }
 

@@ -22,6 +22,7 @@ import {
 import { TrendingUp, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { submitLead, trackFormSubmission } from "@/lib/leadSubmission";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 const valuationSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -103,7 +104,7 @@ export function HomeValuationForm({
                 throw new Error(result.error || "Failed to submit valuation request");
             }
         } catch (error) {
-            console.error("Error submitting valuation request:", error);
+            logger.error("Error submitting valuation request", error as Error);
             const errorMessage =
                 error instanceof Error
                     ? error.message

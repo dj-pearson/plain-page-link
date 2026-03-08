@@ -8,10 +8,10 @@ import { getImageUrls } from "@/lib/images";
 import { formatPrice, parsePrice, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { Listing } from "@/types";
+import type { PublicListing } from "@/types";
 
 interface ListingDetailModalProps {
-  listing: Listing;
+  listing: PublicListing;
   isOpen: boolean;
   onClose: () => void;
   calendlyUrl?: string;
@@ -49,27 +49,26 @@ export default function ListingDetailModal({ listing, isOpen, onClose, calendlyU
   const [isSaved, setIsSaved] = useState(false);
   const [showShareTooltip, setShowShareTooltip] = useState(false);
 
-  const listingAny = listing as any;
   const photos = getImageUrls(
-    listingAny.photos || (listingAny.image ? [listingAny.image] : null),
+    listing.photos || (listing.image ? [listing.image] : null),
     'listings'
   );
 
-  const address = listingAny.address || listing.title || '';
-  const city = listingAny.city || '';
-  const state = listingAny.state || '';
-  const zipCode = listingAny.zip_code || '';
-  const price = parsePrice(listingAny.price);
-  const beds = listing.bedrooms ?? listingAny.beds ?? 0;
-  const baths = listing.bathrooms ?? listingAny.baths ?? 0;
-  const sqft = listing.square_feet ?? listingAny.sqft ?? 0;
-  const description = listingAny.description || '';
-  const propertyType = listingAny.property_type || '';
-  const mlsNumber = listingAny.mls_number || '';
-  const lotSize = listingAny.lot_size_acres;
-  const virtualTourUrl = listingAny.virtual_tour_url;
-  const daysOnMarket = listingAny.days_on_market;
-  const highlights = listingAny.highlights;
+  const address = listing.address || listing.title || '';
+  const city = listing.city || '';
+  const state = listing.state || '';
+  const zipCode = listing.zip_code || '';
+  const price = parsePrice(listing.price);
+  const beds = listing.bedrooms ?? listing.beds ?? 0;
+  const baths = listing.bathrooms ?? listing.baths ?? 0;
+  const sqft = listing.square_feet ?? listing.sqft ?? 0;
+  const description = listing.description || '';
+  const propertyType = listing.property_type || '';
+  const mlsNumber = listing.mls_number || '';
+  const lotSize = listing.lot_size_acres;
+  const virtualTourUrl = listing.virtual_tour_url;
+  const daysOnMarket = listing.days_on_market;
+  const highlights = listing.highlights;
 
   useEffect(() => {
     try {

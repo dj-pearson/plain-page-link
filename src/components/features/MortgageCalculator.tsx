@@ -20,6 +20,7 @@ import {
 } from '@/lib/mortgageCalculator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { logger } from "@/lib/logger";
 
 interface Props {
   listingId?: string;
@@ -114,7 +115,7 @@ export function MortgageCalculator({
         total_cost: mortgageResults.totalCost,
       });
     } catch (error) {
-      console.error('Failed to track calculator usage:', error);
+      logger.error('Failed to track calculator usage', error as Error);
     }
   };
 
@@ -153,7 +154,7 @@ export function MortgageCalculator({
       setLeadCaptured(true);
       trackCalculatorUsage();
     } catch (error) {
-      console.error('Failed to capture lead:', error);
+      logger.error('Failed to capture lead', error as Error);
     }
   };
 

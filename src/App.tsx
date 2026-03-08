@@ -9,6 +9,7 @@ import { cleanupServiceWorkers } from "./lib/sw-cleanup";
 import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
+import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { SkipNavLink } from "./components/ui/skip-nav";
 import { AnnouncerProvider } from "./components/ui/live-region";
 import { RouteAnnouncer } from "./components/ui/route-announcer";
@@ -182,13 +183,29 @@ function App() {
                     <Route path="/features/testimonials" element={<TestimonialsFeature />} />
                     <Route path="/features/analytics" element={<AnalyticsFeature />} />
 
-                    {/* Tools */}
-                    <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
-                    <Route path="/tools/listing-description-generator" element={<ListingDescriptionGenerator />} />
+                    {/* Tools — isolated error boundary */}
+                    <Route path="/tools/instagram-bio-analyzer" element={
+                        <RouteErrorBoundary section="Instagram Bio Analyzer" backPath="/" backLabel="Home">
+                            <InstagramBioAnalyzer />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/tools/listing-description-generator" element={
+                        <RouteErrorBoundary section="Listing Description Generator" backPath="/" backLabel="Home">
+                            <ListingDescriptionGenerator />
+                        </RouteErrorBoundary>
+                    } />
 
-                    {/* User profiles */}
-                    <Route path="/:username/review" element={<SubmitReview />} />
-                    <Route path="/:slug" element={<ProfilePage />} />
+                    {/* User profiles — isolated error boundary */}
+                    <Route path="/:username/review" element={
+                        <RouteErrorBoundary section="Review">
+                            <SubmitReview />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/:slug" element={
+                        <RouteErrorBoundary section="Profile">
+                            <ProfilePage />
+                        </RouteErrorBoundary>
+                    } />
 
                     {/* Auth routes */}
                     <Route path="/auth/login" element={<Login />} />
@@ -198,22 +215,26 @@ function App() {
                     <Route path="/auth/reset-password" element={<ResetPassword />} />
                     <Route path="/auth/sso/callback" element={<SSOCallback />} />
 
-                    {/* Onboarding (protected) */}
+                    {/* Onboarding (protected) — isolated error boundary */}
                     <Route
                         path="/onboarding/wizard"
                         element={
                             <ProtectedRoute>
-                                <OnboardingWizardPage />
+                                <RouteErrorBoundary section="Onboarding" backPath="/dashboard" backLabel="Skip to Dashboard">
+                                    <OnboardingWizardPage />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     />
 
-                    {/* Dashboard routes (protected) */}
+                    {/* Dashboard routes (protected) — isolated error boundary */}
                     <Route
                         path="/dashboard"
                         element={
                             <ProtectedRoute>
-                                <DashboardLayout />
+                                <RouteErrorBoundary section="Dashboard" backPath="/" backLabel="Home">
+                                    <DashboardLayout />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     >
@@ -250,17 +271,21 @@ function App() {
                         path="/dashboard/workflows/:workflowId"
                         element={
                             <ProtectedRoute>
-                                <WorkflowBuilderPage />
+                                <RouteErrorBoundary section="Workflow Builder" backPath="/dashboard/workflows" backLabel="Back to Workflows">
+                                    <WorkflowBuilderPage />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     />
 
-                    {/* Admin routes */}
+                    {/* Admin routes — isolated error boundary */}
                     <Route
                         path="/admin"
                         element={
                             <ProtectedRoute>
-                                <AdminDashboard />
+                                <RouteErrorBoundary section="Admin" backPath="/dashboard" backLabel="Back to Dashboard">
+                                    <AdminDashboard />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     />
@@ -268,7 +293,9 @@ function App() {
                         path="/admin/seo"
                         element={
                             <ProtectedRoute>
-                                <SEODashboard />
+                                <RouteErrorBoundary section="SEO Dashboard" backPath="/admin" backLabel="Back to Admin">
+                                    <SEODashboard />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     />

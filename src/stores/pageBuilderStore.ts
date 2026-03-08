@@ -7,6 +7,7 @@ import { create } from "zustand";
 import { PageConfig, PageBlock, BlockConfig } from "@/types/pageBuilder";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import {
     addBlock,
     removeBlock,
@@ -108,7 +109,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
 
             get().setPage(pageConfig);
         } catch (error) {
-            console.error('Failed to load page:', error);
+            logger.error('Failed to load page', error as Error);
             toast.error('Failed to load page');
             throw error;
         }
@@ -142,7 +143,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
                 updatedAt: new Date(d.updated_at),
             }));
         } catch (error) {
-            console.error('Failed to load user pages:', error);
+            logger.error('Failed to load user pages', error as Error);
             return [];
         }
     },
@@ -177,7 +178,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
                 selectedBlockId: newPage.blocks[newPage.blocks.length - 1]?.id,
             });
         } catch (error) {
-            console.error('Error adding block:', error);
+            logger.error('Error adding block', error as Error);
             toast.error('Failed to add block');
         }
     },
@@ -373,7 +374,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
 
             toast.success('Page saved successfully');
         } catch (error) {
-            console.error('Failed to save page:', error);
+            logger.error('Failed to save page', error as Error);
             toast.error('Failed to save page');
             throw error;
         } finally {
@@ -408,7 +409,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
 
             toast.success('This page is now your active profile');
         } catch (error) {
-            console.error('Failed to set active page:', error);
+            logger.error('Failed to set active page', error as Error);
             toast.error('Failed to set active page');
             throw error;
         }

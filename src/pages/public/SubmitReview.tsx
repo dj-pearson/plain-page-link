@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { logger } from "@/lib/logger";
 
 export default function SubmitReview() {
   const { username } = useParams();
@@ -41,7 +42,7 @@ export default function SubmitReview() {
         if (error) throw error;
         setProfile(data);
       } catch (error) {
-        console.error("Error fetching profile:", error);
+        logger.error("Error fetching profile", error as Error);
         toast({
           title: "Agent not found",
           description: "The agent profile could not be found.",
@@ -93,7 +94,7 @@ export default function SubmitReview() {
         description: `Thank you for sharing your experience with ${profile.full_name}!`,
       });
     } catch (error) {
-      console.error("Error submitting review:", error);
+      logger.error("Error submitting review", error as Error);
       toast({
         title: "Submission failed",
         description: "There was an error submitting your review. Please try again.",

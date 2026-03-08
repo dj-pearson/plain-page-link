@@ -34,6 +34,7 @@ import {
     RefreshCw,
 } from "lucide-react";
 import { useAnalytics, type TimeRange } from "@/hooks/useAnalytics";
+import { logger } from "@/lib/logger";
 
 export default function Analytics() {
     const [dateRange, setDateRange] = useState<TimeRange>("30d");
@@ -332,7 +333,7 @@ export default function Analytics() {
             {/* Recent Leads Table */}
             <LeadsTable
                 leads={recentLeads}
-                onLeadClick={(lead) => console.log("Lead clicked:", lead)}
+                onLeadClick={(lead) => logger.debug("Lead clicked", { lead })}
             />
                 </TabsContent>
 

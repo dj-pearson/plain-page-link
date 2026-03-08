@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Mail, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { EdgeFunctions } from "@/lib/edgeFunctions";
+import { logger } from "@/lib/logger";
 
 const contactSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -68,7 +69,7 @@ export function ContactForm({
                 onSuccess?.();
             }, 3000);
         } catch (err) {
-            console.error("Error submitting contact form:", err);
+            logger.error("Error submitting contact form", err as Error);
             setError("Failed to send message. Please try again.");
         } finally {
             setIsSubmitting(false);

@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Save, Trash2, Check, Plus, Palette } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import type { ThemeConfig } from "@/lib/themes";
 
 interface SavedTheme {
@@ -50,7 +51,7 @@ export function SavedThemesManager({ currentTheme, onApplyTheme }: SavedThemesMa
                     createdAt: new Date(t.createdAt),
                 })));
             } catch (error) {
-                console.error("Failed to load saved themes:", error);
+                logger.error("Failed to load saved themes", error as Error);
             }
         }
     }, []);

@@ -22,6 +22,7 @@ import {
 import { DollarSign, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { submitLead, trackFormSubmission } from "@/lib/leadSubmission";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 const sellerSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -103,7 +104,7 @@ export function SellerInquiryForm({
                 throw new Error(result.error || "Failed to submit request");
             }
         } catch (error) {
-            console.error("Error submitting seller inquiry:", error);
+            logger.error("Error submitting seller inquiry", error as Error);
             const errorMessage =
                 error instanceof Error
                     ? error.message

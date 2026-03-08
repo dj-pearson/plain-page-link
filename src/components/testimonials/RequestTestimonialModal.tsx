@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 interface RequestTestimonialModalProps {
   open: boolean;
@@ -91,7 +92,7 @@ ${agentName}`;
         });
       } catch (err) {
         // User cancelled or error occurred
-        console.log("Share cancelled");
+        logger.debug("Share cancelled");
       }
     } else {
       // Fallback to copy

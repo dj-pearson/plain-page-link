@@ -12,6 +12,7 @@ import { Helmet } from "react-helmet-async";
 import { Loader2, MessageCircle, X } from "lucide-react";
 import { getThemedStyles, preloadThemeFonts } from "@/lib/themeUtils";
 import { motion, AnimatePresence } from "framer-motion";
+import { logger } from "@/lib/logger";
 
 const animationVariants: Record<string, any> = {
     fadeIn: {
@@ -123,7 +124,7 @@ export default function PublicPage() {
 
                 setPage(pageConfig);
             } catch (err) {
-                console.error("Failed to fetch page:", err);
+                logger.error("Failed to fetch page", err as Error);
                 setError("Page not found or not published");
             } finally {
                 setLoading(false);

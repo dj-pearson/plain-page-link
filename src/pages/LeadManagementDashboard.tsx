@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { analyzeLead } from "@/lib/lead-scoring";
 import { Mail, MessageSquare, TrendingUp, Filter } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 // Mock data (replace with actual API calls)
 const mockLeads = [
@@ -173,18 +174,18 @@ export default function LeadManagementDashboard() {
         // Simulate API call
         await new Promise((resolve) => setTimeout(resolve, 500));
         // In real app, would update lead with new note
-        console.log("Adding note:", note);
+        logger.debug("Adding note", { note });
     };
 
     const handleSendEmail = async (subject: string, body: string) => {
         // Simulate API call
         await new Promise((resolve) => setTimeout(resolve, 500));
-        console.log("Sending email:", { subject, body });
+        logger.debug("Sending email", { subject, body });
         toast.success("Email sent!");
     };
 
     const handleDismissHotLead = (leadId: string) => {
-        console.log("Dismissed hot lead:", leadId);
+        logger.debug("Dismissed hot lead", { leadId });
     };
 
     const handleViewHotLead = (leadId: string) => {
@@ -211,7 +212,7 @@ export default function LeadManagementDashboard() {
         body = body.replace("{agentPhone}", "(555) 123-4567");
 
         toast.success("Template loaded! Ready to send.");
-        console.log("Using template:", { subject: template.subject, body });
+        logger.debug("Using template", { subject: template.subject, body });
     };
 
     const handleCreateTemplate = (

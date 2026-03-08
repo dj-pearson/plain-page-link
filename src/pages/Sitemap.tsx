@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from "@/lib/logger";
 
 /**
  * Sitemap Generator Component
@@ -93,7 +94,7 @@ ${profiles?.map(profile => `  <url>
         URL.revokeObjectURL(url);
 
       } catch (err) {
-        console.error('Error generating sitemap:', err);
+        logger.error('Error generating sitemap', err as Error);
         setError('Error generating sitemap. Please try again later.');
       }
     };

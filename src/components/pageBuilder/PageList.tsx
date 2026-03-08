@@ -22,6 +22,7 @@ import {
     Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { supabase } from "@/integrations/supabase/client";
 import { createNewPage } from "@/lib/pageBuilder";
 import { pageTemplates, applyTemplate } from "@/lib/pageTemplates";
@@ -46,7 +47,7 @@ export function PageList() {
             const userPages = await loadUserPages();
             setPages(userPages);
         } catch (error) {
-            console.error("Failed to load pages:", error);
+            logger.error("Failed to load pages", error as Error);
             toast.error("Failed to load pages");
         } finally {
             setLoading(false);
@@ -99,7 +100,7 @@ export function PageList() {
             await setAsActivePage(pageId);
             await loadPages(); // Reload to show updated active status
         } catch (error) {
-            console.error("Failed to set active page:", error);
+            logger.error("Failed to set active page", error as Error);
         } finally {
             setActivating(null);
         }
@@ -119,7 +120,7 @@ export function PageList() {
             toast.success("Page deleted successfully");
             await loadPages();
         } catch (error) {
-            console.error("Failed to delete page:", error);
+            logger.error("Failed to delete page", error as Error);
             toast.error("Failed to delete page");
         }
     };

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Share2, Download, Facebook, Linkedin, Twitter, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 interface SocialShareProps {
   propertyAddress: string;
@@ -103,7 +104,7 @@ export function SocialShare({
   // Track sharing analytics
   const trackShare = (platform: string) => {
     // This will be wired up to Supabase analytics
-    console.log('Share tracked:', platform);
+    logger.debug('Share tracked', { platform });
   };
 
   return (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
-import { FullPageLoader } from "@/components/LoadingSpinner";
+import { FullPageLoader, ProfileSkeleton } from "@/components/LoadingSpinner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ContactButtons from "@/components/profile/ContactButtons";
 import SocialLinks from "@/components/profile/SocialLinks";
@@ -24,7 +24,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { SEOHead } from "@/components/SEOHead";
 import { applyTheme, type ThemeConfig } from "@/lib/themes";
 import { parsePrice } from "@/lib/format";
-import type { Listing } from "@/types";
+import { getImageUrl } from "@/lib/images";
+import { logger } from "@/lib/logger";
+import type { PublicListing } from "@/types";
 import NotFound from "./NotFound";
 import { ThreeDBackground } from "@/components/theme/ThreeDBackgroundLazy";
 import { GradientMesh } from "@/components/theme/GradientMeshLazy";
@@ -32,7 +34,7 @@ import { FloatingGeometry } from "@/components/theme/FloatingGeometryLazy";
 
 export default function FullProfilePage() {
     const { slug } = useParams<{ slug: string }>();
-    const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+    const [selectedListing, setSelectedListing] = useState<PublicListing | null>(null);
     const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
     const [customPageSlug, setCustomPageSlug] = useState<string | null>(null);
     const [checkingCustomPage, setCheckingCustomPage] = useState(true);
@@ -64,7 +66,7 @@ export default function FullProfilePage() {
                     setCustomPageSlug(customPage.slug);
                 }
             } catch (err) {
-                console.error('Error checking for custom page:', err);
+                logger.error('Error checking for custom page', err as Error);
             } finally {
                 setCheckingCustomPage(false);
             }
@@ -92,7 +94,7 @@ export default function FullProfilePage() {
                         applyTheme(data.profile.theme);
                     } else {
                         // It's just a theme name like "default", skip applying
-                        console.log('[Theme] Using theme preset:', data.profile.theme);
+                        logger.debug('Using theme preset', { theme: data.profile.theme });
                     }
                 } else {
                     // It's already an object, stringify it
@@ -100,9 +102,43 @@ export default function FullProfilePage() {
                     applyTheme(JSON.stringify(data.profile.theme));
                 }
             } catch (e) {
-                console.error('Failed to apply profile theme:', e);
+                logger.error('Failed to apply profile theme', e as Error);
             }
         }
+    }, [data]);
+
+    // Preload featured listing images and avatar for faster rendering
+    useEffect(() => {
+        if (!data) return;
+        const imagesToPreload: string[] = [];
+
+        // Preload avatar
+        if (data.profile?.avatar_url) {
+            imagesToPreload.push(data.profile.avatar_url);
+        }
+
+        // Preload first image of each featured listing
+        const featured = data.listings?.filter((l: { is_featured?: boolean }) => l.is_featured) || [];
+        featured.slice(0, 5).forEach((listing: { image?: string | null; photos?: string[] | null }) => {
+            const imgSrc = getImageUrl(listing.image || listing.photos?.[0], 'listings');
+            if (imgSrc && imgSrc !== '/placeholder-property.jpg') {
+                imagesToPreload.push(imgSrc);
+            }
+        });
+
+        // Preload via link tags for browser-level priority
+        imagesToPreload.forEach(src => {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'image';
+            link.href = src;
+            document.head.appendChild(link);
+        });
+
+        return () => {
+            // Cleanup preload links on unmount
+            document.querySelectorAll('link[rel="preload"][as="image"]').forEach(el => el.remove());
+        };
     }, [data]);
 
     // Redirect to custom page if active
@@ -115,7 +151,7 @@ export default function FullProfilePage() {
     }
 
     if (isLoading) {
-        return <FullPageLoader text="Loading profile..." />;
+        return <ProfileSkeleton />;
     }
 
     if (error || !data) {
@@ -124,17 +160,17 @@ export default function FullProfilePage() {
 
     const { profile, listings, testimonials, links, settings } = data;
 
-    const activeListings = listings.filter((l: any) => l.status === "active");
-    const soldListings = listings.filter((l: any) => l.status === "sold");
+    const activeListings = listings.filter((l: PublicListing) => l.status === "active");
+    const soldListings = listings.filter((l: PublicListing) => l.status === "sold");
 
     // Calculate social proof stats
     const totalVolume = soldListings.reduce(
-        (sum: number, listing: any) => sum + parsePrice(listing.price),
+        (sum: number, listing: PublicListing) => sum + parsePrice(listing.price),
         0
     );
     const averageRating =
         testimonials.length > 0
-            ? testimonials.reduce((sum: number, t: any) => sum + (t.rating || 0), 0) /
+            ? testimonials.reduce((sum: number, t: { rating?: number }) => sum + (t.rating || 0), 0) /
               testimonials.length
             : 0;
 
@@ -268,7 +304,7 @@ export default function FullProfilePage() {
                 ]
             },
             // Individual Review schemas
-            ...(testimonials.length > 0 ? testimonials.slice(0, 10).map((testimonial: any, index: number) => ({
+            ...(testimonials.length > 0 ? testimonials.slice(0, 10).map((testimonial: { author?: string; rating?: number; content?: string; created_at?: string }, index: number) => ({
                 "@type": "Review",
                 "@id": `${currentUrl}#review-${index}`,
                 "itemReviewed": {
@@ -355,7 +391,7 @@ export default function FullProfilePage() {
                         <ContactButtons
                             profile={profile}
                             onContactClick={(method) =>
-                                console.log("Contact clicked:", method)
+                                logger.info("Contact clicked", { method })
                             }
                         />
                     )}

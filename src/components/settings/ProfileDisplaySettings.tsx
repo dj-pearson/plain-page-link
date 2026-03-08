@@ -7,6 +7,7 @@ import { Globe, Plus, ExternalLink, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 export function ProfileDisplaySettings() {
     const navigate = useNavigate();
@@ -33,7 +34,7 @@ export function ProfileDisplaySettings() {
                 setActivePage(data);
             }
         } catch (error) {
-            console.error('Error loading active page:', error);
+            logger.error('Error loading active page', error as Error);
         } finally {
             setLoading(false);
         }
@@ -53,7 +54,7 @@ export function ProfileDisplaySettings() {
             toast.success('Switched to default profile');
             setActivePage(null);
         } catch (error) {
-            console.error('Error deactivating page:', error);
+            logger.error('Error deactivating page', error as Error);
             toast.error('Failed to deactivate custom page');
         }
     };

@@ -4,6 +4,7 @@
  */
 
 import { PageTheme } from "@/types/pageBuilder";
+import { logger } from "@/lib/logger";
 
 // ThemeConfig interface for theme cards
 export interface ThemeConfig {
@@ -641,7 +642,7 @@ export const applyTheme = (themeData: string | ThemeConfig | null) => {
             );
         }
     } catch (error) {
-        console.error("Failed to apply theme:", error);
+        logger.error("Failed to apply theme:", error as Error);
     }
 };
 
