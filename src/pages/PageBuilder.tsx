@@ -53,6 +53,7 @@ import {
     ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { getThemedStyles, preloadThemeFonts } from "@/lib/themeUtils";
 import type { BlockStyle } from "@/types/pageBuilder";
 
@@ -137,7 +138,7 @@ export default function PageBuilderEditor() {
                 await savePage();
                 setLastSaved(new Date());
             } catch (error) {
-                console.error("Auto-save failed:", error);
+                logger.error("Auto-save failed", error as Error);
                 toast.error("Auto-save failed - please save manually");
             }
         }, 3000);

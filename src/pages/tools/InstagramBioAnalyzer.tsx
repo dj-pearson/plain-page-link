@@ -32,6 +32,7 @@ import {
   Target
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export default function InstagramBioAnalyzer() {
   const [currentStep, setCurrentStep] = useState<'form' | 'results'>('form');
@@ -73,7 +74,7 @@ export default function InstagramBioAnalyzer() {
         .single();
 
       if (error) {
-        console.error('Error saving analysis:', error);
+        logger.error('Error saving analysis', error as Error);
       } else if (savedAnalysis) {
         setAnalysisId(savedAnalysis.id);
       }
@@ -92,7 +93,7 @@ export default function InstagramBioAnalyzer() {
       // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      console.error('Analysis error:', error);
+      logger.error('Analysis error', error as Error);
       toast.error('Something went wrong. Please try again.');
     } finally {
       setIsAnalyzing(false);
@@ -142,11 +143,11 @@ export default function InstagramBioAnalyzer() {
           );
 
           if (functionError) {
-            console.error('Error sending email:', functionError);
+            logger.error('Error sending email', functionError as Error);
             // Don't throw - email is nice to have but shouldn't block unlock
           }
         } catch (emailError) {
-          console.error('Email function error:', emailError);
+          logger.error('Email function error', emailError as Error);
           // Don't throw - email failure shouldn't prevent unlock
         }
       }
@@ -157,7 +158,7 @@ export default function InstagramBioAnalyzer() {
 
       toast.success('Success! Check your email for all 3 bio rewrites.');
     } catch (error) {
-      console.error('Email capture error:', error);
+      logger.error('Email capture error', error as Error);
       throw error;
     }
   };
@@ -170,7 +171,7 @@ export default function InstagramBioAnalyzer() {
         session_id: getSessionId(),
       });
     } catch (error) {
-      console.error('Analytics error:', error);
+      logger.error('Analytics error', error as Error);
     }
   };
 

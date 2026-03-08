@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import {
     BlockConfig,
     BioBlockConfig,
@@ -24,7 +25,7 @@ async function fetchUserProfile(userId: string) {
         .single();
 
     if (error) {
-        console.error("Error fetching profile:", error);
+        logger.error("Error fetching profile:", error as Error);
         return null;
     }
 
@@ -43,7 +44,7 @@ async function fetchUserLinks(userId: string) {
         .order("position");
 
     if (error) {
-        console.error("Error fetching links:", error);
+        logger.error("Error fetching links:", error as Error);
         return [];
     }
 
@@ -184,7 +185,7 @@ export async function autoPopulateBlockConfig(
                 return defaultConfig;
         }
     } catch (error) {
-        console.error("Error auto-populating block:", error);
+        logger.error("Error auto-populating block:", error as Error);
         // Fall back to default config on error
         return defaultConfig;
     }

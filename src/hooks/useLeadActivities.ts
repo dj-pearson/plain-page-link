@@ -6,6 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 export interface LeadActivity {
   id: string;
@@ -150,7 +151,7 @@ export function useLeadActivities(leadId?: string) {
       queryClient.invalidateQueries({ queryKey: ["lead-activity-summary", leadId] });
     },
     onError: (error) => {
-      console.error("Failed to log activity:", error);
+      logger.error("Failed to log activity", error as Error);
       toast.error("Failed to log activity");
     },
   });
@@ -175,7 +176,7 @@ export function useLeadActivities(leadId?: string) {
       toast.success("Note added");
     },
     onError: (error) => {
-      console.error("Failed to add note:", error);
+      logger.error("Failed to add note", error as Error);
       toast.error("Failed to add note");
     },
   });
@@ -200,7 +201,7 @@ export function useLeadActivities(leadId?: string) {
       toast.success("Email logged");
     },
     onError: (error) => {
-      console.error("Failed to log email:", error);
+      logger.error("Failed to log email", error as Error);
       toast.error("Failed to log email");
     },
   });
@@ -225,7 +226,7 @@ export function useLeadActivities(leadId?: string) {
       toast.success("Call logged");
     },
     onError: (error) => {
-      console.error("Failed to log call:", error);
+      logger.error("Failed to log call", error as Error);
       toast.error("Failed to log call");
     },
   });
@@ -261,7 +262,7 @@ export function useLeadActivities(leadId?: string) {
       toast.success("Meeting logged");
     },
     onError: (error) => {
-      console.error("Failed to log meeting:", error);
+      logger.error("Failed to log meeting", error as Error);
       toast.error("Failed to log meeting");
     },
   });
@@ -282,7 +283,7 @@ export function useLeadActivities(leadId?: string) {
       toast.success("Activity deleted");
     },
     onError: (error) => {
-      console.error("Failed to delete activity:", error);
+      logger.error("Failed to delete activity", error as Error);
       toast.error("Failed to delete activity");
     },
   });

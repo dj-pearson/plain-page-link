@@ -1,7 +1,7 @@
 {
   "project": "AgentBio Enterprise Readiness",
   "branchName": "ralph/enterprise-readiness",
-  "description": "Transform AgentBio Intelligence from a functional MVP into an enterprise-grade, production-ready real estate SaaS platform. Covers CI/CD, testing, security hardening, compliance, monitoring, performance, and code quality — systematically closing every gap identified in the production readiness audit.",
+  "description": "Transform AgentBio Intelligence from a functional MVP into an enterprise-grade, production-ready real estate SaaS platform. Covers CI/CD, testing, security hardening, compliance, monitoring, performance, and code quality \u2014 systematically closing every gap identified in the production readiness audit.",
   "userStories": [
     {
       "id": "US-001",
@@ -41,8 +41,8 @@
       "description": "As a developer, I need automated CI checks on every pull request so that type errors and build failures are caught before merge.",
       "acceptanceCriteria": [
         "Create .github/workflows/ci.yml triggered on push to main and on pull_request",
-        "Job 1: 'typecheck' — runs tsc --noEmit on Node 20",
-        "Job 2: 'build' — runs npm run build, fails if build errors occur",
+        "Job 1: 'typecheck' \u2014 runs tsc --noEmit on Node 20",
+        "Job 2: 'build' \u2014 runs npm run build, fails if build errors occur",
         "Both jobs use npm ci for deterministic installs",
         "Both jobs cache node_modules using actions/cache with package-lock.json hash",
         "Workflow file is valid YAML (use actionlint or manual validation)",
@@ -74,9 +74,9 @@
       "description": "As a security-conscious developer, I need automated vulnerability scanning in CI so that known dependency vulnerabilities are flagged before deployment.",
       "acceptanceCriteria": [
         "Add 'security' job to .github/workflows/ci.yml",
-        "Job runs 'npm audit --audit-level=high' — fails on high/critical vulnerabilities",
+        "Job runs 'npm audit --audit-level=high' \u2014 fails on high/critical vulnerabilities",
         "Job runs the existing lint script if available",
-        "Add Dependabot auto-merge for patch updates in .github/dependabot.yml (file may already exist — update it)",
+        "Add Dependabot auto-merge for patch updates in .github/dependabot.yml (file may already exist \u2014 update it)",
         "Document any existing high/critical vulnerabilities found in a SECURITY_NOTES.md file if they cannot be resolved immediately",
         "Typecheck passes: tsc --noEmit succeeds"
       ],
@@ -107,17 +107,17 @@
       "title": "Add unit tests for core utility libraries",
       "description": "As a developer, I need thorough unit tests for critical utility modules so that core business logic has verified correctness.",
       "acceptanceCriteria": [
-        "Create src/lib/errorHandler.test.ts — test captureException, handleApiError, sanitization of sensitive data",
-        "Create src/lib/logger.test.ts — test log levels, PII redaction (passwords, tokens, emails), environment-aware behavior",
-        "Create src/lib/encryption.test.ts — test encrypt/decrypt round-trip, handling of empty strings and special characters",
-        "Create src/lib/seo.test.ts — test meta tag generation, slug creation, canonical URL building",
+        "Create src/lib/errorHandler.test.ts \u2014 test captureException, handleApiError, sanitization of sensitive data",
+        "Create src/lib/logger.test.ts \u2014 test log levels, PII redaction (passwords, tokens, emails), environment-aware behavior",
+        "Create src/lib/encryption.test.ts \u2014 test encrypt/decrypt round-trip, handling of empty strings and special characters",
+        "Create src/lib/seo.test.ts \u2014 test meta tag generation, slug creation, canonical URL building",
         "All new tests pass with 'npm run test:run'",
         "Combined test coverage for src/lib/ reaches at least 40%",
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 7,
       "passes": false,
-      "notes": "Focus on testing pure functions and utilities — these are the easiest to test and highest value."
+      "notes": "Focus on testing pure functions and utilities \u2014 these are the easiest to test and highest value."
     },
     {
       "id": "US-008",
@@ -138,11 +138,11 @@
     {
       "id": "US-009",
       "title": "Add component tests for authentication flow",
-      "description": "As a developer, I need tests covering login, registration, and auth guards so that authentication—the most security-critical flow—is verified.",
+      "description": "As a developer, I need tests covering login, registration, and auth guards so that authentication\u2014the most security-critical flow\u2014is verified.",
       "acceptanceCriteria": [
-        "Create tests for the login page component — renders form, validates inputs, handles submit, shows errors",
-        "Create tests for the registration page component — renders form, validates inputs, handles submit",
-        "Create tests for the ProtectedRoute component — redirects unauthenticated users, renders for authenticated users",
+        "Create tests for the login page component \u2014 renders form, validates inputs, handles submit, shows errors",
+        "Create tests for the registration page component \u2014 renders form, validates inputs, handles submit",
+        "Create tests for the ProtectedRoute component \u2014 redirects unauthenticated users, renders for authenticated users",
         "Mock Supabase auth methods (signInWithPassword, signUp, getSession) using the mock from src/test/mocks/supabase.ts",
         "All tests pass with 'npm run test:run'",
         "Typecheck passes: tsc --noEmit succeeds"
@@ -156,9 +156,9 @@
       "title": "Add hook tests for critical custom hooks",
       "description": "As a developer, I need tests for core custom hooks so that data fetching, state management, and side effects are verified.",
       "acceptanceCriteria": [
-        "Create src/hooks/useProfile.test.ts — test profile fetching, caching, error states",
-        "Create src/hooks/useListings.test.ts — test CRUD operations, query invalidation",
-        "Create src/hooks/useLeads.test.ts — test lead fetching, status updates",
+        "Create src/hooks/useProfile.test.ts \u2014 test profile fetching, caching, error states",
+        "Create src/hooks/useListings.test.ts \u2014 test CRUD operations, query invalidation",
+        "Create src/hooks/useLeads.test.ts \u2014 test lead fetching, status updates",
         "Use @testing-library/react renderHook for all hook tests",
         "Mock Supabase responses for each test scenario (success, error, empty)",
         "All tests pass with 'npm run test:run'",
@@ -239,7 +239,7 @@
       "title": "Implement PII encryption utilities for sensitive data at rest",
       "description": "As a security engineer, I need client-side encryption for PII fields so that sensitive data (phone numbers, addresses) is encrypted in the database.",
       "acceptanceCriteria": [
-        "Review and enhance src/lib/encryption.ts — ensure it uses AES-256-GCM with a proper key derivation from environment variable",
+        "Review and enhance src/lib/encryption.ts \u2014 ensure it uses AES-256-GCM with a proper key derivation from environment variable",
         "Create src/lib/pii.ts with encryptPII(plaintext) and decryptPII(ciphertext) functions that wrap the encryption library",
         "Add VITE_PII_ENCRYPTION_KEY to .env.example with documentation",
         "PII functions handle edge cases: null, undefined, empty string (return as-is)",
@@ -261,7 +261,7 @@
         "Update the profile hook (src/hooks/useProfile.ts) to encrypt phone_number field before save and decrypt after fetch",
         "Create a SQL migration adding encrypted_phone and encrypted_email columns to leads table (keep original columns during migration period)",
         "Add a migration note explaining the transition strategy: encrypt new data, backfill existing data separately",
-        "Existing functionality is not broken — forms still display decrypted values",
+        "Existing functionality is not broken \u2014 forms still display decrypted values",
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 16,
@@ -273,7 +273,7 @@
       "title": "Add React Error Boundaries for all major route sections",
       "description": "As a user, I need graceful error recovery instead of white screens so that a crash in one section does not take down the entire application.",
       "acceptanceCriteria": [
-        "Create src/components/ui/error-boundary.tsx — a reusable ErrorBoundary component with fallback UI showing error message and 'Try Again' button",
+        "Create src/components/ui/error-boundary.tsx \u2014 a reusable ErrorBoundary component with fallback UI showing error message and 'Try Again' button",
         "ErrorBoundary logs errors to errorHandler.captureException and logger.error",
         "ErrorBoundary fallback UI is styled with Tailwind, includes the AgentBio branding, and offers navigation back to dashboard",
         "Wrap each major route section in App.tsx with ErrorBoundary: dashboard routes, auth routes, admin routes, public profile routes",
@@ -281,7 +281,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 17,
-      "passes": false,
+      "passes": true,
       "notes": "A LazyLoadErrorBoundary may already exist. Check first and consolidate into one reusable component."
     },
     {
@@ -411,7 +411,7 @@
       "title": "Configure Sentry performance monitoring and alerting",
       "description": "As a platform operator, I need Sentry properly configured with alerting thresholds so that production errors and performance regressions are detected and escalated.",
       "acceptanceCriteria": [
-        "Review and update src/lib/sentry.ts — ensure performance monitoring sample rate is at least 10% in production",
+        "Review and update src/lib/sentry.ts \u2014 ensure performance monitoring sample rate is at least 10% in production",
         "Add Sentry.setTag for environment, release version (from package.json), and deployment region",
         "Configure Sentry breadcrumbs for navigation, console, fetch, and DOM events",
         "Add Sentry.captureMessage for critical business events: subscription created, subscription cancelled, lead scored > 90",
@@ -457,7 +457,7 @@
     },
     {
       "id": "US-028",
-      "title": "Fix critical type safety issues — eliminate high-risk 'as any' casts",
+      "title": "Fix critical type safety issues \u2014 eliminate high-risk 'as any' casts",
       "description": "As a developer, I need the most dangerous 'as any' type casts removed so that TypeScript can catch bugs in critical code paths.",
       "acceptanceCriteria": [
         "Audit all files in src/lib/, src/hooks/, and src/stores/ for 'as any' usage",
@@ -469,8 +469,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 28,
-      "passes": false,
-      "notes": "84+ 'as any' usages found across the codebase. Focus on src/lib/, src/hooks/, src/stores/ first — these are highest risk."
+      "passes": true,
+      "notes": "84+ 'as any' usages found across the codebase. Focus on src/lib/, src/hooks/, src/stores/ first \u2014 these are highest risk."
     },
     {
       "id": "US-029",
@@ -491,7 +491,7 @@
     },
     {
       "id": "US-030",
-      "title": "Add MFA/2FA support — backend schema and TOTP verification",
+      "title": "Add MFA/2FA support \u2014 backend schema and TOTP verification",
       "description": "As an enterprise user, I need multi-factor authentication so that my account is protected even if my password is compromised.",
       "acceptanceCriteria": [
         "Create SQL migration for mfa_factors table: id, user_id, factor_type ('totp'), secret_encrypted, verified, created_at",
@@ -508,19 +508,19 @@
     },
     {
       "id": "US-031",
-      "title": "Add MFA/2FA support — frontend enrollment and verification UI",
+      "title": "Add MFA/2FA support \u2014 frontend enrollment and verification UI",
       "description": "As a user, I need a UI to set up and use two-factor authentication so that I can protect my account with a second factor.",
       "acceptanceCriteria": [
         "Create src/components/settings/MFASetup.tsx with QR code display (using qrcode.react), manual secret display, and 6-digit verification input",
         "Create src/components/auth/MFAChallenge.tsx that prompts for TOTP code during login when MFA is enabled",
-        "Integrate MFA challenge into the login flow — after password success, check if MFA is enabled, show challenge",
+        "Integrate MFA challenge into the login flow \u2014 after password success, check if MFA is enabled, show challenge",
         "Add MFA setup section to dashboard settings page with enable/disable toggle",
         "Show recovery codes (8 single-use codes) during setup and allow regeneration",
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 31,
       "passes": false,
-      "notes": "qrcode.react is already installed as a dependency. Supabase has built-in MFA support — check if we should use Supabase MFA API instead of custom implementation."
+      "notes": "qrcode.react is already installed as a dependency. Supabase has built-in MFA support \u2014 check if we should use Supabase MFA API instead of custom implementation."
     },
     {
       "id": "US-032",
@@ -530,7 +530,7 @@
         "Create supabase/functions/optimize-image/index.ts that accepts an image upload, converts to WebP, generates thumbnails (200px, 400px, 800px widths), and stores all variants in Supabase Storage",
         "Original image is preserved alongside optimized variants",
         "Function returns URLs for all generated variants",
-        "Integrate with listing image upload flow — call optimize-image after upload",
+        "Integrate with listing image upload flow \u2014 call optimize-image after upload",
         "Create src/components/ui/optimized-image.tsx component that uses srcSet with WebP variants and falls back to original",
         "Add loading='lazy' and proper width/height attributes to prevent CLS",
         "Typecheck passes: tsc --noEmit succeeds"
@@ -596,7 +596,7 @@
       "title": "Implement Stripe subscription billing integration",
       "description": "As a SaaS operator, I need Stripe subscription billing so that users can upgrade to paid plans and the platform generates revenue.",
       "acceptanceCriteria": [
-        "Install @stripe/stripe-js (frontend) — check if already present",
+        "Install @stripe/stripe-js (frontend) \u2014 check if already present",
         "Create supabase/functions/create-checkout-session/index.ts (or update existing) that creates a Stripe Checkout session for Professional ($39/mo), Team ($29/agent/mo), and Enterprise ($69/agent/mo) plans",
         "Create supabase/functions/create-portal-session/index.ts (or update existing) that creates a Stripe Customer Portal session for managing subscriptions",
         "Create SQL migration for subscriptions table if it doesn't exist: user_id, stripe_customer_id, stripe_subscription_id, plan_id, status, current_period_start, current_period_end, cancel_at",
@@ -675,7 +675,7 @@
       ],
       "priority": 40,
       "passes": false,
-      "notes": "Various deployment docs already exist (PRODUCTION_FIX_DEPLOYMENT.md, etc.) — consolidate into one authoritative runbook."
+      "notes": "Various deployment docs already exist (PRODUCTION_FIX_DEPLOYMENT.md, etc.) \u2014 consolidate into one authoritative runbook."
     },
     {
       "id": "US-041",
@@ -708,7 +708,7 @@
       ],
       "priority": 42,
       "passes": false,
-      "notes": "Feature flags are essential for enterprise deployments — they allow gradual rollouts and instant kill switches."
+      "notes": "Feature flags are essential for enterprise deployments \u2014 they allow gradual rollouts and instant kill switches."
     },
     {
       "id": "US-043",
@@ -743,7 +743,7 @@
       ],
       "priority": 44,
       "passes": false,
-      "notes": "API keys are a core enterprise feature — they enable CRM integrations (Salesforce, HubSpot, Follow Up Boss)."
+      "notes": "API keys are a core enterprise feature \u2014 they enable CRM integrations (Salesforce, HubSpot, Follow Up Boss)."
     },
     {
       "id": "US-045",
@@ -827,7 +827,7 @@
       ],
       "priority": 49,
       "passes": false,
-      "notes": "Supabase Realtime is already available via the client. Firebase Cloud Messaging (FCM) is installed for push notifications — this is for in-app notifications."
+      "notes": "Supabase Realtime is already available via the client. Firebase Cloud Messaging (FCM) is installed for push notifications \u2014 this is for in-app notifications."
     },
     {
       "id": "US-050",
@@ -859,7 +859,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 51,
-      "passes": false,
+      "passes": true,
       "notes": "Partial migration completed: auth pages, leads dashboard, lead detail modal, and ML scoring hook. Remaining files need systematic migration. Run: grep -rn 'console\\.' src/ --include='*.ts' --include='*.tsx' | grep -v logger.ts to find remaining instances."
     },
     {
@@ -911,7 +911,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 54,
-      "passes": false,
+      "passes": true,
       "notes": "Public profiles are the most visited pages (they're shared on social media). A ProgressiveImage component may already exist. Check src/components/ui/ and build on it."
     },
     {

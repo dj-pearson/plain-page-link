@@ -4,10 +4,10 @@ import { formatPrice, parsePrice, formatNumber } from "@/lib/format";
 import { getImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { Listing } from "@/types";
+import type { PublicListing } from "@/types";
 
 interface ListingCardProps {
-  listing: Listing;
+  listing: PublicListing;
   onClick?: () => void;
 }
 
@@ -33,19 +33,18 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const listingAny = listing as any;
-  const address = listingAny.address || listing.title || 'Property';
-  const city = listingAny.city || '';
-  const state = listingAny.state || '';
-  const price = parsePrice(listingAny.price);
-  const beds = listing.bedrooms ?? listingAny.beds ?? 0;
-  const baths = listing.bathrooms ?? listingAny.baths ?? 0;
-  const sqft = listing.square_feet ?? listingAny.sqft ?? 0;
-  const isFeatured = listingAny.is_featured;
-  const photoCount = listingAny.photos?.length || 1;
+  const address = listing.address || listing.title || 'Property';
+  const city = listing.city || '';
+  const state = listing.state || '';
+  const price = parsePrice(listing.price);
+  const beds = listing.bedrooms ?? listing.beds ?? 0;
+  const baths = listing.bathrooms ?? listing.baths ?? 0;
+  const sqft = listing.square_feet ?? listing.sqft ?? 0;
+  const isFeatured = listing.is_featured;
+  const photoCount = listing.photos?.length || 1;
 
   const primaryImage = getImageUrl(
-    listingAny.image || listingAny.photos?.[0],
+    listing.image || listing.photos?.[0],
     'listings'
   );
 

@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { logger } from "@/lib/logger";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { UpgradeModal } from "@/components/UpgradeModal";
 
@@ -101,7 +102,7 @@ export default function Theme() {
                 applyTheme(savedTheme);
             }
         } catch (error) {
-            console.error('Failed to load saved theme:', error);
+            logger.error('Failed to load saved theme', error as Error);
             // Load default theme on error
             const defaultTheme = DEFAULT_THEMES[0];
             setSelectedTheme(defaultTheme);
@@ -165,7 +166,7 @@ export default function Theme() {
             
             setIsCustomizing(false);
         } catch (error) {
-            console.error('Failed to save theme:', error);
+            logger.error('Failed to save theme', error as Error);
             toast({
                 title: "Error",
                 description: "Failed to save theme. Please try again.",

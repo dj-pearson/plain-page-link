@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 /**
  * OnboardingWizardPage
@@ -73,7 +74,7 @@ export default function OnboardingWizardPage() {
 
           profileUpdates.avatar_url = publicUrl;
         } catch (error) {
-          console.error('Error uploading avatar:', error);
+          logger.error('Error uploading avatar', error as Error);
           // Continue even if avatar upload fails
         }
       }
@@ -143,11 +144,11 @@ export default function OnboardingWizardPage() {
             .insert(listingData);
 
           if (listingError) {
-            console.error('Error creating listing:', listingError);
+            logger.error('Error creating listing', listingError as Error);
             // Don't throw - listing is optional
           }
         } catch (error) {
-          console.error('Error with first listing:', error);
+          logger.error('Error with first listing', error as Error);
           // Continue even if listing creation fails
         }
       }
@@ -163,7 +164,7 @@ export default function OnboardingWizardPage() {
           }
         });
       } catch (emailError) {
-        console.error('Welcome email failed (non-critical):', emailError);
+        logger.error('Welcome email failed (non-critical)', emailError as Error);
         // Don't block navigation if email fails
       }
 
@@ -177,7 +178,7 @@ export default function OnboardingWizardPage() {
       navigate('/dashboard', { replace: true });
 
     } catch (error: any) {
-      console.error('Error completing onboarding:', error);
+      logger.error('Error completing onboarding', error as Error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to save your information. Please try again.',

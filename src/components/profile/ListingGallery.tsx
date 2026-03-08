@@ -3,12 +3,12 @@ import { Search, SlidersHorizontal, ArrowUpDown, Home, X } from "lucide-react";
 import ListingCard from "./ListingCard";
 import { parsePrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Listing } from "@/types";
+import type { PublicListing } from "@/types";
 
 interface ListingGalleryProps {
-  listings: Listing[];
+  listings: PublicListing[];
   title?: string;
-  onListingClick?: (listing: Listing) => void;
+  onListingClick?: (listing: PublicListing) => void;
   calendlyUrl?: string;
 }
 
@@ -43,8 +43,7 @@ export default function ListingGallery({ listings, title, onListingClick, calend
   const availableTypes = useMemo(() => {
     const types = new Set<string>();
     listings.forEach(l => {
-      const pt = (l as any).property_type;
-      if (pt) types.add(pt);
+      if (l.property_type) types.add(l.property_type);
     });
     return types;
   }, [listings]);
@@ -55,31 +54,28 @@ export default function ListingGallery({ listings, title, onListingClick, calend
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(l => {
-        const la = l as any;
-        return (la.address?.toLowerCase().includes(q) ||
-                la.city?.toLowerCase().includes(q) ||
-                la.description?.toLowerCase().includes(q));
+        return (l.address?.toLowerCase().includes(q) ||
+                l.city?.toLowerCase().includes(q) ||
+                l.description?.toLowerCase().includes(q));
       });
     }
 
     if (propertyTypeFilter !== "all") {
-      result = result.filter(l => (l as any).property_type === propertyTypeFilter);
+      result = result.filter(l => l.property_type === propertyTypeFilter);
     }
 
     if (bedroomFilter > 0) {
       result = result.filter(l => {
-        const beds = l.bedrooms ?? (l as any).beds ?? 0;
+        const beds = l.bedrooms ?? l.beds ?? 0;
         return beds >= bedroomFilter;
       });
     }
 
     result.sort((a, b) => {
-      const aa = a as any;
-      const ba = b as any;
       switch (sortBy) {
-        case "price-low": return parsePrice(aa.price) - parsePrice(ba.price);
-        case "price-high": return parsePrice(ba.price) - parsePrice(aa.price);
-        case "beds-high": return ((b.bedrooms ?? ba.beds ?? 0) - (a.bedrooms ?? aa.beds ?? 0));
+        case "price-low": return parsePrice(a.price) - parsePrice(b.price);
+        case "price-high": return parsePrice(b.price) - parsePrice(a.price);
+        case "beds-high": return ((b.bedrooms ?? b.beds ?? 0) - (a.bedrooms ?? a.beds ?? 0));
         default: return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       }
     });

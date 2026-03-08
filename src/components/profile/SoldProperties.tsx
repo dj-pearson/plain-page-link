@@ -1,11 +1,11 @@
 import { Trophy, TrendingUp } from "lucide-react";
 import { parsePrice } from "@/lib/format";
 import ListingCard from "./ListingCard";
-import type { Listing } from "@/types";
+import type { PublicListing } from "@/types";
 
 interface SoldPropertiesProps {
-    listings: Listing[];
-    onListingClick?: (listing: Listing) => void;
+    listings: PublicListing[];
+    onListingClick?: (listing: PublicListing) => void;
 }
 
 export default function SoldProperties({
@@ -19,7 +19,7 @@ export default function SoldProperties({
     }
 
     // Calculate some stats
-    const totalValue = soldListings.reduce((sum, l) => sum + (parsePrice((l as any).price)), 0);
+    const totalValue = soldListings.reduce((sum, l) => sum + parsePrice(l.price), 0);
     const avgSalePrice =
         soldListings.length > 0 ? totalValue / soldListings.length : 0;
 

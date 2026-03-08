@@ -3,6 +3,8 @@
  * Prevents open redirect vulnerabilities by validating redirect URLs
  */
 
+import { logger } from "@/lib/logger";
+
 /**
  * Validate that a redirect URL is safe (same origin or whitelisted)
  * @param redirectUrl - The URL to validate
@@ -52,7 +54,7 @@ export function isValidRedirectUrl(
     });
   } catch (error) {
     // Invalid URL format
-    console.error('Invalid redirect URL format:', error);
+    logger.error('Invalid redirect URL format:', error as Error);
     return false;
   }
 }
@@ -80,6 +82,6 @@ export function sanitizeRedirectUrl(
   }
 
   // Invalid URL, return default
-  console.warn(`[Security] Invalid redirect URL blocked: ${redirectUrl}`);
+  logger.warn(`[Security] Invalid redirect URL blocked: ${redirectUrl}`);
   return defaultPath;
 }
