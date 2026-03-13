@@ -42,7 +42,7 @@ export default function PropertyListings() {
                 canonicalUrl={`${window.location.origin}/features/property-listings`}
                 schema={schema}
             />
-            <main className="min-h-screen bg-background">
+            <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>
                 <PublicHeader />
 
                 {/* Direct Answer */}

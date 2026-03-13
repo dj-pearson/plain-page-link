@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { EdgeFunctions } from "@/lib/edgeFunctions";
 import { validateUsername } from "@/lib/usernameValidation";
-import { debounce } from "lodash";
+import { debounce } from "@/lib/utils";
 
 export const useUsernameCheck = () => {
   const [isChecking, setIsChecking] = useState(false);

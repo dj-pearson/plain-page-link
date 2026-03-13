@@ -90,7 +90,7 @@ export default function InstagramBioForRealtors() {
                 canonicalUrl={`${window.location.origin}/instagram-bio-for-realtors`}
                 schema={schema}
             />
-            <main className="min-h-screen bg-background">
+            <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>
                 <PublicHeader />
 
                 {/* Direct Answer Section */}

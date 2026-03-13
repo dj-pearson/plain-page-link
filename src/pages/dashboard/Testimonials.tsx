@@ -11,6 +11,7 @@ import { LimitBanner } from "@/components/LimitBanner";
 import { RequestTestimonialModal } from "@/components/testimonials/RequestTestimonialModal";
 import { useProfile } from "@/hooks/useProfile";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function Testimonials() {
@@ -84,7 +85,7 @@ export default function Testimonials() {
       setEditingTestimonial(null);
     } catch (error) {
       // Error toast is already handled by the mutation
-      console.error('Failed to update testimonial:', error);
+      logger.error('Failed to update testimonial', error as Error);
     }
   };
 

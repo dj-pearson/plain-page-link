@@ -8,6 +8,7 @@ import { ListingsBlockConfig } from "@/types/pageBuilder";
 import { Badge } from "@/components/ui/badge";
 import { Bed, Bath, Square, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 interface ListingsBlockProps {
     config: ListingsBlockConfig;
@@ -68,7 +69,7 @@ export function ListingsBlock({
 
                 setListings(data || []);
             } catch (error) {
-                console.error("Error fetching listings:", error);
+                logger.error("Error fetching listings", error as Error);
                 setListings([]);
             } finally {
                 setIsLoading(false);

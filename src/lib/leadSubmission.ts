@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 export interface LeadSubmissionData {
     agentId: string;
@@ -68,7 +69,7 @@ export async function submitLead(
                     },
                 })
                 .catch((err) => {
-                    console.error("Failed to send email notification:", err);
+                    logger.error("Failed to send email notification:", err as Error);
                     // Don't fail the whole submission if email fails
                 });
 
@@ -78,10 +79,7 @@ export async function submitLead(
             };
         } catch (error) {
             lastError = error as Error;
-            console.error(
-                `Lead submission attempt ${attempt + 1} failed:`,
-                error
-            );
+            logger.error(`Lead submission attempt ${attempt + 1} failed:`, error as Error);
 
             // Only retry on network errors, not validation errors
             if (
@@ -136,7 +134,7 @@ export function trackFormSubmission(formType: string, success: boolean) {
         });
         localStorage.setItem(storageKey, JSON.stringify(submissions));
     } catch (error) {
-        console.error("Failed to track form submission:", error);
+        logger.error("Failed to track form submission:", error as Error);
         // Don't fail the submission if analytics fails
     }
 }

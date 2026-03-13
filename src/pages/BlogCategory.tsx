@@ -337,6 +337,7 @@ export default function BlogCategory() {
       <div className="min-h-screen bg-background flex flex-col">
         <PublicHeader />
 
+        <main id="main-content" tabIndex={-1}>
         {/* Category Header */}
         <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-b">
           <div className="container mx-auto px-4 py-12">
@@ -447,6 +448,7 @@ export default function BlogCategory() {
             </div>
           </div>
         </div>
+        </main>
 
         <PublicFooter />
       </div>

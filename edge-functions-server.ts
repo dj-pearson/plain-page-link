@@ -23,6 +23,7 @@ const FUNCTIONS_MAP: { [key: string]: string } = {
   "generate-article": "./functions/generate-article/index.ts",
   "generate-social-post": "./functions/generate-social-post/index.ts",
   "publish-article-to-social": "./functions/publish-article-to-social/index.ts",
+  "oauth-proxy": "./functions/oauth-proxy/index.ts",
   // Add more functions as needed
 };
 

@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 import type { Workflow as WorkflowType, WorkflowCategory } from "@/types/workflow";
 
 const CATEGORY_LABELS: Record<WorkflowCategory, string> = {
@@ -61,7 +62,7 @@ export const WorkflowsListPage = () => {
         const data = await loadUserWorkflows();
         setWorkflows(data);
       } catch (error) {
-        console.error("Failed to load workflows:", error);
+        logger.error("Failed to load workflows", error as Error);
       } finally {
         setIsLoading(false);
       }

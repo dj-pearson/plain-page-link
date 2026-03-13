@@ -12,6 +12,7 @@ import { Breadcrumbs } from "@/components/blog/Breadcrumbs";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import ReactMarkdown from "react-markdown";
+import { logger } from "@/lib/logger";
 
 export default function BlogArticle() {
   const { slug } = useParams<{ slug: string }>();
@@ -55,7 +56,7 @@ export default function BlogArticle() {
         .update({ view_count: (article.view_count || 0) + 1 })
         .eq("id", article.id)
         .then(() => {
-          console.log("View count incremented");
+          logger.debug("View count incremented");
         });
     }
   }, [article?.id]);
@@ -101,6 +102,7 @@ export default function BlogArticle() {
         {/* Header */}
         <PublicHeader />
 
+        <main id="main-content" tabIndex={-1}>
         {/* Breadcrumb Bar */}
         <div className="bg-gray-50 border-b">
           <div className="container mx-auto px-4 py-3">
@@ -310,6 +312,7 @@ export default function BlogArticle() {
             tags={article.tags || []}
           />
         </article>
+        </main>
 
         {/* Footer */}
         <PublicFooter />

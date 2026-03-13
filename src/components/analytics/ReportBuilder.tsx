@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { exportToCSV } from "@/lib/analytics";
 import { generatePDFReport } from "@/lib/exportUtils";
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
@@ -156,7 +157,7 @@ export function ReportBuilder({
                 }
             }
         } catch (error) {
-            console.error("Report generation error:", error);
+            logger.error("Report generation error", error as Error);
             toast.error("Failed to generate report");
         } finally {
             setIsGenerating(false);

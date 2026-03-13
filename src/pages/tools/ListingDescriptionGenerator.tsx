@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { PropertyDetails, GeneratedDescription, EmailCaptureData } from '@/lib/listing-description-generator/types';
+import { logger } from '@/lib/logger';
 
 type FlowStep = 'intro' | 'form' | 'generating' | 'results';
 
@@ -39,7 +40,7 @@ export default function ListingDescriptionGenerator() {
         referrer: document.referrer,
       });
     } catch (error) {
-      console.error('Analytics tracking error:', error);
+      logger.error('Analytics tracking error', error as Error);
     }
   };
 
@@ -90,7 +91,7 @@ export default function ListingDescriptionGenerator() {
 
       toast.success('Descriptions generated successfully!');
     } catch (error) {
-      console.error('Generation error:', error);
+      logger.error('Generation error', error as Error);
       toast.error('Failed to generate descriptions. Please try again.');
       setCurrentStep('form');
     }
@@ -126,7 +127,7 @@ export default function ListingDescriptionGenerator() {
           },
         });
       } catch (emailError) {
-        console.error('Email send error:', emailError);
+        logger.error('Email send error', emailError as Error);
         // Don't block unlock if email fails
       }
 
@@ -142,7 +143,7 @@ export default function ListingDescriptionGenerator() {
 
       toast.success('Success! All 3 styles unlocked. Check your email for your complete guide!');
     } catch (error) {
-      console.error('Email capture error:', error);
+      logger.error('Email capture error', error as Error);
       toast.error('Failed to capture email. Please try again.');
     }
   };
@@ -531,7 +532,7 @@ export default function ListingDescriptionGenerator() {
         </script>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12 px-4">
+      <main id="main-content" className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12 px-4" tabIndex={-1}>
         {/* Render current step */}
         {currentStep === 'intro' && renderIntro()}
         {currentStep === 'form' && (
@@ -548,7 +549,7 @@ export default function ListingDescriptionGenerator() {
           onClose={() => setShowEmailModal(false)}
           onSubmit={handleEmailCapture}
         />
-      </div>
+      </main>
     </>
   );
 }

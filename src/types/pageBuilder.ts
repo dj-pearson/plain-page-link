@@ -14,7 +14,25 @@ export type BlockType =
     | "testimonial"
     | "spacer"
     | "image"
-    | "text";
+    | "text"
+    | "hero"
+    | "stats"
+    | "gallery"
+    | "cta"
+    | "divider";
+
+// Per-block styling that can be applied to any block
+export interface BlockStyle {
+    backgroundColor?: string;
+    backgroundGradient?: string; // e.g. "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+    padding?: "none" | "small" | "medium" | "large";
+    margin?: "none" | "small" | "medium" | "large";
+    borderRadius?: "none" | "small" | "medium" | "large" | "full";
+    border?: string; // e.g. "1px solid #e5e7eb"
+    shadow?: "none" | "small" | "medium" | "large" | "glow";
+    animation?: "none" | "fadeIn" | "slideUp" | "slideLeft" | "slideRight" | "scaleIn" | "bounce";
+    textColor?: string;
+}
 
 // Base block interface
 export interface PageBlock {
@@ -23,6 +41,7 @@ export interface PageBlock {
     order: number;
     visible: boolean;
     config: BlockConfig;
+    style?: BlockStyle;
 }
 
 // Block configurations for different types
@@ -36,7 +55,12 @@ export type BlockConfig =
     | TestimonialBlockConfig
     | SpacerBlockConfig
     | ImageBlockConfig
-    | TextBlockConfig;
+    | TextBlockConfig
+    | HeroBlockConfig
+    | StatsBlockConfig
+    | GalleryBlockConfig
+    | CTABlockConfig
+    | DividerBlockConfig;
 
 // Bio Block
 export interface BioBlockConfig {
@@ -127,7 +151,7 @@ export interface TestimonialBlockConfig {
     type: "testimonial";
     title?: string;
     testimonials: Testimonial[];
-    layout: "slider" | "grid";
+    layout: "slider" | "grid" | "stacked";
 }
 
 export interface Testimonial {
@@ -161,6 +185,70 @@ export interface TextBlockConfig {
     content: string;
     align: "left" | "center" | "right";
     fontSize: "small" | "medium" | "large";
+}
+
+// Hero Block - prominent header section with background
+export interface HeroBlockConfig {
+    type: "hero";
+    headline: string;
+    subheadline?: string;
+    backgroundImageUrl?: string;
+    backgroundOverlay?: "none" | "light" | "dark" | "gradient";
+    ctaText?: string;
+    ctaUrl?: string;
+    layout: "centered" | "left" | "split";
+    height: "small" | "medium" | "large";
+}
+
+// Stats Block - showcase agent metrics
+export interface StatsBlockConfig {
+    type: "stats";
+    title?: string;
+    stats: StatItem[];
+    layout: "row" | "grid" | "cards";
+}
+
+export interface StatItem {
+    id: string;
+    value: string;
+    label: string;
+    icon?: string;
+    prefix?: string;
+    suffix?: string;
+}
+
+// Gallery Block - photo showcase
+export interface GalleryBlockConfig {
+    type: "gallery";
+    title?: string;
+    images: GalleryImage[];
+    layout: "grid" | "masonry" | "carousel";
+    columns: 2 | 3 | 4;
+}
+
+export interface GalleryImage {
+    id: string;
+    url: string;
+    alt: string;
+    caption?: string;
+}
+
+// CTA Block - prominent call to action
+export interface CTABlockConfig {
+    type: "cta";
+    headline: string;
+    description?: string;
+    buttonText: string;
+    buttonUrl: string;
+    variant: "solid" | "outline" | "gradient";
+    openInNewTab: boolean;
+}
+
+// Divider Block - visual separator
+export interface DividerBlockConfig {
+    type: "divider";
+    style: "line" | "dashed" | "dotted" | "gradient" | "wave";
+    color?: string;
 }
 
 // Page configuration
@@ -222,6 +310,6 @@ export interface BlockTemplate {
     name: string;
     description: string;
     icon: string;
-    category: "content" | "media" | "engagement";
+    category: "content" | "media" | "engagement" | "layout";
     defaultConfig: BlockConfig;
 }

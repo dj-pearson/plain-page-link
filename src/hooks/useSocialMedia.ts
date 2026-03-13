@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { edgeFunctions } from "@/lib/edgeFunctions";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 export interface SocialMediaPost {
   id: string;
@@ -307,7 +308,7 @@ export function useSocialMedia() {
       toast.success('Post resent successfully');
     },
     onError: (error) => {
-      console.error('Failed to retry post:', error);
+      logger.error('Failed to retry post', error as Error);
       toast.error('Failed to resend post');
     },
   });

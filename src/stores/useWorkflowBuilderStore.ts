@@ -6,6 +6,7 @@
 import { create } from "zustand";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import type {
   Workflow,
   WorkflowNode,
@@ -175,7 +176,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
 
       get().setWorkflow(workflow);
     } catch (error) {
-      console.error("Failed to load workflow:", error);
+      logger.error("Failed to load workflow", error as Error);
       toast.error("Failed to load workflow");
       throw error;
     }
@@ -219,7 +220,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
         updatedAt: d.updated_at,
       }));
     } catch (error) {
-      console.error("Failed to load workflows:", error);
+      logger.error("Failed to load workflows", error as Error);
       return [];
     }
   },
@@ -251,7 +252,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
 
       set({ nodeTemplates: templates });
     } catch (error) {
-      console.error("Failed to load node templates:", error);
+      logger.error("Failed to load node templates", error as Error);
     }
   },
 
@@ -595,7 +596,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
 
       toast.success("Workflow saved");
     } catch (error) {
-      console.error("Failed to save workflow:", error);
+      logger.error("Failed to save workflow", error as Error);
       toast.error("Failed to save workflow");
       throw error;
     } finally {
@@ -656,7 +657,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
       toast.success("Workflow execution started");
       return data as string;
     } catch (error) {
-      console.error("Failed to execute workflow:", error);
+      logger.error("Failed to execute workflow", error as Error);
       toast.error("Failed to execute workflow");
       throw error;
     } finally {

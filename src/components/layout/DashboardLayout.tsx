@@ -94,20 +94,20 @@ export default function DashboardLayout() {
             {/* Sidebar - Hidden on mobile */}
             <aside
                 className="hidden md:fixed md:block left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40"
-                role="navigation"
-                aria-label="Main navigation"
+                aria-label="Dashboard sidebar"
             >
                 <div className="p-6">
                     <Link
                         to="/"
                         className="flex items-center gap-2 text-xl font-bold text-gray-900"
+                        aria-label="AgentBio.net - Go to homepage"
                     >
-                        <Home className="h-6 w-6 text-blue-600" />
+                        <Home className="h-6 w-6 text-blue-600" aria-hidden="true" />
                         AgentBio.net
                     </Link>
                 </div>
 
-                <nav className="px-3 space-y-1">
+                <nav className="px-3 space-y-1" aria-label="Main navigation">
                     <NavLink
                         to="/dashboard"
                         icon={<LayoutDashboard className="h-5 w-5" />}
@@ -307,13 +307,14 @@ function NavLink({
     return (
         <Link
             to={to}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+            aria-current={active ? "page" : undefined}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors min-h-[44px] ${
                 active
                     ? "bg-blue-50 text-blue-600 font-medium"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             }`}
         >
-            {icon}
+            <span aria-hidden="true">{icon}</span>
             <span>{label}</span>
         </Link>
     );

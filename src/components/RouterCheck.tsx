@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FullPageLoader } from "./LoadingSpinner";
+import { logger } from "@/lib/logger";
 
 /**
  * Component to verify Router context is available before rendering children
@@ -21,7 +22,7 @@ export function RouterCheck({ children }: { children: React.ReactNode }) {
         }, [navigate]);
 
     } catch (error) {
-        console.error("[RouterCheck] Router context not available:", error);
+        logger.error("[RouterCheck] Router context not available", error as Error);
         // If router isn't ready, show loader
         return <FullPageLoader text="Initializing..." />;
     }

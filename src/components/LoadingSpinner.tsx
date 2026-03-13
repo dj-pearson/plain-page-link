@@ -120,26 +120,61 @@ export const SkeletonCard = ({ className }: { className?: string }) => {
 
 /**
  * Profile skeleton for loading user profiles
+ * Mirrors the FullProfilePage layout structure for perceived performance
  */
 export const ProfileSkeleton = () => {
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header skeleton */}
-        <div className="flex items-center gap-4">
-          <div className="h-24 w-24 rounded-full bg-muted animate-pulse" />
-          <div className="space-y-2 flex-1">
-            <SkeletonLine width="1/2" className="h-6" />
-            <SkeletonLine width="3/4" />
-            <SkeletonLine width="1/4" />
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
+      <div className="container mx-auto px-3 sm:px-4 max-w-5xl space-y-4 sm:space-y-6">
+        {/* Profile Header skeleton */}
+        <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-gray-200 animate-pulse flex-shrink-0" />
+            <div className="flex-1 space-y-3 text-center sm:text-left w-full">
+              <div className="h-7 bg-gray-200 animate-pulse rounded w-48 mx-auto sm:mx-0" />
+              <div className="h-4 bg-gray-200 animate-pulse rounded w-32 mx-auto sm:mx-0" />
+              <div className="h-4 bg-gray-200 animate-pulse rounded w-full max-w-md mx-auto sm:mx-0" />
+              <div className="h-4 bg-gray-200 animate-pulse rounded w-3/4 max-w-sm mx-auto sm:mx-0" />
+              {/* Trust badges */}
+              <div className="flex gap-3 justify-center sm:justify-start pt-2">
+                <div className="h-10 w-20 bg-gray-200 animate-pulse rounded-lg" />
+                <div className="h-10 w-20 bg-gray-200 animate-pulse rounded-lg" />
+                <div className="h-10 w-20 bg-gray-200 animate-pulse rounded-lg" />
+              </div>
+            </div>
           </div>
         </div>
-        {/* Content skeleton */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <SkeletonCard />
-          <SkeletonCard />
+
+        {/* Contact Buttons skeleton */}
+        <div className="flex gap-3 justify-center">
+          <div className="h-12 w-32 bg-gray-200 animate-pulse rounded-lg" />
+          <div className="h-12 w-32 bg-gray-200 animate-pulse rounded-lg" />
+          <div className="h-12 w-32 bg-gray-200 animate-pulse rounded-lg" />
         </div>
-        <SkeletonCard className="h-48" />
+
+        {/* Featured Carousel skeleton */}
+        <div className="h-[400px] md:h-[500px] bg-gray-200 animate-pulse rounded-xl" />
+
+        {/* Listing Cards skeleton */}
+        <div>
+          <div className="h-7 bg-gray-200 animate-pulse rounded w-40 mb-4" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white rounded-xl overflow-hidden border border-gray-100">
+                <div className="h-52 bg-gray-200 animate-pulse" />
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-gray-200 animate-pulse rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 animate-pulse rounded w-1/2" />
+                  <div className="flex gap-4">
+                    <div className="h-4 w-12 bg-gray-200 animate-pulse rounded" />
+                    <div className="h-4 w-12 bg-gray-200 animate-pulse rounded" />
+                    <div className="h-4 w-16 bg-gray-200 animate-pulse rounded" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

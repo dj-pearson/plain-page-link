@@ -3,6 +3,7 @@ import { ExternalLink, Copy, Check, Share2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 interface ProfileURLCardProps {
   username: string;
@@ -41,7 +42,7 @@ export function ProfileURLCard({ username }: ProfileURLCardProps) {
         });
       } catch (err) {
         // User cancelled share or error occurred
-        console.log("Share cancelled or failed");
+        logger.debug("Share cancelled or failed");
       }
     } else {
       // Fallback to copy

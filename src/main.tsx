@@ -6,6 +6,7 @@ import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { initSentry } from "./lib/sentry";
+import { logger } from "@/lib/logger";
 import "./index.css";
 
 // Initialize Sentry as early as possible for error monitoring
@@ -25,10 +26,10 @@ const queryClient = new QueryClient({
 
 const rootEl = document.getElementById("root")!;
 if (!rootEl) {
-    console.error("Root element #root not found");
+    logger.error("Root element #root not found", new Error("Root element #root not found"));
 }
 if (import.meta.env.DEV) {
-    console.log("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
+    logger.debug("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
 }
 
 // SECURITY: Lazy load DevTools only in development to prevent info disclosure in production
@@ -58,5 +59,5 @@ ReactDOM.createRoot(rootEl).render(
 );
 
 if (import.meta.env.DEV) {
-    console.log("[Lovable] React render invoked");
+    logger.debug("[Lovable] React render invoked");
 }

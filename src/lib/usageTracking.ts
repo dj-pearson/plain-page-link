@@ -5,6 +5,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
+import { logger } from '@/lib/logger';
 import type {
   FeatureUsage,
   FeatureLimitCheck,
@@ -29,7 +30,7 @@ export class UsageTrackingService {
 
       return data[0] as FeatureLimitCheck;
     } catch (error) {
-      console.error('Error checking feature limit:', error);
+      logger.error('Error checking feature limit', error as Error);
       return {
         allowed: false,
         remaining: 0,
@@ -66,7 +67,7 @@ export class UsageTrackingService {
 
       return data;
     } catch (error) {
-      console.error('Error recording usage:', error);
+      logger.error('Error recording usage', error as Error);
       return null;
     }
   }
@@ -85,7 +86,7 @@ export class UsageTrackingService {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error getting usage:', error);
+      logger.error('Error getting usage', error as Error);
       return null;
     }
   }
@@ -112,7 +113,7 @@ export class UsageTrackingService {
 
       return data.reduce((sum, record) => sum + record.usage_count, 0);
     } catch (error) {
-      console.error('Error getting current month usage:', error);
+      logger.error('Error getting current month usage', error as Error);
       return 0;
     }
   }
@@ -159,7 +160,7 @@ export class UsageTrackingService {
 
       return stats;
     } catch (error) {
-      console.error('Error getting usage stats:', error);
+      logger.error('Error getting usage stats', error as Error);
       return {};
     }
   }
@@ -172,14 +173,14 @@ export class UsageTrackingService {
       // Get or create Stripe customer
       const stripeCustomer = await this.getOrCreateStripeCustomer(usage.user_id);
       if (!stripeCustomer) {
-        console.error('No Stripe customer found');
+        logger.warn('No Stripe customer found');
         return false;
       }
 
       // Get active subscription
       const subscription = await this.getActiveSubscription(usage.user_id);
       if (!subscription) {
-        console.error('No active subscription found');
+        logger.warn('No active subscription found');
         return false;
       }
 
@@ -190,7 +191,7 @@ export class UsageTrackingService {
       );
 
       if (!subscriptionItemId) {
-        console.error('No subscription item for usage billing');
+        logger.warn('No subscription item for usage billing');
         return false;
       }
 
@@ -229,7 +230,7 @@ export class UsageTrackingService {
 
       return true;
     } catch (error) {
-      console.error('Error syncing to Stripe:', error);
+      logger.error('Error syncing to Stripe', error as Error);
 
       // Mark as failed
       await supabase
@@ -295,7 +296,7 @@ export class UsageTrackingService {
 
       return newCustomer;
     } catch (error) {
-      console.error('Error getting/creating Stripe customer:', error);
+      logger.error('Error getting/creating Stripe customer', error as Error);
       return null;
     }
   }
@@ -317,7 +318,7 @@ export class UsageTrackingService {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error getting active subscription:', error);
+      logger.error('Error getting active subscription', error as Error);
       return null;
     }
   }
@@ -354,7 +355,7 @@ export class UsageTrackingService {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('Error getting monthly summary:', error);
+      logger.error('Error getting monthly summary', error as Error);
       return [];
     }
   }
@@ -432,7 +433,7 @@ export class UsageTrackingService {
         breakdown,
       };
     } catch (error) {
-      console.error('Error calculating projected bill:', error);
+      logger.error('Error calculating projected bill', error as Error);
       return {
         basePlan: 0,
         overageCharges: 0,
@@ -494,7 +495,7 @@ export class UsageTrackingService {
         byFeature: Object.values(byFeature),
       };
     } catch (error) {
-      console.error('Error generating usage report:', error);
+      logger.error('Error generating usage report', error as Error);
       return {
         totalUsage: 0,
         totalCost: 0,

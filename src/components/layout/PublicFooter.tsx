@@ -13,8 +13,8 @@ export function PublicFooter() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand Section */}
           <div className="md:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <Home className="h-6 w-6 text-blue-500" />
+            <Link to="/" className="flex items-center gap-2 mb-4" aria-label="AgentBio.net - Go to homepage">
+              <Home className="h-6 w-6 text-blue-500" aria-hidden="true" />
               <span className="text-xl font-bold text-white">
                 AgentBio.net
               </span>
@@ -23,24 +23,26 @@ export function PublicFooter() {
               Professional real estate agent portfolio links to showcase your properties and capture qualified leads.
             </p>
             {/* Social Links */}
-            <div className="flex gap-3">
+            <div className="flex gap-3" role="list" aria-label="Social media links">
               <a
                 href="https://www.facebook.com/agentbioapp"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-500 transition-colors"
-                aria-label="Facebook"
+                className="text-gray-400 hover:text-blue-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Facebook (opens in a new tab)"
+                role="listitem"
               >
-                <Facebook className="h-5 w-5" />
+                <Facebook className="h-5 w-5" aria-hidden="true" />
               </a>
               <a
                 href="https://x.com/AgentBioApp"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-gray-200 transition-colors"
-                aria-label="X (formerly Twitter)"
+                className="text-gray-400 hover:text-gray-200 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="X, formerly Twitter (opens in a new tab)"
+                role="listitem"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                 </svg>
               </a>
@@ -48,19 +50,21 @@ export function PublicFooter() {
                 href="https://www.instagram.com/agentbioapp/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-pink-500 transition-colors"
-                aria-label="Instagram"
+                className="text-gray-400 hover:text-pink-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Instagram (opens in a new tab)"
+                role="listitem"
               >
-                <Instagram className="h-5 w-5" />
+                <Instagram className="h-5 w-5" aria-hidden="true" />
               </a>
               <a
                 href="https://www.linkedin.com/company/agentbio/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-blue-600 transition-colors"
-                aria-label="LinkedIn"
+                className="text-gray-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="LinkedIn (opens in a new tab)"
+                role="listitem"
               >
-                <Linkedin className="h-5 w-5" />
+                <Linkedin className="h-5 w-5" aria-hidden="true" />
               </a>
             </div>
           </div>
@@ -159,7 +163,7 @@ export function PublicFooter() {
             <div className="flex items-center gap-3">
               {/* Equal Housing Opportunity Logo */}
               <div className="bg-white rounded p-2">
-                <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Equal Housing Opportunity logo">
                   <rect width="100" height="100" fill="white"/>
                   <path d="M50 10L20 40H30V90H70V40H80L50 10Z" fill="#000"/>
                   <rect x="40" y="50" width="20" height="20" fill="white"/>
@@ -213,27 +217,27 @@ export function PublicFooter() {
             <p className="text-sm text-center md:text-left text-gray-400">
               &copy; {new Date().getFullYear()} AgentBio.net. All rights reserved.
             </p>
-            <div className="flex gap-4 text-sm flex-wrap justify-center">
+            <nav className="flex gap-4 text-sm flex-wrap justify-center" aria-label="Footer legal links">
               <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors">
                 Privacy
               </Link>
-              <span className="text-gray-600">•</span>
+              <span className="text-gray-600" aria-hidden="true">•</span>
               <Link to="/terms" className="text-gray-400 hover:text-white transition-colors">
                 Terms
               </Link>
-              <span className="text-gray-600">•</span>
+              <span className="text-gray-600" aria-hidden="true">•</span>
               <Link to="/dmca" className="text-gray-400 hover:text-white transition-colors">
                 DMCA
               </Link>
-              <span className="text-gray-600">•</span>
+              <span className="text-gray-600" aria-hidden="true">•</span>
               <Link to="/acceptable-use" className="text-gray-400 hover:text-white transition-colors">
                 Acceptable Use
               </Link>
-              <span className="text-gray-600">•</span>
+              <span className="text-gray-600" aria-hidden="true">•</span>
               <Link to="/accessibility" className="text-gray-400 hover:text-white transition-colors">
                 Accessibility
               </Link>
-            </div>
+            </nav>
           </div>
         </div>
       </div>

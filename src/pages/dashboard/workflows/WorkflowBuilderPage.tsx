@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, ArrowLeft } from "lucide-react";
+import { logger } from "@/lib/logger";
 import type { WorkflowCategory, WorkflowNodeTemplate } from "@/types/workflow";
 
 const CATEGORY_OPTIONS: { value: WorkflowCategory; label: string }[] = [
@@ -61,7 +62,7 @@ export const WorkflowBuilderPage = () => {
           createNewWorkflow("Untitled Workflow");
         }
       } catch (error) {
-        console.error("Failed to initialize workflow:", error);
+        logger.error("Failed to initialize workflow", error as Error);
         navigate("/dashboard/workflows");
       } finally {
         setIsLoading(false);

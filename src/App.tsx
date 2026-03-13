@@ -9,8 +9,11 @@ import { cleanupServiceWorkers } from "./lib/sw-cleanup";
 import { OfflineIndicator } from "./components/mobile/OfflineIndicator";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import LazyLoadErrorBoundary from "./components/LazyLoadErrorBoundary";
+import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { SkipNavLink } from "./components/ui/skip-nav";
 import { AnnouncerProvider } from "./components/ui/live-region";
+import { RouteAnnouncer } from "./components/ui/route-announcer";
+import { AccessibilityWidget } from "./components/ui/accessibility-widget";
 
 // Public pages (eager load for better UX on landing)
 import Landing from "./pages/public/Landing";
@@ -24,9 +27,10 @@ const SubmitReview = lazy(() => import("./pages/public/SubmitReview"));
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 
-// Lazy load auth recovery pages
+// Lazy load auth recovery & callback pages
 const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
+const AuthCallback = lazy(() => import("./pages/auth/AuthCallback"));
 
 // Lazy load onboarding
 const OnboardingWizardPage = lazy(() => import("./pages/onboarding/OnboardingWizardPage"));
@@ -140,6 +144,9 @@ function App() {
             {/* Skip Navigation for Keyboard Accessibility (WCAG 2.4.1) */}
             <SkipNavLink />
 
+            {/* Route change announcements for screen readers (WCAG 2.4.2, 4.1.3) */}
+            <RouteAnnouncer />
+
             {/* Offline Indicator */}
             <OfflineIndicator />
 
@@ -176,37 +183,58 @@ function App() {
                     <Route path="/features/testimonials" element={<TestimonialsFeature />} />
                     <Route path="/features/analytics" element={<AnalyticsFeature />} />
 
-                    {/* Tools */}
-                    <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
-                    <Route path="/tools/listing-description-generator" element={<ListingDescriptionGenerator />} />
+                    {/* Tools — isolated error boundary */}
+                    <Route path="/tools/instagram-bio-analyzer" element={
+                        <RouteErrorBoundary section="Instagram Bio Analyzer" backPath="/" backLabel="Home">
+                            <InstagramBioAnalyzer />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/tools/listing-description-generator" element={
+                        <RouteErrorBoundary section="Listing Description Generator" backPath="/" backLabel="Home">
+                            <ListingDescriptionGenerator />
+                        </RouteErrorBoundary>
+                    } />
 
-                    {/* User profiles */}
-                    <Route path="/:username/review" element={<SubmitReview />} />
-                    <Route path="/:slug" element={<ProfilePage />} />
+                    {/* User profiles — isolated error boundary */}
+                    <Route path="/:username/review" element={
+                        <RouteErrorBoundary section="Review">
+                            <SubmitReview />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/:slug" element={
+                        <RouteErrorBoundary section="Profile">
+                            <ProfilePage />
+                        </RouteErrorBoundary>
+                    } />
 
                     {/* Auth routes */}
                     <Route path="/auth/login" element={<Login />} />
                     <Route path="/auth/register" element={<Register />} />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/auth/forgot-password" element={<ForgotPassword />} />
                     <Route path="/auth/reset-password" element={<ResetPassword />} />
                     <Route path="/auth/sso/callback" element={<SSOCallback />} />
 
-                    {/* Onboarding (protected) */}
+                    {/* Onboarding (protected) — isolated error boundary */}
                     <Route
                         path="/onboarding/wizard"
                         element={
                             <ProtectedRoute>
-                                <OnboardingWizardPage />
+                                <RouteErrorBoundary section="Onboarding" backPath="/dashboard" backLabel="Skip to Dashboard">
+                                    <OnboardingWizardPage />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     />
 
-                    {/* Dashboard routes (protected) */}
+                    {/* Dashboard routes (protected) — isolated error boundary */}
                     <Route
                         path="/dashboard"
                         element={
                             <ProtectedRoute>
-                                <DashboardLayout />
+                                <RouteErrorBoundary section="Dashboard" backPath="/" backLabel="Home">
+                                    <DashboardLayout />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     >
@@ -243,17 +271,21 @@ function App() {
                         path="/dashboard/workflows/:workflowId"
                         element={
                             <ProtectedRoute>
-                                <WorkflowBuilderPage />
+                                <RouteErrorBoundary section="Workflow Builder" backPath="/dashboard/workflows" backLabel="Back to Workflows">
+                                    <WorkflowBuilderPage />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     />
 
-                    {/* Admin routes */}
+                    {/* Admin routes — isolated error boundary */}
                     <Route
                         path="/admin"
                         element={
                             <ProtectedRoute>
-                                <AdminDashboard />
+                                <RouteErrorBoundary section="Admin" backPath="/dashboard" backLabel="Back to Dashboard">
+                                    <AdminDashboard />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     />
@@ -261,7 +293,9 @@ function App() {
                         path="/admin/seo"
                         element={
                             <ProtectedRoute>
-                                <SEODashboard />
+                                <RouteErrorBoundary section="SEO Dashboard" backPath="/admin" backLabel="Back to Admin">
+                                    <SEODashboard />
+                                </RouteErrorBoundary>
                             </ProtectedRoute>
                         }
                     />
@@ -273,6 +307,9 @@ function App() {
             </LazyLoadErrorBoundary>
 
             <Toaster position="top-right" richColors />
+
+            {/* Accessibility widget for user preferences (WCAG 1.4.4, 1.4.3, 2.3.3) */}
+            <AccessibilityWidget />
         </AnnouncerProvider>
     );
 }

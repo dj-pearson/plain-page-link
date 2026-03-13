@@ -234,7 +234,7 @@ export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
             "@type": "Offer",
             "price": "39",
             "priceCurrency": "USD",
-            "priceValidUntil": "2025-12-31",
+            "priceValidUntil": "2026-12-31",
             "availability": "https://schema.org/InStock",
             "url": `${baseUrl}/pricing`
         }
@@ -428,6 +428,217 @@ export const optimizeTitle = (title: string): string => {
     }
 
     return optimized;
+};
+
+/**
+ * Generate SoftwareApplication Schema
+ * Used on product pages, feature pages, and landing pages for AI search engines
+ */
+export const generateSoftwareApplicationSchema = (options?: {
+    name?: string;
+    description?: string;
+    url?: string;
+    price?: string;
+    priceCurrency?: string;
+    ratingValue?: string;
+    reviewCount?: string;
+    category?: string;
+    operatingSystem?: string;
+    features?: string[];
+}): Record<string, any> => {
+    const baseUrl = getSafeOrigin();
+    const opts = {
+        name: 'AgentBio',
+        description: 'Purpose-built link-in-bio platform for real estate agents. Showcase properties, capture leads, and book appointments from Instagram.',
+        url: baseUrl,
+        price: '39',
+        priceCurrency: 'USD',
+        ratingValue: '4.8',
+        reviewCount: '523',
+        category: 'BusinessApplication',
+        operatingSystem: 'Web, iOS, Android',
+        features: [],
+        ...options,
+    };
+
+    const schema: Record<string, any> = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": opts.name,
+        "description": opts.description,
+        "url": opts.url,
+        "applicationCategory": opts.category,
+        "operatingSystem": opts.operatingSystem,
+        "offers": {
+            "@type": "Offer",
+            "price": opts.price,
+            "priceCurrency": opts.priceCurrency,
+            "priceValidUntil": "2026-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": `${baseUrl}/pricing`
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": opts.ratingValue,
+            "reviewCount": opts.reviewCount,
+            "bestRating": "5",
+            "worstRating": "1"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "AgentBio",
+            "url": baseUrl
+        }
+    };
+
+    if (opts.features.length > 0) {
+        schema.featureList = opts.features.join(', ');
+    }
+
+    return schema;
+};
+
+/**
+ * Generate ItemList Schema for Comparison Pages
+ * Used on "vs" pages to help AI engines understand product comparisons
+ */
+export const generateComparisonSchema = (items: {
+    name: string;
+    description: string;
+    url: string;
+    image?: string;
+    price?: string;
+    rating?: string;
+}[]): Record<string, any> => {
+    return {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "itemListElement": items.map((item, index) => ({
+            "@type": "ListItem",
+            "position": index + 1,
+            "item": {
+                "@type": "SoftwareApplication",
+                "name": item.name,
+                "description": item.description,
+                "url": item.url,
+                ...(item.image && { "image": item.image }),
+                ...(item.price && {
+                    "offers": {
+                        "@type": "Offer",
+                        "price": item.price,
+                        "priceCurrency": "USD"
+                    }
+                }),
+                ...(item.rating && {
+                    "aggregateRating": {
+                        "@type": "AggregateRating",
+                        "ratingValue": item.rating,
+                        "bestRating": "5"
+                    }
+                })
+            }
+        }))
+    };
+};
+
+/**
+ * Generate HowTo Schema for Tutorial/Guide Content
+ * Helps AI engines extract step-by-step instructions
+ */
+export const generateHowToSchema = (options: {
+    name: string;
+    description: string;
+    totalTime?: string;
+    estimatedCost?: { currency: string; value: string };
+    steps: { name: string; text: string; image?: string; url?: string }[];
+    tools?: string[];
+}): Record<string, any> => {
+    const schema: Record<string, any> = {
+        "@context": "https://schema.org",
+        "@type": "HowTo",
+        "name": options.name,
+        "description": options.description,
+        "step": options.steps.map((step, index) => ({
+            "@type": "HowToStep",
+            "position": index + 1,
+            "name": step.name,
+            "text": step.text,
+            ...(step.image && { "image": step.image }),
+            ...(step.url && { "url": step.url })
+        }))
+    };
+
+    if (options.totalTime) {
+        schema.totalTime = options.totalTime;
+    }
+    if (options.estimatedCost) {
+        schema.estimatedCost = {
+            "@type": "MonetaryAmount",
+            "currency": options.estimatedCost.currency,
+            "value": options.estimatedCost.value
+        };
+    }
+    if (options.tools && options.tools.length > 0) {
+        schema.tool = options.tools.map(tool => ({
+            "@type": "HowToTool",
+            "name": tool
+        }));
+    }
+
+    return schema;
+};
+
+/**
+ * Generate Pricing Schema with multiple tiers
+ * Used on pricing pages to display offer details in search results
+ */
+export const generatePricingSchema = (tiers: {
+    name: string;
+    description: string;
+    price: string;
+    priceCurrency?: string;
+    billingPeriod?: string;
+    features: string[];
+    url?: string;
+}[]): Record<string, any> => {
+    const baseUrl = getSafeOrigin();
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": "AgentBio",
+        "description": "Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, and appointment booking.",
+        "brand": {
+            "@type": "Brand",
+            "name": "AgentBio"
+        },
+        "url": `${baseUrl}/pricing`,
+        "offers": tiers.map(tier => ({
+            "@type": "Offer",
+            "name": tier.name,
+            "description": tier.description,
+            "price": tier.price,
+            "priceCurrency": tier.priceCurrency || "USD",
+            "priceValidUntil": "2026-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": tier.url || `${baseUrl}/pricing`,
+            ...(tier.billingPeriod && {
+                "priceSpecification": {
+                    "@type": "UnitPriceSpecification",
+                    "price": tier.price,
+                    "priceCurrency": tier.priceCurrency || "USD",
+                    "billingDuration": tier.billingPeriod
+                }
+            })
+        })),
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "523",
+            "bestRating": "5",
+            "worstRating": "1"
+        }
+    };
 };
 
 /**

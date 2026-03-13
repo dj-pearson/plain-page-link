@@ -3,6 +3,8 @@
  * Handles Firebase Cloud Messaging for push notifications
  */
 
+import { logger } from "@/lib/logger";
+
 // Firebase configuration will be loaded from environment variables
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -33,7 +35,7 @@ export class PushNotificationManager {
         // Check if Firebase is configured
         if (!firebaseConfig.apiKey) {
             if (import.meta.env.DEV) {
-                console.warn("[PushNotifications] Firebase not configured");
+                logger.warn("[PushNotifications] Firebase not configured");
             }
             return false;
         }
@@ -54,24 +56,21 @@ export class PushNotificationManager {
             // Handle foreground messages
             onMessage(this.messaging, (payload) => {
                 if (import.meta.env.DEV) {
-                    console.log(
-                        "[PushNotifications] Foreground message received:",
-                        payload
-                    );
+                    logger.debug("[PushNotifications] Foreground message received:", { payload });
                 }
                 this.handleForegroundMessage(payload);
             });
 
             return true;
         } catch (error) {
-            console.error("[PushNotifications] Failed to initialize:", error);
+            logger.error("[PushNotifications] Failed to initialize:", error as Error);
             return false;
         }
     }
 
     private async registerServiceWorker(): Promise<void> {
         if (!('serviceWorker' in navigator)) {
-            console.warn('[PushNotifications] Service workers not supported');
+            logger.warn('[PushNotifications] Service workers not supported');
             return;
         }
 
@@ -82,7 +81,7 @@ export class PushNotificationManager {
             );
 
             if (import.meta.env.DEV) {
-                console.log('[PushNotifications] Service worker registered:', registration);
+                logger.debug('[PushNotifications] Service worker registered:', { registration });
             }
 
             // Send Firebase config to service worker
@@ -108,7 +107,7 @@ export class PushNotificationManager {
                 }
             });
         } catch (error) {
-            console.error('[PushNotifications] Service worker registration failed:', error);
+            logger.error('[PushNotifications] Service worker registration failed:', error as Error);
         }
     }
 
@@ -116,14 +115,11 @@ export class PushNotificationManager {
         try {
             const permission = await Notification.requestPermission();
             if (import.meta.env.DEV) {
-                console.log("[PushNotifications] Permission:", permission);
+                logger.debug("[PushNotifications] Permission:", { permission });
             }
             return permission === "granted";
         } catch (error) {
-            console.error(
-                "[PushNotifications] Permission request failed:",
-                error
-            );
+            logger.error("[PushNotifications] Permission request failed:", error as Error);
             return false;
         }
     }
@@ -141,20 +137,18 @@ export class PushNotificationManager {
 
             if (token) {
                 if (import.meta.env.DEV) {
-                    console.log("[PushNotifications] FCM Token:", token);
+                    logger.debug("[PushNotifications] FCM Token:", { token });
                 }
                 this.currentToken = token;
                 return token;
             } else {
                 if (import.meta.env.DEV) {
-                    console.log(
-                        "[PushNotifications] No registration token available"
-                    );
+                    logger.debug("[PushNotifications] No registration token available");
                 }
                 return null;
             }
         } catch (error) {
-            console.error("[PushNotifications] Failed to get token:", error);
+            logger.error("[PushNotifications] Failed to get token:", error as Error);
             return null;
         }
     }
@@ -169,7 +163,7 @@ export class PushNotificationManager {
             const { data: { session } } = await supabase.auth.getSession();
 
             if (!session?.access_token) {
-                console.error('[PushNotifications] No active session');
+                logger.error('[PushNotifications] No active session', new Error('No active session'));
                 return false;
             }
 
@@ -192,14 +186,11 @@ export class PushNotificationManager {
             }
 
             if (import.meta.env.DEV) {
-                console.log("[PushNotifications] Token registered successfully");
+                logger.debug("[PushNotifications] Token registered successfully");
             }
             return true;
         } catch (error) {
-            console.error(
-                "[PushNotifications] Failed to register token:",
-                error
-            );
+            logger.error("[PushNotifications] Failed to register token:", error as Error);
             return false;
         }
     }
@@ -213,7 +204,7 @@ export class PushNotificationManager {
             const { data: { session } } = await supabase.auth.getSession();
 
             if (!session?.access_token) {
-                console.error('[PushNotifications] No active session');
+                logger.error('[PushNotifications] No active session', new Error('No active session'));
                 return false;
             }
 
@@ -233,15 +224,12 @@ export class PushNotificationManager {
             }
 
             if (import.meta.env.DEV) {
-                console.log("[PushNotifications] Token unregistered successfully");
+                logger.debug("[PushNotifications] Token unregistered successfully");
             }
             this.currentToken = undefined;
             return true;
         } catch (error) {
-            console.error(
-                "[PushNotifications] Failed to unregister token:",
-                error
-            );
+            logger.error("[PushNotifications] Failed to unregister token:", error as Error);
             return false;
         }
     }
@@ -278,10 +266,7 @@ export class PushNotificationManager {
                 const registration = await navigator.serviceWorker.ready;
                 await registration.showNotification(title, options);
             } catch (error) {
-                console.error(
-                    "[PushNotifications] Failed to show notification:",
-                    error
-                );
+                logger.error("[PushNotifications] Failed to show notification:", error as Error);
                 // Fallback to browser notification
                 new Notification(title, options);
             }

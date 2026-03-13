@@ -34,11 +34,16 @@ import {
     FileText,
     Send,
     X,
+    Flame,
+    TrendingUp,
+    Brain,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import type { Lead } from "@/types/lead";
+import { useLeadScore } from "@/hooks/useMLLeadScoring";
+import { logger } from "@/lib/logger";
 
 // Extended Lead type for modal with additional fields that may be present
 interface LeadWithExtras extends Lead {
@@ -104,6 +109,7 @@ export function LeadDetailModal({
     const [isSaving, setIsSaving] = useState(false);
     const [loadingNotes, setLoadingNotes] = useState(false);
     const [selectedResponse, setSelectedResponse] = useState<string>("");
+    const leadScore = useLeadScore(lead);
 
     // Load notes when modal opens
     useEffect(() => {
@@ -126,7 +132,7 @@ export function LeadDetailModal({
             if (error) throw error;
             setNotes(data || []);
         } catch (error) {
-            console.error("Failed to load notes:", error);
+            logger.error("Failed to load notes", error as Error);
         } finally {
             setLoadingNotes(false);
         }
@@ -151,7 +157,7 @@ export function LeadDetailModal({
             // Auto-add a note about the status change
             await addNote(`Status changed to: ${newStatus}`, true);
         } catch (error) {
-            console.error("Failed to update status:", error);
+            logger.error("Failed to update lead status", error as Error);
             toast.error("Failed to update status");
         } finally {
             setIsSaving(false);
@@ -180,7 +186,7 @@ export function LeadDetailModal({
                 toast.success("Note added");
             }
         } catch (error) {
-            console.error("Failed to add note:", error);
+            logger.error("Failed to add note", error as Error);
             if (!isSystemNote) {
                 toast.error("Failed to add note");
             }
@@ -270,6 +276,53 @@ export function LeadDetailModal({
                             </SelectContent>
                         </Select>
                     </div>
+
+                    {/* AI Lead Score */}
+                    {leadScore && (
+                        <div className="space-y-3">
+                            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                                <Brain className="h-4 w-4" />
+                                AI Lead Score
+                            </h3>
+                            <div className="p-4 rounded-lg border bg-gradient-to-r from-background to-muted/30">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        {leadScore.priority === "hot" && <Flame className="h-5 w-5 text-red-500" />}
+                                        {leadScore.priority === "warm" && <TrendingUp className="h-5 w-5 text-amber-500" />}
+                                        <span className={`text-lg font-bold ${
+                                            leadScore.priority === "hot" ? "text-red-600" :
+                                            leadScore.priority === "warm" ? "text-amber-600" : "text-slate-600"
+                                        }`}>
+                                            {leadScore.priority === "hot" ? "Hot Lead" :
+                                             leadScore.priority === "warm" ? "Warm Lead" : "Cold Lead"}
+                                        </span>
+                                    </div>
+                                    <span className="text-2xl font-bold text-foreground">{leadScore.score}</span>
+                                </div>
+                                <div className="w-full bg-muted rounded-full h-2">
+                                    <div
+                                        className={`h-2 rounded-full transition-all ${
+                                            leadScore.priority === "hot" ? "bg-red-500" :
+                                            leadScore.priority === "warm" ? "bg-amber-500" : "bg-slate-400"
+                                        }`}
+                                        style={{ width: `${Math.min(leadScore.score, 100)}%` }}
+                                    />
+                                </div>
+                                {leadScore.featureImportance && leadScore.featureImportance.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-1.5">
+                                        {leadScore.featureImportance.slice(0, 3).map((f) => (
+                                            <span
+                                                key={f.feature}
+                                                className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground"
+                                            >
+                                                {f.feature}: {f.contribution > 0 ? "+" : ""}{f.contribution.toFixed(1)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Contact Information */}
                     <div className="space-y-3">

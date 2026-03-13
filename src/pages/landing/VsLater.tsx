@@ -84,7 +84,7 @@ export default function VsLater() {
         <script type="application/ld+json">{JSON.stringify(schema)}</script>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
+      <main id="main-content" className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5" tabIndex={-1}>
         {/* Hero Section */}
         <section className="container mx-auto px-4 pt-24 pb-16">
           <div className="max-w-4xl mx-auto text-center">
@@ -781,7 +781,7 @@ export default function VsLater() {
             </div>
           </div>
         </section>
-      </div>
+      </main>
     </>
   );
 }
