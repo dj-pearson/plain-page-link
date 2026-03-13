@@ -1,7 +1,7 @@
 import { Navigate, Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, BrainCircuit, Share2, FileText, ArrowLeft, Users, Database, Search, BarChart3 } from "lucide-react";
+import { Settings, BrainCircuit, Share2, FileText, ArrowLeft, Users, Database, Search, BarChart3, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AIConfigurationManager } from "@/components/admin/AIConfigurationManager";
 import { SocialMediaManager } from "@/components/admin/SocialMediaManager";
@@ -10,6 +10,7 @@ import { KeywordImportDialog } from "@/components/admin/KeywordImportDialog";
 import { SEOManager } from "@/components/admin/SEOManager";
 import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDashboard";
 import { SampleDataManager } from "@/components/admin/SampleDataManager";
+import { PSEOManager } from "@/components/admin/PSEOManager";
 
 export function AdminDashboard() {
   const { user, role } = useAuthStore();
@@ -42,8 +43,12 @@ export function AdminDashboard() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="ai" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-9 lg:w-auto">
+        <Tabs defaultValue="pseo" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-10 lg:w-auto">
+            <TabsTrigger value="pseo" className="gap-2">
+              <Globe className="h-4 w-4" />
+              pSEO
+            </TabsTrigger>
             <TabsTrigger value="ai" className="gap-2">
               <BrainCircuit className="h-4 w-4" />
               AI Settings
@@ -81,6 +86,10 @@ export function AdminDashboard() {
               Platform
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="pseo" className="space-y-6">
+            <PSEOManager />
+          </TabsContent>
 
           <TabsContent value="ai" className="space-y-6">
             <AIConfigurationManager />
