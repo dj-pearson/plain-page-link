@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base32Encode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 /**
  * Setup MFA (Multi-Factor Authentication)
@@ -79,7 +80,7 @@ serve(async (req) => {
       .single();
 
     if (existingMfa?.mfa_enabled && existingMfa?.verified_at) {
-      throw new Error('MFA is already enabled. Please disable it first to set up again.');
+      return errorResponse('MFA is already enabled. Please disable it first to set up again.', 'AUTH_MFA_ALREADY_ENABLED', req, 400);
     }
 
     // Generate TOTP secret (20 bytes = 160 bits, recommended for SHA1)
@@ -113,7 +114,7 @@ serve(async (req) => {
 
     if (upsertError) {
       console.error('Error storing MFA settings:', upsertError);
-      throw new Error('Failed to setup MFA');
+      return errorResponse('Failed to setup MFA', 'AUTH_MFA_SETUP_FAILED', req, 500);
     }
 
     // Log the setup attempt
@@ -125,29 +126,14 @@ serve(async (req) => {
       user_agent: req.headers.get('user-agent'),
     });
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        secret,
-        totpUri,
-        backupCodes,
-        message: 'Scan the QR code with your authenticator app, then verify with a code'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    return successResponse({
+      secret,
+      totpUri,
+      backupCodes,
+      message: 'Scan the QR code with your authenticator app, then verify with a code'
+    }, req);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'An error occurred';
-    console.error('MFA Setup Error:', message);
-
-    return new Response(
-      JSON.stringify({ error: message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    );
+    console.error('MFA Setup Error:', error instanceof Error ? error.message : error);
+    return handleUnexpectedError(error, req);
   }
 });

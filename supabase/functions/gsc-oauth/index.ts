@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { successResponse, errorResponse, unauthorizedResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 /**
  * Google Search Console OAuth Handler
@@ -20,10 +21,7 @@ serve(async (req) => {
     const { code, redirectUri } = await req.json();
 
     if (!code) {
-      return new Response(
-        JSON.stringify({ error: 'Authorization code is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Authorization code is required', 'REQUEST_VALIDATION_FAILED', req);
     }
 
     // Get OAuth credentials from environment
@@ -32,10 +30,7 @@ serve(async (req) => {
     const REDIRECT_URI = redirectUri || Deno.env.get("GOOGLE_REDIRECT_URI");
 
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return new Response(
-        JSON.stringify({ error: 'Google OAuth credentials not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Google OAuth credentials not configured', 'INTERNAL_SERVER_ERROR', req, 500);
     }
 
     console.log('Exchanging authorization code for tokens...');
@@ -76,10 +71,7 @@ serve(async (req) => {
       userId = user.id;
     } catch (e) {
       console.error('Failed to authenticate user:', e);
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return unauthorizedResponse(req);
     }
 
     // Calculate token expiration
@@ -133,20 +125,12 @@ serve(async (req) => {
       console.log('Saved new GSC credentials');
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Google Search Console connected successfully',
-        expiresAt: expiresAt.toISOString(),
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return successResponse({
+      message: 'Google Search Console connected successfully',
+      expiresAt: expiresAt.toISOString(),
+    }, req);
 
   } catch (error) {
-    console.error('GSC OAuth error:', error);
-    return new Response(
-      JSON.stringify({ error: getErrorMessage(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return handleUnexpectedError(error, req);
   }
 });

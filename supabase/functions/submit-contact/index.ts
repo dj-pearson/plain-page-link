@@ -7,6 +7,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail } from '../_shared/email.ts';
 import { checkRateLimit, getRateLimitHeaders } from '../_shared/rateLimit.ts';
 import { validateContactData, sanitizeString, getClientIP } from '../_shared/validation.ts';
+import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -19,20 +20,10 @@ serve(async (req) => {
     // Rate limiting - 5 requests per minute per IP
     const clientIP = getClientIP(req);
     const rateLimit = checkRateLimit(clientIP, { maxRequests: 5, windowMs: 60000 });
-    
+
     if (!rateLimit.allowed) {
       console.warn(`Rate limit exceeded for IP: ${clientIP}`);
-      return new Response(
-        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-        { 
-          status: 429, 
-          headers: { 
-            ...corsHeaders, 
-            ...getRateLimitHeaders(rateLimit),
-            'Content-Type': 'application/json' 
-          } 
-        }
-      );
+      return rateLimitResponse(Math.ceil(rateLimit.resetMs / 1000), req, 'Too many requests. Please try again later.');
     }
 
     // Create Supabase client (public access for contact forms)
@@ -43,15 +34,12 @@ serve(async (req) => {
 
     // Parse request body
     const rawData = await req.json()
-    
+
     // Validate input
     const validation = validateContactData(rawData);
     if (!validation.valid) {
       console.error('Validation errors:', validation.errors);
-      return new Response(
-        JSON.stringify({ error: 'Invalid input data', details: validation.errors }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return validationError(validation.errors, req);
     }
 
     // Sanitize inputs
@@ -151,28 +139,12 @@ serve(async (req) => {
       // Don't fail the whole request if email fails
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Lead submitted and notifications sent successfully',
-        leadId: leadData?.id || leadId,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    )
+    return successResponse({
+      message: 'Lead submitted and notifications sent successfully',
+      leadId: leadData?.id || leadId,
+    }, req)
   } catch (error) {
     console.error('Error:', error)
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    )
+    return handleUnexpectedError(error, req)
   }
 })

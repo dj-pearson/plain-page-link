@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getAuthenticatedUser } from '../_shared/service-auth.ts';
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 // Timeout constants
 const AI_API_TIMEOUT_MS = 120000; // 2 minutes for AI generation
@@ -62,10 +63,7 @@ export default async (req: Request) => {
       requestBody = bodyText ? JSON.parse(bodyText) : {};
     } catch (parseError) {
       console.error('[generate-article] Failed to parse request body:', parseError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid JSON in request body' }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse('Invalid JSON in request body', 'REQUEST_VALIDATION_FAILED', req);
     }
 
     const { topic, category, keywords, customInstructions, autoSelectKeyword = true } = requestBody;
@@ -82,10 +80,7 @@ export default async (req: Request) => {
 
     if (missingEnvVars.length > 0) {
       console.error(`[generate-article] Missing environment variables: ${missingEnvVars.join(', ')}`);
-      return new Response(
-        JSON.stringify({ success: false, error: `Missing required environment variables: ${missingEnvVars.join(', ')}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse(`Missing required environment variables: ${missingEnvVars.join(', ')}`, 'INTERNAL_SERVER_ERROR', req, 500);
     }
 
     console.log(`[generate-article] Environment validated. SUPABASE_URL: ${SUPABASE_URL}`);
@@ -314,16 +309,10 @@ mobile real estate marketing`;
 
       // Check if it was a timeout (AbortError)
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        return new Response(
-          JSON.stringify({ success: false, error: 'AI service timed out. Please try again.' }),
-          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return errorResponse('AI service timed out. Please try again.', 'ARTICLE_GENERATE_FAILED', req, 504);
       }
 
-      return new Response(
-        JSON.stringify({ success: false, error: `AI service unavailable: ${errorMessage}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse(`AI service unavailable: ${errorMessage}`, 'ARTICLE_GENERATE_FAILED', req, 502);
     }
 
     if (!aiResponse.ok) {
@@ -338,10 +327,7 @@ mobile real estate marketing`;
       } else if (status === 401) {
         friendly = "Invalid API key. Please check your CLAUDE_API_KEY.";
       }
-      return new Response(
-        JSON.stringify({ success: false, error: `${friendly}: ${status}` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse(`${friendly}: ${status}`, 'ARTICLE_GENERATE_FAILED', req, 200);
     }
 
     let aiData: Record<string, unknown>;
@@ -349,10 +335,7 @@ mobile real estate marketing`;
       aiData = await aiResponse.json();
     } catch (jsonError) {
       console.error('[generate-article] Failed to parse AI response as JSON:', jsonError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'AI service returned invalid response format' }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse('AI service returned invalid response format', 'ARTICLE_GENERATE_FAILED', req, 502);
     }
 
     // Extract content from Claude response
@@ -362,10 +345,7 @@ mobile real estate marketing`;
     // Validate that content was actually generated
     if (!content || content.trim().length < 100) {
       console.error('[generate-article] Claude returned empty or too short content:', content?.length || 0);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Claude API returned insufficient content. Please try again.' }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse('Claude API returned insufficient content. Please try again.', 'ARTICLE_GENERATE_FAILED', req, 502);
     }
 
     console.log(`[generate-article] Claude returned ${content.length} chars of content`);
@@ -424,10 +404,7 @@ mobile real estate marketing`;
 
     if (insertError) {
       console.error("[generate-article] Error saving article:", insertError);
-      return new Response(
-        JSON.stringify({ success: false, error: `Failed to save article: ${insertError.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse(`Failed to save article: ${insertError.message}`, 'ARTICLE_GENERATE_FAILED', req, 500);
     }
 
     console.log("[generate-article] Article generated and saved successfully");
@@ -478,22 +455,10 @@ mobile real estate marketing`;
       // Don't fail the article generation if social posting fails
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        article: insertedArticle
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return successResponse({ article: insertedArticle }, req);
 
   } catch (error) {
     console.error("[generate-article] Error generating article:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error"
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return handleUnexpectedError(error, req);
   }
 };

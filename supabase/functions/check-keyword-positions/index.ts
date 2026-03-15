@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -28,7 +29,7 @@ serve(async (req) => {
     } else if (keyword && url) {
       targetKeyword = { keyword, target_url: url };
     } else {
-      throw new Error('Either keywordId or keyword+url is required');
+      return errorResponse('Either keywordId or keyword+url is required', 'REQUEST_VALIDATION_FAILED', req);
     }
 
     console.log(`Checking position for keyword: ${targetKeyword.keyword}`);
@@ -130,17 +131,11 @@ serve(async (req) => {
 
     console.log(`Position check complete: "${targetKeyword.keyword}" at position ${position}`);
 
-    return new Response(
-      JSON.stringify({ success: true, analysis }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return successResponse({ analysis }, req);
 
   } catch (error: any) {
     console.error('Error checking keyword position:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return handleUnexpectedError(error, req);
   }
 });
 

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 interface CrawlRequest {
   startUrl: string;
@@ -27,10 +28,7 @@ serve(async (req) => {
     }: CrawlRequest = await req.json();
 
     if (!startUrl) {
-      return new Response(
-        JSON.stringify({ error: 'startUrl is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('startUrl is required', 'SEO_CRAWL_VALIDATION', req);
     }
 
     console.log(`Starting crawl from: ${startUrl}`);
@@ -304,20 +302,9 @@ serve(async (req) => {
 
     console.log(`Crawl complete. Crawled ${summary.pagesCrawled} pages.`);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        summary,
-        results: crawlResults,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return successResponse({ summary, results: crawlResults }, req);
 
   } catch (error) {
-    console.error('Error in site crawl:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return handleUnexpectedError(error, req);
   }
 });

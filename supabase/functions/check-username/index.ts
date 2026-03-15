@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { successResponse, errorResponse, unauthorizedResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -16,20 +17,20 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      return unauthorizedResponse(req, 'No authorization header');
     }
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      return unauthorizedResponse(req, 'Unauthorized');
     }
 
     const { username } = await req.json();
 
     if (!username) {
-      throw new Error('Username is required');
+      return errorResponse('Username is required', 'REQUEST_VALIDATION_FAILED', req, 400);
     }
 
     const { data, error } = await supabase.rpc('check_username_available', {
@@ -39,21 +40,8 @@ serve(async (req) => {
 
     if (error) throw error;
 
-    return new Response(
-      JSON.stringify({ available: data }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    return successResponse({ available: data }, req);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'An error occurred';
-    return new Response(
-      JSON.stringify({ error: message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    );
+    return handleUnexpectedError(error, req);
   }
 });

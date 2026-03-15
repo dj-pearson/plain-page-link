@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 // Use environment variable for BASE_URL with fallback
 const BASE_URL = Deno.env.get('SITE_URL') || Deno.env.get('APP_URL') || 'https://agentbio.net';
@@ -37,13 +38,9 @@ Deno.serve(async (req) => {
       return generatePagesSitemap(supabase, xmlHeaders);
     }
 
-    return new Response('Invalid type parameter', { status: 400, headers: xmlHeaders });
+    return errorResponse('Invalid type parameter. Use: index, static, blog, profiles, or pages', 'REQUEST_VALIDATION_FAILED', req);
   } catch (error) {
-    console.error('Sitemap generation error:', error);
-    return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>`,
-      { headers: { ...xmlHeaders }, status: 500 }
-    );
+    return handleUnexpectedError(error, req);
   }
 });
 

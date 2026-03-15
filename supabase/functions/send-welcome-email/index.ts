@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts'
 
 interface WelcomeEmailData {
   user_id: string
@@ -23,10 +24,7 @@ serve(async (req) => {
 
     // Validate required fields
     if (!data.email || !data.username) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return errorResponse('Missing required fields: email and username', 'REQUEST_VALIDATION_FAILED', req)
     }
 
     const userName = data.full_name || data.username
@@ -186,16 +184,9 @@ P.S. Share your first listing today and see how AgentBio helps you convert Insta
 </html>`
     })
 
-    return new Response(
-      JSON.stringify({ success: true, message: 'Welcome email sent' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return successResponse({ message: 'Welcome email sent' }, req)
 
   } catch (error) {
-    console.error('Error in send-welcome-email function:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return handleUnexpectedError(error, req)
   }
 })

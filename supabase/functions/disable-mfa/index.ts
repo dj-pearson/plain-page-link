@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { decode as base32Decode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 /**
  * Disable MFA
@@ -93,7 +94,7 @@ serve(async (req) => {
     const { code, password } = await req.json();
 
     if (!code) {
-      throw new Error('Verification code is required to disable MFA');
+      return errorResponse('Verification code is required to disable MFA', 'REQUEST_VALIDATION_FAILED', req);
     }
 
     // Get MFA settings
@@ -104,12 +105,12 @@ serve(async (req) => {
       .single();
 
     if (mfaError || !mfaSettings || !mfaSettings.mfa_enabled) {
-      throw new Error('MFA is not enabled for this account');
+      return errorResponse('MFA is not enabled for this account', 'AUTH_MFA_INVALID', req);
     }
 
     // Check if locked
     if (mfaSettings.locked_until && new Date(mfaSettings.locked_until) > new Date()) {
-      throw new Error('Account is temporarily locked due to too many failed attempts');
+      return errorResponse('Account is temporarily locked due to too many failed attempts', 'AUTH_LOGIN_RATE_LIMITED', req, 429);
     }
 
     const normalizedCode = code.replace(/\s/g, '');
@@ -134,7 +135,7 @@ serve(async (req) => {
 
     if (!isValid) {
       await supabase.rpc('increment_mfa_failed_attempts', { p_user_id: user.id });
-      throw new Error('Invalid verification code');
+      return errorResponse('Invalid verification code', 'AUTH_MFA_INVALID', req);
     }
 
     // Disable MFA
@@ -152,7 +153,7 @@ serve(async (req) => {
       .eq('user_id', user.id);
 
     if (updateError) {
-      throw new Error('Failed to disable MFA');
+      return errorResponse('Failed to disable MFA', 'AUTH_MFA_INVALID', req, 500);
     }
 
     // Revoke all trusted devices
@@ -164,26 +165,9 @@ serve(async (req) => {
       })
       .eq('user_id', user.id);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'MFA has been disabled successfully',
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    return successResponse({ message: 'MFA has been disabled successfully' }, req);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'An error occurred';
-    console.error('MFA Disable Error:', message);
-
-    return new Response(
-      JSON.stringify({ error: message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    );
+    console.error('MFA Disable Error:', error instanceof Error ? error.message : error);
+    return handleUnexpectedError(error, req);
   }
 });

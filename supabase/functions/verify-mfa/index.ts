@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { decode as base32Decode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 /**
  * Verify MFA Code
@@ -105,7 +106,7 @@ serve(async (req) => {
     const { code, isSetupVerification, trustDevice, deviceFingerprint } = body;
 
     if (!code) {
-      throw new Error('Verification code is required');
+      return errorResponse('Verification code is required', 'REQUEST_VALIDATION_FAILED', req);
     }
 
     // Get MFA settings
@@ -116,13 +117,13 @@ serve(async (req) => {
       .single();
 
     if (mfaError || !mfaSettings) {
-      throw new Error('MFA is not set up for this account');
+      return errorResponse('MFA is not set up for this account', 'AUTH_MFA_INVALID', req);
     }
 
     // Check if locked due to too many failed attempts
     if (mfaSettings.locked_until && new Date(mfaSettings.locked_until) > new Date()) {
       const unlockTime = new Date(mfaSettings.locked_until).toLocaleTimeString();
-      throw new Error(`Too many failed attempts. Try again after ${unlockTime}`);
+      return errorResponse(`Too many failed attempts. Try again after ${unlockTime}`, 'AUTH_LOGIN_RATE_LIMITED', req, 429);
     }
 
     const normalizedCode = code.replace(/\s/g, '');
@@ -156,7 +157,7 @@ serve(async (req) => {
       // Increment failed attempts
       await supabase.rpc('increment_mfa_failed_attempts', { p_user_id: user.id });
 
-      throw new Error('Invalid verification code');
+      return errorResponse('Invalid verification code', 'AUTH_MFA_INVALID', req);
     }
 
     // Reset failed attempts on success
@@ -174,7 +175,7 @@ serve(async (req) => {
         .eq('user_id', user.id);
 
       if (updateError) {
-        throw new Error('Failed to enable MFA');
+        return errorResponse('Failed to enable MFA', 'AUTH_MFA_INVALID', req, 500);
       }
     }
 
@@ -211,33 +212,18 @@ serve(async (req) => {
       });
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        verified: true,
-        mfaEnabled: isSetupVerification || mfaSettings.mfa_enabled,
-        remainingBackupCodes: method === 'backup_code'
-          ? mfaSettings.backup_codes.length - 1
-          : mfaSettings.backup_codes.length,
-        message: isSetupVerification
-          ? 'MFA has been successfully enabled'
-          : 'Verification successful',
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    return successResponse({
+      verified: true,
+      mfaEnabled: isSetupVerification || mfaSettings.mfa_enabled,
+      remainingBackupCodes: method === 'backup_code'
+        ? mfaSettings.backup_codes.length - 1
+        : mfaSettings.backup_codes.length,
+      message: isSetupVerification
+        ? 'MFA has been successfully enabled'
+        : 'Verification successful',
+    }, req);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'An error occurred';
-    console.error('MFA Verification Error:', message);
-
-    return new Response(
-      JSON.stringify({ error: message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    );
+    console.error('MFA Verification Error:', error instanceof Error ? error.message : error);
+    return handleUnexpectedError(error, req);
   }
 });
