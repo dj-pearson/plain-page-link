@@ -7,6 +7,7 @@ import App from "./App";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { initSentry } from "./lib/sentry";
 import { logger } from "@/lib/logger";
+import { initWebVitals } from "@/lib/web-vitals";
 import "./index.css";
 
 // Initialize Sentry as early as possible for error monitoring
@@ -61,3 +62,6 @@ ReactDOM.createRoot(rootEl).render(
 if (import.meta.env.DEV) {
     logger.debug("[Lovable] React render invoked");
 }
+
+// Initialize Web Vitals monitoring (LCP, FID, CLS, TTFB, INP)
+initWebVitals();

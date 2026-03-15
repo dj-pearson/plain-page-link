@@ -4,6 +4,7 @@ import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 /**
  * Analyze Content for SEO
@@ -34,10 +35,7 @@ serve(async (req) => {
     }: ContentAnalysisRequest = await req.json();
 
     if (!url && !providedContent) {
-      return new Response(
-        JSON.stringify({ error: 'Either URL or content is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Either URL or content is required', 'CONTENT_ANALYZE_FAILED', req);
     }
 
     console.log(`Analyzing content for: ${url || 'provided content'}`);
@@ -332,17 +330,10 @@ serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, result }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return successResponse({ result }, req);
 
   } catch (error) {
-    console.error('Error analyzing content:', error);
-    return new Response(
-      JSON.stringify({ error: getErrorMessage(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return handleUnexpectedError(error, req);
   }
 });
 

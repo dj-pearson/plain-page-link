@@ -4,6 +4,7 @@ import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { checkRateLimit, getRateLimitHeaders } from '../_shared/rateLimit.ts'
 import { validateLeadData, sanitizeString, getClientIP } from '../_shared/validation.ts'
+import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts'
 
 interface LeadData {
   user_id: string
@@ -36,32 +37,19 @@ serve(async (req) => {
     // Rate limiting - 5 requests per minute per IP
     const clientIP = getClientIP(req);
     const rateLimit = checkRateLimit(clientIP, { maxRequests: 5, windowMs: 60000 });
-    
+
     if (!rateLimit.allowed) {
       console.warn(`Rate limit exceeded for IP: ${clientIP}`);
-      return new Response(
-        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-        { 
-          status: 429, 
-          headers: { 
-            ...corsHeaders, 
-            ...getRateLimitHeaders(rateLimit),
-            'Content-Type': 'application/json' 
-          } 
-        }
-      );
+      return rateLimitResponse(Math.ceil(rateLimit.resetMs / 1000), req, 'Too many requests. Please try again later.');
     }
 
     const rawData = await req.json()
-    
+
     // Validate input data
     const validation = validateLeadData(rawData);
     if (!validation.valid) {
       console.error('Validation errors:', validation.errors);
-      return new Response(
-        JSON.stringify({ error: 'Invalid input data', details: validation.errors }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return validationError(validation.errors, req);
     }
 
     // Sanitize string inputs
@@ -276,16 +264,10 @@ Sent from AgentBio.net`,
       })
     }
 
-    return new Response(
-      JSON.stringify({ success: true, lead_id: lead.id }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return successResponse({ lead_id: lead.id }, req)
 
   } catch (error) {
     console.error('Error in submit-lead function:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return handleUnexpectedError(error, req)
   }
 })

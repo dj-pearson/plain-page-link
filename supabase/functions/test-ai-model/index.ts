@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { successResponse, errorResponse, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -93,23 +94,11 @@ serve(async (req) => {
       console.error("AI API error:", response.status, errorText);
       
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: "Rate limit exceeded. Please try again later." 
-          }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return rateLimitResponse(60, req, 'Rate limit exceeded. Please try again later.');
       }
-      
+
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: "Payment required. Please check your API credits." 
-          }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return errorResponse('Payment required. Please check your API credits.', 'ARTICLE_GENERATE_QUOTA', req, 402);
       }
 
       throw new Error(`AI API error: ${response.status} - ${errorText}`);
@@ -127,25 +116,14 @@ serve(async (req) => {
 
     console.log("AI test response:", testResult);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "AI model is working correctly",
-        response: testResult,
-        model: modelConfig.model_id,
-        provider: modelConfig.provider
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return successResponse({
+      message: "AI model is working correctly",
+      response: testResult,
+      model: modelConfig.model_id,
+      provider: modelConfig.provider,
+    }, req);
 
   } catch (error) {
-    console.error("Error testing AI model:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred"
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return handleUnexpectedError(error, req);
   }
 });

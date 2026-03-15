@@ -16,7 +16,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Do NOT auto-fix existing code in this story. Only set up the tooling. Existing violations will be addressed incrementally."
     },
     {
@@ -49,7 +49,7 @@
         "Typecheck passes: tsc --noEmit succeeds locally"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "This is the most critical infrastructure gap. The .github/workflows/ directory currently exists but is empty."
     },
     {
@@ -297,7 +297,7 @@
         "Typecheck passes on edge function code"
       ],
       "priority": 18,
-      "passes": false,
+      "passes": true,
       "notes": "A _shared/ directory already exists in supabase/functions/. Check what utilities are already there."
     },
     {
@@ -403,7 +403,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 24,
-      "passes": false,
+      "passes": true,
       "notes": "Web Vitals are Google's official page experience metrics and affect SEO ranking."
     },
     {

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 interface AuditRequest {
   url: string;
@@ -19,10 +20,7 @@ serve(async (req) => {
     const { url, auditType = 'full', saveResults = true }: AuditRequest = await req.json();
 
     if (!url) {
-      return new Response(
-        JSON.stringify({ error: 'URL is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('URL is required', 'SEO_AUDIT_VALIDATION', req);
     }
 
     console.log(`Starting ${auditType} SEO audit for: ${url}`);
@@ -333,17 +331,10 @@ serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, audit }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return successResponse({ audit }, req);
 
   } catch (error) {
     console.error('Error in SEO audit:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return handleUnexpectedError(error, req);
   }
 });
