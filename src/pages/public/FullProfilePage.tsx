@@ -74,8 +74,11 @@ export default function FullProfilePage() {
 
         if (data) {
             checkForCustomPage();
+        } else if (!isLoading) {
+            // Profile failed to load or doesn't exist — stop spinner
+            setCheckingCustomPage(false);
         }
-    }, [slug, data]);
+    }, [slug, data, isLoading]);
 
     // Track profile view analytics - must be called before any conditional returns
     // We pass the profile.id only when data is available

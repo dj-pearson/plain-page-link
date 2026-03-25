@@ -43,7 +43,7 @@ export const usePublicProfile = (username: string) => {
           is_published
         `)
         .eq('username', username)
-        .eq('is_published', true)
+        .neq('is_published', false)
         .single();
 
       if (profileError) throw profileError;
