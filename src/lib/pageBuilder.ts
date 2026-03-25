@@ -22,7 +22,7 @@ class PageBuilderEngine {
      */
     createNewPage(userId: string, slug: string): PageConfig {
         return {
-            id: this.generateId(),
+            id: crypto.randomUUID(),
             userId,
             slug,
             title: "My Link-in-Bio Page",
