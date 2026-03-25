@@ -120,7 +120,9 @@ export const AlertsDashboard = () => {
       const { error } = await supabase
         .from('seo_notification_queue')
         .update({ status: 'sent' })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
 
       if (error) throw error;
 

@@ -360,7 +360,9 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
                 const { error } = await supabase
                     .from('custom_pages')
                     .update(pageData)
-                    .eq('id', page.id);
+                    .eq('id', page.id)
+                    .select('id')
+                    .single();
 
                 if (error) throw error;
             } else {
@@ -403,7 +405,9 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
                 .from('custom_pages')
                 .update({ is_active: true })
                 .eq('id', pageId)
-                .eq('user_id', user.id);
+                .eq('user_id', user.id)
+                .select('id')
+                .single();
 
             if (error) throw error;
 

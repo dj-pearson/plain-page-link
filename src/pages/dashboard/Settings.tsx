@@ -90,7 +90,9 @@ export default function Settings() {
           bio: data.bio,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select('id')
+        .single();
 
       if (error) throw error;
     },

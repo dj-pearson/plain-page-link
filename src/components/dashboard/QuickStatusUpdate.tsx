@@ -47,7 +47,9 @@ export function QuickStatusUpdate({
       const { error } = await supabase
         .from('listings')
         .update({ status: newStatus })
-        .eq('id', listingId);
+        .eq('id', listingId)
+        .select('id')
+        .single();
 
       if (error) throw error;
 

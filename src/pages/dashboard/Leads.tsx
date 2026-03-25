@@ -122,7 +122,8 @@ export default function Leads() {
       const { error } = await supabase
         .from("leads")
         .update({ status: newStatus })
-        .in("id", Array.from(selectedLeadIds));
+        .in("id", Array.from(selectedLeadIds))
+        .select('id');
 
       if (error) throw error;
 

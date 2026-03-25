@@ -47,7 +47,9 @@ export function ProfileDisplaySettings() {
             const { error } = await supabase
                 .from('custom_pages')
                 .update({ is_active: false })
-                .eq('id', activePage.id);
+                .eq('id', activePage.id)
+                .select('id')
+                .single();
 
             if (error) throw error;
 

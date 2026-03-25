@@ -38,7 +38,9 @@ export function ZapierIntegrationModal({
       const { error } = await supabase
         .from('profiles')
         .update({ zapier_webhook_url: webhookUrl || null })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select('id')
+        .single();
 
       if (error) throw error;
 

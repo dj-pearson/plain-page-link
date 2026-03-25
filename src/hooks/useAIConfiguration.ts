@@ -60,12 +60,14 @@ export function useAIConfiguration() {
     mutationFn: async ({ key, value }: { key: string; value: any }) => {
       const { error } = await supabase
         .from('ai_configuration')
-        .update({ 
+        .update({
           setting_value: value,
           updated_at: new Date().toISOString(),
           updated_by: (await supabase.auth.getUser()).data.user?.id
         })
-        .eq('setting_key', key);
+        .eq('setting_key', key)
+        .select('setting_key')
+        .single();
       
       if (error) throw error;
     },
@@ -84,7 +86,9 @@ export function useAIConfiguration() {
       const { error } = await supabase
         .from('ai_models')
         .update({ is_active: isActive })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
       
       if (error) throw error;
     },

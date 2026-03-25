@@ -62,8 +62,10 @@ export function useArticleWebhooks() {
       const { error } = await supabase
         .from('article_webhooks')
         .update(updates)
-        .eq('id', id);
-      
+        .eq('id', id)
+        .select('id')
+        .single();
+
       if (error) throw error;
     },
     onSuccess: () => {

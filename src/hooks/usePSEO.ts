@@ -50,7 +50,9 @@ export function usePSEO() {
       const { error } = await supabase
         .from('pseo_pages')
         .update({ is_published: true })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
       if (error) throw error;
     },
     onSuccess: () => {
@@ -68,7 +70,9 @@ export function usePSEO() {
       const { error } = await supabase
         .from('pseo_pages')
         .update({ is_published: false })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
       if (error) throw error;
     },
     onSuccess: () => {
@@ -145,7 +149,9 @@ export function usePSEO() {
       const { error } = await supabase
         .from('pseo_combination_queue')
         .update({ status: 'pending', error_message: null, attempt_count: 0 })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
       if (error) throw error;
     },
     onSuccess: () => {
@@ -214,7 +220,9 @@ export function usePSEO() {
       const { error } = await supabase
         .from('pseo_taxonomy')
         .update(updates)
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
       if (error) throw error;
     },
     onSuccess: () => {
@@ -279,7 +287,9 @@ export function usePSEO() {
       const { error } = await supabase
         .from('pseo_prompts')
         .update({ ...updates, version: updates.version })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
       if (error) throw error;
     },
     onSuccess: () => {
@@ -356,7 +366,8 @@ export function usePSEO() {
       const { error } = await supabase
         .from('pseo_pages')
         .update({ is_published: true })
-        .in('id', ids);
+        .in('id', ids)
+        .select('id');
       if (error) throw error;
     },
     onSuccess: () => {

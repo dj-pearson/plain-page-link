@@ -55,6 +55,8 @@ export default function BlogArticle() {
         .from("articles")
         .update({ view_count: (article.view_count || 0) + 1 })
         .eq("id", article.id)
+        .select('id')
+        .single()
         .then(() => {
           logger.debug("View count incremented");
         });

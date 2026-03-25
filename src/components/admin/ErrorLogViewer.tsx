@@ -162,7 +162,9 @@ export const ErrorLogViewer = () => {
           resolved_at: new Date().toISOString(),
           resolution_notes: resolutionNotes,
         })
-        .eq('id', selectedError.id);
+        .eq('id', selectedError.id)
+        .select('id')
+        .single();
 
       if (error) throw error;
 

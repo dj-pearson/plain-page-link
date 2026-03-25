@@ -65,7 +65,9 @@ export async function trackLinkClick(linkId: string) {
         await supabase
           .from("links")
           .update({ click_count: (link.click_count || 0) + 1 })
-          .eq("id", linkId);
+          .eq("id", linkId)
+          .select('id')
+          .single();
       }
     }
   } catch (error) {

@@ -148,6 +148,7 @@ export function MortgageCalculator({
           visitor_phone: visitorPhone || undefined,
           lead_id: lead.id,
         })
+        .select('id')
         .order('created_at', { ascending: false })
         .limit(1);
 

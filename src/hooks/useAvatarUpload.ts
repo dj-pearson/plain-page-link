@@ -77,7 +77,9 @@ export function useAvatarUpload() {
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select('id')
+        .single();
 
       if (updateError) throw updateError;
 

@@ -218,7 +218,9 @@ export const AutoFixEngine = () => {
       const { error } = await supabase
         .from('seo_autofix_rules')
         .update({ active: !currentActive })
-        .eq('id', ruleId);
+        .eq('id', ruleId)
+        .select('id')
+        .single();
 
       if (error) throw error;
 
@@ -271,7 +273,9 @@ export const AutoFixEngine = () => {
           result: 'success',
           approved_by: (await supabase.auth.getUser()).data.user?.id,
         })
-        .eq('id', historyId);
+        .eq('id', historyId)
+        .select('id')
+        .single();
 
       if (error) throw error;
 
@@ -296,7 +300,9 @@ export const AutoFixEngine = () => {
       const { error } = await supabase
         .from('seo_autofix_history')
         .update({ result: 'failed', error_message: 'Rejected by admin' })
-        .eq('id', historyId);
+        .eq('id', historyId)
+        .select('id')
+        .single();
 
       if (error) throw error;
 

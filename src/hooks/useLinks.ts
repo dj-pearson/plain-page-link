@@ -137,7 +137,9 @@ export function useLinks() {
       const { error } = await supabase
         .from("links")
         .update({ is_active })
-        .eq("id", id);
+        .eq("id", id)
+        .select('id')
+        .single();
 
       if (error) throw error;
     },

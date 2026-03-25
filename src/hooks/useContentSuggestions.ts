@@ -124,7 +124,9 @@ export function useContentSuggestions() {
       await supabase
         .from("content_suggestions")
         .update({ status: 'completed' })
-        .eq("id", suggestion.id);
+        .eq("id", suggestion.id)
+        .select('id')
+        .single();
 
       return response.data;
     },
@@ -148,7 +150,9 @@ export function useContentSuggestions() {
       await supabase
         .from("content_suggestions")
         .update({ status: 'queued' })
-        .eq("id", suggestion.id);
+        .eq("id", suggestion.id)
+        .select('id')
+        .single();
 
       // Then trigger article generation
       const response = await edgeFunctions.invoke('generate-article', {
@@ -168,7 +172,9 @@ export function useContentSuggestions() {
       await supabase
         .from("content_suggestions")
         .update({ status: 'completed', generated_article_id: response.data?.article?.id })
-        .eq("id", suggestion.id);
+        .eq("id", suggestion.id)
+        .select('id')
+        .single();
 
       return response.data;
     },

@@ -582,7 +582,9 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
         const { error } = await supabase
           .from("workflows")
           .update(workflowData)
-          .eq("id", workflow.id);
+          .eq("id", workflow.id)
+          .select('id')
+          .single();
 
         if (error) throw error;
       } else {

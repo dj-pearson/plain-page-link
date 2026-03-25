@@ -135,8 +135,10 @@ export function useSocialMedia() {
       const { error } = await supabase
         .from('social_media_posts')
         .update(updates)
-        .eq('id', id);
-      
+        .eq('id', id)
+        .select('id')
+        .single();
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -194,8 +196,10 @@ export function useSocialMedia() {
       const { error } = await supabase
         .from('social_media_webhooks')
         .update(updates)
-        .eq('id', id);
-      
+        .eq('id', id)
+        .select('id')
+        .single();
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -294,12 +298,14 @@ export function useSocialMedia() {
 
       await supabase
         .from('social_media_posts')
-        .update({ 
-          status: 'posted', 
+        .update({
+          status: 'posted',
           posted_at: new Date().toISOString(),
           webhook_urls: [webhookUrl]
         })
-        .eq('id', postId);
+        .eq('id', postId)
+        .select('id')
+        .single();
 
       return { success: true };
     },

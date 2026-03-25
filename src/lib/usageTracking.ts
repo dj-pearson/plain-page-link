@@ -214,7 +214,9 @@ export class UsageTrackingService {
           billing_status: 'billed',
           billed_at: new Date().toISOString(),
         })
-        .eq('id', usage.id);
+        .eq('id', usage.id)
+        .select('id')
+        .single();
 
       // Record in stripe_usage_records
       await supabase.from('stripe_usage_records').insert({
@@ -238,7 +240,9 @@ export class UsageTrackingService {
         .update({
           billing_status: 'failed',
         })
-        .eq('id', usage.id);
+        .eq('id', usage.id)
+        .select('id')
+        .single();
 
       return false;
     }

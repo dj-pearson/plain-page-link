@@ -149,10 +149,12 @@ export default function Theme() {
             // Save to database
             const { error } = await supabase
                 .from('profiles')
-                .update({ 
+                .update({
                     theme: JSON.stringify(themeToApply)
                 })
-                .eq('id', user.id);
+                .eq('id', user.id)
+                .select('id')
+                .single();
 
             if (error) throw error;
 

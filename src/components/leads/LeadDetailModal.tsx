@@ -146,7 +146,9 @@ export function LeadDetailModal({
             const { error } = await supabase
                 .from("leads")
                 .update({ status: newStatus })
-                .eq("id", lead.id);
+                .eq("id", lead.id)
+                .select('id')
+                .single();
 
             if (error) throw error;
 

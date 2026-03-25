@@ -88,7 +88,9 @@ export default function OnboardingWizardPage() {
       const { error: profileError } = await supabase
         .from('profiles')
         .update(profileUpdates)
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select('id')
+        .single();
 
       if (profileError) throw profileError;
 
