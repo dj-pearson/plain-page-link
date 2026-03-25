@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(grep -l '^export default' /c/Users/pears/Documents/AgentBio/plain-page-link/supabase/functions/*/index.ts)"
     ],
     "deny": [],
     "ask": []
