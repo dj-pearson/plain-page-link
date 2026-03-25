@@ -76,8 +76,14 @@ export async function callEdgeFunction<T = any>(
   }
 
   // Parse and return response
-  const data = await response.json();
-  return data as T;
+  const responseData = await response.json();
+
+  // Unwrap standardized response format { success, data } if present
+  if (responseData && typeof responseData === 'object' && 'success' in responseData && 'data' in responseData) {
+    return responseData.data as T;
+  }
+
+  return responseData as T;
 }
 
 /**
