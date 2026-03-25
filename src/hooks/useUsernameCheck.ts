@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { EdgeFunctions } from "@/lib/edgeFunctions";
+import { supabase } from "@/integrations/supabase/client";
 import { validateUsername } from "@/lib/usernameValidation";
 import { debounce } from "@/lib/utils";
 
@@ -29,14 +29,23 @@ export const useUsernameCheck = () => {
       setError(null);
 
       try {
-        const data = await EdgeFunctions.checkUsername(username);
+        // Query Supabase directly instead of going through edge function
+        const { data, error: queryError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', username.toLowerCase())
+          .maybeSingle();
 
-        if (data.available) {
+        if (queryError) {
+          throw queryError;
+        }
+
+        if (!data) {
           setIsAvailable(true);
           setError(null);
         } else {
           setIsAvailable(false);
-          setError(data.message || "Username is already taken");
+          setError("Username is already taken");
         }
       } catch (err) {
         setError("Failed to check username availability");
