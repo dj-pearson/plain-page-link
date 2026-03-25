@@ -11,7 +11,9 @@
       "Bash(for i:*)",
       "Bash(do echo:*)",
       "Read(//c/Users/pears/Documents/AgentBio/plain-page-link/supabase/**)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(grep -r \"Cover.png\\\\|Icon.png\" src/ --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
+      "Bash(npx --yes sharp-cli -i public/Icon.png -o public/icons/icon-72.png resize 72 72)"
     ],
     "deny": [],
     "ask": []

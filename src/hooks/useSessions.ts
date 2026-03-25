@@ -60,7 +60,8 @@ export function useSessions() {
     },
     enabled: !!user?.id,
     staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // Refetch every minute
+    refetchInterval: false, // Disabled until edge function is deployed
+    retry: false, // Don't retry if function doesn't exist
   });
 
   // Revoke a specific session
