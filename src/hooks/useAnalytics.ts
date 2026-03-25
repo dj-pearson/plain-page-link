@@ -31,12 +31,19 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
         .order("viewed_at", { ascending: false })
         .limit(1000); // Hard limit for safety
 
-      if (error) throw error;
+      // Table/view may not exist yet — return empty instead of throwing
+      if (error) {
+        if (error.code === '42P01' || error.message?.includes('does not exist') || error.code === 'PGRST204') {
+          return [];
+        }
+        throw error;
+      }
       return data;
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds
     gcTime: 10 * 60 * 1000, // 10 minutes cache time
+    retry: false, // Don't retry if table doesn't exist
   });
 
   // Fetch leads for analytics with optimizations

@@ -25,7 +25,7 @@ export function useProfileTracking(userId: string | undefined, username: string)
         
         const source = document.referrer || "direct";
 
-        // Insert analytics view
+        // Insert analytics view (table may not exist yet — fail silently)
         await supabase.from("analytics_views").insert({
           user_id: userId,
           visitor_id: visitorId,
@@ -33,8 +33,8 @@ export function useProfileTracking(userId: string | undefined, username: string)
           source,
           location: null, // Could be enhanced with geolocation API
         });
-      } catch (error) {
-        console.error("Error tracking profile view:", error);
+      } catch {
+        // Silently ignore tracking errors (table may not exist)
       }
     };
 
