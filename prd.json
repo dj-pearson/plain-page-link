@@ -165,7 +165,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "These hooks use TanStack Query. Wrap renderHook in a QueryClientProvider with a fresh QueryClient per test."
     },
     {
@@ -181,7 +181,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "Starting thresholds are deliberately low (15%) to avoid blocking development. Increase incrementally as more tests are added."
     },
     {

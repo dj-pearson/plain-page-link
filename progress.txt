@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 15 stories completed (passes: true), 40 stories pending
+- 17 stories completed (passes: true), 38 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -180,3 +180,17 @@
 - **Files**: `src/components/auth/ProtectedRoute.test.tsx`, `src/pages/auth/Login.test.tsx`, `src/pages/auth/Register.test.tsx` (all new)
 - **Verification**: Full suite 235/235 tests pass (16 files).
 - **Impact**: The most security-sensitive flow (auth + route guards) now has regression coverage for redirects, input validation, and credential handling.
+
+### US-010: Add hook tests for critical custom hooks ✅
+- **Status**: PASSED
+- **Changes**: Added 12 tests across useProfile, useListings, useLeads using @testing-library/react renderHook wrapped in a per-test QueryClientProvider (fresh client, retries off). Each covers: fetch for authenticated user, no-fetch/empty when unauthenticated, error state on query failure, and mutation surface (updateProfile / add+update+delete listing / updateLead resolves with row). Supabase mocked via the shared createQueryBuilder; useAuthStore mocked per scenario.
+- **Files**: `src/hooks/useProfile.test.ts`, `src/hooks/useListings.test.ts`, `src/hooks/useLeads.test.ts` (all new)
+- **Verification**: Full suite 247/247 tests pass (19 files).
+- **Impact**: Core data-fetching hooks now have regression coverage for auth-gating, error handling, and CRUD mutation wiring — the read/write path for profile, listings, and leads.
+
+### US-011: Enforce test coverage thresholds in CI ✅
+- **Status**: PASSED
+- **Changes**: Added coverage thresholds (lines/functions/branches/statements = 15) to vitest.config.ts with a documented baseline comment (measured ~71.5% stmts / 63.5% branch / 70.9% funcs / 73.1% lines over test-imported files). The CI test job already runs `npm run test:coverage` (set in US-004), so it now fails if coverage drops below thresholds.
+- **Files**: `vitest.config.ts`
+- **Verification**: `npm run test:coverage` exits 0 with thresholds enabled, no violations, 247/247 tests pass.
+- **Impact**: Coverage regressions are now gated in CI. Thresholds are deliberately conservative (15%) and documented for incremental tightening as coverage grows.
