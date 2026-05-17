@@ -132,7 +132,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "UI components are built on Radix UI primitives. Test the composed behavior, not Radix internals."
     },
     {

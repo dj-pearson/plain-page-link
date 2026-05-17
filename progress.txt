@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 13 stories completed (passes: true), 42 stories pending
+- 14 stories completed (passes: true), 41 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -166,3 +166,10 @@
 - **Files**: `src/lib/logger.test.ts`, `src/lib/encryption.test.ts`, `src/lib/errorHandler.test.ts`, `src/lib/seo.test.ts` (all new)
 - **Verification**: Full suite 204/204 tests pass. src/lib coverage = 82.73% lines / 81.24% statements (requirement: ≥40%). Per-file: encryption 97.7%, logger 80.2%, errorHandler 70.4%, seo 46.2%.
 - **Impact**: Core security/error/SEO logic now has regression protection. Crypto round-trips, PII redaction, and error sanitization are verified — these are the highest-risk pure functions in the codebase.
+
+### US-008: Add component tests for core UI components ✅
+- **Status**: PASSED
+- **Changes**: Added 20 component tests across 5 core UI components using the `renderWithProviders` helper and @testing-library/react queries (getByRole/getByText/getByLabelText). Button (render, click, disabled, variants, asChild Slot), Input (typing, aria-invalid, aria-describedby, disabled, type), Label (text, required indicator, htmlFor association), Badge (content, variant styling, className merge), Dialog (closed by default, opens on trigger, accessible name/description).
+- **Files**: `src/components/ui/button.test.tsx`, `input.test.tsx`, `label.test.tsx`, `badge.test.tsx`, `dialog.test.tsx` (all new)
+- **Verification**: Full suite 224/224 tests pass (13 files).
+- **Impact**: Foundational UI primitives now have interaction + a11y regression coverage; the test-utils helper is proven against real Radix-based components.
