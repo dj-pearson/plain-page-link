@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 17 stories completed (passes: true), 38 stories pending
+- 18 stories completed (passes: true), 37 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -194,3 +194,10 @@
 - **Files**: `vitest.config.ts`
 - **Verification**: `npm run test:coverage` exits 0 with thresholds enabled, no violations, 247/247 tests pass.
 - **Impact**: Coverage regressions are now gated in CI. Thresholds are deliberately conservative (15%) and documented for incremental tightening as coverage grows.
+
+### US-012: Implement centralized API rate limiting for edge functions ✅
+- **Status**: PASSED
+- **Changes**: Created the `rate_limits` table (ip_address, endpoint, request_count, window_start, created_at; unique on the triple) with lookup + window indexes and RLS enabled (service-role only). Added an atomic `check_rate_limit()` SQL function (fixed-window upsert/increment returning allowed/remaining/reset_at) plus `cleanup_rate_limits()`. Created `_shared/rate-limiter.ts` with `checkRateLimitDb()` (fails open on DB error), `RATE_LIMITS` presets (general 60/min, submission 5/min, auth 5/min), and headers helper. Wired the DB limiter into submit-lead, submit-contact, and check-username (the latter previously had no rate limiting), replacing the per-instance in-memory limiter.
+- **Files**: `supabase/migrations/20260517000001_rate_limits_table.sql` (new), `supabase/functions/_shared/rate-limiter.ts` (new), `submit-lead/index.ts`, `submit-contact/index.ts`, `check-username/index.ts`
+- **Note**: Edge functions run on Deno (no local deno toolchain; frontend tsconfig only includes `src`). Code follows the existing _shared module conventions (esm.sh imports, type-only SupabaseClient import). Returns 429 with Retry-After via the existing rateLimitResponse helper. Partitioning strategy documented in the migration.
+- **Impact**: Rate limits are now enforced consistently across all edge function instances (was per-instance memory), closing an abuse/DDoS gap on the public lead/contact endpoints and adding protection to username checks.

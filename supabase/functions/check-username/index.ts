@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { successResponse, errorResponse, handleUnexpectedError, rateLimitResponse } from '../_shared/response.ts';
+import { getClientIP } from '../_shared/validation.ts';
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 
 export default async (req: Request) => {
   const origin = req.headers.get('origin');
@@ -14,6 +16,13 @@ export default async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Database-backed rate limiting - 5 requests per minute per IP
+    const clientIP = getClientIP(req);
+    const rateLimit = await checkRateLimitDb(supabase, clientIP, 'check-username', RATE_LIMITS.auth);
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds, req, 'Too many requests. Please try again later.');
+    }
 
     const { username } = await req.json();
 
