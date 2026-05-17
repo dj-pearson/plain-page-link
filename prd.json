@@ -116,7 +116,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Focus on testing pure functions and utilities \u2014 these are the easiest to test and highest value."
     },
     {

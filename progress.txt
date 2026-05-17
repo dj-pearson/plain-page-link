@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 12 stories completed (passes: true), 43 stories pending
+- 13 stories completed (passes: true), 42 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -159,3 +159,10 @@
 - **Files**: `src/test/test-utils.tsx`, `src/test/mocks/supabase.ts`, `src/test/mocks/auth.ts`, `src/test/fixtures/profile.ts`, `src/test/fixtures/listing.ts`, `src/test/fixtures/lead.ts` (all new)
 - **Verification**: All 157 existing tests still pass; `tsc --noEmit` reports zero errors in the new test util files.
 - **Impact**: Component/hook tests (US-008, US-009, US-010) can now be written quickly with consistent providers, typed fixtures, and a controllable Supabase mock — removing the main friction for raising test coverage.
+
+### US-007: Add unit tests for core utility libraries ✅
+- **Status**: PASSED
+- **Changes**: Added 47 unit tests across 4 new files covering the core utility modules: logger (PII redaction, sensitive-key detection, id truncation, log levels), encryption (AES-256-GCM round-trip, unicode/special chars, wrong-key/empty/version edge cases, field helpers), errorHandler (captureException + localStorage cap, captureMessage routing, withErrorHandling, handleApiError), and seo (canonical URL, title/description optimization, meta tag generation, validateSEO).
+- **Files**: `src/lib/logger.test.ts`, `src/lib/encryption.test.ts`, `src/lib/errorHandler.test.ts`, `src/lib/seo.test.ts` (all new)
+- **Verification**: Full suite 204/204 tests pass. src/lib coverage = 82.73% lines / 81.24% statements (requirement: ≥40%). Per-file: encryption 97.7%, logger 80.2%, errorHandler 70.4%, seo 46.2%.
+- **Impact**: Core security/error/SEO logic now has regression protection. Crypto round-trips, PII redaction, and error sanitization are verified — these are the highest-risk pure functions in the codebase.
