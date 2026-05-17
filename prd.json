@@ -148,7 +148,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Auth pages may be in src/pages/auth/. Check App.tsx for route definitions and component imports."
     },
     {

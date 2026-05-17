@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 14 stories completed (passes: true), 41 stories pending
+- 15 stories completed (passes: true), 40 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -173,3 +173,10 @@
 - **Files**: `src/components/ui/button.test.tsx`, `input.test.tsx`, `label.test.tsx`, `badge.test.tsx`, `dialog.test.tsx` (all new)
 - **Verification**: Full suite 224/224 tests pass (13 files).
 - **Impact**: Foundational UI primitives now have interaction + a11y regression coverage; the test-utils helper is proven against real Radix-based components.
+
+### US-009: Add component tests for authentication flow ✅
+- **Status**: PASSED
+- **Changes**: Added 11 tests for the security-critical auth flow. ProtectedRoute (loading state, redirect when unauthenticated, renders children when authenticated, saves attempted route) via mocked supabase client + MemoryRouter. Login page (renders form, zod validation on empty submit, calls signIn with normalized/trimmed/lowercased credentials, shows store error) with mocked useAuthStore/useLoginSecurity/use-toast. Register page (renders all fields, terms-agreement validation, calls signUp with form values) with mocked store/useUsernameCheck/supabase client.
+- **Files**: `src/components/auth/ProtectedRoute.test.tsx`, `src/pages/auth/Login.test.tsx`, `src/pages/auth/Register.test.tsx` (all new)
+- **Verification**: Full suite 235/235 tests pass (16 files).
+- **Impact**: The most security-sensitive flow (auth + route guards) now has regression coverage for redirects, input validation, and credential handling.
