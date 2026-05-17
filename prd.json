@@ -32,7 +32,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on US-001 (ESLint/Prettier must be configured first)."
     },
     {

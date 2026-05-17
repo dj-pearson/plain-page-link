@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 8 stories completed (passes: true), 47 stories pending
+- 9 stories completed (passes: true), 46 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -131,3 +131,10 @@
 - **Files**: `src/lib/web-vitals.ts` (new), `src/main.tsx` (updated — imports and initializes web vitals)
 - **Performance budgets**: LCP < 2500ms, FID < 100ms, CLS < 0.1, TTFB < 800ms, INP < 200ms
 - **Impact**: Core Web Vitals are now tracked in every session. Developers see performance budget warnings in the console during development. Production metrics flow to Google Analytics for SEO ranking correlation analysis.
+
+### US-002: Set up Husky pre-commit hooks with lint-staged ✅
+- **Status**: PASSED
+- **Changes**: Installed `husky` and `lint-staged` as devDependencies, ran `husky init` (created `.husky/pre-commit` + `prepare` script), configured pre-commit to run `npx lint-staged`, added `lint-staged` config to package.json (eslint --fix + prettier --write on staged .ts/.tsx, prettier --write on css/json/md)
+- **Files**: `.husky/pre-commit` (new), `.husky/_/` (husky internals), `package.json` (lint-staged config + prepare script + devDeps)
+- **Verification**: Test commit with a staged .ts file confirmed the hook fires lint-staged, runs eslint --fix and prettier --write, and re-stages the file. Test commit and file were reverted.
+- **Impact**: Broken or inconsistently formatted .ts/.tsx code can no longer enter the repo — every commit auto-lints and auto-formats staged files. Closes the local code-quality enforcement gap (CI catches it on PR; husky catches it before commit).
