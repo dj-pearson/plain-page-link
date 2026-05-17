@@ -99,7 +99,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "src/test/setup.ts already exists with basic mocks (matchMedia, ResizeObserver, IntersectionObserver). Build on that foundation."
     },
     {

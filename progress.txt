@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 11 stories completed (passes: true), 44 stories pending
+- 12 stories completed (passes: true), 43 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -152,3 +152,10 @@
 - **Files**: `.github/workflows/ci.yml`, `.github/dependabot.yml`, `.github/workflows/dependabot-auto-merge.yml` (new), `SECURITY_NOTES.md` (new)
 - **Note**: 23 known vulns (14 high, 2 critical). Most have non-breaking `npm audit fix` resolutions deferred to a dedicated dependency-bump PR; `jspdf`/`jspdf-autotable` require a breaking major upgrade tracked separately. CI security job is intentionally strict to keep findings visible.
 - **Impact**: Dependency vulnerabilities are now surfaced on every push/PR; patch updates auto-merge after CI; the security posture is documented and auditable.
+
+### US-006: Create comprehensive test utilities and component test helpers ✅
+- **Status**: PASSED
+- **Changes**: Created a reusable test infrastructure: `renderWithProviders` (wraps in BrowserRouter + HelmetProvider + QueryClientProvider, returns the queryClient), a chainable mock Supabase client (auth/from/storage/functions/rpc), mock auth users/sessions, and typed fixtures for Profile, Listing/PublicListing, and Lead matching the actual schema types.
+- **Files**: `src/test/test-utils.tsx`, `src/test/mocks/supabase.ts`, `src/test/mocks/auth.ts`, `src/test/fixtures/profile.ts`, `src/test/fixtures/listing.ts`, `src/test/fixtures/lead.ts` (all new)
+- **Verification**: All 157 existing tests still pass; `tsc --noEmit` reports zero errors in the new test util files.
+- **Impact**: Component/hook tests (US-008, US-009, US-010) can now be written quickly with consistent providers, typed fixtures, and a controllable Supabase mock — removing the main friction for raising test coverage.
