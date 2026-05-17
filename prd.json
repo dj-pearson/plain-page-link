@@ -65,7 +65,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Currently 4 test files exist: analytics.test.ts, lead-scoring.test.ts, ml-lead-scoring.test.ts, useMLLeadScoring.test.ts. All must pass."
     },
     {
@@ -81,7 +81,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "A dependabot.yml may already exist. Check before creating."
     },
     {

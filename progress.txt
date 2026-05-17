@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 9 stories completed (passes: true), 46 stories pending
+- 11 stories completed (passes: true), 44 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -138,3 +138,17 @@
 - **Files**: `.husky/pre-commit` (new), `.husky/_/` (husky internals), `package.json` (lint-staged config + prepare script + devDeps)
 - **Verification**: Test commit with a staged .ts file confirmed the hook fires lint-staged, runs eslint --fix and prettier --write, and re-stages the file. Test commit and file were reverted.
 - **Impact**: Broken or inconsistently formatted .ts/.tsx code can no longer enter the repo — every commit auto-lints and auto-formats staged files. Closes the local code-quality enforcement gap (CI catches it on PR; husky catches it before commit).
+
+### US-004: Add automated test execution to CI pipeline ✅
+- **Status**: PASSED
+- **Changes**: Added a `test` job to ci.yml (`needs: typecheck`) running `npm run test:coverage` (non-watch + coverage) and uploading the coverage/ directory as an artifact. Installed `@vitest/coverage-v8` (vitest.config.ts already configured v8 provider). Added `/coverage` to .gitignore.
+- **Files**: `.github/workflows/ci.yml`, `package.json` (+@vitest/coverage-v8), `.gitignore`
+- **Verification**: `npm run test:coverage` → 157/157 tests pass across 4 files; coverage report generated (Statements 82%, Lines 84%). YAML validated.
+- **Impact**: Every push/PR now runs the full test suite after typecheck; regressions are caught before merge and coverage is archived per run.
+
+### US-005: Add security and dependency audit to CI pipeline ✅
+- **Status**: PASSED
+- **Changes**: Added a `security` job to ci.yml running `npm audit --audit-level=high` plus ESLint. Updated existing dependabot.yml with grouped patch-update config and `dependencies` labels. Created `.github/workflows/dependabot-auto-merge.yml` (auto-approves + enables auto-merge for semver-patch Dependabot PRs). Created SECURITY_NOTES.md cataloguing all 16 high/critical findings, fix status, and remediation plan.
+- **Files**: `.github/workflows/ci.yml`, `.github/dependabot.yml`, `.github/workflows/dependabot-auto-merge.yml` (new), `SECURITY_NOTES.md` (new)
+- **Note**: 23 known vulns (14 high, 2 critical). Most have non-breaking `npm audit fix` resolutions deferred to a dedicated dependency-bump PR; `jspdf`/`jspdf-autotable` require a breaking major upgrade tracked separately. CI security job is intentionally strict to keep findings visible.
+- **Impact**: Dependency vulnerabilities are now surfaced on every push/PR; patch updates auto-merge after CI; the security posture is documented and auditable.
