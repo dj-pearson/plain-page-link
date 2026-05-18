@@ -108,6 +108,32 @@ serve(async (req: Request) => {
       );
     }
 
+    // Audit the revocation (fire-and-forget; never fail the request on
+    // a logging error). Uses the service role so RLS does not block the
+    // audit_logs insert.
+    try {
+      const serviceSupabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+      await serviceSupabase.rpc('log_audit_event', {
+        p_user_id: user.id,
+        p_action: revokeAll ? 'revoke_all_sessions' : 'session_revoke',
+        p_status: 'success',
+        p_resource_type: 'session',
+        p_resource_id: revokeAll ? null : sessionId || null,
+        p_ip_address: getClientIP(req),
+        p_user_agent: req.headers.get('user-agent') || null,
+        p_details: JSON.stringify({
+          reason: reason || 'user_revoked',
+          revoked_count: result.revoked_count ?? null,
+        }),
+        p_risk_level: 'high',
+      });
+    } catch (auditError) {
+      console.error('[revoke-session] audit log failed:', auditError);
+    }
+
     return new Response(
       JSON.stringify(result),
       {

@@ -5,6 +5,7 @@ import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base32Encode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { encryptSecret } from '../_shared/crypto.ts';
 
 /**
  * Setup MFA (Multi-Factor Authentication)
@@ -101,7 +102,9 @@ serve(async (req) => {
         user_id: user.id,
         mfa_enabled: false,
         mfa_method: 'totp',
-        totp_secret: secret,
+        // Encrypt the TOTP secret at rest (AES-256-GCM). verify-mfa
+        // decrypts it; legacy plaintext rows are handled transparently.
+        totp_secret: await encryptSecret(secret),
         backup_codes: hashedBackupCodes,
         backup_codes_generated_at: new Date().toISOString(),
         verified_at: null,
@@ -125,6 +128,23 @@ serve(async (req) => {
       ip_address: clientIP,
       user_agent: req.headers.get('user-agent'),
     });
+
+    // Audit the MFA setup (fire-and-forget; never block the response).
+    try {
+      await supabase.rpc('log_audit_event', {
+        p_user_id: user.id,
+        p_action: 'mfa_setup',
+        p_status: 'success',
+        p_resource_type: 'mfa',
+        p_resource_id: null,
+        p_ip_address: clientIP,
+        p_user_agent: req.headers.get('user-agent') || null,
+        p_details: JSON.stringify({ method: 'totp' }),
+        p_risk_level: 'high',
+      });
+    } catch (auditError) {
+      console.error('[setup-mfa] audit log failed:', auditError);
+    }
 
     return successResponse({
       secret,

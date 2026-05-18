@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 30 stories completed (passes: true), 25 stories pending
+- 33 stories completed (passes: true), 22 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -284,3 +284,25 @@
 - **Deliberate deviation**: the AC's "cache profile/listings API with 5-min TTL" was intentionally NOT implemented — profile/listings come from Supabase and caching them would violate the user-approved "never cache auth/Supabase" safety constraint and risk re-triggering the original incident. Offline data is already served by the existing IndexedDB `offline-storage.ts`. Documented as an accepted, safety-driven scope reduction.
 - **Verification**: `npm run build` ok (dist/sw.js + dist/offline.html emitted); full suite 258/258; zero new tsc errors (stash-compare).
 - **Impact**: App shell, static assets, and images are now offline-capable with an offline fallback and safe update flow — without reintroducing the auth-caching risk the cleanup safeguard was protecting against.
+
+### US-029: Session management and revocation UI ✅
+- **Status**: PASSED (infra existed; closed audit gap)
+- **Discovery**: `user_sessions` table (migration 20251204000001), `src/hooks/useSessions.ts`, `src/components/settings/SessionManagement.tsx`, and the `revoke-session` edge function all already exist and are wired into Settings. Only AC gap: revocations were not written to audit_logs.
+- **Changes**: `revoke-session/index.ts` now logs every revoke (single + revoke-all) to audit_logs via a service-role `log_audit_event` call (action `session_revoke`/`revoke_all_sessions`, risk_level high, fire-and-forget).
+- **Files**: `supabase/functions/revoke-session/index.ts`
+- **Impact**: Session revocations are now in the compliance audit trail.
+
+### US-030: MFA backend schema and TOTP verification ✅
+- **Status**: PASSED (infra existed; added encryption + audit)
+- **Discovery**: MFA tables (migration 20251203000001), setup-mfa (TOTP secret + otpauth URI + backup codes), and verify-mfa (TOTP/HOTP + backup codes + failed-attempt lockout) already existed. AC gaps: TOTP secret stored in plaintext; no audit logging.
+- **Changes**: New `supabase/functions/_shared/crypto.ts` — Deno AES-256-GCM (PBKDF2-SHA256, `enc:v1:` prefix, PII_ENCRYPTION_KEY env, legacy-plaintext passthrough) mirroring src/lib/pii.ts. setup-mfa now stores `encryptSecret(secret)`; verify-mfa `decryptSecret`s before TOTP validation (transparent for old plaintext rows). Both functions now emit `log_audit_event` (`mfa_setup`/`mfa_verify`, risk_level high). Rate limiting already satisfied by the existing failed-attempt lockout.
+- **Files**: `supabase/functions/_shared/crypto.ts` (new), `setup-mfa/index.ts`, `verify-mfa/index.ts`
+- **Impact**: TOTP secrets are encrypted at rest; MFA setup/verify events are audited. Gradual migration — existing plaintext secrets keep working until re-enrolled.
+
+### US-031: MFA frontend enrollment and verification UI ✅
+- **Status**: PASSED (components existed; wired the integration gaps)
+- **Discovery**: `MFASetup`, `MFAVerification`, `MFASettings` (in src/components/auth/mfa) and `useMFA` already existed, but were NOT wired in: no `/auth/mfa` route (SecureRoute even redirected to a 404), Login ignored `requiresMFA` (security gap — went straight to dashboard), and Settings had no MFA section.
+- **Changes**: Created `src/components/auth/MFAChallenge.tsx` (guarded page wrapping the existing MFAVerification; on success sets mfaVerified + continues to saved route/dashboard). Added `/auth/mfa` route in App.tsx. Fixed Login's post-login effect to redirect to `/auth/mfa` when `requiresMFA && !mfaVerified`. Added `<MFASettings />` to the dashboard Settings Security section (enable/disable + backup codes via existing components).
+- **Files**: `src/components/auth/MFAChallenge.tsx` (new), `src/App.tsx`, `src/pages/auth/Login.tsx`, `src/pages/dashboard/Settings.tsx`
+- **Verification**: Full suite 258/258; zero new tsc errors (stash-compare across MFAChallenge/App/Login/Settings).
+- **Impact**: MFA is now actually enforced — a password login on an MFA-enabled account is gated by the challenge before dashboard access; users can enroll/manage MFA from Settings. Closed a real auth-bypass gap where the challenge was never shown.

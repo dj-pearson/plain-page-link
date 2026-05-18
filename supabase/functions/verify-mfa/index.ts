@@ -5,6 +5,7 @@ import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { decode as base32Decode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { decryptSecret } from '../_shared/crypto.ts';
 
 /**
  * Verify MFA Code
@@ -138,8 +139,9 @@ serve(async (req) => {
       method = 'backup_code';
       backupCodeIndex = result.index;
     } else {
-      // Verify TOTP code
-      isValid = await verifyTOTP(mfaSettings.totp_secret, normalizedCode);
+      // Decrypt the at-rest TOTP secret (legacy plaintext passes through).
+      const totpSecret = await decryptSecret(mfaSettings.totp_secret);
+      isValid = await verifyTOTP(totpSecret || '', normalizedCode);
     }
 
     // Log verification attempt
@@ -152,6 +154,23 @@ serve(async (req) => {
       device_fingerprint: deviceFingerprint,
       failure_reason: isValid ? null : 'Invalid code',
     });
+
+    // Audit the verification result (fire-and-forget).
+    try {
+      await supabase.rpc('log_audit_event', {
+        p_user_id: user.id,
+        p_action: 'mfa_verify',
+        p_status: isValid ? 'success' : 'failure',
+        p_resource_type: 'mfa',
+        p_resource_id: null,
+        p_ip_address: clientIP,
+        p_user_agent: req.headers.get('user-agent') || null,
+        p_details: JSON.stringify({ method }),
+        p_risk_level: 'high',
+      });
+    } catch (auditError) {
+      console.error('[verify-mfa] audit log failed:', auditError);
+    }
 
     if (!isValid) {
       // Increment failed attempts
