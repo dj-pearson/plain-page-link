@@ -452,7 +452,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 27,
-      "passes": false,
+      "passes": true,
       "notes": "PWA manifest already exists at public/manifest.json. IndexedDB offline storage exists at src/lib/offline-storage.ts. Service worker is the missing piece."
     },
     {

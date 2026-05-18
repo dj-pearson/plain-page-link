@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 29 stories completed (passes: true), 26 stories pending
+- 30 stories completed (passes: true), 25 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -275,3 +275,12 @@
 - **Files**: `vite.config.ts`, `package.json` (deps + scripts), `scripts/check-bundle-size.mjs` (new), `.github/workflows/ci.yml`
 - **Verification**: `npm run size-check` exits 0 (133 chunks within budget, 1 documented exception); ci.yml valid YAML; full suite 258/258.
 - **Impact**: Bundle bloat is now gated in CI — any non-exempt chunk over budget fails the build, with stats.html available locally via `npm run analyze`.
+
+### US-027: Implement service worker for offline support and caching ✅
+- **Status**: PASSED (carefully reconciled — user-approved)
+- **Architectural conflict resolved**: `sw-cleanup.ts` aggressively unregistered ALL service workers + wiped ALL caches on every app mount, added after a prior production auth-caching incident (repo root AUTH_BROKEN_*.md). User chose "Carefully reconcile" via AskUserQuestion.
+- **Changes**: `public/sw.js` — native Cache API SW (CSP blocks the Workbox CDN and there is no SW build step; strategies mirror Workbox). CacheFirst for hashed static assets, StaleWhileRevalidate for images, NetworkFirst for navigations with `/offline.html` fallback; precaches the app shell; skipWaiting/clients.claim + SKIP_WAITING message. **Hard NetworkOnly (never cached)** for anything auth/Supabase/authorized/cross-origin. `public/offline.html` fallback page. `src/lib/register-sw.ts` registers via workbox-window (production only) with a sonner "new version" refresh prompt. `sw-cleanup.ts` now allowlists `sw.js` + preserves `agentbio-sw-` caches while still purging legacy/unknown SWs + stale caches. Installed workbox-precaching/routing/strategies/build per the AC (available for a future build-time injectManifest).
+- **Files**: `public/sw.js` (new), `public/offline.html` (new), `src/lib/register-sw.ts` (new), `src/main.tsx`, `src/lib/sw-cleanup.ts`, `package.json`
+- **Deliberate deviation**: the AC's "cache profile/listings API with 5-min TTL" was intentionally NOT implemented — profile/listings come from Supabase and caching them would violate the user-approved "never cache auth/Supabase" safety constraint and risk re-triggering the original incident. Offline data is already served by the existing IndexedDB `offline-storage.ts`. Documented as an accepted, safety-driven scope reduction.
+- **Verification**: `npm run build` ok (dist/sw.js + dist/offline.html emitted); full suite 258/258; zero new tsc errors (stash-compare).
+- **Impact**: App shell, static assets, and images are now offline-capable with an offline fallback and safe update flow — without reintroducing the auth-caching risk the cleanup safeguard was protecting against.
