@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 22 stories completed (passes: true), 33 stories pending
+- 24 stories completed (passes: true), 31 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -230,3 +230,18 @@
 - **Files**: `supabase/migrations/20260517000003_leads_pii_encrypted_columns.sql` (new), `src/hooks/useLeads.ts`, `src/hooks/useProfile.ts`
 - **Verification**: Full suite 258/258 pass. tsc: zero new errors (caught + removed an unused import that briefly added one). Plaintext columns intentionally retained for the gradual backfill.
 - **Impact**: New/updated lead and profile PII is now encrypted at rest while reads remain transparent; a DB breach no longer exposes fresh phone/email in plaintext. Backfill of existing rows + plaintext column drop are deliberately deferred to follow-up work.
+
+### US-019: Implement GDPR data export endpoint ✅
+- **Status**: PASSED
+- **Discovery**: `supabase/functions/gdpr-export/index.ts` already existed and was comprehensive (auth via requireAuth, full data export across profile/listings/leads/links/testimonials/blog/analytics/security, JSON Content-Disposition: attachment, audit logging via log_audit_event). Two AC gaps remained.
+- **Changes**: (1) Added rate limiting — max 1 export/hour/user via checkRateLimitDb keyed on user.id (returns 429 + Retry-After). (2) PII readability — strip opaque encrypted_phone/encrypted_email blobs from exported leads so the user receives readable plaintext (authoritative during the US-016 transition); documented the post-transition Deno-side decrypt path.
+- **Files**: `supabase/functions/gdpr-export/index.ts`
+- **Impact**: GDPR Article 20 (data portability) endpoint is now abuse-resistant and exports human-readable PII rather than ciphertext.
+
+### US-020: Implement GDPR data deletion endpoint ✅
+- **Status**: PASSED
+- **Discovery**: `supabase/functions/gdpr-deletion/index.ts` already existed and is complete (request/cancel/status actions, 30-day grace period via request_account_deletion/cancel_account_deletion RPCs, soft-delete coverage, JWT auth, audit logging). Reused as-is. The genuine gap was the missing frontend page.
+- **Changes**: Created `src/pages/dashboard/DeleteAccount.tsx` — a confirmation-flow page showing current deletion status (with cancel) or a danger-zone form requiring the user to type "DELETE MY ACCOUNT" plus an optional reason; calls gdpr-deletion (GET status, POST request/cancel) via edgeFunctions. Added lazy import + route `/dashboard/settings/delete-account` in App.tsx.
+- **Files**: `src/pages/dashboard/DeleteAccount.tsx` (new), `src/App.tsx`
+- **Verification**: Full suite 258/258 pass. tsc: DeleteAccount.tsx clean, App.tsx zero new errors (stash-compare).
+- **Impact**: Users can now self-serve GDPR Article 17 erasure with a clear, reversible (30-day) confirmation flow.

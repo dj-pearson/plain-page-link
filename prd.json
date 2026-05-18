@@ -315,7 +315,7 @@
         "Typecheck passes on edge function code"
       ],
       "priority": 19,
-      "passes": false,
+      "passes": true,
       "notes": "GDPR compliance is a legal requirement for serving EU users. This is a blocker for enterprise sales."
     },
     {
@@ -332,7 +332,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 20,
-      "passes": false,
+      "passes": true,
       "notes": "Soft-delete with 30-day retention is standard practice. Full purge can be a separate scheduled job."
     },
     {
