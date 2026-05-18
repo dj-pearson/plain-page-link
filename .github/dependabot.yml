@@ -9,7 +9,23 @@ updates:
     directory: '/'
     schedule:
       interval: daily
+    # Group all patch-level updates into a single PR so the
+    # dependabot-auto-merge workflow can fast-track them.
+    groups:
+      npm-patch:
+        applies-to: version-updates
+        update-types:
+          - patch
+    labels:
+      - dependencies
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       interval: 'daily'
+    groups:
+      actions-patch:
+        applies-to: version-updates
+        update-types:
+          - patch
+    labels:
+      - dependencies

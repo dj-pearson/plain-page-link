@@ -7,6 +7,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
+import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
 
 interface ExportData {
   exportedAt: string;
@@ -63,6 +64,32 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // Rate limit: max 1 export per hour per user. The limiter is keyed by
+    // identifier + endpoint, so we pass the user id as the identifier to
+    // get per-user (not per-IP) enforcement.
+    if (req.method === 'POST' || req.method === 'GET') {
+      const rl = await checkRateLimitDb(serviceSupabase, user.id, 'gdpr-export', {
+        maxRequests: 1,
+        windowSeconds: 3600,
+      });
+      if (!rl.allowed) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'You can only request one data export per hour. Please try again later.',
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'Retry-After': String(rl.retryAfterSeconds),
+            },
+            status: 429,
+          }
+        );
+      }
+    }
 
     if (req.method === 'POST') {
       // Create export request
@@ -135,7 +162,16 @@ serve(async (req: Request) => {
         profile: profileResult.data || null,
         settings: settingsResult.data || null,
         listings: listingsResult.data || [],
-        leads: leadsResult.data || [],
+        // PII in leads must be exported in readable form, never as opaque
+        // ciphertext. During the US-016 encryption transition the plaintext
+        // phone/email columns remain authoritative, so we export those and
+        // strip the encrypted_* blobs. (Once plaintext columns are dropped,
+        // replace this with a Deno-side decrypt of encrypted_phone/email.)
+        leads: (leadsResult.data || []).map((lead) => {
+          const { encrypted_phone, encrypted_email, ...readable } =
+            lead as Record<string, unknown>;
+          return readable;
+        }),
         testimonials: testimonialsResult.data || [],
         links: linksResult.data || [],
         blogPosts: blogPostsResult.data || [],

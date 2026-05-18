@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { logAuditEvent } from '@/lib/audit';
 import { generateSampleData } from '@/lib/sample-data-service';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
@@ -106,24 +107,25 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           // Get current session (this will also refresh if needed)
-          const { data: { session } } = await supabase.auth.getSession();
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
 
           if (session?.user) {
             // Fetch profile and roles in parallel for better performance
             const [profileResult, rolesResult] = await Promise.all([
-              supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single(),
+              supabase.from('profiles').select('*').eq('id', session.user.id).single(),
               supabase
                 .from('user_roles')
                 .select('role')
                 .eq('user_id', session.user.id)
-                .order('role', { ascending: true })
+                .order('role', { ascending: true }),
             ]);
 
-            const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+            const role =
+              rolesResult.data?.find((r) => r.role === 'admin')?.role ||
+              rolesResult.data?.[0]?.role ||
+              null;
 
             set({
               user: session.user,
@@ -138,7 +140,7 @@ export const useAuthStore = create<AuthState>()(
               session: null,
               profile: null,
               role: null,
-              isLoading: false
+              isLoading: false,
             });
           }
         } catch (error: any) {
@@ -149,7 +151,7 @@ export const useAuthStore = create<AuthState>()(
             profile: null,
             role: null,
             isLoading: false,
-            error: error.message
+            error: error.message,
           });
         }
 
@@ -162,7 +164,7 @@ export const useAuthStore = create<AuthState>()(
               session: null,
               user: null,
               profile: null,
-              role: null
+              role: null,
             });
             return;
           }
@@ -178,19 +180,18 @@ export const useAuthStore = create<AuthState>()(
             // Fetch user data for new sessions or sign-ins
             try {
               const [profileResult, rolesResult] = await Promise.all([
-                supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', session.user.id)
-                  .single(),
+                supabase.from('profiles').select('*').eq('id', session.user.id).single(),
                 supabase
                   .from('user_roles')
                   .select('role')
                   .eq('user_id', session.user.id)
-                  .order('role', { ascending: true })
+                  .order('role', { ascending: true }),
               ]);
 
-              const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+              const role =
+                rolesResult.data?.find((r) => r.role === 'admin')?.role ||
+                rolesResult.data?.[0]?.role ||
+                null;
               set({ profile: profileResult.data || null, role });
             } catch (error) {
               logger.error('Error fetching user data in auth state listener', error);
@@ -231,27 +232,28 @@ export const useAuthStore = create<AuthState>()(
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
               const [profileResult, rolesResult] = await Promise.all([
-                supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', data.user.id)
-                  .single(),
+                supabase.from('profiles').select('*').eq('id', data.user.id).single(),
                 supabase
                   .from('user_roles')
                   .select('role')
                   .eq('user_id', data.user.id)
-                  .order('role', { ascending: true })
+                  .order('role', { ascending: true }),
               ]);
 
               if (profileResult.data) {
                 profile = profileResult.data;
-                role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+                role =
+                  rolesResult.data?.find((r) => r.role === 'admin')?.role ||
+                  rolesResult.data?.[0]?.role ||
+                  null;
                 break;
               }
 
               // Wait before retrying (exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms)
               if (attempt < maxRetries - 1) {
-                await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, attempt)));
+                await new Promise((resolve) =>
+                  setTimeout(resolve, baseDelay * Math.pow(2, attempt))
+                );
               }
             }
 
@@ -266,7 +268,7 @@ export const useAuthStore = create<AuthState>()(
             // Generate sample data for new users (runs in background)
             // This provides demo content to help users visualize their profile
             if (profile) {
-              generateSampleData(data.user.id).catch(error => {
+              generateSampleData(data.user.id).catch((error) => {
                 logger.error('Failed to generate sample data for new user', error);
                 // Don't throw - sample data is non-critical
               });
@@ -301,11 +303,7 @@ export const useAuthStore = create<AuthState>()(
 
           // Fetch profile, roles, and MFA settings in parallel for better performance
           const [profileResult, rolesResult, mfaResult] = await Promise.all([
-            supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', data.user.id)
-              .single(),
+            supabase.from('profiles').select('*').eq('id', data.user.id).single(),
             supabase
               .from('user_roles')
               .select('role')
@@ -315,10 +313,19 @@ export const useAuthStore = create<AuthState>()(
               .from('user_mfa_settings')
               .select('mfa_enabled, verified_at')
               .eq('user_id', data.user.id)
-              .maybeSingle()
+              .maybeSingle(),
           ]);
 
-          const role = rolesResult.data?.find(r => r.role === 'admin')?.role || rolesResult.data?.[0]?.role || null;
+          const role =
+            rolesResult.data?.find((r) => r.role === 'admin')?.role ||
+            rolesResult.data?.[0]?.role ||
+            null;
+
+          // Audit the successful credential authentication (fire-and-forget)
+          logAuditEvent('login', {
+            resourceType: 'auth',
+            resourceId: data.user.id,
+          });
 
           // Check if MFA is enabled and verified for this user
           const mfaEnabled = mfaResult.data?.mfa_enabled && mfaResult.data?.verified_at;
@@ -434,6 +441,14 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
 
         try {
+          // Audit the logout while the session is still valid (fire-and-forget)
+          if (user?.id) {
+            logAuditEvent('logout', {
+              resourceType: 'auth',
+              resourceId: user.id,
+            });
+          }
+
           // Sign out from Supabase (optionally from all devices)
           await supabase.auth.signOut({ scope: options?.global ? 'global' : 'local' });
 
@@ -530,9 +545,9 @@ export const useAuthStore = create<AuthState>()(
       updateProfile: async (updates: Partial<Profile>) => {
         const { user } = get();
         if (!user) throw new Error('Not authenticated');
-        
+
         set({ isLoading: true, error: null });
-        
+
         try {
           const { data, error } = await supabase
             .from('profiles')
@@ -540,9 +555,9 @@ export const useAuthStore = create<AuthState>()(
             .eq('id', user.id)
             .select()
             .single();
-          
+
           if (error) throw error;
-          
+
           set({
             profile: data,
             isLoading: false,

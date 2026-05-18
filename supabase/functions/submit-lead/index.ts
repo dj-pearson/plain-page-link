@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
-import { checkRateLimit, getRateLimitHeaders } from '../_shared/rateLimit.ts'
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { validateLeadData, sanitizeString, getClientIP } from '../_shared/validation.ts'
 import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts'
 
@@ -34,13 +34,17 @@ serve(async (req) => {
   }
 
   try {
-    // Rate limiting - 5 requests per minute per IP
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Database-backed rate limiting - 5 requests per minute per IP
     const clientIP = getClientIP(req);
-    const rateLimit = checkRateLimit(clientIP, { maxRequests: 5, windowMs: 60000 });
+    const rateLimit = await checkRateLimitDb(supabase, clientIP, 'submit-lead', RATE_LIMITS.submission);
 
     if (!rateLimit.allowed) {
       console.warn(`Rate limit exceeded for IP: ${clientIP}`);
-      return rateLimitResponse(Math.ceil(rateLimit.resetMs / 1000), req, 'Too many requests. Please try again later.');
+      return rateLimitResponse(rateLimit.retryAfterSeconds, req, 'Too many requests. Please try again later.');
     }
 
     const rawData = await req.json()
@@ -71,11 +75,6 @@ serve(async (req) => {
       utm_campaign: rawData.utm_campaign ? sanitizeString(rawData.utm_campaign) : undefined,
       device: rawData.device ? sanitizeString(rawData.device) : undefined,
     };
-
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Insert lead into database
     const { data: lead, error: insertError } = await supabase

@@ -5,7 +5,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail } from '../_shared/email.ts';
-import { checkRateLimit, getRateLimitHeaders } from '../_shared/rateLimit.ts';
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 import { validateContactData, sanitizeString, getClientIP } from '../_shared/validation.ts';
 import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts';
 
@@ -17,20 +17,20 @@ serve(async (req) => {
   }
 
   try {
-    // Rate limiting - 5 requests per minute per IP
-    const clientIP = getClientIP(req);
-    const rateLimit = checkRateLimit(clientIP, { maxRequests: 5, windowMs: 60000 });
-
-    if (!rateLimit.allowed) {
-      console.warn(`Rate limit exceeded for IP: ${clientIP}`);
-      return rateLimitResponse(Math.ceil(rateLimit.resetMs / 1000), req, 'Too many requests. Please try again later.');
-    }
-
     // Create Supabase client (public access for contact forms)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Database-backed rate limiting - 5 requests per minute per IP
+    const clientIP = getClientIP(req);
+    const rateLimit = await checkRateLimitDb(supabaseClient, clientIP, 'submit-contact', RATE_LIMITS.submission);
+
+    if (!rateLimit.allowed) {
+      console.warn(`Rate limit exceeded for IP: ${clientIP}`);
+      return rateLimitResponse(rateLimit.retryAfterSeconds, req, 'Too many requests. Please try again later.');
+    }
 
     // Parse request body
     const rawData = await req.json()

@@ -75,8 +75,16 @@ export function initSentry(): void {
 
     // Integrations
     integrations: [
-      // Browser tracing for performance monitoring
+      // Browser tracing for performance monitoring (navigation + fetch)
       Sentry.browserTracingIntegration(),
+      // Explicit breadcrumbs for navigation, console, fetch/xhr, and DOM
+      Sentry.breadcrumbsIntegration({
+        console: true,
+        dom: true,
+        fetch: true,
+        history: true,
+        xhr: true,
+      }),
       // Session replay for error debugging
       Sentry.replayIntegration({
         // Mask all text for privacy
@@ -106,7 +114,7 @@ export function initSentry(): void {
 
       // Scrub sensitive data from breadcrumbs
       if (event.breadcrumbs) {
-        event.breadcrumbs = event.breadcrumbs.map(breadcrumb => ({
+        event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => ({
           ...breadcrumb,
           data: breadcrumb.data ? scrubSensitiveData(breadcrumb.data) : undefined,
         }));
@@ -130,9 +138,48 @@ export function initSentry(): void {
     normalizeDepth: 5,
   });
 
+  // Explicit tags for filtering/alerting in the Sentry dashboard.
+  const release = import.meta.env.VITE_APP_VERSION || '1.0.0';
+  Sentry.setTag('environment', isDevelopment ? 'development' : 'production');
+  Sentry.setTag('release', release);
+  Sentry.setTag(
+    'deployment.region',
+    (import.meta.env.VITE_DEPLOYMENT_REGION as string) || 'unknown'
+  );
+
   if (isDevelopment) {
     console.log('[Sentry] Initialized successfully');
   }
+}
+
+/**
+ * Critical business events. These are surfaced as Sentry messages (info
+ * level) so product/ops can alert on revenue and high-value-lead signals
+ * alongside error monitoring. See MONITORING.md for alert thresholds.
+ */
+export function trackSubscriptionCreated(plan: string, userId: string): void {
+  captureMessage(`Subscription created: ${plan}`, 'info', {
+    event: 'subscription_created',
+    plan,
+    userId,
+  });
+}
+
+export function trackSubscriptionCancelled(plan: string, userId: string): void {
+  captureMessage(`Subscription cancelled: ${plan}`, 'warning', {
+    event: 'subscription_cancelled',
+    plan,
+    userId,
+  });
+}
+
+export function trackHighValueLead(score: number, userId: string): void {
+  if (score <= 90) return;
+  captureMessage(`High-value lead scored ${score}`, 'info', {
+    event: 'lead_scored_high',
+    score,
+    userId,
+  });
 }
 
 /**
@@ -151,7 +198,7 @@ function scrubSensitiveData(data: unknown): unknown {
     const scrubbed: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       // Check if key contains sensitive pattern
-      const isSensitive = SENSITIVE_PATTERNS.some(pattern => pattern.test(key));
+      const isSensitive = SENSITIVE_PATTERNS.some((pattern) => pattern.test(key));
       scrubbed[key] = isSensitive ? '[REDACTED]' : scrubSensitiveData(value);
     }
     return scrubbed;
@@ -172,7 +219,7 @@ export function captureException(
   }
 
   return Sentry.captureException(error, {
-    extra: context ? scrubSensitiveData(context) as Record<string, unknown> : undefined,
+    extra: context ? (scrubSensitiveData(context) as Record<string, unknown>) : undefined,
   });
 }
 
@@ -190,7 +237,7 @@ export function captureMessage(
 
   return Sentry.captureMessage(message, {
     level,
-    extra: context ? scrubSensitiveData(context) as Record<string, unknown> : undefined,
+    extra: context ? (scrubSensitiveData(context) as Record<string, unknown>) : undefined,
   });
 }
 
@@ -232,7 +279,9 @@ export function addBreadcrumb(breadcrumb: Sentry.Breadcrumb): void {
 
   Sentry.addBreadcrumb({
     ...breadcrumb,
-    data: breadcrumb.data ? scrubSensitiveData(breadcrumb.data) as Record<string, unknown> : undefined,
+    data: breadcrumb.data
+      ? (scrubSensitiveData(breadcrumb.data) as Record<string, unknown>)
+      : undefined,
   });
 }
 

@@ -1,67 +1,71 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
-import { HelmetProvider } from "react-helmet-async";
-import App from "./App";
-import ErrorBoundary from "./components/ui/ErrorBoundary";
-import { initSentry } from "./lib/sentry";
-import { logger } from "@/lib/logger";
-import { initWebVitals } from "@/lib/web-vitals";
-import "./index.css";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
+import App from './App';
+import ErrorBoundary from './components/ui/ErrorBoundary';
+import { initSentry } from './lib/sentry';
+import { logger } from '@/lib/logger';
+import { initWebVitals } from '@/lib/web-vitals';
+import { registerServiceWorker } from '@/lib/register-sw';
+import './index.css';
 
 // Initialize Sentry as early as possible for error monitoring
 initSentry();
 
 const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            staleTime: 5 * 60 * 1000, // 5 minutes - reduces unnecessary refetches
-            gcTime: 10 * 60 * 1000, // 10 minutes cache time (formerly cacheTime)
-            retry: 1,
-            refetchOnWindowFocus: false,
-            refetchOnReconnect: true, // Refetch when network reconnects
-        },
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes - reduces unnecessary refetches
+      gcTime: 10 * 60 * 1000, // 10 minutes cache time (formerly cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true, // Refetch when network reconnects
     },
+  },
 });
 
-const rootEl = document.getElementById("root")!;
+const rootEl = document.getElementById('root')!;
 if (!rootEl) {
-    logger.error("Root element #root not found", new Error("Root element #root not found"));
+  logger.error('Root element #root not found', new Error('Root element #root not found'));
 }
 if (import.meta.env.DEV) {
-    logger.debug("[Lovable] Mounting React app", { mode: import.meta?.env?.MODE });
+  logger.debug('[Lovable] Mounting React app', { mode: import.meta?.env?.MODE });
 }
 
 // SECURITY: Lazy load DevTools only in development to prevent info disclosure in production
 const ReactQueryDevtools = import.meta.env.DEV
-    ? React.lazy(() =>
-          import("@tanstack/react-query-devtools").then((m) => ({
-              default: m.ReactQueryDevtools,
-          }))
-      )
-    : null;
+  ? React.lazy(() =>
+      import('@tanstack/react-query-devtools').then((m) => ({
+        default: m.ReactQueryDevtools,
+      }))
+    )
+  : null;
 
 ReactDOM.createRoot(rootEl).render(
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <ErrorBoundary>
-            <HelmetProvider>
-                <QueryClientProvider client={queryClient}>
-                    <App />
-                    {ReactQueryDevtools && (
-                        <React.Suspense fallback={null}>
-                            <ReactQueryDevtools initialIsOpen={false} />
-                        </React.Suspense>
-                    )}
-                </QueryClientProvider>
-            </HelmetProvider>
-        </ErrorBoundary>
-    </BrowserRouter>
+  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <ErrorBoundary>
+      <HelmetProvider>
+        <QueryClientProvider client={queryClient}>
+          <App />
+          {ReactQueryDevtools && (
+            <React.Suspense fallback={null}>
+              <ReactQueryDevtools initialIsOpen={false} />
+            </React.Suspense>
+          )}
+        </QueryClientProvider>
+      </HelmetProvider>
+    </ErrorBoundary>
+  </BrowserRouter>
 );
 
 if (import.meta.env.DEV) {
-    logger.debug("[Lovable] React render invoked");
+  logger.debug('[Lovable] React render invoked');
 }
 
 // Initialize Web Vitals monitoring (LCP, FID, CLS, TTFB, INP)
 initWebVitals();
+
+// Register the auth-safe service worker (production only)
+registerServiceWorker();
