@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 20 stories completed (passes: true), 35 stories pending
+- 22 stories completed (passes: true), 33 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -216,3 +216,17 @@
 - **Files**: `src/lib/audit.ts` (new), `src/stores/useAuthStore.ts`, `src/hooks/useProfile.ts`, `src/hooks/useListings.ts`; test mocks added to useProfile/useListings hook tests
 - **Verification**: Full suite 247/247 pass. tsc shows 10 pre-existing baseline errors in touched files with AND without the changes — zero new type errors (audit.ts is clean).
 - **Impact**: Client-side security-relevant actions (auth + resource CRUD) now flow into the audit trail, complementing the DB triggers from US-013.
+
+### US-015: Implement PII encryption utilities for sensitive data at rest ✅
+- **Status**: PASSED
+- **Changes**: Reviewed src/lib/encryption.ts (already AES-256-GCM + PBKDF2-SHA256, 100k iterations — sound). Created `src/lib/pii.ts` with `encryptPII`/`decryptPII`/`isEncryptedPII`: master key from VITE_PII_ENCRYPTION_KEY, serialized as `enc:v1:<base64(json)>` so plaintext is distinguishable during migration; null/undefined/empty returned as-is; corrupt ciphertext returns as-is (no throw); unicode-safe base64. Added VITE_PII_ENCRYPTION_KEY to .env.example with generation + rotation guidance.
+- **Files**: `src/lib/pii.ts` (new), `src/lib/pii.test.ts` (new, 11 tests), `.env.example`
+- **Verification**: 11 pii tests pass; full suite 258/258.
+- **Impact**: A safe, migration-aware PII encryption wrapper is now available for at-rest protection of phone/email/address fields.
+
+### US-016: Apply PII encryption to leads and profiles tables ✅
+- **Status**: PASSED
+- **Changes**: Migration adds nullable encrypted_phone/encrypted_email columns to leads (plaintext kept; documented 5-step transition strategy + column COMMENTs). useLeads now dual-writes encrypted_* on insert/update and decrypts on fetch (prefers encrypted_*, falls back to plaintext). useProfile encrypts `phone` before save and decrypts after fetch (in-place; decryptPII passes legacy plaintext through so nothing breaks).
+- **Files**: `supabase/migrations/20260517000003_leads_pii_encrypted_columns.sql` (new), `src/hooks/useLeads.ts`, `src/hooks/useProfile.ts`
+- **Verification**: Full suite 258/258 pass. tsc: zero new errors (caught + removed an unused import that briefly added one). Plaintext columns intentionally retained for the gradual backfill.
+- **Impact**: New/updated lead and profile PII is now encrypted at rest while reads remain transparent; a DB breach no longer exposes fresh phone/email in plaintext. Backfill of existing rows + plaintext column drop are deliberately deferred to follow-up work.

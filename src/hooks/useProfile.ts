@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
+import { encryptPII, decryptPII } from '@/lib/pii';
 
 export interface Profile {
   id: string;
@@ -65,7 +66,12 @@ export function useProfile() {
         .single();
 
       if (error) throw error;
-      return data as Profile;
+      const profileData = data as Profile;
+      // Decrypt PII (decryptPII passes legacy plaintext through unchanged).
+      return {
+        ...profileData,
+        phone: (await decryptPII(profileData.phone)) ?? profileData.phone,
+      } as Profile;
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
@@ -76,9 +82,16 @@ export function useProfile() {
     mutationFn: async (updates: Partial<Profile>) => {
       if (!user?.id) throw new Error('User not authenticated');
 
+      // Encrypt PII fields before save (transition: encrypts in place;
+      // decryptPII on read passes any legacy plaintext through).
+      const encryptedUpdates: Partial<Profile> = { ...updates };
+      if ('phone' in updates) {
+        encryptedUpdates.phone = (await encryptPII(updates.phone)) as string | undefined;
+      }
+
       const { data, error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update(encryptedUpdates)
         .eq('id', user.id)
         .select()
         .single();

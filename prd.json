@@ -248,7 +248,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": "An encryption.ts already exists in src/lib/. Review it first and build on what's there. Key management in production should use Supabase Vault, but env var is acceptable for now."
     },
     {
@@ -265,7 +265,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": "This is a gradual migration. Do NOT delete original plaintext columns in this story. A separate backfill + column swap will happen later."
     },
     {
