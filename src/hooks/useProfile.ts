@@ -1,6 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { logAuditEvent } from '@/lib/audit';
 
 export interface Profile {
   id: string;
@@ -46,15 +47,21 @@ export function useProfile() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data: profile, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["profile", user?.id],
+  const {
+    data: profile,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
 
       const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
         .single();
 
       if (error) throw error;
@@ -67,20 +74,25 @@ export function useProfile() {
 
   const updateProfile = useMutation({
     mutationFn: async (updates: Partial<Profile>) => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from("profiles")
+        .from('profiles')
         .update(updates)
-        .eq("id", user.id)
+        .eq('id', user.id)
         .select()
         .single();
 
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+    onSuccess: (_data, updates) => {
+      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+      logAuditEvent('profile_update', {
+        resourceType: 'profile',
+        resourceId: user?.id,
+        details: { fields: Object.keys(updates) },
+      });
     },
   });
 

@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 18 stories completed (passes: true), 37 stories pending
+- 20 stories completed (passes: true), 35 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -201,3 +201,18 @@
 - **Files**: `supabase/migrations/20260517000001_rate_limits_table.sql` (new), `supabase/functions/_shared/rate-limiter.ts` (new), `submit-lead/index.ts`, `submit-contact/index.ts`, `check-username/index.ts`
 - **Note**: Edge functions run on Deno (no local deno toolchain; frontend tsconfig only includes `src`). Code follows the existing _shared module conventions (esm.sh imports, type-only SupabaseClient import). Returns 429 with Retry-After via the existing rateLimitResponse helper. Partitioning strategy documented in the migration.
 - **Impact**: Rate limits are now enforced consistently across all edge function instances (was per-instance memory), closing an abuse/DDoS gap on the public lead/contact endpoints and adding protection to username checks.
+
+### US-013: Create audit logging database schema and trigger system ✅
+- **Status**: PASSED
+- **Discovery**: The audit_logs table, indexes ((user_id, created_at DESC), (resource_type, resource_id), etc.), RLS, and log_audit_event() ALREADY exist from migration 20251204000001_auth_security_features.sql (richer signature: p_user_id, p_action, p_status, p_resource_type, p_resource_id, p_ip_address, p_user_agent, p_details, p_risk_level, p_actor_id). Rewrote the migration to be purely additive rather than create a conflicting duplicate schema.
+- **Changes**: Added the missing admin "read all" RLS policy (has_role(auth.uid(),'admin')), a generic `audit_table_change()` trigger function (records old/new jsonb snapshots; jsonb owner extraction so profiles — whose id IS the user — doesn't raise), and AFTER INSERT/UPDATE/DELETE triggers on profiles, listings, leads. Documented monthly RANGE partition strategy.
+- **Files**: `supabase/migrations/20260517000002_audit_logs_schema.sql` (new)
+- **Impact**: All profile/listing/lead mutations are now automatically audited at the DB layer; admins can query the full audit trail. SOC 2 / GDPR foundation completed without schema conflicts.
+
+### US-014: Create audit logging edge function and frontend integration ✅
+- **Status**: PASSED
+- **Discovery**: `supabase/functions/audit-log/index.ts` already exists and correctly calls log_audit_event (POST to log, GET to query own logs, JWT-auth required). Kept as-is.
+- **Changes**: Created `src/lib/audit.ts` with `logAuditEvent(action, { status?, resourceType?, resourceId?, details? })` — fire-and-forget via callEdgeFunction (errors swallowed to logger.debug, never blocks UI). Integrated into: login success + logout (useAuthStore), profile update (useProfile, logs changed field names), and listing create/update/delete (useListings).
+- **Files**: `src/lib/audit.ts` (new), `src/stores/useAuthStore.ts`, `src/hooks/useProfile.ts`, `src/hooks/useListings.ts`; test mocks added to useProfile/useListings hook tests
+- **Verification**: Full suite 247/247 pass. tsc shows 10 pre-existing baseline errors in touched files with AND without the changes — zero new type errors (audit.ts is clean).
+- **Impact**: Client-side security-relevant actions (auth + resource CRUD) now flow into the audit trail, complementing the DB triggers from US-013.

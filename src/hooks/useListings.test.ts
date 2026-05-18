@@ -19,6 +19,8 @@ vi.mock('@/stores/useAuthStore', () => ({
   useAuthStore: () => ({ user: authUser }),
 }));
 
+vi.mock('@/lib/audit', () => ({ logAuditEvent: vi.fn() }));
+
 import { useListings } from './useListings';
 
 const listingRow = {

@@ -20,6 +20,8 @@ vi.mock('@/stores/useAuthStore', () => ({
   useAuthStore: () => ({ user: authUser }),
 }));
 
+vi.mock('@/lib/audit', () => ({ logAuditEvent: vi.fn() }));
+
 import { useProfile } from './useProfile';
 
 const wrapper = ({ children }: { children: ReactNode }) =>

@@ -215,7 +215,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "This is a compliance blocker for enterprise customers. The audit_logs table is the foundation for SOC 2 and GDPR compliance."
     },
     {
@@ -231,7 +231,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "The edge function may already exist at supabase/functions/audit-log/. Check and update rather than recreate."
     },
     {

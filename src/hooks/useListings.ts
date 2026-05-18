@@ -1,6 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { logAuditEvent } from '@/lib/audit';
 
 export interface Listing {
   id: string;
@@ -34,16 +35,22 @@ export function useListings() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data: listings = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["listings", user?.id],
+  const {
+    data: listings = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['listings', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
-        .from("listings")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .from('listings')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as Listing[];
@@ -54,11 +61,13 @@ export function useListings() {
   });
 
   const addListing = useMutation({
-    mutationFn: async (listingData: Partial<Omit<Listing, "id" | "user_id" | "created_at" | "updated_at">>) => {
-      if (!user?.id) throw new Error("User not authenticated");
+    mutationFn: async (
+      listingData: Partial<Omit<Listing, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+    ) => {
+      if (!user?.id) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from("listings")
+        .from('listings')
         .insert({
           user_id: user.id,
           ...listingData,
@@ -69,47 +78,59 @@ export function useListings() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["listings", user?.id] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['listings', user?.id] });
+      logAuditEvent('listing_create', {
+        resourceType: 'listing',
+        resourceId: (data as { id?: string })?.id,
+      });
     },
   });
 
   const updateListing = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Listing> & { id: string }) => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) throw new Error('User not authenticated');
 
       // Security: Verify user owns this listing by requiring both id and user_id match
       const { data, error } = await supabase
-        .from("listings")
+        .from('listings')
         .update(updates)
-        .eq("id", id)
-        .eq("user_id", user.id)
+        .eq('id', id)
+        .eq('user_id', user.id)
         .select()
         .single();
 
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["listings", user?.id] });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['listings', user?.id] });
+      logAuditEvent('listing_update', {
+        resourceType: 'listing',
+        resourceId: variables.id,
+      });
     },
   });
 
   const deleteListing = useMutation({
     mutationFn: async (id: string) => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) throw new Error('User not authenticated');
 
       // Security: Verify user owns this listing by requiring both id and user_id match
       const { error } = await supabase
-        .from("listings")
+        .from('listings')
         .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["listings", user?.id] });
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: ['listings', user?.id] });
+      logAuditEvent('listing_delete', {
+        resourceType: 'listing',
+        resourceId: id,
+      });
     },
   });
 
