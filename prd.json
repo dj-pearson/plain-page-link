@@ -435,7 +435,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 26,
-      "passes": false,
+      "passes": true,
       "notes": "vite.config.ts already has manualChunks configured. Build on that by adding visibility into sizes."
     },
     {

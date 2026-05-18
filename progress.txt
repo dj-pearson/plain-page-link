@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 28 stories completed (passes: true), 27 stories pending
+- 29 stories completed (passes: true), 26 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -268,3 +268,10 @@
 - **Files**: `src/lib/sentry.ts`, `MONITORING.md` (new)
 - **Verification**: Full suite 258/258 pass. sentry.ts: 2 pre-existing baseline tsc errors with AND without changes — zero new.
 - **Impact**: Production errors/perf and revenue/high-value-lead signals are now observable with documented thresholds and escalation; business-event hooks ready to wire into Stripe (US-036/037) and lead scoring.
+
+### US-026: Add bundle analysis and size budgets to build pipeline ✅
+- **Status**: PASSED
+- **Changes**: Installed rollup-plugin-visualizer; added it to vite.config.ts gated by `ANALYZE=true` (writes+opens dist/stats.html; off in CI/normal builds). Added `analyze` (`ANALYZE=true vite build`) and `size-check` npm scripts. Created `scripts/check-bundle-size.mjs` enforcing 500 KB app / 600 KB vendor budgets with a minimal documented exception allowlist (three-vendor: 801 KB, lazy-loaded 3D, never on first paint — same pragmatic pattern as US-005's SECURITY_NOTES). Added a CI `bundle-size` job (needs build) that builds and runs the check. Documented the chunk-size baseline in a vite.config.ts comment.
+- **Files**: `vite.config.ts`, `package.json` (deps + scripts), `scripts/check-bundle-size.mjs` (new), `.github/workflows/ci.yml`
+- **Verification**: `npm run size-check` exits 0 (133 chunks within budget, 1 documented exception); ci.yml valid YAML; full suite 258/258.
+- **Impact**: Bundle bloat is now gated in CI — any non-exempt chunk over budget fails the build, with stats.html available locally via `npm run analyze`.
