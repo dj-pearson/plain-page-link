@@ -86,7 +86,7 @@
     "three-mesh-bvh": "^0.9.2",
     "web-vitals": "^5.1.0",
     "zod": "^3.22.4",
-    "zustand": "^4.5.2"
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
