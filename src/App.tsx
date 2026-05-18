@@ -14,6 +14,7 @@ import { SkipNavLink } from './components/ui/skip-nav';
 import { AnnouncerProvider } from './components/ui/live-region';
 import { RouteAnnouncer } from './components/ui/route-announcer';
 import { AccessibilityWidget } from './components/ui/accessibility-widget';
+import { CookieConsent } from './components/ui/cookie-consent';
 
 // Public pages (eager load for better UX on landing)
 import Landing from './pages/public/Landing';
@@ -41,6 +42,7 @@ const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'));
 const DMCAPolicy = lazy(() => import('./pages/legal/DMCAPolicy'));
 const AcceptableUse = lazy(() => import('./pages/legal/AcceptableUse'));
 const AccessibilityStatement = lazy(() => import('./pages/legal/AccessibilityStatement'));
+const CookiePolicy = lazy(() => import('./pages/legal/CookiePolicy'));
 
 // Lazy load marketing pages
 const Pricing = lazy(() => import('./pages/Pricing'));
@@ -152,6 +154,9 @@ function App() {
       {/* Offline Indicator */}
       <OfflineIndicator />
 
+      {/* Cookie consent banner (first visit only) */}
+      <CookieConsent />
+
       <LazyLoadErrorBoundary>
         <Suspense fallback={<FullPageLoader text="Loading page..." />}>
           <Routes>
@@ -163,6 +168,7 @@ function App() {
             <Route path="/dmca" element={<DMCAPolicy />} />
             <Route path="/acceptable-use" element={<AcceptableUse />} />
             <Route path="/accessibility" element={<AccessibilityStatement />} />
+            <Route path="/cookies" element={<CookiePolicy />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/category/:category" element={<BlogCategory />} />
             <Route path="/blog/:slug" element={<BlogArticle />} />

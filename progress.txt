@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 24 stories completed (passes: true), 31 stories pending
+- 27 stories completed (passes: true), 28 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -245,3 +245,18 @@
 - **Files**: `src/pages/dashboard/DeleteAccount.tsx` (new), `src/App.tsx`
 - **Verification**: Full suite 258/258 pass. tsc: DeleteAccount.tsx clean, App.tsx zero new errors (stash-compare).
 - **Impact**: Users can now self-serve GDPR Article 17 erasure with a clear, reversible (30-day) confirmation flow.
+
+### US-021: Create Terms of Service page ✅
+- **Status**: PASSED (already implemented)
+- **Discovery**: `src/pages/legal/TermsOfService.tsx` (485 lines) already exists with route `/terms` (App.tsx) and footer links (PublicFooter). Verified it covers all AC sections: Account Terms, Acceptable Use, Intellectual Property, Payment, Limitation of Liability, Termination, Governing Law, and a "Last updated" date — styled with Tailwind. No changes required; marked passing.
+
+### US-022: Create Privacy Policy page ✅
+- **Status**: PASSED (already implemented)
+- **Discovery**: `src/pages/legal/PrivacyPolicy.tsx` (504 lines) already exists with route `/privacy` and footer links. Verified all AC sections present: data collected/usage, third-party sharing, Cookies, Data Retention, Your Rights, Security, plus GDPR and CCPA ("Do Not Sell") sections and a "Last updated" date. No changes required; marked passing.
+
+### US-023: Create Cookie Policy page and consent banner ✅
+- **Status**: PASSED
+- **Changes**: Built the full cookie-consent system. `src/lib/cookie-consent.ts` (versioned localStorage state + timestamp, COOKIE_CONSENT_EVENT). `src/components/ui/cookie-consent.tsx` banner (Accept All / Reject Non-Essential / Manage Preferences with per-category toggles), rendered globally in App.tsx, shows only on first visit. `src/pages/legal/CookiePolicy.tsx` (route `/cookies`) documenting necessary/analytics/preferences cookies. Gated the deferred GA loader: `public/scripts/analytics.js` now only calls loadGA() when analytics consent is granted, and listens for COOKIE_CONSENT_EVENT to load GA on later opt-in without reload.
+- **Files**: `src/lib/cookie-consent.ts` (new), `src/components/ui/cookie-consent.tsx` (new), `src/pages/legal/CookiePolicy.tsx` (new), `src/App.tsx`, `public/scripts/analytics.js`
+- **Verification**: Full suite 258/258 pass; zero new tsc errors.
+- **Impact**: Google Analytics no longer loads without explicit consent — closes an ePrivacy/GDPR cookie-compliance gap. Users have a clear, granular consent UI and a documented Cookie Policy.
