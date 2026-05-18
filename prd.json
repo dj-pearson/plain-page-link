@@ -419,7 +419,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 25,
-      "passes": false,
+      "passes": true,
       "notes": "Sentry is already partially integrated (src/lib/sentry.ts exists). Enhance rather than rebuild."
     },
     {

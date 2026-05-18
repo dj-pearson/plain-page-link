@@ -7,7 +7,7 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 27 stories completed (passes: true), 28 stories pending
+- 28 stories completed (passes: true), 27 stories pending
 - Completed critical platform improvements in Ralph loop
 
 ## Codebase Patterns
@@ -260,3 +260,11 @@
 - **Files**: `src/lib/cookie-consent.ts` (new), `src/components/ui/cookie-consent.tsx` (new), `src/pages/legal/CookiePolicy.tsx` (new), `src/App.tsx`, `public/scripts/analytics.js`
 - **Verification**: Full suite 258/258 pass; zero new tsc errors.
 - **Impact**: Google Analytics no longer loads without explicit consent — closes an ePrivacy/GDPR cookie-compliance gap. Users have a clear, granular consent UI and a documented Cookie Policy.
+
+### US-025: Configure Sentry performance monitoring and alerting ✅
+- **Status**: PASSED
+- **Discovery**: src/lib/sentry.ts was already solid — 10% prod trace sampling, environment/release config, sensitive-data scrubbing, replay. Enhanced rather than rebuilt.
+- **Changes**: Added explicit `breadcrumbsIntegration` (console/dom/fetch/xhr/history) alongside browserTracing; added explicit `setTag` for environment, release (VITE_APP_VERSION, == package.json 1.0.0), and deployment.region (VITE_DEPLOYMENT_REGION). Added business-event helpers `trackSubscriptionCreated`/`trackSubscriptionCancelled`/`trackHighValueLead` (>90) that emit Sentry messages. Created MONITORING.md (stack, Sentry config, alert thresholds table, escalation, dashboards, routine checks).
+- **Files**: `src/lib/sentry.ts`, `MONITORING.md` (new)
+- **Verification**: Full suite 258/258 pass. sentry.ts: 2 pre-existing baseline tsc errors with AND without changes — zero new.
+- **Impact**: Production errors/perf and revenue/high-value-lead signals are now observable with documented thresholds and escalation; business-event hooks ready to wire into Stripe (US-036/037) and lead scoring.
