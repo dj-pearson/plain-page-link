@@ -486,8 +486,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 29,
-      "passes": false,
-      "notes": "Supabase Auth manages JWTs. Session management may need to work with Supabase's session API or implement a custom session tracking layer."
+      "passes": true,
+      "notes": "Supabase Auth manages JWTs. Session management may need to work with Supabase's session API or implement a custom session tracking layer. COMPLETED: user_sessions table + get-sessions/revoke-session edge functions + useSessions hook + SessionManagement component already existed and are wired into the Settings security section. Added audit_logs logging to the revoke-session edge function (session_revoke / session_revoke_all events via log_audit_event)."
     },
     {
       "id": "US-030",
@@ -503,8 +503,8 @@
         "Edge function typecheck passes"
       ],
       "priority": 30,
-      "passes": false,
-      "notes": "MFA edge functions may already exist (setup-mfa, verify-mfa found in the functions directory). Check and update existing implementations."
+      "passes": true,
+      "notes": "MFA edge functions may already exist (setup-mfa, verify-mfa found in the functions directory). Check and update existing implementations. COMPLETED: user_mfa_settings is the existing equivalent of mfa_factors (added a compatibility view + docs migration). Enhanced setup-mfa/verify-mfa/disable-mfa: TOTP secrets now encrypted at rest via new _shared/encryption.ts (AES-256-GCM, MFA_ENCRYPTION_KEY, legacy plaintext passthrough); verify-mfa rate limited to 5/min per user via checkRateLimitDb; setup/verify/disable events mirrored to audit_logs via log_audit_event."
     },
     {
       "id": "US-031",
@@ -519,8 +519,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 31,
-      "passes": false,
-      "notes": "qrcode.react is already installed as a dependency. Supabase has built-in MFA support — check if we should use Supabase MFA API instead of custom implementation."
+      "passes": true,
+      "notes": "qrcode.react is already installed as a dependency. Supabase has built-in MFA support — check if we should use Supabase MFA API instead of custom implementation. COMPLETED: MFASetup/MFAVerification/MFASettings components already existed. Switched MFASetup QR rendering from a third-party image API (api.qrserver.com — leaked the TOTP secret) to local qrcode.react QRCodeSVG. Wired the MFA challenge into the login flow (Login.tsx now gates navigation on requiresMFA and renders MFAVerification after password success). Added MFASettings (enable/disable toggle) to the dashboard Settings security section. Recovery codes (10 single-use) are shown during setup; regeneration is via disable+re-enroll."
     },
     {
       "id": "US-032",

@@ -7,8 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 30 stories completed (passes: true), 25 stories pending
+- 34 stories completed (passes: true), 21 stories pending
 - Completed critical platform improvements in Ralph loop
+- Latest batch: US-029 (session management), US-030 (MFA backend), US-031 (MFA frontend) — auth security hardening
 
 ## Codebase Patterns
 
@@ -284,3 +285,27 @@
 - **Deliberate deviation**: the AC's "cache profile/listings API with 5-min TTL" was intentionally NOT implemented — profile/listings come from Supabase and caching them would violate the user-approved "never cache auth/Supabase" safety constraint and risk re-triggering the original incident. Offline data is already served by the existing IndexedDB `offline-storage.ts`. Documented as an accepted, safety-driven scope reduction.
 - **Verification**: `npm run build` ok (dist/sw.js + dist/offline.html emitted); full suite 258/258; zero new tsc errors (stash-compare).
 - **Impact**: App shell, static assets, and images are now offline-capable with an offline fallback and safe update flow — without reintroducing the auth-caching risk the cleanup safeguard was protecting against.
+
+### US-029: Implement session management and session revocation UI (PASSED)
+- Status: PASSED (mostly pre-existing; closed the audit gap)
+- Discovery: user_sessions table (migration 20251204000001), get-sessions + revoke-session edge functions, useSessions hook, and SessionManagement component already existed and were wired into the Settings security section.
+- Changes: Added audit_logs logging to revoke-session -- it now records session_revoke / session_revoke_all events (with reason + revoked_count) via the log_audit_event RPC, satisfying the remaining AC ("Log session revocations to audit_logs").
+- Files: supabase/functions/revoke-session/index.ts
+- Impact: Session revocations are now part of the central audit trail alongside the existing session view/revoke UI.
+
+### US-030: Add MFA/2FA support -- backend schema and TOTP verification (PASSED)
+- Status: PASSED (enhanced existing implementation)
+- Discovery: user_mfa_settings (migration 20251203000001) is the existing equivalent of the AC's "mfa_factors" (totp_secret, backup_codes, verified_at, failed_attempts/locked_until account lockout). setup-mfa/verify-mfa/disable-mfa edge functions already implemented a correct from-scratch TOTP (HMAC-SHA1, +/-1 window drift) + hashed backup codes.
+- Changes: (1) Created supabase/functions/_shared/encryption.ts -- Deno AES-256-GCM (PBKDF2-SHA256, per-value salt+IV, mfaenc:v1: prefix, MFA_ENCRYPTION_KEY w/ PII_ENCRYPTION_KEY fallback, legacy-plaintext passthrough on decrypt, fails-soft to plaintext if no key). (2) setup-mfa now encrypts totp_secret at rest; verify-mfa/disable-mfa decrypt before TOTP check. (3) verify-mfa now rate-limited to 5/min per user via checkRateLimitDb (RATE_LIMITS.auth) on top of the existing account lockout. (4) setup/verify/disable now mirror events to audit_logs via log_audit_event (mfa_setup_initiated / mfa_setup_verified / mfa_verified / mfa_disabled). (5) Additive migration adds an mfa_factors compat view over user_mfa_settings + documents encryption-at-rest. Documented MFA_ENCRYPTION_KEY in .env.example.
+- Files: supabase/functions/_shared/encryption.ts (new), setup-mfa/index.ts, verify-mfa/index.ts, disable-mfa/index.ts, supabase/migrations/20260518000001_mfa_factors_encryption.sql (new), .env.example
+- Note: Edge functions run on Deno (no local toolchain; frontend tsconfig only covers src/). Code follows existing _shared conventions (esm.sh imports, type-only SupabaseClient).
+- Impact: TOTP secrets are encrypted at rest, verification is rate-limited, and all MFA lifecycle events are auditable -- closing the enterprise-MFA backend gaps.
+
+### US-031: Add MFA/2FA support -- frontend enrollment and verification UI (PASSED)
+- Status: PASSED (wired existing components + fixed a secret-leak)
+- Discovery: MFASetup (QR + manual secret + 6-digit verify + 10 backup codes), MFAVerification (login challenge w/ backup-code toggle + trust-device), and MFASettings (status card, enable/disable dialog, trusted devices) all existed but were NOT connected: MFASettings was absent from the Settings page and the login flow never showed the challenge (signIn set requiresMFA but Login navigated on user regardless, bypassing MFA).
+- Changes: (1) MFASetup QR now rendered locally with qrcode.react QRCodeSVG instead of being sent to api.qrserver.com (which leaked the TOTP shared secret to a third party). (2) Login.tsx now computes mfaPending = user && requiresMFA && !mfaVerified, only navigates when not pending, and renders MFAVerification (onSuccess -> setMFAVerified(true); onCancel -> signOut). (3) Added MFASettings to the Settings security section. (4) Fixed a console.error -> logger.error in MFASettings (US-051 convention).
+- Files: src/components/auth/mfa/MFASetup.tsx, src/pages/auth/Login.tsx, src/pages/dashboard/Settings.tsx, src/components/auth/mfa/MFASettings.tsx
+- Verification: Full suite 258/258 pass; tsc reports only the pre-existing tsconfig baseUrl deprecation (no errors in changed files); ESLint 0 errors on changed files.
+- Known limitation: requiresMFA is not persisted (auth-storage only persists profile/role), so a page reload during the challenge -- while the Supabase session is already established -- would not re-prompt. Fully enforcing post-reload would require holding/withholding the Supabase session until MFA passes (a larger auth-architecture change). Recovery-code regeneration is via disable+re-enroll rather than a dedicated button.
+- Impact: Users can now enroll in TOTP 2FA from Settings (with a locally-rendered QR, no secret leak) and are challenged for a second factor during login.

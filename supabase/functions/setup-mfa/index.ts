@@ -5,6 +5,7 @@ import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base32Encode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { encryptSecret } from '../_shared/encryption.ts';
 
 /**
  * Setup MFA (Multi-Factor Authentication)
@@ -91,8 +92,12 @@ serve(async (req) => {
     const backupCodes = generateBackupCodes(10);
     const hashedBackupCodes = await hashBackupCodes(backupCodes);
 
-    // Generate TOTP URI for QR code
+    // Generate TOTP URI for QR code (uses the plaintext secret — this is only
+    // returned to the authenticated user, never persisted in plaintext).
     const totpUri = generateTotpUri(secret, user.email || 'user');
+
+    // Encrypt the TOTP secret before storing it at rest.
+    const encryptedSecret = await encryptSecret(secret);
 
     // Store secret temporarily (not verified yet)
     const { error: upsertError } = await supabase
@@ -101,7 +106,7 @@ serve(async (req) => {
         user_id: user.id,
         mfa_enabled: false,
         mfa_method: 'totp',
-        totp_secret: secret,
+        totp_secret: encryptedSecret,
         backup_codes: hashedBackupCodes,
         backup_codes_generated_at: new Date().toISOString(),
         verified_at: null,
@@ -124,6 +129,19 @@ serve(async (req) => {
       status: 'success',
       ip_address: clientIP,
       user_agent: req.headers.get('user-agent'),
+    });
+
+    // Record the security-relevant event in the central audit log.
+    await supabase.rpc('log_audit_event', {
+      p_user_id: user.id,
+      p_action: 'mfa_setup_initiated',
+      p_status: 'success',
+      p_resource_type: 'mfa',
+      p_resource_id: user.id,
+      p_ip_address: clientIP,
+      p_user_agent: req.headers.get('user-agent'),
+      p_details: { method: 'totp' },
+      p_risk_level: 'medium',
     });
 
     return successResponse({

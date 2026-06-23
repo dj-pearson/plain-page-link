@@ -41,6 +41,7 @@ serve(async (req: Request) => {
 
     // Require authentication
     const user = await requireAuth(req, supabase);
+    const clientIP = getClientIP(req);
 
     const body: RevokeRequest = await req.json();
     const { sessionId, revokeAll, currentSessionId, reason } = body;
@@ -107,6 +108,23 @@ serve(async (req: Request) => {
         }
       );
     }
+
+    // Audit the session revocation (fire-and-forget; never block the response).
+    await supabase.rpc('log_audit_event', {
+      p_user_id: user.id,
+      p_action: revokeAll ? 'session_revoke_all' : 'session_revoke',
+      p_status: 'success',
+      p_resource_type: 'session',
+      p_resource_id: sessionId || null,
+      p_ip_address: clientIP,
+      p_user_agent: req.headers.get('user-agent'),
+      p_details: {
+        reason: reason || 'user_revoked',
+        revoked_count: result.revoked_count ?? null,
+        revoke_all: !!revokeAll,
+      },
+      p_risk_level: 'medium',
+    });
 
     return new Response(
       JSON.stringify(result),

@@ -4,7 +4,9 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { decode as base32Decode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
-import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { successResponse, errorResponse, handleUnexpectedError, rateLimitResponse } from '../_shared/response.ts';
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
+import { decryptSecret } from '../_shared/encryption.ts';
 
 /**
  * Verify MFA Code
@@ -102,6 +104,13 @@ serve(async (req) => {
     const user = await requireAuth(req, supabase);
     const clientIP = getClientIP(req);
 
+    // Rate limit verification attempts (max 5 per minute per user) to slow down
+    // online brute-force of TOTP/backup codes, on top of the account lockout.
+    const rl = await checkRateLimitDb(supabase, user.id, 'verify-mfa', RATE_LIMITS.auth);
+    if (!rl.allowed) {
+      return rateLimitResponse(rl.retryAfterSeconds, req, 'Too many verification attempts. Please wait and try again.');
+    }
+
     const body = await req.json();
     const { code, isSetupVerification, trustDevice, deviceFingerprint } = body;
 
@@ -138,8 +147,10 @@ serve(async (req) => {
       method = 'backup_code';
       backupCodeIndex = result.index;
     } else {
+      // Decrypt the stored TOTP secret (legacy plaintext secrets pass through).
+      const totpSecret = await decryptSecret(mfaSettings.totp_secret);
       // Verify TOTP code
-      isValid = await verifyTOTP(mfaSettings.totp_secret, normalizedCode);
+      isValid = await verifyTOTP(totpSecret, normalizedCode);
     }
 
     // Log verification attempt
@@ -151,6 +162,19 @@ serve(async (req) => {
       user_agent: req.headers.get('user-agent'),
       device_fingerprint: deviceFingerprint,
       failure_reason: isValid ? null : 'Invalid code',
+    });
+
+    // Mirror the event into the central audit log for compliance/forensics.
+    await supabase.rpc('log_audit_event', {
+      p_user_id: user.id,
+      p_action: isSetupVerification ? 'mfa_setup_verified' : 'mfa_verified',
+      p_status: isValid ? 'success' : 'failed',
+      p_resource_type: 'mfa',
+      p_resource_id: user.id,
+      p_ip_address: clientIP,
+      p_user_agent: req.headers.get('user-agent'),
+      p_details: { method },
+      p_risk_level: isValid ? 'low' : 'high',
     });
 
     if (!isValid) {

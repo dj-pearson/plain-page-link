@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useMFA } from "@/hooks/useMFA";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useState } from 'react';
+import { useMFA } from '@/hooks/useMFA';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -9,8 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { MFASetup } from "./MFASetup";
+} from '@/components/ui/dialog';
+import { MFASetup } from './MFASetup';
 import {
   Shield,
   ShieldOff,
@@ -20,8 +20,9 @@ import {
   AlertCircle,
   Check,
   X,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 export const MFASettings = () => {
   const {
@@ -37,24 +38,22 @@ export const MFASettings = () => {
 
   const [showSetup, setShowSetup] = useState(false);
   const [showDisable, setShowDisable] = useState(false);
-  const [disableCode, setDisableCode] = useState("");
-  const [disableError, setDisableError] = useState("");
+  const [disableCode, setDisableCode] = useState('');
+  const [disableError, setDisableError] = useState('');
 
   const handleDisableMFA = async () => {
     if (!disableCode) {
-      setDisableError("Please enter your verification code");
+      setDisableError('Please enter your verification code');
       return;
     }
 
-    setDisableError("");
+    setDisableError('');
     try {
       await disableMFA.mutateAsync({ code: disableCode });
       setShowDisable(false);
-      setDisableCode("");
+      setDisableCode('');
     } catch (err) {
-      setDisableError(
-        err instanceof Error ? err.message : "Failed to disable MFA"
-      );
+      setDisableError(err instanceof Error ? err.message : 'Failed to disable MFA');
     }
   };
 
@@ -62,17 +61,17 @@ export const MFASettings = () => {
     try {
       await revokeTrustedDevice.mutateAsync(deviceId);
     } catch (err) {
-      console.error("Failed to revoke device:", err);
+      logger.error('Failed to revoke trusted device', err as Error);
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
     });
   };
 
@@ -92,8 +91,8 @@ export const MFASettings = () => {
           <div className="flex items-start gap-4">
             <div
               className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center",
-                isMFAEnabled ? "bg-green-100" : "bg-gray-100"
+                'w-12 h-12 rounded-full flex items-center justify-center',
+                isMFAEnabled ? 'bg-green-100' : 'bg-gray-100'
               )}
             >
               {isMFAEnabled ? (
@@ -103,13 +102,11 @@ export const MFASettings = () => {
               )}
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                Two-Factor Authentication
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900">Two-Factor Authentication</h3>
               <p className="text-sm text-gray-600 mt-1">
                 {isMFAEnabled
-                  ? "Your account is protected with two-factor authentication"
-                  : "Add an extra layer of security to your account"}
+                  ? 'Your account is protected with two-factor authentication'
+                  : 'Add an extra layer of security to your account'}
               </p>
               {isMFAEnabled && mfaSettings?.verified_at && (
                 <p className="text-xs text-gray-500 mt-2">
@@ -135,8 +132,8 @@ export const MFASettings = () => {
                     <DialogHeader>
                       <DialogTitle>Disable Two-Factor Authentication</DialogTitle>
                       <DialogDescription>
-                        Enter your authenticator code or backup code to disable
-                        two-factor authentication.
+                        Enter your authenticator code or backup code to disable two-factor
+                        authentication.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
@@ -158,8 +155,8 @@ export const MFASettings = () => {
                           variant="outline"
                           onClick={() => {
                             setShowDisable(false);
-                            setDisableCode("");
-                            setDisableError("");
+                            setDisableCode('');
+                            setDisableError('');
                           }}
                           className="flex-1"
                         >
@@ -177,7 +174,7 @@ export const MFASettings = () => {
                               Disabling...
                             </>
                           ) : (
-                            "Disable MFA"
+                            'Disable MFA'
                           )}
                         </Button>
                       </div>
@@ -208,8 +205,8 @@ export const MFASettings = () => {
           <div className="mt-4 flex items-center gap-2 bg-yellow-50 text-yellow-800 p-3 rounded-lg text-sm">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
             <span>
-              MFA verification is temporarily locked due to too many failed
-              attempts. Try again later.
+              MFA verification is temporarily locked due to too many failed attempts. Try again
+              later.
             </span>
           </div>
         )}
@@ -218,9 +215,7 @@ export const MFASettings = () => {
       {/* Trusted Devices */}
       {isMFAEnabled && (
         <div className="bg-white rounded-lg border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Trusted Devices
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Trusted Devices</h3>
           <p className="text-sm text-gray-600 mb-4">
             These devices can skip two-factor authentication when signing in.
           </p>
@@ -236,10 +231,10 @@ export const MFASettings = () => {
                     <Smartphone className="w-5 h-5 text-gray-400" />
                     <div>
                       <p className="font-medium text-gray-900">
-                        {device.device_name || "Unknown Device"}
+                        {device.device_name || 'Unknown Device'}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {device.browser} on {device.os} • Last used{" "}
+                        {device.browser} on {device.os} • Last used{' '}
                         {formatDate(device.last_used_at)}
                       </p>
                     </div>
@@ -262,8 +257,8 @@ export const MFASettings = () => {
             </div>
           ) : (
             <p className="text-sm text-gray-500 text-center py-4">
-              No trusted devices. When you sign in and choose to trust a device,
-              it will appear here.
+              No trusted devices. When you sign in and choose to trust a device, it will appear
+              here.
             </p>
           )}
         </div>
@@ -275,12 +270,10 @@ export const MFASettings = () => {
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="font-medium text-yellow-800">
-                Security Recommendation
-              </h4>
+              <h4 className="font-medium text-yellow-800">Security Recommendation</h4>
               <p className="text-sm text-yellow-700 mt-1">
-                We strongly recommend enabling two-factor authentication to
-                protect your account from unauthorized access.
+                We strongly recommend enabling two-factor authentication to protect your account
+                from unauthorized access.
               </p>
             </div>
           </div>

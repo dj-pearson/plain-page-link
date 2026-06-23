@@ -1,21 +1,22 @@
-import { useState, useEffect } from "react";
-import { Shield, Bell, CreditCard, User, Lock, Mail, Save, Eye, KeyRound } from "lucide-react";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { useSettings } from "@/hooks/useSettings";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { UsernameInput } from "@/components/UsernameInput";
-import { ProfileURLCard } from "@/components/settings/ProfileURLCard";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProfileDisplaySettings } from "@/components/settings/ProfileDisplaySettings";
-import { SessionManagement } from "@/components/settings/SessionManagement";
-import { AuditLogViewer } from "@/components/settings/AuditLogViewer";
-import { GDPRSettings } from "@/components/settings/GDPRSettings";
+import { useState, useEffect } from 'react';
+import { Shield, Bell, CreditCard, User, Lock, Mail, Save, Eye, KeyRound } from 'lucide-react';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useSettings } from '@/hooks/useSettings';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { UsernameInput } from '@/components/UsernameInput';
+import { ProfileURLCard } from '@/components/settings/ProfileURLCard';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProfileDisplaySettings } from '@/components/settings/ProfileDisplaySettings';
+import { SessionManagement } from '@/components/settings/SessionManagement';
+import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
+import { GDPRSettings } from '@/components/settings/GDPRSettings';
+import { MFASettings } from '@/components/auth/mfa';
 
 export default function Settings() {
   const { user } = useAuthStore();
@@ -39,9 +40,9 @@ export default function Settings() {
   });
 
   const [password, setPassword] = useState({
-    current: "",
-    new: "",
-    confirm: "",
+    current: '',
+    new: '',
+    confirm: '',
   });
 
   // Profile state
@@ -49,7 +50,7 @@ export default function Settings() {
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -99,15 +100,15 @@ export default function Settings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
+        title: 'Profile updated',
+        description: 'Your profile has been updated successfully.',
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update profile",
-        variant: "destructive",
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update profile',
+        variant: 'destructive',
       });
     },
   });
@@ -132,50 +133,62 @@ export default function Settings() {
   }, [settings]);
 
   const handleNotificationChange = async (key: keyof typeof notifications, value: boolean) => {
-    setNotifications(prev => ({ ...prev, [key]: value }));
-    
+    setNotifications((prev) => ({ ...prev, [key]: value }));
+
     // Map frontend keys to database column names
-    const dbKey = key === 'emailLeads' ? 'email_leads' :
-                  key === 'smsLeads' ? 'sms_leads' :
-                  key === 'weeklyReport' ? 'weekly_report' :
-                  'marketing_emails';
-    
+    const dbKey =
+      key === 'emailLeads'
+        ? 'email_leads'
+        : key === 'smsLeads'
+          ? 'sms_leads'
+          : key === 'weeklyReport'
+            ? 'weekly_report'
+            : 'marketing_emails';
+
     try {
       await updateSettings.mutateAsync({ [dbKey]: value });
       toast({
-        title: "Settings updated",
-        description: "Your notification preferences have been saved.",
+        title: 'Settings updated',
+        description: 'Your notification preferences have been saved.',
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update settings.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update settings.',
+        variant: 'destructive',
       });
     }
   };
 
-  const handleProfileVisibilityChange = async (key: keyof typeof profileVisibility, value: boolean) => {
-    setProfileVisibility(prev => ({ ...prev, [key]: value }));
-    
+  const handleProfileVisibilityChange = async (
+    key: keyof typeof profileVisibility,
+    value: boolean
+  ) => {
+    setProfileVisibility((prev) => ({ ...prev, [key]: value }));
+
     // Map frontend keys to database column names
-    const dbKey = key === 'showListings' ? 'show_listings' :
-                  key === 'showSoldProperties' ? 'show_sold_properties' :
-                  key === 'showTestimonials' ? 'show_testimonials' :
-                  key === 'showSocialProof' ? 'show_social_proof' :
-                  'show_contact_buttons';
-    
+    const dbKey =
+      key === 'showListings'
+        ? 'show_listings'
+        : key === 'showSoldProperties'
+          ? 'show_sold_properties'
+          : key === 'showTestimonials'
+            ? 'show_testimonials'
+            : key === 'showSocialProof'
+              ? 'show_social_proof'
+              : 'show_contact_buttons';
+
     try {
       await updateSettings.mutateAsync({ [dbKey]: value });
       toast({
-        title: "Profile visibility updated",
-        description: "Your profile display preferences have been saved.",
+        title: 'Profile visibility updated',
+        description: 'Your profile display preferences have been saved.',
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update visibility settings.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update visibility settings.',
+        variant: 'destructive',
       });
     }
   };
@@ -185,18 +198,18 @@ export default function Settings() {
 
     if (password.new !== password.confirm) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: "New passwords don't match.",
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
 
     if (password.new.length < 6) {
       toast({
-        title: "Error",
-        description: "Password must be at least 6 characters.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Password must be at least 6 characters.',
+        variant: 'destructive',
       });
       return;
     }
@@ -209,41 +222,41 @@ export default function Settings() {
       if (error) throw error;
 
       toast({
-        title: "Password updated",
-        description: "Your password has been changed successfully.",
+        title: 'Password updated',
+        description: 'Your password has been changed successfully.',
       });
 
-      setPassword({ current: "", new: "", confirm: "" });
+      setPassword({ current: '', new: '', confirm: '' });
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update password.",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to update password.',
+        variant: 'destructive',
       });
     }
   };
 
-  const memberSince = user?.created_at 
-    ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    : "Unknown";
+  const memberSince = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : 'Unknown';
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-foreground">Account Settings</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your account and preferences
-        </p>
+        <p className="text-muted-foreground mt-1">Manage your account and preferences</p>
       </div>
 
       {/* Profile & Username Section */}
       <Card>
         <CardHeader>
           <CardTitle>Profile & Username</CardTitle>
-          <CardDescription>
-            Manage your public profile and unique URL
-          </CardDescription>
+          <CardDescription>Manage your public profile and unique URL</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-6">
@@ -307,24 +320,20 @@ export default function Settings() {
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center gap-3 mb-4">
           <User className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">
-            Account Information
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Account Information</h2>
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <div className="font-medium text-foreground">Email Address</div>
-              <div className="text-sm text-muted-foreground">
-                {user?.email || "Not available"}
-              </div>
+              <div className="text-sm text-muted-foreground">{user?.email || 'Not available'}</div>
             </div>
           </div>
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <div className="font-medium text-foreground">User ID</div>
               <div className="text-sm text-muted-foreground font-mono text-xs">
-                {user?.id || "Not available"}
+                {user?.id || 'Not available'}
               </div>
             </div>
           </div>
@@ -341,15 +350,11 @@ export default function Settings() {
       <form onSubmit={handlePasswordChange} className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center gap-3 mb-4">
           <Lock className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">
-            Change Password
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Change Password</h2>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              New Password
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-2">New Password</label>
             <input
               type="password"
               value={password.new}
@@ -366,15 +371,13 @@ export default function Settings() {
             <input
               type="password"
               value={password.confirm}
-              onChange={(e) =>
-                setPassword({ ...password, confirm: e.target.value })
-              }
+              onChange={(e) => setPassword({ ...password, confirm: e.target.value })}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               required
               minLength={6}
             />
           </div>
-          <button 
+          <button
             type="submit"
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
           >
@@ -388,9 +391,7 @@ export default function Settings() {
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center gap-3 mb-4">
           <Bell className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">
-            Notification Preferences
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Notification Preferences</h2>
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between py-3 border-b border-border">
@@ -468,9 +469,7 @@ export default function Settings() {
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center gap-3 mb-4">
           <Eye className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">
-            Profile Visibility
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Profile Visibility</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
           Control which sections appear on your public profile page
@@ -487,7 +486,9 @@ export default function Settings() {
               <input
                 type="checkbox"
                 checked={profileVisibility.showContactButtons}
-                onChange={(e) => handleProfileVisibilityChange('showContactButtons', e.target.checked)}
+                onChange={(e) =>
+                  handleProfileVisibilityChange('showContactButtons', e.target.checked)
+                }
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -538,7 +539,9 @@ export default function Settings() {
               <input
                 type="checkbox"
                 checked={profileVisibility.showSoldProperties}
-                onChange={(e) => handleProfileVisibilityChange('showSoldProperties', e.target.checked)}
+                onChange={(e) =>
+                  handleProfileVisibilityChange('showSoldProperties', e.target.checked)
+                }
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -555,7 +558,9 @@ export default function Settings() {
               <input
                 type="checkbox"
                 checked={profileVisibility.showTestimonials}
-                onChange={(e) => handleProfileVisibilityChange('showTestimonials', e.target.checked)}
+                onChange={(e) =>
+                  handleProfileVisibilityChange('showTestimonials', e.target.checked)
+                }
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -568,17 +573,13 @@ export default function Settings() {
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center gap-3 mb-4">
           <CreditCard className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">
-            Billing & Subscription
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Billing & Subscription</h2>
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <div className="font-medium text-foreground">Current Plan</div>
-              <div className="text-sm text-muted-foreground">
-                Professional - $49/month
-              </div>
+              <div className="text-sm text-muted-foreground">Professional - $49/month</div>
             </div>
             <button className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium">
               Manage Plan
@@ -587,9 +588,7 @@ export default function Settings() {
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <div className="font-medium text-foreground">Payment Method</div>
-              <div className="text-sm text-muted-foreground">
-                •••• •••• •••• 4242
-              </div>
+              <div className="text-sm text-muted-foreground">•••• •••• •••• 4242</div>
             </div>
             <button className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium">
               Update
@@ -617,6 +616,9 @@ export default function Settings() {
           Manage your security settings, active sessions, and data privacy
         </p>
       </div>
+
+      {/* Two-Factor Authentication */}
+      <MFASettings />
 
       {/* Session Management */}
       <SessionManagement />
