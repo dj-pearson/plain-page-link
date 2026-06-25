@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 35 stories completed (passes: true), 20 stories pending
+- 37 stories completed (passes: true), 18 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029 (session mgmt), US-030/031 (MFA), US-033 (E2E auth tests), US-032 (image optimization)
+- Latest session: US-029 (session), US-030/031 (MFA), US-032 (images), US-033 (E2E), US-034/035 (email + lead notifications)
 
 ## Codebase Patterns
 
@@ -343,3 +343,19 @@
 - **Library choice**: Deno edge functions can't run native `sharp`, so the function uses **ImageMagick WASM** (`imagemagick_deno`, magick-wasm) which runs in the edge runtime and supports WebP encode + resize — the proven Supabase-edge pattern (the story notes called this out).
 - **Verification**: Frontend tsc clean for the touched hook (zero new errors); unit suite 258/258. The Deno edge function could not be runtime-executed here (no Deno/Supabase in the sandbox, same as prior edge-function stories) — it is written against the documented imagemagick_deno + Storage APIs.
 - **Naming note**: kept the existing `OptimizedImage.tsx` rather than adding a near-duplicate `optimized-image.tsx` (case-only difference; collides on case-insensitive filesystems).
+
+### US-034: Implement email service integration for transactional emails ✅
+- **Status**: PASSED
+- **Discovery**: `supabase/functions/_shared/email.ts` already wrapped the Resend API (`sendEmail`) with graceful failure (logs + swallows, never throws), and `send-welcome-email` already used it with a polished branded HTML template. `createAgentNotificationEmail`/`createAutoResponseEmail` templates existed.
+- **Gaps closed**: (1) Added `createLeadNotificationEmail()` to email.ts — a branded, responsive HTML template with subject `New Lead: {name} is interested in {listing}`, lead detail table, optional lead-score badge, message block, and a dashboard CTA (reused by US-035). (2) Documented `RESEND_API_KEY` (+ `FROM_EMAIL`, `AGENT_EMAIL`, `SITE_URL`) in `.env.example` as Edge Function secrets with `supabase secrets set` guidance.
+- **Note**: kept the options-object `sendEmail({to,subject,body,html})` signature (richer than the AC's positional sketch); it already supports html + text and fails gracefully.
+- **Files**: `supabase/functions/_shared/email.ts`, `.env.example`.
+
+### US-035: Create lead notification email system ✅
+- **Status**: PASSED
+- **Changes**:
+  - `supabase/functions/notify-lead/index.ts` (new) — emails the agent on a new lead. Accepts the trigger's `{ record }` payload (or `{ lead_id }` for manual calls), resolves the agent profile + `notification_preferences.leads`, and sends via `createLeadNotificationEmail` only when the pref is `instant` (skips `daily_digest`/`off`). Includes name, email, phone, message, source page, lead score (if present), and a dashboard link; audits `lead_notification_sent`.
+  - Migration `20260525000001_lead_notifications.sql` — adds `profiles.notification_preferences jsonb` (default `{"leads":"instant"}`) and an AFTER INSERT trigger on `leads` that calls notify-lead via **pg_net** (`net.http_post`). The trigger reads the functions URL + service-role key from database settings (`app.settings.*`) so no secrets are hard-coded, no-ops safely when unconfigured, and never blocks lead capture (exception-guarded). Operator setup documented in the migration header.
+  - `src/components/settings/LeadNotificationPreferences.tsx` (new) — Instant / Daily digest / Off selector persisted to `profiles.notification_preferences.leads`; mounted in the Settings Security & Privacy section.
+- **Type note**: `notification_preferences` isn't in the out-of-sync generated `types.ts`, so the read/write use a single isolated cast each (documented inline) — consistent with the repo's existing pattern; zero new tsc errors in my files.
+- **Verification**: tsc clean for new/touched frontend files (Settings.tsx shows only pre-existing baseline unused-import errors, line-shifted by the added import); unit suite 258/258. Edge function + trigger not runtime-executed (no Deno/Supabase in sandbox).

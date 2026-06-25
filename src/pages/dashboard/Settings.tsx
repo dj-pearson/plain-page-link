@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileDisplaySettings } from '@/components/settings/ProfileDisplaySettings';
 import { SessionManagement } from '@/components/settings/SessionManagement';
+import { LeadNotificationPreferences } from '@/components/settings/LeadNotificationPreferences';
 import { MFASettings } from '@/components/auth/mfa';
 import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
 import { GDPRSettings } from '@/components/settings/GDPRSettings';
@@ -616,6 +617,9 @@ export default function Settings() {
           Manage your security settings, active sessions, and data privacy
         </p>
       </div>
+
+      {/* Lead Notification Preferences */}
+      <LeadNotificationPreferences />
 
       {/* Two-Factor Authentication */}
       <MFASettings />

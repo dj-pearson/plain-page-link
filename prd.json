@@ -571,7 +571,7 @@
         "Typecheck passes on edge function code"
       ],
       "priority": 34,
-      "passes": false,
+      "passes": true,
       "notes": "Edge functions for email may already exist (send-welcome-email, send-scheduled-emails). Check what's there and build on it. Resend is preferred for its developer experience."
     },
     {
@@ -588,7 +588,7 @@
         "Typecheck passes on edge function code"
       ],
       "priority": 35,
-      "passes": false,
+      "passes": true,
       "notes": "Lead notifications are a core value proposition for the platform. Fast notification = higher conversion rates."
     },
     {
