@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 50 stories completed (passes: true), 5 stories pending
+- 51 stories completed (passes: true), 4 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029–038, US-040–043, US-046/047, US-052/053, US-039 (a11y), US-050 (health dashboard)
+- Latest session: US-029–038, US-040–043, US-046/047, US-052/053, US-039, US-050, US-048 (onboarding)
 
 ## Codebase Patterns
 
@@ -465,3 +465,13 @@
   - Route `/admin/health` (lazy, ProtectedRoute + error boundary); "Health" link added to the AdminDashboard header.
 - **Type note**: several tables not in the out-of-sync generated types — isolated generic count/fetch helpers with localized casts (no `any`); zero new tsc errors.
 - **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272.
+
+### US-048: Create onboarding flow for new user setup ✅
+- **Status**: PASSED
+- **Discovery**: A 5-step `OnboardingWizard` (Template → Profile Basics → First Listing → Preview → Share) + `OnboardingWizardPage` (persists profile/listing/theme, welcome email) + progress indicator already existed at `/onboarding/wizard`. Gaps: completion tracking + post-login redirect, plus two real bugs in the completion path.
+- **Changes**:
+  - Migration `20260525000006_onboarding_completed.sql` — adds `profiles.onboarding_completed_at`.
+  - `OnboardingWizardPage` — stamps `onboarding_completed_at` on finish (profileUpdates is `any`, no new error).
+  - `Login.tsx` — after auth, routes users whose `onboarding_completed_at` is null to `/onboarding/wizard` (only when heading to the default /dashboard; saved-route redirects preserved).
+  - **Bug fixes in the certified path** (both pre-existing): added the missing `edgeFunctions` import (welcome-email call would have thrown at runtime, breaking onboarding completion), and fixed `OnboardingWizardProps.onComplete` type to `(wizardData) => void` (it's called with data). This resolved 2 baseline tsc errors.
+- **Verification**: tsc — net −2 errors (fixed the 2 above; remaining OnboardingWizard errors are pre-existing unused-var/implicit-any baseline); `npm run build` succeeds; unit suite 272/272.

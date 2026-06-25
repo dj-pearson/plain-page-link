@@ -809,7 +809,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 48,
-      "passes": false,
+      "passes": true,
       "notes": "Onboarding components may already exist at src/components/onboarding/ and src/pages/onboarding/. Check and enhance."
     },
     {

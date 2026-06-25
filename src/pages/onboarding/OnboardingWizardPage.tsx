@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { edgeFunctions } from '@/lib/edgeFunctions';
 
 /**
  * OnboardingWizardPage
@@ -68,9 +69,9 @@ export default function OnboardingWizardPage() {
 
           if (uploadError) throw uploadError;
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(filePath);
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
           profileUpdates.avatar_url = publicUrl;
         } catch (error) {
@@ -83,6 +84,9 @@ export default function OnboardingWizardPage() {
       if (wizardData.templateChoice) {
         profileUpdates.theme = wizardData.templateChoice;
       }
+
+      // Mark onboarding complete so the user isn't routed back into the wizard.
+      profileUpdates.onboarding_completed_at = new Date().toISOString();
 
       // Update profile
       const { error: profileError } = await supabase
@@ -110,16 +114,17 @@ export default function OnboardingWizardPage() {
               .upload(filePath, wizardData.firstListing.photo);
 
             if (!uploadError) {
-              const { data: { publicUrl } } = supabase.storage
-                .from('listing-images')
-                .getPublicUrl(filePath);
+              const {
+                data: { publicUrl },
+              } = supabase.storage.from('listing-images').getPublicUrl(filePath);
 
               photoUrl = publicUrl;
             }
           }
 
           // Parse address
-          const addressParts = wizardData.firstListing.address?.split(',').map((s: string) => s.trim()) || [];
+          const addressParts =
+            wizardData.firstListing.address?.split(',').map((s: string) => s.trim()) || [];
           const address = addressParts[0] || '';
           const city = addressParts[1] || '';
           const stateZip = addressParts[2] || '';
@@ -135,15 +140,15 @@ export default function OnboardingWizardPage() {
             zip_code: zip,
             price: wizardData.firstListing.price || '0',
             bedrooms: wizardData.firstListing.beds ? parseInt(wizardData.firstListing.beds) : null,
-            bathrooms: wizardData.firstListing.baths ? parseInt(wizardData.firstListing.baths) : null,
+            bathrooms: wizardData.firstListing.baths
+              ? parseInt(wizardData.firstListing.baths)
+              : null,
             status: wizardData.firstListing.status || 'active',
             featured: true, // Make first listing featured
             photos: photoUrl ? [photoUrl] : [],
           };
 
-          const { error: listingError } = await supabase
-            .from('listings')
-            .insert(listingData);
+          const { error: listingError } = await supabase.from('listings').insert(listingData);
 
           if (listingError) {
             logger.error('Error creating listing', listingError as Error);
@@ -162,8 +167,8 @@ export default function OnboardingWizardPage() {
             user_id: user.id,
             email: user.email,
             full_name: wizardData.profileBasics.fullName || user.user_metadata?.full_name,
-            username: user.user_metadata?.username || 'agent'
-          }
+            username: user.user_metadata?.username || 'agent',
+          },
         });
       } catch (emailError) {
         logger.error('Welcome email failed (non-critical)', emailError as Error);
@@ -178,7 +183,6 @@ export default function OnboardingWizardPage() {
 
       // Navigate to dashboard
       navigate('/dashboard', { replace: true });
-
     } catch (error: any) {
       logger.error('Error completing onboarding', error as Error);
       toast({
@@ -203,10 +207,5 @@ export default function OnboardingWizardPage() {
     );
   }
 
-  return (
-    <OnboardingWizard
-      onComplete={handleComplete}
-      userProfile={profile || user}
-    />
-  );
+  return <OnboardingWizard onComplete={handleComplete} userProfile={profile || user} />;
 }
