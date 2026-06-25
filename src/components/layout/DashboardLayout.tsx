@@ -20,6 +20,7 @@ import {
   Share2,
   Workflow,
   CreditCard,
+  KeyRound,
 } from 'lucide-react';
 import { MobileNav } from '@/components/mobile/MobileNav';
 import { Badge } from '@/components/ui/badge';
@@ -197,6 +198,12 @@ export default function DashboardLayout() {
               icon={<CreditCard className="h-5 w-5" />}
               label="Subscription"
               active={isActive('/dashboard/subscription')}
+            />
+            <NavLink
+              to="/dashboard/api-keys"
+              icon={<KeyRound className="h-5 w-5" />}
+              label="API Keys"
+              active={isActive('/dashboard/api-keys')}
             />
             <NavLink
               to="/dashboard/settings"

@@ -85,6 +85,7 @@ const Testimonials = lazy(() => import('./pages/dashboard/Testimonials'));
 const Analytics = lazy(() => import('./pages/dashboard/Analytics'));
 const Settings = lazy(() => import('./pages/dashboard/Settings'));
 const SubscriptionPage = lazy(() => import('./pages/dashboard/SubscriptionPage'));
+const ApiKeysPage = lazy(() => import('./pages/dashboard/ApiKeysPage'));
 const DeleteAccount = lazy(() => import('./pages/dashboard/DeleteAccount'));
 const QuickActionsDashboard = lazy(() => import('./pages/QuickActionsDashboard'));
 const LeadManagementDashboard = lazy(() => import('./pages/LeadManagementDashboard'));
@@ -284,6 +285,7 @@ function App() {
               <Route path="testimonials" element={<Testimonials />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="subscription" element={<SubscriptionPage />} />
+              <Route path="api-keys" element={<ApiKeysPage />} />
               <Route path="settings" element={<Settings />} />
               <Route path="settings/delete-account" element={<DeleteAccount />} />
               <Route path="workflows" element={<WorkflowsListPage />} />

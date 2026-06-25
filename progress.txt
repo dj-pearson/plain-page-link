@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 51 stories completed (passes: true), 4 stories pending
+- 52 stories completed (passes: true), 3 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029–038, US-040–043, US-046/047, US-052/053, US-039, US-050, US-048 (onboarding)
+- Latest session: US-029–053 batch + US-044 (API keys). Remaining: US-045, US-049, US-055
 
 ## Codebase Patterns
 
@@ -475,3 +475,13 @@
   - `Login.tsx` — after auth, routes users whose `onboarding_completed_at` is null to `/onboarding/wizard` (only when heading to the default /dashboard; saved-route redirects preserved).
   - **Bug fixes in the certified path** (both pre-existing): added the missing `edgeFunctions` import (welcome-email call would have thrown at runtime, breaking onboarding completion), and fixed `OnboardingWizardProps.onComplete` type to `(wizardData) => void` (it's called with data). This resolved 2 baseline tsc errors.
 - **Verification**: tsc — net −2 errors (fixed the 2 above; remaining OnboardingWizard errors are pre-existing unused-var/implicit-any baseline); `npm run build` succeeds; unit suite 272/272.
+
+### US-044: Add API key system for programmatic access ✅
+- **Status**: PASSED
+- **Discovery**: An `api_keys` table existed (20260129) but lacked key_prefix/permissions/revoked_at (had is_active).
+- **Changes**:
+  - Migration `20260525000007_api_keys_extend.sql` — adds key_prefix, permissions (jsonb), revoked_at (additive) + prefix index.
+  - `supabase/functions/_shared/api-auth.ts` — `authenticateApiKey(req, serviceClient)` validating `Authorization: Bearer ab_…` (SHA-256 hash lookup, revoked/expired checks, last_used_at touch) as a JWT alternative; `hashApiKey` helper.
+  - `supabase/functions/api-keys/index.ts` — create/list/revoke. Keys are `ab_<base64url(32 bytes)>`; only the hash + 8-char prefix stored; full key returned once on create; max 10 active per user; audits create/revoke.
+  - `src/pages/dashboard/ApiKeysPage.tsx` — create (one-time reveal + copy), list (prefix/last-used), revoke (confirm dialog). Route `/dashboard/api-keys` + sidebar "API Keys" link.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272. Edge functions not runtime-executed (no Deno/Supabase).

@@ -742,7 +742,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 44,
-      "passes": false,
+      "passes": true,
       "notes": "API keys are a core enterprise feature \u2014 they enable CRM integrations (Salesforce, HubSpot, Follow Up Boss)."
     },
     {
