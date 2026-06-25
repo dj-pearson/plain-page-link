@@ -45,6 +45,15 @@ serve(async (req: Request) => {
     const body: RevokeRequest = await req.json();
     const { sessionId, revokeAll, currentSessionId, reason } = body;
 
+    const clientIP = getClientIP(req);
+    const userAgent = req.headers.get('user-agent') ?? null;
+
+    // Service-role client for writing audit logs (independent of the caller's RLS context).
+    const serviceSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!
+    );
+
     let result: { success: boolean; message: string; revoked_count?: number };
 
     if (revokeAll) {
@@ -64,6 +73,23 @@ serve(async (req: Request) => {
         message: `Successfully revoked ${data} session(s)`,
         revoked_count: data,
       };
+
+      // Audit: bulk session revocation (fire-and-forget; never blocks the response).
+      await serviceSupabase
+        .rpc('log_audit_event', {
+          p_user_id: user.id,
+          p_action: 'session_revoke_all',
+          p_status: 'success',
+          p_resource_type: 'session',
+          p_ip_address: clientIP,
+          p_user_agent: userAgent,
+          p_details: JSON.stringify({
+            revoked_count: data,
+            preserved_session_id: currentSessionId || null,
+            reason: reason || 'revoke_all_by_user',
+          }),
+        })
+        .catch(() => undefined);
     } else if (sessionId) {
       // Revoke specific session
       const { data, error } = await supabase
@@ -95,6 +121,20 @@ serve(async (req: Request) => {
         message: 'Session revoked successfully',
         revoked_count: 1,
       };
+
+      // Audit: single session revocation.
+      await serviceSupabase
+        .rpc('log_audit_event', {
+          p_user_id: user.id,
+          p_action: 'session_revoke',
+          p_status: 'success',
+          p_resource_type: 'session',
+          p_resource_id: sessionId,
+          p_ip_address: clientIP,
+          p_user_agent: userAgent,
+          p_details: JSON.stringify({ reason: reason || 'user_revoked' }),
+        })
+        .catch(() => undefined);
     } else {
       return new Response(
         JSON.stringify({

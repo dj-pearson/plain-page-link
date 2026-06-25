@@ -32,6 +32,7 @@ import Register from './pages/auth/Register';
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const AuthCallback = lazy(() => import('./pages/auth/AuthCallback'));
+const MFAChallenge = lazy(() => import('./pages/auth/MFAChallenge'));
 
 // Lazy load onboarding
 const OnboardingWizardPage = lazy(() => import('./pages/onboarding/OnboardingWizardPage'));
@@ -236,6 +237,7 @@ function App() {
             <Route path="/auth/register" element={<Register />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/mfa" element={<MFAChallenge />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/auth/sso/callback" element={<SSOCallback />} />
 

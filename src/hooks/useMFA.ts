@@ -1,8 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { edgeFunctions } from "@/lib/edgeFunctions";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { logger } from "@/lib/logger";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { logger } from '@/lib/logger';
 
 export interface MFASettings {
   id: string;
@@ -57,14 +57,14 @@ export function useMFA() {
     error: settingsError,
     refetch: refetchSettings,
   } = useQuery({
-    queryKey: ["mfa-settings", user?.id],
+    queryKey: ['mfa-settings', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
 
       const { data, error } = await supabase
-        .from("user_mfa_settings")
-        .select("*")
-        .eq("user_id", user.id)
+        .from('user_mfa_settings')
+        .select('*')
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -79,17 +79,17 @@ export function useMFA() {
     isLoading: isLoadingDevices,
     refetch: refetchDevices,
   } = useQuery({
-    queryKey: ["mfa-trusted-devices", user?.id],
+    queryKey: ['mfa-trusted-devices', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
-        .from("mfa_trusted_devices")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("revoked", false)
-        .gte("trusted_until", new Date().toISOString())
-        .order("created_at", { ascending: false });
+        .from('mfa_trusted_devices')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('revoked', false)
+        .gte('trusted_until', new Date().toISOString())
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as TrustedDevice[];
@@ -100,9 +100,9 @@ export function useMFA() {
   // Setup MFA mutation
   const setupMFA = useMutation({
     mutationFn: async (): Promise<MFASetupResponse> => {
-      if (!session?.access_token) throw new Error("Not authenticated");
+      if (!session?.access_token) throw new Error('Not authenticated');
 
-      const response = await edgeFunctions.invoke("setup-mfa", {
+      const response = await edgeFunctions.invoke('setup-mfa', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -132,9 +132,9 @@ export function useMFA() {
       browser?: string;
       os?: string;
     }): Promise<MFAVerifyResponse> => {
-      if (!session?.access_token) throw new Error("Not authenticated");
+      if (!session?.access_token) throw new Error('Not authenticated');
 
-      const response = await edgeFunctions.invoke("verify-mfa", {
+      const response = await edgeFunctions.invoke('verify-mfa', {
         body: {
           code,
           isSetupVerification,
@@ -153,17 +153,17 @@ export function useMFA() {
       return response.data as MFAVerifyResponse;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mfa-settings", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["mfa-trusted-devices", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mfa-settings', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mfa-trusted-devices', user?.id] });
     },
   });
 
   // Disable MFA mutation
   const disableMFA = useMutation({
     mutationFn: async ({ code }: { code: string }) => {
-      if (!session?.access_token) throw new Error("Not authenticated");
+      if (!session?.access_token) throw new Error('Not authenticated');
 
-      const response = await edgeFunctions.invoke("disable-mfa", {
+      const response = await edgeFunctions.invoke('disable-mfa', {
         body: { code },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -174,29 +174,53 @@ export function useMFA() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mfa-settings", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["mfa-trusted-devices", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mfa-settings', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mfa-trusted-devices', user?.id] });
+    },
+  });
+
+  // Regenerate backup codes mutation (requires a current MFA/backup code).
+  const regenerateBackupCodes = useMutation({
+    mutationFn: async ({
+      code,
+    }: {
+      code: string;
+    }): Promise<{ backupCodes: string[]; message: string }> => {
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const response = await edgeFunctions.invoke('regenerate-backup-codes', {
+        body: { code },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      return response.data as { backupCodes: string[]; message: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mfa-settings', user?.id] });
     },
   });
 
   // Revoke trusted device
   const revokeTrustedDevice = useMutation({
     mutationFn: async (deviceId: string) => {
-      if (!user?.id) throw new Error("Not authenticated");
+      if (!user?.id) throw new Error('Not authenticated');
 
       const { error } = await supabase
-        .from("mfa_trusted_devices")
+        .from('mfa_trusted_devices')
         .update({
           revoked: true,
           revoked_at: new Date().toISOString(),
         })
-        .eq("id", deviceId)
-        .eq("user_id", user.id);
+        .eq('id', deviceId)
+        .eq('user_id', user.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mfa-trusted-devices", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mfa-trusted-devices', user?.id] });
     },
   });
 
@@ -204,13 +228,13 @@ export function useMFA() {
   const checkDeviceTrust = async (deviceFingerprint: string): Promise<boolean> => {
     if (!user?.id || !mfaSettings?.mfa_enabled) return false;
 
-    const { data, error } = await supabase.rpc("is_device_trusted", {
+    const { data, error } = await supabase.rpc('is_device_trusted', {
       p_user_id: user.id,
       p_device_fingerprint: deviceFingerprint,
     });
 
     if (error) {
-      logger.error("Error checking device trust", error as Error);
+      logger.error('Error checking device trust', error as Error);
       return false;
     }
 
@@ -229,11 +253,11 @@ export function useMFA() {
     ];
 
     // Simple hash function
-    const str = components.join("|");
+    const str = components.join('|');
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash;
     }
     return Math.abs(hash).toString(36);
@@ -242,22 +266,22 @@ export function useMFA() {
   // Get browser info
   const getBrowserInfo = () => {
     const userAgent = navigator.userAgent;
-    let browser = "Unknown";
-    let os = "Unknown";
+    let browser = 'Unknown';
+    let os = 'Unknown';
 
     // Detect browser
-    if (userAgent.includes("Firefox")) browser = "Firefox";
-    else if (userAgent.includes("Chrome")) browser = "Chrome";
-    else if (userAgent.includes("Safari")) browser = "Safari";
-    else if (userAgent.includes("Edge")) browser = "Edge";
-    else if (userAgent.includes("Opera")) browser = "Opera";
+    if (userAgent.includes('Firefox')) browser = 'Firefox';
+    else if (userAgent.includes('Chrome')) browser = 'Chrome';
+    else if (userAgent.includes('Safari')) browser = 'Safari';
+    else if (userAgent.includes('Edge')) browser = 'Edge';
+    else if (userAgent.includes('Opera')) browser = 'Opera';
 
     // Detect OS
-    if (userAgent.includes("Windows")) os = "Windows";
-    else if (userAgent.includes("Mac")) os = "macOS";
-    else if (userAgent.includes("Linux")) os = "Linux";
-    else if (userAgent.includes("Android")) os = "Android";
-    else if (userAgent.includes("iPhone") || userAgent.includes("iPad")) os = "iOS";
+    if (userAgent.includes('Windows')) os = 'Windows';
+    else if (userAgent.includes('Mac')) os = 'macOS';
+    else if (userAgent.includes('Linux')) os = 'Linux';
+    else if (userAgent.includes('Android')) os = 'Android';
+    else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS';
 
     return { browser, os };
   };
@@ -270,14 +294,13 @@ export function useMFA() {
     error: settingsError,
     isMFAEnabled: mfaSettings?.mfa_enabled ?? false,
     isVerified: !!mfaSettings?.verified_at,
-    isLocked: mfaSettings?.locked_until
-      ? new Date(mfaSettings.locked_until) > new Date()
-      : false,
+    isLocked: mfaSettings?.locked_until ? new Date(mfaSettings.locked_until) > new Date() : false,
 
     // Actions
     setupMFA,
     verifyMFA,
     disableMFA,
+    regenerateBackupCodes,
     revokeTrustedDevice,
     refetchSettings,
     refetchDevices,

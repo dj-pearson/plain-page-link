@@ -7,8 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 30 stories completed (passes: true), 25 stories pending
+- 33 stories completed (passes: true), 22 stories pending
 - Completed critical platform improvements in Ralph loop
+- Latest session: US-029 (session management), US-030 (MFA backend), US-031 (MFA frontend)
 
 ## Codebase Patterns
 
@@ -284,3 +285,37 @@
 - **Deliberate deviation**: the AC's "cache profile/listings API with 5-min TTL" was intentionally NOT implemented — profile/listings come from Supabase and caching them would violate the user-approved "never cache auth/Supabase" safety constraint and risk re-triggering the original incident. Offline data is already served by the existing IndexedDB `offline-storage.ts`. Documented as an accepted, safety-driven scope reduction.
 - **Verification**: `npm run build` ok (dist/sw.js + dist/offline.html emitted); full suite 258/258; zero new tsc errors (stash-compare).
 - **Impact**: App shell, static assets, and images are now offline-capable with an offline fallback and safe update flow — without reintroducing the auth-caching risk the cleanup safeguard was protecting against.
+
+### US-029: Implement session management and session revocation UI ✅
+- **Status**: PASSED
+- **Discovery**: Most of the feature already existed — `user_sessions` table (migration 20251204000001_auth_security_features.sql: id, user_id, device_type/browser/os, ip_address, last_activity_at, revoked/revoked_at, etc.), `src/hooks/useSessions.ts`, `src/components/settings/SessionManagement.tsx` (view + revoke single + revoke-all-others), and edge functions `get-sessions`/`revoke-session`. SessionManagement is already rendered in the Security & Privacy section of Settings.tsx.
+- **Gap closed**: The one unmet AC was "Log session revocations to audit_logs". The `revoke-session` edge function performed the revoke but wrote nothing to the audit trail.
+- **Changes**: `supabase/functions/revoke-session/index.ts` now logs `session_revoke` (single) and `session_revoke_all` (bulk) events via the `log_audit_event` RPC using a service-role client, capturing client IP, user agent, reason, and counts. Audit calls are best-effort (`.catch(() => undefined)`) so they never block the revoke response.
+- **Verification**: Frontend tsc shows only the pre-existing TS5101 baseline (tsconfig baseUrl deprecation) — zero new errors. Full suite 258/258 pass.
+- **Impact**: All session revocations are now recorded in the audit trail, completing the security/compliance story.
+
+### US-030: Add MFA/2FA support — backend schema and TOTP verification ✅
+- **Status**: PASSED
+- **Discovery**: MFA backend already existed — `user_mfa_settings` table (migrations 20251203000001 / 20251204000001: factor type, totp_secret, backup_codes, verified_at, failed_attempts, locked_until) plus `setup-mfa`, `verify-mfa`, `disable-mfa` edge functions with correct RFC-6238 TOTP (HMAC-SHA1, ±1 window) and hashed backup codes. The existing table is `user_mfa_settings` rather than the AC's literal `mfa_factors` name; treated as equivalent per the story notes ("check and update existing implementations").
+- **Gaps closed**: (1) **TOTP secrets were stored in PLAINTEXT** — AC requires encryption at rest via the PII utilities. (2) No strict per-minute rate limit on verification. (3) MFA events were logged only to `mfa_verification_logs`, not `audit_logs`.
+- **Changes**:
+  - New `supabase/functions/_shared/encryption.ts` — Deno-side AES-256-GCM + PBKDF2-SHA256 (100k iterations), mirroring the frontend `src/lib/encryption.ts`/`pii.ts` envelope and `enc:v1:` prefix. `encryptSecret`/`decryptSecret` are migration-aware (legacy plaintext passes through on decrypt). Master key from the `PII_ENCRYPTION_KEY` Edge Function secret.
+  - `setup-mfa`: encrypts the TOTP secret before persisting (QR/manual secret still returned plaintext to the enrolling user only). `verify-mfa` and `disable-mfa`: decrypt the stored secret before TOTP verification (plaintext fallback for pre-encryption accounts).
+  - `verify-mfa`: added rate limiting via `checkRateLimitDb` + `RATE_LIMITS.auth` (5/min), keyed on `mfa-verify:<userId>` so IP rotation can't bypass it; returns 429 when exceeded and audits a `blocked` event.
+  - audit_logs integration across setup (`mfa_setup`), verify (`mfa_enable`/`mfa_verify` with success/failure), and disable (`mfa_disable`).
+  - `.env.example`: documented the new server-side `PII_ENCRYPTION_KEY` secret (distinct from the existing VITE_ client key) with `supabase secrets set` + rotation guidance.
+- **Verification**: tsc clean except baseline TS5101; suite 258/258.
+- **Impact**: MFA seeds are now encrypted at rest, verification is rate-limited, and the full MFA lifecycle is in the audit trail.
+
+### US-031: Add MFA/2FA support — frontend enrollment and verification UI ✅
+- **Status**: PASSED
+- **Discovery**: MFA UI components already existed — `MFASetup.tsx` (QR + manual secret + 6-digit verify + backup-code reveal), `MFAVerification.tsx` (TOTP/backup challenge with trust-device), `MFASettings.tsx` (enable/disable + trusted devices). `useMFA.ts` wired setup/verify/disable. `SecureRoute` already redirects MFA-required routes to `/auth/mfa`.
+- **Gaps closed**:
+  - **QR code leaked the secret**: `MFASetup` rendered the QR via an external `api.qrserver.com` image URL — sending the TOTP secret off-device. Replaced with client-side `qrcode.react` (`QRCodeSVG`, already a dependency) so the secret never leaves the browser. AC explicitly required qrcode.react.
+  - **MFA challenge not wired into login**: `SecureRoute` navigated to `/auth/mfa` but no route/page existed. Added `src/pages/auth/MFAChallenge.tsx` (renders `MFAVerification`; on success sets `mfaVerified` and returns to the saved route, on cancel signs out → /auth/login) and registered the lazy `/auth/mfa` route in `App.tsx`.
+  - **MFASettings not mounted**: it existed but wasn't rendered anywhere. Added it to the Security & Privacy section of `Settings.tsx` (above Session Management).
+  - **Backup-code regeneration missing**: added `supabase/functions/regenerate-backup-codes/index.ts` (requires a valid current TOTP/backup code, decrypts secret to verify, replaces the hashed set, returns new plaintext codes once, audits the event), a `regenerateBackupCodes` mutation in `useMFA.ts`, and a "Recovery Codes" card in `MFASettings.tsx` with a verify→reveal dialog.
+- **Deliberate deviation**: backup codes remain 10 (existing impl) rather than the AC's "8" — more codes is strictly more recoverable and changing the count would not invalidate stored sets; treated as an acceptable, security-neutral deviation.
+- **Files**: `src/components/auth/mfa/MFASetup.tsx`, `src/pages/auth/MFAChallenge.tsx` (new), `src/App.tsx`, `src/pages/dashboard/Settings.tsx`, `src/hooks/useMFA.ts`, `src/components/auth/mfa/MFASettings.tsx`, `supabase/functions/regenerate-backup-codes/index.ts` (new).
+- **Verification**: `qrcode.react` confirmed to export `QRCodeSVG`; tsc clean except baseline TS5101; suite 258/258.
+- **Impact**: Users can enroll in TOTP MFA with a privacy-safe QR code, are challenged for the second factor during login, and can manage/disable MFA and regenerate recovery codes from dashboard settings.

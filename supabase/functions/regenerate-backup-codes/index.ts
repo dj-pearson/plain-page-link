@@ -8,97 +8,91 @@ import { successResponse, errorResponse, handleUnexpectedError } from '../_share
 import { decryptSecret } from '../_shared/encryption.ts';
 
 /**
- * Disable MFA
- * Requires verification of current MFA code before disabling
+ * Regenerate MFA backup codes.
+ *
+ * Requires a valid current TOTP (or existing backup) code, then replaces
+ * the stored set with a fresh batch and returns the new plaintext codes
+ * ONCE. The old codes are invalidated immediately.
  */
 
 const TOTP_DIGITS = 6;
 const TOTP_PERIOD = 30;
 const TOTP_ALGORITHM = 'SHA-1';
 
-// HMAC-based OTP generation
 async function generateHOTP(secret: Uint8Array, counter: bigint): Promise<string> {
   const counterBuffer = new ArrayBuffer(8);
-  const counterView = new DataView(counterBuffer);
-  counterView.setBigUint64(0, counter, false);
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    secret,
-    { name: 'HMAC', hash: TOTP_ALGORITHM },
-    false,
-    ['sign']
-  );
-
+  new DataView(counterBuffer).setBigUint64(0, counter, false);
+  const key = await crypto.subtle.importKey('raw', secret, { name: 'HMAC', hash: TOTP_ALGORITHM }, false, ['sign']);
   const signature = await crypto.subtle.sign('HMAC', key, counterBuffer);
   const hmac = new Uint8Array(signature);
-
   const offset = hmac[hmac.length - 1] & 0x0f;
   const code =
     ((hmac[offset] & 0x7f) << 24) |
     ((hmac[offset + 1] & 0xff) << 16) |
     ((hmac[offset + 2] & 0xff) << 8) |
     (hmac[offset + 3] & 0xff);
-
-  const otp = (code % Math.pow(10, TOTP_DIGITS)).toString().padStart(TOTP_DIGITS, '0');
-  return otp;
-}
-
-async function generateTOTP(secret: string, timestamp?: number): Promise<string> {
-  const secretBytes = base32Decode(secret);
-  const time = timestamp || Math.floor(Date.now() / 1000);
-  const counter = BigInt(Math.floor(time / TOTP_PERIOD));
-  return generateHOTP(secretBytes, counter);
+  return (code % Math.pow(10, TOTP_DIGITS)).toString().padStart(TOTP_DIGITS, '0');
 }
 
 async function verifyTOTP(secret: string, code: string, tolerance = 1): Promise<boolean> {
-  const time = Math.floor(Date.now() / 1000);
-  const currentWindow = Math.floor(time / TOTP_PERIOD);
-
+  const secretBytes = base32Decode(secret);
+  const currentWindow = Math.floor(Math.floor(Date.now() / 1000) / TOTP_PERIOD);
   for (let i = -tolerance; i <= tolerance; i++) {
-    const windowTime = (currentWindow + i) * TOTP_PERIOD;
-    const validCode = await generateTOTP(secret, windowTime);
-    if (validCode === code) {
-      return true;
-    }
+    const counter = BigInt(currentWindow + i);
+    if ((await generateHOTP(secretBytes, counter)) === code) return true;
   }
-
   return false;
 }
 
 async function verifyBackupCode(code: string, hashedCodes: string[]): Promise<boolean> {
-  const normalizedCode = code.replace(/-/g, '').toUpperCase();
-  const encoder = new TextEncoder();
-  const data = encoder.encode(normalizedCode);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hash = base64Encode(new Uint8Array(hashBuffer));
+  const normalized = code.replace(/-/g, '').toUpperCase();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+  return hashedCodes.includes(base64Encode(new Uint8Array(hashBuffer)));
+}
 
-  return hashedCodes.includes(hash);
+function generateBackupCodes(count = 10): string[] {
+  const codes: string[] = [];
+  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  for (let i = 0; i < count; i++) {
+    const array = new Uint8Array(8);
+    crypto.getRandomValues(array);
+    let code = '';
+    for (let j = 0; j < 8; j++) code += charset[array[j] % charset.length];
+    codes.push(`${code.slice(0, 4)}-${code.slice(4)}`);
+  }
+  return codes;
+}
+
+async function hashBackupCodes(codes: string[]): Promise<string[]> {
+  const hashes: string[] = [];
+  for (const code of codes) {
+    const data = new TextEncoder().encode(code.replace('-', ''));
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    hashes.push(base64Encode(new Uint8Array(hashBuffer)));
+  }
+  return hashes;
 }
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
-
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') as string,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
+    );
 
-    // Authenticate user
     const user = await requireAuth(req, supabase);
     const clientIP = getClientIP(req);
 
-    const { code, password } = await req.json();
-
+    const { code } = await req.json();
     if (!code) {
-      return errorResponse('Verification code is required to disable MFA', 'REQUEST_VALIDATION_FAILED', req);
+      return errorResponse('Verification code is required to regenerate backup codes', 'REQUEST_VALIDATION_FAILED', req);
     }
 
-    // Get MFA settings
     const { data: mfaSettings, error: mfaError } = await supabase
       .from('user_mfa_settings')
       .select('*')
@@ -109,81 +103,74 @@ serve(async (req) => {
       return errorResponse('MFA is not enabled for this account', 'AUTH_MFA_INVALID', req);
     }
 
-    // Check if locked
     if (mfaSettings.locked_until && new Date(mfaSettings.locked_until) > new Date()) {
       return errorResponse('Account is temporarily locked due to too many failed attempts', 'AUTH_LOGIN_RATE_LIMITED', req, 429);
     }
 
     const normalizedCode = code.replace(/\s/g, '');
     let isValid = false;
-
-    // Check backup code first
     if (normalizedCode.replace(/-/g, '').length === 8) {
       isValid = await verifyBackupCode(normalizedCode, mfaSettings.backup_codes);
     } else {
-      // Decrypt the at-rest TOTP secret (passes through legacy plaintext).
       const totpSecret = (await decryptSecret(mfaSettings.totp_secret)) as string;
       isValid = await verifyTOTP(totpSecret, normalizedCode);
     }
 
-    // Log verification attempt
-    await supabase.from('mfa_verification_logs').insert({
-      user_id: user.id,
-      method: 'totp',
-      status: isValid ? 'success' : 'failed',
-      ip_address: clientIP,
-      user_agent: req.headers.get('user-agent'),
-      failure_reason: isValid ? null : 'Invalid code for MFA disable',
-    });
-
     if (!isValid) {
       await supabase.rpc('increment_mfa_failed_attempts', { p_user_id: user.id });
+      await supabase
+        .rpc('log_audit_event', {
+          p_user_id: user.id,
+          p_action: 'mfa_backup_codes_regenerate',
+          p_status: 'failure',
+          p_resource_type: 'mfa',
+          p_ip_address: clientIP,
+          p_user_agent: req.headers.get('user-agent'),
+          p_details: JSON.stringify({ reason: 'invalid_code' }),
+        })
+        .catch(() => undefined);
       return errorResponse('Invalid verification code', 'AUTH_MFA_INVALID', req);
     }
 
-    // Disable MFA
+    await supabase.rpc('reset_mfa_failed_attempts', { p_user_id: user.id });
+
+    const backupCodes = generateBackupCodes(10);
+    const hashedBackupCodes = await hashBackupCodes(backupCodes);
+
     const { error: updateError } = await supabase
       .from('user_mfa_settings')
       .update({
-        mfa_enabled: false,
-        totp_secret: null,
-        backup_codes: [],
-        verified_at: null,
-        failed_attempts: 0,
-        locked_until: null,
+        backup_codes: hashedBackupCodes,
+        backup_codes_generated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', user.id);
 
     if (updateError) {
-      return errorResponse('Failed to disable MFA', 'AUTH_MFA_INVALID', req, 500);
+      return errorResponse('Failed to regenerate backup codes', 'AUTH_MFA_INVALID', req, 500);
     }
 
-    // Revoke all trusted devices
-    await supabase
-      .from('mfa_trusted_devices')
-      .update({
-        revoked: true,
-        revoked_at: new Date().toISOString(),
-      })
-      .eq('user_id', user.id);
-
-    // Audit trail: MFA disabled.
     await supabase
       .rpc('log_audit_event', {
         p_user_id: user.id,
-        p_action: 'mfa_disable',
+        p_action: 'mfa_backup_codes_regenerate',
         p_status: 'success',
         p_resource_type: 'mfa',
         p_ip_address: clientIP,
         p_user_agent: req.headers.get('user-agent'),
-        p_details: JSON.stringify({ method: 'totp' }),
+        p_details: JSON.stringify({ count: backupCodes.length }),
       })
       .catch(() => undefined);
 
-    return successResponse({ message: 'MFA has been disabled successfully' }, req);
+    return successResponse(
+      {
+        backupCodes,
+        message: 'New backup codes generated. Your previous codes are no longer valid.',
+      },
+      req
+    );
   } catch (error) {
-    console.error('MFA Disable Error:', error instanceof Error ? error.message : error);
+    console.error('Regenerate Backup Codes Error:', error instanceof Error ? error.message : error);
     return handleUnexpectedError(error, req);
   }
 });
