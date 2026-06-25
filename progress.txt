@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 34 stories completed (passes: true), 21 stories pending
+- 35 stories completed (passes: true), 20 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029 (session mgmt), US-030/031 (MFA), US-033 (E2E auth tests)
+- Latest session: US-029 (session mgmt), US-030/031 (MFA), US-033 (E2E auth tests), US-032 (image optimization)
 
 ## Codebase Patterns
 
@@ -333,3 +333,13 @@
   - `PW_CHROMIUM_PATH` env var optionally pins a pre-installed browser executable (used here: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`); unset, Playwright uses its bundled browser (CI/local).
 - **Verification**: `npm run test:e2e` → 5/5 passing against the dev server (`PW_CHROMIUM_PATH=... npx playwright test --config=playwright-e2e.config.ts`). Unit suite still 258/258. tsc: the new spec/config compile clean.
 - **Baseline note**: `npx tsc --noEmit` surfaces ~1763 pre-existing repo errors once full deps are installed — overwhelmingly from `src/integrations/supabase/types.ts` being out of sync with the live DB (e.g. user_mfa_settings, mfa_trusted_devices, is_device_trusted not present in generated types) plus widespread noUnusedLocals. This is the inherited repo baseline (skipLibCheck masks some; see gotchas). All my changes introduce zero NEW type errors — fixed the one I did add (MFAChallenge used a non-existent `isAuthenticated`; now keys off `session`) and removed unused imports in files I touched.
+
+### US-032: Add image optimization pipeline with WebP conversion ✅
+- **Status**: PASSED
+- **Discovery**: The frontend component already existed — `src/components/ui/OptimizedImage.tsx` (PascalCase; functionally the AC's "optimized-image.tsx") with `<picture>` WebP `source` + srcSet, JPEG/PNG fallback, IntersectionObserver lazy loading, `loading`/`decoding`/`fetchPriority`, width/height + `aspect-ratio` to prevent CLS, schema.org ImageObject markup, plus helpers `generateResponsiveSources` and `generateSupabaseImageSources`. The gap was the conversion edge function and upload integration.
+- **Changes**:
+  - `supabase/functions/optimize-image/index.ts` (new) — downloads an already-uploaded original from Storage, generates WebP variants at 200/400/800 px (preserving aspect ratio), preserves the original, stores each variant as `<stem>-<width>.webp`, and returns public URLs for the original + all variants. Auth via requireAuth; authorization restricts callers to objects under their own `${user.id}/` prefix; best-effort audit (`image_optimize`).
+  - Integrated into `src/hooks/useListingImageUpload.ts`: after each original upload + getPublicUrl, fires `optimize-image` in the background (`void ... .catch`) so optimization never blocks or breaks the upload — the original remains usable and OptimizedImage falls back to it until variants land.
+- **Library choice**: Deno edge functions can't run native `sharp`, so the function uses **ImageMagick WASM** (`imagemagick_deno`, magick-wasm) which runs in the edge runtime and supports WebP encode + resize — the proven Supabase-edge pattern (the story notes called this out).
+- **Verification**: Frontend tsc clean for the touched hook (zero new errors); unit suite 258/258. The Deno edge function could not be runtime-executed here (no Deno/Supabase in the sandbox, same as prior edge-function stories) — it is written against the documented imagemagick_deno + Storage APIs.
+- **Naming note**: kept the existing `OptimizedImage.tsx` rather than adding a near-duplicate `optimized-image.tsx` (case-only difference; collides on case-insensitive filesystems).

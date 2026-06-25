@@ -536,7 +536,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 32,
-      "passes": false,
+      "passes": true,
       "notes": "Sharp is already a devDependency. Deno edge functions may need a different image library (sharp may not work in Deno). Research alternatives like ImageMagick WASM or Supabase image transformation."
     },
     {

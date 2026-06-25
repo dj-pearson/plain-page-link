@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useToast } from '@/hooks/use-toast';
+import { edgeFunctions } from '@/lib/edgeFunctions';
+import { logger } from '@/lib/logger';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGES = 25;
-const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
 export interface UploadProgress {
   current: number;
@@ -32,9 +34,9 @@ export function useListingImageUpload() {
   const uploadListingImages = async (files: File[], listingId?: string): Promise<string[]> => {
     if (!user?.id) {
       toast({
-        title: "Error",
-        description: "You must be logged in to upload images",
-        variant: "destructive",
+        title: 'Error',
+        description: 'You must be logged in to upload images',
+        variant: 'destructive',
       });
       return [];
     }
@@ -45,9 +47,9 @@ export function useListingImageUpload() {
 
     if (files.length > MAX_IMAGES) {
       toast({
-        title: "Too many images",
+        title: 'Too many images',
         description: `You can upload a maximum of ${MAX_IMAGES} images per listing`,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return [];
     }
@@ -57,9 +59,9 @@ export function useListingImageUpload() {
       const validationError = validateFile(file);
       if (validationError) {
         toast({
-          title: "Invalid file",
+          title: 'Invalid file',
           description: validationError,
-          variant: "destructive",
+          variant: 'destructive',
         });
         return [];
       }
@@ -83,7 +85,7 @@ export function useListingImageUpload() {
           .from('listings')
           .upload(fileName, file, {
             cacheControl: '3600',
-            upsert: false
+            upsert: false,
           });
 
         if (uploadError) {
@@ -92,24 +94,35 @@ export function useListingImageUpload() {
         }
 
         // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('listings')
-          .getPublicUrl(fileName);
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('listings').getPublicUrl(fileName);
 
         uploadedUrls.push(publicUrl);
+
+        // Kick off WebP optimization (200/400/800 variants) in the background.
+        // Best-effort: the original is already usable and OptimizedImage falls
+        // back to it, so a failure here must never break the upload.
+        void edgeFunctions
+          .invoke('optimize-image', { body: { bucket: 'listings', path: fileName } })
+          .catch((err) =>
+            logger.debug('Image optimization failed (non-blocking)', {
+              error: err instanceof Error ? err.message : String(err),
+            })
+          );
 
         // Update progress
         const newProgress = {
           current: i + 1,
           total: files.length,
-          percentage: Math.round(((i + 1) / files.length) * 100)
+          percentage: Math.round(((i + 1) / files.length) * 100),
         };
         setProgress(newProgress);
       }
 
       if (uploadedUrls.length > 0) {
         toast({
-          title: "Success",
+          title: 'Success',
           description: `Successfully uploaded ${uploadedUrls.length} image${uploadedUrls.length > 1 ? 's' : ''}`,
         });
       }
@@ -118,9 +131,10 @@ export function useListingImageUpload() {
     } catch (error) {
       console.error('Error uploading listing images:', error);
       toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to upload images. Please try again.",
-        variant: "destructive",
+        title: 'Upload failed',
+        description:
+          error instanceof Error ? error.message : 'Failed to upload images. Please try again.',
+        variant: 'destructive',
       });
 
       // Clean up any successfully uploaded images
@@ -142,18 +156,18 @@ export function useListingImageUpload() {
 
     try {
       // Extract file paths from public URLs
-      const filePaths = imageUrls.map(url => {
-        const match = url.match(/listings\/(.+)$/);
-        return match ? match[1] : null;
-      }).filter(Boolean) as string[];
+      const filePaths = imageUrls
+        .map((url) => {
+          const match = url.match(/listings\/(.+)$/);
+          return match ? match[1] : null;
+        })
+        .filter(Boolean) as string[];
 
       if (filePaths.length === 0) {
         return false;
       }
 
-      const { error } = await supabase.storage
-        .from('listings')
-        .remove(filePaths);
+      const { error } = await supabase.storage.from('listings').remove(filePaths);
 
       if (error) throw error;
 
