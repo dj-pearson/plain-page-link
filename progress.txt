@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 45 stories completed (passes: true), 10 stories pending
+- 47 stories completed (passes: true), 8 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029–038, US-040/041/043, US-046 (SEO), US-042 (feature flags)
+- Latest session: US-029–038, US-040/041/043, US-046, US-042, US-052 (lead SLA), US-053 (funnel)
 
 ## Codebase Patterns
 
@@ -417,3 +417,19 @@
   - `src/lib/feature-flags.test.ts` — 7 tests (kill switch, targeting, 0/100%, anonymous, determinism, monotonic rollout, bucket range).
 - **Type note**: feature_flags isn't in the out-of-sync generated types — isolated, documented casts in the data-access code (no `any`); zero new tsc errors.
 - **Verification**: 7 new tests pass (full suite 272/272); `npm run build` succeeds.
+
+### US-052: Add lead response time tracking and SLA alerts ✅
+- **Status**: PASSED
+- **Changes**:
+  - Migration `20260525000004_lead_response_time.sql` — adds `leads.first_responded_at`, a BEFORE UPDATE trigger that stamps it on the first transition out of 'new', a backfill from `contacted_at`, and an index `(user_id, first_responded_at)`.
+  - `src/types/lead.ts` — added optional `first_responded_at`.
+  - `src/pages/dashboard/Leads.tsx` — response time per card ("Responded in 2h 15m"), an "Avg Response" stat card, a red "No response · <age>" warning for overdue new leads, a configurable SLA threshold selector (1/2/4/24h, default 2h), and a "Needs Attention" filter (with count badge) showing new leads past the SLA. Helpers: responseMs, isNeedsAttention, formatDuration.
+- **Type note**: first_responded_at isn't in the out-of-sync generated types — the leads query uses an isolated typed cast to our Lead shape (no `any`). Net effect: Leads.tsx errors dropped 8→3 (3 remaining are pre-existing unused vars), zero new.
+- **Verification**: build succeeds; unit suite 272/272.
+
+### US-053: Add conversion funnel analytics widget to dashboard ✅
+- **Status**: PASSED
+- **Changes**: `src/components/dashboard/ConversionFunnel.tsx` (new) — Visitors → Leads → Contacted → Qualified → Converted funnel with per-stage counts and drop-off % from the previous stage. Visitors come from analytics_views, the rest from leads status distribution (contacted = past 'new'/'lost'; qualified = qualified/nurturing/converted/closed; converted = converted/closed). Time-period selector (7d/30d/90d/all). Responsive CSS bar funnel (no extra deps). Added to the Overview dashboard above Recent Activity.
+- **Note**: a separate pre-existing `components/analytics/ConversionFunnel.tsx` exists with its own baseline errors; the AC specifically asked for the dashboard path, which is new and clean.
+- **Type note**: analytics_views isn't in generated types — isolated PromiseLike chain cast (no `any`).
+- **Verification**: tsc clean for new file (Overview's 3 errors are pre-existing baseline, confirmed via stash compare); build succeeds; suite 272/272.

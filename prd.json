@@ -876,7 +876,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 52,
-      "passes": false,
+      "passes": true,
       "notes": "Response time is the #1 predictor of lead conversion in real estate. Agents who respond in <5 minutes are 21x more likely to convert. This directly impacts the platform's core value proposition."
     },
     {
@@ -894,7 +894,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 53,
-      "passes": false,
+      "passes": true,
       "notes": "Recharts is already installed. Dashboard page exists at src/pages/dashboard/. The funnel should be prominently placed to drive agent engagement with the platform."
     },
     {
