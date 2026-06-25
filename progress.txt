@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 40 stories completed (passes: true), 15 stories pending
+- 43 stories completed (passes: true), 12 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029 (session), US-030/031 (MFA), US-032 (images), US-033 (E2E), US-034/035 (email/leads), US-036/037/038 (Stripe billing)
+- Latest session: US-029–038 (security/MFA/email/Stripe), US-040 (runbook), US-041 (indexes), US-043 (admin audit viewer)
 
 ## Codebase Patterns
 
@@ -380,3 +380,20 @@
   - Sidebar nav link "Subscription" (CreditCard icon) in `DashboardLayout.tsx`.
 - **Type note**: the `invoices` table isn't in the out-of-sync generated types — the query uses a single isolated, documented cast (returns [] on error), zero new tsc errors in my files.
 - **Verification**: tsc clean for SubscriptionPage/App/DashboardLayout; `npm run build` succeeds (new lazy chunk bundles); unit suite 258/258.
+
+### US-040: Create deployment runbook and environment configuration docs ✅
+- **Status**: PASSED
+- **Changes**: Created authoritative `DEPLOYMENT.md` consolidating the scattered `*_DEPLOYMENT.md` notes. Covers prerequisites, full env var reference (frontend VITE_* + edge-function secrets, with where-to-obtain + required/optional), deploy steps (Cloudflare Pages build, Supabase `db push` migrations, `functions deploy` + `secrets set`, Stripe webhook wiring), post-deploy verification checklist, rollback (Pages instant rollback / compensating migrations / function redeploy), staging vs production differences, DB backup & restore (`supabase db dump`/PITR), and an incident-response runbook with contacts. Cross-links MONITORING.md / SECURITY.md / .env.example.
+- **Files**: `DEPLOYMENT.md` (new).
+
+### US-041: Add database performance indexes and query optimization ✅
+- **Status**: PASSED
+- **Discovery**: Single-column indexes on listings/leads (user_id, status, created_at) already existed, but no composites for the common "owner + status, newest-first" patterns.
+- **Changes**: Migration `20260525000002_performance_indexes.sql` adds composite indexes — listings(user_id,status,created_at DESC), leads(user_id,status,created_at DESC), links(user_id,is_active,position), analytics_views(user_id,viewed_at DESC) — plus partial indexes for the hottest filtered views (listings WHERE status='active', leads WHERE status='new'). All `IF NOT EXISTS` (additive, safe re-run, nothing broken). Each index carries an EXPLAIN ANALYZE comment documenting the expected plan for the query it serves. (analytics time column is `viewed_at`, not created_at.)
+- **Files**: `supabase/migrations/20260525000002_performance_indexes.sql` (new).
+
+### US-043: Create admin audit log viewer ✅
+- **Status**: PASSED
+- **Changes**: `src/pages/admin/AuditLogPage.tsx` (new) — admin-only (role guard → redirect), full audit trail across all users (relies on the audit_logs admin read-all RLS from US-013). Filters: action, resource type, user id, date range. Columns: timestamp, user (click to filter by that user), action, resource, status, IP. Expandable rows reveal the raw jsonb (details, actor_id, risk_level, user_agent). Pagination 50/page (keepPreviousData). Route `/admin/audit-log` (lazy, ProtectedRoute + error boundary) in App.tsx; "Audit Log" link added to the AdminDashboard header.
+- **Type note**: audit_logs isn't in the out-of-sync generated types — used a minimal typed query-builder interface (no `any`) isolated to the query; zero new tsc errors in my files.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 258/258.

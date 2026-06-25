@@ -674,7 +674,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 40,
-      "passes": false,
+      "passes": true,
       "notes": "Various deployment docs already exist (PRODUCTION_FIX_DEPLOYMENT.md, etc.) \u2014 consolidate into one authoritative runbook."
     },
     {
@@ -690,7 +690,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 41,
-      "passes": false,
+      "passes": true,
       "notes": "Some indexes may already exist from prior migrations. Check before adding duplicates. Focus on queries used in dashboard, public profiles, and listing pages."
     },
     {
@@ -725,7 +725,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 43,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on US-013 (audit logging schema). Admin pages exist at src/pages/admin/."
     },
     {
