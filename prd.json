@@ -554,7 +554,7 @@
         "All tests pass against the dev server"
       ],
       "priority": 33,
-      "passes": false,
+      "passes": true,
       "notes": "playwright.config.ts is currently configured for security tests only (tests/security). Create a separate config for E2E tests."
     },
     {

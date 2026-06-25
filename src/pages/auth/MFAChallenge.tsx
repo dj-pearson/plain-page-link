@@ -14,7 +14,7 @@ const LAST_ROUTE_KEY = 'lastVisitedRoute';
  */
 export const MFAChallenge = () => {
   const navigate = useNavigate();
-  const { setMFAVerified, signOut, isAuthenticated } = useAuthStore();
+  const { setMFAVerified, signOut, session } = useAuthStore();
 
   const handleSuccess = () => {
     setMFAVerified(true);
@@ -24,7 +24,7 @@ export const MFAChallenge = () => {
 
   const handleCancel = async () => {
     // Abandoning the second factor aborts the login entirely.
-    if (isAuthenticated) {
+    if (session) {
       await signOut();
     }
     navigate('/auth/login', { replace: true });

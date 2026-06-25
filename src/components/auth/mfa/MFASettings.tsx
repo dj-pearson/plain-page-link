@@ -11,16 +11,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { MFASetup } from './MFASetup';
-import {
-  Shield,
-  ShieldOff,
-  Smartphone,
-  Trash2,
-  Loader2,
-  AlertCircle,
-  Check,
-  X,
-} from 'lucide-react';
+import { Shield, ShieldOff, Smartphone, Trash2, Loader2, AlertCircle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const MFASettings = () => {

@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 33 stories completed (passes: true), 22 stories pending
+- 34 stories completed (passes: true), 21 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029 (session management), US-030 (MFA backend), US-031 (MFA frontend)
+- Latest session: US-029 (session mgmt), US-030/031 (MFA), US-033 (E2E auth tests)
 
 ## Codebase Patterns
 
@@ -319,3 +319,17 @@
 - **Files**: `src/components/auth/mfa/MFASetup.tsx`, `src/pages/auth/MFAChallenge.tsx` (new), `src/App.tsx`, `src/pages/dashboard/Settings.tsx`, `src/hooks/useMFA.ts`, `src/components/auth/mfa/MFASettings.tsx`, `supabase/functions/regenerate-backup-codes/index.ts` (new).
 - **Verification**: `qrcode.react` confirmed to export `QRCodeSVG`; tsc clean except baseline TS5101; suite 258/258.
 - **Impact**: Users can enroll in TOTP MFA with a privacy-safe QR code, are challenged for the second factor during login, and can manage/disable MFA and regenerate recovery codes from dashboard settings.
+
+### US-033: Create comprehensive E2E test for authentication flow ✅
+- **Status**: PASSED
+- **Discovery**: `playwright.config.ts` was dedicated to security tests (tests/security). No E2E config, no tests/e2e, no `test:e2e` script existed.
+- **Changes**:
+  - `playwright-e2e.config.ts` (new) — separate E2E config (testDir tests/e2e, own report/output dirs, single chromium project, boots the Vite dev server).
+  - `tests/e2e/auth.spec.ts` (new) — 5 specs: protected-route redirect (unauth → /auth/login), login form render + client-side validation, login → /dashboard, registration → leaves /auth/register (onboarding), and logout → /auth/login.
+  - `package.json`: added `test:e2e` and `test:e2e:ui` scripts.
+- **Hermetic backend**: Supabase GoTrue/PostgREST/edge-function calls are intercepted with `page.route` so the suite passes without a live backend or seeded credentials. Key details: profile lookup returns an object (for `.single()`), MFA settings return `{}` (no MFA), signup returns a session-shaped body so the app auto-confirms and routes to onboarding instead of the OTP screen. Cookie consent is pre-seeded via `addInitScript` so the global consent banner doesn't intercept clicks.
+- **Sandbox accommodations (env-gated, portable)**:
+  - Vite's `server.host` defaults to `'::'` (IPv6), which fails where IPv6 is absent — the E2E `webServer` command overrides with `npm run dev -- --host 127.0.0.1` and baseURL `http://127.0.0.1:8080`. No change to the shared vite.config.ts.
+  - `PW_CHROMIUM_PATH` env var optionally pins a pre-installed browser executable (used here: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`); unset, Playwright uses its bundled browser (CI/local).
+- **Verification**: `npm run test:e2e` → 5/5 passing against the dev server (`PW_CHROMIUM_PATH=... npx playwright test --config=playwright-e2e.config.ts`). Unit suite still 258/258. tsc: the new spec/config compile clean.
+- **Baseline note**: `npx tsc --noEmit` surfaces ~1763 pre-existing repo errors once full deps are installed — overwhelmingly from `src/integrations/supabase/types.ts` being out of sync with the live DB (e.g. user_mfa_settings, mfa_trusted_devices, is_device_trusted not present in generated types) plus widespread noUnusedLocals. This is the inherited repo baseline (skipLibCheck masks some; see gotchas). All my changes introduce zero NEW type errors — fixed the one I did add (MFAChallenge used a non-existent `isAuthenticated`; now keys off `session`) and removed unused imports in files I touched.
