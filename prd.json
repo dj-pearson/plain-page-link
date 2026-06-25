@@ -843,7 +843,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 50,
-      "passes": false,
+      "passes": true,
       "notes": "Admin pages exist at src/pages/admin/. Recharts is already installed. Build on existing admin infrastructure."
     },
     {

@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 49 stories completed (passes: true), 6 stories pending
+- 50 stories completed (passes: true), 5 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029–038, US-040/041/043, US-046, US-042, US-052/053, US-047, US-039 (a11y CI)
+- Latest session: US-029–038, US-040–043, US-046/047, US-052/053, US-039 (a11y), US-050 (health dashboard)
 
 ## Codebase Patterns
 
@@ -453,3 +453,15 @@
   - `test:a11y` script + a warn-only (`continue-on-error: true`) `accessibility` CI job that installs Chromium and runs the suite.
 - **Documented baseline (critical/serious)**: landing 3 (button-name [critical], color-contrast, link-in-text-block), login/register/dashboard/public-profile 1 each (color-contrast). Recorded in the spec header to ratchet down over time.
 - **Verification**: `npm run test:a11y` → 5/5 pass at baseline (run with PW_CHROMIUM_PATH in the sandbox); tests execute without crashing; ci.yml valid YAML; unit suite 272/272.
+
+### US-050: Create platform health dashboard for admin monitoring ✅
+- **Status**: PASSED
+- **Changes**: `src/pages/admin/HealthDashboard.tsx` (new, admin-only via role guard) composing recent infra:
+  - Platform metrics (count queries): total users, active (7d, by profiles.updated_at proxy), new signups (7d), total listings, total leads.
+  - System health: DB connectivity + latency via the US-047 `health-check` edge function; edge-function status derived from it (green/red indicators).
+  - Revenue: MRR (active subscriptions × plan price from PRICING_PLANS), active subscriptions by plan, churn rate (canceled / lifecycle).
+  - Trends: recharts LineCharts for signups + leads over the last 14 days (client-side day bucketing).
+  - Auto-refresh every 60s (refetchInterval).
+  - Route `/admin/health` (lazy, ProtectedRoute + error boundary); "Health" link added to the AdminDashboard header.
+- **Type note**: several tables not in the out-of-sync generated types — isolated generic count/fetch helpers with localized casts (no `any`); zero new tsc errors.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272.

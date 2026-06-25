@@ -104,6 +104,7 @@ const AdminDashboard = lazy(() =>
 );
 const SEODashboard = lazy(() => import('./pages/SEODashboard'));
 const AuditLogPage = lazy(() => import('./pages/admin/AuditLogPage'));
+const HealthDashboard = lazy(() => import('./pages/admin/HealthDashboard'));
 
 function App() {
   const { initialize, user } = useAuthStore();
@@ -343,6 +344,20 @@ function App() {
                     backLabel="Back to Admin"
                   >
                     <AuditLogPage />
+                  </RouteErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/health"
+              element={
+                <ProtectedRoute>
+                  <RouteErrorBoundary
+                    section="Platform Health"
+                    backPath="/admin"
+                    backLabel="Back to Admin"
+                  >
+                    <HealthDashboard />
                   </RouteErrorBoundary>
                 </ProtectedRoute>
               }

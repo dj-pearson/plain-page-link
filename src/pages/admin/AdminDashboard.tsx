@@ -13,6 +13,7 @@ import {
   BarChart3,
   Globe,
   ScrollText,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AIConfigurationManager } from '@/components/admin/AIConfigurationManager';
@@ -47,6 +48,12 @@ export function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Link to="/admin/health">
+                <Button variant="outline" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Health
+                </Button>
+              </Link>
               <Link to="/admin/audit-log">
                 <Button variant="outline" className="gap-2">
                   <ScrollText className="h-4 w-4" />
