@@ -60,3 +60,6 @@ SUPABASE_KEYS_QUICK_ANSWER.md
 # Playwright E2E artifacts
 playwright-report-e2e/
 test-results/
+
+# a11y report
+playwright-report-a11y/

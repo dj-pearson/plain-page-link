@@ -657,7 +657,7 @@
         "All tests execute without crashing"
       ],
       "priority": 39,
-      "passes": false,
+      "passes": true,
       "notes": "Radix UI components should be mostly compliant. Focus on custom components and page-level composition."
     },
     {

@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 48 stories completed (passes: true), 7 stories pending
+- 49 stories completed (passes: true), 6 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029–038, US-040/041/043, US-046, US-042, US-052/053, US-047 (query monitoring)
+- Latest session: US-029–038, US-040/041/043, US-046, US-042, US-052/053, US-047, US-039 (a11y CI)
 
 ## Codebase Patterns
 
@@ -443,3 +443,13 @@
   - `supabase/functions/health-check/index.ts` — public connectivity probe returning DB latency + 200/503.
   - `src/components/admin/SlowQueriesWidget.tsx` — top-10 slowest queries (24h) table, added to the AdminDashboard Platform tab.
 - **Verification**: frontend tsc clean for new files; build succeeds; suite 272/272. Edge functions not runtime-executed (no Deno/Supabase in sandbox).
+
+### US-039: Implement accessibility testing with axe-core in CI ✅
+- **Status**: PASSED
+- **Changes**:
+  - Installed `@axe-core/playwright` (devDep).
+  - `playwright-a11y.config.ts` (new) — dedicated config (testDir tests/a11y), boots the dev server (IPv4), supports PW_CHROMIUM_PATH like the E2E config.
+  - `tests/a11y/accessibility.spec.ts` (new) — axe.analyze() (wcag2a/2aa) on 5 key pages: landing, login, register, dashboard, public profile. Supabase + cookie consent are mocked (hermetic). Implemented as a **regression guard**: fails when critical/serious violations EXCEED the documented per-page baseline (rather than blocking on the existing baseline), satisfying "warn but not fail initially" while still catching new regressions.
+  - `test:a11y` script + a warn-only (`continue-on-error: true`) `accessibility` CI job that installs Chromium and runs the suite.
+- **Documented baseline (critical/serious)**: landing 3 (button-name [critical], color-contrast, link-in-text-block), login/register/dashboard/public-profile 1 each (color-contrast). Recorded in the spec header to ratchet down over time.
+- **Verification**: `npm run test:a11y` → 5/5 pass at baseline (run with PW_CHROMIUM_PATH in the sandbox); tests execute without crashing; ci.yml valid YAML; unit suite 272/272.

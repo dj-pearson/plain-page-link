@@ -20,6 +20,7 @@
     "test:security:report": "playwright show-report",
     "test:e2e": "playwright test --config=playwright-e2e.config.ts",
     "test:e2e:ui": "playwright test --config=playwright-e2e.config.ts --ui",
+    "test:a11y": "playwright test --config=playwright-a11y.config.ts",
     "lint": "eslint src/",
     "lint:warn": "eslint src/ --max-warnings -1",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
@@ -92,6 +93,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^9.0.0",
     "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.9.1",
