@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 47 stories completed (passes: true), 8 stories pending
+- 48 stories completed (passes: true), 7 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029–038, US-040/041/043, US-046, US-042, US-052 (lead SLA), US-053 (funnel)
+- Latest session: US-029–038, US-040/041/043, US-046, US-042, US-052/053, US-047 (query monitoring)
 
 ## Codebase Patterns
 
@@ -433,3 +433,13 @@
 - **Note**: a separate pre-existing `components/analytics/ConversionFunnel.tsx` exists with its own baseline errors; the AC specifically asked for the dashboard path, which is new and clean.
 - **Type note**: analytics_views isn't in generated types — isolated PromiseLike chain cast (no `any`).
 - **Verification**: tsc clean for new file (Overview's 3 errors are pre-existing baseline, confirmed via stash compare); build succeeds; suite 272/272.
+
+### US-047: Implement database connection pooling and query performance monitoring ✅
+- **Status**: PASSED
+- **Note**: Supabase manages pooling (PgBouncer/Supavisor) — focus is query monitoring per the story notes.
+- **Changes**:
+  - Migration `20260525000005_query_metrics.sql` — `query_metrics` table (query_hash, duration_ms, endpoint, created_at) + indexes + admin-read/service-write RLS, `cleanup_query_metrics()` (30-day purge), and `top_slow_queries(limit)` RPC (24h aggregation: max/avg/calls).
+  - `supabase/functions/_shared/db-monitor.ts` — `monitorQuery(supabase, hash, endpoint, fn)` times any async DB call and fire-and-forget logs anything >500ms to query_metrics (never throws/blocks).
+  - `supabase/functions/health-check/index.ts` — public connectivity probe returning DB latency + 200/503.
+  - `src/components/admin/SlowQueriesWidget.tsx` — top-10 slowest queries (24h) table, added to the AdminDashboard Platform tab.
+- **Verification**: frontend tsc clean for new files; build succeeds; suite 272/272. Edge functions not runtime-executed (no Deno/Supabase in sandbox).

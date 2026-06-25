@@ -24,6 +24,7 @@ import { SearchAnalyticsDashboard } from '@/components/admin/SearchAnalyticsDash
 import { SampleDataManager } from '@/components/admin/SampleDataManager';
 import { PSEOManager } from '@/components/admin/PSEOManager';
 import { FeatureFlagsManager } from '@/components/admin/FeatureFlagsManager';
+import { SlowQueriesWidget } from '@/components/admin/SlowQueriesWidget';
 
 export function AdminDashboard() {
   const { user, role } = useAuthStore();
@@ -161,6 +162,7 @@ export function AdminDashboard() {
 
           <TabsContent value="settings" className="space-y-6">
             <FeatureFlagsManager />
+            <SlowQueriesWidget />
           </TabsContent>
         </Tabs>
       </div>
