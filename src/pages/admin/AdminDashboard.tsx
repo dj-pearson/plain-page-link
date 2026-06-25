@@ -23,6 +23,7 @@ import { SEOManager } from '@/components/admin/SEOManager';
 import { SearchAnalyticsDashboard } from '@/components/admin/SearchAnalyticsDashboard';
 import { SampleDataManager } from '@/components/admin/SampleDataManager';
 import { PSEOManager } from '@/components/admin/PSEOManager';
+import { FeatureFlagsManager } from '@/components/admin/FeatureFlagsManager';
 
 export function AdminDashboard() {
   const { user, role } = useAuthStore();
@@ -159,12 +160,7 @@ export function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <div className="rounded-lg border p-6">
-              <h2 className="text-2xl font-bold mb-4">Platform Settings</h2>
-              <p className="text-muted-foreground">
-                Additional platform configuration coming soon...
-              </p>
-            </div>
+            <FeatureFlagsManager />
           </TabsContent>
         </Tabs>
       </div>

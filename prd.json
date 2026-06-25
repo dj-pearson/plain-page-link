@@ -707,7 +707,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 42,
-      "passes": false,
+      "passes": true,
       "notes": "Feature flags are essential for enterprise deployments \u2014 they allow gradual rollouts and instant kill switches."
     },
     {
