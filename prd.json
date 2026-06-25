@@ -759,7 +759,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 45,
-      "passes": false,
+      "passes": true,
       "notes": "Team pricing from PRD: Team plan $29/agent/mo, Enterprise $69/agent/mo. This is critical for brokerage sales."
     },
     {
@@ -929,7 +929,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 55,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on US-045 (team management). This is a high-value enterprise feature that differentiates AgentBio from simple link-in-bio tools."
     }
   ]

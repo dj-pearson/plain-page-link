@@ -201,6 +201,12 @@ export default function DashboardLayout() {
               active={isActive('/dashboard/subscription')}
             />
             <NavLink
+              to="/dashboard/team"
+              icon={<Users className="h-5 w-5" />}
+              label="Team"
+              active={isActive('/dashboard/team')}
+            />
+            <NavLink
               to="/dashboard/api-keys"
               icon={<KeyRound className="h-5 w-5" />}
               label="API Keys"
