@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 43 stories completed (passes: true), 12 stories pending
+- 44 stories completed (passes: true), 11 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029–038 (security/MFA/email/Stripe), US-040 (runbook), US-041 (indexes), US-043 (admin audit viewer)
+- Latest session: US-029–038, US-040/041/043, US-046 (SEO structured data)
 
 ## Codebase Patterns
 
@@ -397,3 +397,12 @@
 - **Changes**: `src/pages/admin/AuditLogPage.tsx` (new) — admin-only (role guard → redirect), full audit trail across all users (relies on the audit_logs admin read-all RLS from US-013). Filters: action, resource type, user id, date range. Columns: timestamp, user (click to filter by that user), action, resource, status, IP. Expandable rows reveal the raw jsonb (details, actor_id, risk_level, user_agent). Pagination 50/page (keepPreviousData). Route `/admin/audit-log` (lazy, ProtectedRoute + error boundary) in App.tsx; "Audit Log" link added to the AdminDashboard header.
 - **Type note**: audit_logs isn't in the out-of-sync generated types — used a minimal typed query-builder interface (no `any`) isolated to the query; zero new tsc errors in my files.
 - **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 258/258.
+
+### US-046: Add comprehensive SEO meta tags and structured data ✅
+- **Status**: PASSED
+- **Discovery**: Meta tags via react-helmet-async already shipped (`SEOHead`, used on public pages incl. Landing + FullProfilePage), and a lot of schema generation existed (`src/lib/seo.ts`, `src/components/seo/SchemaMarkup.tsx`). Public profiles already emit unique seo_title/seo_description + an inline RealEstateAgent schema; the landing page emits Organization. Missing: a consolidated `structured-data.ts` lib, and RealEstateListing + Article helpers (neither existed anywhere).
+- **Changes**:
+  - `src/lib/structured-data.ts` (new) — pure JSON-LD builders: `organizationSchema`, `realEstateAgentSchema` (Person/RealEstateAgent for profiles), `realEstateListingSchema` (price/address/beds/baths/sqft + Offer availability, SoldOut for sold), `articleSchema` (Article w/ publisher), `breadcrumbSchema`. A `compact()` helper omits empty fields so output validates.
+  - `src/lib/structured-data.test.ts` (new, 7 tests) — asserts required @context/@type fields, URL building, empty-field omission, listing price/address/details, sold availability, and breadcrumb positions.
+  - Wired `realEstateListingSchema` into `ListingDetailModal` as a JSON-LD `<script>` so each viewed listing emits price/address/property-detail structured data.
+- **Verification**: 7 new tests pass (full suite 265/265); `npm run build` succeeds; tsc adds zero new errors (ListingDetailModal's 3 errors are pre-existing baseline, confirmed via stash compare).

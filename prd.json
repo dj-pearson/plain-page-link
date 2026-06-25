@@ -776,7 +776,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 46,
-      "passes": false,
+      "passes": true,
       "notes": "react-helmet-async is already installed. SEO utilities exist at src/lib/seo.ts and src/lib/image-seo.ts. Build on existing code."
     },
     {
