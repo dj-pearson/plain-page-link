@@ -20,6 +20,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { sendEmail } from '../_shared/email.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   apiVersion: '2023-10-16',
@@ -179,6 +180,20 @@ serve(async (req) => {
     console.log(`Processing event: ${event.type} (${event.id})`);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Audit every webhook event (best-effort; never blocks processing).
+    // user_id is extracted from metadata when present, otherwise null (system).
+    const auditUserId =
+      ((event.data.object as { metadata?: { user_id?: string } })?.metadata?.user_id) ?? null;
+    await supabase
+      .rpc('log_audit_event', {
+        p_user_id: auditUserId,
+        p_action: `stripe_${event.type}`,
+        p_status: 'success',
+        p_resource_type: 'subscription',
+        p_details: JSON.stringify({ event_id: event.id, event_type: event.type }),
+      })
+      .catch(() => undefined);
 
     switch (event.type) {
       // ========================================
@@ -399,6 +414,33 @@ serve(async (req) => {
               // Notifications table might not exist
               console.log('Could not create payment failed notification');
             }
+
+            // Send a dunning email (best-effort; sendEmail never throws).
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', sub.user_id)
+              .single();
+
+            if (profile?.email) {
+              const portalUrl = `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/subscription`;
+              await sendEmail({
+                to: profile.email,
+                subject: 'Action needed: your AgentBio payment failed',
+                body: `Hi ${profile.full_name || 'there'},
+
+We were unable to process your most recent AgentBio subscription payment${
+                  invoice.amount_due ? ` of $${(invoice.amount_due / 100).toFixed(2)}` : ''
+                }.
+
+Please update your payment method to avoid any interruption to your service:
+${portalUrl}
+
+If you've already updated your details, you can ignore this message.
+
+— The AgentBio Team`,
+              });
+            }
           }
 
           console.log(`Payment failed for subscription: ${subscriptionId}`);
@@ -407,8 +449,9 @@ serve(async (req) => {
       }
 
       // ========================================
-      // INVOICE PAID (Payment success)
+      // INVOICE PAID / PAYMENT SUCCEEDED (Payment success)
       // ========================================
+      case 'invoice.payment_succeeded':
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
         const subscriptionId = invoice.subscription as string;

@@ -604,7 +604,7 @@
         "Typecheck passes on edge function code"
       ],
       "priority": 36,
-      "passes": false,
+      "passes": true,
       "notes": "Stripe edge functions may already exist (create-checkout-session, stripe-webhook found in functions directory). Check and update."
     },
     {
@@ -621,7 +621,7 @@
         "Typecheck passes on edge function code"
       ],
       "priority": 37,
-      "passes": false,
+      "passes": true,
       "notes": "A stripe-webhook function directory already exists. Review and enhance the existing implementation."
     },
     {
@@ -639,7 +639,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 38,
-      "passes": false,
+      "passes": true,
       "notes": "Pricing tiers from PRD.md: Free ($0), Professional ($39/mo), Team ($29/agent/mo), Enterprise ($69/agent/mo)."
     },
     {

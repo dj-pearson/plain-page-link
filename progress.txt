@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 37 stories completed (passes: true), 18 stories pending
+- 40 stories completed (passes: true), 15 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029 (session), US-030/031 (MFA), US-032 (images), US-033 (E2E), US-034/035 (email + lead notifications)
+- Latest session: US-029 (session), US-030/031 (MFA), US-032 (images), US-033 (E2E), US-034/035 (email/leads), US-036/037/038 (Stripe billing)
 
 ## Codebase Patterns
 
@@ -359,3 +359,24 @@
   - `src/components/settings/LeadNotificationPreferences.tsx` (new) — Instant / Daily digest / Off selector persisted to `profiles.notification_preferences.leads`; mounted in the Settings Security & Privacy section.
 - **Type note**: `notification_preferences` isn't in the out-of-sync generated `types.ts`, so the read/write use a single isolated cast each (documented inline) — consistent with the repo's existing pattern; zero new tsc errors in my files.
 - **Verification**: tsc clean for new/touched frontend files (Settings.tsx shows only pre-existing baseline unused-import errors, line-shifted by the added import); unit suite 258/258. Edge function + trigger not runtime-executed (no Deno/Supabase in sandbox).
+
+### US-036: Implement Stripe subscription billing integration ✅
+- **Status**: PASSED
+- **Discovery**: Most existed — `create-checkout-session` (subscription mode + price-ID validation), `create-portal-session`, `create-stripe-customer`, a `subscriptions`/`user_subscriptions` schema (migrations 20251031000004 + 20251209000001 consolidate), and STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET documented in `.env.example`.
+- **Gap closed**: `@stripe/stripe-js` was not installed — added it (^5.x) to dependencies (`npm install`). The checkout flow itself redirects to the Stripe-hosted Checkout URL returned by the edge function (no Stripe.js call required), so the lib is available for future Elements/Stripe.js use.
+- **Note**: pricing tiers come from the existing `src/config/pricing-plans.ts` (Free/Starter/Professional/Team/Enterprise) — used as the source of truth rather than the AC's illustrative numbers.
+
+### US-037: Implement Stripe webhook handler for subscription lifecycle ✅
+- **Status**: PASSED
+- **Discovery**: `stripe-webhook` already verified signatures (`constructEvent` + STRIPE_WEBHOOK_SECRET), was idempotent, and handled checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed, invoice.paid, payment_intent.succeeded (create/update subscription, downgrade on delete, dunning notification record).
+- **Gaps closed**: (1) Added `invoice.payment_succeeded` (aliased to the existing invoice.paid block). (2) Added **audit_logs** logging for *every* webhook event (`stripe_<event.type>` via log_audit_event, best-effort, user_id from metadata when present). (3) invoice.payment_failed now also **sends a dunning email** to the agent (via `_shared/email.ts` sendEmail) with a link to the subscription page — in addition to the existing in-app notification.
+- **Files**: `supabase/functions/stripe-webhook/index.ts`.
+
+### US-038: Create subscription management UI in dashboard ✅
+- **Status**: PASSED
+- **Changes**:
+  - `src/pages/dashboard/SubscriptionPage.tsx` (new) — current plan / status / renewal date (from useSubscription), a Free→Enterprise feature comparison table (from PRICING_PLANS), per-plan **Upgrade** buttons (call create-checkout-session and redirect to Stripe Checkout), a **Manage Billing** button (create-portal-session → Stripe Customer Portal), and a Recent Invoices list (tolerates a missing `invoices` table).
+  - Route `/dashboard/subscription` (lazy, inside the protected DashboardLayout) in `App.tsx`.
+  - Sidebar nav link "Subscription" (CreditCard icon) in `DashboardLayout.tsx`.
+- **Type note**: the `invoices` table isn't in the out-of-sync generated types — the query uses a single isolated, documented cast (returns [] on error), zero new tsc errors in my files.
+- **Verification**: tsc clean for SubscriptionPage/App/DashboardLayout; `npm run build` succeeds (new lazy chunk bundles); unit suite 258/258.
