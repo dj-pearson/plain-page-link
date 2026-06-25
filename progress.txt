@@ -7,9 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 52 stories completed (passes: true), 3 stories pending
+- 53 stories completed (passes: true), 2 stories pending
 - Completed critical platform improvements in Ralph loop
-- Latest session: US-029–053 batch + US-044 (API keys). Remaining: US-045, US-049, US-055
+- Latest session: US-029–053 batch + US-044/US-049. Remaining: US-045 (teams), US-055 (lead routing)
 
 ## Codebase Patterns
 
@@ -485,3 +485,15 @@
   - `supabase/functions/api-keys/index.ts` — create/list/revoke. Keys are `ab_<base64url(32 bytes)>`; only the hash + 8-char prefix stored; full key returned once on create; max 10 active per user; audits create/revoke.
   - `src/pages/dashboard/ApiKeysPage.tsx` — create (one-time reveal + copy), list (prefix/last-used), revoke (confirm dialog). Route `/dashboard/api-keys` + sidebar "API Keys" link.
 - **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272. Edge functions not runtime-executed (no Deno/Supabase).
+
+### US-049: Implement real-time notifications system ✅
+- **Status**: PASSED
+- **Changes** (built from scratch):
+  - Migration `20260525000008_notifications.sql` — `notifications` table (type/title/message/data/read_at), unread + recent indexes, RLS (user read/update own, service insert), added to the `supabase_realtime` publication (idempotent), and an AFTER INSERT trigger on `leads` creating a `new_lead` notification.
+  - `src/hooks/useNotifications.ts` — loads recent notifications, subscribes to Supabase Realtime INSERTs (per-user channel, invalidates on new), exposes unreadCount + markAsRead/markAllAsRead.
+  - `src/components/ui/notification-bell.tsx` — header bell with unread badge (Popover trigger).
+  - `src/components/ui/notification-dropdown.tsx` — list with relative times, per-item mark-read, mark-all-read, empty state.
+  - Wired the bell into the DashboardLayout top bar.
+- **Note**: subscription-event notifications are already created by the stripe-webhook (payment_failed → notifications insert); the lead trigger covers new_lead. Types: new_lead/lead_scored/subscription_event/system_alert.
+- **Type note**: notifications isn't in the out-of-sync generated types — isolated typed cast in the hook (no `any`); zero new tsc errors.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272.

@@ -826,7 +826,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 49,
-      "passes": false,
+      "passes": true,
       "notes": "Supabase Realtime is already available via the client. Firebase Cloud Messaging (FCM) is installed for push notifications \u2014 this is for in-app notifications."
     },
     {
