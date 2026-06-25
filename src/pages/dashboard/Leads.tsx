@@ -1,56 +1,103 @@
-import { useState, useMemo } from "react";
-import { Download, Search, Filter, Mail, Phone, MessageSquare, Calendar, User, Zap, CheckSquare, Square, Trash2, CheckCircle2, AlertCircle, RefreshCw, Flame, TrendingUp, ArrowUpDown } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
-import { UpgradeModal } from "@/components/UpgradeModal";
-import { ZapierIntegrationModal } from "@/components/integrations/ZapierIntegrationModal";
-import { LeadDetailModal } from "@/components/leads/LeadDetailModal";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { SkeletonLeads } from "@/components/ui/skeleton";
+import { useState, useMemo } from 'react';
+import {
+  Download,
+  Search,
+  Filter,
+  Mail,
+  Phone,
+  MessageSquare,
+  Calendar,
+  User,
+  Zap,
+  CheckSquare,
+  Square,
+  Trash2,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Flame,
+  TrendingUp,
+  ArrowUpDown,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
+import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { SkeletonLeads } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import type { Lead } from "@/types/lead";
-import { useMLLeadScoring } from "@/hooks/useMLLeadScoring";
-import type { LeadScore } from "@/hooks/useMLLeadScoring";
-import { logger } from "@/lib/logger";
+} from '@/components/ui/select';
+import type { Lead } from '@/types/lead';
+import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
+import type { LeadScore } from '@/hooks/useMLLeadScoring';
+import { logger } from '@/lib/logger';
 
 export default function Leads() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showLeadDetail, setShowLeadDetail] = useState(false);
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [isBulkActing, setIsBulkActing] = useState(false);
-  const [sortBy, setSortBy] = useState<"date" | "score">("date");
+  const [sortBy, setSortBy] = useState<'date' | 'score'>('date');
   const { user } = useAuthStore();
   const { toast } = useToast();
   const { subscription, hasFeature } = useSubscriptionLimits();
   const { scoreLeadObject } = useMLLeadScoring();
 
-  const { data: leads, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["leads", user?.id],
-    queryFn: async () => {
+  const [slaHours, setSlaHours] = useState(2);
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
+
+  const {
+    data: leads,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['leads', user?.id],
+    queryFn: async (): Promise<Lead[]> => {
       if (!user?.id) return [];
 
-      const { data, error } = await supabase
-        .from("leads")
-        .select("id, user_id, lead_type, name, email, phone, message, status, source, form_data, created_at, updated_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      // first_responded_at isn't in the (out-of-sync) generated types yet —
+      // isolated cast keeps the query typed to our Lead shape.
+      const leadsTable = supabase.from('leads') as unknown as {
+        select: (c: string) => {
+          eq: (
+            c: string,
+            v: string
+          ) => {
+            order: (
+              c: string,
+              o: { ascending: boolean }
+            ) => Promise<{ data: Lead[] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+
+      const { data, error } = await leadsTable
+        .select(
+          'id, user_id, lead_type, name, email, phone, message, status, source, form_data, created_at, updated_at, first_responded_at'
+        )
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
     enabled: !!user?.id,
   });
@@ -69,23 +116,68 @@ export default function Leads() {
     return scores;
   }, [leads, scoreLeadObject]);
 
+  const slaMs = slaHours * 60 * 60 * 1000;
+
+  // Response time = first_responded_at - created_at (ms), or null if not yet responded.
+  const responseMs = (lead: Lead): number | null =>
+    lead.first_responded_at
+      ? new Date(lead.first_responded_at).getTime() - new Date(lead.created_at).getTime()
+      : null;
+
+  // A 'new' lead with no response past the SLA threshold needs attention.
+  const isNeedsAttention = (lead: Lead): boolean =>
+    lead.status === 'new' && Date.now() - new Date(lead.created_at).getTime() > slaMs;
+
+  const formatDuration = (ms: number): string => {
+    if (ms < 0) ms = 0;
+    const mins = Math.floor(ms / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ${mins % 60}m`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
+  };
+
   // Memoize lead stats to avoid N+1 filtering on every render
   const leadStats = useMemo(() => {
-    if (!leads) return { total: 0, new: 0, contacted: 0, converted: 0, hot: 0 };
+    if (!leads)
+      return {
+        total: 0,
+        new: 0,
+        contacted: 0,
+        converted: 0,
+        hot: 0,
+        avgResponse: null as number | null,
+        needsAttention: 0,
+      };
 
-    return leads.reduce(
-      (acc, lead) => {
-        acc.total++;
-        if (lead.status === "new") acc.new++;
-        else if (lead.status === "contacted") acc.contacted++;
-        else if (lead.status === "converted") acc.converted++;
+    let respondedCount = 0;
+    let respondedTotalMs = 0;
+    const acc = leads.reduce(
+      (a, lead) => {
+        a.total++;
+        if (lead.status === 'new') a.new++;
+        else if (lead.status === 'contacted') a.contacted++;
+        else if (lead.status === 'converted') a.converted++;
         const score = leadScores.get(lead.id);
-        if (score?.priority === "hot") acc.hot++;
-        return acc;
+        if (score?.priority === 'hot') a.hot++;
+        if (isNeedsAttention(lead)) a.needsAttention++;
+        const rm = responseMs(lead);
+        if (rm !== null) {
+          respondedCount++;
+          respondedTotalMs += rm;
+        }
+        return a;
       },
-      { total: 0, new: 0, contacted: 0, converted: 0, hot: 0 }
+      { total: 0, new: 0, contacted: 0, converted: 0, hot: 0, needsAttention: 0 }
     );
-  }, [leads, leadScores]);
+
+    return {
+      ...acc,
+      avgResponse: respondedCount > 0 ? respondedTotalMs / respondedCount : null,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, leadScores, slaMs]);
 
   const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead);
@@ -95,7 +187,7 @@ export default function Leads() {
   // Bulk selection handlers
   const toggleLeadSelection = (leadId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent opening the detail modal
-    setSelectedLeadIds(prev => {
+    setSelectedLeadIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(leadId)) {
         newSet.delete(leadId);
@@ -110,7 +202,7 @@ export default function Leads() {
     if (selectedLeadIds.size === filteredLeads?.length) {
       setSelectedLeadIds(new Set());
     } else {
-      setSelectedLeadIds(new Set(filteredLeads?.map(l => l.id) || []));
+      setSelectedLeadIds(new Set(filteredLeads?.map((l) => l.id) || []));
     }
   };
 
@@ -120,26 +212,26 @@ export default function Leads() {
     setIsBulkActing(true);
     try {
       const { error } = await supabase
-        .from("leads")
+        .from('leads')
         .update({ status: newStatus })
-        .in("id", Array.from(selectedLeadIds))
+        .in('id', Array.from(selectedLeadIds))
         .select('id');
 
       if (error) throw error;
 
       toast({
-        title: "Status updated",
+        title: 'Status updated',
         description: `Updated ${selectedLeadIds.size} lead(s) to ${newStatus}`,
       });
 
       setSelectedLeadIds(new Set());
       refetch();
     } catch (error) {
-      logger.error("Bulk status update failed", error as Error);
+      logger.error('Bulk status update failed', error as Error);
       toast({
-        title: "Error",
-        description: "Failed to update lead status",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update lead status',
+        variant: 'destructive',
       });
     } finally {
       setIsBulkActing(false);
@@ -149,32 +241,33 @@ export default function Leads() {
   const handleBulkDelete = async () => {
     if (selectedLeadIds.size === 0) return;
 
-    if (!confirm(`Are you sure you want to delete ${selectedLeadIds.size} lead(s)? This action cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedLeadIds.size} lead(s)? This action cannot be undone.`
+      )
+    ) {
       return;
     }
 
     setIsBulkActing(true);
     try {
-      const { error } = await supabase
-        .from("leads")
-        .delete()
-        .in("id", Array.from(selectedLeadIds));
+      const { error } = await supabase.from('leads').delete().in('id', Array.from(selectedLeadIds));
 
       if (error) throw error;
 
       toast({
-        title: "Leads deleted",
+        title: 'Leads deleted',
         description: `Deleted ${selectedLeadIds.size} lead(s)`,
       });
 
       setSelectedLeadIds(new Set());
       refetch();
     } catch (error) {
-      logger.error("Bulk delete failed", error as Error);
+      logger.error('Bulk delete failed', error as Error);
       toast({
-        title: "Error",
-        description: "Failed to delete leads",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to delete leads',
+        variant: 'destructive',
       });
     } finally {
       setIsBulkActing(false);
@@ -190,65 +283,68 @@ export default function Leads() {
 
     if (!leads || leads.length === 0) {
       toast({
-        title: "No leads to export",
+        title: 'No leads to export',
         description: "You don't have any leads yet.",
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
 
     // Create CSV
-    const headers = ["Name", "Email", "Phone", "Type", "Message", "Status", "Created At"];
+    const headers = ['Name', 'Email', 'Phone', 'Type', 'Message', 'Status', 'Created At'];
     const csvContent = [
-      headers.join(","),
+      headers.join(','),
       ...leads.map((lead) =>
         [
           lead.name,
           lead.email,
-          lead.phone || "",
+          lead.phone || '',
           lead.lead_type,
-          `"${(lead.message || "").replace(/"/g, '""')}"`,
+          `"${(lead.message || '').replace(/"/g, '""')}"`,
           lead.status,
           new Date(lead.created_at).toLocaleDateString(),
-        ].join(",")
+        ].join(',')
       ),
-    ].join("\n");
+    ].join('\n');
 
     // Download
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = `leads-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
     toast({
-      title: "Leads exported",
+      title: 'Leads exported',
       description: `Successfully exported ${leads.length} leads to CSV`,
     });
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      new: { variant: "default", label: "New" },
-      contacted: { variant: "secondary", label: "Contacted" },
-      qualified: { variant: "outline", label: "Qualified" },
-      converted: { variant: "default", label: "Converted" },
+    const statusMap: Record<
+      string,
+      { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }
+    > = {
+      new: { variant: 'default', label: 'New' },
+      contacted: { variant: 'secondary', label: 'Contacted' },
+      qualified: { variant: 'outline', label: 'Qualified' },
+      converted: { variant: 'default', label: 'Converted' },
     };
-    const config = statusMap[status] || { variant: "outline", label: status };
+    const config = statusMap[status] || { variant: 'outline', label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const getLeadTypeIcon = (type: string) => {
     switch (type) {
-      case "buyer":
+      case 'buyer':
         return <User className="h-4 w-4" />;
-      case "seller":
+      case 'seller':
         return <Phone className="h-4 w-4" />;
-      case "valuation":
+      case 'valuation':
         return <Mail className="h-4 w-4" />;
       default:
         return <MessageSquare className="h-4 w-4" />;
@@ -260,13 +356,27 @@ export default function Leads() {
     if (!score) return null;
 
     const config = {
-      hot: { className: "bg-red-100 text-red-700 border-red-200", label: "Hot", icon: <Flame className="h-3 w-3" /> },
-      warm: { className: "bg-amber-100 text-amber-700 border-amber-200", label: "Warm", icon: <TrendingUp className="h-3 w-3" /> },
-      cold: { className: "bg-slate-100 text-slate-600 border-slate-200", label: "Cold", icon: null },
+      hot: {
+        className: 'bg-red-100 text-red-700 border-red-200',
+        label: 'Hot',
+        icon: <Flame className="h-3 w-3" />,
+      },
+      warm: {
+        className: 'bg-amber-100 text-amber-700 border-amber-200',
+        label: 'Warm',
+        icon: <TrendingUp className="h-3 w-3" />,
+      },
+      cold: {
+        className: 'bg-slate-100 text-slate-600 border-slate-200',
+        label: 'Cold',
+        icon: null,
+      },
     }[score.priority];
 
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.className}`}>
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.className}`}
+      >
         {config.icon}
         {config.label}
         <span className="text-[10px] opacity-70">{score.score}</span>
@@ -275,14 +385,16 @@ export default function Leads() {
   };
 
   const filteredLeads = useMemo(() => {
-    let result = leads?.filter((lead) =>
-      searchQuery
+    let result = leads?.filter((lead) => {
+      const matchesSearch = searchQuery
         ? lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           lead.email.toLowerCase().includes(searchQuery.toLowerCase())
-        : true
-    );
+        : true;
+      const matchesAttention = needsAttentionOnly ? isNeedsAttention(lead) : true;
+      return matchesSearch && matchesAttention;
+    });
 
-    if (sortBy === "score" && result) {
+    if (sortBy === 'score' && result) {
       result = [...result].sort((a, b) => {
         const scoreA = leadScores.get(a.id)?.score ?? 0;
         const scoreB = leadScores.get(b.id)?.score ?? 0;
@@ -291,7 +403,8 @@ export default function Leads() {
     }
 
     return result;
-  }, [leads, searchQuery, sortBy, leadScores]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, searchQuery, sortBy, leadScores, needsAttentionOnly, slaMs]);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -321,14 +434,16 @@ export default function Leads() {
             <Download className="h-4 w-4 mr-2" />
             <span className="text-sm sm:text-base">Export CSV</span>
             {subscription?.plan_name === 'free' && (
-              <Badge variant="secondary" className="ml-2">Pro</Badge>
+              <Badge variant="secondary" className="ml-2">
+                Pro
+              </Badge>
             )}
           </Button>
         </div>
       </div>
 
       {/* Stats - Mobile optimized grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 sm:gap-4">
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
             <div className="text-xl sm:text-2xl font-bold text-foreground">{leadStats.total}</div>
@@ -346,26 +461,31 @@ export default function Leads() {
         </Card>
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-            <div className="text-xl sm:text-2xl font-bold text-green-600">
-              {leadStats.new}
-            </div>
+            <div className="text-xl sm:text-2xl font-bold text-green-600">{leadStats.new}</div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">New</div>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-            <div className="text-xl sm:text-2xl font-bold text-blue-600">
-              {leadStats.contacted}
-            </div>
+            <div className="text-xl sm:text-2xl font-bold text-blue-600">{leadStats.contacted}</div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Contacted</div>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-            <div className="text-xl sm:text-2xl font-bold text-primary">
-              {leadStats.converted}
-            </div>
+            <div className="text-xl sm:text-2xl font-bold text-primary">{leadStats.converted}</div>
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Converted</div>
+          </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className="text-xl sm:text-2xl font-bold text-foreground">
+                {leadStats.avgResponse !== null ? formatDuration(leadStats.avgResponse) : '—'}
+              </div>
+            </div>
+            <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Avg Response</div>
           </CardContent>
         </Card>
       </div>
@@ -384,14 +504,39 @@ export default function Leads() {
             />
           </div>
           <Button
-            variant={sortBy === "score" ? "default" : "outline"}
-            onClick={() => setSortBy(sortBy === "date" ? "score" : "date")}
+            variant={sortBy === 'score' ? 'default' : 'outline'}
+            onClick={() => setSortBy(sortBy === 'date' ? 'score' : 'date')}
             className="min-h-[44px] gap-2 flex-shrink-0"
-            title={sortBy === "score" ? "Sorted by AI score" : "Sort by AI score"}
+            title={sortBy === 'score' ? 'Sorted by AI score' : 'Sort by AI score'}
           >
             <ArrowUpDown className="h-4 w-4" />
-            <span className="hidden sm:inline">{sortBy === "score" ? "AI Score" : "Recent"}</span>
+            <span className="hidden sm:inline">{sortBy === 'score' ? 'AI Score' : 'Recent'}</span>
           </Button>
+          <Button
+            variant={needsAttentionOnly ? 'default' : 'outline'}
+            onClick={() => setNeedsAttentionOnly((v) => !v)}
+            className="min-h-[44px] gap-2 flex-shrink-0"
+            title={`Show leads with no response after ${slaHours}h`}
+          >
+            <AlertTriangle className="h-4 w-4" />
+            <span className="hidden sm:inline">Needs Attention</span>
+            {leadStats.needsAttention > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {leadStats.needsAttention}
+              </Badge>
+            )}
+          </Button>
+          <Select value={String(slaHours)} onValueChange={(v) => setSlaHours(Number(v))}>
+            <SelectTrigger className="w-[110px] min-h-[44px] flex-shrink-0" title="SLA threshold">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">SLA: 1h</SelectItem>
+              <SelectItem value="2">SLA: 2h</SelectItem>
+              <SelectItem value="4">SLA: 4h</SelectItem>
+              <SelectItem value="24">SLA: 24h</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Bulk Actions Toolbar */}
@@ -472,7 +617,9 @@ export default function Leads() {
                 Failed to load leads
               </h3>
               <p className="text-sm sm:text-base text-muted-foreground mb-4 max-w-sm mx-auto">
-                {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+                {error instanceof Error
+                  ? error.message
+                  : 'An unexpected error occurred. Please try again.'}
               </p>
               <Button onClick={() => refetch()} variant="outline" className="gap-2">
                 <RefreshCw className="h-4 w-4" />
@@ -532,7 +679,9 @@ export default function Leads() {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <h3 className="font-semibold text-sm sm:text-base text-foreground truncate">{lead.name}</h3>
+                        <h3 className="font-semibold text-sm sm:text-base text-foreground truncate">
+                          {lead.name}
+                        </h3>
                         {getScoreBadge(lead.id)}
                         {getStatusBadge(lead.status)}
                         <Badge variant="outline" className="capitalize text-xs">
@@ -543,31 +692,62 @@ export default function Leads() {
                       <div className="space-y-1.5 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-2 min-h-[32px]">
                           <Mail className="h-3 w-3 flex-shrink-0" />
-                          <a href={`mailto:${lead.email}`} className="hover:text-primary active:text-primary-dark break-all">
+                          <a
+                            href={`mailto:${lead.email}`}
+                            className="hover:text-primary active:text-primary-dark break-all"
+                          >
                             {lead.email}
                           </a>
                         </div>
                         {lead.phone && (
                           <div className="flex items-center gap-2 min-h-[32px]">
                             <Phone className="h-3 w-3 flex-shrink-0" />
-                            <a href={`tel:${lead.phone}`} className="hover:text-primary active:text-primary-dark">
+                            <a
+                              href={`tel:${lead.phone}`}
+                              className="hover:text-primary active:text-primary-dark"
+                            >
                               {lead.phone}
                             </a>
                           </div>
                         )}
                         {lead.message && (
-                          <p className="mt-2 text-foreground line-clamp-2 text-xs sm:text-sm leading-relaxed">{lead.message}</p>
+                          <p className="mt-2 text-foreground line-clamp-2 text-xs sm:text-sm leading-relaxed">
+                            {lead.message}
+                          </p>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Date - Mobile: below content, Desktop: right side */}
-                  <div className="text-left sm:text-right flex-shrink-0 pl-12 sm:pl-0">
+                  {/* Date + response time - Mobile: below content, Desktop: right side */}
+                  <div className="text-left sm:text-right flex-shrink-0 pl-12 sm:pl-0 space-y-1">
                     <div className="flex sm:justify-end items-center gap-1 text-xs text-muted-foreground">
                       <Calendar className="h-3 w-3" />
                       <span>{new Date(lead.created_at).toLocaleDateString()}</span>
                     </div>
+                    {(() => {
+                      const rm = responseMs(lead);
+                      if (rm !== null) {
+                        return (
+                          <div className="flex sm:justify-end items-center gap-1 text-xs text-green-600">
+                            <Clock className="h-3 w-3" />
+                            <span>Responded in {formatDuration(rm)}</span>
+                          </div>
+                        );
+                      }
+                      if (isNeedsAttention(lead)) {
+                        return (
+                          <div className="flex sm:justify-end items-center gap-1 text-xs font-medium text-red-600">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span>
+                              No response ·{' '}
+                              {formatDuration(Date.now() - new Date(lead.created_at).getTime())}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
               </CardContent>
@@ -595,15 +775,12 @@ export default function Leads() {
         open={showUpgradeModal}
         onOpenChange={setShowUpgradeModal}
         feature="lead_export"
-        currentPlan={subscription?.plan_name || "Free"}
+        currentPlan={subscription?.plan_name || 'Free'}
         requiredPlan="Starter"
       />
 
       {/* Zapier Integration Modal */}
-      <ZapierIntegrationModal
-        open={showZapierModal}
-        onOpenChange={setShowZapierModal}
-      />
+      <ZapierIntegrationModal open={showZapierModal} onOpenChange={setShowZapierModal} />
 
       {/* Lead Detail Modal */}
       {selectedLead && (

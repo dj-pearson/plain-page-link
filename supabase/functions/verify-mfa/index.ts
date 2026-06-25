@@ -5,6 +5,8 @@ import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { decode as base32Decode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { decryptSecret } from '../_shared/encryption.ts';
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 
 /**
  * Verify MFA Code
@@ -102,6 +104,34 @@ serve(async (req) => {
     const user = await requireAuth(req, supabase);
     const clientIP = getClientIP(req);
 
+    // Rate limit MFA verification attempts: max 5 per minute (per user).
+    // Keyed on the user id so an attacker cannot bypass it by rotating IPs.
+    const rateLimit = await checkRateLimitDb(
+      supabase,
+      `mfa-verify:${user.id}`,
+      'verify-mfa',
+      RATE_LIMITS.auth
+    );
+    if (!rateLimit.allowed) {
+      await supabase
+        .rpc('log_audit_event', {
+          p_user_id: user.id,
+          p_action: 'mfa_verify',
+          p_status: 'blocked',
+          p_resource_type: 'mfa',
+          p_ip_address: clientIP,
+          p_user_agent: req.headers.get('user-agent'),
+          p_details: JSON.stringify({ reason: 'rate_limited' }),
+        })
+        .catch(() => undefined);
+      return errorResponse(
+        'Too many verification attempts. Please try again shortly.',
+        'AUTH_LOGIN_RATE_LIMITED',
+        req,
+        429
+      );
+    }
+
     const body = await req.json();
     const { code, isSetupVerification, trustDevice, deviceFingerprint } = body;
 
@@ -138,8 +168,11 @@ serve(async (req) => {
       method = 'backup_code';
       backupCodeIndex = result.index;
     } else {
+      // Decrypt the stored TOTP secret (passes through legacy plaintext
+      // for accounts enrolled before at-rest encryption was applied).
+      const totpSecret = (await decryptSecret(mfaSettings.totp_secret)) as string;
       // Verify TOTP code
-      isValid = await verifyTOTP(mfaSettings.totp_secret, normalizedCode);
+      isValid = await verifyTOTP(totpSecret, normalizedCode);
     }
 
     // Log verification attempt
@@ -152,6 +185,19 @@ serve(async (req) => {
       device_fingerprint: deviceFingerprint,
       failure_reason: isValid ? null : 'Invalid code',
     });
+
+    // Audit trail: MFA verification (setup confirmation or login challenge).
+    await supabase
+      .rpc('log_audit_event', {
+        p_user_id: user.id,
+        p_action: isSetupVerification ? 'mfa_enable' : 'mfa_verify',
+        p_status: isValid ? 'success' : 'failure',
+        p_resource_type: 'mfa',
+        p_ip_address: clientIP,
+        p_user_agent: req.headers.get('user-agent'),
+        p_details: JSON.stringify({ method }),
+      })
+      .catch(() => undefined);
 
     if (!isValid) {
       // Increment failed attempts

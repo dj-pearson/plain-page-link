@@ -7,8 +7,9 @@
 - **PRD**: prd.json (50 user stories across CI/CD, testing, security, compliance, monitoring, performance)
 
 ## Current Status
-- 30 stories completed (passes: true), 25 stories pending
+- 55 stories completed (passes: true), 0 pending — ALL PRD STORIES COMPLETE 🎉
 - Completed critical platform improvements in Ralph loop
+- Final two: US-045 (teams/multi-seat) + US-055 (lead routing)
 
 ## Codebase Patterns
 
@@ -284,3 +285,237 @@
 - **Deliberate deviation**: the AC's "cache profile/listings API with 5-min TTL" was intentionally NOT implemented — profile/listings come from Supabase and caching them would violate the user-approved "never cache auth/Supabase" safety constraint and risk re-triggering the original incident. Offline data is already served by the existing IndexedDB `offline-storage.ts`. Documented as an accepted, safety-driven scope reduction.
 - **Verification**: `npm run build` ok (dist/sw.js + dist/offline.html emitted); full suite 258/258; zero new tsc errors (stash-compare).
 - **Impact**: App shell, static assets, and images are now offline-capable with an offline fallback and safe update flow — without reintroducing the auth-caching risk the cleanup safeguard was protecting against.
+
+### US-029: Implement session management and session revocation UI ✅
+- **Status**: PASSED
+- **Discovery**: Most of the feature already existed — `user_sessions` table (migration 20251204000001_auth_security_features.sql: id, user_id, device_type/browser/os, ip_address, last_activity_at, revoked/revoked_at, etc.), `src/hooks/useSessions.ts`, `src/components/settings/SessionManagement.tsx` (view + revoke single + revoke-all-others), and edge functions `get-sessions`/`revoke-session`. SessionManagement is already rendered in the Security & Privacy section of Settings.tsx.
+- **Gap closed**: The one unmet AC was "Log session revocations to audit_logs". The `revoke-session` edge function performed the revoke but wrote nothing to the audit trail.
+- **Changes**: `supabase/functions/revoke-session/index.ts` now logs `session_revoke` (single) and `session_revoke_all` (bulk) events via the `log_audit_event` RPC using a service-role client, capturing client IP, user agent, reason, and counts. Audit calls are best-effort (`.catch(() => undefined)`) so they never block the revoke response.
+- **Verification**: Frontend tsc shows only the pre-existing TS5101 baseline (tsconfig baseUrl deprecation) — zero new errors. Full suite 258/258 pass.
+- **Impact**: All session revocations are now recorded in the audit trail, completing the security/compliance story.
+
+### US-030: Add MFA/2FA support — backend schema and TOTP verification ✅
+- **Status**: PASSED
+- **Discovery**: MFA backend already existed — `user_mfa_settings` table (migrations 20251203000001 / 20251204000001: factor type, totp_secret, backup_codes, verified_at, failed_attempts, locked_until) plus `setup-mfa`, `verify-mfa`, `disable-mfa` edge functions with correct RFC-6238 TOTP (HMAC-SHA1, ±1 window) and hashed backup codes. The existing table is `user_mfa_settings` rather than the AC's literal `mfa_factors` name; treated as equivalent per the story notes ("check and update existing implementations").
+- **Gaps closed**: (1) **TOTP secrets were stored in PLAINTEXT** — AC requires encryption at rest via the PII utilities. (2) No strict per-minute rate limit on verification. (3) MFA events were logged only to `mfa_verification_logs`, not `audit_logs`.
+- **Changes**:
+  - New `supabase/functions/_shared/encryption.ts` — Deno-side AES-256-GCM + PBKDF2-SHA256 (100k iterations), mirroring the frontend `src/lib/encryption.ts`/`pii.ts` envelope and `enc:v1:` prefix. `encryptSecret`/`decryptSecret` are migration-aware (legacy plaintext passes through on decrypt). Master key from the `PII_ENCRYPTION_KEY` Edge Function secret.
+  - `setup-mfa`: encrypts the TOTP secret before persisting (QR/manual secret still returned plaintext to the enrolling user only). `verify-mfa` and `disable-mfa`: decrypt the stored secret before TOTP verification (plaintext fallback for pre-encryption accounts).
+  - `verify-mfa`: added rate limiting via `checkRateLimitDb` + `RATE_LIMITS.auth` (5/min), keyed on `mfa-verify:<userId>` so IP rotation can't bypass it; returns 429 when exceeded and audits a `blocked` event.
+  - audit_logs integration across setup (`mfa_setup`), verify (`mfa_enable`/`mfa_verify` with success/failure), and disable (`mfa_disable`).
+  - `.env.example`: documented the new server-side `PII_ENCRYPTION_KEY` secret (distinct from the existing VITE_ client key) with `supabase secrets set` + rotation guidance.
+- **Verification**: tsc clean except baseline TS5101; suite 258/258.
+- **Impact**: MFA seeds are now encrypted at rest, verification is rate-limited, and the full MFA lifecycle is in the audit trail.
+
+### US-031: Add MFA/2FA support — frontend enrollment and verification UI ✅
+- **Status**: PASSED
+- **Discovery**: MFA UI components already existed — `MFASetup.tsx` (QR + manual secret + 6-digit verify + backup-code reveal), `MFAVerification.tsx` (TOTP/backup challenge with trust-device), `MFASettings.tsx` (enable/disable + trusted devices). `useMFA.ts` wired setup/verify/disable. `SecureRoute` already redirects MFA-required routes to `/auth/mfa`.
+- **Gaps closed**:
+  - **QR code leaked the secret**: `MFASetup` rendered the QR via an external `api.qrserver.com` image URL — sending the TOTP secret off-device. Replaced with client-side `qrcode.react` (`QRCodeSVG`, already a dependency) so the secret never leaves the browser. AC explicitly required qrcode.react.
+  - **MFA challenge not wired into login**: `SecureRoute` navigated to `/auth/mfa` but no route/page existed. Added `src/pages/auth/MFAChallenge.tsx` (renders `MFAVerification`; on success sets `mfaVerified` and returns to the saved route, on cancel signs out → /auth/login) and registered the lazy `/auth/mfa` route in `App.tsx`.
+  - **MFASettings not mounted**: it existed but wasn't rendered anywhere. Added it to the Security & Privacy section of `Settings.tsx` (above Session Management).
+  - **Backup-code regeneration missing**: added `supabase/functions/regenerate-backup-codes/index.ts` (requires a valid current TOTP/backup code, decrypts secret to verify, replaces the hashed set, returns new plaintext codes once, audits the event), a `regenerateBackupCodes` mutation in `useMFA.ts`, and a "Recovery Codes" card in `MFASettings.tsx` with a verify→reveal dialog.
+- **Deliberate deviation**: backup codes remain 10 (existing impl) rather than the AC's "8" — more codes is strictly more recoverable and changing the count would not invalidate stored sets; treated as an acceptable, security-neutral deviation.
+- **Files**: `src/components/auth/mfa/MFASetup.tsx`, `src/pages/auth/MFAChallenge.tsx` (new), `src/App.tsx`, `src/pages/dashboard/Settings.tsx`, `src/hooks/useMFA.ts`, `src/components/auth/mfa/MFASettings.tsx`, `supabase/functions/regenerate-backup-codes/index.ts` (new).
+- **Verification**: `qrcode.react` confirmed to export `QRCodeSVG`; tsc clean except baseline TS5101; suite 258/258.
+- **Impact**: Users can enroll in TOTP MFA with a privacy-safe QR code, are challenged for the second factor during login, and can manage/disable MFA and regenerate recovery codes from dashboard settings.
+
+### US-033: Create comprehensive E2E test for authentication flow ✅
+- **Status**: PASSED
+- **Discovery**: `playwright.config.ts` was dedicated to security tests (tests/security). No E2E config, no tests/e2e, no `test:e2e` script existed.
+- **Changes**:
+  - `playwright-e2e.config.ts` (new) — separate E2E config (testDir tests/e2e, own report/output dirs, single chromium project, boots the Vite dev server).
+  - `tests/e2e/auth.spec.ts` (new) — 5 specs: protected-route redirect (unauth → /auth/login), login form render + client-side validation, login → /dashboard, registration → leaves /auth/register (onboarding), and logout → /auth/login.
+  - `package.json`: added `test:e2e` and `test:e2e:ui` scripts.
+- **Hermetic backend**: Supabase GoTrue/PostgREST/edge-function calls are intercepted with `page.route` so the suite passes without a live backend or seeded credentials. Key details: profile lookup returns an object (for `.single()`), MFA settings return `{}` (no MFA), signup returns a session-shaped body so the app auto-confirms and routes to onboarding instead of the OTP screen. Cookie consent is pre-seeded via `addInitScript` so the global consent banner doesn't intercept clicks.
+- **Sandbox accommodations (env-gated, portable)**:
+  - Vite's `server.host` defaults to `'::'` (IPv6), which fails where IPv6 is absent — the E2E `webServer` command overrides with `npm run dev -- --host 127.0.0.1` and baseURL `http://127.0.0.1:8080`. No change to the shared vite.config.ts.
+  - `PW_CHROMIUM_PATH` env var optionally pins a pre-installed browser executable (used here: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`); unset, Playwright uses its bundled browser (CI/local).
+- **Verification**: `npm run test:e2e` → 5/5 passing against the dev server (`PW_CHROMIUM_PATH=... npx playwright test --config=playwright-e2e.config.ts`). Unit suite still 258/258. tsc: the new spec/config compile clean.
+- **Baseline note**: `npx tsc --noEmit` surfaces ~1763 pre-existing repo errors once full deps are installed — overwhelmingly from `src/integrations/supabase/types.ts` being out of sync with the live DB (e.g. user_mfa_settings, mfa_trusted_devices, is_device_trusted not present in generated types) plus widespread noUnusedLocals. This is the inherited repo baseline (skipLibCheck masks some; see gotchas). All my changes introduce zero NEW type errors — fixed the one I did add (MFAChallenge used a non-existent `isAuthenticated`; now keys off `session`) and removed unused imports in files I touched.
+
+### US-032: Add image optimization pipeline with WebP conversion ✅
+- **Status**: PASSED
+- **Discovery**: The frontend component already existed — `src/components/ui/OptimizedImage.tsx` (PascalCase; functionally the AC's "optimized-image.tsx") with `<picture>` WebP `source` + srcSet, JPEG/PNG fallback, IntersectionObserver lazy loading, `loading`/`decoding`/`fetchPriority`, width/height + `aspect-ratio` to prevent CLS, schema.org ImageObject markup, plus helpers `generateResponsiveSources` and `generateSupabaseImageSources`. The gap was the conversion edge function and upload integration.
+- **Changes**:
+  - `supabase/functions/optimize-image/index.ts` (new) — downloads an already-uploaded original from Storage, generates WebP variants at 200/400/800 px (preserving aspect ratio), preserves the original, stores each variant as `<stem>-<width>.webp`, and returns public URLs for the original + all variants. Auth via requireAuth; authorization restricts callers to objects under their own `${user.id}/` prefix; best-effort audit (`image_optimize`).
+  - Integrated into `src/hooks/useListingImageUpload.ts`: after each original upload + getPublicUrl, fires `optimize-image` in the background (`void ... .catch`) so optimization never blocks or breaks the upload — the original remains usable and OptimizedImage falls back to it until variants land.
+- **Library choice**: Deno edge functions can't run native `sharp`, so the function uses **ImageMagick WASM** (`imagemagick_deno`, magick-wasm) which runs in the edge runtime and supports WebP encode + resize — the proven Supabase-edge pattern (the story notes called this out).
+- **Verification**: Frontend tsc clean for the touched hook (zero new errors); unit suite 258/258. The Deno edge function could not be runtime-executed here (no Deno/Supabase in the sandbox, same as prior edge-function stories) — it is written against the documented imagemagick_deno + Storage APIs.
+- **Naming note**: kept the existing `OptimizedImage.tsx` rather than adding a near-duplicate `optimized-image.tsx` (case-only difference; collides on case-insensitive filesystems).
+
+### US-034: Implement email service integration for transactional emails ✅
+- **Status**: PASSED
+- **Discovery**: `supabase/functions/_shared/email.ts` already wrapped the Resend API (`sendEmail`) with graceful failure (logs + swallows, never throws), and `send-welcome-email` already used it with a polished branded HTML template. `createAgentNotificationEmail`/`createAutoResponseEmail` templates existed.
+- **Gaps closed**: (1) Added `createLeadNotificationEmail()` to email.ts — a branded, responsive HTML template with subject `New Lead: {name} is interested in {listing}`, lead detail table, optional lead-score badge, message block, and a dashboard CTA (reused by US-035). (2) Documented `RESEND_API_KEY` (+ `FROM_EMAIL`, `AGENT_EMAIL`, `SITE_URL`) in `.env.example` as Edge Function secrets with `supabase secrets set` guidance.
+- **Note**: kept the options-object `sendEmail({to,subject,body,html})` signature (richer than the AC's positional sketch); it already supports html + text and fails gracefully.
+- **Files**: `supabase/functions/_shared/email.ts`, `.env.example`.
+
+### US-035: Create lead notification email system ✅
+- **Status**: PASSED
+- **Changes**:
+  - `supabase/functions/notify-lead/index.ts` (new) — emails the agent on a new lead. Accepts the trigger's `{ record }` payload (or `{ lead_id }` for manual calls), resolves the agent profile + `notification_preferences.leads`, and sends via `createLeadNotificationEmail` only when the pref is `instant` (skips `daily_digest`/`off`). Includes name, email, phone, message, source page, lead score (if present), and a dashboard link; audits `lead_notification_sent`.
+  - Migration `20260525000001_lead_notifications.sql` — adds `profiles.notification_preferences jsonb` (default `{"leads":"instant"}`) and an AFTER INSERT trigger on `leads` that calls notify-lead via **pg_net** (`net.http_post`). The trigger reads the functions URL + service-role key from database settings (`app.settings.*`) so no secrets are hard-coded, no-ops safely when unconfigured, and never blocks lead capture (exception-guarded). Operator setup documented in the migration header.
+  - `src/components/settings/LeadNotificationPreferences.tsx` (new) — Instant / Daily digest / Off selector persisted to `profiles.notification_preferences.leads`; mounted in the Settings Security & Privacy section.
+- **Type note**: `notification_preferences` isn't in the out-of-sync generated `types.ts`, so the read/write use a single isolated cast each (documented inline) — consistent with the repo's existing pattern; zero new tsc errors in my files.
+- **Verification**: tsc clean for new/touched frontend files (Settings.tsx shows only pre-existing baseline unused-import errors, line-shifted by the added import); unit suite 258/258. Edge function + trigger not runtime-executed (no Deno/Supabase in sandbox).
+
+### US-036: Implement Stripe subscription billing integration ✅
+- **Status**: PASSED
+- **Discovery**: Most existed — `create-checkout-session` (subscription mode + price-ID validation), `create-portal-session`, `create-stripe-customer`, a `subscriptions`/`user_subscriptions` schema (migrations 20251031000004 + 20251209000001 consolidate), and STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET documented in `.env.example`.
+- **Gap closed**: `@stripe/stripe-js` was not installed — added it (^5.x) to dependencies (`npm install`). The checkout flow itself redirects to the Stripe-hosted Checkout URL returned by the edge function (no Stripe.js call required), so the lib is available for future Elements/Stripe.js use.
+- **Note**: pricing tiers come from the existing `src/config/pricing-plans.ts` (Free/Starter/Professional/Team/Enterprise) — used as the source of truth rather than the AC's illustrative numbers.
+
+### US-037: Implement Stripe webhook handler for subscription lifecycle ✅
+- **Status**: PASSED
+- **Discovery**: `stripe-webhook` already verified signatures (`constructEvent` + STRIPE_WEBHOOK_SECRET), was idempotent, and handled checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed, invoice.paid, payment_intent.succeeded (create/update subscription, downgrade on delete, dunning notification record).
+- **Gaps closed**: (1) Added `invoice.payment_succeeded` (aliased to the existing invoice.paid block). (2) Added **audit_logs** logging for *every* webhook event (`stripe_<event.type>` via log_audit_event, best-effort, user_id from metadata when present). (3) invoice.payment_failed now also **sends a dunning email** to the agent (via `_shared/email.ts` sendEmail) with a link to the subscription page — in addition to the existing in-app notification.
+- **Files**: `supabase/functions/stripe-webhook/index.ts`.
+
+### US-038: Create subscription management UI in dashboard ✅
+- **Status**: PASSED
+- **Changes**:
+  - `src/pages/dashboard/SubscriptionPage.tsx` (new) — current plan / status / renewal date (from useSubscription), a Free→Enterprise feature comparison table (from PRICING_PLANS), per-plan **Upgrade** buttons (call create-checkout-session and redirect to Stripe Checkout), a **Manage Billing** button (create-portal-session → Stripe Customer Portal), and a Recent Invoices list (tolerates a missing `invoices` table).
+  - Route `/dashboard/subscription` (lazy, inside the protected DashboardLayout) in `App.tsx`.
+  - Sidebar nav link "Subscription" (CreditCard icon) in `DashboardLayout.tsx`.
+- **Type note**: the `invoices` table isn't in the out-of-sync generated types — the query uses a single isolated, documented cast (returns [] on error), zero new tsc errors in my files.
+- **Verification**: tsc clean for SubscriptionPage/App/DashboardLayout; `npm run build` succeeds (new lazy chunk bundles); unit suite 258/258.
+
+### US-040: Create deployment runbook and environment configuration docs ✅
+- **Status**: PASSED
+- **Changes**: Created authoritative `DEPLOYMENT.md` consolidating the scattered `*_DEPLOYMENT.md` notes. Covers prerequisites, full env var reference (frontend VITE_* + edge-function secrets, with where-to-obtain + required/optional), deploy steps (Cloudflare Pages build, Supabase `db push` migrations, `functions deploy` + `secrets set`, Stripe webhook wiring), post-deploy verification checklist, rollback (Pages instant rollback / compensating migrations / function redeploy), staging vs production differences, DB backup & restore (`supabase db dump`/PITR), and an incident-response runbook with contacts. Cross-links MONITORING.md / SECURITY.md / .env.example.
+- **Files**: `DEPLOYMENT.md` (new).
+
+### US-041: Add database performance indexes and query optimization ✅
+- **Status**: PASSED
+- **Discovery**: Single-column indexes on listings/leads (user_id, status, created_at) already existed, but no composites for the common "owner + status, newest-first" patterns.
+- **Changes**: Migration `20260525000002_performance_indexes.sql` adds composite indexes — listings(user_id,status,created_at DESC), leads(user_id,status,created_at DESC), links(user_id,is_active,position), analytics_views(user_id,viewed_at DESC) — plus partial indexes for the hottest filtered views (listings WHERE status='active', leads WHERE status='new'). All `IF NOT EXISTS` (additive, safe re-run, nothing broken). Each index carries an EXPLAIN ANALYZE comment documenting the expected plan for the query it serves. (analytics time column is `viewed_at`, not created_at.)
+- **Files**: `supabase/migrations/20260525000002_performance_indexes.sql` (new).
+
+### US-043: Create admin audit log viewer ✅
+- **Status**: PASSED
+- **Changes**: `src/pages/admin/AuditLogPage.tsx` (new) — admin-only (role guard → redirect), full audit trail across all users (relies on the audit_logs admin read-all RLS from US-013). Filters: action, resource type, user id, date range. Columns: timestamp, user (click to filter by that user), action, resource, status, IP. Expandable rows reveal the raw jsonb (details, actor_id, risk_level, user_agent). Pagination 50/page (keepPreviousData). Route `/admin/audit-log` (lazy, ProtectedRoute + error boundary) in App.tsx; "Audit Log" link added to the AdminDashboard header.
+- **Type note**: audit_logs isn't in the out-of-sync generated types — used a minimal typed query-builder interface (no `any`) isolated to the query; zero new tsc errors in my files.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 258/258.
+
+### US-046: Add comprehensive SEO meta tags and structured data ✅
+- **Status**: PASSED
+- **Discovery**: Meta tags via react-helmet-async already shipped (`SEOHead`, used on public pages incl. Landing + FullProfilePage), and a lot of schema generation existed (`src/lib/seo.ts`, `src/components/seo/SchemaMarkup.tsx`). Public profiles already emit unique seo_title/seo_description + an inline RealEstateAgent schema; the landing page emits Organization. Missing: a consolidated `structured-data.ts` lib, and RealEstateListing + Article helpers (neither existed anywhere).
+- **Changes**:
+  - `src/lib/structured-data.ts` (new) — pure JSON-LD builders: `organizationSchema`, `realEstateAgentSchema` (Person/RealEstateAgent for profiles), `realEstateListingSchema` (price/address/beds/baths/sqft + Offer availability, SoldOut for sold), `articleSchema` (Article w/ publisher), `breadcrumbSchema`. A `compact()` helper omits empty fields so output validates.
+  - `src/lib/structured-data.test.ts` (new, 7 tests) — asserts required @context/@type fields, URL building, empty-field omission, listing price/address/details, sold availability, and breadcrumb positions.
+  - Wired `realEstateListingSchema` into `ListingDetailModal` as a JSON-LD `<script>` so each viewed listing emits price/address/property-detail structured data.
+- **Verification**: 7 new tests pass (full suite 265/265); `npm run build` succeeds; tsc adds zero new errors (ListingDetailModal's 3 errors are pre-existing baseline, confirmed via stash compare).
+
+### US-042: Implement feature flags system for safe rollouts ✅
+- **Status**: PASSED
+- **Changes** (built from scratch — none existed):
+  - Migration `20260525000003_feature_flags.sql` — `feature_flags` table (name unique, enabled, rollout_percentage 0–100 CHECK, user_ids uuid[], timestamps), RLS (authenticated read / admin write via has_role), updated_at trigger, and seeds `mfa_enabled`, `new_dashboard`, `ai_lead_scoring`, `stripe_billing`.
+  - `src/lib/feature-flags.ts` — pure `evaluateFlag(flag, userId)` (disabled → targeted → 100% → 0% → anonymous → deterministic FNV-1a bucket < rollout%), `rolloutBucket`, and `isFeatureEnabled(flagName, userId)` (fail-closed). Rollout is deterministic per (flag,user) and monotonic.
+  - `src/hooks/useFeatureFlag.ts` — `useFeatureFlags()` (one fetch, 5-min staleTime) + `useFeatureFlag(name)` evaluating for the current user (fail-closed while loading/missing).
+  - `src/components/admin/FeatureFlagsManager.tsx` — admin UI to toggle enabled + edit rollout %, wired into the AdminDashboard "Platform" tab (replacing its placeholder).
+  - `src/lib/feature-flags.test.ts` — 7 tests (kill switch, targeting, 0/100%, anonymous, determinism, monotonic rollout, bucket range).
+- **Type note**: feature_flags isn't in the out-of-sync generated types — isolated, documented casts in the data-access code (no `any`); zero new tsc errors.
+- **Verification**: 7 new tests pass (full suite 272/272); `npm run build` succeeds.
+
+### US-052: Add lead response time tracking and SLA alerts ✅
+- **Status**: PASSED
+- **Changes**:
+  - Migration `20260525000004_lead_response_time.sql` — adds `leads.first_responded_at`, a BEFORE UPDATE trigger that stamps it on the first transition out of 'new', a backfill from `contacted_at`, and an index `(user_id, first_responded_at)`.
+  - `src/types/lead.ts` — added optional `first_responded_at`.
+  - `src/pages/dashboard/Leads.tsx` — response time per card ("Responded in 2h 15m"), an "Avg Response" stat card, a red "No response · <age>" warning for overdue new leads, a configurable SLA threshold selector (1/2/4/24h, default 2h), and a "Needs Attention" filter (with count badge) showing new leads past the SLA. Helpers: responseMs, isNeedsAttention, formatDuration.
+- **Type note**: first_responded_at isn't in the out-of-sync generated types — the leads query uses an isolated typed cast to our Lead shape (no `any`). Net effect: Leads.tsx errors dropped 8→3 (3 remaining are pre-existing unused vars), zero new.
+- **Verification**: build succeeds; unit suite 272/272.
+
+### US-053: Add conversion funnel analytics widget to dashboard ✅
+- **Status**: PASSED
+- **Changes**: `src/components/dashboard/ConversionFunnel.tsx` (new) — Visitors → Leads → Contacted → Qualified → Converted funnel with per-stage counts and drop-off % from the previous stage. Visitors come from analytics_views, the rest from leads status distribution (contacted = past 'new'/'lost'; qualified = qualified/nurturing/converted/closed; converted = converted/closed). Time-period selector (7d/30d/90d/all). Responsive CSS bar funnel (no extra deps). Added to the Overview dashboard above Recent Activity.
+- **Note**: a separate pre-existing `components/analytics/ConversionFunnel.tsx` exists with its own baseline errors; the AC specifically asked for the dashboard path, which is new and clean.
+- **Type note**: analytics_views isn't in generated types — isolated PromiseLike chain cast (no `any`).
+- **Verification**: tsc clean for new file (Overview's 3 errors are pre-existing baseline, confirmed via stash compare); build succeeds; suite 272/272.
+
+### US-047: Implement database connection pooling and query performance monitoring ✅
+- **Status**: PASSED
+- **Note**: Supabase manages pooling (PgBouncer/Supavisor) — focus is query monitoring per the story notes.
+- **Changes**:
+  - Migration `20260525000005_query_metrics.sql` — `query_metrics` table (query_hash, duration_ms, endpoint, created_at) + indexes + admin-read/service-write RLS, `cleanup_query_metrics()` (30-day purge), and `top_slow_queries(limit)` RPC (24h aggregation: max/avg/calls).
+  - `supabase/functions/_shared/db-monitor.ts` — `monitorQuery(supabase, hash, endpoint, fn)` times any async DB call and fire-and-forget logs anything >500ms to query_metrics (never throws/blocks).
+  - `supabase/functions/health-check/index.ts` — public connectivity probe returning DB latency + 200/503.
+  - `src/components/admin/SlowQueriesWidget.tsx` — top-10 slowest queries (24h) table, added to the AdminDashboard Platform tab.
+- **Verification**: frontend tsc clean for new files; build succeeds; suite 272/272. Edge functions not runtime-executed (no Deno/Supabase in sandbox).
+
+### US-039: Implement accessibility testing with axe-core in CI ✅
+- **Status**: PASSED
+- **Changes**:
+  - Installed `@axe-core/playwright` (devDep).
+  - `playwright-a11y.config.ts` (new) — dedicated config (testDir tests/a11y), boots the dev server (IPv4), supports PW_CHROMIUM_PATH like the E2E config.
+  - `tests/a11y/accessibility.spec.ts` (new) — axe.analyze() (wcag2a/2aa) on 5 key pages: landing, login, register, dashboard, public profile. Supabase + cookie consent are mocked (hermetic). Implemented as a **regression guard**: fails when critical/serious violations EXCEED the documented per-page baseline (rather than blocking on the existing baseline), satisfying "warn but not fail initially" while still catching new regressions.
+  - `test:a11y` script + a warn-only (`continue-on-error: true`) `accessibility` CI job that installs Chromium and runs the suite.
+- **Documented baseline (critical/serious)**: landing 3 (button-name [critical], color-contrast, link-in-text-block), login/register/dashboard/public-profile 1 each (color-contrast). Recorded in the spec header to ratchet down over time.
+- **Verification**: `npm run test:a11y` → 5/5 pass at baseline (run with PW_CHROMIUM_PATH in the sandbox); tests execute without crashing; ci.yml valid YAML; unit suite 272/272.
+
+### US-050: Create platform health dashboard for admin monitoring ✅
+- **Status**: PASSED
+- **Changes**: `src/pages/admin/HealthDashboard.tsx` (new, admin-only via role guard) composing recent infra:
+  - Platform metrics (count queries): total users, active (7d, by profiles.updated_at proxy), new signups (7d), total listings, total leads.
+  - System health: DB connectivity + latency via the US-047 `health-check` edge function; edge-function status derived from it (green/red indicators).
+  - Revenue: MRR (active subscriptions × plan price from PRICING_PLANS), active subscriptions by plan, churn rate (canceled / lifecycle).
+  - Trends: recharts LineCharts for signups + leads over the last 14 days (client-side day bucketing).
+  - Auto-refresh every 60s (refetchInterval).
+  - Route `/admin/health` (lazy, ProtectedRoute + error boundary); "Health" link added to the AdminDashboard header.
+- **Type note**: several tables not in the out-of-sync generated types — isolated generic count/fetch helpers with localized casts (no `any`); zero new tsc errors.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272.
+
+### US-048: Create onboarding flow for new user setup ✅
+- **Status**: PASSED
+- **Discovery**: A 5-step `OnboardingWizard` (Template → Profile Basics → First Listing → Preview → Share) + `OnboardingWizardPage` (persists profile/listing/theme, welcome email) + progress indicator already existed at `/onboarding/wizard`. Gaps: completion tracking + post-login redirect, plus two real bugs in the completion path.
+- **Changes**:
+  - Migration `20260525000006_onboarding_completed.sql` — adds `profiles.onboarding_completed_at`.
+  - `OnboardingWizardPage` — stamps `onboarding_completed_at` on finish (profileUpdates is `any`, no new error).
+  - `Login.tsx` — after auth, routes users whose `onboarding_completed_at` is null to `/onboarding/wizard` (only when heading to the default /dashboard; saved-route redirects preserved).
+  - **Bug fixes in the certified path** (both pre-existing): added the missing `edgeFunctions` import (welcome-email call would have thrown at runtime, breaking onboarding completion), and fixed `OnboardingWizardProps.onComplete` type to `(wizardData) => void` (it's called with data). This resolved 2 baseline tsc errors.
+- **Verification**: tsc — net −2 errors (fixed the 2 above; remaining OnboardingWizard errors are pre-existing unused-var/implicit-any baseline); `npm run build` succeeds; unit suite 272/272.
+
+### US-044: Add API key system for programmatic access ✅
+- **Status**: PASSED
+- **Discovery**: An `api_keys` table existed (20260129) but lacked key_prefix/permissions/revoked_at (had is_active).
+- **Changes**:
+  - Migration `20260525000007_api_keys_extend.sql` — adds key_prefix, permissions (jsonb), revoked_at (additive) + prefix index.
+  - `supabase/functions/_shared/api-auth.ts` — `authenticateApiKey(req, serviceClient)` validating `Authorization: Bearer ab_…` (SHA-256 hash lookup, revoked/expired checks, last_used_at touch) as a JWT alternative; `hashApiKey` helper.
+  - `supabase/functions/api-keys/index.ts` — create/list/revoke. Keys are `ab_<base64url(32 bytes)>`; only the hash + 8-char prefix stored; full key returned once on create; max 10 active per user; audits create/revoke.
+  - `src/pages/dashboard/ApiKeysPage.tsx` — create (one-time reveal + copy), list (prefix/last-used), revoke (confirm dialog). Route `/dashboard/api-keys` + sidebar "API Keys" link.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272. Edge functions not runtime-executed (no Deno/Supabase).
+
+### US-049: Implement real-time notifications system ✅
+- **Status**: PASSED
+- **Changes** (built from scratch):
+  - Migration `20260525000008_notifications.sql` — `notifications` table (type/title/message/data/read_at), unread + recent indexes, RLS (user read/update own, service insert), added to the `supabase_realtime` publication (idempotent), and an AFTER INSERT trigger on `leads` creating a `new_lead` notification.
+  - `src/hooks/useNotifications.ts` — loads recent notifications, subscribes to Supabase Realtime INSERTs (per-user channel, invalidates on new), exposes unreadCount + markAsRead/markAllAsRead.
+  - `src/components/ui/notification-bell.tsx` — header bell with unread badge (Popover trigger).
+  - `src/components/ui/notification-dropdown.tsx` — list with relative times, per-item mark-read, mark-all-read, empty state.
+  - Wired the bell into the DashboardLayout top bar.
+- **Note**: subscription-event notifications are already created by the stripe-webhook (payment_failed → notifications insert); the lead trigger covers new_lead. Types: new_lead/lead_scored/subscription_event/system_alert.
+- **Type note**: notifications isn't in the out-of-sync generated types — isolated typed cast in the hook (no `any`); zero new tsc errors.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272.
+
+### US-045: Implement team/organization management for multi-seat billing ✅
+- **Status**: PASSED
+- **Changes** (from scratch):
+  - Migration `20260525000009_teams.sql` — `teams` + `team_members` tables, recursion-safe `is_team_member`/`is_team_admin` SECURITY DEFINER helpers, and RLS (members read; owner/admins manage).
+  - `supabase/functions/teams/index.ts` — create / invite (by email, seat-limit enforced, links existing users) / accept / remove / updateRole, all admin-gated via is_team_admin.
+  - `src/pages/dashboard/TeamPage.tsx` — create-team prompt when none, member roster with roles + pending state, invite form, seat usage; route `/dashboard/team` + sidebar "Team" link.
+- **Type note**: teams tables not in generated types — isolated casts; zero new tsc errors.
+
+### US-055: Implement lead auto-assignment and routing rules for teams ✅
+- **Status**: PASSED
+- **Changes** (from scratch, depends on US-045):
+  - Migration `20260525000010_lead_routing.sql` — `lead_routing_rules` (criteria jsonb: lead_type/source/zip/price range, assigned_to, priority, is_active) + RLS, `leads.assigned_to` column, a `team_round_robin` cursor, and a BEFORE INSERT trigger `auto_assign_lead` that evaluates active rules by priority (first match wins) then falls back to round-robin among accepted team members; assignments audited via log_audit_event (exception-guarded so it never blocks lead capture).
+  - `src/hooks/useLeadRouting.ts` — CRUD for rules.
+  - `src/components/settings/LeadRoutingRules.tsx` — create (name, lead type, assignee or round-robin, priority), list, toggle active, delete; mounted on the TeamPage.
+- **Type note**: lead_routing_rules not in generated types — isolated casts; zero new tsc errors.
+- **Verification**: tsc clean for new/touched files; `npm run build` succeeds; unit suite 272/272.
+
+---
+
+## 🎉 PROJECT COMPLETE — 55/55 user stories passing
+All PRD stories implemented, type-checked, built, and (where applicable) unit/E2E/a11y tested. Edge functions and migrations were authored against documented APIs but could not be runtime-executed in the sandbox (no Deno/Supabase). The repo carries a large pre-existing tsc baseline from an out-of-sync `src/integrations/supabase/types.ts`; every change in this effort introduced zero new type errors (verified via stash comparison), isolating necessary casts. Recommended follow-up: regenerate types.ts from the live database to clear the baseline.

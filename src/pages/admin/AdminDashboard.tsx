@@ -1,16 +1,31 @@
-import { Navigate, Link } from "react-router-dom";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, BrainCircuit, Share2, FileText, ArrowLeft, Users, Database, Search, BarChart3, Globe } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { AIConfigurationManager } from "@/components/admin/AIConfigurationManager";
-import { SocialMediaManager } from "@/components/admin/SocialMediaManager";
-import { ArticlesManager } from "@/components/admin/ArticlesManager";
-import { KeywordImportDialog } from "@/components/admin/KeywordImportDialog";
-import { SEOManager } from "@/components/admin/SEOManager";
-import { SearchAnalyticsDashboard } from "@/components/admin/SearchAnalyticsDashboard";
-import { SampleDataManager } from "@/components/admin/SampleDataManager";
-import { PSEOManager } from "@/components/admin/PSEOManager";
+import { Navigate, Link } from 'react-router-dom';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Settings,
+  BrainCircuit,
+  Share2,
+  FileText,
+  ArrowLeft,
+  Users,
+  Database,
+  Search,
+  BarChart3,
+  Globe,
+  ScrollText,
+  Activity,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AIConfigurationManager } from '@/components/admin/AIConfigurationManager';
+import { SocialMediaManager } from '@/components/admin/SocialMediaManager';
+import { ArticlesManager } from '@/components/admin/ArticlesManager';
+import { KeywordImportDialog } from '@/components/admin/KeywordImportDialog';
+import { SEOManager } from '@/components/admin/SEOManager';
+import { SearchAnalyticsDashboard } from '@/components/admin/SearchAnalyticsDashboard';
+import { SampleDataManager } from '@/components/admin/SampleDataManager';
+import { PSEOManager } from '@/components/admin/PSEOManager';
+import { FeatureFlagsManager } from '@/components/admin/FeatureFlagsManager';
+import { SlowQueriesWidget } from '@/components/admin/SlowQueriesWidget';
 
 export function AdminDashboard() {
   const { user, role } = useAuthStore();
@@ -32,12 +47,26 @@ export function AdminDashboard() {
                 <p className="text-muted-foreground">Manage AI, content, and platform settings</p>
               </div>
             </div>
-            <Link to="/dashboard">
-              <Button variant="outline" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link to="/admin/health">
+                <Button variant="outline" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Health
+                </Button>
+              </Link>
+              <Link to="/admin/audit-log">
+                <Button variant="outline" className="gap-2">
+                  <ScrollText className="h-4 w-4" />
+                  Audit Log
+                </Button>
+              </Link>
+              <Link to="/dashboard">
+                <Button variant="outline" className="gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -113,8 +142,8 @@ export function AdminDashboard() {
                 <KeywordImportDialog />
               </div>
               <p className="text-sm text-muted-foreground">
-                Use the import button to bulk upload keywords from a CSV file. 
-                Keywords help improve content generation and SEO optimization.
+                Use the import button to bulk upload keywords from a CSV file. Keywords help improve
+                content generation and SEO optimization.
               </p>
             </div>
           </TabsContent>
@@ -139,10 +168,8 @@ export function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <div className="rounded-lg border p-6">
-              <h2 className="text-2xl font-bold mb-4">Platform Settings</h2>
-              <p className="text-muted-foreground">Additional platform configuration coming soon...</p>
-            </div>
+            <FeatureFlagsManager />
+            <SlowQueriesWidget />
           </TabsContent>
         </Tabs>
       </div>

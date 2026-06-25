@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { useMFA } from "@/hooks/useMFA";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { Copy, Check, Shield, AlertCircle, Loader2 } from "lucide-react";
+import { useState } from 'react';
+import { useMFA } from '@/hooks/useMFA';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Copy, Check, Shield, AlertCircle, Loader2 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface MFASetupProps {
   onComplete?: () => void;
@@ -12,24 +12,19 @@ interface MFASetupProps {
 
 export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
   const { setupMFA, verifyMFA, getDeviceFingerprint, getBrowserInfo } = useMFA();
-  const [step, setStep] = useState<"intro" | "setup" | "verify" | "backup" | "complete">("intro");
+  const [step, setStep] = useState<'intro' | 'setup' | 'verify' | 'backup' | 'complete'>('intro');
   const [setupData, setSetupData] = useState<{
     secret: string;
     totpUri: string;
     backupCodes: string[];
   } | null>(null);
-  const [verificationCode, setVerificationCode] = useState("");
-  const [error, setError] = useState("");
+  const [verificationCode, setVerificationCode] = useState('');
+  const [error, setError] = useState('');
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [copiedBackupCodes, setCopiedBackupCodes] = useState(false);
 
-  // Generate QR code URL
-  const getQRCodeUrl = (totpUri: string) => {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`;
-  };
-
   const handleStartSetup = async () => {
-    setError("");
+    setError('');
     try {
       const result = await setupMFA.mutateAsync();
       setSetupData({
@@ -37,19 +32,19 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
         totpUri: result.totpUri,
         backupCodes: result.backupCodes,
       });
-      setStep("setup");
+      setStep('setup');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start MFA setup");
+      setError(err instanceof Error ? err.message : 'Failed to start MFA setup');
     }
   };
 
   const handleVerify = async () => {
     if (!verificationCode || verificationCode.length !== 6) {
-      setError("Please enter a 6-digit code");
+      setError('Please enter a 6-digit code');
       return;
     }
 
-    setError("");
+    setError('');
     try {
       const { browser, os } = getBrowserInfo();
       await verifyMFA.mutateAsync({
@@ -61,9 +56,9 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
         browser,
         os,
       });
-      setStep("backup");
+      setStep('backup');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid verification code");
+      setError(err instanceof Error ? err.message : 'Invalid verification code');
     }
   };
 
@@ -77,32 +72,30 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
 
   const handleCopyBackupCodes = async () => {
     if (setupData?.backupCodes) {
-      await navigator.clipboard.writeText(setupData.backupCodes.join("\n"));
+      await navigator.clipboard.writeText(setupData.backupCodes.join('\n'));
       setCopiedBackupCodes(true);
       setTimeout(() => setCopiedBackupCodes(false), 2000);
     }
   };
 
   const handleComplete = () => {
-    setStep("complete");
+    setStep('complete');
     onComplete?.();
   };
 
   return (
     <div className="w-full max-w-md mx-auto">
       {/* Intro Step */}
-      {step === "intro" && (
+      {step === 'intro' && (
         <div className="space-y-6">
           <div className="text-center">
             <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
               <Shield className="w-8 h-8 text-blue-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              Enable Two-Factor Authentication
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900">Enable Two-Factor Authentication</h2>
             <p className="mt-2 text-gray-600">
-              Add an extra layer of security to your account by requiring a code
-              from your authenticator app when signing in.
+              Add an extra layer of security to your account by requiring a code from your
+              authenticator app when signing in.
             </p>
           </div>
 
@@ -112,9 +105,9 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
               <li className="flex items-start gap-2">
                 <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                 <span>
-                  An authenticator app like{" "}
-                  <span className="font-medium">Google Authenticator</span>,{" "}
-                  <span className="font-medium">Authy</span>, or{" "}
+                  An authenticator app like{' '}
+                  <span className="font-medium">Google Authenticator</span>,{' '}
+                  <span className="font-medium">Authy</span>, or{' '}
                   <span className="font-medium">1Password</span>
                 </span>
               </li>
@@ -127,26 +120,18 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
 
           <div className="flex gap-3">
             {onCancel && (
-              <Button
-                variant="outline"
-                onClick={onCancel}
-                className="flex-1"
-              >
+              <Button variant="outline" onClick={onCancel} className="flex-1">
                 Cancel
               </Button>
             )}
-            <Button
-              onClick={handleStartSetup}
-              disabled={setupMFA.isPending}
-              className="flex-1"
-            >
+            <Button onClick={handleStartSetup} disabled={setupMFA.isPending} className="flex-1">
               {setupMFA.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Setting up...
                 </>
               ) : (
-                "Get Started"
+                'Get Started'
               )}
             </Button>
           </div>
@@ -154,24 +139,22 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
       )}
 
       {/* Setup Step */}
-      {step === "setup" && setupData && (
+      {step === 'setup' && setupData && (
         <div className="space-y-6">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900">
-              Scan QR Code
-            </h2>
-            <p className="mt-2 text-gray-600">
-              Scan this QR code with your authenticator app
-            </p>
+            <h2 className="text-2xl font-bold text-gray-900">Scan QR Code</h2>
+            <p className="mt-2 text-gray-600">Scan this QR code with your authenticator app</p>
           </div>
 
           <div className="flex justify-center">
             <div className="bg-white p-4 rounded-lg shadow-sm border">
-              <img
-                src={getQRCodeUrl(setupData.totpUri)}
-                alt="QR Code for authenticator"
-                width={200}
-                height={200}
+              {/* Rendered client-side so the TOTP secret never leaves the browser. */}
+              <QRCodeSVG
+                value={setupData.totpUri}
+                size={200}
+                level="M"
+                includeMargin
+                aria-label="QR code for authenticator app"
                 className="rounded"
               />
             </div>
@@ -182,9 +165,7 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
               Can't scan the code? Enter this key manually:
             </p>
             <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-3">
-              <code className="flex-1 text-sm font-mono break-all">
-                {setupData.secret}
-              </code>
+              <code className="flex-1 text-sm font-mono break-all">{setupData.secret}</code>
               <Button
                 variant="ghost"
                 size="sm"
@@ -200,22 +181,18 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
             </div>
           </div>
 
-          <Button onClick={() => setStep("verify")} className="w-full">
+          <Button onClick={() => setStep('verify')} className="w-full">
             Continue
           </Button>
         </div>
       )}
 
       {/* Verify Step */}
-      {step === "verify" && (
+      {step === 'verify' && (
         <div className="space-y-6">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900">
-              Verify Setup
-            </h2>
-            <p className="mt-2 text-gray-600">
-              Enter the 6-digit code from your authenticator app
-            </p>
+            <h2 className="text-2xl font-bold text-gray-900">Verify Setup</h2>
+            <p className="mt-2 text-gray-600">Enter the 6-digit code from your authenticator app</p>
           </div>
 
           {error && (
@@ -234,7 +211,7 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
               placeholder="000000"
               value={verificationCode}
               onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, "");
+                const value = e.target.value.replace(/\D/g, '');
                 setVerificationCode(value);
               }}
               className="text-center text-2xl tracking-widest font-mono"
@@ -243,11 +220,7 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
           </div>
 
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setStep("setup")}
-              className="flex-1"
-            >
+            <Button variant="outline" onClick={() => setStep('setup')} className="flex-1">
               Back
             </Button>
             <Button
@@ -261,7 +234,7 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
                   Verifying...
                 </>
               ) : (
-                "Verify"
+                'Verify'
               )}
             </Button>
           </div>
@@ -269,31 +242,23 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
       )}
 
       {/* Backup Codes Step */}
-      {step === "backup" && setupData && (
+      {step === 'backup' && setupData && (
         <div className="space-y-6">
           <div className="text-center">
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <Check className="w-8 h-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              Save Your Backup Codes
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900">Save Your Backup Codes</h2>
             <p className="mt-2 text-gray-600">
-              Store these codes securely. You can use each code once if you lose
-              access to your authenticator app.
+              Store these codes securely. You can use each code once if you lose access to your
+              authenticator app.
             </p>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex justify-between items-center mb-3">
-              <span className="text-sm font-medium text-gray-700">
-                Backup Codes
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopyBackupCodes}
-              >
+              <span className="text-sm font-medium text-gray-700">Backup Codes</span>
+              <Button variant="ghost" size="sm" onClick={handleCopyBackupCodes}>
                 {copiedBackupCodes ? (
                   <>
                     <Check className="w-4 h-4 mr-1 text-green-500" />
@@ -320,8 +285,8 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
           </div>
 
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-            <strong>Important:</strong> Each backup code can only be used once.
-            Keep them in a safe place!
+            <strong>Important:</strong> Each backup code can only be used once. Keep them in a safe
+            place!
           </div>
 
           <Button onClick={handleComplete} className="w-full">
@@ -331,18 +296,15 @@ export const MFASetup = ({ onComplete, onCancel }: MFASetupProps) => {
       )}
 
       {/* Complete Step */}
-      {step === "complete" && (
+      {step === 'complete' && (
         <div className="space-y-6 text-center">
           <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
             <Shield className="w-8 h-8 text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Two-Factor Authentication Enabled
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900">Two-Factor Authentication Enabled</h2>
           <p className="text-gray-600">
-            Your account is now protected with two-factor authentication.
-            You'll need to enter a code from your authenticator app each time
-            you sign in.
+            Your account is now protected with two-factor authentication. You'll need to enter a
+            code from your authenticator app each time you sign in.
           </p>
         </div>
       )}

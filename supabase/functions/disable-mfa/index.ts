@@ -5,6 +5,7 @@ import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { decode as base32Decode } from "https://deno.land/std@0.168.0/encoding/base32.ts";
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { decryptSecret } from '../_shared/encryption.ts';
 
 /**
  * Disable MFA
@@ -120,7 +121,9 @@ serve(async (req) => {
     if (normalizedCode.replace(/-/g, '').length === 8) {
       isValid = await verifyBackupCode(normalizedCode, mfaSettings.backup_codes);
     } else {
-      isValid = await verifyTOTP(mfaSettings.totp_secret, normalizedCode);
+      // Decrypt the at-rest TOTP secret (passes through legacy plaintext).
+      const totpSecret = (await decryptSecret(mfaSettings.totp_secret)) as string;
+      isValid = await verifyTOTP(totpSecret, normalizedCode);
     }
 
     // Log verification attempt
@@ -164,6 +167,19 @@ serve(async (req) => {
         revoked_at: new Date().toISOString(),
       })
       .eq('user_id', user.id);
+
+    // Audit trail: MFA disabled.
+    await supabase
+      .rpc('log_audit_event', {
+        p_user_id: user.id,
+        p_action: 'mfa_disable',
+        p_status: 'success',
+        p_resource_type: 'mfa',
+        p_ip_address: clientIP,
+        p_user_agent: req.headers.get('user-agent'),
+        p_details: JSON.stringify({ method: 'totp' }),
+      })
+      .catch(() => undefined);
 
     return successResponse({ message: 'MFA has been disabled successfully' }, req);
   } catch (error) {

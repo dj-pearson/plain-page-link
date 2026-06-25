@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, ArrowRight, ArrowLeft, Sparkles, Upload, Home, Link as LinkIcon, Eye } from 'lucide-react';
+import {
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Upload,
+  Home,
+  Link as LinkIcon,
+  Eye,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -11,7 +20,8 @@ import { Progress } from '@/components/ui/progress';
  */
 
 interface OnboardingWizardProps {
-  onComplete: () => void;
+  // Receives the collected wizard data on finish (persisted by the page).
+  onComplete: (wizardData: any) => void;
   userProfile?: any;
 }
 
@@ -26,7 +36,7 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
       title: '',
       bio: '',
       phone: '',
-      location: ''
+      location: '',
     },
     firstListing: {
       photo: null as File | null,
@@ -35,9 +45,9 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
       price: '',
       beds: '',
       baths: '',
-      status: 'active' as 'active' | 'sold'
+      status: 'active' as 'active' | 'sold',
     },
-    importOption: null as 'scratch' | 'linktree' | null
+    importOption: null as 'scratch' | 'linktree' | null,
   });
 
   const navigate = useNavigate();
@@ -50,14 +60,34 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
     { number: 2, title: 'Profile Basics', icon: Upload },
     { number: 3, title: 'First Listing', icon: Home },
     { number: 4, title: 'Preview', icon: Eye },
-    { number: 5, title: 'Share', icon: LinkIcon }
+    { number: 5, title: 'Share', icon: LinkIcon },
   ];
 
   const templates = [
-    { id: 'luxury', name: 'Luxury', description: 'High-end properties', colors: ['#1e3a8a', '#d4af37'] },
-    { id: 'modern', name: 'Modern Clean', description: 'Minimalist & professional', colors: ['#2563eb', '#10b981'] },
-    { id: 'coastal', name: 'Coastal', description: 'Beach & waterfront', colors: ['#0891b2', '#06b6d4'] },
-    { id: 'classic', name: 'Classic', description: 'Traditional & timeless', colors: ['#7c3aed', '#a855f7'] }
+    {
+      id: 'luxury',
+      name: 'Luxury',
+      description: 'High-end properties',
+      colors: ['#1e3a8a', '#d4af37'],
+    },
+    {
+      id: 'modern',
+      name: 'Modern Clean',
+      description: 'Minimalist & professional',
+      colors: ['#2563eb', '#10b981'],
+    },
+    {
+      id: 'coastal',
+      name: 'Coastal',
+      description: 'Beach & waterfront',
+      colors: ['#0891b2', '#06b6d4'],
+    },
+    {
+      id: 'classic',
+      name: 'Classic',
+      description: 'Traditional & timeless',
+      colors: ['#7c3aed', '#a855f7'],
+    },
   ];
 
   const handleNext = () => {
@@ -101,9 +131,7 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
         {/* Header with Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Setup Your AgentBio Profile
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900">Setup Your AgentBio Profile</h1>
             <Button variant="ghost" size="sm" onClick={handleSkipToEnd}>
               Skip Setup
             </Button>
@@ -114,8 +142,11 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
               <div
                 key={step.number}
                 className={`flex items-center gap-2 ${
-                  step.number === currentStep ? 'text-blue-600 font-semibold' :
-                  step.number < currentStep ? 'text-green-600' : 'text-gray-400'
+                  step.number === currentStep
+                    ? 'text-blue-600 font-semibold'
+                    : step.number < currentStep
+                      ? 'text-green-600'
+                      : 'text-gray-400'
                 }`}
               >
                 {step.number < currentStep ? (
@@ -123,9 +154,13 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
                     <Check className="h-5 w-5 text-white" />
                   </div>
                 ) : (
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    step.number === currentStep ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      step.number === currentStep
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-500'
+                    }`}
+                  >
                     {step.number}
                   </div>
                 )}
@@ -159,32 +194,21 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
             />
           )}
 
-          {currentStep === 4 && (
-            <StepPreview wizardData={wizardData} />
-          )}
+          {currentStep === 4 && <StepPreview wizardData={wizardData} />}
 
-          {currentStep === 5 && (
-            <StepShare username={userProfile?.username || 'yourname'} />
-          )}
+          {currentStep === 5 && <StepShare username={userProfile?.username || 'yourname'} />}
         </Card>
 
         {/* Navigation */}
         <div className="flex items-center justify-between mt-8">
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            disabled={currentStep === 1}
-          >
+          <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <div className="text-sm text-gray-600">
             Step {currentStep} of {totalSteps} • ~{10 - currentStep * 2} min remaining
           </div>
-          <Button
-            onClick={handleNext}
-            disabled={!canProceed()}
-          >
+          <Button onClick={handleNext} disabled={!canProceed()}>
             {currentStep === totalSteps ? 'Go to Dashboard' : 'Next'}
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
@@ -216,7 +240,7 @@ function StepChooseTemplate({ templates, selected, onSelect }: any) {
             <div
               className="w-full h-24 rounded-lg mb-3"
               style={{
-                background: `linear-gradient(135deg, ${template.colors[0]}, ${template.colors[1]})`
+                background: `linear-gradient(135deg, ${template.colors[0]}, ${template.colors[1]})`,
               }}
             />
             <div className="font-semibold text-sm">{template.name}</div>
@@ -243,9 +267,7 @@ function StepProfileBasics({ data, onChange }: any) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-2">Your Profile Basics</h2>
-      <p className="text-gray-600 mb-6">
-        Add your photo and basic info. Takes ~2 minutes.
-      </p>
+      <p className="text-gray-600 mb-6">Add your photo and basic info. Takes ~2 minutes.</p>
       <div className="space-y-4">
         {/* Photo Upload */}
         <div>
@@ -364,7 +386,11 @@ function StepFirstListing({ data, onChange }: any) {
           <div className="flex items-center gap-4">
             <div className="w-32 h-24 rounded-lg bg-gray-200 overflow-hidden">
               {data.photoPreview ? (
-                <img src={data.photoPreview} alt="Property" className="w-full h-full object-cover" />
+                <img
+                  src={data.photoPreview}
+                  alt="Property"
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                   <Home className="h-8 w-8" />
@@ -480,17 +506,19 @@ function StepPreview({ wizardData }: any) {
             ) : (
               <div className="w-24 h-24 rounded-full bg-gray-300 mb-4" />
             )}
-            <h3 className="text-xl font-bold">{wizardData.profileBasics.fullName || 'Your Name'}</h3>
-            <p className="text-sm text-gray-600">{wizardData.profileBasics.title || 'Your Title'}</p>
+            <h3 className="text-xl font-bold">
+              {wizardData.profileBasics.fullName || 'Your Name'}
+            </h3>
+            <p className="text-sm text-gray-600">
+              {wizardData.profileBasics.title || 'Your Title'}
+            </p>
             {wizardData.profileBasics.location && (
               <p className="text-sm text-gray-500">{wizardData.profileBasics.location}</p>
             )}
           </div>
 
           {wizardData.profileBasics.bio && (
-            <p className="text-sm text-gray-700 text-center mb-4">
-              {wizardData.profileBasics.bio}
-            </p>
+            <p className="text-sm text-gray-700 text-center mb-4">{wizardData.profileBasics.bio}</p>
           )}
 
           {wizardData.firstListing.photoPreview && (
@@ -538,7 +566,8 @@ function StepShare({ username }: any) {
       </div>
       <h2 className="text-2xl font-bold mb-2">🎉 Your Profile is Live!</h2>
       <p className="text-gray-600 mb-8">
-        Share your link on Instagram, Facebook, business cards, and everywhere you connect with clients.
+        Share your link on Instagram, Facebook, business cards, and everywhere you connect with
+        clients.
       </p>
 
       <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
@@ -557,7 +586,9 @@ function StepShare({ username }: any) {
           </div>
           <div>
             <div className="font-medium">Add it to Instagram bio</div>
-            <div className="text-sm text-gray-600">Replace your current link with your AgentBio URL</div>
+            <div className="text-sm text-gray-600">
+              Replace your current link with your AgentBio URL
+            </div>
           </div>
         </div>
         <div className="flex items-start gap-3">
@@ -566,7 +597,9 @@ function StepShare({ username }: any) {
           </div>
           <div>
             <div className="font-medium">Add more listings</div>
-            <div className="text-sm text-gray-600">Showcase your sold properties and active listings</div>
+            <div className="text-sm text-gray-600">
+              Showcase your sold properties and active listings
+            </div>
           </div>
         </div>
         <div className="flex items-start gap-3">
@@ -575,7 +608,9 @@ function StepShare({ username }: any) {
           </div>
           <div>
             <div className="font-medium">Customize your theme</div>
-            <div className="text-sm text-gray-600">Match your personal brand with colors and fonts</div>
+            <div className="text-sm text-gray-600">
+              Match your personal brand with colors and fonts
+            </div>
           </div>
         </div>
       </div>

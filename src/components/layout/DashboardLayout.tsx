@@ -1,321 +1,348 @@
-import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/useAuthStore';
 import {
-    Home,
-    LayoutDashboard,
-    Building2,
-    Users,
-    Link as LinkIcon,
-    Star,
-    BarChart3,
-    User,
-    Palette,
-    Settings,
-    LogOut,
-    Shield,
-    Zap,
-    FileText,
-    Copy,
-    Check,
-    Share2,
-    Workflow,
-} from "lucide-react";
-import { MobileNav } from "@/components/mobile/MobileNav";
-import { Badge } from "@/components/ui/badge";
-import { SkipLink } from "@/components/SkipLink";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { logger } from "@/lib/logger";
+  Home,
+  LayoutDashboard,
+  Building2,
+  Users,
+  Link as LinkIcon,
+  Star,
+  BarChart3,
+  User,
+  Palette,
+  Settings,
+  LogOut,
+  Shield,
+  Zap,
+  FileText,
+  Copy,
+  Check,
+  Share2,
+  Workflow,
+  CreditCard,
+  KeyRound,
+} from 'lucide-react';
+import { MobileNav } from '@/components/mobile/MobileNav';
+import { NotificationBell } from '@/components/ui/notification-bell';
+import { Badge } from '@/components/ui/badge';
+import { SkipLink } from '@/components/SkipLink';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { logger } from '@/lib/logger';
 
 export default function DashboardLayout() {
-    const location = useLocation();
-    const navigate = useNavigate();
-    const { profile, signOut, role } = useAuthStore();
-    const { toast } = useToast();
-    const [copied, setCopied] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { profile, signOut, role } = useAuthStore();
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
 
-    const isActive = (path: string) => {
-        return location.pathname === path;
-    };
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
 
-    const handleLogout = async () => {
-        await signOut();
-        navigate("/auth/login");
-    };
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/auth/login');
+  };
 
-    const getInitials = (name: string | null | undefined) => {
-        if (!name) return "U";
-        return name
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-            .toUpperCase()
-            .slice(0, 2);
-    };
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return 'U';
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
-    const handleCopyProfileURL = async () => {
-        if (!profile?.username) return;
+  const handleCopyProfileURL = async () => {
+    if (!profile?.username) return;
 
-        const profileURL = `${window.location.origin}/${profile.username}`;
+    const profileURL = `${window.location.origin}/${profile.username}`;
 
-        try {
-            if (navigator.share && /mobile|android|ios|iphone|ipad/i.test(navigator.userAgent)) {
-                await navigator.share({
-                    title: `${profile.full_name || 'My'} AgentBio Profile`,
-                    url: profileURL,
-                });
-                toast({
-                    title: "Shared!",
-                    description: "Profile link shared successfully",
-                });
-            } else {
-                await navigator.clipboard.writeText(profileURL);
-                setCopied(true);
-                toast({
-                    title: "Copied!",
-                    description: "Profile link copied to clipboard",
-                });
-                setTimeout(() => setCopied(false), 2000);
-            }
-        } catch (error) {
-            logger.error('Failed to copy/share profile URL', error);
-            toast({
-                title: "Failed to copy",
-                description: "Please try again",
-                variant: "destructive",
-            });
-        }
-    };
+    try {
+      if (navigator.share && /mobile|android|ios|iphone|ipad/i.test(navigator.userAgent)) {
+        await navigator.share({
+          title: `${profile.full_name || 'My'} AgentBio Profile`,
+          url: profileURL,
+        });
+        toast({
+          title: 'Shared!',
+          description: 'Profile link shared successfully',
+        });
+      } else {
+        await navigator.clipboard.writeText(profileURL);
+        setCopied(true);
+        toast({
+          title: 'Copied!',
+          description: 'Profile link copied to clipboard',
+        });
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch (error) {
+      logger.error('Failed to copy/share profile URL', error);
+      toast({
+        title: 'Failed to copy',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
+    }
+  };
 
-    return (
-        <div className="min-h-screen bg-gray-50">
-            <SkipLink />
-            {/* Sidebar - Hidden on mobile */}
-            <aside
-                className="hidden md:fixed md:flex md:flex-col left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40"
-                aria-label="Dashboard sidebar"
-            >
-                <div className="p-6 flex-shrink-0">
-                    <Link
-                        to="/"
-                        className="flex items-center gap-2 text-xl font-bold text-gray-900"
-                        aria-label="AgentBio.net - Go to homepage"
-                    >
-                        <Home className="h-6 w-6 text-blue-600" aria-hidden="true" />
-                        AgentBio.net
-                    </Link>
-                </div>
-
-                <nav className="px-3 space-y-1 flex-1 overflow-y-auto" aria-label="Main navigation">
-                    <NavLink
-                        to="/dashboard"
-                        icon={<LayoutDashboard className="h-5 w-5" />}
-                        label="Dashboard"
-                        active={isActive("/dashboard")}
-                    />
-                    <NavLink
-                        to="/dashboard/listings"
-                        icon={<Building2 className="h-5 w-5" />}
-                        label="Listings"
-                        active={isActive("/dashboard/listings")}
-                    />
-                    <NavLink
-                        to="/dashboard/leads"
-                        icon={<Users className="h-5 w-5" />}
-                        label="Leads"
-                        active={isActive("/dashboard/leads")}
-                    />
-                    <NavLink
-                        to="/dashboard/testimonials"
-                        icon={<Star className="h-5 w-5" />}
-                        label="Testimonials"
-                        active={isActive("/dashboard/testimonials")}
-                    />
-                    <NavLink
-                        to="/dashboard/links"
-                        icon={<LinkIcon className="h-5 w-5" />}
-                        label="Custom Links"
-                        active={isActive("/dashboard/links")}
-                    />
-                    <NavLink
-                        to="/dashboard/analytics"
-                        icon={<BarChart3 className="h-5 w-5" />}
-                        label="Analytics"
-                        active={isActive("/dashboard/analytics")}
-                    />
-                    <NavLink
-                        to="/dashboard/quick-actions"
-                        icon={<Zap className="h-5 w-5" />}
-                        label="Quick Actions"
-                        active={isActive("/dashboard/quick-actions")}
-                    />
-                    <NavLink
-                        to="/dashboard/page-builder"
-                        icon={<FileText className="h-5 w-5" />}
-                        label="Page Builder"
-                        active={isActive("/dashboard/page-builder")}
-                    />
-                    <NavLink
-                        to="/dashboard/workflows"
-                        icon={<Workflow className="h-5 w-5" />}
-                        label="Workflows"
-                        active={isActive("/dashboard/workflows")}
-                    />
-
-                    <div className="pt-4 mt-4 border-t border-gray-200">
-                        {role === 'admin' && (
-                            <NavLink
-                                to="/admin"
-                                icon={<Shield className="h-5 w-5" />}
-                                label={
-                                    <div className="flex items-center gap-2">
-                                        Admin
-                                        <Badge variant="secondary" className="text-xs">
-                                            ROOT
-                                        </Badge>
-                                    </div>
-                                }
-                                active={isActive("/admin")}
-                            />
-                        )}
-                        <NavLink
-                            to="/dashboard/profile"
-                            icon={<User className="h-5 w-5" />}
-                            label="Profile"
-                            active={isActive("/dashboard/profile")}
-                        />
-                        <NavLink
-                            to="/dashboard/theme"
-                            icon={<Palette className="h-5 w-5" />}
-                            label="Theme"
-                            active={isActive("/dashboard/theme")}
-                        />
-                        <NavLink
-                            to="/dashboard/settings"
-                            icon={<Settings className="h-5 w-5" />}
-                            label="Settings"
-                            active={isActive("/dashboard/settings")}
-                        />
-                    </div>
-                </nav>
-
-                <div className="flex-shrink-0 p-4 border-t border-gray-200">
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 w-full px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-                    >
-                        <LogOut className="h-5 w-5" />
-                        <span>Log Out</span>
-                    </button>
-                </div>
-            </aside>
-
-            {/* Main Content */}
-            <div className="md:ml-64 min-h-screen">
-                {/* Top Bar - Mobile optimized with better touch targets */}
-                <header
-                    className="bg-white border-b border-gray-200 sticky top-0 z-30 safe-area-inset-top"
-                    role="banner"
-                >
-                    <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
-                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
-                            Dashboard
-                        </h1>
-                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                            {profile?.username && (
-                                <>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleCopyProfileURL}
-                                        className="gap-2 hidden md:flex"
-                                        aria-label="Copy profile URL to clipboard"
-                                    >
-                                        {copied ? (
-                                            <>
-                                                <Check className="h-4 w-4 text-green-600" />
-                                                <span>Copied!</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy className="h-4 w-4" />
-                                                <span>Copy Link</span>
-                                            </>
-                                        )}
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleCopyProfileURL}
-                                        className="md:hidden p-2"
-                                        aria-label="Share profile URL"
-                                    >
-                                        {copied ? (
-                                            <Check className="h-4 w-4 text-green-600" />
-                                        ) : (
-                                            <Share2 className="h-4 w-4" />
-                                        )}
-                                    </Button>
-                                </>
-                            )}
-                            <Link
-                                to={`/${profile?.username || ""}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap min-h-[44px] flex items-center hidden sm:flex"
-                                aria-label={`View your public profile page as ${profile?.username}`}
-                            >
-                                View Profile →
-                            </Link>
-                            <div
-                                className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0"
-                                role="img"
-                                aria-label={`Profile avatar for ${profile?.full_name || 'user'}`}
-                            >
-                                <span className="text-sm sm:text-base text-blue-600 font-semibold" aria-hidden="true">
-                                    {getInitials(profile?.full_name)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
-                {/* Page Content - Enhanced mobile spacing and safe areas */}
-                <main id="main-content" className="p-4 sm:p-5 md:p-6 pb-24 sm:pb-24 md:pb-6 safe-area-inset-bottom" tabIndex={-1}>
-                    <Outlet />
-                </main>
-            </div>
-
-            {/* Mobile Bottom Navigation */}
-            <MobileNav />
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <SkipLink />
+      {/* Sidebar - Hidden on mobile */}
+      <aside
+        className="hidden md:fixed md:flex md:flex-col left-0 top-0 h-full w-64 bg-white border-r border-gray-200 z-40"
+        aria-label="Dashboard sidebar"
+      >
+        <div className="p-6 flex-shrink-0">
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-xl font-bold text-gray-900"
+            aria-label="AgentBio.net - Go to homepage"
+          >
+            <Home className="h-6 w-6 text-blue-600" aria-hidden="true" />
+            AgentBio.net
+          </Link>
         </div>
-    );
+
+        <nav className="px-3 space-y-1 flex-1 overflow-y-auto" aria-label="Main navigation">
+          <NavLink
+            to="/dashboard"
+            icon={<LayoutDashboard className="h-5 w-5" />}
+            label="Dashboard"
+            active={isActive('/dashboard')}
+          />
+          <NavLink
+            to="/dashboard/listings"
+            icon={<Building2 className="h-5 w-5" />}
+            label="Listings"
+            active={isActive('/dashboard/listings')}
+          />
+          <NavLink
+            to="/dashboard/leads"
+            icon={<Users className="h-5 w-5" />}
+            label="Leads"
+            active={isActive('/dashboard/leads')}
+          />
+          <NavLink
+            to="/dashboard/testimonials"
+            icon={<Star className="h-5 w-5" />}
+            label="Testimonials"
+            active={isActive('/dashboard/testimonials')}
+          />
+          <NavLink
+            to="/dashboard/links"
+            icon={<LinkIcon className="h-5 w-5" />}
+            label="Custom Links"
+            active={isActive('/dashboard/links')}
+          />
+          <NavLink
+            to="/dashboard/analytics"
+            icon={<BarChart3 className="h-5 w-5" />}
+            label="Analytics"
+            active={isActive('/dashboard/analytics')}
+          />
+          <NavLink
+            to="/dashboard/quick-actions"
+            icon={<Zap className="h-5 w-5" />}
+            label="Quick Actions"
+            active={isActive('/dashboard/quick-actions')}
+          />
+          <NavLink
+            to="/dashboard/page-builder"
+            icon={<FileText className="h-5 w-5" />}
+            label="Page Builder"
+            active={isActive('/dashboard/page-builder')}
+          />
+          <NavLink
+            to="/dashboard/workflows"
+            icon={<Workflow className="h-5 w-5" />}
+            label="Workflows"
+            active={isActive('/dashboard/workflows')}
+          />
+
+          <div className="pt-4 mt-4 border-t border-gray-200">
+            {role === 'admin' && (
+              <NavLink
+                to="/admin"
+                icon={<Shield className="h-5 w-5" />}
+                label={
+                  <div className="flex items-center gap-2">
+                    Admin
+                    <Badge variant="secondary" className="text-xs">
+                      ROOT
+                    </Badge>
+                  </div>
+                }
+                active={isActive('/admin')}
+              />
+            )}
+            <NavLink
+              to="/dashboard/profile"
+              icon={<User className="h-5 w-5" />}
+              label="Profile"
+              active={isActive('/dashboard/profile')}
+            />
+            <NavLink
+              to="/dashboard/theme"
+              icon={<Palette className="h-5 w-5" />}
+              label="Theme"
+              active={isActive('/dashboard/theme')}
+            />
+            <NavLink
+              to="/dashboard/subscription"
+              icon={<CreditCard className="h-5 w-5" />}
+              label="Subscription"
+              active={isActive('/dashboard/subscription')}
+            />
+            <NavLink
+              to="/dashboard/team"
+              icon={<Users className="h-5 w-5" />}
+              label="Team"
+              active={isActive('/dashboard/team')}
+            />
+            <NavLink
+              to="/dashboard/api-keys"
+              icon={<KeyRound className="h-5 w-5" />}
+              label="API Keys"
+              active={isActive('/dashboard/api-keys')}
+            />
+            <NavLink
+              to="/dashboard/settings"
+              icon={<Settings className="h-5 w-5" />}
+              label="Settings"
+              active={isActive('/dashboard/settings')}
+            />
+          </div>
+        </nav>
+
+        <div className="flex-shrink-0 p-4 border-t border-gray-200">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 w-full px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <LogOut className="h-5 w-5" />
+            <span>Log Out</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div className="md:ml-64 min-h-screen">
+        {/* Top Bar - Mobile optimized with better touch targets */}
+        <header
+          className="bg-white border-b border-gray-200 sticky top-0 z-30 safe-area-inset-top"
+          role="banner"
+        >
+          <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Dashboard</h1>
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <NotificationBell />
+              {profile?.username && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyProfileURL}
+                    className="gap-2 hidden md:flex"
+                    aria-label="Copy profile URL to clipboard"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-4 w-4 text-green-600" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyProfileURL}
+                    className="md:hidden p-2"
+                    aria-label="Share profile URL"
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Share2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </>
+              )}
+              <Link
+                to={`/${profile?.username || ''}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap min-h-[44px] flex items-center hidden sm:flex"
+                aria-label={`View your public profile page as ${profile?.username}`}
+              >
+                View Profile →
+              </Link>
+              <div
+                className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0"
+                role="img"
+                aria-label={`Profile avatar for ${profile?.full_name || 'user'}`}
+              >
+                <span
+                  className="text-sm sm:text-base text-blue-600 font-semibold"
+                  aria-hidden="true"
+                >
+                  {getInitials(profile?.full_name)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content - Enhanced mobile spacing and safe areas */}
+        <main
+          id="main-content"
+          className="p-4 sm:p-5 md:p-6 pb-24 sm:pb-24 md:pb-6 safe-area-inset-bottom"
+          tabIndex={-1}
+        >
+          <Outlet />
+        </main>
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileNav />
+    </div>
+  );
 }
 
 function NavLink({
-    to,
-    icon,
-    label,
-    active,
+  to,
+  icon,
+  label,
+  active,
 }: {
-    to: string;
-    icon: React.ReactNode;
-    label: string | React.ReactNode;
-    active: boolean;
+  to: string;
+  icon: React.ReactNode;
+  label: string | React.ReactNode;
+  active: boolean;
 }) {
-    return (
-        <Link
-            to={to}
-            aria-current={active ? "page" : undefined}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors min-h-[44px] ${
-                active
-                    ? "bg-blue-50 text-blue-600 font-medium"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-            }`}
-        >
-            <span aria-hidden="true">{icon}</span>
-            <span>{label}</span>
-        </Link>
-    );
+  return (
+    <Link
+      to={to}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors min-h-[44px] ${
+        active
+          ? 'bg-blue-50 text-blue-600 font-medium'
+          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+      }`}
+    >
+      <span aria-hidden="true">{icon}</span>
+      <span>{label}</span>
+    </Link>
+  );
 }

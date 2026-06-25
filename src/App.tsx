@@ -32,6 +32,7 @@ import Register from './pages/auth/Register';
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const AuthCallback = lazy(() => import('./pages/auth/AuthCallback'));
+const MFAChallenge = lazy(() => import('./pages/auth/MFAChallenge'));
 
 // Lazy load onboarding
 const OnboardingWizardPage = lazy(() => import('./pages/onboarding/OnboardingWizardPage'));
@@ -83,6 +84,9 @@ const Links = lazy(() => import('./pages/dashboard/Links'));
 const Testimonials = lazy(() => import('./pages/dashboard/Testimonials'));
 const Analytics = lazy(() => import('./pages/dashboard/Analytics'));
 const Settings = lazy(() => import('./pages/dashboard/Settings'));
+const SubscriptionPage = lazy(() => import('./pages/dashboard/SubscriptionPage'));
+const ApiKeysPage = lazy(() => import('./pages/dashboard/ApiKeysPage'));
+const TeamPage = lazy(() => import('./pages/dashboard/TeamPage'));
 const DeleteAccount = lazy(() => import('./pages/dashboard/DeleteAccount'));
 const QuickActionsDashboard = lazy(() => import('./pages/QuickActionsDashboard'));
 const LeadManagementDashboard = lazy(() => import('./pages/LeadManagementDashboard'));
@@ -101,6 +105,8 @@ const AdminDashboard = lazy(() =>
   import('./pages/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 );
 const SEODashboard = lazy(() => import('./pages/SEODashboard'));
+const AuditLogPage = lazy(() => import('./pages/admin/AuditLogPage'));
+const HealthDashboard = lazy(() => import('./pages/admin/HealthDashboard'));
 
 function App() {
   const { initialize, user } = useAuthStore();
@@ -236,6 +242,7 @@ function App() {
             <Route path="/auth/register" element={<Register />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/mfa" element={<MFAChallenge />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/auth/sso/callback" element={<SSOCallback />} />
 
@@ -278,6 +285,9 @@ function App() {
               <Route path="links" element={<Links />} />
               <Route path="testimonials" element={<Testimonials />} />
               <Route path="analytics" element={<Analytics />} />
+              <Route path="subscription" element={<SubscriptionPage />} />
+              <Route path="api-keys" element={<ApiKeysPage />} />
+              <Route path="team" element={<TeamPage />} />
               <Route path="settings" element={<Settings />} />
               <Route path="settings/delete-account" element={<DeleteAccount />} />
               <Route path="workflows" element={<WorkflowsListPage />} />
@@ -324,6 +334,34 @@ function App() {
                     backLabel="Back to Admin"
                   >
                     <SEODashboard />
+                  </RouteErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/audit-log"
+              element={
+                <ProtectedRoute>
+                  <RouteErrorBoundary
+                    section="Audit Log"
+                    backPath="/admin"
+                    backLabel="Back to Admin"
+                  >
+                    <AuditLogPage />
+                  </RouteErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/health"
+              element={
+                <ProtectedRoute>
+                  <RouteErrorBoundary
+                    section="Platform Health"
+                    backPath="/admin"
+                    backLabel="Back to Admin"
+                  >
+                    <HealthDashboard />
                   </RouteErrorBoundary>
                 </ProtectedRoute>
               }
