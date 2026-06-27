@@ -587,3 +587,43 @@ in the sandbox, so these are verified on GitHub-hosted runners:
 - `scripts/validate-migrations.mjs` (new)
 - `package.json` (verify:migrations script + lint flag fix)
 - `progress.txt`
+
+---
+
+## Verification Pass — CI follow-ups (2026-06-27, after #136 merge)
+
+Watching the #136 merge run on `main` surfaced three CI issues; fixed across
+PRs #137 and a follow-up.
+
+### PR #137 (merged)
+- **`verify-backend` edge-functions `deno check`**: failed in ~1s on a
+  dependency-resolution error, not type errors — `optimize-image` transitively
+  imports `npm:@imagemagick/magick-wasm` via `imagemagick_deno`, and `deno check`
+  aborts on `npm:` specifiers without a node_modules dir. Added
+  `--node-modules-dir=auto`. The check now actually type-checks (~17s).
+- **`ci` test job skipped**: it had `needs: typecheck`, so it never ran while
+  typecheck stays red on the tsc baseline. Dropped the dependency so tests run
+  every push/PR.
+
+### Edge-function deno baseline (documented; warn-only, NOT blocking)
+After the npm-resolution fix, `deno check` over the 90 edge functions reports
+**114 errors** — the Deno-side equivalent of the frontend tsc baseline. The job
+is intentionally `continue-on-error: true` so this does not block. Dominant
+patterns to address in dedicated follow-up work:
+- `esm.sh` **supabase-js version skew** — different functions import different
+  `@supabase/supabase-js` versions, so `SupabaseClient` types are incompatible
+  when passed into shared helpers (e.g. verify-mfa/index.ts:110). Fix by pinning
+  one esm.sh supabase-js version across functions / _shared.
+- **`.catch()` on Postgrest builders** — best-effort audit calls do
+  `supabase.from(...)...catch(() => undefined)`, but `PostgrestFilterBuilder`
+  isn't a Promise until awaited/`.then()`-ed (verify-mfa/index.ts:126,200).
+Flip the job to blocking once this baseline is cleared.
+
+### Follow-up PR — CI Node 20 → 22
+Decoupling the test job exposed a previously-hidden failure: `pii.test.ts` /
+`encryption.test.ts` pass on Node 22 (local/dev) but FAIL on CI's Node 20 (the
+PII encrypt→decrypt round-trip silently returns the ciphertext). Node is
+**test-runner-only** here — production is browser Web Crypto (frontend) and Deno
+(edge functions) — so this is a test-environment artifact, not a prod bug.
+Bumped `node-version: 20 → 22` across `ci.yml` and `verify-backend.yml`
+(also clears the Node 20 runner-deprecation warnings). Tests go green on 22.
