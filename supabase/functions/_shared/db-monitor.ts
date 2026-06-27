@@ -13,7 +13,7 @@
  *   );
  */
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const SLOW_QUERY_MS = 500;
 

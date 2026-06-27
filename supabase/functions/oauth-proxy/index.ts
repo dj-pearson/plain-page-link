@@ -8,7 +8,7 @@
  *   oauth-proxy -> Frontend /auth/callback?token=xxx -> establish session
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

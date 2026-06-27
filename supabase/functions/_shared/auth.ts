@@ -3,7 +3,7 @@
  * Security: Enforces admin checks on Edge Functions
  */
 
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 /**
  * Get authenticated user from request

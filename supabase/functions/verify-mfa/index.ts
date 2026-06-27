@@ -123,7 +123,7 @@ serve(async (req) => {
           p_user_agent: req.headers.get('user-agent'),
           p_details: JSON.stringify({ reason: 'rate_limited' }),
         })
-        .catch(() => undefined);
+        .then(undefined, () => undefined);
       return errorResponse(
         'Too many verification attempts. Please try again shortly.',
         'AUTH_LOGIN_RATE_LIMITED',
@@ -197,7 +197,7 @@ serve(async (req) => {
         p_user_agent: req.headers.get('user-agent'),
         p_details: JSON.stringify({ method }),
       })
-      .catch(() => undefined);
+      .then(undefined, () => undefined);
 
     if (!isValid) {
       // Increment failed attempts

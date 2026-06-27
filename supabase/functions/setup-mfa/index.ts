@@ -142,7 +142,7 @@ serve(async (req) => {
         p_user_agent: req.headers.get('user-agent'),
         p_details: JSON.stringify({ method: 'totp' }),
       })
-      .catch(() => undefined);
+      .then(undefined, () => undefined);
 
     return successResponse({
       secret,
