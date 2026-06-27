@@ -37,7 +37,11 @@ jobs:
 
   test:
     name: Test
-    needs: typecheck
+    # Intentionally NOT gated on typecheck: the repo carries a known tsc
+    # baseline (out-of-sync src/integrations/supabase/types.ts) that keeps the
+    # typecheck job red, which would otherwise skip tests entirely. Tests must
+    # run on every push/PR regardless. Re-add `needs: typecheck` once the
+    # baseline is cleared.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
