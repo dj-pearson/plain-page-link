@@ -20,10 +20,10 @@ jobs:
   edge-functions:
     name: Edge Functions (deno check)
     runs-on: ubuntu-latest
-    # Warn-only for now: this is the first time the 90 Deno edge functions are
-    # type-checked in CI, so surface results without blocking merges. Flip to
-    # blocking (remove continue-on-error) once the baseline is confirmed clean.
-    continue-on-error: true
+    # Blocking: the deno-check baseline has been cleared (114 -> 0). New
+    # genuine type errors in edge functions now fail CI. (Strictness is relaxed
+    # via supabase/functions/deno.json strict:false; genuine errors like wrong
+    # arg counts / missing properties are still caught.)
     steps:
       - uses: actions/checkout@v4
 
