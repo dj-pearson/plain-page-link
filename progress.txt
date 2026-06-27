@@ -10,6 +10,8 @@
 - 55 stories completed (passes: true), 0 pending — ALL PRD STORIES COMPLETE 🎉
 - Completed critical platform improvements in Ralph loop
 - Final two: US-045 (teams/multi-seat) + US-055 (lead routing)
+- 2026-06-27: Verification pass on branch claude/prd-stories-verification-13yn00
+  (see "Verification Pass" section at the end of this log)
 
 ## Codebase Patterns
 
@@ -519,3 +521,69 @@
 
 ## 🎉 PROJECT COMPLETE — 55/55 user stories passing
 All PRD stories implemented, type-checked, built, and (where applicable) unit/E2E/a11y tested. Edge functions and migrations were authored against documented APIs but could not be runtime-executed in the sandbox (no Deno/Supabase). The repo carries a large pre-existing tsc baseline from an out-of-sync `src/integrations/supabase/types.ts`; every change in this effort introduced zero new type errors (verified via stash comparison), isolating necessary casts. Recommended follow-up: regenerate types.ts from the live database to clear the baseline.
+
+---
+
+## Verification Pass — 2026-06-27 (branch: claude/prd-stories-verification-13yn00)
+
+Re-verified every directly-verifiable gate locally and routed the rest through CI.
+All 55 stories were already `passes: true`; no prd.json values were flipped — the
+work here was to *prove* the claims and close the gaps that verification surfaced.
+
+### What was verified locally (npm ci on a clean tree)
+| Gate | Command | Result |
+|------|---------|--------|
+| Unit tests | `npm run test:run` | ✅ 272/272 pass (22 files) |
+| Production build | `npm run build` | ✅ succeeds |
+| Bundle budgets | `npm run size-check` | ✅ within budget (1 documented exception) |
+| Lint (errors) | `eslint src/` | ✅ 0 errors (1037 warnings — baseline) |
+| Migrations (structure) | `npm run verify:migrations` | ✅ 78/78 structurally valid |
+| Typecheck | `tsc --noEmit` | ⚠️ 709 errors — accepted pre-existing baseline (out-of-sync types.ts) |
+
+### Gaps found and fixed
+1. **3 real React rules-of-hooks errors** (conditional hook calls) were failing the
+   CI `lint` and `security` jobs. Fixed by restructuring so hooks are always called
+   in the same order:
+   - `src/components/RouterCheck.tsx` — replaced try/catch-wrapped `useNavigate()`
+     with `useInRouterContext()` (a hook safe to call unconditionally).
+   - `src/components/profile/TestimonialSection.tsx` — moved the empty-state early
+     return to after `useSwipeGesture()`; made list/avg computations null-safe.
+   - `src/components/profile/FeaturedListingsCarousel.tsx` — hoisted the auto-advance
+     `useEffect` above the `featuredListings.length === 0` early return.
+   Stash-compared: these edits **removed 1 type error and introduced 0** (710→709).
+
+2. **Broken CI lint flag.** `eslint src/ --max-warnings -1` is invalid under ESLint 9
+   ("No -NUM option defined", exit 2) — the `lint` + `security` CI jobs and the
+   `lint:warn` script were failing on a *flag parse error*, not on code. Corrected to
+   `--max-warnings=-1` in `.github/workflows/ci.yml` (both jobs) and `package.json`.
+
+### Not locally verifiable → routed to a GitHub Action (per plan)
+Edge-function imports (deno.land/esm.sh) and a live Supabase Postgres are unreachable
+in the sandbox, so these are verified on GitHub-hosted runners:
+- **`.github/workflows/verify-backend.yml`** (new):
+  - `edge-functions` job — `deno check` over all 90 edge functions via
+    `denoland/setup-deno`. Warn-only initially (first-ever Deno typecheck of these
+    functions; flip to blocking once the baseline is confirmed clean on a runner).
+  - `migrations` job — runs `scripts/validate-migrations.mjs` (blocking).
+- **`scripts/validate-migrations.mjs`** (new) — dependency-free structural SQL lint
+  (balanced parens, balanced dollar-quoted blocks, unterminated strings/comments,
+  presence of a statement terminator; comments/dollar-bodies skipped to avoid false
+  positives). Negative-tested against deliberately broken fixtures. Wired as
+  `npm run verify:migrations`.
+
+### Decisions (confirmed with the user)
+- Typecheck baseline: **accepted** as pre-existing (not introduced by PRD work);
+  build + tests are the effective gates. Follow-up remains: regenerate `types.ts`
+  from the live DB to clear the ~709-error baseline.
+- The 3 hooks errors: **fixed**.
+- Edge functions / migrations: **verified via the new GitHub Action**.
+
+### Files changed in this pass
+- `src/components/RouterCheck.tsx`
+- `src/components/profile/TestimonialSection.tsx`
+- `src/components/profile/FeaturedListingsCarousel.tsx`
+- `.github/workflows/ci.yml`
+- `.github/workflows/verify-backend.yml` (new)
+- `scripts/validate-migrations.mjs` (new)
+- `package.json` (verify:migrations script + lint flag fix)
+- `progress.txt`
