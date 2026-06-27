@@ -246,7 +246,7 @@ serve(async (req) => {
     } else {
       // Check if user exists by email
       const { data: existingUser } = await supabase.auth.admin.listUsers();
-      const userByEmail = existingUser?.users?.find(u => u.email === userEmail);
+      const userByEmail = existingUser?.users?.find((u: { email?: string }) => u.email === userEmail);
 
       if (userByEmail) {
         userId = userByEmail.id;

@@ -83,7 +83,7 @@ serve(async (req) => {
     // Extract main content (remove script, style, nav, footer, etc.)
     const elementsToRemove = ['script', 'style', 'nav', 'footer', 'header', 'aside', 'iframe'];
     elementsToRemove.forEach(tag => {
-      doc.querySelectorAll(tag).forEach(el => el.remove());
+      doc.querySelectorAll(tag).forEach((el: any) => el.remove());
     });
 
     // Get text content
@@ -131,7 +131,7 @@ serve(async (req) => {
     const images = doc.querySelectorAll('img');
     const totalImages = images.length;
     let imagesWithAlt = 0;
-    images.forEach(img => {
+    images.forEach((img: any) => {
       if (img.getAttribute('alt')) imagesWithAlt++;
     });
 
@@ -141,7 +141,7 @@ serve(async (req) => {
     let internalLinks = 0;
     let externalLinks = 0;
 
-    links.forEach(link => {
+    links.forEach((link: any) => {
       const href = link.getAttribute('href') || '';
       if (url && href.includes(new URL(url).hostname)) {
         internalLinks++;
@@ -342,7 +342,7 @@ function estimateAvgSyllables(text: string, wordCount: number): number {
   if (wordCount === 0) return 0;
 
   // Simple syllable estimation based on vowel groups
-  const words = text.toLowerCase().match(/\b[a-z]+\b/g) || [];
+  const words: string[] = text.toLowerCase().match(/\b[a-z]+\b/g) || [];
   let totalSyllables = 0;
 
   words.forEach(word => {

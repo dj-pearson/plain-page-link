@@ -64,7 +64,7 @@ serve(async (req) => {
     const externalLinks = [];
     let brokenAnchors = 0;
 
-    linkElements.forEach(link => {
+    linkElements.forEach((link: any) => {
       const href = link.getAttribute('href') || '';
       const linkText = link.textContent?.trim() || '';
       const rel = link.getAttribute('rel') || '';

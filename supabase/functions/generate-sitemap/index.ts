@@ -210,7 +210,7 @@ serve(async (req) => {
           }
 
           // Get username from the joined profile
-          const profile = listing.profiles as { username: string } | null;
+          const profile = listing.profiles as unknown as { username: string } | null;
           if (profile?.username) {
             urls.push({
               loc: `${baseUrl}/${profile.username}/listing/${listing.id}`,

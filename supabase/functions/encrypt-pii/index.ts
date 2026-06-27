@@ -93,7 +93,7 @@ async function encryptValue(
   const encoder = new TextEncoder();
 
   const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv as BufferSource },
     key,
     encoder.encode(plaintext)
   );
@@ -114,7 +114,7 @@ async function decryptValue(
   const ciphertext = base64ToArrayBuffer(encryptedValue.ciphertext);
 
   const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv as BufferSource },
     key,
     ciphertext
   );
@@ -235,7 +235,7 @@ serve(async (req) => {
     } else {
       for (const field of fields) {
         const value = data[field];
-        if (value && typeof value === 'object' && 'ciphertext' in value) {
+        if (value && typeof value === 'object' && 'ciphertext' in (value as object)) {
           try {
             result[field] = await decryptValue(value as EncryptedValue, key);
           } catch {
@@ -247,7 +247,7 @@ serve(async (req) => {
     }
 
     // Log the operation
-    await logOperation(supabase, user.id, action, table, recordId, true);
+    await logOperation(supabase as any, user.id, action, table, recordId, true);
 
     const response: EncryptResponse = {
       success: true,
