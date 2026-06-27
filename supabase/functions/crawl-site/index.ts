@@ -105,7 +105,7 @@ serve(async (req) => {
         const internalLinks = new Set<string>();
         const externalLinks = new Set<string>();
 
-        for (const link of linkElements) {
+        for (const link of (linkElements as any)) {
           try {
             const href = link.getAttribute('href') || '';
             const absoluteUrl = new URL(href, current.url).toString();
@@ -147,7 +147,7 @@ serve(async (req) => {
         const imagesData = [];
         let imagesWithoutAlt = 0;
 
-        for (const img of imageElements) {
+        for (const img of (imageElements as any)) {
           const src = img.getAttribute('src') || '';
           const alt = img.getAttribute('alt') || '';
           if (!alt || alt.trim() === '') {

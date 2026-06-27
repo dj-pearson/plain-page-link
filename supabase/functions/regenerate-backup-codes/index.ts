@@ -22,7 +22,7 @@ const TOTP_ALGORITHM = 'SHA-1';
 async function generateHOTP(secret: Uint8Array, counter: bigint): Promise<string> {
   const counterBuffer = new ArrayBuffer(8);
   new DataView(counterBuffer).setBigUint64(0, counter, false);
-  const key = await crypto.subtle.importKey('raw', secret, { name: 'HMAC', hash: TOTP_ALGORITHM }, false, ['sign']);
+  const key = await crypto.subtle.importKey('raw', secret as BufferSource, { name: 'HMAC', hash: TOTP_ALGORITHM }, false, ['sign']);
   const signature = await crypto.subtle.sign('HMAC', key, counterBuffer);
   const hmac = new Uint8Array(signature);
   const offset = hmac[hmac.length - 1] & 0x0f;
@@ -47,7 +47,7 @@ async function verifyTOTP(secret: string, code: string, tolerance = 1): Promise<
 async function verifyBackupCode(code: string, hashedCodes: string[]): Promise<boolean> {
   const normalized = code.replace(/-/g, '').toUpperCase();
   const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
-  return hashedCodes.includes(base64Encode(new Uint8Array(hashBuffer)));
+  return hashedCodes.includes(base64Encode(hashBuffer));
 }
 
 function generateBackupCodes(count = 10): string[] {
@@ -68,7 +68,7 @@ async function hashBackupCodes(codes: string[]): Promise<string[]> {
   for (const code of codes) {
     const data = new TextEncoder().encode(code.replace('-', ''));
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    hashes.push(base64Encode(new Uint8Array(hashBuffer)));
+    hashes.push(base64Encode(hashBuffer));
   }
   return hashes;
 }

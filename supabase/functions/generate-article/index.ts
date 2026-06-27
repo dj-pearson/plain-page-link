@@ -109,9 +109,9 @@ export default async (req: Request) => {
     }
 
     // Priority order: 1) Queued suggestions, 2) Unused keywords, 3) AI suggestions
-    let selectedTopic = topic;
+    let selectedTopic: string = (topic as string) || '';
     let selectedKeywordId = null;
-    let selectedKeywords = keywords || [];
+    let selectedKeywords: string[] = (keywords as string[]) || [];
     let selectedSuggestionId = null;
     let articleCategory = category;
 
@@ -160,7 +160,7 @@ export default async (req: Request) => {
           console.log('[generate-article] No queued suggestions or keywords, generating AI suggestion...');
 
           const suggestResponse = await invokeFunctionWithTimeout(
-            supabase,
+            supabase as any,
             'generate-content-suggestions',
             { count: 1 },
             FUNCTION_INVOKE_TIMEOUT_MS

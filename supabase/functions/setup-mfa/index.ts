@@ -45,7 +45,7 @@ async function hashBackupCodes(codes: string[]): Promise<string[]> {
     const encoder = new TextEncoder();
     const data = encoder.encode(code.replace('-', ''));
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    hashes.push(base64Encode(new Uint8Array(hashBuffer)));
+    hashes.push(base64Encode(hashBuffer));
   }
   return hashes;
 }

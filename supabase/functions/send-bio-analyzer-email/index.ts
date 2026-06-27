@@ -57,7 +57,7 @@ serve(async (req) => {
     const sanitizedBrokerage = data.brokerage ? sanitizeString(data.brokerage) : undefined
 
     // Rate limiting - 5 requests per minute
-    const rateLimitResult = await checkRateLimit(req, `bio_email_${data.email}`, 5, 60)
+    const rateLimitResult = checkRateLimit(`bio_email_${data.email}`, { maxRequests: 5, windowMs: 60 * 1000 })
     if (!rateLimitResult.allowed) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),

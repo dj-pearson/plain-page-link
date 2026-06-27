@@ -14,7 +14,7 @@ import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/b
 function generateSecureRandom(length = 32): string {
   const array = new Uint8Array(length);
   crypto.getRandomValues(array);
-  return base64Encode(array).replace(/[+/=]/g, '').substring(0, length);
+  return base64Encode(array.buffer as ArrayBuffer).replace(/[+/=]/g, '').substring(0, length);
 }
 
 // Generate SAML AuthnRequest
@@ -49,7 +49,7 @@ function generateSAMLRequest(
 function encodeSAMLRequest(xml: string): string {
   const encoder = new TextEncoder();
   const data = encoder.encode(xml);
-  return base64Encode(data);
+  return base64Encode(data.buffer as ArrayBuffer);
 }
 
 serve(async (req) => {
@@ -161,7 +161,7 @@ serve(async (req) => {
       const relayState = base64Encode(new TextEncoder().encode(JSON.stringify({
         requestId,
         state,
-      })));
+      })).buffer as ArrayBuffer);
 
       authUrl = `${ssoConfig.saml_sso_url}?SAMLRequest=${encodeURIComponent(encodedRequest)}&RelayState=${encodeURIComponent(relayState)}`;
 

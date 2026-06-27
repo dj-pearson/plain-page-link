@@ -102,7 +102,7 @@ serve(async (req) => {
           // Resize to the target width, preserving aspect ratio (0 height).
           img.resize(width, 0);
           img.quality = WEBP_QUALITY;
-          img.write(MagickFormat.Webp, (data) => resolve(new Uint8Array(data)));
+          img.write(MagickFormat.WebP, (data) => resolve(new Uint8Array(data)));
         });
       });
 

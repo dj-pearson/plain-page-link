@@ -29,7 +29,7 @@ async function generateHOTP(secret: Uint8Array, counter: bigint): Promise<string
   // Import the secret as a CryptoKey
   const key = await crypto.subtle.importKey(
     'raw',
-    secret,
+    secret as BufferSource,
     { name: 'HMAC', hash: TOTP_ALGORITHM },
     false,
     ['sign']
@@ -82,7 +82,7 @@ async function verifyBackupCode(code: string, hashedCodes: string[]): Promise<{ 
   const encoder = new TextEncoder();
   const data = encoder.encode(normalizedCode);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hash = base64Encode(new Uint8Array(hashBuffer));
+  const hash = base64Encode(hashBuffer);
 
   const index = hashedCodes.indexOf(hash);
   return { valid: index !== -1, index };

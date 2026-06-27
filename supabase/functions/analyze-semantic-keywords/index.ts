@@ -61,14 +61,14 @@ serve(async (req) => {
     // Extract content
     const elementsToRemove = ['script', 'style', 'nav', 'footer', 'header'];
     elementsToRemove.forEach(tag => {
-      doc.querySelectorAll(tag).forEach(el => el.remove());
+      doc.querySelectorAll(tag).forEach((el: any) => el.remove());
     });
 
     const bodyText = doc.querySelector('body')?.textContent || '';
     const cleanText = bodyText.replace(/\s+/g, ' ').trim().toLowerCase();
 
     // Extract keywords (simple word frequency)
-    const words = cleanText.match(/\b[a-z]{3,}\b/g) || [];
+    const words: string[] = cleanText.match(/\b[a-z]{3,}\b/g) || [];
 
     // Remove common stop words
     const stopWords = new Set([

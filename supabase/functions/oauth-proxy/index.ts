@@ -163,7 +163,7 @@ export default async function handler(req: Request): Promise<Response> {
 
       // Check if user already exists
       const { data: existingUsers } = await supabase.auth.admin.listUsers();
-      const existingUser = existingUsers?.users?.find(u => u.email === payload.email);
+      const existingUser = existingUsers?.users?.find((u: { email?: string }) => u.email === payload.email);
 
       if (!existingUser) {
         // Create new user with provider metadata

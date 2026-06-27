@@ -70,7 +70,7 @@ serve(async (req) => {
     // Extract content
     const elementsToRemove = ['script', 'style', 'nav', 'footer', 'header'];
     elementsToRemove.forEach(tag => {
-      doc.querySelectorAll(tag).forEach(el => el.remove());
+      doc.querySelectorAll(tag).forEach((el: any) => el.remove());
     });
 
     const bodyText = doc.querySelector('body')?.textContent || '';
