@@ -39,7 +39,11 @@ jobs:
           # entrypoints transitively pull in the _shared utilities.
           mapfile -t FILES < <(find supabase/functions -name '*.ts' | sort)
           echo "Found ${#FILES[@]} edge-function TypeScript files."
-          deno check "${FILES[@]}"
+          # --node-modules-dir=auto lets Deno resolve npm: specifiers that some
+          # functions pull in transitively (e.g. optimize-image ->
+          # imagemagick_deno -> npm:@imagemagick/magick-wasm). Without it,
+          # `deno check` aborts on the first npm: import before type-checking.
+          deno check --node-modules-dir=auto "${FILES[@]}"
 
   migrations:
     name: SQL Migrations (structural lint)
