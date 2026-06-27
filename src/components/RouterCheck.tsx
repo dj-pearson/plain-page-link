@@ -1,36 +1,21 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FullPageLoader } from "./LoadingSpinner";
-import { logger } from "@/lib/logger";
+import { useInRouterContext } from 'react-router-dom';
+import { FullPageLoader } from './LoadingSpinner';
 
 /**
- * Component to verify Router context is available before rendering children
- * This prevents the "Cannot destructure property 'basename'" error
+ * Component to verify Router context is available before rendering children.
+ * This prevents the "Cannot destructure property 'basename'" error.
+ *
+ * Uses useInRouterContext() — a hook that synchronously reports whether the
+ * component tree is inside a Router — instead of wrapping useNavigate() in a
+ * try/catch. The previous approach called hooks conditionally, violating the
+ * rules of hooks.
  */
 export function RouterCheck({ children }: { children: React.ReactNode }) {
-    const [isRouterReady, setIsRouterReady] = useState(false);
+  const inRouterContext = useInRouterContext();
 
-    // Try to access the router context
-    try {
-        const navigate = useNavigate();
+  if (!inRouterContext) {
+    return <FullPageLoader text="Initializing..." />;
+  }
 
-        useEffect(() => {
-            // If we can call useNavigate successfully, router is ready
-            if (navigate) {
-                setIsRouterReady(true);
-            }
-        }, [navigate]);
-
-    } catch (error) {
-        logger.error("[RouterCheck] Router context not available", error as Error);
-        // If router isn't ready, show loader
-        return <FullPageLoader text="Initializing..." />;
-    }
-
-    // Wait for router to be ready
-    if (!isRouterReady) {
-        return <FullPageLoader text="Loading..." />;
-    }
-
-    return <>{children}</>;
+  return <>{children}</>;
 }

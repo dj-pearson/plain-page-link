@@ -142,7 +142,7 @@ jobs:
         run: npm ci
 
       - name: Run ESLint
-        run: npx eslint src/ --max-warnings -1
+        run: npx eslint src/ --max-warnings=-1
 
   security:
     name: Security Audit
@@ -169,7 +169,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Run ESLint
-        run: npx eslint src/ --max-warnings -1
+        run: npx eslint src/ --max-warnings=-1
 
   accessibility:
     name: Accessibility (axe-core)
