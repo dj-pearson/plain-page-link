@@ -43,7 +43,9 @@ jobs:
           # functions pull in transitively (e.g. optimize-image ->
           # imagemagick_deno -> npm:@imagemagick/magick-wasm). Without it,
           # `deno check` aborts on the first npm: import before type-checking.
-          deno check --node-modules-dir=auto "${FILES[@]}"
+          # --config points at the edge-function deno.json (relaxes catch-var
+          # and implicit-any strictness for the Deno runtime).
+          deno check --config supabase/functions/deno.json --node-modules-dir=auto "${FILES[@]}"
 
   migrations:
     name: SQL Migrations (structural lint)

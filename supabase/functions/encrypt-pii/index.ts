@@ -57,7 +57,7 @@ function getMasterKey(): Uint8Array {
 async function importKey(keyBytes: Uint8Array): Promise<CryptoKey> {
   return await crypto.subtle.importKey(
     'raw',
-    keyBytes,
+    keyBytes as BufferSource,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt', 'decrypt']

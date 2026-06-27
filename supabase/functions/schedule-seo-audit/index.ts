@@ -6,6 +6,7 @@ interface AuditSchedule {
   id: string
   name: string
   schedule_type: string
+  cron_expression?: string | null
   audit_config: {
     checks?: string[]
     include_performance?: boolean
