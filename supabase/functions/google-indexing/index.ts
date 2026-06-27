@@ -6,7 +6,7 @@
  * See: https://developers.google.com/search/apis/indexing-api/v3/prereqs
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { handleError, successResponse, ValidationError, AppError } from '../_shared/errors.ts';
 import { requireAuth } from '../_shared/auth.ts';

@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
@@ -110,7 +110,7 @@ serve(async (req) => {
           p_resource_type: 'api_key',
           p_resource_id: data.id,
         })
-        .catch(() => undefined);
+        .then(undefined, () => undefined);
 
       // Full key returned ONCE — never retrievable again.
       return successResponse({ key: fullKey, record: data }, req);
@@ -135,7 +135,7 @@ serve(async (req) => {
           p_resource_type: 'api_key',
           p_resource_id: id,
         })
-        .catch(() => undefined);
+        .then(undefined, () => undefined);
 
       return successResponse({ revoked: true }, req);
     }

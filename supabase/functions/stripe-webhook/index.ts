@@ -193,7 +193,7 @@ serve(async (req) => {
         p_resource_type: 'subscription',
         p_details: JSON.stringify({ event_id: event.id, event_type: event.type }),
       })
-      .catch(() => undefined);
+      .then(undefined, () => undefined);
 
     switch (event.type) {
       // ========================================

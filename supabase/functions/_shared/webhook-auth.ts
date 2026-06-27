@@ -5,7 +5,7 @@
  * Security: Validates API keys for server-to-server communication
  */
 
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 /**
  * Validate API key from request headers

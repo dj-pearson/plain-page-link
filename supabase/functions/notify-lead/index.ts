@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail, createLeadNotificationEmail } from '../_shared/email.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
@@ -116,7 +116,7 @@ serve(async (req) => {
         p_resource_id: lead.id,
         p_details: JSON.stringify({ channel: 'email' }),
       })
-      .catch(() => undefined);
+      .then(undefined, () => undefined);
 
     return successResponse({ notified: true }, req);
   } catch (error) {

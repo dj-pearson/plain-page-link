@@ -128,7 +128,7 @@ serve(async (req) => {
           p_user_agent: req.headers.get('user-agent'),
           p_details: JSON.stringify({ reason: 'invalid_code' }),
         })
-        .catch(() => undefined);
+        .then(undefined, () => undefined);
       return errorResponse('Invalid verification code', 'AUTH_MFA_INVALID', req);
     }
 
@@ -160,7 +160,7 @@ serve(async (req) => {
         p_user_agent: req.headers.get('user-agent'),
         p_details: JSON.stringify({ count: backupCodes.length }),
       })
-      .catch(() => undefined);
+      .then(undefined, () => undefined);
 
     return successResponse(
       {

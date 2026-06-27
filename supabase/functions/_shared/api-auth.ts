@@ -7,7 +7,7 @@
  * non-expired) row, returning the owning user_id + permissions.
  */
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 export const API_KEY_PREFIX = 'ab_';
 

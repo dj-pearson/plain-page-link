@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getAuthenticatedUser } from '../_shared/service-auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';

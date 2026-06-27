@@ -4,7 +4,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 
@@ -89,7 +89,7 @@ serve(async (req: Request) => {
             reason: reason || 'revoke_all_by_user',
           }),
         })
-        .catch(() => undefined);
+        .then(undefined, () => undefined);
     } else if (sessionId) {
       // Revoke specific session
       const { data, error } = await supabase
@@ -134,7 +134,7 @@ serve(async (req: Request) => {
           p_user_agent: userAgent,
           p_details: JSON.stringify({ reason: reason || 'user_revoked' }),
         })
-        .catch(() => undefined);
+        .then(undefined, () => undefined);
     } else {
       return new Response(
         JSON.stringify({
