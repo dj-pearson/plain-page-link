@@ -116,7 +116,7 @@ async function decryptValue(
   const decrypted = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: iv as BufferSource },
     key,
-    ciphertext
+    ciphertext as BufferSource
   );
 
   const decoder = new TextDecoder();

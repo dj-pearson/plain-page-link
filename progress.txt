@@ -627,3 +627,46 @@ PII encrypt→decrypt round-trip silently returns the ciphertext). Node is
 (edge functions) — so this is a test-environment artifact, not a prod bug.
 Bumped `node-version: 20 → 22` across `ci.yml` and `verify-backend.yml`
 (also clears the Node 20 runner-deprecation warnings). Tests go green on 22.
+
+---
+
+## Follow-up #2 COMPLETE — edge-function deno check cleared & blocking (2026-06-27)
+
+Drove the `Edge Functions (deno check)` job from its 114-error baseline to 0 and
+flipped it from warn-only to **blocking**. Trajectory: **114 → 212 → 34 → 1 → 0**
+(the 212 spike was a self-inflicted `noImplicitAny:false` misstep — disabling
+implicit-any also disables TS's evolving-array inference, collapsing `const x=[]`
+to `never[]`; corrected with `strict:false`).
+
+### Genuine bugs the deno check surfaced (now fixed)
+- **optimize-image**: `MagickFormat.Webp` → `WebP` — would throw on WebP encode.
+- **analyze-content** imported a non-existent `_shared/errorHelpers.ts`, and
+  **apply-seo-autofix** referenced an undefined `getErrorMessage` — created
+  `_shared/errorHelpers.ts` (`getErrorMessage`) and imported it.
+
+### Systematic fixes
+- Pinned all 91 `@supabase/supabase-js` esm.sh imports to `2.39.7` (version skew
+  caused `SupabaseClient` type mismatches into `_shared` helpers).
+- `.catch(() => undefined)` → `.then(undefined, () => undefined)` on 13 audit
+  calls (`PostgrestFilterBuilder` is a thenable with no `.catch` — type + latent
+  runtime error).
+- `supabase/functions/deno.json` `strict:false` (edge-function runtime; these
+  weren't written to strict TS). Genuine errors (arg counts, missing props,
+  bad imports) are still caught.
+- Per-site: deno_dom `Node` casts (querySelectorAll lacks getAttribute/remove in
+  the type), `Uint8Array`→`BufferSource` crypto casts, base64 ArrayBuffer args,
+  `unknown`/`never` typings, supabase `.users.find` callback typing.
+
+### CI config
+- `.github/workflows/verify-backend.yml`: `deno check` runs with
+  `--node-modules-dir=auto` (npm: resolution) and `--config supabase/functions/
+  deno.json`; the edge-functions job is now **blocking** (continue-on-error
+  removed). Migrations job already blocking + green.
+
+### Status of both follow-ups
+- **#2 (edge-function deno errors): DONE** — 0 errors, job blocking.
+- **#1 (regenerate types.ts to clear the 709 tsc baseline): DEFERRED** — needs
+  Supabase DB access (CLI + access token) not available in this environment.
+  Run `supabase gen types typescript --project-id <ref> > src/integrations/
+  supabase/types.ts`, then the CI `test` job's `needs: typecheck` can be
+  restored and Type Check flipped back to a hard gate.
