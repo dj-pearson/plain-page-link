@@ -1,25 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { isServiceRoleRequest, getAuthenticatedUser } from '../_shared/service-auth.ts';
 
 export default async (req: Request) => {
   console.log('[publish-article-to-social] Function invoked');
-  
+
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const bodyText = await req.text();
-    console.log('[publish-article-to-social] Request body:', bodyText);
-    
-    const { articleId } = JSON.parse(bodyText || '{}');
-    console.log('[publish-article-to-social] Publishing article to social:', articleId);
-    
-    if (!articleId) {
-      throw new Error('articleId is required');
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const claudeApiKey = Deno.env.get('CLAUDE_API_KEY');
@@ -30,6 +21,30 @@ export default async (req: Request) => {
         persistSession: false,
       }
     });
+
+    // verify_jwt is disabled, but this is invoked both by generate-article
+    // (service role) and by the admin UI (user JWT). Accept either, but reject
+    // anonymous/anon-key callers so arbitrary article IDs can't be published to
+    // all configured webhooks at the attacker's whim (also spends the AI budget).
+    if (!isServiceRoleRequest(req)) {
+      const userId = await getAuthenticatedUser(req, supabase);
+      if (!userId) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const bodyText = await req.text();
+    console.log('[publish-article-to-social] Request body:', bodyText);
+
+    const { articleId } = JSON.parse(bodyText || '{}');
+    console.log('[publish-article-to-social] Publishing article to social:', articleId);
+
+    if (!articleId) {
+      throw new Error('articleId is required');
+    }
 
     // Fetch the article
     const { data: article, error: articleError } = await supabase
