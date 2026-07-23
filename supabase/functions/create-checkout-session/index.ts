@@ -217,10 +217,10 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Checkout session error:', error);
-    const message = error instanceof Error ? error.message : 'An error occurred';
+    // Log detail server-side; don't return internal error strings to the caller.
+    console.error('Checkout session error:', error instanceof Error ? error.message : error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: 'Unable to start checkout. Please try again.' }),
       {
         headers: { ...getCorsHeaders(null), 'Content-Type': 'application/json' },
         status: 400,

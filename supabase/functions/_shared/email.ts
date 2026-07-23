@@ -8,6 +8,20 @@ interface EmailOptions {
   html?: string
 }
 
+// Escape user-controlled values before interpolating them into HTML email
+// bodies. Lead name/message/listing come from public intake forms, so an
+// unescaped value could inject markup (phishing links, layout breakout) into
+// the email delivered from the agent's own domain.
+export function escapeHtml(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return ''
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export async function sendEmail(options: EmailOptions): Promise<void> {
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
 
@@ -28,7 +42,9 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
         to: options.to,
         subject: options.subject,
         text: options.body,
-        html: options.html || `<p>${options.body.replace(/\n/g, '<br>')}</p>`,
+        // When no explicit HTML is supplied, escape the plaintext body before
+        // wrapping it so user-controlled content can't inject markup.
+        html: options.html || `<p>${escapeHtml(options.body).replace(/\n/g, '<br>')}</p>`,
       }),
     })
 
@@ -103,7 +119,7 @@ export function createLeadNotificationEmail(data: {
     .filter(([, v]) => v)
     .map(
       ([label, value]) =>
-        `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:120px;">${label}</td><td style="padding:6px 0;color:#1f2937;font-size:14px;font-weight:600;">${value}</td></tr>`
+        `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:120px;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#1f2937;font-size:14px;font-weight:600;">${escapeHtml(value)}</td></tr>`
     )
     .join('')
 
@@ -125,14 +141,14 @@ View this lead: ${dashboardUrl}
   <div style="max-width:600px;margin:0 auto;">
     <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:32px 30px;text-align:center;">
       <h1 style="margin:0;font-size:22px;font-weight:600;">🔔 New Lead Captured</h1>
-      <p style="margin:8px 0 0;opacity:.95;font-size:15px;">${data.name} is interested in ${listing}</p>
+      <p style="margin:8px 0 0;opacity:.95;font-size:15px;">${escapeHtml(data.name)} is interested in ${escapeHtml(listing)}</p>
     </div>
     <div style="background:#fff;padding:30px;">
       ${scoreBadge ? `<p style="margin:0 0 16px;">${scoreBadge}</p>` : ''}
       <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
       ${
         data.message
-          ? `<div style="margin:20px 0;padding:16px;background:#f9fafb;border-left:4px solid #667eea;border-radius:8px;"><p style="margin:0 0 6px;color:#6b7280;font-size:13px;font-weight:600;">MESSAGE</p><p style="margin:0;color:#1f2937;font-size:14px;white-space:pre-wrap;">${data.message}</p></div>`
+          ? `<div style="margin:20px 0;padding:16px;background:#f9fafb;border-left:4px solid #667eea;border-radius:8px;"><p style="margin:0 0 6px;color:#6b7280;font-size:13px;font-weight:600;">MESSAGE</p><p style="margin:0;color:#1f2937;font-size:14px;white-space:pre-wrap;">${escapeHtml(data.message)}</p></div>`
           : ''
       }
       <div style="text-align:center;margin-top:24px;">

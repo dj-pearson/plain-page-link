@@ -249,9 +249,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error checking security headers:', error);
+    // Log the detail server-side; return a generic message so internal error
+    // strings (stack fragments, DB errors) don't leak to the caller.
+    console.error('Error checking security headers:', getErrorMessage(error));
     return new Response(
-      JSON.stringify({ error: getErrorMessage(error) }),
+      JSON.stringify({ error: 'Failed to check security headers' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
