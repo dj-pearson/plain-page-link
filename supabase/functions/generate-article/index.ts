@@ -83,9 +83,8 @@ export default async (req: Request) => {
       return errorResponse(`Missing required environment variables: ${missingEnvVars.join(', ')}`, 'INTERNAL_SERVER_ERROR', req, 500);
     }
 
-    console.log(`[generate-article] Environment validated. SUPABASE_URL: ${SUPABASE_URL}`);
-    console.log(`[generate-article] Service Role Key present: ${!!SUPABASE_SERVICE_ROLE_KEY}, length: ${SUPABASE_SERVICE_ROLE_KEY?.length}`);
-    console.log(`[generate-article] Service Role Key prefix: ${SUPABASE_SERVICE_ROLE_KEY?.substring(0, 20)}...`);
+    // Never log any portion of the service-role key (it is the RLS-bypass master secret).
+    console.log(`[generate-article] Environment validated. Service Role Key present: ${!!SUPABASE_SERVICE_ROLE_KEY}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {

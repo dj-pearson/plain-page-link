@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { isPublicFetchableUrl } from '../_shared/validation.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -15,6 +16,13 @@ serve(async (req) => {
     if (!url) {
       return new Response(
         JSON.stringify({ error: 'URL is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!isPublicFetchableUrl(url)) {
+      return new Response(
+        JSON.stringify({ error: 'URL must be a public http(s) URL' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

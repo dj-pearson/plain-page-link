@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { isPublicFetchableUrl } from '../_shared/validation.ts';
 
 interface CrawlRequest {
   startUrl: string;
@@ -31,6 +32,14 @@ serve(async (req) => {
       return errorResponse('startUrl is required', 'SEO_CRAWL_VALIDATION', req);
     }
 
+    if (!isPublicFetchableUrl(startUrl)) {
+      return errorResponse(
+        'startUrl must be a public http(s) URL',
+        'SEO_CRAWL_VALIDATION',
+        req
+      );
+    }
+
     console.log(`Starting crawl from: ${startUrl}`);
     console.log(`Max pages: ${maxPages}, Max depth: ${maxDepth}`);
 
@@ -53,6 +62,9 @@ serve(async (req) => {
 
       if (visited.has(current.url)) continue;
       if (current.depth > maxDepth) continue;
+      // Re-check every URL before fetching: discovered links could point at
+      // internal hosts even when the entry URL was public (SSRF via redirect/link).
+      if (!isPublicFetchableUrl(current.url)) continue;
 
       visited.add(current.url);
       console.log(`Crawling [${visited.size}/${maxPages}]: ${current.url} (depth: ${current.depth})`);
