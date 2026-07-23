@@ -5,6 +5,22 @@
 
 ---
 
+## Remediation status (updated 2026-07-23)
+
+Fixes were applied on branch `claude/web-platform-code-review-924v71` (16 commits). Summary:
+
+**Fixed & pushed:** C2 (SSRF ×6), H1 (MFA enforcement), H3 (chunk-error recovery), H4 (service-worker scope), H5 (auth-store listener leak), H6 (soft-delete undo/cleanup), H7 (generate-article auth+rate-limit), H8 (service-role key logging), M3 (admin route authz), M4 (useLinks IDOR), M5 (oauth-proxy CORS), M6 (offline-sync table/timer), M7 (auto-save timer), M8 (analytics query), M10 (verify_jwt=false authz ×3), M12 (email HTML escaping), M13 (intake rate bucket), L1–L6, L9, L11–L13, plus a bonus fix reviving the app-wide toast system (~50 components were silently dropping notifications).
+
+**Needs an infra/product decision (not safe to auto-fix here):**
+- **C1** — move the PII encryption key server-side (Supabase Vault / edge secret) + rotate. Architectural.
+- **C3** — verify SAML/OIDC signatures with a real library + IdP certs. Needs library + cert config.
+- **H2 / M11** — login throttle & login-security must be enforced **server-side** (a Supabase auth hook); a client-side "fail closed" would let an attacker DoS the throttle into locking out all logins.
+- **M1 / M2** — regenerate `types.ts` via `supabase gen types` (30+ tables are stale), then enable a `tsc --noEmit` CI gate. Needs DB access; belongs in CI.
+- **M9** — bundle-splitting strategy for the 660 kB main chunk / 820 kB three-vendor. Config + measurement call.
+- **L7 / L8 / L10** — bulk `console.*`→`logger`, single-segment 404 HTTP status (Cloudflare-side), and eslint-warning burndown. Mechanical; low urgency.
+
+---
+
 ## Executive summary
 
 The app **builds and runs**, but its type-safety net is effectively disabled and there are genuine **security holes** and **correctness bugs** that affect real user flows (login/MFA/SSO, lead PII, the public profile page, offline sync). The recurring backend theme: functions trust `verify_jwt` (satisfied by the public anon key) instead of doing in-code authorization, ownership checks, and input-URL validation. Highest priority: fix the three Critical security issues, then restore the TypeScript gate so regressions can't ship unnoticed.
