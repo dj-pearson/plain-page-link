@@ -1,7 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { getAuthenticatedUser } from '../_shared/service-auth.ts';
+import { getAuthenticatedUser, isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
 
 // Timeout constants
 const AI_API_TIMEOUT_MS = 120000; // 2 minutes for AI generation
@@ -93,18 +94,41 @@ export default async (req: Request) => {
       }
     });
 
-    // Authenticate: Accept service role key (for Make.com) or JWT (for web app)
-    let userId = null;
-    try {
+    // Authenticate: accept EITHER a service-role request (Make.com/server) OR a
+    // valid user JWT. Do NOT proceed on failure — getAuthenticatedUser returns
+    // null both for service-role and for unauthenticated callers, so a bare
+    // anon-key request (which satisfies verify_jwt) must be rejected explicitly.
+    let userId: string | null = null;
+    const serviceRole = isServiceRoleRequest(req);
+
+    if (serviceRole) {
+      console.log('[generate-article] Authenticated via service role key');
+    } else {
       userId = await getAuthenticatedUser(req, supabase);
-      
-      if (userId) {
-        console.log('[generate-article] User authenticated with ID:', userId);
-      } else {
-        console.log('[generate-article] Authenticated via service role key (no user ID)');
+      if (!userId) {
+        return errorResponse(
+          'Authentication required',
+          'UNAUTHORIZED',
+          req,
+          401
+        );
       }
-    } catch (e) {
-      console.warn('[generate-article] Auth check failed (proceeding without user):', e instanceof Error ? e.message : e);
+      console.log('[generate-article] User authenticated with ID:', userId);
+
+      // Rate-limit this expensive AI generation per user so a single account
+      // can't run up the model bill. Service-role automation is exempt.
+      const rateLimit = await checkRateLimitDb(supabase, `user:${userId}`, 'generate-article', {
+        maxRequests: 10,
+        windowSeconds: 60,
+      });
+      if (!rateLimit.allowed) {
+        return errorResponse(
+          'Too many generation requests. Please try again shortly.',
+          'RATE_LIMITED',
+          req,
+          429
+        );
+      }
     }
 
     // Priority order: 1) Queued suggestions, 2) Unused keywords, 3) AI suggestions
