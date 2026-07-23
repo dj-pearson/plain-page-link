@@ -3,242 +3,248 @@
  * Handles background synchronization of offline changes
  */
 
-import { offlineStorage } from "./offline-storage";
-import { supabase } from "@/integrations/supabase/client";
-import { logger } from "@/lib/logger";
+import { offlineStorage } from './offline-storage';
+import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export class SyncManager {
-    private static instance: SyncManager;
-    private syncInterval: number = 5000; // 5 seconds
-    private syncTimer?: NodeJS.Timeout;
-    private isSyncing: boolean = false;
+  private static instance: SyncManager;
+  private syncInterval: number = 5000; // 5 seconds
+  private syncTimer?: NodeJS.Timeout;
+  private isSyncing: boolean = false;
 
-    private constructor() {
-        this.startSync();
-        this.setupOnlineListener();
+  private constructor() {
+    // Do NOT start the polling timer here: this class is instantiated at
+    // module load, and auto-starting an unbounded setInterval on import
+    // would peg a timer for the page's lifetime. Callers opt in via start().
+    this.setupOnlineListener();
+  }
+
+  /**
+   * Begin periodic background sync. Call this once during app init when the
+   * offline-sync feature is actually enabled.
+   */
+  start() {
+    this.startSync();
+  }
+
+  static getInstance(): SyncManager {
+    if (!SyncManager.instance) {
+      SyncManager.instance = new SyncManager();
+    }
+    return SyncManager.instance;
+  }
+
+  private setupOnlineListener() {
+    window.addEventListener('online', () => {
+      logger.info('[SyncManager] Network connection restored');
+      this.syncNow();
+    });
+
+    window.addEventListener('offline', () => {
+      logger.info('[SyncManager] Network connection lost');
+    });
+  }
+
+  private startSync() {
+    if (this.syncTimer) {
+      clearInterval(this.syncTimer);
     }
 
-    static getInstance(): SyncManager {
-        if (!SyncManager.instance) {
-            SyncManager.instance = new SyncManager();
+    this.syncTimer = setInterval(() => {
+      if (navigator.onLine && !this.isSyncing) {
+        this.processSyncQueue();
+      }
+    }, this.syncInterval);
+  }
+
+  async syncNow() {
+    if (navigator.onLine && !this.isSyncing) {
+      await this.processSyncQueue();
+    }
+  }
+
+  private async processSyncQueue() {
+    if (this.isSyncing) return;
+
+    this.isSyncing = true;
+
+    try {
+      const queue = await offlineStorage.getSyncQueue();
+      logger.info(`[SyncManager] Processing ${queue.length} items`);
+
+      for (const item of queue) {
+        // Skip if too many attempts
+        if (item.attempts >= 5) {
+          logger.warn(`[SyncManager] Max attempts reached for item ${item.id}`);
+          // You might want to move this to a failed queue or alert the user
+          await offlineStorage.removeFromSyncQueue(item.id);
+          continue;
         }
-        return SyncManager.instance;
-    }
-
-    private setupOnlineListener() {
-        window.addEventListener("online", () => {
-            logger.info("[SyncManager] Network connection restored");
-            this.syncNow();
-        });
-
-        window.addEventListener("offline", () => {
-            logger.info("[SyncManager] Network connection lost");
-        });
-    }
-
-    private startSync() {
-        if (this.syncTimer) {
-            clearInterval(this.syncTimer);
-        }
-
-        this.syncTimer = setInterval(() => {
-            if (navigator.onLine && !this.isSyncing) {
-                this.processSyncQueue();
-            }
-        }, this.syncInterval);
-    }
-
-    async syncNow() {
-        if (navigator.onLine && !this.isSyncing) {
-            await this.processSyncQueue();
-        }
-    }
-
-    private async processSyncQueue() {
-        if (this.isSyncing) return;
-
-        this.isSyncing = true;
 
         try {
-            const queue = await offlineStorage.getSyncQueue();
-            logger.info(`[SyncManager] Processing ${queue.length} items`);
-
-            for (const item of queue) {
-                // Skip if too many attempts
-                if (item.attempts >= 5) {
-                    logger.warn(`[SyncManager] Max attempts reached for item ${item.id}`);
-                    // You might want to move this to a failed queue or alert the user
-                    await offlineStorage.removeFromSyncQueue(item.id);
-                    continue;
-                }
-
-                try {
-                    await this.syncItem(item);
-                    await offlineStorage.removeFromSyncQueue(item.id);
-                    logger.info(`[SyncManager] Successfully synced item ${item.id}`);
-                } catch (error) {
-                    logger.error(`[SyncManager] Failed to sync item ${item.id}:`, error as Error);
-                    await offlineStorage.incrementSyncAttempts(item.id);
-                }
-            }
-        } finally {
-            this.isSyncing = false;
+          await this.syncItem(item);
+          await offlineStorage.removeFromSyncQueue(item.id);
+          logger.info(`[SyncManager] Successfully synced item ${item.id}`);
+        } catch (error) {
+          logger.error(`[SyncManager] Failed to sync item ${item.id}:`, error as Error);
+          await offlineStorage.incrementSyncAttempts(item.id);
         }
+      }
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  private async syncItem(item: any) {
+    const { type, action, data } = item;
+
+    switch (type) {
+      case 'listing_create':
+        return await this.syncListingCreate(data);
+
+      case 'listing_update':
+        return await this.syncListingUpdate(data);
+
+      case 'listing_delete':
+        return await this.syncListingDelete(data);
+
+      case 'lead_response':
+        return await this.syncLeadResponse(data);
+
+      default:
+        logger.warn(`[SyncManager] Unknown sync type: ${type}`);
+    }
+  }
+
+  private async syncListingCreate(data: any) {
+    const { data: result, error } = await supabase.from('listings').insert(data).select().single();
+
+    if (error) throw error;
+
+    // Update local storage with server ID
+    if (result) {
+      await offlineStorage.saveListing({
+        ...data,
+        id: result.id,
+        lastSync: Date.now(),
+        localChanges: false,
+      });
     }
 
-    private async syncItem(item: any) {
-        const { type, action, data } = item;
+    return result;
+  }
 
-        switch (type) {
-            case "listing_create":
-                return await this.syncListingCreate(data);
+  private async syncListingUpdate(data: any) {
+    const { id, ...updates } = data;
 
-            case "listing_update":
-                return await this.syncListingUpdate(data);
+    const { data: result, error } = await supabase
+      .from('listings')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
 
-            case "listing_delete":
-                return await this.syncListingDelete(data);
+    if (error) throw error;
 
-            case "lead_response":
-                return await this.syncLeadResponse(data);
-
-            default:
-                logger.warn(`[SyncManager] Unknown sync type: ${type}`);
-        }
+    // Update local storage
+    if (result) {
+      await offlineStorage.saveListing({
+        ...result,
+        lastSync: Date.now(),
+        localChanges: false,
+      });
     }
 
-    private async syncListingCreate(data: any) {
-        const { data: result, error } = await supabase
-            .from("pages")
-            .insert(data)
-            .select()
-            .single();
+    return result;
+  }
 
-        if (error) throw error;
+  private async syncListingDelete(data: any) {
+    const { id } = data;
 
-        // Update local storage with server ID
-        if (result) {
-            await offlineStorage.saveListing({
-                ...data,
-                id: result.id,
-                lastSync: Date.now(),
-                localChanges: false,
-            });
-        }
+    const { error } = await supabase.from('listings').delete().eq('id', id);
 
-        return result;
+    if (error) throw error;
+
+    // Remove from local storage
+    await offlineStorage.deleteListing(id);
+  }
+
+  private async syncLeadResponse(data: any) {
+    // Implement lead response sync
+    // This would typically involve sending an email or updating lead status
+    logger.info('[SyncManager] Syncing lead response:', { data });
+  }
+
+  async queueListingUpdate(listing: any) {
+    const syncItem = {
+      id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: 'listing_update' as const,
+      action: 'update' as const,
+      data: listing,
+      timestamp: Date.now(),
+      attempts: 0,
+    };
+
+    await offlineStorage.addToSyncQueue(syncItem);
+
+    // Also save to local storage with pending changes flag
+    await offlineStorage.saveListing({
+      ...listing,
+      lastSync: Date.now(),
+      localChanges: true,
+    });
+
+    // Try to sync immediately if online
+    if (navigator.onLine) {
+      this.syncNow();
     }
+  }
 
-    private async syncListingUpdate(data: any) {
-        const { id, ...updates } = data;
+  async queueListingCreate(listing: any) {
+    const syncItem = {
+      id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: 'listing_create' as const,
+      action: 'create' as const,
+      data: listing,
+      timestamp: Date.now(),
+      attempts: 0,
+    };
 
-        const { data: result, error } = await supabase
-            .from("pages")
-            .update(updates)
-            .eq("id", id)
-            .select()
-            .single();
+    await offlineStorage.addToSyncQueue(syncItem);
+    await offlineStorage.saveListing({
+      ...listing,
+      lastSync: Date.now(),
+      localChanges: true,
+    });
 
-        if (error) throw error;
-
-        // Update local storage
-        if (result) {
-            await offlineStorage.saveListing({
-                ...result,
-                lastSync: Date.now(),
-                localChanges: false,
-            });
-        }
-
-        return result;
+    if (navigator.onLine) {
+      this.syncNow();
     }
+  }
 
-    private async syncListingDelete(data: any) {
-        const { id } = data;
+  async queueListingDelete(id: string) {
+    const syncItem = {
+      id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: 'listing_delete' as const,
+      action: 'delete' as const,
+      data: { id },
+      timestamp: Date.now(),
+      attempts: 0,
+    };
 
-        const { error } = await supabase.from("pages").delete().eq("id", id);
+    await offlineStorage.addToSyncQueue(syncItem);
 
-        if (error) throw error;
-
-        // Remove from local storage
-        await offlineStorage.deleteListing(id);
+    if (navigator.onLine) {
+      this.syncNow();
     }
+  }
 
-    private async syncLeadResponse(data: any) {
-        // Implement lead response sync
-        // This would typically involve sending an email or updating lead status
-        logger.info("[SyncManager] Syncing lead response:", { data });
+  stop() {
+    if (this.syncTimer) {
+      clearInterval(this.syncTimer);
     }
-
-    async queueListingUpdate(listing: any) {
-        const syncItem = {
-            id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            type: "listing_update" as const,
-            action: "update" as const,
-            data: listing,
-            timestamp: Date.now(),
-            attempts: 0,
-        };
-
-        await offlineStorage.addToSyncQueue(syncItem);
-
-        // Also save to local storage with pending changes flag
-        await offlineStorage.saveListing({
-            ...listing,
-            lastSync: Date.now(),
-            localChanges: true,
-        });
-
-        // Try to sync immediately if online
-        if (navigator.onLine) {
-            this.syncNow();
-        }
-    }
-
-    async queueListingCreate(listing: any) {
-        const syncItem = {
-            id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            type: "listing_create" as const,
-            action: "create" as const,
-            data: listing,
-            timestamp: Date.now(),
-            attempts: 0,
-        };
-
-        await offlineStorage.addToSyncQueue(syncItem);
-        await offlineStorage.saveListing({
-            ...listing,
-            lastSync: Date.now(),
-            localChanges: true,
-        });
-
-        if (navigator.onLine) {
-            this.syncNow();
-        }
-    }
-
-    async queueListingDelete(id: string) {
-        const syncItem = {
-            id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            type: "listing_delete" as const,
-            action: "delete" as const,
-            data: { id },
-            timestamp: Date.now(),
-            attempts: 0,
-        };
-
-        await offlineStorage.addToSyncQueue(syncItem);
-
-        if (navigator.onLine) {
-            this.syncNow();
-        }
-    }
-
-    stop() {
-        if (this.syncTimer) {
-            clearInterval(this.syncTimer);
-        }
-    }
+  }
 }
 
 // Export singleton instance
