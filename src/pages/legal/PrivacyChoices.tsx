@@ -62,10 +62,11 @@ export default function PrivacyChoices() {
                   Exercise your choices
                 </h2>
                 <p className="mb-4">
-                  Depending on where you live, privacy laws such as the California Consumer Privacy
-                  Act (CCPA/CPRA), other US state privacy laws, and the EU/UK GDPR give you rights
-                  over your personal information. This page brings those controls together in one
-                  place. For full details, see our{' '}
+                  AgentBio serves real estate professionals in the United States. Depending on where
+                  you live, US privacy laws — such as the California Consumer Privacy Act
+                  (CCPA/CPRA) and comparable laws in states like Virginia, Colorado, Connecticut,
+                  and Texas — give you rights over your personal information. This page brings those
+                  controls together in one place. For full details, see our{' '}
                   <Link to="/privacy" className="text-blue-600 underline">
                     Privacy Policy
                   </Link>
@@ -132,23 +133,23 @@ export default function PrivacyChoices() {
                 </p>
                 <ul className="list-disc pl-6 space-y-1">
                   <li>
-                    <strong>Download my data</strong> — export a copy of your personal data
-                    (GDPR Article 15 / CCPA right to know) from{' '}
+                    <strong>Right to know / download my data</strong> — export a copy of the
+                    personal information we hold about you from{' '}
                     <Link to="/dashboard/settings" className="text-blue-600 underline">
                       Settings → Privacy &amp; Data
                     </Link>
                     .
                   </li>
                   <li>
-                    <strong>Delete my account</strong> — request erasure of your account and
-                    associated data (GDPR Article 17 / CCPA right to delete) from{' '}
+                    <strong>Right to delete my account</strong> — request deletion of your account
+                    and associated data from{' '}
                     <Link to="/dashboard/settings" className="text-blue-600 underline">
                       Settings → Privacy &amp; Data
                     </Link>
                     .
                   </li>
                   <li>
-                    <strong>Correct my data</strong> — update your profile information at any time,
+                    <strong>Right to correct</strong> — update your profile information at any time,
                     or contact us for help with corrections.
                   </li>
                 </ul>

@@ -88,19 +88,23 @@ registration at dmca.copyright.gov and fill in the real agent details, or soften
 the claim until done. (Registration expires every 3 years — set a renewal
 reminder.)
 
-### B4. GDPR substance in the Privacy Policy
-The Privacy Policy is currently **US-focused**; "GDPR" appears only as an SEO
-keyword. If AgentBio has (or will have) EEA/UK users, the policy needs:
-- **Legal basis** for each processing purpose (Art. 6);
-- explicit **right to restriction** and **right to object** (currently absent);
-- **international-transfer safeguards** (SCCs / adequacy) rather than relying on
-  "consent" (Chapter V);
-- **right to lodge a complaint** with a supervisory authority;
-- an **Art. 27 EU/UK representative** where applicable.
+### B4. GDPR substance in the Privacy Policy — **not required (US-only)**
+**Decision (2026-07-23, product owner): AgentBio targets US realtors and does
+not expect EU/EEA/UK customers.** Full GDPR drafting (Art. 6 legal bases,
+restriction/objection rights, Chapter V transfer safeguards / SCCs,
+supervisory-authority complaint right, Art. 27 representative) is therefore
+**out of scope** and deferred unless the EU/UK ever becomes a target market.
 
-The new `/privacy-choices` page references GDPR rights and the working data
-tools, but the **Privacy Policy legal text itself** still needs this drafting —
-a decision for counsel, gated on whether EU/UK users are in scope.
+Residual cleanup (low priority, not a compliance blocker):
+- The Privacy Policy and Cookie Policy list "GDPR" as an SEO keyword only
+  (`PrivacyPolicy.tsx:32`, `CookiePolicy.tsx:28`); consider replacing with
+  US-relevant terms (CCPA/CPRA, "US state privacy laws") to match scope.
+- The standalone `DeleteAccount.tsx` copy cites "GDPR Article 17"; the right to
+  delete also exists under CCPA and other US state laws, so the reference is not
+  wrong, but US framing would be more accurate to the audience.
+
+The `/privacy-choices` page and lead-form notices added in this change are
+**US-framed** (CCPA/CPRA + comparable state laws, GPC honoring).
 
 ### B5. CPRA "Notice at Collection" & rights-gating
 - Add a formal **Notice at Collection** (categories + purposes + retention) — the
@@ -135,8 +139,10 @@ cost strategy, veil-piercing). Confirm it is not served publicly.
 **no edge function, RPC, or cron job ever processes that queue.** The columns
 `executed`, `executed_at`, `anonymization_completed` are never set, and there is
 no immediate deactivation. Consequently, after the 30-day grace period the
-account and all data **remain intact indefinitely** — the GDPR Art. 17 / CCPA
-right to delete is not fulfilled.
+account and all data **remain intact indefinitely** — the **CCPA / US state-law
+right to delete** is not fulfilled. (This remains the top open item even though
+GDPR is out of scope — the right to delete applies under US state privacy laws
+too.)
 
 `DeleteAccount.tsx:159-160` also overstates this ("deactivated immediately and
 fully removed after a 30-day grace period"), which is currently inaccurate.
@@ -209,9 +215,9 @@ for it in the Cookie Policy. (First-party GA is correctly consent-gated.)
 
 ## 7. Recommended next steps (priority order)
 
-1. **C1** — implement the account-deletion processor (unblocks real GDPR/CCPA erasure).
+1. **C1** — implement the account-deletion processor (unblocks the real CCPA / US state-law right to delete).
 2. **B1 / B2 / B3** — fill physical address, name the legal entity, complete DMCA agent registration.
-3. **B4 / B5** — counsel-led GDPR + CPRA policy drafting (if EU/UK users are in scope).
+3. **B5** — counsel-led CPRA "Notice at Collection" and remove threshold-gating of consumer rights. (**B4 GDPR drafting is out of scope — US-only.**)
 4. **C2 / C3** — server-side consent ledger; confirm Cloudflare RUM gating.
 5. **Accessibility CI** — reduce the axe baseline to zero and make the job blocking.
 6. **B6 / B7** — fix date handling and reconcile cookie categories.
