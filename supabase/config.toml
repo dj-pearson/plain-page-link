@@ -121,3 +121,7 @@ verify_jwt = true
 # Sitemaps
 [functions.generate-sitemap]
 verify_jwt = false  # Public access for sitemap
+# Account deletion processor (Right to Delete). Destructive; guarded internally
+# by a service-role check, so JWT verification is disabled for the scheduler.
+[functions.process-account-deletions]
+verify_jwt = false  # Called by cron/scheduler with the service-role key

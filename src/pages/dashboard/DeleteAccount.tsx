@@ -156,8 +156,8 @@ export default function DeleteAccount() {
             </CardTitle>
             <CardDescription>
               This schedules permanent deletion of your profile, listings, leads, links, analytics,
-              and testimonials. Your account is deactivated immediately and fully removed after a
-              30-day grace period (during which you can cancel).
+              and testimonials. Your account is scheduled for deletion and permanently removed after
+              a 30-day grace period, during which you can cancel to keep your account.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

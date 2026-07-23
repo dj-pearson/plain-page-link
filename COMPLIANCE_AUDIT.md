@@ -109,10 +109,11 @@ The `/privacy-choices` page and lead-form notices added in this change are
 ### B5. CPRA "Notice at Collection" & rights-gating
 - Add a formal **Notice at Collection** (categories + purposes + retention) — the
   point-of-collection notice on forms was added (A7), but the policy-level notice
-  is still needed.
-- `PrivacyPolicy.tsx:291-293` appears to **gate consumer rights on business
-  thresholds**; CCPA rights should not be conditioned that way. Have counsel
-  review.
+  is still needed. *(Still open.)*
+- ~~`PrivacyPolicy.tsx:291-293` gates consumer rights on business thresholds.~~
+  **Fixed (2026-07-23):** reworded so California residents' rights are no longer
+  conditioned on CCPA applicability thresholds; AgentBio now states it honors
+  verified requests regardless. Have counsel confirm the final wording.
 
 ### B6. "Last updated" date inconsistency
 Four docs compute `new Date().toLocaleDateString()` at render (so the date is
@@ -132,6 +133,19 @@ cost strategy, veil-piercing). Confirm it is not served publicly.
 ---
 
 ## 4. Requires backend work (Section C)
+
+> **UPDATE (2026-07-23): processor now implemented — deploy + schedule required.**
+> A durable-audit deletion processor was added:
+> `supabase/migrations/20260723000001_process_account_deletions.sql`
+> (creates `account_deletion_log` + `process_scheduled_account_deletions()`) and
+> the service-role-guarded edge function
+> `supabase/functions/process-account-deletions/`. **Applying the migration is
+> non-destructive** — nothing deletes until you enable the pg_cron schedule (a
+> commented block at the bottom of the migration) or call the edge function from
+> your scheduler with the service-role key. The `DeleteAccount.tsx` copy was also
+> corrected (no more false "deactivated immediately"). **Remaining owner action:**
+> deploy the migration + function, then enable one scheduling path, and verify an
+> end-to-end erasure in staging before production.
 
 ### C1. Right to Erasure does not actually delete data — **highest severity** 🔴
 `request_account_deletion` only **inserts a row** into
@@ -159,8 +173,11 @@ fully removed after a 30-day grace period"), which is currently inaccurate.
    (`GDPRSettings` via `useGDPR` — now fixed — and the standalone
    `DeleteAccount.tsx` page) so users have one consistent flow.
 
-A destructive, untested deletion job was intentionally **not** shipped in this
-change.
+The processor described above implements steps 1 and 3 (and corrects the copy);
+the cron/edge scheduling that actually *runs* it is intentionally left for the
+owner to enable and test, since it is destructive and cannot be validated in
+this environment. Optional step 2 (immediate deactivation flag) is not yet
+implemented.
 
 ### C2. No server-side consent ledger
 Cookie consent is timestamped/versioned **only in `localStorage`**; there is no
@@ -215,9 +232,11 @@ for it in the Cookie Policy. (First-party GA is correctly consent-gated.)
 
 ## 7. Recommended next steps (priority order)
 
-1. **C1** — implement the account-deletion processor (unblocks the real CCPA / US state-law right to delete).
+1. **C1 (deploy)** — processor is now implemented; **deploy the migration + edge
+   function, enable one scheduling path, and verify an end-to-end erasure in
+   staging.** This is the last step to actually satisfy the right to delete.
 2. **B1 / B2 / B3** — fill physical address, name the legal entity, complete DMCA agent registration.
-3. **B5** — counsel-led CPRA "Notice at Collection" and remove threshold-gating of consumer rights. (**B4 GDPR drafting is out of scope — US-only.**)
+3. **B5 (remaining)** — add a policy-level CPRA "Notice at Collection." (Threshold-gating already fixed; **B4 GDPR drafting is out of scope — US-only.**)
 4. **C2 / C3** — server-side consent ledger; confirm Cloudflare RUM gating.
 5. **Accessibility CI** — reduce the axe baseline to zero and make the job blocking.
 6. **B6 / B7** — fix date handling and reconcile cookie categories.
