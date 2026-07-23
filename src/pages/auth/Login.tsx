@@ -27,8 +27,18 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signIn, signInWithGoogle, signInWithApple, isLoading, error, clearError, user, profile } =
-    useAuthStore();
+  const {
+    signIn,
+    signInWithGoogle,
+    signInWithApple,
+    isLoading,
+    error,
+    clearError,
+    user,
+    profile,
+    requiresMFA,
+    mfaVerified,
+  } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isThrottled, setIsThrottled] = useState(false);
   const [throttleMessage, setThrottleMessage] = useState<string | null>(null);
@@ -47,19 +57,29 @@ export default function Login() {
   });
 
   useEffect(() => {
-    if (user) {
-      localStorage.removeItem('lastVisitedRoute');
-      // Route brand-new users (no onboarding completion) into the wizard.
-      // onboarding_completed_at isn't in the generated types yet — isolated read.
-      const onboardingDone = (profile as { onboarding_completed_at?: string | null } | null)
-        ?.onboarding_completed_at;
-      if (profile && !onboardingDone && redirectTo === '/dashboard') {
-        navigate('/onboarding/wizard', { replace: true });
-      } else {
-        navigate(redirectTo, { replace: true });
-      }
+    if (!user) return;
+
+    // If the account has MFA enabled, the password step is only the first
+    // factor: hold navigation to the app and send the user to the MFA
+    // challenge until the second factor is verified. Preserve the intended
+    // destination so MFAChallenge can return there on success.
+    if (requiresMFA && !mfaVerified) {
+      localStorage.setItem('lastVisitedRoute', redirectTo);
+      navigate('/auth/mfa', { replace: true });
+      return;
     }
-  }, [user, profile, navigate, redirectTo]);
+
+    localStorage.removeItem('lastVisitedRoute');
+    // Route brand-new users (no onboarding completion) into the wizard.
+    // onboarding_completed_at isn't in the generated types yet — isolated read.
+    const onboardingDone = (profile as { onboarding_completed_at?: string | null } | null)
+      ?.onboarding_completed_at;
+    if (profile && !onboardingDone && redirectTo === '/dashboard') {
+      navigate('/onboarding/wizard', { replace: true });
+    } else {
+      navigate(redirectTo, { replace: true });
+    }
+  }, [user, profile, navigate, redirectTo, requiresMFA, mfaVerified]);
 
   useEffect(() => {
     return () => {

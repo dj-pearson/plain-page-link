@@ -17,6 +17,13 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
+// Mock the auth store so ProtectedRoute's MFA gate can be driven directly
+// (and so its transitive imports aren't pulled into the test environment).
+let mfaState = { requiresMFA: false, mfaVerified: false };
+vi.mock('@/stores/useAuthStore', () => ({
+  useAuthStore: (selector: (s: typeof mfaState) => unknown) => selector(mfaState),
+}));
+
 import ProtectedRoute from './ProtectedRoute';
 
 const renderAt = (path: string) =>
@@ -32,6 +39,7 @@ const renderAt = (path: string) =>
           }
         />
         <Route path="/auth/login" element={<div>Login page</div>} />
+        <Route path="/auth/mfa" element={<div>MFA challenge</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -41,6 +49,7 @@ describe('ProtectedRoute', () => {
     getSession.mockReset();
     onAuthStateChange.mockClear();
     localStorage.clear();
+    mfaState = { requiresMFA: false, mfaVerified: false };
   });
 
   it('shows a loading state while checking the session', () => {
@@ -73,5 +82,20 @@ describe('ProtectedRoute', () => {
     renderAt('/dashboard');
     await waitFor(() => expect(screen.getByText('Login page')).toBeInTheDocument());
     expect(localStorage.getItem('lastVisitedRoute')).toBe('/dashboard');
+  });
+
+  it('redirects to the MFA challenge when a verified session still has MFA pending', async () => {
+    mfaState = { requiresMFA: true, mfaVerified: false };
+    getSession.mockResolvedValue({ data: { session: mockSession }, error: null });
+    renderAt('/dashboard');
+    await waitFor(() => expect(screen.getByText('MFA challenge')).toBeInTheDocument());
+    expect(screen.queryByText('Protected content')).not.toBeInTheDocument();
+  });
+
+  it('renders children once MFA is verified', async () => {
+    mfaState = { requiresMFA: true, mfaVerified: true };
+    getSession.mockResolvedValue({ data: { session: mockSession }, error: null });
+    renderAt('/dashboard');
+    await waitFor(() => expect(screen.getByText('Protected content')).toBeInTheDocument());
   });
 });
