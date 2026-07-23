@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { useAuthStore } from './stores/useAuthStore';
 import { errorHandler } from './lib/errorHandler';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import SecureRoute from './components/auth/SecureRoute';
 import { offlineStorage } from './lib/offline-storage';
 import { cleanupServiceWorkers } from './lib/sw-cleanup';
 import { OfflineIndicator } from './components/mobile/OfflineIndicator';
@@ -313,7 +314,7 @@ function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute>
+                <SecureRoute requireAdmin>
                   <RouteErrorBoundary
                     section="Admin"
                     backPath="/dashboard"
@@ -321,13 +322,13 @@ function App() {
                   >
                     <AdminDashboard />
                   </RouteErrorBoundary>
-                </ProtectedRoute>
+                </SecureRoute>
               }
             />
             <Route
               path="/admin/seo"
               element={
-                <ProtectedRoute>
+                <SecureRoute requireAdmin>
                   <RouteErrorBoundary
                     section="SEO Dashboard"
                     backPath="/admin"
@@ -335,13 +336,13 @@ function App() {
                   >
                     <SEODashboard />
                   </RouteErrorBoundary>
-                </ProtectedRoute>
+                </SecureRoute>
               }
             />
             <Route
               path="/admin/audit-log"
               element={
-                <ProtectedRoute>
+                <SecureRoute requireAdmin>
                   <RouteErrorBoundary
                     section="Audit Log"
                     backPath="/admin"
@@ -349,13 +350,13 @@ function App() {
                   >
                     <AuditLogPage />
                   </RouteErrorBoundary>
-                </ProtectedRoute>
+                </SecureRoute>
               }
             />
             <Route
               path="/admin/health"
               element={
-                <ProtectedRoute>
+                <SecureRoute requireAdmin>
                   <RouteErrorBoundary
                     section="Platform Health"
                     backPath="/admin"
@@ -363,7 +364,7 @@ function App() {
                   >
                     <HealthDashboard />
                   </RouteErrorBoundary>
-                </ProtectedRoute>
+                </SecureRoute>
               }
             />
 
