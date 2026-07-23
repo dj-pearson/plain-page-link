@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useId } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,19 +34,30 @@ interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
-    ({ label, error, helperText, required, className, type = 'text', ...props }, ref) => {
+    ({ label, error, helperText, required, className, type = 'text', id, ...props }, ref) => {
         // Get mobile-optimized input configuration
         const mobileConfig = mobileInputConfigs[type as MobileInputType] || {};
 
+        // Ensure a stable id so label association and error wiring never break,
+        // even when the caller omits `id` (WCAG 1.3.1 / 3.3.2).
+        const generatedId = useId();
+        const fieldId = id ?? generatedId;
+        const errorId = `${fieldId}-error`;
+
         return (
             <div className="space-y-2">
-                <Label htmlFor={props.id} className="text-sm font-medium">
+                <Label htmlFor={fieldId} className="text-sm font-medium">
                     {label}
-                    {required && <span className="text-red-500 ml-1">*</span>}
+                    {required && (
+                        <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                    )}
                 </Label>
                 <Input
                     ref={ref}
+                    id={fieldId}
                     type={type}
+                    required={required}
+                    aria-required={required ? "true" : undefined}
                     inputMode={props.inputMode || mobileConfig.inputMode}
                     autoComplete={props.autoComplete || mobileConfig.autoComplete}
                     pattern={props.pattern || mobileConfig.pattern}
@@ -55,12 +66,12 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
                         className
                     )}
                     aria-invalid={error ? "true" : "false"}
-                    aria-describedby={error ? `${props.id}-error` : undefined}
+                    aria-describedby={error ? errorId : undefined}
                     {...props}
                 />
                 {error && (
                     <p
-                        id={`${props.id}-error`}
+                        id={errorId}
                         className="text-sm text-red-500 font-medium"
                         role="alert"
                     >
@@ -90,26 +101,35 @@ interface TextareaFieldProps
 export const TextareaField = forwardRef<
     HTMLTextAreaElement,
     TextareaFieldProps
->(({ label, error, helperText, required, className, ...props }, ref) => {
+>(({ label, error, helperText, required, className, id, ...props }, ref) => {
+    const generatedId = useId();
+    const fieldId = id ?? generatedId;
+    const errorId = `${fieldId}-error`;
+
     return (
         <div className="space-y-2">
-            <Label htmlFor={props.id} className="text-sm font-medium">
+            <Label htmlFor={fieldId} className="text-sm font-medium">
                 {label}
-                {required && <span className="text-red-500 ml-1">*</span>}
+                {required && (
+                    <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                )}
             </Label>
             <Textarea
                 ref={ref}
+                id={fieldId}
+                required={required}
+                aria-required={required ? "true" : undefined}
                 className={cn(
                     error && "border-red-500 focus-visible:ring-red-500",
                     className
                 )}
                 aria-invalid={error ? "true" : "false"}
-                aria-describedby={error ? `${props.id}-error` : undefined}
+                aria-describedby={error ? errorId : undefined}
                 {...props}
             />
             {error && (
                 <p
-                    id={`${props.id}-error`}
+                    id={errorId}
                     className="text-sm text-red-500 font-medium"
                     role="alert"
                 >

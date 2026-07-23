@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { hasMadeChoice, acceptAll, rejectNonEssential, saveConsent } from '@/lib/cookie-consent';
+import {
+  hasMadeChoice,
+  getStoredConsent,
+  acceptAll,
+  rejectNonEssential,
+  saveConsent,
+  COOKIE_PREFERENCES_OPEN_EVENT,
+} from '@/lib/cookie-consent';
 
 /**
  * Cookie consent banner. Renders on first visit (no stored choice) and
@@ -17,6 +24,20 @@ export function CookieConsent() {
 
   useEffect(() => {
     if (!hasMadeChoice()) setVisible(true);
+
+    // Allow re-opening the banner later (footer link / Privacy Choices page),
+    // seeded with the user's previously stored choices.
+    const reopen = () => {
+      const stored = getStoredConsent();
+      if (stored) {
+        setAnalytics(stored.analytics);
+        setPreferences(stored.preferences);
+      }
+      setManaging(true);
+      setVisible(true);
+    };
+    window.addEventListener(COOKIE_PREFERENCES_OPEN_EVENT, reopen);
+    return () => window.removeEventListener(COOKIE_PREFERENCES_OPEN_EVENT, reopen);
   }, []);
 
   if (!visible) return null;

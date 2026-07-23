@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { FormField, TextareaField } from "./FormField";
+import { FormPrivacyNotice } from "./FormPrivacyNotice";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -407,10 +408,7 @@ export function SellerInquiryForm({
                         )}
                     </Button>
 
-                    <p className="text-xs text-center text-muted-foreground">
-                        No obligation. Your information is secure and
-                        confidential.
-                    </p>
+                    <FormPrivacyNotice assurance="No obligation. Your information is secure and confidential." />
                 </form>
             </CardContent>
         </Card>

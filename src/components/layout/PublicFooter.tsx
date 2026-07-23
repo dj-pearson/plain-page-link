@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Home, Mail, Facebook, Instagram, Linkedin } from "lucide-react";
+import { openCookiePreferences } from "@/lib/cookie-consent";
 
 export function PublicFooter() {
   return (
@@ -141,6 +142,25 @@ export function PublicFooter() {
                 <Link to="/accessibility" className="text-gray-400 hover:text-white transition-colors">
                   Accessibility
                 </Link>
+              </li>
+              <li>
+                <Link to="/cookies" className="text-gray-400 hover:text-white transition-colors">
+                  Cookie Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy-choices" className="text-gray-400 hover:text-white transition-colors">
+                  Your Privacy Choices
+                </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={openCookiePreferences}
+                  className="text-gray-400 hover:text-white transition-colors text-left"
+                >
+                  Cookie Preferences
+                </button>
               </li>
               <li>
                 <a href="mailto:legal@agentbio.net" className="text-gray-400 hover:text-white transition-colors">

@@ -13,6 +13,8 @@
 
 export const COOKIE_CONSENT_KEY = 'cookie_consent_v1';
 export const COOKIE_CONSENT_EVENT = 'cookie-consent-updated';
+/** Fired to re-open the consent banner after a choice has already been made. */
+export const COOKIE_PREFERENCES_OPEN_EVENT = 'cookie-preferences-open';
 const CONSENT_VERSION = 1;
 
 export interface CookieConsent {
@@ -60,3 +62,17 @@ export function saveConsent(choice: { analytics: boolean; preferences: boolean }
 export const acceptAll = () => saveConsent({ analytics: true, preferences: true });
 
 export const rejectNonEssential = () => saveConsent({ analytics: false, preferences: false });
+
+/**
+ * Re-open the cookie consent banner so users can review or withdraw consent at
+ * any time (GDPR requires withdrawing consent to be as easy as giving it).
+ * Wired from the footer "Cookie Preferences" control and the Privacy Choices
+ * page. Safe to call before the banner mounts — it's a no-op until then.
+ */
+export function openCookiePreferences(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(COOKIE_PREFERENCES_OPEN_EVENT));
+  } catch {
+    // window unavailable (SSR) — nothing to open.
+  }
+}

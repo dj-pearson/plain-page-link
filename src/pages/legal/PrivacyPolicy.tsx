@@ -290,7 +290,7 @@ export default function PrivacyPolicy() {
 
             <h3 className="text-xl font-semibold mt-6 mb-3">8.2 California Residents (CCPA/CPRA Rights)</h3>
             <p className="mb-4">
-              If you are a California resident and we meet the CCPA applicability thresholds (annual revenue &gt; $26.625 million OR processing data of 100,000+ California residents), you have additional rights:
+              If you are a California resident, you have the following rights under the CCPA/CPRA. We honor verified requests to exercise these rights and do not require you to meet any condition to make one. (Whether a business is legally obligated under the CCPA depends on statutory applicability thresholds, but we extend these rights to California residents regardless.)
             </p>
             <ul className="list-disc pl-6 mb-4 space-y-2">
               <li><strong>Right to Know:</strong> Request disclosure of categories and specific pieces of personal information we collect, use, and disclose</li>
