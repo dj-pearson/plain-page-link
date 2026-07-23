@@ -105,9 +105,12 @@ export default function CookiePolicy() {
                   When you first visit AgentBio you are shown a consent banner with three choices:{' '}
                   <strong>Accept all</strong>, <strong>Reject non-essential</strong>, or{' '}
                   <strong>Manage preferences</strong>. Your choice is stored locally with a
-                  timestamp. You can change it at any time by clearing site data in your browser,
-                  which will re-display the banner on your next visit. Withdrawing analytics consent
-                  stops Google Analytics from loading.
+                  timestamp. You can change or withdraw it at any time using the{' '}
+                  <strong>Cookie Preferences</strong> link in the site footer, or from our{' '}
+                  <a href="/privacy-choices" className="text-blue-600 underline">
+                    Your Privacy Choices
+                  </a>{' '}
+                  page. Withdrawing analytics consent stops Google Analytics from loading.
                 </p>
               </section>
 

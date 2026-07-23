@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { FormField, TextareaField } from "./FormField";
+import { FormPrivacyNotice } from "./FormPrivacyNotice";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -438,9 +439,7 @@ export function BuyerInquiryForm({
                         )}
                     </Button>
 
-                    <p className="text-xs text-center text-muted-foreground">
-                        Your information is secure. No spam, ever.
-                    </p>
+                    <FormPrivacyNotice assurance="Your information is secure. No spam, ever." />
                 </form>
             </CardContent>
         </Card>

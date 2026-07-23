@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { callEdgeFunction, edgeFunctions } from '@/lib/edgeFunctions';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/hooks/use-toast';
 
@@ -52,15 +52,10 @@ export function useGDPR() {
   } = useQuery({
     queryKey: ['deletionStatus', user?.id],
     queryFn: async (): Promise<DeletionStatus> => {
-      const { data, error } = await edgeFunctions.invoke('gdpr-deletion', {
+      return await callEdgeFunction<DeletionStatus>('gdpr-deletion', {
         method: 'GET',
+        auth: true,
       });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data;
     },
     enabled: !!user?.id,
     staleTime: 60000, // 1 minute
@@ -73,13 +68,10 @@ export function useGDPR() {
 
       try {
         // Request export and get data directly
-        const { data, error } = await edgeFunctions.invoke('gdpr-export', {
+        const data = await callEdgeFunction('gdpr-export', {
           method: 'GET',
+          auth: true,
         });
-
-        if (error) {
-          throw new Error(error.message);
-        }
 
         // Convert to blob for download
         const blob = new Blob([JSON.stringify(data, null, 2)], {

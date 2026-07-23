@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { FormField } from "./FormField";
+import { FormPrivacyNotice } from "./FormPrivacyNotice";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -392,10 +393,7 @@ export function HomeValuationForm({
                         )}
                     </Button>
 
-                    <p className="text-xs text-center text-muted-foreground">
-                        100% free with no obligation. Results delivered to your
-                        email.
-                    </p>
+                    <FormPrivacyNotice assurance="100% free with no obligation. Results delivered to your email." />
                 </form>
             </CardContent>
         </Card>

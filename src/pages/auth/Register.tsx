@@ -622,7 +622,7 @@ export default function Register() {
                                                 Privacy Policy
                                             </a>
                                             , and{" "}
-                                            <a href="/legal/acceptable-use" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 font-medium underline">
+                                            <a href="/acceptable-use" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 font-medium underline">
                                                 Acceptable Use Policy
                                             </a>
                                             . I will comply with MLS photo restrictions and Fair Housing laws.

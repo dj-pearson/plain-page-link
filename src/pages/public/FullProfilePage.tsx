@@ -370,7 +370,8 @@ export default function FullProfilePage() {
                 hasListings={activeListings.length > 0}
                 hasTestimonials={testimonials.length > 0}
             />
-            <div className="min-h-screen relative"
+            <main id="main-content" tabIndex={-1}
+                 className="min-h-screen relative"
                  style={{
                      backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
                      color: `hsl(var(--theme-text, 222 47% 11%))`
@@ -614,7 +615,7 @@ export default function FullProfilePage() {
                 }}
                 onContactFormOpen={() => setIsLeadModalOpen(true)}
             />
-        </div>
+        </main>
         </>
     );
 }
