@@ -26,9 +26,14 @@ const queryClient = new QueryClient({
   },
 });
 
-const rootEl = document.getElementById('root')!;
+const rootEl = document.getElementById('root');
 if (!rootEl) {
+  // Without a mount node ReactDOM.createRoot would throw outside any React
+  // boundary, leaving a blank white screen. Fail loudly with a minimal message.
   logger.error('Root element #root not found', new Error('Root element #root not found'));
+  document.body.innerHTML =
+    '<div style="font-family:sans-serif;padding:2rem;text-align:center">Unable to load the application. Please refresh the page.</div>';
+  throw new Error('Root element #root not found');
 }
 if (import.meta.env.DEV) {
   logger.debug('[Lovable] Mounting React app', { mode: import.meta?.env?.MODE });
