@@ -201,7 +201,9 @@ export default function ListingDetailModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema) }}
+        // Escape "<" so a listing field containing "</script>" can't break out
+        // of the JSON-LD script tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema).replace(/</g, '\\u003c') }}
       />
       {/* Backdrop */}
       <motion.div

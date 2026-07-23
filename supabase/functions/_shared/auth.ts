@@ -36,14 +36,17 @@ export async function requireAuth(req: Request, supabase: SupabaseClient) {
 export async function requireAdmin(req: Request, supabase: SupabaseClient) {
   const user = await requireAuth(req, supabase);
 
-  // Check admin role in user_roles table
-  const { data: userRole, error: roleError } = await supabase
+  // Check for an admin role row directly. Filtering by role (rather than
+  // .single() over all of the user's roles) avoids throwing when a user
+  // legitimately has more than one role row.
+  const { data: adminRole, error: roleError } = await supabase
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
-    .single();
+    .eq('role', 'admin')
+    .maybeSingle();
 
-  if (roleError || userRole?.role !== 'admin') {
+  if (roleError || !adminRole) {
     throw new Error('Forbidden: Admin access required');
   }
 
