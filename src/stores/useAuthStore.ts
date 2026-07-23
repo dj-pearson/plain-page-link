@@ -29,6 +29,13 @@ interface SLOMessage {
   userId?: string;
 }
 
+// Guard so the global listeners (storage event + Supabase auth subscription) are
+// only ever registered once, even if initialize() is called multiple times
+// (App bootstrap + SSO callback, React StrictMode double-invoke, etc.). Without
+// this, each call leaked another subscription that re-fired duplicate profile/
+// role fetches on every token refresh.
+let authListenersRegistered = false;
+
 interface AuthState {
   user: User | null;
   session: Session | null;
@@ -70,6 +77,13 @@ export const useAuthStore = create<AuthState>()(
       initialize: async () => {
         const { _handleSLOMessage } = get();
 
+        // Claim listener registration synchronously (before any await) so two
+        // concurrent initialize() calls can't both register the global listeners.
+        const registerListeners = !authListenersRegistered;
+        if (registerListeners) {
+          authListenersRegistered = true;
+        }
+
         // Set up BroadcastChannel listener for Single Sign-Out (SLO)
         if (authChannel) {
           authChannel.onmessage = (event: MessageEvent<SLOMessage>) => {
@@ -77,8 +91,9 @@ export const useAuthStore = create<AuthState>()(
           };
         }
 
-        // Set up localStorage listener for SLO fallback (works in older browsers)
-        if (typeof window !== 'undefined') {
+        // Set up localStorage listener for SLO fallback (works in older browsers).
+        // Only register once — see authListenersRegistered above.
+        if (typeof window !== 'undefined' && registerListeners) {
           window.addEventListener('storage', (event) => {
             if (event.key === 'agentbio-logout' && event.newValue) {
               logger.debug('SLO: Received logout via localStorage event');
@@ -155,7 +170,13 @@ export const useAuthStore = create<AuthState>()(
           });
         }
 
-        // Set up auth state listener for session changes
+        // Set up auth state listener for session changes.
+        // Guarded so repeated initialize() calls don't stack duplicate
+        // subscriptions that each re-fire profile/role fetches on every event.
+        if (!registerListeners) {
+          return;
+        }
+
         supabase.auth.onAuthStateChange(async (event, session) => {
           logger.authEvent(event, session?.user?.id);
 

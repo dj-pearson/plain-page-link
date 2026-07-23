@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { validateRedirectPath } from '@/utils/navigation';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
 
@@ -25,7 +26,9 @@ export default function AuthCallback() {
         // Handle magic link token from OAuth proxy
         const token = searchParams.get('token');
         const type = searchParams.get('type');
-        const redirectTo = searchParams.get('redirect_to') || '/dashboard';
+        // Validate against the redirect whitelist (blocks //evil.com, external
+        // hosts, and non-whitelisted paths) rather than trusting the raw param.
+        const redirectTo = validateRedirectPath(searchParams.get('redirect_to'), '/dashboard');
         const isNewUser = searchParams.get('new_user') === 'true';
 
         if (token && type) {

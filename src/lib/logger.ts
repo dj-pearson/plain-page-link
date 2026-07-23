@@ -44,7 +44,7 @@ const SENSITIVE_KEYS = new Set([
 function isSensitiveKey(key: string): boolean {
   const lowerKey = key.toLowerCase();
   if (SENSITIVE_KEYS.has(lowerKey)) return true;
-  return SENSITIVE_PATTERNS.some(pattern => pattern.test(key));
+  return SENSITIVE_PATTERNS.some((pattern) => pattern.test(key));
 }
 
 /**
@@ -68,6 +68,12 @@ function sanitizeObject(obj: unknown, depth = 0): unknown {
   if (obj === null || obj === undefined) return obj;
 
   if (typeof obj === 'string') {
+    // Redact JWTs (three base64url segments separated by dots). These contain
+    // '.' so they don't match the base64-only pattern below and would otherwise
+    // be logged in full when passed as a bare value.
+    if (/^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(obj)) {
+      return redactValue(obj);
+    }
     // Redact things that look like tokens or keys (long base64-ish strings)
     if (obj.length > 50 && /^[A-Za-z0-9+/=_-]+$/.test(obj)) {
       return redactValue(obj);
@@ -76,9 +82,7 @@ function sanitizeObject(obj: unknown, depth = 0): unknown {
     if (obj.includes('@') && obj.includes('.')) {
       const [local, domain] = obj.split('@');
       if (local && domain) {
-        const redactedLocal = local.length > 2
-          ? `${local[0]}***${local[local.length - 1]}`
-          : '***';
+        const redactedLocal = local.length > 2 ? `${local[0]}***${local[local.length - 1]}` : '***';
         return `${redactedLocal}@${domain}`;
       }
     }
@@ -86,7 +90,7 @@ function sanitizeObject(obj: unknown, depth = 0): unknown {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item, depth + 1));
+    return obj.map((item) => sanitizeObject(item, depth + 1));
   }
 
   if (typeof obj === 'object') {
@@ -194,7 +198,10 @@ class SecureLogger {
     if (!this.isDevelopment) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (sanitizedContext) {
-        console.error(this.formatMessage('error', message), { error: errorMessage, ...sanitizedContext as object });
+        console.error(this.formatMessage('error', message), {
+          error: errorMessage,
+          ...(sanitizedContext as object),
+        });
       } else {
         console.error(this.formatMessage('error', message), { error: errorMessage });
       }
@@ -218,7 +225,7 @@ class SecureLogger {
     if (!this.shouldLog('info')) return;
 
     this.info(`Auth: ${event}`, {
-      userId: truncateId(userId)
+      userId: truncateId(userId),
     });
   }
 }

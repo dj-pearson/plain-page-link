@@ -1,11 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // verify_jwt is disabled, so enforce the service-role key in code — otherwise
+  // any anonymous caller could post an attacker-supplied customMessage to a
+  // user's configured Slack/webhook for a known alertId.
+  if (!isServiceRoleRequest(req)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {

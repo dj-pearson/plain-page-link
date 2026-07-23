@@ -1,5 +1,8 @@
-import { useState, useCallback, useRef } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useCallback, useRef, useEffect } from 'react';
+// Use sonner directly: it is the toaster actually mounted in App.tsx and it
+// natively supports the { action: { label, onClick }, duration } shape this hook
+// relies on. The custom use-toast hook does not, so the Undo action never rendered.
+import { toast as sonnerToast } from 'sonner';
 
 interface DeleteQueueItem<T> {
   id: string;
@@ -38,12 +41,48 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
     resourceName,
   } = options;
 
-  const { toast, dismiss } = useToast();
   const [deletionQueue, setDeletionQueue] = useState<Map<string, DeleteQueueItem<T>>>(new Map());
   const queueRef = useRef(deletionQueue);
 
   // Keep ref in sync with state
   queueRef.current = deletionQueue;
+
+  // Clear any pending deletion timers on unmount so a permanent delete (and its
+  // setState/toast) can never fire after the component has unmounted.
+  useEffect(() => {
+    return () => {
+      queueRef.current.forEach((item) => clearTimeout(item.timeoutId));
+    };
+  }, []);
+
+  /**
+   * Cancels a pending deletion
+   */
+  const undoDelete = useCallback(
+    (id: string) => {
+      const queueItem = queueRef.current.get(id);
+
+      if (!queueItem) {
+        return;
+      }
+
+      // Cancel the timeout
+      clearTimeout(queueItem.timeoutId);
+
+      // Remove from queue
+      setDeletionQueue((prev) => {
+        const newQueue = new Map(prev);
+        newQueue.delete(id);
+        return newQueue;
+      });
+
+      // Show undo confirmation
+      sonnerToast.success('Deletion cancelled', {
+        description: `Your ${resourceName} has been restored.`,
+      });
+    },
+    [resourceName]
+  );
 
   /**
    * Initiates a soft delete with undo option
@@ -68,16 +107,13 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
           });
 
           // Show success toast
-          toast({
-            title: `${resourceName} deleted`,
+          sonnerToast.success(`${resourceName} deleted`, {
             description: `Your ${resourceName} has been permanently removed.`,
           });
         } catch (error) {
           // Show error toast
-          toast({
-            title: "Deletion failed",
+          sonnerToast.error('Deletion failed', {
             description: `Failed to delete ${resourceName}. Please try again.`,
-            variant: "destructive",
           });
 
           // Remove from queue on error
@@ -103,59 +139,29 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
         return newQueue;
       });
 
-      // Show undo toast
-      const { dismiss: dismissToast } = toast({
-        title: `${resourceName} deleted`,
-        description: undoMessage?.(item) || `Deleting ${resourceName} in ${deleteDelay / 1000} seconds...`,
+      // Show undo toast (sonner renders the action button and honors duration)
+      const toastId = sonnerToast(`${resourceName} deleted`, {
+        description:
+          undoMessage?.(item) || `Deleting ${resourceName} in ${deleteDelay / 1000} seconds...`,
+        duration: deleteDelay,
         action: {
-          label: "Undo",
+          label: 'Undo',
           onClick: () => {
             undoDelete(item.id);
-            dismissToast();
+            sonnerToast.dismiss(toastId);
           },
         },
-        duration: deleteDelay,
       });
     },
-    [onDelete, deleteDelay, undoMessage, resourceName, toast]
+    [onDelete, deleteDelay, undoMessage, resourceName, undoDelete]
   );
-
-  /**
-   * Cancels a pending deletion
-   */
-  const undoDelete = useCallback((id: string) => {
-    const queueItem = queueRef.current.get(id);
-
-    if (!queueItem) {
-      return;
-    }
-
-    // Cancel the timeout
-    clearTimeout(queueItem.timeoutId);
-
-    // Remove from queue
-    setDeletionQueue((prev) => {
-      const newQueue = new Map(prev);
-      newQueue.delete(id);
-      return newQueue;
-    });
-
-    // Show undo confirmation
-    toast({
-      title: "Deletion cancelled",
-      description: `Your ${resourceName} has been restored.`,
-    });
-  }, [resourceName, toast]);
 
   /**
    * Checks if an item is pending deletion
    */
-  const isPendingDeletion = useCallback(
-    (id: string): boolean => {
-      return queueRef.current.has(id);
-    },
-    []
-  );
+  const isPendingDeletion = useCallback((id: string): boolean => {
+    return queueRef.current.has(id);
+  }, []);
 
   /**
    * Gets all items pending deletion
@@ -174,12 +180,11 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
     setDeletionQueue(new Map());
 
     if (queueRef.current.size > 0) {
-      toast({
-        title: "All deletions cancelled",
+      sonnerToast.success('All deletions cancelled', {
         description: `${queueRef.current.size} ${resourceName}${queueRef.current.size > 1 ? 's' : ''} restored.`,
       });
     }
-  }, [resourceName, toast]);
+  }, [resourceName]);
 
   /**
    * Forces immediate deletion of a queued item
@@ -205,19 +210,16 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
       // Execute deletion immediately
       try {
         await onDelete(id);
-        toast({
-          title: `${resourceName} deleted`,
+        sonnerToast.success(`${resourceName} deleted`, {
           description: `Your ${resourceName} has been permanently removed.`,
         });
       } catch (error) {
-        toast({
-          title: "Deletion failed",
+        sonnerToast.error('Deletion failed', {
           description: `Failed to delete ${resourceName}. Please try again.`,
-          variant: "destructive",
         });
       }
     },
-    [onDelete, resourceName, toast]
+    [onDelete, resourceName]
   );
 
   return {

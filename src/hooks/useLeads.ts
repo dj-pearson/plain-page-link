@@ -50,9 +50,13 @@ export function useLeads() {
 
   const addLead = useMutation({
     mutationFn: async (leadData: Omit<Lead, 'id' | 'created_at' | 'updated_at'>) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
       // Dual-write: keep plaintext (transition phase) + encrypted columns.
+      // Force ownership to the authenticated user rather than trusting caller-supplied user_id.
       const payload = {
         ...leadData,
+        user_id: user.id,
         encrypted_email: await encryptPII(leadData.email),
         encrypted_phone: await encryptPII(leadData.phone),
       } as typeof leadData;

@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,7 +20,7 @@ function getFullPath(location: ReturnType<typeof useLocation>): string {
 
 /**
  * ProtectedRoute Component
- * 
+ *
  * Best Practices from AUTH_SETUP_DOCUMENTATION.md:
  * - Uses onAuthStateChange listener for real-time session updates
  * - Prevents race conditions with proper loading states
@@ -31,11 +32,15 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const location = useLocation();
+  const requiresMFA = useAuthStore((s) => s.requiresMFA);
+  const mfaVerified = useAuthStore((s) => s.mfaVerified);
 
   useEffect(() => {
     // Check existing session on mount
     const checkSession = async () => {
-      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
       setSession(currentSession);
       setIsLoading(false);
     };
@@ -43,12 +48,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     checkSession();
 
     // Listen for auth state changes (sign in, sign out, token refresh, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
-        setSession(currentSession);
-        setIsLoading(false);
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession);
+      setIsLoading(false);
+    });
 
     // Cleanup: unsubscribe from auth state changes on unmount
     return () => subscription.unsubscribe();
@@ -85,6 +90,14 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       localStorage.setItem(LAST_ROUTE_KEY, fullPath);
     }
     return <Navigate to="/auth/login" replace />;
+  }
+
+  // A valid session whose second factor is still pending must not reach the app.
+  // (requiresMFA defaults to false, so this only affects users mid-MFA in the
+  // current session — it never blocks users without MFA.)
+  if (requiresMFA && !mfaVerified && !location.pathname.startsWith('/auth/')) {
+    localStorage.setItem(LAST_ROUTE_KEY, getFullPath(location));
+    return <Navigate to="/auth/mfa" replace />;
   }
 
   return <>{children}</>;

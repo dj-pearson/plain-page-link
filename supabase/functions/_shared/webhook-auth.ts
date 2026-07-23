@@ -6,6 +6,7 @@
  */
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { hashApiKey } from './api-auth.ts';
 
 /**
  * Validate API key from request headers
@@ -26,11 +27,16 @@ export async function validateApiKey(
   }
 
   try {
+    // Keys are stored as SHA-256 hashes, so hash the presented key before
+    // looking it up. Comparing the raw key against key_hash never matched,
+    // silently breaking all API-key auth through this path.
+    const keyHash = await hashApiKey(apiKey);
+
     // Query api_keys table for valid key
     const { data: keyData, error } = await supabase
       .from('api_keys')
       .select('user_id, name, is_active, expires_at, last_used_at')
-      .eq('key_hash', apiKey) // In production, hash the key
+      .eq('key_hash', keyHash)
       .single();
 
     if (error || !keyData) {
@@ -51,7 +57,7 @@ export async function validateApiKey(
     await supabase
       .from('api_keys')
       .update({ last_used_at: new Date().toISOString() })
-      .eq('key_hash', apiKey);
+      .eq('key_hash', keyHash);
 
     return {
       user_id: keyData.user_id,

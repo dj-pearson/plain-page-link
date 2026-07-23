@@ -38,16 +38,21 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Database-backed rate limiting - 5 requests per minute per IP
+    const rawData = await req.json()
+
+    // Database-backed rate limiting - 5 requests per minute per IP. When the
+    // source IP is unavailable (getClientIP returns 'unknown'), bucket by the
+    // target agent instead, so every no-IP request doesn't collapse into one
+    // shared global bucket that unrelated agents' visitors would exhaust.
     const clientIP = getClientIP(req);
-    const rateLimit = await checkRateLimitDb(supabase, clientIP, 'submit-lead', RATE_LIMITS.submission);
+    const rateIdentifier =
+      clientIP !== 'unknown' ? clientIP : `target:${rawData?.user_id ?? 'anon'}`;
+    const rateLimit = await checkRateLimitDb(supabase, rateIdentifier, 'submit-lead', RATE_LIMITS.submission);
 
     if (!rateLimit.allowed) {
-      console.warn(`Rate limit exceeded for IP: ${clientIP}`);
+      console.warn(`Rate limit exceeded for identifier: ${rateIdentifier}`);
       return rateLimitResponse(rateLimit.retryAfterSeconds, req, 'Too many requests. Please try again later.');
     }
-
-    const rawData = await req.json()
 
     // Validate input data
     const validation = validateLeadData(rawData);

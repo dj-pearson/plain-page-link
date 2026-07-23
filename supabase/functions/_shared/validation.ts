@@ -70,6 +70,60 @@ export function isValidSafeUrl(url: string): boolean {
   }
 }
 
+// SSRF-safe URL validation: only public http(s) URLs, blocking private /
+// loopback / link-local ranges and internal hostnames. Use this before any
+// server-side fetch() of a user-supplied URL.
+export function isPublicFetchableUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol.toLowerCase())) {
+    return false;
+  }
+
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+
+  // Block obvious internal hostnames
+  if (
+    host === 'localhost' ||
+    host === '0.0.0.0' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host === 'metadata.google.internal'
+  ) {
+    return false;
+  }
+
+  // IPv4 literal checks
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    if (ipv4.slice(1).some((o) => Number(o) > 255)) return false;
+    if (a === 10) return false; // 10.0.0.0/8
+    if (a === 127) return false; // loopback
+    if (a === 0) return false; // 0.0.0.0/8
+    if (a === 169 && b === 254) return false; // link-local / cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return false; // 172.16.0.0/12
+    if (a === 192 && b === 168) return false; // 192.168.0.0/16
+    if (a === 100 && b >= 64 && b <= 127) return false; // CGNAT 100.64.0.0/10
+    if (a >= 224) return false; // multicast / reserved
+  }
+
+  // IPv6 loopback / unique-local / link-local
+  if (host === '::1' || host === '::' ) return false;
+  if (host.startsWith('fc') || host.startsWith('fd')) return false; // fc00::/7 ULA
+  if (host.startsWith('fe80')) return false; // link-local
+  // IPv4-mapped IPv6 targeting metadata (e.g. ::ffff:169.254.169.254)
+  if (host.includes('169.254.169.254') || host.includes('127.0.0.1')) return false;
+
+  return true;
+}
+
 // Validate webhook URL against allowed domains (for SSRF prevention)
 export function isValidWebhookUrl(url: string, allowedDomains: string[] = ['hooks.zapier.com', 'hook.us1.make.com', 'hook.eu1.make.com']): boolean {
   try {

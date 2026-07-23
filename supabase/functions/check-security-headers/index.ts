@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
+import { isPublicFetchableUrl } from '../_shared/validation.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -15,6 +16,13 @@ serve(async (req) => {
     if (!url) {
       return new Response(
         JSON.stringify({ error: 'URL is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!isPublicFetchableUrl(url)) {
+      return new Response(
+        JSON.stringify({ error: 'URL must be a public http(s) URL' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -241,9 +249,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error checking security headers:', error);
+    // Log the detail server-side; return a generic message so internal error
+    // strings (stack fragments, DB errors) don't leak to the caller.
+    console.error('Error checking security headers:', getErrorMessage(error));
     return new Response(
-      JSON.stringify({ error: getErrorMessage(error) }),
+      JSON.stringify({ error: 'Failed to check security headers' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

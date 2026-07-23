@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 export type TimeRange = '7d' | '30d' | '90d';
 
@@ -18,22 +18,35 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
   const cutoffDate = getCutoffDate(timeRange);
 
   // Fetch analytics views with optimizations
-  const { data: views = [], isLoading: viewsLoading, isError: viewsError, error: viewsErrorObj, refetch: refetchViews } = useQuery({
-    queryKey: ["analytics-views", user?.id, timeRange],
+  const {
+    data: views = [],
+    isLoading: viewsLoading,
+    isError: viewsError,
+    error: viewsErrorObj,
+    refetch: refetchViews,
+  } = useQuery({
+    queryKey: ['analytics-views', user?.id, timeRange],
     queryFn: async () => {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
-        .from("analytics_views")
-        .select("viewed_at, visitor_id, page_url, referrer") // Only needed columns
-        .eq("user_id", user.id)
-        .gte("viewed_at", cutoffDate) // Filter by time range
-        .order("viewed_at", { ascending: false })
+        .from('analytics_views')
+        // Only real, used columns. The table has no page_url/referrer columns —
+        // selecting them made every request error out ("column does not exist"),
+        // which the catch below swallowed as [], so analytics always read empty.
+        .select('viewed_at, visitor_id') // Only needed columns
+        .eq('user_id', user.id)
+        .gte('viewed_at', cutoffDate) // Filter by time range
+        .order('viewed_at', { ascending: false })
         .limit(1000); // Hard limit for safety
 
       // Table/view may not exist yet — return empty instead of throwing
       if (error) {
-        if (error.code === '42P01' || error.message?.includes('does not exist') || error.code === 'PGRST204') {
+        if (
+          error.code === '42P01' ||
+          error.message?.includes('does not exist') ||
+          error.code === 'PGRST204'
+        ) {
           return [];
         }
         throw error;
@@ -47,17 +60,23 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
   });
 
   // Fetch leads for analytics with optimizations
-  const { data: leads = [], isLoading: leadsLoading, isError: leadsError, error: leadsErrorObj, refetch: refetchLeads } = useQuery({
-    queryKey: ["analytics-leads", user?.id, timeRange],
+  const {
+    data: leads = [],
+    isLoading: leadsLoading,
+    isError: leadsError,
+    error: leadsErrorObj,
+    refetch: refetchLeads,
+  } = useQuery({
+    queryKey: ['analytics-leads', user?.id, timeRange],
     queryFn: async () => {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
-        .from("leads")
-        .select("created_at, lead_type, status, email, phone") // Only needed columns
-        .eq("user_id", user.id)
-        .gte("created_at", cutoffDate) // Filter by time range
-        .order("created_at", { ascending: false })
+        .from('leads')
+        .select('created_at, lead_type, status, email, phone') // Only needed columns
+        .eq('user_id', user.id)
+        .gte('created_at', cutoffDate) // Filter by time range
+        .order('created_at', { ascending: false })
         .limit(500); // Hard limit for safety
 
       if (error) throw error;
@@ -71,14 +90,17 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
   // Calculate stats from data
   const stats = {
     totalViews: views.length,
-    uniqueVisitors: new Set(views.map(v => v.visitor_id)).size,
+    uniqueVisitors: new Set(views.map((v) => v.visitor_id)).size,
     totalLeads: leads.length,
-    conversionRate: views.length > 0 ? ((leads.length / views.length) * 100).toFixed(2) : "0.00",
+    conversionRate: views.length > 0 ? ((leads.length / views.length) * 100).toFixed(2) : '0.00',
   };
 
   // Group views by date for chart
   const viewsByDate = views.reduce((acc: any, view: any) => {
-    const date = new Date(view.viewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const date = new Date(view.viewed_at).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
     if (!acc[date]) {
       acc[date] = { name: date, views: 0, visitors: new Set() };
     }
@@ -115,7 +137,10 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     isLoading: viewsLoading || leadsLoading,
     isError: viewsError || leadsError,
     error: viewsErrorObj || leadsErrorObj,
-    refetch: () => { refetchViews(); refetchLeads(); },
+    refetch: () => {
+      refetchViews();
+      refetchLeads();
+    },
     timeRange,
   };
 }
