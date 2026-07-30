@@ -10,8 +10,6 @@ import {
   Maximize,
   MapPin,
   Share2,
-  Check,
-  Copy,
 } from 'lucide-react';
 import { formatPrice, parsePrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';

@@ -1,42 +1,42 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useSSO, SSOConfig } from "@/hooks/useSSO";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useSSO, SSOConfig } from '@/hooks/useSSO';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Loader2, AlertCircle, Check } from "lucide-react";
+} from '@/components/ui/select';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 const ssoConfigSchema = z.object({
-  organization_name: z.string().min(1, "Organization name is required"),
+  organization_name: z.string().min(1, 'Organization name is required'),
   organization_domain: z
     .string()
-    .min(1, "Domain is required")
-    .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i, "Invalid domain format"),
-  sso_provider: z.enum(["saml", "oidc", "azure_ad", "okta", "google_workspace"]),
+    .min(1, 'Domain is required')
+    .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i, 'Invalid domain format'),
+  sso_provider: z.enum(['saml', 'oidc', 'azure_ad', 'okta', 'google_workspace']),
   // SAML fields
   saml_entity_id: z.string().optional(),
-  saml_sso_url: z.string().url().optional().or(z.literal("")),
-  saml_slo_url: z.string().url().optional().or(z.literal("")),
+  saml_sso_url: z.string().url().optional().or(z.literal('')),
+  saml_slo_url: z.string().url().optional().or(z.literal('')),
   saml_certificate: z.string().optional(),
-  saml_metadata_url: z.string().url().optional().or(z.literal("")),
+  saml_metadata_url: z.string().url().optional().or(z.literal('')),
   // OIDC fields
   oidc_client_id: z.string().optional(),
   oidc_client_secret: z.string().optional(),
-  oidc_issuer: z.string().url().optional().or(z.literal("")),
-  oidc_authorization_endpoint: z.string().url().optional().or(z.literal("")),
-  oidc_token_endpoint: z.string().url().optional().or(z.literal("")),
-  oidc_userinfo_endpoint: z.string().url().optional().or(z.literal("")),
+  oidc_issuer: z.string().url().optional().or(z.literal('')),
+  oidc_authorization_endpoint: z.string().url().optional().or(z.literal('')),
+  oidc_token_endpoint: z.string().url().optional().or(z.literal('')),
+  oidc_userinfo_endpoint: z.string().url().optional().or(z.literal('')),
   // Settings
-  default_role: z.enum(["user", "admin"]).default("user"),
+  default_role: z.enum(['user', 'admin']).default('user'),
   auto_provision_users: z.boolean().default(true),
 });
 
@@ -48,13 +48,9 @@ interface SSOConfigFormProps {
   onCancel?: () => void;
 }
 
-export const SSOConfigForm = ({
-  config,
-  onSuccess,
-  onCancel,
-}: SSOConfigFormProps) => {
+export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProps) => {
   const { createSSOConfig, updateSSOConfig } = useSSO();
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const isEditing = !!config;
 
@@ -67,32 +63,31 @@ export const SSOConfigForm = ({
   } = useForm<SSOConfigFormData>({
     resolver: zodResolver(ssoConfigSchema),
     defaultValues: {
-      organization_name: config?.organization_name || "",
-      organization_domain: config?.organization_domain || "",
-      sso_provider: config?.sso_provider || "saml",
-      saml_entity_id: config?.saml_entity_id || "",
-      saml_sso_url: config?.saml_sso_url || "",
-      saml_slo_url: config?.saml_slo_url || "",
-      saml_certificate: config?.saml_certificate || "",
-      saml_metadata_url: config?.saml_metadata_url || "",
-      oidc_client_id: config?.oidc_client_id || "",
-      oidc_client_secret: "",
-      oidc_issuer: config?.oidc_issuer || "",
-      oidc_authorization_endpoint: config?.oidc_authorization_endpoint || "",
-      oidc_token_endpoint: config?.oidc_token_endpoint || "",
-      oidc_userinfo_endpoint: config?.oidc_userinfo_endpoint || "",
-      default_role: config?.default_role || "user",
+      organization_name: config?.organization_name || '',
+      organization_domain: config?.organization_domain || '',
+      sso_provider: config?.sso_provider || 'saml',
+      saml_entity_id: config?.saml_entity_id || '',
+      saml_sso_url: config?.saml_sso_url || '',
+      saml_slo_url: config?.saml_slo_url || '',
+      saml_certificate: config?.saml_certificate || '',
+      saml_metadata_url: config?.saml_metadata_url || '',
+      oidc_client_id: config?.oidc_client_id || '',
+      oidc_client_secret: '',
+      oidc_issuer: config?.oidc_issuer || '',
+      oidc_authorization_endpoint: config?.oidc_authorization_endpoint || '',
+      oidc_token_endpoint: config?.oidc_token_endpoint || '',
+      oidc_userinfo_endpoint: config?.oidc_userinfo_endpoint || '',
+      default_role: config?.default_role || 'user',
       auto_provision_users: config?.auto_provision_users ?? true,
     },
   });
 
-  const provider = watch("sso_provider");
-  const isSAML =
-    provider === "saml" || provider === "azure_ad" || provider === "okta";
-  const isOIDC = provider === "oidc" || provider === "google_workspace";
+  const provider = watch('sso_provider');
+  const isSAML = provider === 'saml' || provider === 'azure_ad' || provider === 'okta';
+  const isOIDC = provider === 'oidc' || provider === 'google_workspace';
 
   const onSubmit = async (data: SSOConfigFormData) => {
-    setError("");
+    setError('');
     try {
       // Clean up data based on provider type
       const cleanedData: Partial<SSOConfig> = {
@@ -133,9 +128,7 @@ export const SSOConfigForm = ({
 
       onSuccess?.();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to save SSO configuration"
-      );
+      setError(err instanceof Error ? err.message : 'Failed to save SSO configuration');
     }
   };
 
@@ -156,44 +149,28 @@ export const SSOConfigForm = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Organization Name *
-            </label>
-            <Input
-              {...register("organization_name")}
-              placeholder="Acme Corporation"
-            />
+            <label className="text-sm font-medium text-gray-700">Organization Name *</label>
+            <Input {...register('organization_name')} placeholder="Acme Corporation" />
             {errors.organization_name && (
-              <p className="text-sm text-red-600">
-                {errors.organization_name.message}
-              </p>
+              <p className="text-sm text-red-600">{errors.organization_name.message}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Email Domain *
-            </label>
-            <Input
-              {...register("organization_domain")}
-              placeholder="acme.com"
-            />
+            <label className="text-sm font-medium text-gray-700">Email Domain *</label>
+            <Input {...register('organization_domain')} placeholder="acme.com" />
             {errors.organization_domain && (
-              <p className="text-sm text-red-600">
-                {errors.organization_domain.message}
-              </p>
+              <p className="text-sm text-red-600">{errors.organization_domain.message}</p>
             )}
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">
-            SSO Provider *
-          </label>
+          <label className="text-sm font-medium text-gray-700">SSO Provider *</label>
           <Select
             value={provider}
             onValueChange={(value) =>
-              setValue("sso_provider", value as SSOConfigFormData["sso_provider"])
+              setValue('sso_provider', value as SSOConfigFormData['sso_provider'])
             }
           >
             <SelectTrigger>
@@ -216,41 +193,27 @@ export const SSOConfigForm = ({
           <h3 className="font-medium text-gray-900">SAML Configuration</h3>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              IdP Entity ID *
-            </label>
+            <label className="text-sm font-medium text-gray-700">IdP Entity ID *</label>
             <Input
-              {...register("saml_entity_id")}
+              {...register('saml_entity_id')}
               placeholder="https://idp.example.com/saml/metadata"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              IdP SSO URL *
-            </label>
-            <Input
-              {...register("saml_sso_url")}
-              placeholder="https://idp.example.com/saml/sso"
-            />
+            <label className="text-sm font-medium text-gray-700">IdP SSO URL *</label>
+            <Input {...register('saml_sso_url')} placeholder="https://idp.example.com/saml/sso" />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              IdP SLO URL (optional)
-            </label>
-            <Input
-              {...register("saml_slo_url")}
-              placeholder="https://idp.example.com/saml/slo"
-            />
+            <label className="text-sm font-medium text-gray-700">IdP SLO URL (optional)</label>
+            <Input {...register('saml_slo_url')} placeholder="https://idp.example.com/saml/slo" />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              X.509 Certificate *
-            </label>
+            <label className="text-sm font-medium text-gray-700">X.509 Certificate *</label>
             <Textarea
-              {...register("saml_certificate")}
+              {...register('saml_certificate')}
               placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
               rows={6}
               className="font-mono text-xs"
@@ -258,11 +221,9 @@ export const SSOConfigForm = ({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Metadata URL (optional)
-            </label>
+            <label className="text-sm font-medium text-gray-700">Metadata URL (optional)</label>
             <Input
-              {...register("saml_metadata_url")}
+              {...register('saml_metadata_url')}
               placeholder="https://idp.example.com/saml/metadata.xml"
             />
             <p className="text-xs text-gray-500">
@@ -279,53 +240,39 @@ export const SSOConfigForm = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                Client ID *
-              </label>
-              <Input
-                {...register("oidc_client_id")}
-                placeholder="your-client-id"
-              />
+              <label className="text-sm font-medium text-gray-700">Client ID *</label>
+              <Input {...register('oidc_client_id')} placeholder="your-client-id" />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
-                Client Secret {isEditing ? "(leave blank to keep)" : "*"}
+                Client Secret {isEditing ? '(leave blank to keep)' : '*'}
               </label>
               <Input
                 type="password"
-                {...register("oidc_client_secret")}
+                {...register('oidc_client_secret')}
                 placeholder="your-client-secret"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Issuer URL *
-            </label>
-            <Input
-              {...register("oidc_issuer")}
-              placeholder="https://accounts.google.com"
-            />
+            <label className="text-sm font-medium text-gray-700">Issuer URL *</label>
+            <Input {...register('oidc_issuer')} placeholder="https://accounts.google.com" />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Authorization Endpoint *
-            </label>
+            <label className="text-sm font-medium text-gray-700">Authorization Endpoint *</label>
             <Input
-              {...register("oidc_authorization_endpoint")}
+              {...register('oidc_authorization_endpoint')}
               placeholder="https://accounts.google.com/o/oauth2/v2/auth"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Token Endpoint *
-            </label>
+            <label className="text-sm font-medium text-gray-700">Token Endpoint *</label>
             <Input
-              {...register("oidc_token_endpoint")}
+              {...register('oidc_token_endpoint')}
               placeholder="https://oauth2.googleapis.com/token"
             />
           </div>
@@ -335,7 +282,7 @@ export const SSOConfigForm = ({
               UserInfo Endpoint (optional)
             </label>
             <Input
-              {...register("oidc_userinfo_endpoint")}
+              {...register('oidc_userinfo_endpoint')}
               placeholder="https://openidconnect.googleapis.com/v1/userinfo"
             />
           </div>
@@ -347,14 +294,10 @@ export const SSOConfigForm = ({
         <h3 className="font-medium text-gray-900">Settings</h3>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">
-            Default Role
-          </label>
+          <label className="text-sm font-medium text-gray-700">Default Role</label>
           <Select
-            value={watch("default_role")}
-            onValueChange={(value) =>
-              setValue("default_role", value as "user" | "admin")
-            }
+            value={watch('default_role')}
+            onValueChange={(value) => setValue('default_role', value as 'user' | 'admin')}
           >
             <SelectTrigger>
               <SelectValue />
@@ -364,20 +307,16 @@ export const SSOConfigForm = ({
               <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
-          <p className="text-xs text-gray-500">
-            Role assigned to new users created via SSO
-          </p>
+          <p className="text-xs text-gray-500">Role assigned to new users created via SSO</p>
         </div>
 
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
-            {...register("auto_provision_users")}
+            {...register('auto_provision_users')}
             className="rounded border-gray-300"
           />
-          <span className="text-sm text-gray-700">
-            Automatically create accounts for new users
-          </span>
+          <span className="text-sm text-gray-700">Automatically create accounts for new users</span>
         </label>
       </div>
 
@@ -395,9 +334,9 @@ export const SSOConfigForm = ({
               Saving...
             </>
           ) : isEditing ? (
-            "Update Configuration"
+            'Update Configuration'
           ) : (
-            "Create Configuration"
+            'Create Configuration'
           )}
         </Button>
       </div>

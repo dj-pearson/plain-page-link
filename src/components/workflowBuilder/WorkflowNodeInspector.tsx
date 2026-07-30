@@ -1,28 +1,21 @@
-import { useState, useEffect } from "react";
-import { useWorkflowBuilderStore } from "@/stores/useWorkflowBuilderStore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { useState, useEffect } from 'react';
+import { useWorkflowBuilderStore } from '@/stores/useWorkflowBuilderStore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { X, Trash2, Copy, Settings2 } from "lucide-react";
-import { NODE_CONFIG_SCHEMAS } from "@/types/workflow";
-import type { WorkflowNode } from "@/types/workflow";
+} from '@/components/ui/select';
+import { X, Trash2, Copy, Settings2 } from 'lucide-react';
+import { NODE_CONFIG_SCHEMAS } from '@/types/workflow';
 
 export const WorkflowNodeInspector = () => {
-  const {
-    workflow,
-    selectedNodeId,
-    selectNode,
-    updateNode,
-    removeNode,
-    duplicateNode,
-  } = useWorkflowBuilderStore();
+  const { workflow, selectedNodeId, selectNode, updateNode, removeNode, duplicateNode } =
+    useWorkflowBuilderStore();
 
   const selectedNode = workflow?.nodes.find((n) => n.id === selectedNodeId);
   const [localConfig, setLocalConfig] = useState<Record<string, any>>({});
@@ -37,9 +30,7 @@ export const WorkflowNodeInspector = () => {
     return (
       <div className="w-80 bg-white border-l flex flex-col items-center justify-center p-8 text-center">
         <Settings2 className="w-12 h-12 text-gray-300 mb-4" />
-        <p className="text-gray-500">
-          Select a node to configure its properties
-        </p>
+        <p className="text-gray-500">Select a node to configure its properties</p>
       </div>
     );
   }
@@ -61,10 +52,10 @@ export const WorkflowNodeInspector = () => {
   };
 
   const renderConfigField = (key: string, schema: Record<string, any>) => {
-    const value = localConfig[key] ?? schema.default ?? "";
+    const value = localConfig[key] ?? schema.default ?? '';
 
     switch (schema.type) {
-      case "string":
+      case 'string':
         return (
           <Input
             value={value}
@@ -73,7 +64,7 @@ export const WorkflowNodeInspector = () => {
           />
         );
 
-      case "number":
+      case 'number':
         return (
           <Input
             type="number"
@@ -84,7 +75,7 @@ export const WorkflowNodeInspector = () => {
           />
         );
 
-      case "textarea":
+      case 'textarea':
         return (
           <Textarea
             value={value}
@@ -95,12 +86,9 @@ export const WorkflowNodeInspector = () => {
           />
         );
 
-      case "select":
+      case 'select':
         return (
-          <Select
-            value={value}
-            onValueChange={(v) => handleConfigChange(key, v)}
-          >
+          <Select value={value} onValueChange={(v) => handleConfigChange(key, v)}>
             <SelectTrigger>
               <SelectValue placeholder={`Select ${schema.label}`} />
             </SelectTrigger>
@@ -114,10 +102,10 @@ export const WorkflowNodeInspector = () => {
           </Select>
         );
 
-      case "json":
+      case 'json':
         return (
           <Textarea
-            value={typeof value === "string" ? value : JSON.stringify(value, null, 2)}
+            value={typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
             onChange={(e) => {
               try {
                 handleConfigChange(key, JSON.parse(e.target.value));
@@ -133,12 +121,7 @@ export const WorkflowNodeInspector = () => {
         );
 
       default:
-        return (
-          <Input
-            value={value}
-            onChange={(e) => handleConfigChange(key, e.target.value)}
-          />
-        );
+        return <Input value={value} onChange={(e) => handleConfigChange(key, e.target.value)} />;
     }
   };
 
@@ -147,11 +130,7 @@ export const WorkflowNodeInspector = () => {
       {/* Header */}
       <div className="p-4 border-b flex items-center justify-between">
         <h3 className="font-semibold text-gray-900">Node Settings</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => selectNode(null)}
-        >
+        <Button variant="ghost" size="sm" onClick={() => selectNode(null)}>
           <X className="w-4 h-4" />
         </Button>
       </div>
@@ -162,18 +141,13 @@ export const WorkflowNodeInspector = () => {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Label</label>
-            <Input
-              value={selectedNode.label}
-              onChange={(e) => handleLabelChange(e.target.value)}
-            />
+            <Input value={selectedNode.label} onChange={(e) => handleLabelChange(e.target.value)} />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Description
-            </label>
+            <label className="text-sm font-medium text-gray-700">Description</label>
             <Textarea
-              value={selectedNode.description || ""}
+              value={selectedNode.description || ''}
               onChange={(e) => handleDescriptionChange(e.target.value)}
               placeholder="Add a description..."
               rows={2}
@@ -190,7 +164,7 @@ export const WorkflowNodeInspector = () => {
           <div className="flex items-center justify-between text-sm mt-1">
             <span className="text-gray-500">Action</span>
             <span className="font-medium capitalize">
-              {selectedNode.subtype.replace(/_/g, " ")}
+              {selectedNode.subtype.replace(/_/g, ' ')}
             </span>
           </div>
         </div>
@@ -203,14 +177,10 @@ export const WorkflowNodeInspector = () => {
               <div key={key} className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
                   {schema.label}
-                  {schema.required && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
+                  {schema.required && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 {renderConfigField(key, schema)}
-                {schema.help && (
-                  <p className="text-xs text-gray-500">{schema.help}</p>
-                )}
+                {schema.help && <p className="text-xs text-gray-500">{schema.help}</p>}
               </div>
             ))}
           </div>
@@ -218,14 +188,10 @@ export const WorkflowNodeInspector = () => {
 
         {/* Variables help */}
         <div className="bg-blue-50 rounded-lg p-3">
-          <p className="text-xs text-blue-700 font-medium mb-1">
-            Using Variables
-          </p>
+          <p className="text-xs text-blue-700 font-medium mb-1">Using Variables</p>
           <p className="text-xs text-blue-600">
             Use double curly braces to insert variables:
-            <code className="bg-blue-100 px-1 mx-1 rounded">
-              {"{{lead.email}}"}
-            </code>
+            <code className="bg-blue-100 px-1 mx-1 rounded">{'{{lead.email}}'}</code>
           </p>
         </div>
       </div>

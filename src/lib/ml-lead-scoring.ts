@@ -9,8 +9,6 @@
  * - Provides confidence scores and feature importance
  */
 
-import type { Lead, LeadStatus } from '@/types/lead';
-
 // ============================================================================
 // Types & Interfaces
 // ============================================================================
@@ -169,7 +167,7 @@ export class FeatureExtractor {
 
       // UTM signals (presence)
       features.utmSource ? 0.5 : 0,
-      features.utmMedium === 'cpc' ? 0.6 : (features.utmMedium ? 0.3 : 0),
+      features.utmMedium === 'cpc' ? 0.6 : features.utmMedium ? 0.3 : 0,
     ];
   }
 
@@ -266,9 +264,9 @@ export class LogisticRegressionModel {
 
     // Initialize weights with small random values (Xavier initialization)
     const scale = Math.sqrt(2 / numFeatures);
-    this.weights = Array(numFeatures).fill(0).map(() =>
-      (Math.random() - 0.5) * scale
-    );
+    this.weights = Array(numFeatures)
+      .fill(0)
+      .map(() => (Math.random() - 0.5) * scale);
     this.bias = 0;
   }
 
@@ -365,7 +363,7 @@ export class LogisticRegressionModel {
    */
   getFeatureImportance(): number[] {
     const total = this.weights.reduce((sum, w) => sum + Math.abs(w), 0);
-    return this.weights.map(w => Math.abs(w) / total);
+    return this.weights.map((w) => Math.abs(w) / total);
   }
 }
 
@@ -430,7 +428,7 @@ export class MLLeadScoringSystem {
   private loadDefaultWeights(): void {
     const featureNames = FeatureExtractor.getFeatureNames();
     const weights = featureNames.map(
-      name => MLLeadScoringSystem.DEFAULT_WEIGHTS.weights[name] ?? 0
+      (name) => MLLeadScoringSystem.DEFAULT_WEIGHTS.weights[name] ?? 0
     );
     this.model.importWeights({
       weights,
@@ -457,8 +455,12 @@ export class MLLeadScoringSystem {
         feature: name,
         value: featureVector[i],
         contribution: contributions[i],
-        direction: contributions[i] > 0.1 ? 'positive' as const :
-                   contributions[i] < -0.1 ? 'negative' as const : 'neutral' as const,
+        direction:
+          contributions[i] > 0.1
+            ? ('positive' as const)
+            : contributions[i] < -0.1
+              ? ('negative' as const)
+              : ('neutral' as const),
       }))
       .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
       .slice(0, 5); // Top 5 contributing features
@@ -508,7 +510,7 @@ export class MLLeadScoringSystem {
     }
 
     // Prepare training data
-    const data = this.trainingExamples.map(ex => ({
+    const data = this.trainingExamples.map((ex) => ({
       features: FeatureExtractor.extractFeatureVector(ex.features),
       label: ex.converted ? 1 : 0,
     }));
@@ -565,7 +567,7 @@ export class MLLeadScoringSystem {
     // Sort by score descending
     const sorted = [...predictions].sort((a, b) => b.score - a.score);
 
-    const positives = sorted.filter(p => p.label === 1).length;
+    const positives = sorted.filter((p) => p.label === 1).length;
     const negatives = sorted.length - positives;
 
     if (positives === 0 || negatives === 0) return 0.5;
@@ -612,7 +614,7 @@ export class MLLeadScoringSystem {
    */
   importModel(modelWeights: ModelWeights): void {
     const featureNames = FeatureExtractor.getFeatureNames();
-    const weights = featureNames.map(name => modelWeights.weights[name] ?? 0);
+    const weights = featureNames.map((name) => modelWeights.weights[name] ?? 0);
 
     this.model.importWeights({
       weights,
@@ -713,7 +715,7 @@ export class ABTestManager {
    * Record conversion outcome
    */
   recordConversion(leadId: string, converted: boolean): void {
-    const result = this.results.find(r => r.leadId === leadId);
+    const result = this.results.find((r) => r.leadId === leadId);
     if (result) {
       result.converted = converted;
     }
@@ -730,26 +732,29 @@ export class ABTestManager {
     winner: 'ml' | 'rules' | 'inconclusive';
     confidence: number;
   } {
-    const mlResults = this.results.filter(r => r.variant === 'ml');
-    const rulesResults = this.results.filter(r => r.variant === 'rules');
+    const mlResults = this.results.filter((r) => r.variant === 'ml');
+    const rulesResults = this.results.filter((r) => r.variant === 'rules');
 
-    const mlConversions = mlResults.filter(r => r.converted).length;
-    const rulesConversions = rulesResults.filter(r => r.converted).length;
+    const mlConversions = mlResults.filter((r) => r.converted).length;
+    const rulesConversions = rulesResults.filter((r) => r.converted).length;
 
     const mlConversionRate = mlResults.length > 0 ? mlConversions / mlResults.length : 0;
-    const rulesConversionRate = rulesResults.length > 0 ? rulesConversions / rulesResults.length : 0;
+    const rulesConversionRate =
+      rulesResults.length > 0 ? rulesConversions / rulesResults.length : 0;
 
-    const mlAvgScore = mlResults.length > 0
-      ? mlResults.reduce((sum, r) => sum + r.score, 0) / mlResults.length
-      : 0;
-    const rulesAvgScore = rulesResults.length > 0
-      ? rulesResults.reduce((sum, r) => sum + r.score, 0) / rulesResults.length
-      : 0;
+    const mlAvgScore =
+      mlResults.length > 0 ? mlResults.reduce((sum, r) => sum + r.score, 0) / mlResults.length : 0;
+    const rulesAvgScore =
+      rulesResults.length > 0
+        ? rulesResults.reduce((sum, r) => sum + r.score, 0) / rulesResults.length
+        : 0;
 
     // Calculate statistical significance using chi-squared test
     const confidence = this.calculateSignificance(
-      mlResults.length, mlConversions,
-      rulesResults.length, rulesConversions
+      mlResults.length,
+      mlConversions,
+      rulesResults.length,
+      rulesConversions
     );
 
     const duration = (Date.now() - this.testConfig.startedAt.getTime()) / (1000 * 60 * 60 * 24);
@@ -783,8 +788,10 @@ export class ABTestManager {
    * Calculate statistical significance using chi-squared test
    */
   private calculateSignificance(
-    mlTotal: number, mlConversions: number,
-    rulesTotal: number, rulesConversions: number
+    mlTotal: number,
+    mlConversions: number,
+    rulesTotal: number,
+    rulesConversions: number
   ): number {
     const total = mlTotal + rulesTotal;
     const totalConversions = mlConversions + rulesConversions;
@@ -797,16 +804,21 @@ export class ABTestManager {
     const expectedRulesNonConversions = rulesTotal - expectedRulesConversions;
 
     // Avoid division by zero
-    if (expectedMlConversions === 0 || expectedRulesConversions === 0 ||
-        expectedMlNonConversions === 0 || expectedRulesNonConversions === 0) {
+    if (
+      expectedMlConversions === 0 ||
+      expectedRulesConversions === 0 ||
+      expectedMlNonConversions === 0 ||
+      expectedRulesNonConversions === 0
+    ) {
       return 0;
     }
 
     const chiSquared =
       Math.pow(mlConversions - expectedMlConversions, 2) / expectedMlConversions +
       Math.pow(rulesConversions - expectedRulesConversions, 2) / expectedRulesConversions +
-      Math.pow((mlTotal - mlConversions) - expectedMlNonConversions, 2) / expectedMlNonConversions +
-      Math.pow((rulesTotal - rulesConversions) - expectedRulesNonConversions, 2) / expectedRulesNonConversions;
+      Math.pow(mlTotal - mlConversions - expectedMlNonConversions, 2) / expectedMlNonConversions +
+      Math.pow(rulesTotal - rulesConversions - expectedRulesNonConversions, 2) /
+        expectedRulesNonConversions;
 
     // Convert chi-squared to p-value (approximation for 1 degree of freedom)
     // p-value ≈ 1 - CDF of chi-squared distribution
@@ -822,7 +834,7 @@ export class ABTestManager {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash);
@@ -861,7 +873,10 @@ export class UnifiedLeadScorer {
   /**
    * Score a lead using either ML or rules based on A/B test assignment
    */
-  scoreLead(leadId: string, features: LeadFeatures): {
+  scoreLead(
+    leadId: string,
+    features: LeadFeatures
+  ): {
     score: number;
     priority: 'hot' | 'warm' | 'cold';
     variant: 'ml' | 'rules';
@@ -1020,11 +1035,8 @@ export const recordConversion = (leadId: string, features: LeadFeatures, convert
 export const startABTest = (mlTrafficPercent?: number) =>
   getUnifiedScorer().startABTest(mlTrafficPercent);
 
-export const stopABTest = () =>
-  getUnifiedScorer().stopABTest();
+export const stopABTest = () => getUnifiedScorer().stopABTest();
 
-export const getABTestResults = () =>
-  getUnifiedScorer().getABTestResults();
+export const getABTestResults = () => getUnifiedScorer().getABTestResults();
 
-export const getModelStats = () =>
-  getUnifiedScorer().getModelStats();
+export const getModelStats = () => getUnifiedScorer().getModelStats();

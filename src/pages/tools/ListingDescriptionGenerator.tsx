@@ -3,7 +3,7 @@
  * Generates professional listing descriptions in 3 styles for real estate agents
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { PropertyDetailsForm } from '@/components/tools/listing-description-generator/PropertyDetailsForm';
 import { DescriptionDisplay } from '@/components/tools/listing-description-generator/DescriptionDisplay';

@@ -3,7 +3,7 @@
  * Enables viral sharing of listing descriptions with pre-populated posts
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Share2, Download, Facebook, Linkedin, Twitter, Copy, Check } from 'lucide-react';

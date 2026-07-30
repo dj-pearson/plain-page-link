@@ -16,7 +16,6 @@ import { useProfile } from '@/hooks/useProfile';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LeadsTable } from '@/components/dashboard/LeadsTable';
 import { ProfileCompletionWidget } from '@/components/dashboard/ProfileCompletionWidget';
 import { QuickActionsWidget } from '@/components/dashboard/QuickActionsWidget';
 import { ConversionFunnel } from '@/components/dashboard/ConversionFunnel';

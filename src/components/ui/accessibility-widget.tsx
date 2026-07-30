@@ -1,18 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Accessibility,
   X,
   ZoomIn,
   ZoomOut,
   Contrast,
-  MousePointer,
   Underline,
   Focus,
   RotateCcw,
   Minus,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useFocusTrap, useEscapeKey } from "@/hooks/useAccessibility";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useFocusTrap, useEscapeKey } from '@/hooks/useAccessibility';
 
 interface A11yPreferences {
   textScale: number;
@@ -22,7 +21,7 @@ interface A11yPreferences {
   reducedMotion: boolean;
 }
 
-const STORAGE_KEY = "agentbio-a11y-preferences";
+const STORAGE_KEY = 'agentbio-a11y-preferences';
 const TEXT_SCALES = [100, 125, 150, 175, 200];
 
 function loadPreferences(): A11yPreferences {
@@ -63,21 +62,21 @@ function applyPreferences(prefs: A11yPreferences) {
   }
 
   // High contrast
-  root.classList.toggle("a11y-high-contrast", prefs.highContrast);
+  root.classList.toggle('a11y-high-contrast', prefs.highContrast);
 
   // Underline links
-  root.classList.toggle("a11y-underline-links", prefs.underlineLinks);
+  root.classList.toggle('a11y-underline-links', prefs.underlineLinks);
 
   // Focus highlight
-  root.classList.toggle("a11y-focus-highlight", prefs.focusHighlight);
+  root.classList.toggle('a11y-focus-highlight', prefs.focusHighlight);
 
   // Reduced motion
   if (prefs.reducedMotion) {
-    root.style.setProperty("--a11y-reduced-motion", "reduce");
-    root.classList.add("a11y-reduced-motion");
+    root.style.setProperty('--a11y-reduced-motion', 'reduce');
+    root.classList.add('a11y-reduced-motion');
   } else {
-    root.style.removeProperty("--a11y-reduced-motion");
-    root.classList.remove("a11y-reduced-motion");
+    root.style.removeProperty('--a11y-reduced-motion');
+    root.classList.remove('a11y-reduced-motion');
   }
 }
 
@@ -101,7 +100,7 @@ function applyPreferences(prefs: A11yPreferences) {
 export function AccessibilityWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [prefs, setPrefs] = useState<A11yPreferences>(loadPreferences);
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, setAnnouncement] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
 
   useFocusTrap(panelRef as React.RefObject<HTMLElement>, isOpen);
@@ -115,7 +114,7 @@ export function AccessibilityWidget() {
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
-    setTimeout(() => setAnnouncement(""), 1500);
+    setTimeout(() => setAnnouncement(''), 1500);
   }, []);
 
   const updatePref = useCallback(
@@ -157,7 +156,7 @@ export function AccessibilityWidget() {
       reducedMotion: false,
     };
     setPrefs(defaults);
-    announce("All accessibility settings reset to defaults");
+    announce('All accessibility settings reset to defaults');
   }, [announce]);
 
   const hasChanges =
@@ -178,15 +177,15 @@ export function AccessibilityWidget() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "fixed bottom-20 md:bottom-6 right-4 z-[90]",
-          "w-12 h-12 rounded-full shadow-lg",
-          "bg-blue-600 text-white hover:bg-blue-700",
-          "flex items-center justify-center",
-          "transition-all duration-200",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
-          hasChanges && "ring-2 ring-orange-400 ring-offset-2"
+          'fixed bottom-20 md:bottom-6 right-4 z-[90]',
+          'w-12 h-12 rounded-full shadow-lg',
+          'bg-blue-600 text-white hover:bg-blue-700',
+          'flex items-center justify-center',
+          'transition-all duration-200',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
+          hasChanges && 'ring-2 ring-orange-400 ring-offset-2'
         )}
-        aria-label={isOpen ? "Close accessibility settings" : "Open accessibility settings"}
+        aria-label={isOpen ? 'Close accessibility settings' : 'Open accessibility settings'}
         aria-expanded={isOpen}
         aria-controls="a11y-widget-panel"
       >
@@ -206,11 +205,11 @@ export function AccessibilityWidget() {
           aria-label="Accessibility settings"
           aria-modal="true"
           className={cn(
-            "fixed bottom-36 md:bottom-20 right-4 z-[90]",
-            "w-80 max-h-[70vh] overflow-y-auto",
-            "bg-white dark:bg-gray-900 rounded-xl shadow-2xl",
-            "border border-gray-200 dark:border-gray-700",
-            "p-4"
+            'fixed bottom-36 md:bottom-20 right-4 z-[90]',
+            'w-80 max-h-[70vh] overflow-y-auto',
+            'bg-white dark:bg-gray-900 rounded-xl shadow-2xl',
+            'border border-gray-200 dark:border-gray-700',
+            'p-4'
           )}
         >
           <div className="flex items-center justify-between mb-4">
@@ -229,7 +228,10 @@ export function AccessibilityWidget() {
           <div className="space-y-4">
             {/* Text Size */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300" id="text-size-label">
+              <label
+                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                id="text-size-label"
+              >
                 Text Size: {prefs.textScale}%
               </label>
               <div
@@ -241,12 +243,12 @@ export function AccessibilityWidget() {
                   onClick={decreaseTextSize}
                   disabled={prefs.textScale <= 100}
                   className={cn(
-                    "flex items-center justify-center w-10 h-10 rounded-lg border",
-                    "transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                    'flex items-center justify-center w-10 h-10 rounded-lg border',
+                    'transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
                     prefs.textScale <= 100
-                      ? "border-gray-200 text-gray-300 cursor-not-allowed"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                      ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'
                   )}
                   aria-label="Decrease text size"
                 >
@@ -254,7 +256,10 @@ export function AccessibilityWidget() {
                 </button>
 
                 {/* Visual scale indicator */}
-                <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden" role="presentation">
+                <div
+                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
+                  role="presentation"
+                >
                   <div
                     className="h-full bg-blue-600 rounded-full transition-all duration-200"
                     style={{ width: `${((prefs.textScale - 100) / 100) * 100}%` }}
@@ -265,12 +270,12 @@ export function AccessibilityWidget() {
                   onClick={increaseTextSize}
                   disabled={prefs.textScale >= 200}
                   className={cn(
-                    "flex items-center justify-center w-10 h-10 rounded-lg border",
-                    "transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                    'flex items-center justify-center w-10 h-10 rounded-lg border',
+                    'transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
                     prefs.textScale >= 200
-                      ? "border-gray-200 text-gray-300 cursor-not-allowed"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                      ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'
                   )}
                   aria-label="Increase text size"
                 >
@@ -286,28 +291,52 @@ export function AccessibilityWidget() {
                 label="High Contrast"
                 description="Increase color contrast for better readability"
                 checked={prefs.highContrast}
-                onChange={(v) => updatePref("highContrast", v, v ? "High contrast enabled" : "High contrast disabled")}
+                onChange={(v) =>
+                  updatePref(
+                    'highContrast',
+                    v,
+                    v ? 'High contrast enabled' : 'High contrast disabled'
+                  )
+                }
               />
               <ToggleOption
                 icon={<Underline className="h-4 w-4" aria-hidden="true" />}
                 label="Underline Links"
                 description="Underline all links for easier identification"
                 checked={prefs.underlineLinks}
-                onChange={(v) => updatePref("underlineLinks", v, v ? "Links underlined" : "Link underlines removed")}
+                onChange={(v) =>
+                  updatePref(
+                    'underlineLinks',
+                    v,
+                    v ? 'Links underlined' : 'Link underlines removed'
+                  )
+                }
               />
               <ToggleOption
                 icon={<Focus className="h-4 w-4" aria-hidden="true" />}
                 label="Enhanced Focus"
                 description="Show prominent focus indicators on interactive elements"
                 checked={prefs.focusHighlight}
-                onChange={(v) => updatePref("focusHighlight", v, v ? "Enhanced focus enabled" : "Enhanced focus disabled")}
+                onChange={(v) =>
+                  updatePref(
+                    'focusHighlight',
+                    v,
+                    v ? 'Enhanced focus enabled' : 'Enhanced focus disabled'
+                  )
+                }
               />
               <ToggleOption
                 icon={<Minus className="h-4 w-4" aria-hidden="true" />}
                 label="Reduce Motion"
                 description="Minimize animations and transitions"
                 checked={prefs.reducedMotion}
-                onChange={(v) => updatePref("reducedMotion", v, v ? "Reduced motion enabled" : "Reduced motion disabled")}
+                onChange={(v) =>
+                  updatePref(
+                    'reducedMotion',
+                    v,
+                    v ? 'Reduced motion enabled' : 'Reduced motion disabled'
+                  )
+                }
               />
             </div>
 
@@ -316,12 +345,12 @@ export function AccessibilityWidget() {
               <button
                 onClick={resetAll}
                 className={cn(
-                  "w-full flex items-center justify-center gap-2 py-2 px-4",
-                  "text-sm text-gray-600 dark:text-gray-400",
-                  "border border-gray-200 dark:border-gray-700 rounded-lg",
-                  "hover:bg-gray-50 dark:hover:bg-gray-800",
-                  "transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  'w-full flex items-center justify-center gap-2 py-2 px-4',
+                  'text-sm text-gray-600 dark:text-gray-400',
+                  'border border-gray-200 dark:border-gray-700 rounded-lg',
+                  'hover:bg-gray-50 dark:hover:bg-gray-800',
+                  'transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
                 )}
               >
                 <RotateCcw className="h-4 w-4" aria-hidden="true" />
@@ -349,7 +378,7 @@ interface ToggleOptionProps {
 }
 
 function ToggleOption({ icon, label, description, checked, onChange }: ToggleOptionProps) {
-  const id = `a11y-toggle-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  const id = `a11y-toggle-${label.toLowerCase().replace(/\s+/g, '-')}`;
 
   return (
     <button
@@ -358,28 +387,30 @@ function ToggleOption({ icon, label, description, checked, onChange }: ToggleOpt
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
-        "w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+        'w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
         checked
-          ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
-          : "border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
+          ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'
+          : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800'
       )}
     >
       <div
         className={cn(
-          "flex items-center justify-center w-8 h-8 rounded-md flex-shrink-0",
+          'flex items-center justify-center w-8 h-8 rounded-md flex-shrink-0',
           checked
-            ? "bg-blue-600 text-white"
-            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
         )}
       >
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <div className={cn(
-          "text-sm font-medium",
-          checked ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-white"
-        )}>
+        <div
+          className={cn(
+            'text-sm font-medium',
+            checked ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-white'
+          )}
+        >
           {label}
         </div>
         <div className="text-xs text-gray-500 dark:text-gray-400">{description}</div>
@@ -387,15 +418,15 @@ function ToggleOption({ icon, label, description, checked, onChange }: ToggleOpt
       {/* Visual toggle indicator */}
       <div
         className={cn(
-          "w-10 h-6 rounded-full transition-colors flex-shrink-0 relative",
-          checked ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
+          'w-10 h-6 rounded-full transition-colors flex-shrink-0 relative',
+          checked ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
         )}
         aria-hidden="true"
       >
         <div
           className={cn(
-            "absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm",
-            checked ? "translate-x-5" : "translate-x-1"
+            'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm',
+            checked ? 'translate-x-5' : 'translate-x-1'
           )}
         />
       </div>

@@ -3,7 +3,6 @@
  * Shows overall effectiveness score with visual gauge
  */
 
-import React from 'react';
 import { getScoreGrade } from '@/lib/instagram-bio-analyzer/scoring';
 import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Shield, Bell, CreditCard, User, Lock, Mail, Save, Eye, KeyRound } from 'lucide-react';
+import { Bell, CreditCard, User, Lock, Save, Eye, KeyRound } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSettings } from '@/hooks/useSettings';
 import { supabase } from '@/integrations/supabase/client';

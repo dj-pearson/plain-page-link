@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import {
   Download,
   Search,
-  Filter,
   Mail,
   Phone,
   MessageSquare,
@@ -32,7 +31,6 @@ import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { SkeletonLeads } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,

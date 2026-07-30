@@ -8,14 +8,8 @@
  * - Historical test results
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { useState, useMemo } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -35,27 +29,12 @@ import {
   Target,
   Zap,
   AlertCircle,
-  CheckCircle2,
   Clock,
   Users,
-  Percent,
   Trophy,
   History,
 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Cell,
-  PieChart,
-  Pie,
-  Legend,
-} from 'recharts';
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 
 // ============================================================================
 // Sub-components
@@ -84,10 +63,18 @@ const MetricCard = ({ title, value, subtitle, icon, trend, trendValue }: MetricC
           {trend && trendValue && (
             <div
               className={`flex items-center text-xs ${
-                trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-gray-500'
+                trend === 'up'
+                  ? 'text-green-500'
+                  : trend === 'down'
+                    ? 'text-red-500'
+                    : 'text-gray-500'
               }`}
             >
-              {trend === 'up' ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
+              {trend === 'up' ? (
+                <TrendingUp className="h-3 w-3 mr-1" />
+              ) : (
+                <TrendingDown className="h-3 w-3 mr-1" />
+              )}
               {trendValue}
             </div>
           )}
@@ -510,7 +497,13 @@ const ABTestVisualization = () => {
                       <span className="text-sm text-green-600">ML: {h.mlRate}%</span>
                       <span className="text-sm text-blue-600">Rules: {h.rulesRate}%</span>
                       <Badge
-                        variant={h.winner === 'ml' ? 'default' : h.winner === 'rules' ? 'secondary' : 'outline'}
+                        variant={
+                          h.winner === 'ml'
+                            ? 'default'
+                            : h.winner === 'rules'
+                              ? 'secondary'
+                              : 'outline'
+                        }
                         className="w-20 justify-center"
                       >
                         {h.winner === 'ml' ? 'ML Won' : h.winner === 'rules' ? 'Rules Won' : 'Tie'}
@@ -542,9 +535,8 @@ export const MLLeadScoringDashboard = () => {
   const summaryMetrics = useMemo(() => {
     const scores = cachedScores;
     const mlScores = scores.filter((s) => s.variant === 'ml');
-    const avgScore = scores.length > 0
-      ? scores.reduce((sum, s) => sum + s.score, 0) / scores.length
-      : 0;
+    const avgScore =
+      scores.length > 0 ? scores.reduce((sum, s) => sum + s.score, 0) / scores.length : 0;
     const hotLeads = scores.filter((s) => s.priority === 'hot').length;
 
     return {
@@ -623,8 +615,8 @@ export const MLLeadScoringDashboard = () => {
               {stats.trainingExamples < 10
                 ? `Need ${10 - stats.trainingExamples} more examples to enable retraining`
                 : stats.trainingExamples < 100
-                ? 'Model can be retrained. More examples will improve accuracy.'
-                : 'Excellent! You have enough data for a well-trained model.'}
+                  ? 'Model can be retrained. More examples will improve accuracy.'
+                  : 'Excellent! You have enough data for a well-trained model.'}
             </p>
           </CardContent>
         </Card>

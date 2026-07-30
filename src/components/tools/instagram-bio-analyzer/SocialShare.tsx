@@ -3,7 +3,7 @@
  * Enables viral sharing of bio scores and results
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Facebook,

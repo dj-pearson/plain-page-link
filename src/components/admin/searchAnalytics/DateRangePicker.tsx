@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
@@ -19,10 +18,7 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
     const start = new Date();
     start.setDate(start.getDate() - days);
 
-    onChange(
-      start.toISOString().split('T')[0],
-      end.toISOString().split('T')[0]
-    );
+    onChange(start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
     setIsOpen(false);
   };
 
@@ -40,7 +36,8 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
         <PopoverTrigger asChild>
           <Button variant="outline" className="gap-2">
             <CalendarIcon className="h-4 w-4" />
-            {format(new Date(startDate), 'MMM dd, yyyy')} - {format(new Date(endDate), 'MMM dd, yyyy')}
+            {format(new Date(startDate), 'MMM dd, yyyy')} -{' '}
+            {format(new Date(endDate), 'MMM dd, yyyy')}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-4" align="start">

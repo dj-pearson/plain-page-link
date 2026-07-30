@@ -1,10 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  AnalyticsEngine,
-  AnalyticsData,
-  TimeSeriesData,
-  LeadSourceMetric,
-} from './analytics';
+import { describe, it, expect, vi } from 'vitest';
+import { AnalyticsEngine, AnalyticsData, TimeSeriesData, LeadSourceMetric } from './analytics';
 
 describe('AnalyticsEngine', () => {
   const createMockAnalyticsData = (overrides: Partial<AnalyticsData> = {}): AnalyticsData => ({
@@ -100,11 +95,7 @@ describe('AnalyticsEngine', () => {
       const startDate = new Date('2025-01-01');
       const endDate = new Date('2025-01-07');
 
-      const timeSeries = AnalyticsEngine.generateTimeSeries(
-        startDate,
-        endDate,
-        () => 100
-      );
+      const timeSeries = AnalyticsEngine.generateTimeSeries(startDate, endDate, () => 100);
 
       expect(timeSeries.length).toBe(7); // 7 days
       expect(timeSeries[0].value).toBe(100);
@@ -114,11 +105,7 @@ describe('AnalyticsEngine', () => {
       const startDate = new Date('2025-01-15');
       const endDate = new Date('2025-01-17');
 
-      const timeSeries = AnalyticsEngine.generateTimeSeries(
-        startDate,
-        endDate,
-        () => 50
-      );
+      const timeSeries = AnalyticsEngine.generateTimeSeries(startDate, endDate, () => 50);
 
       expect(timeSeries[0].date).toBe('Jan 15');
       expect(timeSeries[1].date).toBe('Jan 16');
@@ -213,9 +200,7 @@ describe('AnalyticsEngine', () => {
     });
 
     it('should return undefined ROI when cost is not provided', () => {
-      const sources = [
-        { source: 'Organic', leads: 100, conversions: 20, revenue: 10000 },
-      ];
+      const sources = [{ source: 'Organic', leads: 100, conversions: 20, revenue: 10000 }];
 
       const analysis = AnalyticsEngine.analyzeLeadSources(sources);
 
@@ -223,9 +208,7 @@ describe('AnalyticsEngine', () => {
     });
 
     it('should handle zero leads', () => {
-      const sources = [
-        { source: 'Empty', leads: 0, conversions: 0, revenue: 0 },
-      ];
+      const sources = [{ source: 'Empty', leads: 0, conversions: 0, revenue: 0 }];
 
       const analysis = AnalyticsEngine.analyzeLeadSources(sources);
 
@@ -237,8 +220,22 @@ describe('AnalyticsEngine', () => {
     it('should sort listings by conversion rate descending', () => {
       const listings = [
         { id: '1', title: 'Low Performer', views: 100, leads: 5, avgTimeOnPage: 60, shareCount: 2 },
-        { id: '2', title: 'High Performer', views: 100, leads: 20, avgTimeOnPage: 120, shareCount: 10 },
-        { id: '3', title: 'Medium Performer', views: 100, leads: 10, avgTimeOnPage: 90, shareCount: 5 },
+        {
+          id: '2',
+          title: 'High Performer',
+          views: 100,
+          leads: 20,
+          avgTimeOnPage: 120,
+          shareCount: 10,
+        },
+        {
+          id: '3',
+          title: 'Medium Performer',
+          views: 100,
+          leads: 10,
+          avgTimeOnPage: 90,
+          shareCount: 5,
+        },
       ];
 
       const ranked = AnalyticsEngine.rankListings(listings);

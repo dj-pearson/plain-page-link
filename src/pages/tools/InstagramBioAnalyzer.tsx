@@ -3,14 +3,14 @@
  * Lead magnet tool for AgentBio.net
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { BioAnalyzerForm } from '@/components/tools/instagram-bio-analyzer/BioAnalyzerForm';
 import { ScoreDisplay } from '@/components/tools/instagram-bio-analyzer/ScoreDisplay';
 import { CategoryBreakdown } from '@/components/tools/instagram-bio-analyzer/CategoryBreakdown';
 import { BioRewriteDisplay } from '@/components/tools/instagram-bio-analyzer/BioRewriteDisplay';
-import { InstagramMockup, InstagramComparison } from '@/components/tools/instagram-bio-analyzer/InstagramMockup';
+import { InstagramComparison } from '@/components/tools/instagram-bio-analyzer/InstagramMockup';
 import { EmailCaptureModal, UnlockCTA } from '@/components/tools/instagram-bio-analyzer/EmailCaptureModal';
 import { SocialShare, ScoreLeaderboard } from '@/components/tools/instagram-bio-analyzer/SocialShare';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,6 @@ import { analyzeLinkStrategy, calculateLeadLoss } from '@/lib/instagram-bio-anal
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import {
-  Instagram,
   TrendingUp,
   Users,
   DollarSign,

@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type {
   PSEOPage,
   PSEOQueueItem,
@@ -8,10 +8,8 @@ import type {
   PSEOGenerationError,
   PSEOPrompt,
   PSEOStats,
-  PSEOPageType,
   PSEOQueueInput,
-  PSEOTaxonomyType,
-} from "@/types/pseo";
+} from '@/types/pseo';
 
 export function usePSEO() {
   const queryClient = useQueryClient();
@@ -23,7 +21,9 @@ export function usePSEO() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pseo_pages')
-        .select('id, page_type, url_path, combination, is_published, quality_score, agent_count, generated_at, published_at, updated_at, next_refresh_at, generation_model, error_count')
+        .select(
+          'id, page_type, url_path, combination, is_published, quality_score, agent_count, generated_at, published_at, updated_at, next_refresh_at, generation_model, error_count'
+        )
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -34,11 +34,7 @@ export function usePSEO() {
   const pageDetailQuery = (id: string) => ({
     queryKey: ['pseo-page', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('pseo_pages')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { data, error } = await supabase.from('pseo_pages').select('*').eq('id', id).single();
 
       if (error) throw error;
       return data as PSEOPage;
@@ -87,10 +83,7 @@ export function usePSEO() {
 
   const deletePageMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('pseo_pages')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('pseo_pages').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -121,7 +114,7 @@ export function usePSEO() {
 
   const addToQueueMutation = useMutation({
     mutationFn: async (items: PSEOQueueInput[]) => {
-      const rows = items.map(item => ({
+      const rows = items.map((item) => ({
         page_type: item.page_type,
         combination: item.combination,
         priority: item.priority ?? 5,
@@ -166,10 +159,7 @@ export function usePSEO() {
 
   const deleteQueueItemMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('pseo_combination_queue')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('pseo_combination_queue').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -201,9 +191,7 @@ export function usePSEO() {
 
   const createTaxonomyMutation = useMutation({
     mutationFn: async (item: Omit<PSEOTaxonomyItem, 'created_at' | 'updated_at'>) => {
-      const { error } = await supabase
-        .from('pseo_taxonomy')
-        .insert(item);
+      const { error } = await supabase.from('pseo_taxonomy').insert(item);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -236,10 +224,7 @@ export function usePSEO() {
 
   const deleteTaxonomyMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('pseo_taxonomy')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('pseo_taxonomy').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -272,10 +257,7 @@ export function usePSEO() {
   const promptsQuery = useQuery({
     queryKey: ['pseo-prompts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('pseo_prompts')
-        .select('*')
-        .order('page_type');
+      const { data, error } = await supabase.from('pseo_prompts').select('*').order('page_type');
 
       if (error) throw error;
       return (data ?? []) as PSEOPrompt[];
@@ -302,10 +284,10 @@ export function usePSEO() {
   });
 
   const createPromptMutation = useMutation({
-    mutationFn: async (prompt: Pick<PSEOPrompt, 'page_type' | 'system_prompt' | 'user_prompt_template'>) => {
-      const { error } = await supabase
-        .from('pseo_prompts')
-        .insert(prompt);
+    mutationFn: async (
+      prompt: Pick<PSEOPrompt, 'page_type' | 'system_prompt' | 'user_prompt_template'>
+    ) => {
+      const { error } = await supabase.from('pseo_prompts').insert(prompt);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -325,21 +307,21 @@ export function usePSEO() {
       const [pagesRes, queueRes, errorsRes] = await Promise.all([
         supabase.from('pseo_pages').select('page_type, is_published, quality_score'),
         supabase.from('pseo_combination_queue').select('status'),
-        supabase.from('pseo_generation_errors').select('id').gte(
-          'created_at',
-          new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-        ),
+        supabase
+          .from('pseo_generation_errors')
+          .select('id')
+          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
       ]);
 
       const pages = pagesRes.data ?? [];
       const queue = queueRes.data ?? [];
       const errors = errorsRes.data ?? [];
 
-      const publishedPages = pages.filter(p => p.is_published);
-      const qualityScores = pages.map(p => p.quality_score).filter(Boolean);
+      const publishedPages = pages.filter((p) => p.is_published);
+      const qualityScores = pages.map((p) => p.quality_score).filter(Boolean);
 
       const pagesByType: Record<string, number> = {};
-      pages.forEach(p => {
+      pages.forEach((p) => {
         pagesByType[p.page_type] = (pagesByType[p.page_type] || 0) + 1;
       });
 
@@ -350,9 +332,9 @@ export function usePSEO() {
         avgQualityScore: qualityScores.length
           ? Math.round(qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length)
           : 0,
-        queuePending: queue.filter(q => q.status === 'pending').length,
-        queueProcessing: queue.filter(q => q.status === 'processing').length,
-        queueFailed: queue.filter(q => q.status === 'failed').length,
+        queuePending: queue.filter((q) => q.status === 'pending').length,
+        queueProcessing: queue.filter((q) => q.status === 'processing').length,
+        queueFailed: queue.filter((q) => q.status === 'failed').length,
         recentErrors: errors.length,
         pagesByType,
       };
@@ -382,10 +364,7 @@ export function usePSEO() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase
-        .from('pseo_pages')
-        .delete()
-        .in('id', ids);
+      const { error } = await supabase.from('pseo_pages').delete().in('id', ids);
       if (error) throw error;
     },
     onSuccess: () => {
