@@ -196,7 +196,37 @@ check('every RPC referenced in code exists', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Smoke test the lead pipeline. Lead capture is the platform's core value
+// 5. The ownership map in src/lib/security/ownership.ts must name real columns.
+//    These helpers fail closed, so a wrong column name does not open a hole —
+//    it silently denies every operation on that table, which is just as broken
+//    and much harder to notice. `articles` was mapped to user_id when the column
+//    is author_id.
+// ---------------------------------------------------------------------------
+check('security ownership map names real columns', () => {
+  const out = [];
+  const file = join(ROOT, 'src/lib/security/ownership.ts');
+  const src = readFileSync(file, 'utf8');
+  const block = src.match(/const OWNER_FIELD[^=]*=\s*\{([\s\S]*?)\n\};/);
+  if (!block) {
+    return ['could not locate the OWNER_FIELD map in src/lib/security/ownership.ts'];
+  }
+  for (const m of stripComments(block[1]).matchAll(/([a-z0-9_]+)\s*:\s*'([a-z0-9_]+)'/g)) {
+    const [, table, column] = m;
+    if (!relations.has(table)) {
+      out.push(`OWNER_FIELD maps '${table}', which is not a table`);
+      continue;
+    }
+    const hit = q(`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='${table}' AND column_name='${column}';
+    `);
+    if (!hit.length) out.push(`OWNER_FIELD['${table}'] = '${column}' — no such column`);
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// 6. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the
 //    side effects too.
