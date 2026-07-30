@@ -141,8 +141,13 @@ serve(async (req: Request) => {
         serviceSupabase.from('leads').select('*').eq('user_id', user.id),
         serviceSupabase.from('testimonials').select('*').eq('user_id', user.id),
         serviceSupabase.from('links').select('*').eq('user_id', user.id),
-        serviceSupabase.from('blog_posts').select('*').eq('author_id', user.id),
-        serviceSupabase.from('profile_views').select('*').eq('profile_id', user.id).limit(1000),
+        // The articles table holds authored posts; there is no `blog_posts`
+        // table, so this query used to fail and fall through to [] below,
+        // silently omitting the user's articles from their own data export.
+        serviceSupabase.from('articles').select('*').eq('author_id', user.id),
+        // Likewise: profile view events live in analytics_views, keyed by
+        // user_id (not a `profile_views` table keyed by profile_id).
+        serviceSupabase.from('analytics_views').select('*').eq('user_id', user.id).limit(1000),
         serviceSupabase.from('user_sessions').select('*').eq('user_id', user.id),
         serviceSupabase.from('login_attempts').select('*').eq('user_id', user.id).limit(100),
         serviceSupabase.from('user_mfa_settings').select('id, mfa_enabled, mfa_method, verified_at, created_at').eq('user_id', user.id).single(),
