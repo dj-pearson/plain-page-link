@@ -944,7 +944,7 @@
       ],
       "priority": 56,
       "passes": false,
-      "notes": "Largest clusters: src/stores/useWorkflowBuilderStore.ts (20), src/pages/public/FullProfilePage.tsx (19), src/lib/security/ownership.ts (18). 85 of the remainder are TS6133 unused locals/params - unlike unused imports these can mark genuinely missing logic, so read each rather than deleting mechanically. Do NOT silence errors with `as any`. See docs/PLATFORM_AUDIT_2026-07.md item 1."
+      "notes": "Largest clusters: src/stores/useWorkflowBuilderStore.ts (20), src/pages/public/FullProfilePage.tsx (19), src/lib/security/ownership.ts (18). 85 of the remainder are TS6133 unused locals/params - unlike unused imports these can mark genuinely missing logic, so read each rather than deleting mechanically. Do NOT silence errors with `as any`. See docs/PLATFORM_AUDIT_2026-07.md item 1. A design decision is needed before grinding the TS2769 'No overload matches this call' cluster (48 errors): modules that address tables dynamically - src/lib/security/ownership.ts (17), secureQuery.ts, useWorkflowBuilderStore.ts - take `table: string` and pass it to supabase.from(), which no longer type-checks now that types.ts is accurate. Pick one approach and apply it consistently: either narrow these to a `keyof Database['public']['Tables']` union, or give each inherently dynamic module a single narrow documented escape hatch (as src/pages/dashboard/SubscriptionPage.tsx already does for its invoices query). Scattered `as any` is not acceptable per CLAUDE.md. Note that fixing ownership.ts already surfaced a real bug (articles mapped to user_id), so expect more genuine defects in this cluster rather than pure noise."
     },
     {
       "id": "US-057",
