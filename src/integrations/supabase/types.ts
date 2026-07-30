@@ -2062,6 +2062,56 @@ export type Database = {
           },
         ];
       };
+      invoices: {
+        Row: {
+          amount: number;
+          created_at: string;
+          currency: string | null;
+          hosted_invoice_url: string | null;
+          id: string;
+          invoice_pdf: string | null;
+          paid_at: string | null;
+          status: string;
+          stripe_invoice_id: string;
+          stripe_subscription_id: string | null;
+          user_id: string | null;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          currency?: string | null;
+          hosted_invoice_url?: string | null;
+          id?: string;
+          invoice_pdf?: string | null;
+          paid_at?: string | null;
+          status: string;
+          stripe_invoice_id: string;
+          stripe_subscription_id?: string | null;
+          user_id?: string | null;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          currency?: string | null;
+          hosted_invoice_url?: string | null;
+          id?: string;
+          invoice_pdf?: string | null;
+          paid_at?: string | null;
+          status?: string;
+          stripe_invoice_id?: string;
+          stripe_subscription_id?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'invoices_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       keywords: {
         Row: {
           category: string | null;
@@ -2193,6 +2243,48 @@ export type Database = {
             columns: ['user_id'];
             isOneToOne: false;
             referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      lead_notes: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          is_system: boolean;
+          lead_id: string;
+          note: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_system?: boolean;
+          lead_id: string;
+          note: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_system?: boolean;
+          lead_id?: string;
+          note?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'lead_notes_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'lead_notes_lead_id_fkey';
+            columns: ['lead_id'];
+            isOneToOne: false;
+            referencedRelation: 'leads';
             referencedColumns: ['id'];
           },
         ];
@@ -3065,6 +3157,103 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'monthly_usage_summary_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      mortgage_calculations: {
+        Row: {
+          created_at: string;
+          down_payment: number | null;
+          down_payment_percent: number | null;
+          hoa_monthly: number | null;
+          home_insurance_annual: number | null;
+          home_price: number;
+          id: string;
+          interest_rate: number | null;
+          lead_id: string | null;
+          listing_id: string | null;
+          loan_amount: number | null;
+          loan_term_years: number | null;
+          monthly_payment: number | null;
+          monthly_payment_breakdown: Json;
+          pmi_monthly: number | null;
+          property_tax_annual: number | null;
+          total_cost: number | null;
+          total_interest: number | null;
+          user_id: string;
+          visitor_email: string | null;
+          visitor_name: string | null;
+          visitor_phone: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          down_payment?: number | null;
+          down_payment_percent?: number | null;
+          hoa_monthly?: number | null;
+          home_insurance_annual?: number | null;
+          home_price: number;
+          id?: string;
+          interest_rate?: number | null;
+          lead_id?: string | null;
+          listing_id?: string | null;
+          loan_amount?: number | null;
+          loan_term_years?: number | null;
+          monthly_payment?: number | null;
+          monthly_payment_breakdown?: Json;
+          pmi_monthly?: number | null;
+          property_tax_annual?: number | null;
+          total_cost?: number | null;
+          total_interest?: number | null;
+          user_id: string;
+          visitor_email?: string | null;
+          visitor_name?: string | null;
+          visitor_phone?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          down_payment?: number | null;
+          down_payment_percent?: number | null;
+          hoa_monthly?: number | null;
+          home_insurance_annual?: number | null;
+          home_price?: number;
+          id?: string;
+          interest_rate?: number | null;
+          lead_id?: string | null;
+          listing_id?: string | null;
+          loan_amount?: number | null;
+          loan_term_years?: number | null;
+          monthly_payment?: number | null;
+          monthly_payment_breakdown?: Json;
+          pmi_monthly?: number | null;
+          property_tax_annual?: number | null;
+          total_cost?: number | null;
+          total_interest?: number | null;
+          user_id?: string;
+          visitor_email?: string | null;
+          visitor_name?: string | null;
+          visitor_phone?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'mortgage_calculations_lead_id_fkey';
+            columns: ['lead_id'];
+            isOneToOne: false;
+            referencedRelation: 'leads';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'mortgage_calculations_listing_id_fkey';
+            columns: ['listing_id'];
+            isOneToOne: false;
+            referencedRelation: 'listings';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'mortgage_calculations_user_id_fkey';
             columns: ['user_id'];
             isOneToOne: false;
             referencedRelation: 'users';

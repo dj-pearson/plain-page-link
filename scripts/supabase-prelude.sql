@@ -91,3 +91,22 @@ CREATE OR REPLACE FUNCTION net.http_post(url text, body jsonb DEFAULT '{}', para
   RETURNS bigint LANGUAGE sql AS $$ SELECT 1::bigint $$;
 CREATE OR REPLACE FUNCTION vault.create_secret(text, text, text) RETURNS uuid
   LANGUAGE sql AS $$ SELECT gen_random_uuid() $$;
+
+-- Hosted Supabase ships these default privileges, which is why none of the
+-- repo's migrations GRANT on the tables they create: new tables in `public`
+-- automatically become reachable by the API roles, and RLS does the actual
+-- restricting. Without this, every table is unreachable for anon/authenticated
+-- and RLS policies cannot be exercised at all.
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+
+-- Default privileges only apply to objects created afterwards, so a database
+-- that already has tables needs them granted explicitly too. Safe to re-run.
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
