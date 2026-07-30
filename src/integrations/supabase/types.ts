@@ -5533,39 +5533,92 @@ export type Database = {
       };
       seo_monitoring_schedules: {
         Row: {
+          additional_urls: string[] | null;
+          config: Json | null;
           created_at: string | null;
+          created_by: string | null;
+          cron_expression: string | null;
+          day_of_month: number | null;
+          day_of_week: number | null;
+          description: string | null;
+          failure_count: number | null;
           frequency: string;
           id: string;
           is_active: boolean | null;
           last_run_at: string | null;
+          last_run_duration_ms: number | null;
+          last_run_status: string | null;
           name: string;
           next_run_at: string | null;
+          run_count: number | null;
           schedule_type: string;
+          success_count: number | null;
           target_url: string;
+          time_of_day: string | null;
+          timezone: string | null;
+          updated_at: string | null;
         };
         Insert: {
+          additional_urls?: string[] | null;
+          config?: Json | null;
           created_at?: string | null;
+          created_by?: string | null;
+          cron_expression?: string | null;
+          day_of_month?: number | null;
+          day_of_week?: number | null;
+          description?: string | null;
+          failure_count?: number | null;
           frequency: string;
           id?: string;
           is_active?: boolean | null;
           last_run_at?: string | null;
+          last_run_duration_ms?: number | null;
+          last_run_status?: string | null;
           name: string;
           next_run_at?: string | null;
+          run_count?: number | null;
           schedule_type: string;
+          success_count?: number | null;
           target_url: string;
+          time_of_day?: string | null;
+          timezone?: string | null;
+          updated_at?: string | null;
         };
         Update: {
+          additional_urls?: string[] | null;
+          config?: Json | null;
           created_at?: string | null;
+          created_by?: string | null;
+          cron_expression?: string | null;
+          day_of_month?: number | null;
+          day_of_week?: number | null;
+          description?: string | null;
+          failure_count?: number | null;
           frequency?: string;
           id?: string;
           is_active?: boolean | null;
           last_run_at?: string | null;
+          last_run_duration_ms?: number | null;
+          last_run_status?: string | null;
           name?: string;
           next_run_at?: string | null;
+          run_count?: number | null;
           schedule_type?: string;
+          success_count?: number | null;
           target_url?: string;
+          time_of_day?: string | null;
+          timezone?: string | null;
+          updated_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'seo_monitoring_schedules_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       seo_notification_preferences: {
         Row: {
