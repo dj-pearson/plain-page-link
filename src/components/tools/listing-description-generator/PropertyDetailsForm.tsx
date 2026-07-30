@@ -6,7 +6,7 @@
  * Step 4: Target Buyer & Review
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

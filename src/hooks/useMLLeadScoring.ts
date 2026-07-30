@@ -14,7 +14,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
-  UnifiedLeadScorer,
   LeadFeatures,
   MLPrediction,
   ModelWeights,
@@ -142,13 +141,16 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
 
       const { data, error } = await supabase
         .from('ml_model_weights')
-        .upsert({
-          user_id: user.id,
-          weights,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'user_id',
-        })
+        .upsert(
+          {
+            user_id: user.id,
+            weights,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: 'user_id',
+          }
+        )
         .select()
         .single();
 
@@ -227,37 +229,38 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
   /**
    * Score a single lead
    */
-  const scoreLead = useCallback((
-    leadId: string,
-    features: LeadFeatures
-  ): LeadScore => {
-    const result = scorer.scoreLead(leadId, features);
+  const scoreLead = useCallback(
+    (leadId: string, features: LeadFeatures): LeadScore => {
+      const result = scorer.scoreLead(leadId, features);
 
-    const leadScore: LeadScore = {
-      leadId,
-      score: result.score,
-      priority: result.priority,
-      variant: result.variant,
-      confidence: result.confidence,
-      featureImportance: result.featureImportance,
-      mlPrediction: result.mlPrediction,
-      scoredAt: new Date(),
-    };
+      const leadScore: LeadScore = {
+        leadId,
+        score: result.score,
+        priority: result.priority,
+        variant: result.variant,
+        confidence: result.confidence,
+        featureImportance: result.featureImportance,
+        mlPrediction: result.mlPrediction,
+        scoredAt: new Date(),
+      };
 
-    // Cache the score
-    setScoredLeads(prev => new Map(prev).set(leadId, leadScore));
+      // Cache the score
+      setScoredLeads((prev) => new Map(prev).set(leadId, leadScore));
 
-    return leadScore;
-  }, [scorer]);
+      return leadScore;
+    },
+    [scorer]
+  );
 
   /**
    * Score multiple leads at once
    */
-  const scoreLeads = useCallback((
-    leads: Array<{ id: string; features: LeadFeatures }>
-  ): LeadScore[] => {
-    return leads.map(({ id, features }) => scoreLead(id, features));
-  }, [scoreLead]);
+  const scoreLeads = useCallback(
+    (leads: Array<{ id: string; features: LeadFeatures }>): LeadScore[] => {
+      return leads.map(({ id, features }) => scoreLead(id, features));
+    },
+    [scoreLead]
+  );
 
   /**
    * Extract features from a Lead object
@@ -289,17 +292,23 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
   /**
    * Score a Lead object directly
    */
-  const scoreLeadObject = useCallback((lead: Lead): LeadScore => {
-    const features = extractFeaturesFromLead(lead);
-    return scoreLead(lead.id, features);
-  }, [scoreLead, extractFeaturesFromLead]);
+  const scoreLeadObject = useCallback(
+    (lead: Lead): LeadScore => {
+      const features = extractFeaturesFromLead(lead);
+      return scoreLead(lead.id, features);
+    },
+    [scoreLead, extractFeaturesFromLead]
+  );
 
   /**
    * Get cached score for a lead
    */
-  const getCachedScore = useCallback((leadId: string): LeadScore | undefined => {
-    return scoredLeads.get(leadId);
-  }, [scoredLeads]);
+  const getCachedScore = useCallback(
+    (leadId: string): LeadScore | undefined => {
+      return scoredLeads.get(leadId);
+    },
+    [scoredLeads]
+  );
 
   // ============================================================================
   // Conversion Feedback
@@ -308,34 +317,36 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
   /**
    * Record a conversion (positive or negative feedback)
    */
-  const recordConversion = useCallback((
-    leadId: string,
-    features: LeadFeatures,
-    converted: boolean
-  ) => {
-    scorer.recordConversion(leadId, features, converted);
+  const recordConversion = useCallback(
+    (leadId: string, features: LeadFeatures, converted: boolean) => {
+      scorer.recordConversion(leadId, features, converted);
 
-    // Update cached score
-    const cachedScore = scoredLeads.get(leadId);
-    if (cachedScore) {
-      setScoredLeads(prev => {
-        const newMap = new Map(prev);
-        newMap.set(leadId, {
-          ...cachedScore,
-          scoredAt: new Date(),
+      // Update cached score
+      const cachedScore = scoredLeads.get(leadId);
+      if (cachedScore) {
+        setScoredLeads((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(leadId, {
+            ...cachedScore,
+            scoredAt: new Date(),
+          });
+          return newMap;
         });
-        return newMap;
-      });
-    }
-  }, [scorer, scoredLeads]);
+      }
+    },
+    [scorer, scoredLeads]
+  );
 
   /**
    * Record conversion from a Lead object
    */
-  const recordLeadConversion = useCallback((lead: Lead, converted: boolean) => {
-    const features = extractFeaturesFromLead(lead);
-    recordConversion(lead.id, features, converted);
-  }, [recordConversion, extractFeaturesFromLead]);
+  const recordLeadConversion = useCallback(
+    (lead: Lead, converted: boolean) => {
+      const features = extractFeaturesFromLead(lead);
+      recordConversion(lead.id, features, converted);
+    },
+    [recordConversion, extractFeaturesFromLead]
+  );
 
   // ============================================================================
   // Model Management
@@ -385,9 +396,12 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
   /**
    * Start a new A/B test
    */
-  const startABTest = useCallback((mlTrafficPercent: number = 50): string => {
-    return scorer.startABTest(mlTrafficPercent);
-  }, [scorer]);
+  const startABTest = useCallback(
+    (mlTrafficPercent: number = 50): string => {
+      return scorer.startABTest(mlTrafficPercent);
+    },
+    [scorer]
+  );
 
   /**
    * Stop the current A/B test and save results
@@ -526,11 +540,14 @@ export function useABTest() {
   const [isRunning, setIsRunning] = useState(isABTestRunning());
   const [analysis, setAnalysis] = useState<ABTestAnalysis | null>(null);
 
-  const start = useCallback((mlTrafficPercent?: number) => {
-    const testId = startABTest(mlTrafficPercent);
-    setIsRunning(true);
-    return testId;
-  }, [startABTest]);
+  const start = useCallback(
+    (mlTrafficPercent?: number) => {
+      const testId = startABTest(mlTrafficPercent);
+      setIsRunning(true);
+      return testId;
+    },
+    [startABTest]
+  );
 
   const stop = useCallback(async () => {
     const result = await stopABTest();
@@ -561,14 +578,8 @@ export function useABTest() {
  * Hook for model management
  */
 export function useMLModel() {
-  const {
-    retrainModel,
-    saveModel,
-    getModelStats,
-    isLoadingModel,
-    isSavingModel,
-    modelError,
-  } = useMLLeadScoring();
+  const { retrainModel, saveModel, getModelStats, isLoadingModel, isSavingModel, modelError } =
+    useMLLeadScoring();
 
   const [stats, setStats] = useState<ModelStats | null>(null);
   const [isRetraining, setIsRetraining] = useState(false);

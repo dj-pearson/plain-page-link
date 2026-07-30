@@ -3,7 +3,7 @@
 // ============================================
 
 import { useState, useEffect } from 'react';
-import { Calculator, DollarSign, Home, TrendingUp } from 'lucide-react';
+import { Calculator } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +20,7 @@ import {
 } from '@/lib/mortgageCalculator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { logger } from "@/lib/logger";
+import { logger } from '@/lib/logger';
 
 interface Props {
   listingId?: string;
@@ -42,9 +42,7 @@ export function MortgageCalculator({
   const [downPaymentPercent, setDownPaymentPercent] = useState(20);
   const [interestRate, setInterestRate] = useState(7.0);
   const [loanTermYears, setLoanTermYears] = useState(30);
-  const [propertyTaxAnnual, setPropertyTaxAnnual] = useState(
-    Math.round(defaultHomePrice * 0.012)
-  );
+  const [propertyTaxAnnual, setPropertyTaxAnnual] = useState(Math.round(defaultHomePrice * 0.012));
   const [homeInsuranceAnnual, setHomeInsuranceAnnual] = useState(1200);
   const [hoaMonthly, setHoaMonthly] = useState(0);
 
@@ -61,7 +59,8 @@ export function MortgageCalculator({
 
   // Calculate derived values
   const downPayment = Math.round((homePrice * downPaymentPercent) / 100);
-  const pmiMonthly = downPaymentPercent < 20 ? Math.round((homePrice - downPayment) * 0.005 / 12) : 0;
+  const pmiMonthly =
+    downPaymentPercent < 20 ? Math.round(((homePrice - downPayment) * 0.005) / 12) : 0;
 
   const mortgageInputs: MortgageInputs = {
     homePrice,
@@ -309,9 +308,7 @@ export function MortgageCalculator({
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total Cost</span>
-                  <span className="font-semibold">
-                    {formatCurrency(mortgageResults.totalCost)}
-                  </span>
+                  <span className="font-semibold">{formatCurrency(mortgageResults.totalCost)}</span>
                 </div>
               </div>
             </div>
@@ -455,7 +452,12 @@ export function MortgageCalculator({
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <h3 className="font-semibold">Thank You!</h3>
@@ -478,7 +480,9 @@ function QualificationBadge({ status }: { status: string }) {
   };
 
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colors[status as keyof typeof colors]}`}>
+    <span
+      className={`px-2 py-1 rounded-full text-xs font-semibold ${colors[status as keyof typeof colors]}`}
+    >
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );

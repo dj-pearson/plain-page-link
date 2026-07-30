@@ -1,12 +1,12 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import * as React from 'react';
+import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 
 interface AccessibleSpinnerProps {
   /** Size of the spinner */
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   /** Color variant */
-  variant?: "default" | "primary" | "muted";
+  variant?: 'default' | 'primary' | 'muted';
   /** Additional CSS classes */
   className?: string;
   /** Accessible label for the spinner */
@@ -14,16 +14,16 @@ interface AccessibleSpinnerProps {
 }
 
 const sizeClasses = {
-  sm: "h-4 w-4",
-  md: "h-6 w-6",
-  lg: "h-8 w-8",
-  xl: "h-12 w-12",
+  sm: 'h-4 w-4',
+  md: 'h-6 w-6',
+  lg: 'h-8 w-8',
+  xl: 'h-12 w-12',
 };
 
 const variantClasses = {
-  default: "text-gray-600",
-  primary: "text-blue-600",
-  muted: "text-gray-400",
+  default: 'text-gray-600',
+  primary: 'text-blue-600',
+  muted: 'text-gray-400',
 };
 
 /**
@@ -35,23 +35,19 @@ const variantClasses = {
  * <AccessibleSpinner size="lg" label="Loading data" />
  */
 export function AccessibleSpinner({
-  size = "md",
-  variant = "primary",
+  size = 'md',
+  variant = 'primary',
   className,
-  label = "Loading",
+  label = 'Loading',
 }: AccessibleSpinnerProps) {
   return (
     <div
       role="status"
       aria-label={label}
-      className={cn("inline-flex items-center justify-center", className)}
+      className={cn('inline-flex items-center justify-center', className)}
     >
       <Loader2
-        className={cn(
-          "animate-spin",
-          sizeClasses[size],
-          variantClasses[variant]
-        )}
+        className={cn('animate-spin', sizeClasses[size], variantClasses[variant])}
         aria-hidden="true"
       />
       <span className="sr-only">{label}</span>
@@ -71,7 +67,7 @@ interface AccessibleLoadingProps {
   /** Whether to show loading spinner inline with content */
   inline?: boolean;
   /** Size of the loading spinner */
-  spinnerSize?: "sm" | "md" | "lg" | "xl";
+  spinnerSize?: 'sm' | 'md' | 'lg' | 'xl';
   /** Custom loading component */
   loadingComponent?: React.ReactNode;
   /** Delay in ms before showing loading indicator (prevents flash for fast loads) */
@@ -108,17 +104,17 @@ interface AccessibleLoadingProps {
 export function AccessibleLoading({
   isLoading,
   children,
-  loadingMessage = "Loading...",
-  completeMessage = "Content loaded",
+  loadingMessage = 'Loading...',
+  completeMessage = 'Content loaded',
   inline = false,
-  spinnerSize = "md",
+  spinnerSize = 'md',
   loadingComponent,
   delay = 0,
   minDuration = 0,
   className,
 }: AccessibleLoadingProps) {
   const [showLoading, setShowLoading] = React.useState(false);
-  const [announcement, setAnnouncement] = React.useState("");
+  const [announcement, setAnnouncement] = React.useState('');
   const loadingStartTime = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -142,9 +138,7 @@ export function AccessibleLoading({
         clearTimeout(delayTimer);
       }
 
-      const elapsed = loadingStartTime.current
-        ? Date.now() - loadingStartTime.current
-        : 0;
+      const elapsed = loadingStartTime.current ? Date.now() - loadingStartTime.current : 0;
       const remaining = Math.max(0, minDuration - elapsed);
 
       if (remaining > 0 && showLoading) {
@@ -171,32 +165,21 @@ export function AccessibleLoading({
   // Clear announcement after it's been read
   React.useEffect(() => {
     if (announcement) {
-      const timer = setTimeout(() => setAnnouncement(""), 1000);
+      const timer = setTimeout(() => setAnnouncement(''), 1000);
       return () => clearTimeout(timer);
     }
   }, [announcement]);
 
   const loadingIndicator = loadingComponent ?? (
-    <div className={cn(
-      "flex items-center justify-center",
-      inline ? "inline-flex" : "py-8"
-    )}>
+    <div className={cn('flex items-center justify-center', inline ? 'inline-flex' : 'py-8')}>
       <AccessibleSpinner size={spinnerSize} label={loadingMessage} />
     </div>
   );
 
   return (
-    <div
-      className={className}
-      aria-busy={showLoading}
-    >
+    <div className={className} aria-busy={showLoading}>
       {/* Live region for announcements */}
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-      >
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
 
@@ -230,7 +213,7 @@ interface FullPageLoadingProps {
  * }
  */
 export function FullPageLoading({
-  message = "Loading...",
+  message = 'Loading...',
   isLoading = true,
 }: FullPageLoadingProps) {
   if (!isLoading) return null;
@@ -280,32 +263,28 @@ export function AccessibleSkeleton({
   circle = false,
   lines = 1,
   className,
-  label = "Loading content",
+  label = 'Loading content',
 }: SkeletonProps) {
   const style: React.CSSProperties = {
-    width: typeof width === "number" ? `${width}px` : width,
-    height: typeof height === "number" ? `${height}px` : height,
+    width: typeof width === 'number' ? `${width}px` : width,
+    height: typeof height === 'number' ? `${height}px` : height,
   };
 
   const baseClasses = cn(
-    "animate-pulse bg-gray-200 dark:bg-gray-700",
-    circle ? "rounded-full" : "rounded",
+    'animate-pulse bg-gray-200 dark:bg-gray-700',
+    circle ? 'rounded-full' : 'rounded',
     className
   );
 
   if (lines > 1) {
     return (
-      <div
-        role="status"
-        aria-label={label}
-        className="space-y-2"
-      >
+      <div role="status" aria-label={label} className="space-y-2">
         {Array.from({ length: lines }).map((_, index) => (
           <div
             key={index}
-            className={cn(baseClasses, "h-4")}
+            className={cn(baseClasses, 'h-4')}
             style={{
-              width: index === lines - 1 ? "75%" : "100%",
+              width: index === lines - 1 ? '75%' : '100%',
             }}
             aria-hidden="true"
           />
@@ -316,12 +295,7 @@ export function AccessibleSkeleton({
   }
 
   return (
-    <div
-      role="status"
-      aria-label={label}
-      className={baseClasses}
-      style={style}
-    >
+    <div role="status" aria-label={label} className={baseClasses} style={style}>
       <span className="sr-only">{label}</span>
     </div>
   );
@@ -337,15 +311,15 @@ interface ProgressBarProps {
   /** Whether to show the percentage text */
   showPercentage?: boolean;
   /** Size variant */
-  size?: "sm" | "md" | "lg";
+  size?: 'sm' | 'md' | 'lg';
   /** Additional CSS classes */
   className?: string;
 }
 
 const progressSizeClasses = {
-  sm: "h-1",
-  md: "h-2",
-  lg: "h-4",
+  sm: 'h-1',
+  md: 'h-2',
+  lg: 'h-4',
 };
 
 /**
@@ -361,13 +335,13 @@ export function AccessibleProgressBar({
   max = 100,
   label,
   showPercentage = false,
-  size = "md",
+  size = 'md',
   className,
 }: ProgressBarProps) {
   const percentage = Math.round((value / max) * 100);
 
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn('w-full', className)}>
       {showPercentage && (
         <div className="flex justify-between mb-1">
           <span className="text-sm font-medium text-gray-700">{label}</span>
@@ -380,29 +354,22 @@ export function AccessibleProgressBar({
         aria-valuemin={0}
         aria-valuemax={max}
         aria-label={label}
-        className={cn(
-          "w-full bg-gray-200 rounded-full overflow-hidden",
-          progressSizeClasses[size]
-        )}
+        className={cn('w-full bg-gray-200 rounded-full overflow-hidden', progressSizeClasses[size])}
       >
         <div
           className={cn(
-            "bg-blue-600 rounded-full transition-all duration-300 ease-in-out",
+            'bg-blue-600 rounded-full transition-all duration-300 ease-in-out',
             progressSizeClasses[size]
           )}
           style={{ width: `${percentage}%` }}
           aria-hidden="true"
         />
       </div>
-      {!showPercentage && <span className="sr-only">{label}: {percentage}%</span>}
+      {!showPercentage && (
+        <span className="sr-only">
+          {label}: {percentage}%
+        </span>
+      )}
     </div>
   );
 }
-
-export {
-  AccessibleSpinner,
-  AccessibleLoading,
-  FullPageLoading,
-  AccessibleSkeleton,
-  AccessibleProgressBar,
-};

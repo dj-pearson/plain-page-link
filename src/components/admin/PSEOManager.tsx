@@ -1,13 +1,19 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 import {
   Table,
   TableBody,
@@ -15,7 +21,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import {
   Loader2,
   Eye,
@@ -32,21 +38,16 @@ import {
   ListPlus,
   Map,
   FileText,
-  Layers,
-} from "lucide-react";
-import { format } from "date-fns";
-import { usePSEO } from "@/hooks/usePSEO";
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { usePSEO } from '@/hooks/usePSEO';
 import {
   PSEO_PAGE_TYPES,
   PSEO_PAGE_TYPE_LABELS,
   PSEO_TAXONOMY_TYPES,
   type PSEOPageType,
-  type PSEOPage,
-  type PSEOQueueItem,
-  type PSEOTaxonomyItem,
-  type PSEOGenerationError,
   type PSEOTaxonomyType,
-} from "@/types/pseo";
+} from '@/types/pseo';
 
 // --- Stats Overview Sub-Component ---
 
@@ -63,9 +64,8 @@ function StatsOverview() {
 
   if (!stats) return null;
 
-  const publishRate = stats.totalPages > 0
-    ? Math.round((stats.publishedPages / stats.totalPages) * 100)
-    : 0;
+  const publishRate =
+    stats.totalPages > 0 ? Math.round((stats.publishedPages / stats.totalPages) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -182,18 +182,11 @@ function StatsOverview() {
 // --- Pages Tab Sub-Component ---
 
 function PagesTab() {
-  const {
-    pages,
-    isLoadingPages,
-    publishPage,
-    unpublishPage,
-    deletePage,
-    bulkPublish,
-    bulkDelete,
-  } = usePSEO();
-  const [filterType, setFilterType] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const { pages, isLoadingPages, publishPage, unpublishPage, deletePage, bulkPublish, bulkDelete } =
+    usePSEO();
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   if (isLoadingPages) {
@@ -204,11 +197,12 @@ function PagesTab() {
     );
   }
 
-  const filteredPages = (pages ?? []).filter(page => {
-    if (filterType !== "all" && page.page_type !== filterType) return false;
-    if (filterStatus === "published" && !page.is_published) return false;
-    if (filterStatus === "draft" && page.is_published) return false;
-    if (searchQuery && !page.url_path.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+  const filteredPages = (pages ?? []).filter((page) => {
+    if (filterType !== 'all' && page.page_type !== filterType) return false;
+    if (filterStatus === 'published' && !page.is_published) return false;
+    if (filterStatus === 'draft' && page.is_published) return false;
+    if (searchQuery && !page.url_path.toLowerCase().includes(searchQuery.toLowerCase()))
+      return false;
     return true;
   });
 
@@ -223,7 +217,7 @@ function PagesTab() {
     if (selectedIds.size === filteredPages.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredPages.map(p => p.id)));
+      setSelectedIds(new Set(filteredPages.map((p) => p.id)));
     }
   };
 
@@ -243,7 +237,7 @@ function PagesTab() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Page Types</SelectItem>
-            {PSEO_PAGE_TYPES.map(type => (
+            {PSEO_PAGE_TYPES.map((type) => (
               <SelectItem key={type} value={type}>
                 {PSEO_PAGE_TYPE_LABELS[type]}
               </SelectItem>
@@ -266,11 +260,7 @@ function PagesTab() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => bulkPublish(Array.from(selectedIds))}
-          >
+          <Button size="sm" variant="outline" onClick={() => bulkPublish(Array.from(selectedIds))}>
             <CheckCircle className="h-4 w-4 mr-1" />
             Publish Selected
           </Button>
@@ -287,11 +277,7 @@ function PagesTab() {
             <Trash className="h-4 w-4 mr-1" />
             Delete Selected
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelectedIds(new Set())}
-          >
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
             Clear
           </Button>
         </div>
@@ -347,16 +333,24 @@ function PagesTab() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={page.is_published ? "bg-green-500 text-white" : "bg-gray-500 text-white"}>
-                        {page.is_published ? "Published" : "Draft"}
+                      <Badge
+                        className={
+                          page.is_published ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'
+                        }
+                      >
+                        {page.is_published ? 'Published' : 'Draft'}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span className={
-                        page.quality_score >= 80 ? "text-green-600 font-semibold" :
-                        page.quality_score >= 50 ? "text-yellow-600 font-semibold" :
-                        "text-red-600 font-semibold"
-                      }>
+                      <span
+                        className={
+                          page.quality_score >= 80
+                            ? 'text-green-600 font-semibold'
+                            : page.quality_score >= 50
+                              ? 'text-yellow-600 font-semibold'
+                              : 'text-red-600 font-semibold'
+                        }
+                      >
                         {page.quality_score}
                       </span>
                     </TableCell>
@@ -417,19 +411,13 @@ function PagesTab() {
 // --- Queue Tab Sub-Component ---
 
 function QueueTab() {
-  const {
-    queue,
-    isLoadingQueue,
-    addToQueue,
-    isAddingToQueue,
-    retryQueueItem,
-    deleteQueueItem,
-  } = usePSEO();
-  const [newPageType, setNewPageType] = useState<PSEOPageType>("city-directory");
-  const [newCity, setNewCity] = useState("");
-  const [newState, setNewState] = useState("");
-  const [newSpecialty, setNewSpecialty] = useState("");
-  const [newPriority, setNewPriority] = useState("5");
+  const { queue, isLoadingQueue, addToQueue, isAddingToQueue, retryQueueItem, deleteQueueItem } =
+    usePSEO();
+  const [newPageType, setNewPageType] = useState<PSEOPageType>('city-directory');
+  const [newCity, setNewCity] = useState('');
+  const [newState, setNewState] = useState('');
+  const [newSpecialty, setNewSpecialty] = useState('');
+  const [newPriority, setNewPriority] = useState('5');
 
   if (isLoadingQueue) {
     return (
@@ -449,36 +437,50 @@ function QueueTab() {
     if (newState) combination.state = newState.toLowerCase().replace(/\s+/g, '-');
     if (newSpecialty) combination.specialty = newSpecialty.toLowerCase().replace(/\s+/g, '-');
 
-    addToQueue([{
-      page_type: newPageType,
-      combination,
-      priority: parseInt(newPriority, 10),
-    }]);
+    addToQueue([
+      {
+        page_type: newPageType,
+        combination,
+        priority: parseInt(newPriority, 10),
+      },
+    ]);
 
-    setNewCity("");
-    setNewState("");
-    setNewSpecialty("");
+    setNewCity('');
+    setNewState('');
+    setNewSpecialty('');
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Clock className="h-4 w-4 text-gray-500" />;
-      case 'processing': return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
-      case 'complete': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'failed': return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'insufficient_data': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      default: return null;
+      case 'pending':
+        return <Clock className="h-4 w-4 text-gray-500" />;
+      case 'processing':
+        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
+      case 'complete':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'insufficient_data':
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      default:
+        return null;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-gray-500';
-      case 'processing': return 'bg-blue-500';
-      case 'complete': return 'bg-green-500';
-      case 'failed': return 'bg-red-500';
-      case 'insufficient_data': return 'bg-yellow-500';
-      default: return 'bg-gray-500';
+      case 'pending':
+        return 'bg-gray-500';
+      case 'processing':
+        return 'bg-blue-500';
+      case 'complete':
+        return 'bg-green-500';
+      case 'failed':
+        return 'bg-red-500';
+      case 'insufficient_data':
+        return 'bg-yellow-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
@@ -491,9 +493,7 @@ function QueueTab() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Add to Generation Queue</CardTitle>
-          <CardDescription>
-            Queue new page combinations for content generation
-          </CardDescription>
+          <CardDescription>Queue new page combinations for content generation</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -504,7 +504,7 @@ function QueueTab() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PSEO_PAGE_TYPES.map(type => (
+                  {PSEO_PAGE_TYPES.map((type) => (
                     <SelectItem key={type} value={type}>
                       {PSEO_PAGE_TYPE_LABELS[type]}
                     </SelectItem>
@@ -567,9 +567,7 @@ function QueueTab() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Generation Queue</CardTitle>
-          <CardDescription>
-            {queue?.length ?? 0} items in queue
-          </CardDescription>
+          <CardDescription>{queue?.length ?? 0} items in queue</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -606,7 +604,9 @@ function QueueTab() {
                       {PSEO_PAGE_TYPE_LABELS[item.page_type as PSEOPageType] || item.page_type}
                     </TableCell>
                     <TableCell className="font-mono text-xs max-w-[200px] truncate">
-                      {Object.entries(item.combination).map(([k, v]) => `${k}=${v}`).join(', ')}
+                      {Object.entries(item.combination)
+                        .map(([k, v]) => `${k}=${v}`)
+                        .join(', ')}
                     </TableCell>
                     <TableCell>{item.priority}</TableCell>
                     <TableCell>{item.attempt_count}</TableCell>
@@ -648,14 +648,14 @@ function QueueTab() {
       </Card>
 
       {/* Error details for failed items */}
-      {(queue ?? []).filter(q => q.status === 'failed' && q.error_message).length > 0 && (
+      {(queue ?? []).filter((q) => q.status === 'failed' && q.error_message).length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg text-red-600">Failed Items</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {(queue ?? [])
-              .filter(q => q.status === 'failed' && q.error_message)
+              .filter((q) => q.status === 'failed' && q.error_message)
               .map((item) => (
                 <div key={item.id} className="border rounded-lg p-3 border-red-200 bg-red-50">
                   <div className="flex items-center gap-2 mb-1">
@@ -679,21 +679,15 @@ function QueueTab() {
 // --- Taxonomy Tab Sub-Component ---
 
 function TaxonomyTab() {
-  const {
-    taxonomy,
-    isLoadingTaxonomy,
-    createTaxonomy,
-    updateTaxonomy,
-    deleteTaxonomy,
-  } = usePSEO();
-  const [filterTaxType, setFilterTaxType] = useState<string>("all");
+  const { taxonomy, isLoadingTaxonomy, createTaxonomy, updateTaxonomy, deleteTaxonomy } = usePSEO();
+  const [filterTaxType, setFilterTaxType] = useState<string>('all');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newId, setNewId] = useState("");
-  const [newDisplayName, setNewDisplayName] = useState("");
-  const [newTaxType, setNewTaxType] = useState<PSEOTaxonomyType>("city");
-  const [newParentId, setNewParentId] = useState("");
-  const [newTier, setNewTier] = useState("3");
-  const [newContext, setNewContext] = useState("{}");
+  const [newId, setNewId] = useState('');
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [newTaxType, setNewTaxType] = useState<PSEOTaxonomyType>('city');
+  const [newParentId, setNewParentId] = useState('');
+  const [newTier, setNewTier] = useState('3');
+  const [newContext, setNewContext] = useState('{}');
 
   if (isLoadingTaxonomy) {
     return (
@@ -703,8 +697,8 @@ function TaxonomyTab() {
     );
   }
 
-  const filteredTaxonomy = (taxonomy ?? []).filter(item => {
-    if (filterTaxType !== "all" && item.taxonomy_type !== filterTaxType) return false;
+  const filteredTaxonomy = (taxonomy ?? []).filter((item) => {
+    if (filterTaxType !== 'all' && item.taxonomy_type !== filterTaxType) return false;
     return true;
   });
 
@@ -728,10 +722,10 @@ function TaxonomyTab() {
       tier: parseInt(newTier, 10),
     });
 
-    setNewId("");
-    setNewDisplayName("");
-    setNewContext("{}");
-    setNewParentId("");
+    setNewId('');
+    setNewDisplayName('');
+    setNewContext('{}');
+    setNewParentId('');
     setShowAddForm(false);
   };
 
@@ -754,7 +748,7 @@ function TaxonomyTab() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              {PSEO_TAXONOMY_TYPES.map(type => (
+              {PSEO_TAXONOMY_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
                   {taxonomyTypeLabels[type] || type}
                 </SelectItem>
@@ -762,9 +756,12 @@ function TaxonomyTab() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={() => setShowAddForm(!showAddForm)} variant={showAddForm ? "secondary" : "default"}>
+        <Button
+          onClick={() => setShowAddForm(!showAddForm)}
+          variant={showAddForm ? 'secondary' : 'default'}
+        >
           <Plus className="h-4 w-4 mr-2" />
-          {showAddForm ? "Cancel" : "Add Taxonomy Item"}
+          {showAddForm ? 'Cancel' : 'Add Taxonomy Item'}
         </Button>
       </div>
 
@@ -794,12 +791,15 @@ function TaxonomyTab() {
               </div>
               <div>
                 <Label>Type</Label>
-                <Select value={newTaxType} onValueChange={(v) => setNewTaxType(v as PSEOTaxonomyType)}>
+                <Select
+                  value={newTaxType}
+                  onValueChange={(v) => setNewTaxType(v as PSEOTaxonomyType)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PSEO_TAXONOMY_TYPES.map(type => (
+                    {PSEO_TAXONOMY_TYPES.map((type) => (
                       <SelectItem key={type} value={type}>
                         {taxonomyTypeLabels[type] || type}
                       </SelectItem>
@@ -847,11 +847,14 @@ function TaxonomyTab() {
 
       {/* Taxonomy counts */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-        {PSEO_TAXONOMY_TYPES.map(type => {
-          const count = (taxonomy ?? []).filter(t => t.taxonomy_type === type).length;
+        {PSEO_TAXONOMY_TYPES.map((type) => {
+          const count = (taxonomy ?? []).filter((t) => t.taxonomy_type === type).length;
           return (
-            <Card key={type} className="cursor-pointer hover:border-primary transition-colors"
-              onClick={() => setFilterTaxType(type)}>
+            <Card
+              key={type}
+              className="cursor-pointer hover:border-primary transition-colors"
+              onClick={() => setFilterTaxType(type)}
+            >
               <CardContent className="pt-4 pb-4 text-center">
                 <p className="text-2xl font-bold">{count}</p>
                 <p className="text-xs text-muted-foreground">{taxonomyTypeLabels[type]}</p>
@@ -897,7 +900,10 @@ function TaxonomyTab() {
                       {item.parent_id || '—'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={item.tier === 1 ? "default" : "secondary"} className="text-xs">
+                      <Badge
+                        variant={item.tier === 1 ? 'default' : 'secondary'}
+                        className="text-xs"
+                      >
                         Tier {item.tier}
                       </Badge>
                     </TableCell>
@@ -919,7 +925,7 @@ function TaxonomyTab() {
                               updates: { is_active: !item.is_active },
                             });
                           }}
-                          title={item.is_active ? "Deactivate" : "Activate"}
+                          title={item.is_active ? 'Deactivate' : 'Activate'}
                         >
                           {item.is_active ? (
                             <EyeOff className="h-4 w-4" />
@@ -975,9 +981,7 @@ function ErrorsTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Showing last 100 generation errors
-      </p>
+      <p className="text-sm text-muted-foreground">Showing last 100 generation errors</p>
 
       {(errors ?? []).length === 0 ? (
         <Card>
@@ -992,7 +996,9 @@ function ErrorsTab() {
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Badge className={`${errorTypeColors[error.error_type] || 'bg-gray-500'} text-white text-xs`}>
+                    <Badge
+                      className={`${errorTypeColors[error.error_type] || 'bg-gray-500'} text-white text-xs`}
+                    >
                       {error.error_type.replace(/_/g, ' ')}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
@@ -1004,12 +1010,12 @@ function ErrorsTab() {
                   </span>
                 </div>
                 <p className="font-mono text-xs text-muted-foreground mb-2">
-                  {Object.entries(error.combination).map(([k, v]) => `${k}=${v}`).join(', ')}
+                  {Object.entries(error.combination)
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join(', ')}
                 </p>
                 {error.error_detail && (
-                  <p className="text-sm text-red-700 bg-red-50 rounded p-2">
-                    {error.error_detail}
-                  </p>
+                  <p className="text-sm text-red-700 bg-red-50 rounded p-2">{error.error_detail}</p>
                 )}
                 {error.quality_check_failures && (
                   <div className="mt-2">
@@ -1033,12 +1039,12 @@ function ErrorsTab() {
 function PromptsTab() {
   const { prompts, isLoadingPrompts, updatePrompt, createPrompt } = usePSEO();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editSystemPrompt, setEditSystemPrompt] = useState("");
-  const [editUserPrompt, setEditUserPrompt] = useState("");
+  const [editSystemPrompt, setEditSystemPrompt] = useState('');
+  const [editUserPrompt, setEditUserPrompt] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newPromptPageType, setNewPromptPageType] = useState<PSEOPageType>("city-directory");
-  const [newSystemPrompt, setNewSystemPrompt] = useState("");
-  const [newUserPrompt, setNewUserPrompt] = useState("");
+  const [newPromptPageType, setNewPromptPageType] = useState<PSEOPageType>('city-directory');
+  const [newSystemPrompt, setNewSystemPrompt] = useState('');
+  const [newUserPrompt, setNewUserPrompt] = useState('');
 
   if (isLoadingPrompts) {
     return (
@@ -1048,7 +1054,11 @@ function PromptsTab() {
     );
   }
 
-  const handleStartEdit = (prompt: { id: string; system_prompt: string; user_prompt_template: string }) => {
+  const handleStartEdit = (prompt: {
+    id: string;
+    system_prompt: string;
+    user_prompt_template: string;
+  }) => {
     setEditingId(prompt.id);
     setEditSystemPrompt(prompt.system_prompt);
     setEditUserPrompt(prompt.user_prompt_template);
@@ -1073,26 +1083,30 @@ function PromptsTab() {
       system_prompt: newSystemPrompt,
       user_prompt_template: newUserPrompt,
     });
-    setNewSystemPrompt("");
-    setNewUserPrompt("");
+    setNewSystemPrompt('');
+    setNewUserPrompt('');
     setShowCreateForm(false);
   };
 
-  const existingPageTypes = new Set((prompts ?? []).map(p => p.page_type));
-  const availablePageTypes = PSEO_PAGE_TYPES.filter(t => !existingPageTypes.has(t));
+  const existingPageTypes = new Set((prompts ?? []).map((p) => p.page_type));
+  const availablePageTypes = PSEO_PAGE_TYPES.filter((t) => !existingPageTypes.has(t));
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            Manage generation prompts for each page type. Prompt updates take effect on next generation.
+            Manage generation prompts for each page type. Prompt updates take effect on next
+            generation.
           </p>
         </div>
         {availablePageTypes.length > 0 && (
-          <Button onClick={() => setShowCreateForm(!showCreateForm)} variant={showCreateForm ? "secondary" : "default"}>
+          <Button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            variant={showCreateForm ? 'secondary' : 'default'}
+          >
             <Plus className="h-4 w-4 mr-2" />
-            {showCreateForm ? "Cancel" : "Add Prompt"}
+            {showCreateForm ? 'Cancel' : 'Add Prompt'}
           </Button>
         )}
       </div>
@@ -1106,12 +1120,15 @@ function PromptsTab() {
           <CardContent className="space-y-4">
             <div>
               <Label>Page Type</Label>
-              <Select value={newPromptPageType} onValueChange={(v) => setNewPromptPageType(v as PSEOPageType)}>
+              <Select
+                value={newPromptPageType}
+                onValueChange={(v) => setNewPromptPageType(v as PSEOPageType)}
+              >
                 <SelectTrigger className="w-64">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {availablePageTypes.map(type => (
+                  {availablePageTypes.map((type) => (
                     <SelectItem key={type} value={type}>
                       {PSEO_PAGE_TYPE_LABELS[type]}
                     </SelectItem>
@@ -1161,14 +1178,18 @@ function PromptsTab() {
                     {PSEO_PAGE_TYPE_LABELS[prompt.page_type as PSEOPageType] || prompt.page_type}
                   </CardTitle>
                   <Badge variant="outline">v{prompt.version}</Badge>
-                  <Badge variant={prompt.is_active ? "default" : "secondary"}>
-                    {prompt.is_active ? "Active" : "Inactive"}
+                  <Badge variant={prompt.is_active ? 'default' : 'secondary'}>
+                    {prompt.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 {editingId === prompt.id ? (
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleSaveEdit(prompt)}>Save</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                    <Button size="sm" onClick={() => handleSaveEdit(prompt)}>
+                      Save
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </Button>
                   </div>
                 ) : (
                   <Button size="sm" variant="outline" onClick={() => handleStartEdit(prompt)}>
@@ -1182,7 +1203,9 @@ function PromptsTab() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">System Prompt</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                  System Prompt
+                </Label>
                 {editingId === prompt.id ? (
                   <Textarea
                     value={editSystemPrompt}
@@ -1197,7 +1220,9 @@ function PromptsTab() {
                 )}
               </div>
               <div>
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">User Prompt Template</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                  User Prompt Template
+                </Label>
                 {editingId === prompt.id ? (
                   <Textarea
                     value={editUserPrompt}
@@ -1286,9 +1311,7 @@ export function PSEOManager() {
             <AlertTriangle className="h-5 w-5 text-red-500" />
             <CardTitle>Generation Errors</CardTitle>
           </div>
-          <CardDescription>
-            Recent errors from the content generation pipeline
-          </CardDescription>
+          <CardDescription>Recent errors from the content generation pipeline</CardDescription>
         </CardHeader>
         <CardContent>
           <ErrorsTab />

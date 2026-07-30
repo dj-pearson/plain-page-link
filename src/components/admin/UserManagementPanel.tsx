@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -11,7 +11,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -19,9 +19,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   Users,
   Search,
@@ -30,11 +30,10 @@ import {
   Activity,
   Download,
   Eye,
-  Trash2,
   RefreshCw,
   Clock,
-} from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface User {
   id: string;
@@ -73,7 +72,7 @@ export const UserManagementPanel = () => {
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [userActivity, setUserActivity] = useState<any[]>([]);
@@ -105,16 +104,12 @@ export const UserManagementPanel = () => {
       if (authError) throw authError;
 
       // Get profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
+      const { data: profiles, error: profilesError } = await supabase.from('profiles').select('*');
 
       if (profilesError) throw profilesError;
 
       // Get user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*');
+      const { data: roles, error: rolesError } = await supabase.from('user_roles').select('*');
 
       if (rolesError) throw rolesError;
 
@@ -137,9 +132,9 @@ export const UserManagementPanel = () => {
       setFilteredUsers(usersWithDetails);
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -222,16 +217,16 @@ export const UserManagementPanel = () => {
       });
 
       toast({
-        title: "Role Updated",
+        title: 'Role Updated',
         description: `User ${action === 'grant' ? 'granted' : 'revoked'} admin privileges`,
       });
 
       await loadUsers();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -279,7 +274,7 @@ export const UserManagementPanel = () => {
     a.click();
 
     toast({
-      title: "Export Complete",
+      title: 'Export Complete',
       description: `Exported ${filteredUsers.length} users to CSV`,
     });
   };
@@ -315,9 +310,7 @@ export const UserManagementPanel = () => {
             <Users className="h-6 w-6" />
             User Management
           </h2>
-          <p className="text-muted-foreground">
-            Manage user accounts, roles, and permissions
-          </p>
+          <p className="text-muted-foreground">Manage user accounts, roles, and permissions</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadUsers} disabled={loading}>
@@ -347,9 +340,7 @@ export const UserManagementPanel = () => {
             <CardTitle className="text-sm">Active (24h)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">
-              {stats.active24h}
-            </div>
+            <div className="text-3xl font-bold text-green-600">{stats.active24h}</div>
           </CardContent>
         </Card>
 
@@ -358,9 +349,7 @@ export const UserManagementPanel = () => {
             <CardTitle className="text-sm">Active (7d)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-600">
-              {stats.active7d}
-            </div>
+            <div className="text-3xl font-bold text-blue-600">{stats.active7d}</div>
           </CardContent>
         </Card>
 
@@ -369,9 +358,7 @@ export const UserManagementPanel = () => {
             <CardTitle className="text-sm">Admins</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-600">
-              {stats.admins}
-            </div>
+            <div className="text-3xl font-bold text-purple-600">{stats.admins}</div>
           </CardContent>
         </Card>
 
@@ -380,9 +367,7 @@ export const UserManagementPanel = () => {
             <CardTitle className="text-sm">Subscribed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {stats.subscribed}
-            </div>
+            <div className="text-3xl font-bold text-yellow-600">{stats.subscribed}</div>
           </CardContent>
         </Card>
       </div>
@@ -402,9 +387,7 @@ export const UserManagementPanel = () => {
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>
-          <CardDescription>
-            {filteredUsers.length} users found
-          </CardDescription>
+          <CardDescription>{filteredUsers.length} users found</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-auto">
@@ -448,23 +431,13 @@ export const UserManagementPanel = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => viewUserDetails(user)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => viewUserDetails(user)}>
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Switch
                             checked={user.role === 'admin'}
-                            onCheckedChange={() =>
-                              toggleAdminRole(user.id, user.role || 'user')
-                            }
-                            title={
-                              user.role === 'admin'
-                                ? 'Revoke admin'
-                                : 'Grant admin'
-                            }
+                            onCheckedChange={() => toggleAdminRole(user.id, user.role || 'user')}
+                            title={user.role === 'admin' ? 'Revoke admin' : 'Grant admin'}
                           />
                         </div>
                       </TableCell>
@@ -495,8 +468,7 @@ export const UserManagementPanel = () => {
                   <h4 className="font-semibold text-sm mb-2">Account Information</h4>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-muted-foreground">Email:</span>{' '}
-                      {selectedUser.email}
+                      <span className="text-muted-foreground">Email:</span> {selectedUser.email}
                     </div>
                     <div>
                       <span className="text-muted-foreground">Username:</span>{' '}
@@ -551,9 +523,7 @@ export const UserManagementPanel = () => {
                         <div key={activity.id} className="p-3 flex items-center gap-3">
                           <Clock className="h-4 w-4 text-muted-foreground" />
                           <div className="flex-1">
-                            <div className="text-sm font-medium">
-                              {activity.activity_type}
-                            </div>
+                            <div className="text-sm font-medium">{activity.activity_type}</div>
                             {activity.page_url && (
                               <div className="text-xs text-muted-foreground">
                                 {activity.page_url}

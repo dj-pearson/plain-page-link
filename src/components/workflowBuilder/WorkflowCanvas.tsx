@@ -1,8 +1,8 @@
-import { useRef, useState, useCallback, useEffect } from "react";
-import { useWorkflowBuilderStore } from "@/stores/useWorkflowBuilderStore";
-import { WorkflowNode } from "./WorkflowNode";
-import { cn } from "@/lib/utils";
-import type { WorkflowNodeTemplate, WorkflowNode as WorkflowNodeType } from "@/types/workflow";
+import { useRef, useState, useCallback } from 'react';
+import { useWorkflowBuilderStore } from '@/stores/useWorkflowBuilderStore';
+import { WorkflowNode } from './WorkflowNode';
+import { cn } from '@/lib/utils';
+import type { WorkflowNodeTemplate } from '@/types/workflow';
 
 interface WorkflowCanvasProps {
   className?: string;
@@ -51,7 +51,7 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
 
       if (!canvasRef.current) return;
 
-      const templateData = e.dataTransfer.getData("application/workflow-node");
+      const templateData = e.dataTransfer.getData('application/workflow-node');
       if (!templateData) return;
 
       const template: WorkflowNodeTemplate = JSON.parse(templateData);
@@ -67,7 +67,7 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+    e.dataTransfer.dropEffect = 'copy';
   };
 
   // Handle canvas panning
@@ -167,8 +167,7 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
 
   // Render connection line while connecting
   const renderConnectionLine = () => {
-    if (!isConnecting || !connectionStart || !workflow || !canvasRef.current)
-      return null;
+    if (!isConnecting || !connectionStart || !workflow || !canvasRef.current) return null;
 
     const sourceNode = workflow.nodes.find((n) => n.id === connectionStart);
     if (!sourceNode) return null;
@@ -182,20 +181,12 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
     const midY = (sourceY + targetY) / 2;
     const path = `M ${sourceX} ${sourceY} C ${sourceX} ${midY}, ${targetX} ${midY}, ${targetX} ${targetY}`;
 
-    return (
-      <path
-        d={path}
-        stroke="#22c55e"
-        strokeWidth={2}
-        strokeDasharray="5,5"
-        fill="none"
-      />
-    );
+    return <path d={path} stroke="#22c55e" strokeWidth={2} strokeDasharray="5,5" fill="none" />;
   };
 
   if (!workflow) {
     return (
-      <div className={cn("flex items-center justify-center bg-gray-100", className)}>
+      <div className={cn('flex items-center justify-center bg-gray-100', className)}>
         <p className="text-gray-500">No workflow loaded</p>
       </div>
     );
@@ -205,9 +196,9 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
     <div
       ref={canvasRef}
       className={cn(
-        "relative overflow-hidden bg-gray-100",
-        "bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px]",
-        panStart && "cursor-grabbing",
+        'relative overflow-hidden bg-gray-100',
+        'bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px]',
+        panStart && 'cursor-grabbing',
         className
       )}
       onDrop={handleDrop}
@@ -228,7 +219,7 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
         className="absolute inset-0"
         style={{
           transform: `translate(${workflow.viewport.x}px, ${workflow.viewport.y}px) scale(${workflow.viewport.zoom || 1})`,
-          transformOrigin: "0 0",
+          transformOrigin: '0 0',
         }}
       >
         {/* Edges SVG layer */}
@@ -248,7 +239,7 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
             onStartConnection={() => startConnection(node.id)}
             onCompleteConnection={() => completeConnection(node.id)}
             onDragStart={(e) => {
-              e.dataTransfer.setData("text/plain", node.id);
+              e.dataTransfer.setData('text/plain', node.id);
             }}
           />
         ))}
@@ -258,9 +249,7 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
       {workflow.nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
-            <p className="text-gray-500 mb-2">
-              Drag nodes from the palette to start building
-            </p>
+            <p className="text-gray-500 mb-2">Drag nodes from the palette to start building</p>
             <p className="text-sm text-gray-400">
               Start with a trigger node to define when your workflow runs
             </p>

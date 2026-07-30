@@ -12,14 +12,7 @@
 
 import { logger } from '@/lib/logger';
 import { getSecurityContext } from './authentication';
-import type {
-  Permission,
-  AppRole,
-  SecurityCheckResult,
-  SecurityViolation,
-  ROLE_PERMISSIONS,
-  ROLE_LEVELS,
-} from './types';
+import type { Permission, AppRole, SecurityCheckResult, SecurityViolation } from './types';
 import { ROLE_PERMISSIONS as PERMISSIONS, ROLE_LEVELS as LEVELS } from './types';
 
 // ============================================================

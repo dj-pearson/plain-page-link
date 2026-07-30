@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,19 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle,
-  Lightbulb,
-  Loader2,
-  Search,
-} from "lucide-react";
-import type { Article } from "@/hooks/useArticles";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, AlertTriangle, CheckCircle, Lightbulb, Loader2, Search } from 'lucide-react';
+import type { Article } from '@/hooks/useArticles';
 
 interface SEOValidationResult {
   score: number;
@@ -48,7 +40,7 @@ function validateArticleSEO(article: Article): SEOValidationResult {
   // Title validation
   const seoTitle = article.seo_title || article.title;
   if (!seoTitle || seoTitle.length === 0) {
-    errors.push("SEO title is missing");
+    errors.push('SEO title is missing');
   } else if (seoTitle.length < 30) {
     warnings.push(`SEO title is too short (${seoTitle.length}/30 minimum characters)`);
   } else if (seoTitle.length > 60) {
@@ -60,9 +52,11 @@ function validateArticleSEO(article: Article): SEOValidationResult {
   // Meta description validation
   const seoDescription = article.seo_description || article.excerpt;
   if (!seoDescription || seoDescription.length === 0) {
-    errors.push("Meta description is missing");
+    errors.push('Meta description is missing');
   } else if (seoDescription.length < 120) {
-    warnings.push(`Meta description is too short (${seoDescription.length}/120 minimum characters)`);
+    warnings.push(
+      `Meta description is too short (${seoDescription.length}/120 minimum characters)`
+    );
   } else if (seoDescription.length > 160) {
     warnings.push(`Meta description is too long (${seoDescription.length}/160 maximum characters)`);
   } else {
@@ -72,7 +66,7 @@ function validateArticleSEO(article: Article): SEOValidationResult {
   // SEO keywords validation
   const keywords = article.seo_keywords || [];
   if (!keywords || keywords.length === 0) {
-    warnings.push("No SEO keywords defined");
+    warnings.push('No SEO keywords defined');
   } else if (keywords.length < 3) {
     suggestions.push(`Consider adding more keywords (${keywords.length}/3+ recommended)`);
   } else {
@@ -81,70 +75,74 @@ function validateArticleSEO(article: Article): SEOValidationResult {
 
   // Slug validation
   if (!article.slug || article.slug.length === 0) {
-    errors.push("Article slug is missing");
-  } else if (article.slug.includes(" ")) {
-    errors.push("Slug contains spaces - should use hyphens");
+    errors.push('Article slug is missing');
+  } else if (article.slug.includes(' ')) {
+    errors.push('Slug contains spaces - should use hyphens');
   } else if (!/^[a-z0-9-]+$/.test(article.slug)) {
-    warnings.push("Slug contains special characters - consider using only lowercase letters, numbers, and hyphens");
+    warnings.push(
+      'Slug contains special characters - consider using only lowercase letters, numbers, and hyphens'
+    );
   } else {
-    passed.push("Slug is properly formatted");
+    passed.push('Slug is properly formatted');
   }
 
   // Content validation
   if (!article.content || article.content.length === 0) {
-    errors.push("Article content is empty");
+    errors.push('Article content is empty');
   } else {
     const wordCount = article.content.split(/\s+/).filter(Boolean).length;
     if (wordCount < 300) {
       warnings.push(`Content is thin (${wordCount} words) - aim for 300+ words for better SEO`);
     } else if (wordCount < 800) {
-      suggestions.push(`Content has ${wordCount} words - consider expanding to 800+ for comprehensive coverage`);
+      suggestions.push(
+        `Content has ${wordCount} words - consider expanding to 800+ for comprehensive coverage`
+      );
     } else {
       passed.push(`Content length is good (${wordCount} words)`);
     }
 
     // Check for headings
-    const hasH2 = article.content.includes("## ");
-    const hasH3 = article.content.includes("### ");
+    const hasH2 = article.content.includes('## ');
+    const hasH3 = article.content.includes('### ');
     if (!hasH2 && !hasH3) {
-      suggestions.push("Consider adding subheadings (## or ###) for better content structure");
+      suggestions.push('Consider adding subheadings (## or ###) for better content structure');
     } else {
-      passed.push("Content has proper heading structure");
+      passed.push('Content has proper heading structure');
     }
 
     // Check for internal/external links
-    const hasLinks = article.content.includes("](");
+    const hasLinks = article.content.includes('](');
     if (!hasLinks) {
-      suggestions.push("Consider adding internal or external links for better SEO");
+      suggestions.push('Consider adding internal or external links for better SEO');
     }
   }
 
   // Excerpt validation
   if (!article.excerpt || article.excerpt.length === 0) {
-    warnings.push("Article excerpt is missing - used for previews and social sharing");
+    warnings.push('Article excerpt is missing - used for previews and social sharing');
   } else if (article.excerpt.length > 200) {
-    suggestions.push("Excerpt is long - consider shortening to under 200 characters");
+    suggestions.push('Excerpt is long - consider shortening to under 200 characters');
   } else {
-    passed.push("Excerpt is defined");
+    passed.push('Excerpt is defined');
   }
 
   // Featured image validation
   if (!article.featured_image_url) {
-    suggestions.push("Consider adding a featured image for social sharing and visual appeal");
+    suggestions.push('Consider adding a featured image for social sharing and visual appeal');
   } else {
-    passed.push("Featured image is set");
+    passed.push('Featured image is set');
   }
 
   // Category validation
   if (!article.category) {
-    warnings.push("Article category is not set");
+    warnings.push('Article category is not set');
   } else {
-    passed.push("Category is defined");
+    passed.push('Category is defined');
   }
 
   // Tags validation
   if (!article.tags || article.tags.length === 0) {
-    suggestions.push("Consider adding tags for better content organization");
+    suggestions.push('Consider adding tags for better content organization');
   } else {
     passed.push(`Tags defined (${article.tags.length} tags)`);
   }
@@ -158,7 +156,14 @@ function validateArticleSEO(article: Article): SEOValidationResult {
 
   let score = Math.max(
     0,
-    Math.min(100, 100 - errorPenalty - warningPenalty - suggestionPenalty + Math.floor(passedWeight / totalChecks * 10))
+    Math.min(
+      100,
+      100 -
+        errorPenalty -
+        warningPenalty -
+        suggestionPenalty +
+        Math.floor((passedWeight / totalChecks) * 10)
+    )
   );
 
   // Ensure minimum score if no errors
@@ -170,24 +175,24 @@ function validateArticleSEO(article: Article): SEOValidationResult {
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 80) return "text-green-600";
-  if (score >= 60) return "text-yellow-600";
-  if (score >= 40) return "text-orange-600";
-  return "text-red-600";
+  if (score >= 80) return 'text-green-600';
+  if (score >= 60) return 'text-yellow-600';
+  if (score >= 40) return 'text-orange-600';
+  return 'text-red-600';
 }
 
 function getScoreLabel(score: number): string {
-  if (score >= 80) return "Excellent";
-  if (score >= 60) return "Good";
-  if (score >= 40) return "Needs Improvement";
-  return "Poor";
+  if (score >= 80) return 'Excellent';
+  if (score >= 60) return 'Good';
+  if (score >= 40) return 'Needs Improvement';
+  return 'Poor';
 }
 
 function getProgressColor(score: number): string {
-  if (score >= 80) return "bg-green-500";
-  if (score >= 60) return "bg-yellow-500";
-  if (score >= 40) return "bg-orange-500";
-  return "bg-red-500";
+  if (score >= 80) return 'bg-green-500';
+  if (score >= 60) return 'bg-yellow-500';
+  if (score >= 40) return 'bg-orange-500';
+  return 'bg-red-500';
 }
 
 export function SEOValidationDialog({
@@ -314,7 +319,11 @@ export function SEOValidationDialog({
               </div>
               <div className="flex flex-wrap gap-2">
                 {validation.passed.map((item, idx) => (
-                  <Badge key={idx} variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  <Badge
+                    key={idx}
+                    variant="outline"
+                    className="bg-green-50 text-green-700 border-green-200"
+                  >
                     <CheckCircle className="h-3 w-3 mr-1" />
                     {item}
                   </Badge>
@@ -345,7 +354,7 @@ export function SEOValidationDialog({
                   Publishing...
                 </>
               ) : (
-                "Publish Anyway"
+                'Publish Anyway'
               )}
             </Button>
           ) : (

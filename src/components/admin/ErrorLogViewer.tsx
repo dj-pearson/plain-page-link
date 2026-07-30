@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -17,11 +17,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   AlertCircle,
   AlertTriangle,
@@ -29,11 +29,9 @@ import {
   CheckCircle2,
   RefreshCw,
   Search,
-  Filter,
   FileText,
-  X,
-} from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface ErrorLog {
   id: string;
@@ -55,12 +53,12 @@ export const ErrorLogViewer = () => {
   const [errors, setErrors] = useState<ErrorLog[]>([]);
   const [filteredErrors, setFilteredErrors] = useState<ErrorLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [severityFilter, setSeverityFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("unresolved");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [severityFilter, setSeverityFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('unresolved');
   const [selectedError, setSelectedError] = useState<ErrorLog | null>(null);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
-  const [resolutionNotes, setResolutionNotes] = useState("");
+  const [resolutionNotes, setResolutionNotes] = useState('');
 
   // Statistics
   const [stats, setStats] = useState({
@@ -104,9 +102,9 @@ export const ErrorLogViewer = () => {
       setStats({ total, unresolved, critical, high, medium, low });
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -128,14 +126,14 @@ export const ErrorLogViewer = () => {
     }
 
     // Severity filter
-    if (severityFilter !== "all") {
+    if (severityFilter !== 'all') {
       filtered = filtered.filter((error) => error.severity === severityFilter);
     }
 
     // Status filter
-    if (statusFilter === "resolved") {
+    if (statusFilter === 'resolved') {
       filtered = filtered.filter((error) => error.resolved);
-    } else if (statusFilter === "unresolved") {
+    } else if (statusFilter === 'unresolved') {
       filtered = filtered.filter((error) => !error.resolved);
     }
 
@@ -144,7 +142,7 @@ export const ErrorLogViewer = () => {
 
   const viewErrorDetails = (error: ErrorLog) => {
     setSelectedError(error);
-    setResolutionNotes(error.resolution_notes || "");
+    setResolutionNotes(error.resolution_notes || '');
     setShowErrorDetails(true);
   };
 
@@ -169,17 +167,17 @@ export const ErrorLogViewer = () => {
       if (error) throw error;
 
       toast({
-        title: "Error Resolved",
-        description: "The error has been marked as resolved",
+        title: 'Error Resolved',
+        description: 'The error has been marked as resolved',
       });
 
       setShowErrorDetails(false);
       await loadErrors();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -200,7 +198,7 @@ export const ErrorLogViewer = () => {
   };
 
   const getSeverityBadge = (severity: string) => {
-    const variants: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
+    const variants: Record<string, 'destructive' | 'default' | 'secondary' | 'outline'> = {
       critical: 'destructive',
       high: 'destructive',
       medium: 'default',
@@ -223,9 +221,7 @@ export const ErrorLogViewer = () => {
             <AlertCircle className="h-6 w-6" />
             Error Log Viewer
           </h2>
-          <p className="text-muted-foreground">
-            Centralized error tracking and debugging
-          </p>
+          <p className="text-muted-foreground">Centralized error tracking and debugging</p>
         </div>
         <Button variant="outline" onClick={loadErrors} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -249,9 +245,7 @@ export const ErrorLogViewer = () => {
             <CardTitle className="text-sm">Unresolved</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {stats.unresolved}
-            </div>
+            <div className="text-3xl font-bold text-yellow-600">{stats.unresolved}</div>
           </CardContent>
         </Card>
 
@@ -269,9 +263,7 @@ export const ErrorLogViewer = () => {
             <CardTitle className="text-sm">High</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-orange-600">
-              {stats.high}
-            </div>
+            <div className="text-3xl font-bold text-orange-600">{stats.high}</div>
           </CardContent>
         </Card>
 
@@ -280,9 +272,7 @@ export const ErrorLogViewer = () => {
             <CardTitle className="text-sm">Medium</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {stats.medium}
-            </div>
+            <div className="text-3xl font-bold text-yellow-600">{stats.medium}</div>
           </CardContent>
         </Card>
 
@@ -335,9 +325,7 @@ export const ErrorLogViewer = () => {
       <Card>
         <CardHeader>
           <CardTitle>Error Log</CardTitle>
-          <CardDescription>
-            {filteredErrors.length} errors found
-          </CardDescription>
+          <CardDescription>{filteredErrors.length} errors found</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredErrors.length === 0 ? (
@@ -353,9 +341,7 @@ export const ErrorLogViewer = () => {
                   className="flex items-start gap-3 p-4 border rounded-lg hover:bg-accent cursor-pointer"
                   onClick={() => viewErrorDetails(error)}
                 >
-                  <div className="pt-0.5">
-                    {getSeverityIcon(error.severity)}
-                  </div>
+                  <div className="pt-0.5">{getSeverityIcon(error.severity)}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold truncate">{error.error_type}</h4>
@@ -367,9 +353,7 @@ export const ErrorLogViewer = () => {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {error.error_message}
-                    </p>
+                    <p className="text-sm text-muted-foreground truncate">{error.error_message}</p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span>
                         {formatDistanceToNow(new Date(error.created_at), {
@@ -377,9 +361,7 @@ export const ErrorLogViewer = () => {
                         })}
                       </span>
                       {error.user_id && (
-                        <span className="truncate">
-                          User: {error.user_id.substring(0, 8)}...
-                        </span>
+                        <span className="truncate">User: {error.user_id.substring(0, 8)}...</span>
                       )}
                     </div>
                   </div>
@@ -401,9 +383,7 @@ export const ErrorLogViewer = () => {
               {selectedError && getSeverityIcon(selectedError.severity)}
               Error Details
             </DialogTitle>
-            <DialogDescription>
-              Complete information about this error
-            </DialogDescription>
+            <DialogDescription>Complete information about this error</DialogDescription>
           </DialogHeader>
 
           {selectedError && (
@@ -420,9 +400,7 @@ export const ErrorLogViewer = () => {
                 </div>
                 <div>
                   <Label className="text-sm font-semibold">Occurred</Label>
-                  <p className="text-sm">
-                    {new Date(selectedError.created_at).toLocaleString()}
-                  </p>
+                  <p className="text-sm">{new Date(selectedError.created_at).toLocaleString()}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-semibold">User ID</Label>
@@ -483,13 +461,14 @@ export const ErrorLogViewer = () => {
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <span className="text-sm font-semibold text-green-600">
-                        Resolved {formatDistanceToNow(new Date(selectedError.resolved_at), { addSuffix: true })}
+                        Resolved{' '}
+                        {formatDistanceToNow(new Date(selectedError.resolved_at), {
+                          addSuffix: true,
+                        })}
                       </span>
                     </div>
                     {selectedError.resolution_notes && (
-                      <p className="text-sm text-green-800">
-                        {selectedError.resolution_notes}
-                      </p>
+                      <p className="text-sm text-green-800">{selectedError.resolution_notes}</p>
                     )}
                   </div>
                 </div>

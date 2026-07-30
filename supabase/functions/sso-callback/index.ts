@@ -223,7 +223,7 @@ serve(async (req) => {
     // Check existing SSO mapping
     const { data: existingMapping } = await supabase
       .from('sso_user_mappings')
-      .select('user_id')
+      .select('user_id, login_count')
       .eq('config_id', ssoConfig.id)
       .eq('sso_subject_id', subjectId)
       .single();
@@ -231,14 +231,25 @@ serve(async (req) => {
     if (existingMapping) {
       userId = existingMapping.user_id;
 
-      // Update mapping with latest info
+      // Update mapping with latest info.
+      //
+      // login_count previously read `supabase.rpc('increment', { x: 1 })`. There
+      // is no `increment` function, and even if there were, a query builder is
+      // not a value: it was serialized into the PATCH body for an integer
+      // column, so the whole update was rejected and sso_email, sso_attributes
+      // and last_login_at were never refreshed on re-login.
+      //
+      // Read-modify-write is used rather than an atomic `login_count + 1`, which
+      // PostgREST cannot express without a dedicated RPC. Two logins racing may
+      // undercount, which is acceptable for a login counter and is strictly
+      // better than the update failing outright.
       await supabase
         .from('sso_user_mappings')
         .update({
           sso_email: userEmail,
           sso_attributes: userAttributes,
           last_login_at: new Date().toISOString(),
-          login_count: supabase.rpc('increment', { x: 1 }),
+          login_count: (existingMapping.login_count ?? 0) + 1,
         })
         .eq('config_id', ssoConfig.id)
         .eq('sso_subject_id', subjectId);

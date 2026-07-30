@@ -1,30 +1,25 @@
-import { useWorkflowBuilderStore } from "@/stores/useWorkflowBuilderStore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useWorkflowBuilderStore } from '@/stores/useWorkflowBuilderStore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Undo2,
   Redo2,
   Save,
   Play,
-  Pause,
   Settings,
   Eye,
   Upload,
   Loader2,
   Power,
   PowerOff,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+} from 'lucide-react';
 
 interface WorkflowToolbarProps {
   onOpenSettings?: () => void;
   onPreview?: () => void;
 }
 
-export const WorkflowToolbar = ({
-  onOpenSettings,
-  onPreview,
-}: WorkflowToolbarProps) => {
+export const WorkflowToolbar = ({ onOpenSettings, onPreview }: WorkflowToolbarProps) => {
   const {
     workflow,
     isSaving,
@@ -53,7 +48,7 @@ export const WorkflowToolbar = ({
     try {
       await executeWorkflow();
     } catch (error) {
-      console.error("Execution failed:", error);
+      console.error('Execution failed:', error);
     }
   };
 
@@ -135,11 +130,11 @@ export const WorkflowToolbar = ({
 
         {/* Activate/Deactivate */}
         <Button
-          variant={workflow.isActive ? "outline" : "secondary"}
+          variant={workflow.isActive ? 'outline' : 'secondary'}
           size="sm"
           onClick={handleToggleActive}
           disabled={!workflow.isPublished}
-          title={!workflow.isPublished ? "Publish workflow first" : undefined}
+          title={!workflow.isPublished ? 'Publish workflow first' : undefined}
         >
           {workflow.isActive ? (
             <>
@@ -175,12 +170,7 @@ export const WorkflowToolbar = ({
         </Button>
 
         {/* Save */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={saveWorkflow}
-          disabled={isSaving}
-        >
+        <Button variant="outline" size="sm" onClick={saveWorkflow} disabled={isSaving}>
           {isSaving ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

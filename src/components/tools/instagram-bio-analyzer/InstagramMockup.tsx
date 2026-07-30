@@ -3,8 +3,6 @@
  * Shows a realistic preview of how the bio looks on Instagram
  */
 
-import React from 'react';
-import { Button } from '@/components/ui/button';
 import { MoreVertical, Grid, User } from 'lucide-react';
 
 interface InstagramMockupProps {

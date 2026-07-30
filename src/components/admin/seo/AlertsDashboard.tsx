@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   AlertCircle,
   AlertTriangle,
@@ -13,9 +13,8 @@ import {
   RefreshCw,
   Bell,
   X,
-  ExternalLink,
-} from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface SEONotification {
   id: string;
@@ -106,9 +105,13 @@ export const AlertsDashboard = () => {
   };
 
   const updateCounts = (notifs: SEONotification[]) => {
-    const critical = notifs.filter(n => n.severity === 'critical' && n.status === 'pending').length;
-    const warnings = notifs.filter(n => n.severity === 'medium' && n.status === 'pending').length;
-    const opportunities = notifs.filter(n => n.notification_type === 'opportunity' && n.status === 'pending').length;
+    const critical = notifs.filter(
+      (n) => n.severity === 'critical' && n.status === 'pending'
+    ).length;
+    const warnings = notifs.filter((n) => n.severity === 'medium' && n.status === 'pending').length;
+    const opportunities = notifs.filter(
+      (n) => n.notification_type === 'opportunity' && n.status === 'pending'
+    ).length;
 
     setCriticalCount(critical);
     setWarningCount(warnings);
@@ -126,18 +129,18 @@ export const AlertsDashboard = () => {
 
       if (error) throw error;
 
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      updateCounts(notifications.filter(n => n.id !== id));
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      updateCounts(notifications.filter((n) => n.id !== id));
 
       toast({
-        title: "Notification dismissed",
-        description: "The notification has been marked as read",
+        title: 'Notification dismissed',
+        description: 'The notification has been marked as read',
       });
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -149,8 +152,8 @@ export const AlertsDashboard = () => {
     setLoading(false);
 
     toast({
-      title: "Alerts refreshed",
-      description: "Latest alerts and audit results loaded",
+      title: 'Alerts refreshed',
+      description: 'Latest alerts and audit results loaded',
     });
   };
 
@@ -169,40 +172,33 @@ export const AlertsDashboard = () => {
   };
 
   const getSeverityBadge = (severity: string) => {
-    const variants: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
+    const variants: Record<string, 'destructive' | 'default' | 'secondary' | 'outline'> = {
       critical: 'destructive',
       high: 'destructive',
       medium: 'default',
       low: 'secondary',
     };
 
-    return (
-      <Badge variant={variants[severity] || 'default'}>
-        {severity}
-      </Badge>
-    );
+    return <Badge variant={variants[severity] || 'default'}>{severity}</Badge>;
   };
 
-  const criticalIssues = notifications.filter(n =>
-    (n.severity === 'critical' || n.severity === 'high') &&
-    n.notification_type === 'critical_issue' &&
-    n.status === 'pending'
+  const criticalIssues = notifications.filter(
+    (n) =>
+      (n.severity === 'critical' || n.severity === 'high') &&
+      n.notification_type === 'critical_issue' &&
+      n.status === 'pending'
   );
 
-  const warnings = notifications.filter(n =>
-    n.severity === 'medium' &&
-    n.notification_type === 'warning' &&
-    n.status === 'pending'
+  const warnings = notifications.filter(
+    (n) => n.severity === 'medium' && n.notification_type === 'warning' && n.status === 'pending'
   );
 
-  const opportunities = notifications.filter(n =>
-    n.notification_type === 'opportunity' &&
-    n.status === 'pending'
+  const opportunities = notifications.filter(
+    (n) => n.notification_type === 'opportunity' && n.status === 'pending'
   );
 
-  const competitorAlerts = notifications.filter(n =>
-    n.notification_type === 'competitor_alert' &&
-    n.status === 'pending'
+  const competitorAlerts = notifications.filter(
+    (n) => n.notification_type === 'competitor_alert' && n.status === 'pending'
   );
 
   return (
@@ -232,9 +228,7 @@ export const AlertsDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-red-600">{criticalCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Require immediate attention
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Require immediate attention</p>
           </CardContent>
         </Card>
 
@@ -247,9 +241,7 @@ export const AlertsDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-yellow-600">{warningCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Should be addressed soon
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Should be addressed soon</p>
           </CardContent>
         </Card>
 
@@ -262,9 +254,7 @@ export const AlertsDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-600">{opportunityCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Potential improvements
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Potential improvements</p>
           </CardContent>
         </Card>
 
@@ -279,9 +269,7 @@ export const AlertsDashboard = () => {
             <div className="text-3xl font-bold text-green-600">
               {recentAudits[0]?.last_run_results?.overall_score || 'N/A'}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Latest audit score
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Latest audit score</p>
           </CardContent>
         </Card>
       </div>
@@ -289,18 +277,10 @@ export const AlertsDashboard = () => {
       {/* Tabs for different alert types */}
       <Tabs defaultValue="critical" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="critical">
-            Critical ({criticalIssues.length})
-          </TabsTrigger>
-          <TabsTrigger value="warnings">
-            Warnings ({warnings.length})
-          </TabsTrigger>
-          <TabsTrigger value="opportunities">
-            Opportunities ({opportunities.length})
-          </TabsTrigger>
-          <TabsTrigger value="competitor">
-            Competitors ({competitorAlerts.length})
-          </TabsTrigger>
+          <TabsTrigger value="critical">Critical ({criticalIssues.length})</TabsTrigger>
+          <TabsTrigger value="warnings">Warnings ({warnings.length})</TabsTrigger>
+          <TabsTrigger value="opportunities">Opportunities ({opportunities.length})</TabsTrigger>
+          <TabsTrigger value="competitor">Competitors ({competitorAlerts.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="critical" className="space-y-4">
@@ -396,9 +376,7 @@ export const AlertsDashboard = () => {
         </CardHeader>
         <CardContent>
           {recentAudits.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4">
-              No recent audits found
-            </p>
+            <p className="text-center text-muted-foreground py-4">No recent audits found</p>
           ) : (
             <div className="space-y-4">
               {recentAudits.map((audit) => (
@@ -425,11 +403,7 @@ export const AlertsDashboard = () => {
                       </div>
                     )}
                     <Badge
-                      variant={
-                        audit.last_run_status === 'success'
-                          ? 'default'
-                          : 'destructive'
-                      }
+                      variant={audit.last_run_status === 'success' ? 'default' : 'destructive'}
                     >
                       {audit.last_run_status}
                     </Badge>
@@ -474,11 +448,7 @@ const NotificationCard = ({
           </div>
           <div className="flex items-center gap-2">
             {getSeverityBadge(notification.severity)}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onDismiss(notification.id)}
-            >
+            <Button variant="ghost" size="icon" onClick={() => onDismiss(notification.id)}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -494,9 +464,11 @@ const NotificationCard = ({
               <div>
                 <h5 className="font-semibold text-sm mb-1">Critical Issues:</h5>
                 <ul className="list-disc list-inside text-sm text-muted-foreground">
-                  {notification.data.critical_issues.slice(0, 3).map((issue: string, idx: number) => (
-                    <li key={idx}>{issue}</li>
-                  ))}
+                  {notification.data.critical_issues
+                    .slice(0, 3)
+                    .map((issue: string, idx: number) => (
+                      <li key={idx}>{issue}</li>
+                    ))}
                 </ul>
               </div>
             )}
@@ -515,9 +487,7 @@ const NotificationCard = ({
             {notification.data.overall_score && (
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-sm font-semibold">Overall Score:</span>
-                <span className="text-lg font-bold">
-                  {notification.data.overall_score}/100
-                </span>
+                <span className="text-lg font-bold">{notification.data.overall_score}/100</span>
               </div>
             )}
           </div>

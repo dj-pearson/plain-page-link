@@ -13,10 +13,10 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 import { requireAuth, getSecurityContext } from './authentication';
-import { requirePermission, hasPermission } from './authorization';
-import { requireOwnership, createUserScopedQuery, fetchOwnedResource } from './ownership';
-import { validateResourceId, sanitizeHtml, stripHtml } from './validation';
-import type { Permission, ResourceType, OwnedResource } from './types';
+import { requirePermission } from './authorization';
+import { fetchOwnedResource } from './ownership';
+import { validateResourceId } from './validation';
+import type { Permission, OwnedResource } from './types';
 
 // ============================================================
 // Secure Query Builder
@@ -70,15 +70,12 @@ export async function secureSelect<T = unknown>(
     const context = await getSecurityContext();
 
     // Build query
-    let query = supabase
-      .from(options.table)
-      .select(options.columns || '*', { count: 'exact' });
+    let query = supabase.from(options.table).select(options.columns || '*', { count: 'exact' });
 
     // Layer 3: Ownership filter
     if (options.scopeToUser && context.userId) {
       // Check if admin can bypass ownership
-      const canBypass =
-        options.allowAdminBypass && context.role === 'admin';
+      const canBypass = options.allowAdminBypass && context.role === 'admin';
 
       if (!canBypass) {
         query = query.eq('user_id', context.userId);

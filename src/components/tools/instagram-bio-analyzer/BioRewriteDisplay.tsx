@@ -3,7 +3,7 @@
  * Shows the 3 optimized bio versions with copy functionality
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { BioRewrite } from '@/lib/instagram-bio-analyzer/types';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, Lock } from 'lucide-react';

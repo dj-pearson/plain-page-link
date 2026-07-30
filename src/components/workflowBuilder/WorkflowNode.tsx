@@ -1,6 +1,6 @@
-import { memo } from "react";
-import { cn } from "@/lib/utils";
-import type { WorkflowNode as WorkflowNodeType } from "@/types/workflow";
+import { memo } from 'react';
+import { cn } from '@/lib/utils';
+import type { WorkflowNode as WorkflowNodeType } from '@/types/workflow';
 import {
   Play,
   Mail,
@@ -16,11 +16,10 @@ import {
   Calendar,
   Link,
   Home,
-  Bell,
   Filter,
   Variable,
   Code,
-} from "lucide-react";
+} from 'lucide-react';
 
 interface WorkflowNodeProps {
   node: WorkflowNodeType;
@@ -57,12 +56,12 @@ const NODE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 };
 
 const NODE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  trigger: { bg: "bg-green-50", border: "border-green-300", text: "text-green-700" },
-  action: { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-700" },
-  condition: { bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-700" },
-  delay: { bg: "bg-purple-50", border: "border-purple-300", text: "text-purple-700" },
-  loop: { bg: "bg-teal-50", border: "border-teal-300", text: "text-teal-700" },
-  transform: { bg: "bg-pink-50", border: "border-pink-300", text: "text-pink-700" },
+  trigger: { bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-700' },
+  action: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' },
+  condition: { bg: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700' },
+  delay: { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700' },
+  loop: { bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-700' },
+  transform: { bg: 'bg-pink-50', border: 'border-pink-300', text: 'text-pink-700' },
 };
 
 export const WorkflowNode = memo(
@@ -95,12 +94,12 @@ export const WorkflowNode = memo(
     return (
       <div
         className={cn(
-          "absolute cursor-grab active:cursor-grabbing",
-          "min-w-[180px] rounded-lg border-2 shadow-md transition-all",
+          'absolute cursor-grab active:cursor-grabbing',
+          'min-w-[180px] rounded-lg border-2 shadow-md transition-all',
           colors.bg,
           colors.border,
-          isSelected && "ring-2 ring-blue-500 ring-offset-2",
-          isConnecting && "ring-2 ring-green-400 ring-offset-1"
+          isSelected && 'ring-2 ring-blue-500 ring-offset-2',
+          isConnecting && 'ring-2 ring-green-400 ring-offset-1'
         )}
         style={{
           left: node.position.x,
@@ -111,13 +110,13 @@ export const WorkflowNode = memo(
         onDragStart={onDragStart}
       >
         {/* Input connection point */}
-        {node.type !== "trigger" && (
+        {node.type !== 'trigger' && (
           <div
             className={cn(
-              "absolute -top-3 left-1/2 -translate-x-1/2",
-              "w-4 h-4 rounded-full bg-white border-2 border-gray-300",
-              "cursor-crosshair hover:border-green-500 hover:bg-green-50",
-              "transition-colors"
+              'absolute -top-3 left-1/2 -translate-x-1/2',
+              'w-4 h-4 rounded-full bg-white border-2 border-gray-300',
+              'cursor-crosshair hover:border-green-500 hover:bg-green-50',
+              'transition-colors'
             )}
             onClick={handleConnectionPoint}
           />
@@ -128,40 +127,34 @@ export const WorkflowNode = memo(
           <div className="flex items-center gap-2">
             <div
               className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center",
+                'w-8 h-8 rounded-lg flex items-center justify-center',
                 colors.text,
-                "bg-white/50"
+                'bg-white/50'
               )}
             >
               <Icon className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm text-gray-900 truncate">
-                {node.label}
-              </p>
-              <p className="text-xs text-gray-500 capitalize">
-                {node.type}
-              </p>
+              <p className="font-medium text-sm text-gray-900 truncate">{node.label}</p>
+              <p className="text-xs text-gray-500 capitalize">{node.type}</p>
             </div>
           </div>
 
           {node.description && (
-            <p className="mt-2 text-xs text-gray-600 line-clamp-2">
-              {node.description}
-            </p>
+            <p className="mt-2 text-xs text-gray-600 line-clamp-2">{node.description}</p>
           )}
         </div>
 
         {/* Output connection points */}
-        {node.type === "condition" ? (
+        {node.type === 'condition' ? (
           <div className="flex justify-around pb-2">
             <div className="flex flex-col items-center gap-1">
               <span className="text-xs text-green-600 font-medium">Yes</span>
               <div
                 className={cn(
-                  "w-4 h-4 rounded-full bg-white border-2 border-green-400",
-                  "cursor-crosshair hover:border-green-600 hover:bg-green-50",
-                  "transition-colors"
+                  'w-4 h-4 rounded-full bg-white border-2 border-green-400',
+                  'cursor-crosshair hover:border-green-600 hover:bg-green-50',
+                  'transition-colors'
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -173,9 +166,9 @@ export const WorkflowNode = memo(
               <span className="text-xs text-red-600 font-medium">No</span>
               <div
                 className={cn(
-                  "w-4 h-4 rounded-full bg-white border-2 border-red-400",
-                  "cursor-crosshair hover:border-red-600 hover:bg-red-50",
-                  "transition-colors"
+                  'w-4 h-4 rounded-full bg-white border-2 border-red-400',
+                  'cursor-crosshair hover:border-red-600 hover:bg-red-50',
+                  'transition-colors'
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -187,10 +180,10 @@ export const WorkflowNode = memo(
         ) : (
           <div
             className={cn(
-              "absolute -bottom-3 left-1/2 -translate-x-1/2",
-              "w-4 h-4 rounded-full bg-white border-2 border-gray-300",
-              "cursor-crosshair hover:border-green-500 hover:bg-green-50",
-              "transition-colors"
+              'absolute -bottom-3 left-1/2 -translate-x-1/2',
+              'w-4 h-4 rounded-full bg-white border-2 border-gray-300',
+              'cursor-crosshair hover:border-green-500 hover:bg-green-50',
+              'transition-colors'
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -203,6 +196,6 @@ export const WorkflowNode = memo(
   }
 );
 
-WorkflowNode.displayName = "WorkflowNode";
+WorkflowNode.displayName = 'WorkflowNode';
 
 export default WorkflowNode;

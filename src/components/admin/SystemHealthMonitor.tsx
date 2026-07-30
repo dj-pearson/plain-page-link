@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   Activity,
   Zap,
@@ -15,8 +15,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-} from "lucide-react";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Bar, BarChart } from "recharts";
+} from 'lucide-react';
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 interface SystemMetric {
   id: string;
@@ -57,8 +57,9 @@ export const SystemHealthMonitor = () => {
     setLoading(true);
     try {
       // Get health summary
-      const { data: summary, error: summaryError } = await supabase
-        .rpc('get_system_health_summary');
+      const { data: summary, error: summaryError } = await supabase.rpc(
+        'get_system_health_summary'
+      );
 
       if (summaryError) throw summaryError;
       setHealthSummary(summary || []);
@@ -75,20 +76,14 @@ export const SystemHealthMonitor = () => {
       setRecentMetrics(metrics || []);
 
       // Group by type
-      setEdgeFunctionMetrics(
-        (metrics || []).filter((m) => m.metric_type === 'edge_function')
-      );
-      setDatabaseMetrics(
-        (metrics || []).filter((m) => m.metric_type === 'database')
-      );
-      setWebhookMetrics(
-        (metrics || []).filter((m) => m.metric_type === 'webhook')
-      );
+      setEdgeFunctionMetrics((metrics || []).filter((m) => m.metric_type === 'edge_function'));
+      setDatabaseMetrics((metrics || []).filter((m) => m.metric_type === 'database'));
+      setWebhookMetrics((metrics || []).filter((m) => m.metric_type === 'webhook'));
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -100,7 +95,8 @@ export const SystemHealthMonitor = () => {
     if (metricType === 'edge_function') {
       // Response time in ms
       if (avgValue < 500) return { status: 'healthy', color: 'text-green-600', icon: CheckCircle2 };
-      if (avgValue < 1000) return { status: 'warning', color: 'text-yellow-600', icon: AlertCircle };
+      if (avgValue < 1000)
+        return { status: 'warning', color: 'text-yellow-600', icon: AlertCircle };
       return { status: 'critical', color: 'text-red-600', icon: AlertCircle };
     }
 
@@ -151,13 +147,14 @@ export const SystemHealthMonitor = () => {
     }));
 
   // Calculate overall health score
-  const overallHealthScore = healthSummary.reduce((acc, summary) => {
-    const health = getHealthStatus(summary.avg_value, summary.metric_type);
-    if (health.status === 'healthy') return acc + 100;
-    if (health.status === 'warning') return acc + 70;
-    if (health.status === 'critical') return acc + 30;
-    return acc + 50;
-  }, 0) / (healthSummary.length || 1);
+  const overallHealthScore =
+    healthSummary.reduce((acc, summary) => {
+      const health = getHealthStatus(summary.avg_value, summary.metric_type);
+      if (health.status === 'healthy') return acc + 100;
+      if (health.status === 'warning') return acc + 70;
+      if (health.status === 'critical') return acc + 30;
+      return acc + 50;
+    }, 0) / (healthSummary.length || 1);
 
   const getOverallHealthBadge = () => {
     if (overallHealthScore >= 90) {
@@ -193,9 +190,7 @@ export const SystemHealthMonitor = () => {
             <Activity className="h-6 w-6" />
             System Health Monitor
           </h2>
-          <p className="text-muted-foreground">
-            Real-time system performance and health metrics
-          </p>
+          <p className="text-muted-foreground">Real-time system performance and health metrics</p>
         </div>
         <div className="flex items-center gap-2">
           {getOverallHealthBadge()}
@@ -215,9 +210,7 @@ export const SystemHealthMonitor = () => {
         <CardContent>
           <div className="flex items-center justify-center">
             <div className="text-center">
-              <div className="text-6xl font-bold mb-2">
-                {overallHealthScore.toFixed(0)}
-              </div>
+              <div className="text-6xl font-bold mb-2">{overallHealthScore.toFixed(0)}</div>
               <div className="text-muted-foreground">Health Score</div>
             </div>
           </div>
@@ -241,9 +234,7 @@ export const SystemHealthMonitor = () => {
               <CardContent>
                 <div className="space-y-2">
                   <div>
-                    <div className="text-2xl font-bold">
-                      {formatValue(summary.avg_value, 'ms')}
-                    </div>
+                    <div className="text-2xl font-bold">{formatValue(summary.avg_value, 'ms')}</div>
                     <div className="text-xs text-muted-foreground">Average</div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -262,9 +253,7 @@ export const SystemHealthMonitor = () => {
                       <div className="text-xs text-muted-foreground">Max</div>
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {summary.count} measurements
-                  </div>
+                  <div className="text-xs text-muted-foreground">{summary.count} measurements</div>
                 </div>
               </CardContent>
             </Card>
@@ -285,10 +274,7 @@ export const SystemHealthMonitor = () => {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={edgeFunctionChartData}>
-                <XAxis
-                  dataKey="time"
-                  tick={{ fontSize: 12 }}
-                />
+                <XAxis dataKey="time" tick={{ fontSize: 12 }} />
                 <YAxis
                   label={{ value: 'Response Time (ms)', angle: -90, position: 'insideLeft' }}
                 />

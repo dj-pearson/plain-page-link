@@ -1,13 +1,11 @@
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
-import { edgeFunctions } from "@/lib/edgeFunctions";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { edgeFunctions } from '@/lib/edgeFunctions';
+import { useToast } from '@/hooks/use-toast';
 import {
   Search,
   BarChart3,
@@ -29,49 +27,48 @@ import {
   Smartphone,
   Clock,
   Globe,
-  Code,
   Activity,
   Wand2,
-} from "lucide-react";
-import { AlertsDashboard } from "./seo/AlertsDashboard";
-import { AutoFixEngine } from "./seo/AutoFixEngine";
-import { KeywordsTracker } from "./seo/KeywordsTracker";
-import { CompetitorMatrix } from "./seo/CompetitorMatrix";
+} from 'lucide-react';
+import { AlertsDashboard } from './seo/AlertsDashboard';
+import { AutoFixEngine } from './seo/AutoFixEngine';
+import { KeywordsTracker } from './seo/KeywordsTracker';
+import { CompetitorMatrix } from './seo/CompetitorMatrix';
 
 export const SEOManager = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [auditUrl, setAuditUrl] = useState("");
+  const [auditUrl, setAuditUrl] = useState('');
   const [auditResults, setAuditResults] = useState<any>(null);
 
   const runSEOAudit = async () => {
     if (!auditUrl) {
       toast({
-        title: "URL Required",
-        description: "Please enter a URL to audit",
-        variant: "destructive",
+        title: 'URL Required',
+        description: 'Please enter a URL to audit',
+        variant: 'destructive',
       });
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await edgeFunctions.invoke("seo-audit", {
-        body: { url: auditUrl, auditType: "full", saveResults: true },
+      const { data, error } = await edgeFunctions.invoke('seo-audit', {
+        body: { url: auditUrl, auditType: 'full', saveResults: true },
       });
 
       if (error) throw error;
 
       setAuditResults(data.audit);
       toast({
-        title: "Audit Complete",
+        title: 'Audit Complete',
         description: `Overall score: ${data.audit.overallScore}/100`,
       });
     } catch (error: any) {
       toast({
-        title: "Audit Failed",
+        title: 'Audit Failed',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -199,9 +196,7 @@ export const SEOManager = () => {
           <Card>
             <CardHeader>
               <CardTitle>SEO Audit</CardTitle>
-              <CardDescription>
-                Run a comprehensive SEO audit on any URL
-              </CardDescription>
+              <CardDescription>Run a comprehensive SEO audit on any URL</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -217,7 +212,7 @@ export const SEOManager = () => {
                   </div>
                   <div className="flex items-end">
                     <Button onClick={runSEOAudit} disabled={loading}>
-                      {loading ? "Running..." : "Run Audit"}
+                      {loading ? 'Running...' : 'Run Audit'}
                     </Button>
                   </div>
                 </div>
@@ -245,7 +240,9 @@ export const SEOManager = () => {
                         <CardTitle className="text-sm">Performance</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-3xl font-bold">{auditResults.performanceScore}/100</div>
+                        <div className="text-3xl font-bold">
+                          {auditResults.performanceScore}/100
+                        </div>
                       </CardContent>
                     </Card>
                     <Card>
@@ -253,7 +250,9 @@ export const SEOManager = () => {
                         <CardTitle className="text-sm">Accessibility</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-3xl font-bold">{auditResults.accessibilityScore}/100</div>
+                        <div className="text-3xl font-bold">
+                          {auditResults.accessibilityScore}/100
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -264,12 +263,16 @@ export const SEOManager = () => {
                     {auditResults.criticalIssues.length > 0 && (
                       <Card className="border-red-500">
                         <CardHeader>
-                          <CardTitle className="text-red-600">Critical Issues ({auditResults.criticalIssues.length})</CardTitle>
+                          <CardTitle className="text-red-600">
+                            Critical Issues ({auditResults.criticalIssues.length})
+                          </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ul className="list-disc pl-5 space-y-1">
                             {auditResults.criticalIssues.map((issue: string, i: number) => (
-                              <li key={i} className="text-red-600">{issue}</li>
+                              <li key={i} className="text-red-600">
+                                {issue}
+                              </li>
                             ))}
                           </ul>
                         </CardContent>
@@ -279,12 +282,16 @@ export const SEOManager = () => {
                     {auditResults.warnings.length > 0 && (
                       <Card className="border-yellow-500">
                         <CardHeader>
-                          <CardTitle className="text-yellow-600">Warnings ({auditResults.warnings.length})</CardTitle>
+                          <CardTitle className="text-yellow-600">
+                            Warnings ({auditResults.warnings.length})
+                          </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ul className="list-disc pl-5 space-y-1">
                             {auditResults.warnings.map((warning: string, i: number) => (
-                              <li key={i} className="text-yellow-600">{warning}</li>
+                              <li key={i} className="text-yellow-600">
+                                {warning}
+                              </li>
                             ))}
                           </ul>
                         </CardContent>
@@ -294,12 +301,16 @@ export const SEOManager = () => {
                     {auditResults.recommendations.length > 0 && (
                       <Card className="border-blue-500">
                         <CardHeader>
-                          <CardTitle className="text-blue-600">Recommendations ({auditResults.recommendations.length})</CardTitle>
+                          <CardTitle className="text-blue-600">
+                            Recommendations ({auditResults.recommendations.length})
+                          </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ul className="list-disc pl-5 space-y-1">
                             {auditResults.recommendations.map((rec: string, i: number) => (
-                              <li key={i} className="text-blue-600">{rec}</li>
+                              <li key={i} className="text-blue-600">
+                                {rec}
+                              </li>
                             ))}
                           </ul>
                         </CardContent>
@@ -333,13 +344,34 @@ export const SEOManager = () => {
         </TabsContent>
 
         {/* Add other tab contents with placeholders for now */}
-        {['pages', 'monitoring', 'meta', 'robots', 'sitemap', 'structured', 'performance', 'backlinks', 'broken-links', 'link-structure', 'content', 'crawler', 'images', 'redirects', 'duplicate', 'security', 'mobile', 'budget', 'semantic'].map((tab) => (
+        {[
+          'pages',
+          'monitoring',
+          'meta',
+          'robots',
+          'sitemap',
+          'structured',
+          'performance',
+          'backlinks',
+          'broken-links',
+          'link-structure',
+          'content',
+          'crawler',
+          'images',
+          'redirects',
+          'duplicate',
+          'security',
+          'mobile',
+          'budget',
+          'semantic',
+        ].map((tab) => (
           <TabsContent key={tab} value={tab}>
             <Card>
               <CardHeader>
                 <CardTitle className="capitalize">{tab.replace('-', ' ')}</CardTitle>
                 <CardDescription>
-                  {tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')} management and analysis
+                  {tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')} management and
+                  analysis
                 </CardDescription>
               </CardHeader>
               <CardContent>

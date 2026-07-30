@@ -1,8 +1,8 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Activity, AlertCircle, Zap } from "lucide-react";
-import { UserManagementPanel } from "./UserManagementPanel";
-import { SystemHealthMonitor } from "./SystemHealthMonitor";
-import { ErrorLogViewer } from "./ErrorLogViewer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Users, Activity, AlertCircle } from 'lucide-react';
+import { UserManagementPanel } from './UserManagementPanel';
+import { SystemHealthMonitor } from './SystemHealthMonitor';
+import { ErrorLogViewer } from './ErrorLogViewer';
 
 export const AdminOperationsHub = () => {
   return (

@@ -1,28 +1,46 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Loader2, Eye, Edit, Trash, CheckCircle, Plus, Hash, ExternalLink, Send, Zap } from "lucide-react";
-import { format } from "date-fns";
-import { useArticles, Article } from "@/hooks/useArticles";
-import { useKeywords } from "@/hooks/useKeywords";
-import { useArticleWebhooks } from "@/hooks/useArticleWebhooks";
-import { CreateArticleDialog } from "./CreateArticleDialog";
-import { ArticleWebhookDialog } from "./ArticleWebhookDialog";
-import { KeywordImportDialog } from "./KeywordImportDialog";
-import { ContentSuggestionsCard } from "./ContentSuggestionsCard";
-import { SEOValidationDialog } from "./SEOValidationDialog";
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import {
+  Loader2,
+  Eye,
+  Edit,
+  Trash,
+  CheckCircle,
+  Hash,
+  ExternalLink,
+  Send,
+  Zap,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { useArticles, Article } from '@/hooks/useArticles';
+import { useKeywords } from '@/hooks/useKeywords';
+import { useArticleWebhooks } from '@/hooks/useArticleWebhooks';
+import { CreateArticleDialog } from './CreateArticleDialog';
+import { ArticleWebhookDialog } from './ArticleWebhookDialog';
+import { KeywordImportDialog } from './KeywordImportDialog';
+import { ContentSuggestionsCard } from './ContentSuggestionsCard';
+import { SEOValidationDialog } from './SEOValidationDialog';
 
 export function ArticlesManager() {
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState('all');
   const [seoValidationOpen, setSeoValidationOpen] = useState(false);
   const [articleToPublish, setArticleToPublish] = useState<Article | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
-  const { articles, isLoading, deleteArticle, publishArticle, republishArticle, isRepublishing } = useArticles();
+  const { articles, isLoading, deleteArticle, publishArticle, republishArticle, isRepublishing } =
+    useArticles();
   const { keywords, isLoading: isLoadingKeywords } = useKeywords();
-  const { webhooks, isLoading: isLoadingWebhooks, updateWebhook, deleteWebhook, testWebhook, isTesting } = useArticleWebhooks();
+  const {
+    webhooks,
+    isLoading: isLoadingWebhooks,
+    updateWebhook,
+    deleteWebhook,
+    testWebhook,
+    isTesting,
+  } = useArticleWebhooks();
 
   const handlePublishClick = (article: Article) => {
     setArticleToPublish(article);
@@ -46,11 +64,16 @@ export function ArticlesManager() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'published': return 'bg-green-500';
-      case 'scheduled': return 'bg-blue-500';
-      case 'draft': return 'bg-gray-500';
-      case 'archived': return 'bg-orange-500';
-      default: return 'bg-gray-500';
+      case 'published':
+        return 'bg-green-500';
+      case 'scheduled':
+        return 'bg-blue-500';
+      case 'draft':
+        return 'bg-gray-500';
+      case 'archived':
+        return 'bg-orange-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
@@ -62,9 +85,8 @@ export function ArticlesManager() {
     );
   }
 
-  const filteredArticles = activeTab === "all" 
-    ? articles 
-    : articles?.filter(a => a.status === activeTab);
+  const filteredArticles =
+    activeTab === 'all' ? articles : articles?.filter((a) => a.status === activeTab);
 
   return (
     <div className="space-y-6">
@@ -73,9 +95,7 @@ export function ArticlesManager() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Blog Articles</CardTitle>
-              <CardDescription>
-                Manage your real estate blog content and articles
-              </CardDescription>
+              <CardDescription>Manage your real estate blog content and articles</CardDescription>
             </div>
             <CreateArticleDialog />
           </div>
@@ -92,7 +112,10 @@ export function ArticlesManager() {
             <TabsContent value={activeTab} className="space-y-4 mt-6">
               {filteredArticles && filteredArticles.length > 0 ? (
                 filteredArticles.map((article) => (
-                  <div key={article.id} className="border rounded-lg p-4 hover:border-primary transition-colors">
+                  <div
+                    key={article.id}
+                    className="border rounded-lg p-4 hover:border-primary transition-colors"
+                  >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
@@ -111,11 +134,14 @@ export function ArticlesManager() {
                           {article.keyword_id && (
                             <Badge variant="secondary" className="gap-1">
                               <Hash className="h-3 w-3" />
-                              {keywords?.find(k => k.id === article.keyword_id)?.keyword || 'Keyword'}
+                              {keywords?.find((k) => k.id === article.keyword_id)?.keyword ||
+                                'Keyword'}
                             </Badge>
                           )}
                           {article.tags?.slice(0, 2).map((tag, idx) => (
-                            <Badge key={idx} variant="secondary">{tag}</Badge>
+                            <Badge key={idx} variant="secondary">
+                              {tag}
+                            </Badge>
                           ))}
                         </div>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -123,9 +149,13 @@ export function ArticlesManager() {
                             <Eye className="h-3 w-3" />
                             {article.view_count} views
                           </span>
-                          <span>Created: {format(new Date(article.created_at), 'MMM d, yyyy')}</span>
+                          <span>
+                            Created: {format(new Date(article.created_at), 'MMM d, yyyy')}
+                          </span>
                           {article.published_at && (
-                            <span>Published: {format(new Date(article.published_at), 'MMM d, yyyy')}</span>
+                            <span>
+                              Published: {format(new Date(article.published_at), 'MMM d, yyyy')}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -147,8 +177,8 @@ export function ArticlesManager() {
                           </Button>
                         )}
                         {article.status === 'published' && (
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => {
                               if (confirm('Re-distribute this article to social platforms?')) {
@@ -165,8 +195,8 @@ export function ArticlesManager() {
                             )}
                           </Button>
                         )}
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => {
                             if (confirm('Delete this article?')) {
@@ -220,18 +250,19 @@ export function ArticlesManager() {
                 <div className="border rounded-lg p-4">
                   <p className="text-sm text-muted-foreground">Unused</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {keywords?.filter(k => k.usage_count === 0).length || 0}
+                    {keywords?.filter((k) => k.usage_count === 0).length || 0}
                   </p>
                 </div>
                 <div className="border rounded-lg p-4">
                   <p className="text-sm text-muted-foreground">Most Used</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    {Math.max(...(keywords?.map(k => k.usage_count) || [0]))}
+                    {Math.max(...(keywords?.map((k) => k.usage_count) || [0]))}
                   </p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                Keywords are automatically tracked when articles are published. Import your keywords.csv to get started.
+                Keywords are automatically tracked when articles are published. Import your
+                keywords.csv to get started.
               </p>
             </div>
           )}
@@ -247,7 +278,9 @@ export function ArticlesManager() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Article Webhooks</CardTitle>
-              <CardDescription>Configure webhooks for automatic article distribution</CardDescription>
+              <CardDescription>
+                Configure webhooks for automatic article distribution
+              </CardDescription>
             </div>
             <ArticleWebhookDialog />
           </div>
@@ -265,13 +298,13 @@ export function ArticlesManager() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-semibold">{webhook.name}</h4>
-                        <Badge variant={webhook.is_active ? "default" : "secondary"}>
-                          {webhook.is_active ? "Active" : "Inactive"}
+                        <Badge variant={webhook.is_active ? 'default' : 'secondary'}>
+                          {webhook.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </div>
-                      <a 
-                        href={webhook.webhook_url} 
-                        target="_blank" 
+                      <a
+                        href={webhook.webhook_url}
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
                       >
@@ -326,7 +359,8 @@ export function ArticlesManager() {
           ) : (
             <div className="text-center py-8">
               <p className="text-sm text-muted-foreground mb-4">
-                No webhooks configured. Add one to automatically send published articles to external platforms.
+                No webhooks configured. Add one to automatically send published articles to external
+                platforms.
               </p>
               <ArticleWebhookDialog />
             </div>

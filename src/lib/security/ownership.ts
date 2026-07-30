@@ -28,29 +28,22 @@ import type {
 // ============================================================
 
 /**
- * Table to resource type mapping
- */
-const TABLE_TO_RESOURCE: Record<string, ResourceType> = {
-  profiles: 'profile',
-  listings: 'listing',
-  leads: 'lead',
-  links: 'link',
-  testimonials: 'testimonial',
-  blog_posts: 'article',
-  articles: 'article',
-};
-
-/**
- * Owner field name by table (most use user_id, but some differ)
+ * Owner field name by table (most use user_id, but some differ).
+ *
+ * Every entry here is checked against the live schema by
+ * scripts/verify-schema.mjs — a wrong column name makes the ownership lookup
+ * error, and because these helpers fail closed that silently denies every
+ * operation on the table rather than allowing one.
  */
 const OWNER_FIELD: Record<string, string> = {
   profiles: 'id', // Profile ID is the user ID
   listings: 'user_id',
   leads: 'user_id',
+  // articles is owned via author_id; it has no user_id column. This previously
+  // read 'user_id', so every ownership check on an article denied.
+  articles: 'author_id',
   links: 'user_id',
   testimonials: 'user_id',
-  blog_posts: 'user_id',
-  articles: 'user_id',
   user_sessions: 'user_id',
   user_mfa_settings: 'user_id',
 };
@@ -351,7 +344,8 @@ export async function createUserScopedQuery(table: string) {
     update: (id: string, data: Record<string, unknown>) =>
       supabase.from(table).update(data).eq('id', id).eq(ownerField, context.userId),
 
-    delete: (id: string) => supabase.from(table).delete().eq('id', id).eq(ownerField, context.userId),
+    delete: (id: string) =>
+      supabase.from(table).delete().eq('id', id).eq(ownerField, context.userId),
 
     userId: context.userId,
     ownerField,

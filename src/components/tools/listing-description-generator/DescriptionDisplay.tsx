@@ -3,7 +3,7 @@
  * Shows generated descriptions in multiple formats with copy functionality
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { GeneratedDescription } from '@/lib/listing-description-generator/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

@@ -3,9 +3,7 @@
  * Displays detailed scores and recommendations for each category
  */
 
-import React from 'react';
 import { BioAnalysisResult } from '@/lib/instagram-bio-analyzer/types';
-import { ScoreBadge } from './ScoreDisplay';
 import {
   Eye,
   Sparkles,

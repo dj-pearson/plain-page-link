@@ -27,10 +27,7 @@ import {
   hasAnyPermission,
   requirePermission,
   requireAdmin,
-  isAdmin,
   checkPermission,
-  roleHasPermission,
-  getRoleLevel,
   AuthorizationError,
 } from '@/lib/security/authorization';
 import {
@@ -300,41 +297,38 @@ export function useSecurity(): UseSecurityResult {
   );
 
   // Combined access requirement (throws on failure)
-  const requireAccess = useCallback(
-    async (options: AccessCheckOptions): Promise<void> => {
-      // Layer 1: Authentication
-      if (options.authenticated !== false) {
-        await requireAuth();
-      }
+  const requireAccess = useCallback(async (options: AccessCheckOptions): Promise<void> => {
+    // Layer 1: Authentication
+    if (options.authenticated !== false) {
+      await requireAuth();
+    }
 
-      // Layer 2: Authorization (admin check)
-      if (options.admin) {
-        await requireAdmin();
-      }
+    // Layer 2: Authorization (admin check)
+    if (options.admin) {
+      await requireAdmin();
+    }
 
-      // Layer 2: Authorization (permission check)
-      if (options.permission) {
-        await requirePermission(options.permission);
-      }
+    // Layer 2: Authorization (permission check)
+    if (options.permission) {
+      await requirePermission(options.permission);
+    }
 
-      // Layer 2: Authorization (multiple permissions)
-      if (options.permissions && options.permissions.length > 0) {
-        for (const permission of options.permissions) {
-          await requirePermission(permission);
-        }
+    // Layer 2: Authorization (multiple permissions)
+    if (options.permissions && options.permissions.length > 0) {
+      for (const permission of options.permissions) {
+        await requirePermission(permission);
       }
+    }
 
-      // Layer 3: Ownership
-      if (options.resourceOwnerId) {
-        if (options.allowAdminBypass) {
-          await requireOwnershipOrAdmin(options.resourceOwnerId);
-        } else {
-          await requireOwnership(options.resourceOwnerId);
-        }
+    // Layer 3: Ownership
+    if (options.resourceOwnerId) {
+      if (options.allowAdminBypass) {
+        await requireOwnershipOrAdmin(options.resourceOwnerId);
+      } else {
+        await requireOwnership(options.resourceOwnerId);
       }
-    },
-    []
-  );
+    }
+  }, []);
 
   // Sanitization functions
   const sanitize = useMemo(

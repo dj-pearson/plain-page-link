@@ -1,19 +1,19 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -22,22 +22,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Wand2,
-  Plus,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  RotateCcw,
-  Trash2,
-  Edit,
-  Play,
-  Pause,
-} from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+} from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Wand2, Plus, CheckCircle2, XCircle, Clock, Trash2, Play, Pause } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface AutoFixRule {
   id: string;
@@ -158,9 +147,9 @@ export const AutoFixEngine = () => {
   const createRule = async () => {
     if (!formData.name || !formData.issue_type || !formData.fix_action) {
       toast({
-        title: "Missing Fields",
-        description: "Please fill in all required fields",
-        variant: "destructive",
+        title: 'Missing Fields',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
       });
       return;
     }
@@ -186,8 +175,8 @@ export const AutoFixEngine = () => {
       if (error) throw error;
 
       toast({
-        title: "Rule Created",
-        description: "Auto-fix rule has been created successfully",
+        title: 'Rule Created',
+        description: 'Auto-fix rule has been created successfully',
       });
 
       setIsDialogOpen(false);
@@ -204,9 +193,9 @@ export const AutoFixEngine = () => {
       await loadRules();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -225,16 +214,16 @@ export const AutoFixEngine = () => {
       if (error) throw error;
 
       toast({
-        title: currentActive ? "Rule Disabled" : "Rule Enabled",
+        title: currentActive ? 'Rule Disabled' : 'Rule Enabled',
         description: `Auto-fix rule has been ${currentActive ? 'disabled' : 'enabled'}`,
       });
 
       await loadRules();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -243,24 +232,21 @@ export const AutoFixEngine = () => {
     if (!confirm('Are you sure you want to delete this rule?')) return;
 
     try {
-      const { error } = await supabase
-        .from('seo_autofix_rules')
-        .delete()
-        .eq('id', ruleId);
+      const { error } = await supabase.from('seo_autofix_rules').delete().eq('id', ruleId);
 
       if (error) throw error;
 
       toast({
-        title: "Rule Deleted",
-        description: "Auto-fix rule has been deleted",
+        title: 'Rule Deleted',
+        description: 'Auto-fix rule has been deleted',
       });
 
       await loadRules();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -280,17 +266,17 @@ export const AutoFixEngine = () => {
       if (error) throw error;
 
       toast({
-        title: "Fix Approved",
-        description: "The fix has been approved and will be applied",
+        title: 'Fix Approved',
+        description: 'The fix has been approved and will be applied',
       });
 
       loadPendingApprovals();
       loadHistory();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -307,17 +293,17 @@ export const AutoFixEngine = () => {
       if (error) throw error;
 
       toast({
-        title: "Fix Rejected",
-        description: "The fix has been rejected",
+        title: 'Fix Rejected',
+        description: 'The fix has been rejected',
       });
 
       loadPendingApprovals();
       loadHistory();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -344,9 +330,7 @@ export const AutoFixEngine = () => {
             <Wand2 className="h-6 w-6" />
             Auto-Fix Engine
           </h2>
-          <p className="text-muted-foreground">
-            Automatically detect and fix common SEO issues
-          </p>
+          <p className="text-muted-foreground">Automatically detect and fix common SEO issues</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -358,9 +342,7 @@ export const AutoFixEngine = () => {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create Auto-Fix Rule</DialogTitle>
-              <DialogDescription>
-                Define a rule to automatically fix SEO issues
-              </DialogDescription>
+              <DialogDescription>Define a rule to automatically fix SEO issues</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -369,9 +351,7 @@ export const AutoFixEngine = () => {
                   id="rule-name"
                   placeholder="e.g., Auto-generate missing alt text"
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
 
@@ -381,9 +361,7 @@ export const AutoFixEngine = () => {
                   id="rule-description"
                   placeholder="Describe what this rule does..."
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
 
@@ -392,9 +370,7 @@ export const AutoFixEngine = () => {
                   <Label htmlFor="issue-type">Issue Type *</Label>
                   <Select
                     value={formData.issue_type}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, issue_type: value })
-                    }
+                    onValueChange={(value) => setFormData({ ...formData, issue_type: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select issue type" />
@@ -413,9 +389,7 @@ export const AutoFixEngine = () => {
                   <Label htmlFor="fix-action">Fix Action *</Label>
                   <Select
                     value={formData.fix_action}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, fix_action: value })
-                    }
+                    onValueChange={(value) => setFormData({ ...formData, fix_action: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select fix action" />
@@ -466,9 +440,7 @@ export const AutoFixEngine = () => {
                   <Switch
                     id="auto-apply"
                     checked={formData.auto_apply}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, auto_apply: checked })
-                    }
+                    onCheckedChange={(checked) => setFormData({ ...formData, auto_apply: checked })}
                     disabled={formData.requires_approval}
                   />
                   <Label htmlFor="auto-apply">Auto Apply</Label>
@@ -480,7 +452,7 @@ export const AutoFixEngine = () => {
                 Cancel
               </Button>
               <Button onClick={createRule} disabled={loading}>
-                {loading ? "Creating..." : "Create Rule"}
+                {loading ? 'Creating...' : 'Create Rule'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -494,9 +466,7 @@ export const AutoFixEngine = () => {
             <CardTitle className="text-sm">Active Rules</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              {rules.filter((r) => r.active).length}
-            </div>
+            <div className="text-3xl font-bold">{rules.filter((r) => r.active).length}</div>
           </CardContent>
         </Card>
 
@@ -505,9 +475,7 @@ export const AutoFixEngine = () => {
             <CardTitle className="text-sm">Pending Approvals</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {pendingApprovals.length}
-            </div>
+            <div className="text-3xl font-bold text-yellow-600">{pendingApprovals.length}</div>
           </CardContent>
         </Card>
 
@@ -544,15 +512,9 @@ export const AutoFixEngine = () => {
       {/* Tabs */}
       <Tabs defaultValue="rules" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="rules">
-            Rules ({rules.length})
-          </TabsTrigger>
-          <TabsTrigger value="approvals">
-            Pending Approvals ({pendingApprovals.length})
-          </TabsTrigger>
-          <TabsTrigger value="history">
-            History ({history.length})
-          </TabsTrigger>
+          <TabsTrigger value="rules">Rules ({rules.length})</TabsTrigger>
+          <TabsTrigger value="approvals">Pending Approvals ({pendingApprovals.length})</TabsTrigger>
+          <TabsTrigger value="history">History ({history.length})</TabsTrigger>
         </TabsList>
 
         {/* Rules Tab */}
@@ -576,9 +538,13 @@ export const AutoFixEngine = () => {
                     <div className="flex-1">
                       <CardTitle className="flex items-center gap-2">
                         {rule.name}
-                        <Badge variant={rule.active ? "default" : "secondary"}>
-                          {rule.active ? <Play className="h-3 w-3 mr-1" /> : <Pause className="h-3 w-3 mr-1" />}
-                          {rule.active ? "Active" : "Inactive"}
+                        <Badge variant={rule.active ? 'default' : 'secondary'}>
+                          {rule.active ? (
+                            <Play className="h-3 w-3 mr-1" />
+                          ) : (
+                            <Pause className="h-3 w-3 mr-1" />
+                          )}
+                          {rule.active ? 'Active' : 'Inactive'}
                         </Badge>
                         <Badge variant="outline">Priority: {rule.priority}</Badge>
                       </CardTitle>
@@ -592,11 +558,7 @@ export const AutoFixEngine = () => {
                       >
                         {rule.active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteRule(rule.id)}
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => deleteRule(rule.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -607,7 +569,8 @@ export const AutoFixEngine = () => {
                     <div>
                       <p className="text-muted-foreground">Issue Type</p>
                       <p className="font-semibold">
-                        {ISSUE_TYPES.find((t) => t.value === rule.issue_type)?.label || rule.issue_type}
+                        {ISSUE_TYPES.find((t) => t.value === rule.issue_type)?.label ||
+                          rule.issue_type}
                       </p>
                     </div>
                     <div>
@@ -624,12 +587,8 @@ export const AutoFixEngine = () => {
                     </div>
                   </div>
                   <div className="mt-4 flex gap-2">
-                    {rule.requires_approval && (
-                      <Badge variant="outline">Requires Approval</Badge>
-                    )}
-                    {rule.auto_apply && (
-                      <Badge variant="outline">Auto Apply</Badge>
-                    )}
+                    {rule.requires_approval && <Badge variant="outline">Requires Approval</Badge>}
+                    {rule.auto_apply && <Badge variant="outline">Auto Apply</Badge>}
                   </div>
                 </CardContent>
               </Card>
@@ -733,8 +692,8 @@ export const AutoFixEngine = () => {
                         item.result === 'success'
                           ? 'default'
                           : item.result === 'failed'
-                          ? 'destructive'
-                          : 'secondary'
+                            ? 'destructive'
+                            : 'secondary'
                       }
                     >
                       {item.result}

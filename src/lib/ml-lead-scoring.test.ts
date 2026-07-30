@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   FeatureExtractor,
   LogisticRegressionModel,
@@ -389,7 +389,7 @@ describe('MLLeadScoringSystem', () => {
       expect(prediction.featureImportance.length).toBeGreaterThan(0);
       expect(prediction.featureImportance.length).toBeLessThanOrEqual(5);
 
-      prediction.featureImportance.forEach(contrib => {
+      prediction.featureImportance.forEach((contrib) => {
         expect(contrib).toHaveProperty('feature');
         expect(contrib).toHaveProperty('value');
         expect(contrib).toHaveProperty('contribution');
@@ -481,8 +481,9 @@ describe('MLLeadScoringSystem', () => {
       const stats = mlSystem.getModelStats();
 
       for (let i = 1; i < stats.featureImportance.length; i++) {
-        expect(stats.featureImportance[i].importance)
-          .toBeLessThanOrEqual(stats.featureImportance[i - 1].importance);
+        expect(stats.featureImportance[i].importance).toBeLessThanOrEqual(
+          stats.featureImportance[i - 1].importance
+        );
       }
     });
   });

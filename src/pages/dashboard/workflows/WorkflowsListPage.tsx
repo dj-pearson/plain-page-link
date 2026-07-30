@@ -1,21 +1,20 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useWorkflowBuilderStore } from "@/stores/useWorkflowBuilderStore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useWorkflowBuilderStore } from '@/stores/useWorkflowBuilderStore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Plus,
   Search,
   Workflow,
   Play,
-  Pause,
   MoreVertical,
   Trash2,
   Copy,
@@ -24,25 +23,24 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-} from "lucide-react";
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
-import { logger } from "@/lib/logger";
-import type { Workflow as WorkflowType, WorkflowCategory } from "@/types/workflow";
+} from '@/components/ui/dropdown-menu';
+import { logger } from '@/lib/logger';
+import type { Workflow as WorkflowType, WorkflowCategory } from '@/types/workflow';
 
 const CATEGORY_LABELS: Record<WorkflowCategory, string> = {
-  lead_management: "Lead Management",
-  listing_automation: "Listing Automation",
-  marketing: "Marketing",
-  notifications: "Notifications",
-  integrations: "Integrations",
-  general: "General",
+  lead_management: 'Lead Management',
+  listing_automation: 'Listing Automation',
+  marketing: 'Marketing',
+  notifications: 'Notifications',
+  integrations: 'Integrations',
+  general: 'General',
 };
 
 export const WorkflowsListPage = () => {
@@ -51,9 +49,9 @@ export const WorkflowsListPage = () => {
 
   const [workflows, setWorkflows] = useState<WorkflowType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
     const fetchWorkflows = async () => {
@@ -62,7 +60,7 @@ export const WorkflowsListPage = () => {
         const data = await loadUserWorkflows();
         setWorkflows(data);
       } catch (error) {
-        logger.error("Failed to load workflows", error as Error);
+        logger.error('Failed to load workflows', error as Error);
       } finally {
         setIsLoading(false);
       }
@@ -82,20 +80,20 @@ export const WorkflowsListPage = () => {
     }
 
     // Category filter
-    if (categoryFilter !== "all" && workflow.category !== categoryFilter) {
+    if (categoryFilter !== 'all' && workflow.category !== categoryFilter) {
       return false;
     }
 
     // Status filter
-    if (statusFilter === "active" && !workflow.isActive) return false;
-    if (statusFilter === "inactive" && workflow.isActive) return false;
-    if (statusFilter === "draft" && workflow.isPublished) return false;
+    if (statusFilter === 'active' && !workflow.isActive) return false;
+    if (statusFilter === 'inactive' && workflow.isActive) return false;
+    if (statusFilter === 'draft' && workflow.isPublished) return false;
 
     return true;
   });
 
   const handleCreateNew = () => {
-    navigate("/dashboard/workflows/new");
+    navigate('/dashboard/workflows/new');
   };
 
   const handleEditWorkflow = (workflowId: string) => {
@@ -103,10 +101,10 @@ export const WorkflowsListPage = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
     });
   };
 
@@ -174,14 +172,12 @@ export const WorkflowsListPage = () => {
         <div className="text-center py-20 bg-white rounded-lg border">
           <Workflow className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {workflows.length === 0
-              ? "No workflows yet"
-              : "No matching workflows"}
+            {workflows.length === 0 ? 'No workflows yet' : 'No matching workflows'}
           </h3>
           <p className="text-gray-600 mb-6">
             {workflows.length === 0
-              ? "Create your first workflow to automate your operations"
-              : "Try adjusting your filters"}
+              ? 'Create your first workflow to automate your operations'
+              : 'Try adjusting your filters'}
           </p>
           {workflows.length === 0 && (
             <Button onClick={handleCreateNew}>
@@ -201,9 +197,7 @@ export const WorkflowsListPage = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-gray-900">
-                      {workflow.name}
-                    </h3>
+                    <h3 className="font-semibold text-gray-900">{workflow.name}</h3>
                     <div className="flex items-center gap-2">
                       {workflow.isActive ? (
                         <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full flex items-center gap-1">
@@ -278,10 +272,7 @@ export const WorkflowsListPage = () => {
                       Duplicate
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-red-600"
-                    >
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="text-red-600">
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete
                     </DropdownMenuItem>

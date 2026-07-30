@@ -1,4 +1,4 @@
-import { ExternalLink, Home, Star, Users } from 'lucide-react';
+import { ExternalLink, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,7 +33,7 @@ export function DemoProfilesShowcase() {
         .limit(6);
 
       if (error) throw error;
-      return (data as FeaturedProfile[]).filter(p => p.username && p.full_name);
+      return (data as FeaturedProfile[]).filter((p) => p.username && p.full_name);
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
@@ -41,7 +41,10 @@ export function DemoProfilesShowcase() {
   // Show loading state
   if (isLoading) {
     return (
-      <section className="py-20 bg-gradient-to-br from-background via-background to-primary/5" id="demo-profiles">
+      <section
+        className="py-20 bg-gradient-to-br from-background via-background to-primary/5"
+        id="demo-profiles"
+      >
         <div className="container mx-auto px-4 flex items-center justify-center min-h-[300px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -52,7 +55,10 @@ export function DemoProfilesShowcase() {
   // If no profiles available, show signup CTA instead
   if (profiles.length === 0) {
     return (
-      <section className="py-20 bg-gradient-to-br from-background via-background to-primary/5" id="demo-profiles">
+      <section
+        className="py-20 bg-gradient-to-br from-background via-background to-primary/5"
+        id="demo-profiles"
+      >
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <div className="bg-glass-background backdrop-blur-md border border-glass-border rounded-xl p-12">
@@ -61,7 +67,8 @@ export function DemoProfilesShowcase() {
                 <span className="glass-heading">Be Among the First</span>
               </h2>
               <p className="text-xl glass-body mb-8">
-                Join our growing community of real estate professionals and create your professional AgentBio profile today.
+                Join our growing community of real estate professionals and create your professional
+                AgentBio profile today.
               </p>
               <Link
                 to="/auth/register"
@@ -79,7 +86,10 @@ export function DemoProfilesShowcase() {
 
   // Display real profiles
   return (
-    <section className="py-20 bg-gradient-to-br from-background via-background to-primary/5" id="demo-profiles">
+    <section
+      className="py-20 bg-gradient-to-br from-background via-background to-primary/5"
+      id="demo-profiles"
+    >
       <div className="container mx-auto px-4">
         <header className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
@@ -90,13 +100,11 @@ export function DemoProfilesShowcase() {
           </p>
         </header>
 
-        <div className={`grid gap-8 max-w-6xl mx-auto ${profiles.length >= 3 ? 'md:grid-cols-3' : profiles.length === 2 ? 'md:grid-cols-2 max-w-4xl' : 'max-w-md'}`}>
+        <div
+          className={`grid gap-8 max-w-6xl mx-auto ${profiles.length >= 3 ? 'md:grid-cols-3' : profiles.length === 2 ? 'md:grid-cols-2 max-w-4xl' : 'max-w-md'}`}
+        >
           {profiles.slice(0, 3).map((profile) => (
-            <Link
-              key={profile.id}
-              to={`/p/${profile.username}`}
-              className="group block"
-            >
+            <Link key={profile.id} to={`/p/${profile.username}`} className="group block">
               <div className="bg-glass-background backdrop-blur-md border border-glass-border rounded-xl p-6 hover:border-primary hover:shadow-lg hover:shadow-primary/10 transition-all">
                 {/* Avatar */}
                 <div className="relative mb-4">
@@ -130,9 +138,7 @@ export function DemoProfilesShowcase() {
                     {profile.full_name}
                   </h3>
                   {profile.title && (
-                    <p className="text-sm text-primary font-medium mb-1">
-                      {profile.title}
-                    </p>
+                    <p className="text-sm text-primary font-medium mb-1">{profile.title}</p>
                   )}
                   {profile.service_cities && profile.service_cities.length > 0 && (
                     <p className="text-sm text-muted-foreground">

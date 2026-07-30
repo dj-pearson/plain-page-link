@@ -1,13 +1,19 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Search, Calendar, Eye, ArrowRight } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Search, Calendar, Eye, ArrowRight } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface BlogSectionProps {
   limit?: number;
@@ -18,19 +24,19 @@ interface BlogSectionProps {
 export function BlogSection({
   limit = 6,
   showSearch = true,
-  showFilters = true
+  showFilters = true,
 }: BlogSectionProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   const { data: articles = [], isLoading } = useQuery({
-    queryKey: ["published-articles"],
+    queryKey: ['published-articles'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("articles")
-        .select("*")
-        .eq("status", "published")
-        .order("published_at", { ascending: false })
+        .from('articles')
+        .select('*')
+        .eq('status', 'published')
+        .order('published_at', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
@@ -39,15 +45,15 @@ export function BlogSection({
   });
 
   const categories = [
-    "all",
-    "Real Estate Tips",
-    "Market Insights",
-    "Buying Guide",
-    "Selling Guide",
-    "Investment",
-    "Neighborhood Guides",
-    "Home Improvement",
-    "General",
+    'all',
+    'Real Estate Tips',
+    'Market Insights',
+    'Buying Guide',
+    'Selling Guide',
+    'Investment',
+    'Neighborhood Guides',
+    'Home Improvement',
+    'General',
   ];
 
   const filteredArticles = articles.filter((article) => {
@@ -55,12 +61,9 @@ export function BlogSection({
       !searchQuery ||
       article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       article.excerpt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      article.tags?.some((tag: string) =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      article.tags?.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesCategory =
-      selectedCategory === "all" || article.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || article.category === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -98,7 +101,7 @@ export function BlogSection({
                 <SelectContent>
                   {categories.map((category) => (
                     <SelectItem key={category} value={category}>
-                      {category === "all" ? "All Categories" : category}
+                      {category === 'all' ? 'All Categories' : category}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -147,9 +150,7 @@ export function BlogSection({
                       <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">
                         {article.title}
                       </CardTitle>
-                      <CardDescription className="line-clamp-3">
-                        {article.excerpt}
-                      </CardDescription>
+                      <CardDescription className="line-clamp-3">{article.excerpt}</CardDescription>
                     </CardHeader>
                     <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
