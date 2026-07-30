@@ -61,3 +61,66 @@ jobs:
 
       - name: Validate migration structure
         run: node scripts/validate-migrations.mjs
+
+  schema:
+    name: Applied Schema (real Postgres)
+    runs-on: ubuntu-latest
+    # The structural lint above only reads the migrations as text. It cannot see
+    # a trigger referencing a column that does not exist, a table the app queries
+    # that no migration creates, or an RPC called by a name nothing defines —
+    # all of which are invisible to tsc and the unit tests but break at run time.
+    # This job applies every migration to a real Postgres and interrogates the
+    # result. See scripts/verify-schema.mjs.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agentbio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+      DB_URL: postgresql://postgres:postgres@localhost:5432/agentbio
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Create the Supabase objects migrations depend on
+        # auth.users, auth.uid(), storage.*, the anon/authenticated/service_role
+        # roles, and the default privileges that hosted Supabase grants.
+        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f scripts/supabase-prelude.sql
+
+      - name: Apply migrations
+        # Three passes: a handful of migrations are not order-independent (four
+        # duplicated timestamp prefixes, files that index columns a later
+        # migration adds), so the schema needs more than one pass to converge.
+        # Errors are tolerated per statement here; verify-schema.mjs is what
+        # decides whether the resulting schema is acceptable.
+        run: |
+          for pass in 1 2 3; do
+            echo "--- pass $pass ---"
+            for f in $(ls supabase/migrations/*.sql | sort); do
+              psql "$DB_URL" -q -f "$f" >/dev/null 2>&1 || true
+            done
+          done
+          psql "$DB_URL" -tAc "SELECT 'tables: ' || count(*) FROM information_schema.tables WHERE table_schema='public';"
+
+      - name: Verify applied schema against the code that uses it
+        run: node scripts/verify-schema.mjs --db-url "$DB_URL"
+
+      - name: Check generated types are in sync with the schema
+        # types.ts drifting from the schema is what collapsed every query against
+        # a missing table to `never` and produced the ~700-error tsc baseline.
+        run: node scripts/gen-supabase-types.mjs --check --db-url "$DB_URL"
