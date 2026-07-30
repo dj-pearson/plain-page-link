@@ -10,6 +10,16 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
+    // src/integrations/supabase/client.ts throws at module load when these are
+    // unset. Any test that transitively imports it — even one only exercising
+    // pure functions, as feature-flags.test.ts does — fails to collect without
+    // them. These are inert placeholders: no test performs real network I/O,
+    // and suites that exercise queries mock the client outright.
+    env: {
+      VITE_SUPABASE_URL: 'http://localhost:54321',
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+      VITE_FUNCTIONS_URL: 'http://localhost:54321/functions/v1',
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
