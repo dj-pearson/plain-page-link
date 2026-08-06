@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 interface Listing {
   id: string;
@@ -69,7 +70,7 @@ export function QuickStatusDashboard({
       await onStatusChange(listingId, newStatus);
       toast.success(`Listing updated to ${newStatus}`);
     } catch (error) {
-      console.error('Failed to update status:', error);
+      logger.error('Failed to update status', error);
       toast.error('Failed to update listing');
     } finally {
       setUpdatingIds((prev) => {

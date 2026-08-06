@@ -13,6 +13,7 @@ import {
 import { MFASetup } from './MFASetup';
 import { Shield, ShieldOff, Smartphone, Trash2, Loader2, AlertCircle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 export const MFASettings = () => {
   const {
@@ -79,7 +80,7 @@ export const MFASettings = () => {
     try {
       await revokeTrustedDevice.mutateAsync(deviceId);
     } catch (err) {
-      console.error('Failed to revoke device:', err);
+      logger.error('Failed to revoke device', err);
     }
   };
 

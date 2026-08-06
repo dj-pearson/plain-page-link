@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { logger } from '@/lib/logger';
 
 export function SearchAnalyticsDashboard() {
   const { toast } = useToast();
@@ -50,7 +51,7 @@ export function SearchAnalyticsDashboard() {
         force_refresh: true,
       });
     } catch (error) {
-      console.error('Failed to refresh data:', error);
+      logger.error('Failed to refresh data', error);
     }
   };
 
@@ -66,7 +67,11 @@ export function SearchAnalyticsDashboard() {
     }
 
     const dateRangeText = `${dateRange.start} to ${dateRange.end}`;
-    const exportData = formatAnalyticsForExport(topQueries, 'Search Analytics Report', dateRangeText);
+    const exportData = formatAnalyticsForExport(
+      topQueries,
+      'Search Analytics Report',
+      dateRangeText
+    );
 
     exportToCSV(exportData);
 
@@ -88,7 +93,11 @@ export function SearchAnalyticsDashboard() {
     }
 
     const dateRangeText = `${dateRange.start} to ${dateRange.end}`;
-    const exportData = formatAnalyticsForExport(topQueries, 'Search Analytics Report', dateRangeText);
+    const exportData = formatAnalyticsForExport(
+      topQueries,
+      'Search Analytics Report',
+      dateRangeText
+    );
 
     exportToPDF(exportData);
 
@@ -108,7 +117,9 @@ export function SearchAnalyticsDashboard() {
           onClick={handleRefreshData}
           disabled={aggregateMutation.isPending}
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${aggregateMutation.isPending ? 'animate-spin' : ''}`} />
+          <RefreshCw
+            className={`h-4 w-4 mr-2 ${aggregateMutation.isPending ? 'animate-spin' : ''}`}
+          />
           Refresh Data
         </Button>
         <DropdownMenu>
@@ -150,10 +161,7 @@ export function SearchAnalyticsDashboard() {
             endDate={dateRange.end}
             onChange={(start, end) => setDateRange({ start, end })}
           />
-          <PlatformFilter
-            selectedPlatforms={selectedPlatforms}
-            onChange={setSelectedPlatforms}
-          />
+          <PlatformFilter selectedPlatforms={selectedPlatforms} onChange={setSelectedPlatforms} />
         </CardContent>
       </Card>
 
@@ -220,7 +228,9 @@ export function SearchAnalyticsDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>All Search Queries</CardTitle>
-              <CardDescription>Complete list of search queries with performance metrics</CardDescription>
+              <CardDescription>
+                Complete list of search queries with performance metrics
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <TopQueriesTable

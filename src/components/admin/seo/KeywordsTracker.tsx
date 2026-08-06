@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { edgeFunctions } from "@/lib/edgeFunctions";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
+import { useToast } from '@/hooks/use-toast';
 import {
   Table,
   TableBody,
@@ -13,16 +13,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  RefreshCw,
-  Search,
-  AlertCircle,
-} from "lucide-react";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+} from '@/components/ui/table';
+import { TrendingUp, TrendingDown, Minus, RefreshCw, Search, AlertCircle } from 'lucide-react';
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { logger } from '@/lib/logger';
 
 interface Keyword {
   id: string;
@@ -46,7 +40,7 @@ export const KeywordsTracker = () => {
   const { toast } = useToast();
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedKeyword, setSelectedKeyword] = useState<Keyword | null>(null);
   const [keywordHistory, setKeywordHistory] = useState<KeywordHistory[]>([]);
 
@@ -66,9 +60,9 @@ export const KeywordsTracker = () => {
       setKeywords(data || []);
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -87,7 +81,7 @@ export const KeywordsTracker = () => {
       if (error) throw error;
       setKeywordHistory(data || []);
     } catch (error: any) {
-      console.error('Error loading keyword history:', error);
+      logger.error('Error loading keyword history', error);
     }
   };
 
@@ -101,16 +95,16 @@ export const KeywordsTracker = () => {
       if (error) throw error;
 
       toast({
-        title: "Positions Updated",
-        description: "Keyword positions have been refreshed",
+        title: 'Positions Updated',
+        description: 'Keyword positions have been refreshed',
       });
 
       await loadKeywords();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -144,17 +138,22 @@ export const KeywordsTracker = () => {
     return <Badge variant="secondary">Easy</Badge>;
   };
 
-  const filteredKeywords = keywords.filter(kw =>
+  const filteredKeywords = keywords.filter((kw) =>
     kw.keyword.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const topMovers = keywords
-    .filter(kw => kw.previous_position && kw.current_position !== kw.previous_position)
-    .sort((a, b) => (b.previous_position - b.current_position) - (a.previous_position - a.current_position))
+    .filter((kw) => kw.previous_position && kw.current_position !== kw.previous_position)
+    .sort(
+      (a, b) =>
+        b.previous_position - b.current_position - (a.previous_position - a.current_position)
+    )
     .slice(0, 5);
 
-  const topRanked = keywords.filter(kw => kw.current_position <= 10);
-  const needsAttention = keywords.filter(kw => kw.current_position > 20 && kw.search_volume > 100);
+  const topRanked = keywords.filter((kw) => kw.current_position <= 10);
+  const needsAttention = keywords.filter(
+    (kw) => kw.current_position > 20 && kw.search_volume > 100
+  );
 
   return (
     <div className="space-y-6">
@@ -189,12 +188,8 @@ export const KeywordsTracker = () => {
             <CardTitle className="text-sm">Top 10 Rankings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">
-              {topRanked.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Keywords in top 10
-            </p>
+            <div className="text-3xl font-bold text-green-600">{topRanked.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Keywords in top 10</p>
           </CardContent>
         </Card>
 
@@ -203,14 +198,13 @@ export const KeywordsTracker = () => {
             <CardTitle className="text-sm">Biggest Gain</CardTitle>
           </CardHeader>
           <CardContent>
-            {topMovers.length > 0 && topMovers[0].current_position < topMovers[0].previous_position ? (
+            {topMovers.length > 0 &&
+            topMovers[0].current_position < topMovers[0].previous_position ? (
               <>
                 <div className="text-3xl font-bold text-green-600">
                   +{topMovers[0].previous_position - topMovers[0].current_position}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {topMovers[0].keyword}
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">{topMovers[0].keyword}</p>
               </>
             ) : (
               <div className="text-3xl font-bold text-gray-400">-</div>
@@ -226,12 +220,8 @@ export const KeywordsTracker = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {needsAttention.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Keywords to optimize
-            </p>
+            <div className="text-3xl font-bold text-yellow-600">{needsAttention.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Keywords to optimize</p>
           </CardContent>
         </Card>
       </div>
@@ -253,9 +243,7 @@ export const KeywordsTracker = () => {
       <Card>
         <CardHeader>
           <CardTitle>All Keywords</CardTitle>
-          <CardDescription>
-            {filteredKeywords.length} keywords found
-          </CardDescription>
+          <CardDescription>{filteredKeywords.length} keywords found</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-auto">
@@ -284,21 +272,25 @@ export const KeywordsTracker = () => {
                     <TableRow key={keyword.id}>
                       <TableCell className="font-medium">{keyword.keyword}</TableCell>
                       <TableCell>
-                        <Badge variant={keyword.current_position <= 10 ? "default" : "outline"}>
+                        <Badge variant={keyword.current_position <= 10 ? 'default' : 'outline'}>
                           #{keyword.current_position}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {getTrendIcon(keyword.current_position, keyword.previous_position || keyword.current_position)}
-                          {getPositionChange(keyword.current_position, keyword.previous_position || keyword.current_position)}
+                          {getTrendIcon(
+                            keyword.current_position,
+                            keyword.previous_position || keyword.current_position
+                          )}
+                          {getPositionChange(
+                            keyword.current_position,
+                            keyword.previous_position || keyword.current_position
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>{keyword.search_volume?.toLocaleString() || 'N/A'}</TableCell>
                       <TableCell>{getDifficultyBadge(keyword.difficulty || 0)}</TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {keyword.url || '-'}
-                      </TableCell>
+                      <TableCell className="max-w-xs truncate">{keyword.url || '-'}</TableCell>
                       <TableCell>
                         {keyword.last_checked
                           ? new Date(keyword.last_checked).toLocaleDateString()
@@ -330,9 +322,7 @@ export const KeywordsTracker = () => {
         <Card>
           <CardHeader>
             <CardTitle>Position History: {selectedKeyword.keyword}</CardTitle>
-            <CardDescription>
-              Ranking positions over the last 30 checks
-            </CardDescription>
+            <CardDescription>Ranking positions over the last 30 checks</CardDescription>
           </CardHeader>
           <CardContent>
             {keywordHistory.length > 0 ? (
@@ -375,9 +365,7 @@ export const KeywordsTracker = () => {
         <Card>
           <CardHeader>
             <CardTitle>Top Movers</CardTitle>
-            <CardDescription>
-              Keywords with the biggest position changes
-            </CardDescription>
+            <CardDescription>Keywords with the biggest position changes</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

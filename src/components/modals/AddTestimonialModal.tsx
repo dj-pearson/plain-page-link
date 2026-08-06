@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   Dialog,
   DialogContent,
@@ -9,18 +9,22 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Star, Upload, X } from "lucide-react";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Star, Upload, X } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 const testimonialSchema = z.object({
-  clientName: z.string().min(2, "Client name must be at least 2 characters"),
-  rating: z.number().min(1, "Rating is required").max(5, "Rating must be between 1 and 5"),
-  review: z.string().min(10, "Review must be at least 10 characters").max(500, "Review must be less than 500 characters"),
-  propertyType: z.string().min(1, "Property type is required"),
+  clientName: z.string().min(2, 'Client name must be at least 2 characters'),
+  rating: z.number().min(1, 'Rating is required').max(5, 'Rating must be between 1 and 5'),
+  review: z
+    .string()
+    .min(10, 'Review must be at least 10 characters')
+    .max(500, 'Review must be less than 500 characters'),
+  propertyType: z.string().min(1, 'Property type is required'),
   clientPhoto: z.instanceof(File).optional(),
   featured: z.boolean(),
 });
@@ -33,11 +37,7 @@ interface AddTestimonialModalProps {
   onSave?: (data: TestimonialFormData) => void;
 }
 
-export function AddTestimonialModal({
-  open,
-  onOpenChange,
-  onSave,
-}: AddTestimonialModalProps) {
+export function AddTestimonialModal({ open, onOpenChange, onSave }: AddTestimonialModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
@@ -51,22 +51,22 @@ export function AddTestimonialModal({
   } = useForm<TestimonialFormData>({
     resolver: zodResolver(testimonialSchema),
     defaultValues: {
-      clientName: "",
+      clientName: '',
       rating: 5,
-      review: "",
-      propertyType: "",
+      review: '',
+      propertyType: '',
       featured: false,
     },
   });
 
-  const rating = watch("rating");
-  const review = watch("review");
-  const featured = watch("featured");
+  const rating = watch('rating');
+  const review = watch('review');
+  const featured = watch('featured');
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setValue("clientPhoto", file);
+      setValue('clientPhoto', file);
 
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -77,7 +77,7 @@ export function AddTestimonialModal({
   };
 
   const removePhoto = () => {
-    setValue("clientPhoto", undefined);
+    setValue('clientPhoto', undefined);
     setPhotoPreview(null);
   };
 
@@ -89,8 +89,8 @@ export function AddTestimonialModal({
       reset();
       setPhotoPreview(null);
     } catch (err) {
-      console.error("Failed to add testimonial:", err);
-      setError("Failed to add testimonial. Please try again.");
+      logger.error('Failed to add testimonial', err);
+      setError('Failed to add testimonial. Please try again.');
     }
   };
 
@@ -115,11 +115,7 @@ export function AddTestimonialModal({
           <div className="space-y-4">
             <div>
               <Label htmlFor="clientName">Client Name *</Label>
-              <Input
-                id="clientName"
-                {...register("clientName")}
-                placeholder="John Smith"
-              />
+              <Input id="clientName" {...register('clientName')} placeholder="John Smith" />
               {errors.clientName && (
                 <p className="text-sm text-red-600 mt-1">{errors.clientName.message}</p>
               )}
@@ -132,7 +128,7 @@ export function AddTestimonialModal({
               <Label htmlFor="propertyType">Property Type *</Label>
               <Input
                 id="propertyType"
-                {...register("propertyType")}
+                {...register('propertyType')}
                 placeholder="Single Family Home, Condo, etc."
               />
               {errors.propertyType && (
@@ -149,22 +145,18 @@ export function AddTestimonialModal({
                 <button
                   key={star}
                   type="button"
-                  onClick={() => setValue("rating", star)}
+                  onClick={() => setValue('rating', star)}
                   className="focus:outline-none"
                 >
                   <Star
                     className={`h-8 w-8 transition-colors ${
-                      star <= rating
-                        ? "fill-yellow-400 text-yellow-400"
-                        : "text-gray-300"
+                      star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
                     }`}
                   />
                 </button>
               ))}
             </div>
-            {errors.rating && (
-              <p className="text-sm text-red-600 mt-1">{errors.rating.message}</p>
-            )}
+            {errors.rating && <p className="text-sm text-red-600 mt-1">{errors.rating.message}</p>}
           </div>
 
           {/* Review Text */}
@@ -172,14 +164,12 @@ export function AddTestimonialModal({
             <Label htmlFor="review">Testimonial Text *</Label>
             <Textarea
               id="review"
-              {...register("review")}
+              {...register('review')}
               rows={6}
               maxLength={500}
               placeholder="Share what the client said about working with you..."
             />
-            {errors.review && (
-              <p className="text-sm text-red-600 mt-1">{errors.review.message}</p>
-            )}
+            {errors.review && <p className="text-sm text-red-600 mt-1">{errors.review.message}</p>}
             <p className="text-xs text-muted-foreground mt-1">
               {review?.length || 0}/500 characters
             </p>
@@ -199,12 +189,8 @@ export function AddTestimonialModal({
                 />
                 <label htmlFor="photo-upload" className="cursor-pointer">
                   <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Upload client photo
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PNG, JPG up to 2MB
-                  </p>
+                  <p className="text-sm text-muted-foreground">Upload client photo</p>
+                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 2MB</p>
                 </label>
               </div>
             ) : (
@@ -231,7 +217,7 @@ export function AddTestimonialModal({
               type="checkbox"
               id="featured"
               checked={featured}
-              onChange={(e) => setValue("featured", e.target.checked)}
+              onChange={(e) => setValue('featured', e.target.checked)}
               className="rounded border-border"
             />
             <Label htmlFor="featured" className="cursor-pointer">
@@ -240,11 +226,7 @@ export function AddTestimonialModal({
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit">Add Testimonial</Button>

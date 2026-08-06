@@ -89,7 +89,7 @@ export function useListingImageUpload() {
           });
 
         if (uploadError) {
-          console.error('Upload error:', uploadError);
+          logger.error('Upload error', uploadError);
           throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
         }
 
@@ -129,7 +129,7 @@ export function useListingImageUpload() {
 
       return uploadedUrls;
     } catch (error) {
-      console.error('Error uploading listing images:', error);
+      logger.error('Error uploading listing images', error);
       toast({
         title: 'Upload failed',
         description:
@@ -173,7 +173,7 @@ export function useListingImageUpload() {
 
       return true;
     } catch (error) {
-      console.error('Error deleting listing images:', error);
+      logger.error('Error deleting listing images', error);
       return false;
     }
   };

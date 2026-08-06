@@ -13,6 +13,7 @@ import {
   Power,
   PowerOff,
 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface WorkflowToolbarProps {
   onOpenSettings?: () => void;
@@ -48,7 +49,7 @@ export const WorkflowToolbar = ({ onOpenSettings, onPreview }: WorkflowToolbarPr
     try {
       await executeWorkflow();
     } catch (error) {
-      console.error('Execution failed:', error);
+      logger.error('Execution failed', error);
     }
   };
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, ImgHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 interface ImageSource {
   url: string;
@@ -89,9 +90,7 @@ export function OptimizedImage({
   // Generate srcset from sources
   const generateSrcSet = (imageSources: ImageSource[]): string => {
     if (imageSources.length === 0) return '';
-    return imageSources
-      .map(source => `${source.url} ${source.width}w`)
-      .join(', ');
+    return imageSources.map((source) => `${source.url} ${source.width}w`).join(', ');
   };
 
   const jpgSrcSet = generateSrcSet(sources);
@@ -112,7 +111,7 @@ export function OptimizedImage({
       },
       {
         rootMargin: '100px', // Start loading 100px before entering viewport
-        threshold: 0.01
+        threshold: 0.01,
       }
     );
 
@@ -131,7 +130,7 @@ export function OptimizedImage({
 
   const handleError = () => {
     setHasError(true);
-    console.error('Failed to load image:', src);
+    logger.warn('Failed to load image', { src });
   };
 
   // Calculate aspect ratio for preventing layout shift
@@ -167,21 +166,10 @@ export function OptimizedImage({
       {isInView && (
         <picture>
           {/* WebP sources for modern browsers */}
-          {webpSrc && (
-            <source
-              type="image/webp"
-              srcSet={webpSrcSet || webpSrc}
-              sizes={sizes}
-            />
-          )}
+          {webpSrc && <source type="image/webp" srcSet={webpSrcSet || webpSrc} sizes={sizes} />}
 
           {/* JPEG/PNG fallback with srcset */}
-          {jpgSrcSet && (
-            <source
-              srcSet={jpgSrcSet}
-              sizes={sizes}
-            />
-          )}
+          {jpgSrcSet && <source srcSet={jpgSrcSet} sizes={sizes} />}
 
           {/* Main image */}
           <img
@@ -253,14 +241,14 @@ export function generateResponsiveSources(
   const extension = baseUrl.split('.').pop() || 'jpg';
   const basePath = baseUrl.replace(`.${extension}`, '');
 
-  const sources: ImageSource[] = widths.map(width => ({
+  const sources: ImageSource[] = widths.map((width) => ({
     url: `${basePath}-${width}.${extension}`,
-    width
+    width,
   }));
 
-  const webpSources: ImageSource[] = widths.map(width => ({
+  const webpSources: ImageSource[] = widths.map((width) => ({
     url: `${basePath}-${width}.webp`,
-    width
+    width,
   }));
 
   return { sources, webpSources };
@@ -277,14 +265,14 @@ export function generateSupabaseImageSources(
   // Supabase storage transformation URL pattern
   // https://your-project.supabase.co/storage/v1/render/image/public/bucket/path?width=400&format=webp
 
-  const sources: ImageSource[] = widths.map(width => ({
+  const sources: ImageSource[] = widths.map((width) => ({
     url: `${storageUrl}?width=${width}&quality=80`,
-    width
+    width,
   }));
 
-  const webpSources: ImageSource[] = widths.map(width => ({
+  const webpSources: ImageSource[] = widths.map((width) => ({
     url: `${storageUrl}?width=${width}&format=webp&quality=80`,
-    width
+    width,
   }));
 
   return { sources, webpSources };

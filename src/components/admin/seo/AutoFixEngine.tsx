@@ -27,6 +27,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Wand2, Plus, CheckCircle2, XCircle, Clock, Trash2, Play, Pause } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 interface AutoFixRule {
   id: string;
@@ -110,7 +111,7 @@ export const AutoFixEngine = () => {
       if (error) throw error;
       setRules(data || []);
     } catch (error: any) {
-      console.error('Error loading rules:', error);
+      logger.error('Error loading rules', error);
     }
   };
 
@@ -125,7 +126,7 @@ export const AutoFixEngine = () => {
       if (error) throw error;
       setHistory(data || []);
     } catch (error: any) {
-      console.error('Error loading history:', error);
+      logger.error('Error loading history', error);
     }
   };
 
@@ -140,7 +141,7 @@ export const AutoFixEngine = () => {
       if (error) throw error;
       setPendingApprovals(data || []);
     } catch (error: any) {
-      console.error('Error loading pending approvals:', error);
+      logger.error('Error loading pending approvals', error);
     }
   };
 

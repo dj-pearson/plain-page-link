@@ -1,5 +1,6 @@
 import { useState, useEffect, ImgHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 interface ProgressiveImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   src: string;
@@ -69,7 +70,7 @@ export function ProgressiveImage({
 
     img.onerror = () => {
       // If high-quality fails, keep showing placeholder
-      console.error('Failed to load image:', src);
+      logger.warn('Failed to load image', { src });
     };
   }, [isInView, src, onLoad]);
 

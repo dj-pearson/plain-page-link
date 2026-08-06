@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 interface StaleListing {
   id: string;
@@ -43,7 +44,7 @@ export function StaleContentAlert({
       try {
         setDismissedIds(new Set(JSON.parse(saved)));
       } catch (e) {
-        console.error('Failed to parse dismissed alerts:', e);
+        logger.error('Failed to parse dismissed alerts', e);
       }
     }
   }, []);

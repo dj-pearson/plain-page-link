@@ -1,9 +1,17 @@
-import { useState, useRef } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Upload, Download, Loader2 } from "lucide-react";
-import { useKeywords } from "@/hooks/useKeywords";
-import { toast } from "sonner";
+import { useState, useRef } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Upload, Download, Loader2 } from 'lucide-react';
+import { useKeywords } from '@/hooks/useKeywords';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export function KeywordImportDialog() {
   const [open, setOpen] = useState(false);
@@ -25,7 +33,7 @@ first time home buyer tips,Real Estate,easy,2000,Educational content`;
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-    toast.success("Template downloaded");
+    toast.success('Template downloaded');
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,45 +42,48 @@ first time home buyer tips,Real Estate,easy,2000,Educational content`;
 
     try {
       const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      
+      const lines = text.split('\n').filter((line) => line.trim());
+
       if (lines.length < 2) {
-        toast.error("CSV file is empty or invalid");
+        toast.error('CSV file is empty or invalid');
         return;
       }
 
       // Parse header
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      
+      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+
       // Parse data rows
-      const keywords = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim());
-        const keyword: any = {};
-        
-        headers.forEach((header, index) => {
-          if (values[index]) {
-            keyword[header] = values[index];
-          }
-        });
-        
-        return keyword;
-      }).filter(k => k.keyword);
+      const keywords = lines
+        .slice(1)
+        .map((line) => {
+          const values = line.split(',').map((v) => v.trim());
+          const keyword: any = {};
+
+          headers.forEach((header, index) => {
+            if (values[index]) {
+              keyword[header] = values[index];
+            }
+          });
+
+          return keyword;
+        })
+        .filter((k) => k.keyword);
 
       if (keywords.length === 0) {
-        toast.error("No valid keywords found in CSV");
+        toast.error('No valid keywords found in CSV');
         return;
       }
 
       await importKeywords(keywords);
       setOpen(false);
-      
+
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (error) {
-      console.error('Error parsing CSV:', error);
-      toast.error("Failed to parse CSV file");
+      logger.error('Error parsing CSV', error);
+      toast.error('Failed to parse CSV file');
     }
   };
 
@@ -88,7 +99,8 @@ first time home buyer tips,Real Estate,easy,2000,Educational content`;
         <DialogHeader>
           <DialogTitle>Import Keywords from CSV</DialogTitle>
           <DialogDescription>
-            Upload a CSV file with your keywords. New keywords will be added and existing ones will be skipped.
+            Upload a CSV file with your keywords. New keywords will be added and existing ones will
+            be skipped.
           </DialogDescription>
         </DialogHeader>
 
@@ -111,11 +123,9 @@ first time home buyer tips,Real Estate,easy,2000,Educational content`;
                   <Upload className="h-8 w-8 text-muted-foreground" />
                 )}
                 <p className="text-sm font-medium">
-                  {isImporting ? "Importing..." : "Click to upload CSV"}
+                  {isImporting ? 'Importing...' : 'Click to upload CSV'}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  CSV files only
-                </p>
+                <p className="text-xs text-muted-foreground">CSV files only</p>
               </div>
             </label>
           </div>
@@ -126,19 +136,25 @@ first time home buyer tips,Real Estate,easy,2000,Educational content`;
               keyword,category,difficulty,search_volume,notes
             </div>
             <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
-              <li><strong>keyword</strong> (required): The keyword phrase</li>
-              <li><strong>category</strong>: Real Estate, Luxury Real Estate, etc.</li>
-              <li><strong>difficulty</strong>: easy, medium, or hard</li>
-              <li><strong>search_volume</strong>: Monthly search volume (number)</li>
-              <li><strong>notes</strong>: Any additional notes</li>
+              <li>
+                <strong>keyword</strong> (required): The keyword phrase
+              </li>
+              <li>
+                <strong>category</strong>: Real Estate, Luxury Real Estate, etc.
+              </li>
+              <li>
+                <strong>difficulty</strong>: easy, medium, or hard
+              </li>
+              <li>
+                <strong>search_volume</strong>: Monthly search volume (number)
+              </li>
+              <li>
+                <strong>notes</strong>: Any additional notes
+              </li>
             </ul>
           </div>
 
-          <Button 
-            onClick={downloadTemplate} 
-            variant="secondary" 
-            className="w-full"
-          >
+          <Button onClick={downloadTemplate} variant="secondary" className="w-full">
             <Download className="h-4 w-4 mr-2" />
             Download Template
           </Button>
