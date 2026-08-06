@@ -60,22 +60,23 @@ export default function InstagramBioAnalyzer() {
 
       setAnalysisResult(result);
 
-      // Save analysis to Supabase
-      const { data: savedAnalysis, error } = await supabase
-        .from('instagram_bio_analyses')
-        .insert({
-          input_data: data,
-          result_data: result,
-          overall_score: result.overallScore,
-          market: data.location,
-        })
-        .select()
-        .single();
+      // Save analysis to Supabase. The id is generated here rather than read
+      // back with .select(): anon has INSERT on this table but deliberately no
+      // SELECT (the rows carry visitor ip_address and user_agent — US-067), and
+      // a RETURNING clause needs SELECT, so .select() would fail the insert.
+      const newAnalysisId = crypto.randomUUID();
+      const { error } = await supabase.from('instagram_bio_analyses').insert({
+        id: newAnalysisId,
+        input_data: data,
+        result_data: result,
+        overall_score: result.overallScore,
+        market: data.location,
+      });
 
       if (error) {
         logger.error('Error saving analysis', error as Error);
-      } else if (savedAnalysis) {
-        setAnalysisId(savedAnalysis.id);
+      } else {
+        setAnalysisId(newAnalysisId);
       }
 
       // Track analytics event
@@ -101,19 +102,20 @@ export default function InstagramBioAnalyzer() {
 
   const handleEmailCapture = async (data: EmailCaptureData) => {
     try {
-      // Save email capture to Supabase
-      const { data: captureData, error: captureError } = await supabase
-        .from('instagram_bio_email_captures')
-        .insert({
-          analysis_id: analysisId,
-          email: data.email,
-          first_name: data.firstName,
-          market: data.market,
-          brokerage: data.brokerage,
-          email_sequence_started: true,
-        })
-        .select()
-        .single();
+      // Same as above: id generated client-side, no .select() read-back. This
+      // insert used to be rejected outright — the RETURNING that .select()
+      // implies needs a SELECT policy anon does not have, so every anonymous
+      // email capture threw. See US-067.
+      const captureId = crypto.randomUUID();
+      const { error: captureError } = await supabase.from('instagram_bio_email_captures').insert({
+        id: captureId,
+        analysis_id: analysisId,
+        email: data.email,
+        first_name: data.firstName,
+        market: data.market,
+        brokerage: data.brokerage,
+        email_sequence_started: true,
+      });
 
       if (captureError) throw captureError;
 
@@ -130,7 +132,12 @@ export default function InstagramBioAnalyzer() {
             'send-bio-analyzer-email',
             {
               body: {
-                analysisId: captureData?.id || analysisId,
+                // Misnamed on the edge function's side: send-bio-analyzer-email
+                // looks this id up in instagram_bio_email_captures and stores it
+                // as email_capture_id, so it wants the capture row, not the
+                // analysis. The old `captureData?.id || analysisId` fallback
+                // would have sent the analysis id and failed the lookup.
+                analysisId: captureId,
                 email: data.email,
                 firstName: data.firstName,
                 market: data.market,

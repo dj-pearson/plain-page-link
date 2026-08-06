@@ -108,32 +108,13 @@ const PUBLIC_BY_DESIGN = new Map([
 ]);
 
 // Pre-existing over-permissive policies, recorded so this check can be blocking
-// today rather than someday. These are defects, not decisions — each one is a
+// today rather than someday. These are defects, not decisions -- each one needs a
 // real exposure with a story against it. Take an entry off the list as it is
 // fixed; do not add to it without one.
 //
-// All of these belong to US-067. See docs/CODE_REVIEW_2026-08.md.
-const KNOWN_OVERPERMISSIVE = new Map([
-  // `ALL TO authenticated USING (true)` on the platform's own lead-gen funnel
-  // tables: any registered user can read and delete every prospect email, name,
-  // phone number and brokerage the free tools have ever captured.
-  ['instagram_bio_analyses:ALL', 'US-067'],
-  ['instagram_bio_analytics:ALL', 'US-067'],
-  ['instagram_bio_email_captures:ALL', 'US-067'],
-  ['instagram_bio_email_sequences:ALL', 'US-067'],
-  ['listing_descriptions:ALL', 'US-067'],
-  ['listing_email_captures:ALL', 'US-067'],
-  ['listing_email_sequences:ALL', 'US-067'],
-  ['listing_generator_analytics:ALL', 'US-067'],
-  // `SELECT TO anon USING (true)` on tables carrying visitor ip_address and
-  // user_agent.
-  ['instagram_bio_analyses:SELECT', 'US-067'],
-  ['listing_descriptions:SELECT', 'US-067'],
-  // Every authenticated user can read every other user's content suggestions.
-  ['content_suggestions:SELECT', 'US-067'],
-  // Admin SEO monitoring config, readable by anonymous visitors.
-  ['seo_alert_rules:SELECT', 'US-067'],
-]);
+// Empty since US-067 closed the last twelve (the /tools/* lead-gen tables,
+// content_suggestions and seo_alert_rules) in migration 20260806000004.
+const KNOWN_OVERPERMISSIVE = new Map([]);
 
 const failures = [];
 const notes = [];
