@@ -10,6 +10,21 @@
  * - This is for client-side encryption only; server-side encryption should use Edge Functions
  */
 
+/*
+ * US-066 note: nothing in production imports this module any more. Its only
+ * consumer was useEncryption.ts, which derived its key from
+ * VITE_ENCRYPTION_SECRET (with a hardcoded fallback) and had no callers of its
+ * own; both are deleted. PII crypto now happens in the pii-crypto Edge
+ * Function, keyed from PII_ENCRYPTION_KEY, so no key reaches the browser.
+ *
+ * Kept because these are pure primitives -- they take the secret as an
+ * argument and read no environment variable, so importing them is not itself
+ * a hole -- and because encryption.test.ts is a useful check on the envelope
+ * that supabase/functions/_shared/encryption.ts must stay compatible with.
+ * If you need to encrypt something in the browser, you almost certainly want
+ * the Edge Function instead.
+ */
+
 // Type definitions
 export interface EncryptedData {
   ciphertext: string; // Base64 encoded
@@ -104,10 +119,7 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
  * @param userSecret - User-specific secret (derived from user ID + app secret)
  * @returns Encrypted data object
  */
-export async function encryptData(
-  plaintext: string,
-  userSecret: string
-): Promise<EncryptedData> {
+export async function encryptData(plaintext: string, userSecret: string): Promise<EncryptedData> {
   if (!plaintext) {
     throw new Error('Cannot encrypt empty data');
   }
@@ -210,10 +222,7 @@ export async function decryptData(
  * @param appSecret - Application-level secret (from environment)
  * @returns A derived secret for encryption
  */
-export async function createUserSecret(
-  userId: string,
-  appSecret: string
-): Promise<string> {
+export async function createUserSecret(userId: string, appSecret: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(`${userId}:${appSecret}`);
 
@@ -305,10 +314,7 @@ export async function decryptSensitiveFields<T extends Record<string, unknown>>(
  * @param salt - A consistent salt for the hash (should be stored)
  * @returns Base64 encoded hash
  */
-export async function hashForSearch(
-  value: string,
-  salt: string
-): Promise<string> {
+export async function hashForSearch(value: string, salt: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(`${salt}:${value.toLowerCase().trim()}`);
 

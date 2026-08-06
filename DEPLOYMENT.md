@@ -40,8 +40,6 @@ variables lives in **`.env.example`** — treat it as the source of truth. Summa
 | `VITE_APP_URL` | ✅ | Your production URL (e.g. https://agentbio.net) |
 | `VITE_FUNCTIONS_URL` | ⬜ | Supabase functions subdomain (self-hosted) |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | ⬜ | Stripe → Developers → API keys |
-| `VITE_PII_ENCRYPTION_KEY` | ✅ | Generate: `openssl rand -base64 48` |
-| `VITE_FIREBASE_*` | ⬜ | Firebase console (push notifications) |
 
 ### Edge Function secrets (set via `supabase secrets set ...`)
 
@@ -52,11 +50,38 @@ variables lives in **`.env.example`** — treat it as the source of truth. Summa
 | `STRIPE_WEBHOOK_SECRET` | ✅ (billing) | `whsec_…` from the webhook endpoint |
 | `RESEND_API_KEY` | ✅ (email) | https://resend.com/api-keys |
 | `FROM_EMAIL` | ⬜ | Verified sender (default noreply@agentbio.net) |
-| `PII_ENCRYPTION_KEY` | ✅ | Server-side at-rest encryption (MFA seeds) |
+| `PII_ENCRYPTION_KEY` | ✅ | At-rest encryption: lead email/phone, profile phone, MFA seeds. See §2.1 |
 | `SITE_URL` | ⬜ | Base URL for links in emails |
 
 > **Never** commit `.env.local` or any secret. `VITE_*` values are embedded in
 > the client bundle — only put publishable/anon values there.
+
+### 2.1 Migrating the PII key off the client bundle (US-066)
+
+`VITE_PII_ENCRYPTION_KEY` is gone. It was a `VITE_` variable, so Vite inlined it
+into the production bundle — the key protecting `leads.encrypted_email`,
+`leads.encrypted_phone` and `profiles.phone` was downloadable by anyone who
+loaded the site. The browser now calls the `pii-crypto` Edge Function, which
+holds `PII_ENCRYPTION_KEY`.
+
+**Existing ciphertext keeps working, but only if you carry the key across.** The
+envelope format is unchanged, so set the function secret to the value
+`VITE_PII_ENCRYPTION_KEY` currently holds in Cloudflare Pages:
+
+```bash
+supabase secrets set PII_ENCRYPTION_KEY="<the current VITE_PII_ENCRYPTION_KEY value>"
+supabase functions deploy pii-crypto
+```
+
+Then remove `VITE_PII_ENCRYPTION_KEY` from Cloudflare Pages → Settings →
+Environment variables and redeploy the frontend.
+
+Rotating to a fresh key is a **separate** job: every stored `enc:v1:` value
+would become undecryptable, so it needs a backfill that decrypts under the old
+key and re-encrypts under the new one before the old key is retired. The
+plaintext `email`/`phone` columns are still dual-written (US-016), so that
+backfill can be reconstructed from them if it comes to it — which is also why
+retiring those columns should wait until after any rotation.
 
 ---
 
