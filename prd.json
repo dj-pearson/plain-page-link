@@ -859,8 +859,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 51,
-      "passes": true,
-      "notes": "Partial migration completed: auth pages, leads dashboard, lead detail modal, and ML scoring hook. Remaining files need systematic migration. Run: grep -rn 'console\\.' src/ --include='*.ts' --include='*.tsx' | grep -v logger.ts to find remaining instances."
+      "passes": false,
+      "notes": "Re-verified 2026-08: NOT complete. 38 raw console statements remain across 26 files in the directories the acceptance criterion names - 34 in src/components/ (admin/seo/*, dashboard/*, mobile/*, modals/*, auth/*) and 4 in src/hooks/ (useListingImageUpload.ts, useProfileTracking.ts), excluding tests and comments. ESLint independently reports 20 no-console warnings. Reproduce with: grep -rn 'console\\.\\(log\\|error\\|warn\\|info\\|debug\\)(' src/components src/hooks src/pages src/stores --include='*.ts' --include='*.tsx' | grep -v '.test.' See docs/CODE_REVIEW_2026-08.md."
     },
     {
       "id": "US-052",
@@ -1037,6 +1037,67 @@
       "priority": 62,
       "passes": false,
       "notes": "scripts/verify-schema.mjs already enumerates them - run it to get the current list. Reported rather than enforced during the audit because it is a pre-existing backlog. Prefer a single corrective migration using ALTER FUNCTION ... SET search_path = public over rewriting each body. See docs/PLATFORM_AUDIT_2026-07.md item 6."
+    },
+    {
+      "id": "US-063",
+      "title": "Scope the twelve service-role RLS policies so anon cannot read or write them",
+      "description": "Twelve policies are written as CREATE POLICY \"Service role can manage X\" ON t FOR ALL USING (true) with no TO clause. Postgres defaults that to TO PUBLIC, and Supabase grants ALL on every public table to anon, whose key ships in the frontend bundle. Every anonymous visitor therefore has unrestricted SELECT/INSERT/UPDATE/DELETE on audit_logs, user_subscriptions, login_attempts, mfa_temp_codes, user_sessions, sso_login_sessions, gdpr_data_requests, account_deletion_scheduled, usage_tracking, rate_limit_entries, workflow_executions and workflow_execution_queue.",
+      "acceptanceCriteria": [
+        "A corrective migration drops and recreates each of the twelve policies with TO service_role",
+        "No policy in the public schema grants ALL/SELECT/UPDATE/DELETE to PUBLIC with a `true` qualifier on a non-public-data table",
+        "Connected as anon, SELECT and DELETE on audit_logs are denied; UPDATE on user_subscriptions is denied",
+        "The edge functions that write these tables still work (they use service_role, which is BYPASSRLS)",
+        "npm run verify:schema passes",
+        "The lead pipeline smoke test still passes"
+      ],
+      "priority": 63,
+      "passes": false,
+      "notes": "CRITICAL - exploitable today with the public anon key. Reproduced against the rebuilt schema: `SET ROLE anon; DELETE FROM audit_logs;` -> DELETE 5, and `SET ROLE anon; UPDATE user_subscriptions SET status='active';` -> UPDATE 1 (free plan upgrade). Zero of the schema's 271 policies currently scope TO service_role, and 32 `USING (true)` policies exist across the migrations - check each, not only the twelve. Same class as the team_round_robin fix in 20260730000004, but systemic. Source examples: 20251204000001_auth_security_features.sql:240 and 20251030203031_*.sql:66. Full table-by-table impact in docs/CODE_REVIEW_2026-08.md item 1."
+    },
+    {
+      "id": "US-064",
+      "title": "Stop anonymous visitors rewriting any user's public profile links",
+      "description": "The \"Anyone can increment link clicks\" policy on links is FOR UPDATE USING (true) WITH CHECK (true). It is intended to let a visitor bump click_count, but it grants UPDATE on every column of every row - so any visitor can repoint any published profile link at a site of their choosing.",
+      "acceptanceCriteria": [
+        "Connected as anon, UPDATE links SET url=... is denied",
+        "Click counting still works from a public profile page with no authenticated session",
+        "Either the policy is replaced by a SECURITY DEFINER increment_link_click(link_id) RPC, or WITH CHECK pins every column except click_count",
+        "If an RPC is added it pins search_path (see US-062) and is called by the profile click handler",
+        "npm run verify:schema passes"
+      ],
+      "priority": 64,
+      "passes": false,
+      "notes": "CRITICAL - live phishing / traffic-hijack vector on the platform's core surface. Reproduced: `SET ROLE anon; UPDATE links SET url='https://evil.example/steal' WHERE title='My Listings';` succeeded. Policy source: supabase/migrations/20251030202316_06d49abd-1d78-473b-a1c4-4be5b8d1a077.sql:8. The RPC route is preferable - a column-scoped WITH CHECK is easy to widen again by accident. See docs/CODE_REVIEW_2026-08.md item 2."
+    },
+    {
+      "id": "US-065",
+      "title": "Make verify-schema.mjs fail on over-permissive RLS policies",
+      "description": "The schema job checks that RLS is enabled on every table but never inspects what the policies grant, so both US-063 and US-064 passed CI. Add a blocking check for permissive policies that apply to PUBLIC with a `true` qualifier.",
+      "acceptanceCriteria": [
+        "verify-schema.mjs gains a blocking check for policies with roles = {public} and qual/with_check `true` on write commands",
+        "Tables that are legitimately public (leads INSERT, analytics_views INSERT, mortgage_calculations INSERT, feature_catalog SELECT, the seo_* public reads) are allowlisted by name with a one-line reason each, as KNOWN_UNDEFINED_TABLES already does",
+        "The check fails on the current schema before US-063/US-064 land and passes after",
+        "npm run verify:schema passes with the new check enabled"
+      ],
+      "priority": 65,
+      "passes": false,
+      "notes": "This is the regression guard for US-063 and US-064 - land it in the same window or the next Lovable-era migration reintroduces the pattern. It would also have caught team_round_robin in July. See docs/CODE_REVIEW_2026-08.md item 3."
+    },
+    {
+      "id": "US-066",
+      "title": "Move the PII encryption key off the client bundle",
+      "description": "src/lib/pii.ts derives its AES-256-GCM master key from import.meta.env.VITE_PII_ENCRYPTION_KEY. Vite inlines every VITE_-prefixed value into the production bundle, so the key protecting encrypted_email and encrypted_phone is publicly downloadable. US-015/US-016 met their criteria, but the control protects nothing as deployed.",
+      "acceptanceCriteria": [
+        "PII encrypt/decrypt happens where the key is not shipped to the browser - an edge function using PII_ENCRYPTION_KEY, or Supabase Vault",
+        "VITE_PII_ENCRYPTION_KEY is removed from .env.example and from src/lib/pii.ts",
+        "src/hooks/useLeads.ts and src/hooks/useProfile.ts still round-trip PII correctly through the new path",
+        "src/lib/pii.test.ts still passes",
+        "A note records how existing enc:v1: values are re-keyed, or that the old key stays valid for decryption only",
+        "The plaintext email/phone columns retire on the schedule US-016 describes, once this lands"
+      ],
+      "priority": 66,
+      "passes": false,
+      "notes": "Not a defect against US-015/US-016 as written - both stories' criteria hold, and they both name Supabase Vault as the intended destination. This is the follow-through. Until it lands, treat encrypted_email/encrypted_phone as obfuscation rather than encryption, and note the plaintext columns are still dual-written by design. See docs/CODE_REVIEW_2026-08.md."
     }
   ]
 }
