@@ -1035,8 +1035,8 @@
         "The lead pipeline smoke test still passes, confirming no function broke"
       ],
       "priority": 62,
-      "passes": false,
-      "notes": "scripts/verify-schema.mjs already enumerates them - run it to get the current list. Reported rather than enforced during the audit because it is a pre-existing backlog. Prefer a single corrective migration using ALTER FUNCTION ... SET search_path = public over rewriting each body. See docs/PLATFORM_AUDIT_2026-07.md item 6."
+      "passes": true,
+      "notes": "DONE 2026-08-06 in migration 20260806000003_pin_security_definer_search_path.sql. All 50 pinned via ALTER FUNCTION rather than rewriting bodies, so there is no chance of a transcription error in the logic and the migration is idempotent for the CI three-pass loop. Pin is `public, extensions, pg_temp`, not bare `public`: pgcrypto and uuid-ossp live in `extensions` both locally and on hosted Supabase, and generate_encryption_key() calls gen_random_bytes(), so a bare public pin would have broken it -- confirmed by calling it after the pin. pg_temp is named last precisely so it is searched last instead of first, which is the actual attack. The two functions already pinned (search_path=public and search_path=public, auth) were left alone. Demonstrated both ways on a clone of log_audit_event: unpinned, an authenticated attacker's `CREATE TEMP TABLE audit_logs` captured the audit row (temp=1, real=0) -- the audit trail silently diverted; pinned, the same attack captured nothing and the row reached the real table (temp=0, real=1). The search_path check in verify-schema.mjs is promoted from a note to blocking check 8, proven to fire by unpinning one function (exit 1) and restoring it (exit 0). Verified on a from-scratch three-pass rebuild: 146 tables, all 8 checks pass including the lead pipeline smoke test, validate-migrations passes on 88 files, and types.ts is still in sync."
     },
     {
       "id": "US-063",

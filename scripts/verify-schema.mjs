@@ -393,26 +393,30 @@ check('lead insert pipeline works end to end', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Informational: SECURITY DEFINER functions without a pinned search_path are a
-// privilege-escalation risk. Reported, not enforced, because the existing
-// codebase has a backlog of them.
+// 8. Every SECURITY DEFINER function must pin search_path. Such a function runs
+//    with its owner's privileges, so if the caller controls how unqualified
+//    names inside it resolve, the caller controls what it operates on. Postgres
+//    searches the temporary schema first for relation names unless pg_temp is
+//    named explicitly, and any role may create temp tables -- so without a pin,
+//    `CREATE TEMP TABLE audit_logs (...)` diverts an unqualified
+//    `INSERT INTO audit_logs` inside the function into the attacker's table.
+//    Demonstrated both ways in the US-062 write-up.
+//
+//    Was a note rather than a check while a backlog of 50 existed; the backlog
+//    is cleared (20260806000003), so this is blocking now.
 // ---------------------------------------------------------------------------
-const unpinned = q(`
-  SELECT p.proname
-  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-  WHERE n.nspname = 'public' AND p.prosecdef
-    AND NOT EXISTS (
-      SELECT 1 FROM unnest(COALESCE(p.proconfig, '{}')) cfg WHERE cfg LIKE 'search\\_path=%'
-    )
-  ORDER BY 1;
-`);
-if (unpinned.length) {
-  notes.push(
-    `${unpinned.length} SECURITY DEFINER function(s) do not pin search_path: ` +
-      unpinned.slice(0, 10).join(', ') +
-      (unpinned.length > 10 ? ', ...' : '')
-  );
-}
+check('SECURITY DEFINER functions pin search_path', () =>
+  q(`
+    SELECT p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+             || ' is SECURITY DEFINER without a pinned search_path'
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.prosecdef
+      AND NOT EXISTS (
+        SELECT 1 FROM unnest(COALESCE(p.proconfig, '{}')) cfg WHERE cfg LIKE 'search\\_path=%'
+      )
+    ORDER BY 1;
+  `)
+);
 
 console.log();
 for (const n of notes) console.log(`note  ${n}`);
