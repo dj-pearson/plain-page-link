@@ -11,7 +11,7 @@
  * - Prevent IDOR (Insecure Direct Object Reference) attacks
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { fromDynamic } from '@/lib/supabaseDynamic';
 import { logger } from '@/lib/logger';
 import { getSecurityContext } from './authentication';
 import { isAdmin, roleHasPermission } from './authorization';
@@ -178,7 +178,7 @@ export async function fetchOwnedResource<T extends OwnedResource>(
 
   try {
     // Build query
-    let query = supabase.from(table).select(columns).eq('id', resourceId);
+    let query = fromDynamic(table).select(columns).eq('id', resourceId);
 
     // If not admin, also filter by owner
     if (!options?.allowAdmin || context.role !== 'admin') {
@@ -191,8 +191,7 @@ export async function fetchOwnedResource<T extends OwnedResource>(
       if (error.code === 'PGRST116') {
         // No rows returned - either doesn't exist or user doesn't own it
         // Log as potential IDOR attempt if resource exists but user doesn't own it
-        const { data: exists } = await supabase
-          .from(table)
+        const { data: exists } = await fromDynamic(table)
           .select('id')
           .eq('id', resourceId)
           .single();
@@ -214,7 +213,9 @@ export async function fetchOwnedResource<T extends OwnedResource>(
       throw error;
     }
 
-    return data as T;
+    // The dynamic builder cannot know the row shape; T is the caller's
+    // declared expectation. See src/lib/supabaseDynamic.ts.
+    return data as unknown as T;
   } catch (error) {
     logger.error('Error fetching owned resource', error as Error, { table, resourceId });
     return null;
@@ -238,8 +239,7 @@ export async function validateOwnershipForMutation<T extends OwnedResource>(
   const ownerField = OWNER_FIELD[table] || 'user_id';
 
   try {
-    const { data, error } = await supabase
-      .from(table)
+    const { data, error } = await fromDynamic(table)
       .select('*')
       .eq('id', resourceId)
       .eq(ownerField, context.userId)
@@ -248,8 +248,7 @@ export async function validateOwnershipForMutation<T extends OwnedResource>(
     if (error) {
       if (error.code === 'PGRST116') {
         // Check if resource exists at all
-        const { data: exists } = await supabase
-          .from(table)
+        const { data: exists } = await fromDynamic(table)
           .select('id')
           .eq('id', resourceId)
           .single();
@@ -271,7 +270,9 @@ export async function validateOwnershipForMutation<T extends OwnedResource>(
       throw error;
     }
 
-    return data as T;
+    // The dynamic builder cannot know the row shape; T is the caller's
+    // declared expectation. See src/lib/supabaseDynamic.ts.
+    return data as unknown as T;
   } catch (error) {
     logger.error('Error validating ownership for mutation', error as Error, { table, resourceId });
     return null;
@@ -333,19 +334,18 @@ export async function createUserScopedQuery(table: string) {
 
   return {
     select: (columns: string = '*') =>
-      supabase.from(table).select(columns).eq(ownerField, context.userId),
+      fromDynamic(table).select(columns).eq(ownerField, context.userId),
 
     insert: (data: Record<string, unknown>) =>
-      supabase.from(table).insert({
+      fromDynamic(table).insert({
         ...data,
         [ownerField]: context.userId,
       }),
 
     update: (id: string, data: Record<string, unknown>) =>
-      supabase.from(table).update(data).eq('id', id).eq(ownerField, context.userId),
+      fromDynamic(table).update(data).eq('id', id).eq(ownerField, context.userId),
 
-    delete: (id: string) =>
-      supabase.from(table).delete().eq('id', id).eq(ownerField, context.userId),
+    delete: (id: string) => fromDynamic(table).delete().eq('id', id).eq(ownerField, context.userId),
 
     userId: context.userId,
     ownerField,
@@ -390,8 +390,7 @@ export async function filterOwnedResources(
   const ownerField = OWNER_FIELD[table] || 'user_id';
 
   try {
-    const { data, error } = await supabase
-      .from(table)
+    const { data, error } = await fromDynamic(table)
       .select('id')
       .in('id', resourceIds)
       .eq(ownerField, context.userId);
