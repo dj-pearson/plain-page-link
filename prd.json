@@ -1051,8 +1051,8 @@
         "The lead pipeline smoke test still passes"
       ],
       "priority": 63,
-      "passes": false,
-      "notes": "CRITICAL - exploitable today with the public anon key. Reproduced against the rebuilt schema: `SET ROLE anon; DELETE FROM audit_logs;` -> DELETE 5, and `SET ROLE anon; UPDATE user_subscriptions SET status='active';` -> UPDATE 1 (free plan upgrade). Zero of the schema's 271 policies currently scope TO service_role, and 32 `USING (true)` policies exist across the migrations - check each, not only the twelve. Same class as the team_round_robin fix in 20260730000004, but systemic. Source examples: 20251204000001_auth_security_features.sql:240 and 20251030203031_*.sql:66. Full table-by-table impact in docs/CODE_REVIEW_2026-08.md item 1."
+      "passes": true,
+      "notes": "DONE 2026-08-06 in migration 20260806000001_scope_service_role_policies.sql. Scoped 16 policies to TO service_role - the 12 FOR ALL ones plus four FOR INSERT ones with the same defect (mfa_verification_logs, notifications, pii_encryption_audit, query_metrics); the notifications one let any visitor inject arbitrary title/message/data into any user's notification bell. Safe to narrow because every edge-function writer uses SUPABASE_SERVICE_ROLE_KEY (the one exception, _shared/db-monitor.ts, has no callers) and every in-database writer (log_audit_event, notify_new_lead, record_login_attempt, check_rate_limit, update_usage_count, log_encryption_operation, start_workflow_execution) is SECURITY DEFINER. Narrowing user_subscriptions removed the admin health dashboard's cross-user read, so the migration adds an explicit \"Admins can view all subscriptions\" policy using the same has_role() pattern as audit_logs. Verified against a rebuilt Postgres with rows present: anon SELECT/DELETE returns 0 on audit_logs, user_subscriptions, user_sessions, login_attempts, mfa_temp_codes and notifications; owners still read their own rows; admin reads all 4 audit_logs; cross-tenant reads return 0; anon INSERT into notifications is denied by RLS. verify:schema passes including the lead pipeline smoke test, validate-migrations passes (86 files), and the migration is idempotent across the CI three-pass loop."
     },
     {
       "id": "US-064",
@@ -1066,8 +1066,8 @@
         "npm run verify:schema passes"
       ],
       "priority": 64,
-      "passes": false,
-      "notes": "CRITICAL - live phishing / traffic-hijack vector on the platform's core surface. Reproduced: `SET ROLE anon; UPDATE links SET url='https://evil.example/steal' WHERE title='My Listings';` succeeded. Policy source: supabase/migrations/20251030202316_06d49abd-1d78-473b-a1c4-4be5b8d1a077.sql:8. The RPC route is preferable - a column-scoped WITH CHECK is easy to widen again by accident. See docs/CODE_REVIEW_2026-08.md item 2."
+      "passes": true,
+      "notes": "DONE 2026-08-06 in migration 20260806000002_fix_links_click_policy.sql. Took the RPC route: public.increment_link_clicks() already existed, was already SECURITY DEFINER and already pinned search_path, so the permissive UPDATE policy was redundant as well as dangerous - it was propping up nothing but the 'fallback: try direct update' branch in src/hooks/useProfileTracking.ts, which is removed alongside it. Migration drops the policy, grants EXECUTE on the function to anon/authenticated and adds a COMMENT warning against re-adding a permissive UPDATE policy. Verified: anon UPDATE of links.url is now UPDATE 0 and the url is intact, anon can still SELECT active links and still increments click_count through the RPC (0 -> 1), the owner can still update their own link, and another authenticated user gets UPDATE 0. Also fixed a double-count found while tracing the write path: FullProfilePage called trackLinkClick (which already increments) and then increment_link_clicks again, so every click counted twice. tsc unchanged at 356 errors, 274 tests pass, build passes, eslint clean on both changed files."
     },
     {
       "id": "US-065",
