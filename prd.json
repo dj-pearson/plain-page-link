@@ -1080,8 +1080,8 @@
         "npm run verify:schema passes with the new check enabled"
       ],
       "priority": 65,
-      "passes": false,
-      "notes": "This is the regression guard for US-063 and US-064 - land it in the same window or the next Lovable-era migration reintroduces the pattern. It would also have caught team_round_robin in July. See docs/CODE_REVIEW_2026-08.md item 3."
+      "passes": true,
+      "notes": "DONE 2026-08-06 in scripts/verify-schema.mjs as check 3, 'no undeclared over-permissive RLS policy'. Flags any PERMISSIVE policy reaching anon/authenticated with an unconditional predicate (qual=true, or with_check=true for INSERT) unless declared. Two lists, following the KNOWN_UNDEFINED_TABLES precedent: PUBLIC_BY_DESIGN (13 entries, each with a one-line reason) for genuinely public reads and anonymous submissions, and KNOWN_OVERPERMISSIVE (12 entries) for pre-existing defects, each tagged with its story so the check can be blocking today. A companion loop emits a note when a KNOWN_OVERPERMISSIVE entry has been fixed, so the list cannot rot into hiding the next regression. Proven in both directions: re-introducing the exact US-063 shape (audit_logs FOR ALL USING (true)) and the US-064 shape (links FOR UPDATE USING (true)) makes it FAIL with exit code 1 naming both, dropping them returns exit code 0, and fixing an allowlisted entry emits the stale-entry note. Building it surfaced 12 pre-existing exposures now filed as US-067."
     },
     {
       "id": "US-066",
@@ -1098,6 +1098,23 @@
       "priority": 66,
       "passes": false,
       "notes": "Not a defect against US-015/US-016 as written - both stories' criteria hold, and they both name Supabase Vault as the intended destination. This is the follow-through. Until it lands, treat encrypted_email/encrypted_phone as obfuscation rather than encryption, and note the plaintext columns are still dual-written by design. See docs/CODE_REVIEW_2026-08.md."
+    },
+    {
+      "id": "US-067",
+      "title": "Fix the free-tool tables: prospect list exposure, visitor IP leak, and broken anonymous email capture",
+      "description": "The /tools/* lead-gen tables carry `ALL TO authenticated USING (true)`, so any registered user can read and delete every prospect email, name, phone number and brokerage the free tools have ever captured. instagram_bio_analyses and listing_descriptions additionally carry `SELECT TO anon USING (true)` over rows holding visitor ip_address and user_agent. And the tools' own anonymous email capture is broken: the client issues .insert().select().single(), whose RETURNING needs a SELECT policy that anon does not have, so the insert is rejected and the code rethrows.",
+      "acceptanceCriteria": [
+        "Reading the lead-gen tables is restricted to admins (has_role) and service_role; anonymous submission still works",
+        "No anonymous SELECT over rows carrying ip_address or user_agent",
+        "Anonymous email capture works end to end on both /tools/instagram-bio-analyzer and /tools/listing-description-generator — verified as anon, not reasoned about",
+        "content_suggestions is scoped to its owner (suggested_by) or to admins rather than every authenticated user",
+        "seo_alert_rules is not readable by anon",
+        "Every entry this story covers is removed from KNOWN_OVERPERMISSIVE in scripts/verify-schema.mjs",
+        "npm run verify:schema passes with the shrunken list and emits no stale-entry notes"
+      ],
+      "priority": 67,
+      "passes": false,
+      "notes": "Found by the US-065 guard the moment it was written. Verified against a rebuilt Postgres: as a freshly registered user, SELECT over instagram_bio_email_captures returned 'prospect@bigbroker.com / Dana / Big Broker' and DELETE removed the row; as anon, SELECT over instagram_bio_analyses returned the visitor's ip_address. The broken capture was isolated by bisecting the statement: as anon, INSERT INTO instagram_bio_email_captures with all NOT NULL columns supplied succeeds, and the identical INSERT with RETURNING id fails with 'new row violates row-level security policy' -- which is exactly what supabase-js .insert().select().single() issues, and the tool code does `if (captureError) throw captureError`. So the fix has to give anon a way to read back its own row (a narrow SELECT scoped to the inserted row, or drop .select() from the two callers) while closing the blanket read. These tables have no user_id -- they are platform-owned marketing funnels, not per-agent data -- so the target access model is: anon INSERT, admin/service_role read. Note this is PII under GDPR (email, phone, name, brokerage, IP), which makes it in scope for US-019/US-020 as well."
     }
   ]
 }

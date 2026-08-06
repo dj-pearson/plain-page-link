@@ -88,6 +88,59 @@ const KNOWN_UNDEFINED_TABLES = new Set([
   'seo_keyword_tracking_summary', // track-serp-positions, never invoked from src/
 ]);
 
+// Policies that reach anon/authenticated with an unconditional predicate and are
+// meant to. Keyed `table:CMD`. Everything not listed here (and not in
+// KNOWN_OVERPERMISSIVE below) fails check 3.
+//
+// The bar for this list: the data is already public, or the command is an
+// append-only submission from a page that has no session to authenticate with.
+const PUBLIC_BY_DESIGN = new Map([
+  ['leads:INSERT', 'public lead-capture forms on every profile — the core product'],
+  ['analytics_views:INSERT', 'profile view counter, fired by anonymous visitors'],
+  ['mortgage_calculations:INSERT', 'anonymous mortgage calculator on public profiles'],
+  ['feature_catalog:SELECT', 'plan/pricing catalog, rendered on the public pricing page'],
+  ['seo_settings:SELECT', 'site-wide SEO config that is emitted into every page head'],
+  ['seo_core_web_vitals:SELECT', 'aggregate page-speed numbers, no per-user data'],
+  ['seo_keyword_history:SELECT', 'aggregate ranking history, no per-user data'],
+  // The free lead-gen tools under /tools/* are used by visitors with no account,
+  // so the submission itself has to be open. Reading them back is not — see
+  // KNOWN_OVERPERMISSIVE.
+  ['instagram_bio_analyses:INSERT', 'anonymous submission from the Instagram bio tool'],
+  ['instagram_bio_analytics:INSERT', 'anonymous usage event from the Instagram bio tool'],
+  ['instagram_bio_email_captures:INSERT', 'anonymous email capture from the Instagram bio tool'],
+  ['listing_descriptions:INSERT', 'anonymous submission from the listing description tool'],
+  ['listing_generator_analytics:INSERT', 'anonymous usage event from the listing tool'],
+  ['listing_email_captures:INSERT', 'anonymous email capture from the listing tool'],
+]);
+
+// Pre-existing over-permissive policies, recorded so this check can be blocking
+// today rather than someday. These are defects, not decisions — each one is a
+// real exposure with a story against it. Take an entry off the list as it is
+// fixed; do not add to it without one.
+//
+// All of these belong to US-067. See docs/CODE_REVIEW_2026-08.md.
+const KNOWN_OVERPERMISSIVE = new Map([
+  // `ALL TO authenticated USING (true)` on the platform's own lead-gen funnel
+  // tables: any registered user can read and delete every prospect email, name,
+  // phone number and brokerage the free tools have ever captured.
+  ['instagram_bio_analyses:ALL', 'US-067'],
+  ['instagram_bio_analytics:ALL', 'US-067'],
+  ['instagram_bio_email_captures:ALL', 'US-067'],
+  ['instagram_bio_email_sequences:ALL', 'US-067'],
+  ['listing_descriptions:ALL', 'US-067'],
+  ['listing_email_captures:ALL', 'US-067'],
+  ['listing_email_sequences:ALL', 'US-067'],
+  ['listing_generator_analytics:ALL', 'US-067'],
+  // `SELECT TO anon USING (true)` on tables carrying visitor ip_address and
+  // user_agent.
+  ['instagram_bio_analyses:SELECT', 'US-067'],
+  ['listing_descriptions:SELECT', 'US-067'],
+  // Every authenticated user can read every other user's content suggestions.
+  ['content_suggestions:SELECT', 'US-067'],
+  // Admin SEO monitoring config, readable by anonymous visitors.
+  ['seo_alert_rules:SELECT', 'US-067'],
+]);
+
 const failures = [];
 const notes = [];
 
@@ -148,7 +201,68 @@ check('row level security enabled on every table', () =>
 );
 
 // ---------------------------------------------------------------------------
-// 3. Every table the code queries must exist.
+// 3. RLS being *enabled* says nothing about what the policies *grant*. Check 2
+//    passed on every table involved in the two worst defects this repo has had:
+//
+//      CREATE POLICY "Service role can manage audit logs"
+//        ON audit_logs FOR ALL USING (true);
+//
+//    Postgres defaults an omitted TO clause to TO PUBLIC, and Supabase grants
+//    ALL on public tables to anon — whose key ships in the frontend bundle — so
+//    that policy let any visitor read and delete the compliance audit trail.
+//    The same shape on `links` let any visitor repoint any profile's links.
+//    Both were invisible to every gate in the repo. (US-063, US-064.)
+//
+//    So: a permissive policy that reaches anon/authenticated with an
+//    unconditional predicate must be declared, either as intentional
+//    (PUBLIC_BY_DESIGN) or as a known defect with a story (KNOWN_OVERPERMISSIVE).
+//    Anything else fails. `TO service_role` is always fine — service_role is
+//    BYPASSRLS anyway and never reachable with a publishable key.
+// ---------------------------------------------------------------------------
+check('no undeclared over-permissive RLS policy', () => {
+  const rows = q(`
+    SELECT tablename || ':' || cmd || '\t' || policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND permissive = 'PERMISSIVE'
+      AND (roles::text = '{public}' OR roles::text ~ '\\manon\\M|\\mauthenticated\\M')
+      AND ( (cmd <> 'INSERT' AND qual = 'true')
+         OR (cmd = 'INSERT'  AND with_check = 'true') )
+    ORDER BY 1;
+  `);
+  const out = [];
+  for (const row of rows) {
+    const [key, policyname] = row.split('\t');
+    if (PUBLIC_BY_DESIGN.has(key)) continue;
+    if (KNOWN_OVERPERMISSIVE.has(key)) continue;
+    out.push(
+      `${key} "${policyname}" is unconditional and reaches anon/authenticated. ` +
+        `Scope it (TO service_role, or a real USING predicate), or declare it in ` +
+        `PUBLIC_BY_DESIGN with a reason.`
+    );
+  }
+  return out;
+});
+
+// Stale allowlist entries are their own kind of rot: they read as "still broken"
+// long after the fix landed, and they hide the next regression on that table.
+for (const [key, story] of KNOWN_OVERPERMISSIVE) {
+  const [table, cmd] = key.split(':');
+  const still = q(`
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = '${table}' AND cmd = '${cmd}'
+      AND permissive = 'PERMISSIVE'
+      AND (roles::text = '{public}' OR roles::text ~ '\\manon\\M|\\mauthenticated\\M')
+      AND ( (cmd <> 'INSERT' AND qual = 'true') OR (cmd = 'INSERT' AND with_check = 'true') )
+    LIMIT 1;
+  `);
+  if (!still.length) {
+    notes.push(`KNOWN_OVERPERMISSIVE entry ${key} (${story}) is fixed — remove it from the list`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4. Every table the code queries must exist.
 // ---------------------------------------------------------------------------
 const relations = new Set(
   q(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';`)
@@ -172,7 +286,7 @@ check('every table referenced in code exists', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Every RPC the code calls must exist. A missing one is a run-time 404 that
+// 5. Every RPC the code calls must exist. A missing one is a run-time 404 that
 //    no build step surfaces.
 // ---------------------------------------------------------------------------
 const routines = new Set(
@@ -196,7 +310,7 @@ check('every RPC referenced in code exists', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. The ownership map in src/lib/security/ownership.ts must name real columns.
+// 6. The ownership map in src/lib/security/ownership.ts must name real columns.
 //    These helpers fail closed, so a wrong column name does not open a hole —
 //    it silently denies every operation on that table, which is just as broken
 //    and much harder to notice. `articles` was mapped to user_id when the column
@@ -226,7 +340,7 @@ check('security ownership map names real columns', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. Smoke test the lead pipeline. Lead capture is the platform's core value
+// 7. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the
 //    side effects too.
