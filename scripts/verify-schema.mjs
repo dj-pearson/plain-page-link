@@ -76,17 +76,11 @@ function sourceFiles(roots) {
 // tables. `.from()` alone cannot distinguish them, so they are listed here.
 const STORAGE_BUCKETS = new Set(['avatars', 'listings', 'listing-images', 'documents', 'logos']);
 
-// Tables referenced only by edge functions that no migration defines, and whose
-// callers are not reachable from the frontend. Recorded so this script can be
-// blocking today; remove an entry as its feature is either built or deleted.
-// See the deep-dive findings in docs/PLATFORM_AUDIT_2026-07.md.
-const KNOWN_UNDEFINED_TABLES = new Set([
-  'analytics_events', // ingest-analytics; src/lib/visitorAnalytics.ts is unimported
-  'purchases', // stripe-webhook, inside a try/catch
-  'push_tokens', // register/unregister-push-token, never invoked from src/
-  'seo_backlinks', // sync-backlinks, never invoked from src/
-  'seo_keyword_tracking_summary', // track-serp-positions, never invoked from src/
-]);
+// Tables the code references that no migration creates. Empty since US-059:
+// each of the five former entries was an unfinished feature whose caller was
+// unreachable from src/, and all five callers were deleted rather than having
+// tables invented for them. Adding an entry here needs a story against it.
+const KNOWN_UNDEFINED_TABLES = new Set([]);
 
 // Policies that reach anon/authenticated with an unconditional predicate and are
 // meant to. Keyed `table:CMD`. Everything not listed here (and not in

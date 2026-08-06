@@ -960,8 +960,8 @@
         "npx tsc --noEmit reports no errors in the affected files"
       ],
       "priority": 57,
-      "passes": false,
-      "notes": "This is a product call, not a mechanical fix - per-feature stats cannot be derived from monthly_usage_summary.features_used (a jsonb blob) without knowing the intended shape. Full inventory of the mismatches is in docs/PLATFORM_AUDIT_2026-07.md item 2. The hooks currently have zero callers, so nothing regresses either way."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Decision recorded: DELETE, chosen by the product owner. Removed src/lib/usageTracking.ts, src/hooks/useFeatureUsage.ts and src/types/features.ts. All three had zero importers, confirmed by grep before deleting, so nothing regressed. Clears 25 of the tsc errors in US-056. No tests existed for them. Metered/overage billing can be rebuilt against the real schema when it is actually on the roadmap; the feature_usage, monthly_usage_summary and feature_catalog tables are untouched."
     },
     {
       "id": "US-058",
@@ -975,8 +975,8 @@
         "npm run build passes and npx tsc --noEmit reports no errors in the file"
       ],
       "priority": 58,
-      "passes": false,
-      "notes": "The mortgage_calculations table now exists (migration 20260730000001) with an anon INSERT policy and owner-only SELECT, so the backend is ready either way. Note .order()/.limit() do not scope an UPDATE the way the current code implies. See docs/PLATFORM_AUDIT_2026-07.md item 3."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Decision recorded: DELETE, chosen by the product owner. Removed src/components/features/MortgageCalculator.tsx. It had never been reachable — zero importers, and it could not have built anyway since @/components/ui/slider does not exist and @radix-ui/react-slider is not a dependency — so no user has ever seen it. Clears 7 tsc errors. The mortgage_calculations table (20260730000001) is deliberately left in place with its anon INSERT / owner SELECT policies, so the feature can come back without schema work."
     },
     {
       "id": "US-059",
@@ -991,8 +991,8 @@
         "npm run verify:schema passes with the shrunken allowlist"
       ],
       "priority": 59,
-      "passes": false,
-      "notes": "Deliberately allowlisted rather than invented during the audit, so the CI schema job could be blocking today. Take entries off the list one at a time. See docs/PLATFORM_AUDIT_2026-07.md item 4."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Decision recorded: DELETE the unreachable callers, chosen by the product owner. Removed five edge functions (ingest-analytics, register-push-token, unregister-push-token, sync-backlinks, track-serp-positions) and src/lib/visitorAnalytics.ts, which nothing imported. `purchases` needed different handling: its caller is stripe-webhook, which obviously stays. Checked reachability rather than assuming — create-checkout-session supports mode: 'payment', but neither src/ call site (Pricing.tsx, SubscriptionPage.tsx) passes mode or productType, so the one-time-purchase path was unreachable and its writes had always failed silently against a table that does not exist. Removed both purchases blocks from the webhook with a comment saying what would be needed to bring add-ons back. Push: the AC's 'work end to end or remove' clause resolved to remove. registerToken POSTed to /api/v1/notifications/register, a route that exists nowhere in this repo, so registration had never worked even before the missing table. Removed src/lib/push-notifications.ts, public/firebase-messaging-sw.js and the App.tsx effect that asked every logged-in visitor for notification permission to no purpose. That left firebase with no consumers, so the dependency and its manualChunks entry are gone too — 83 packages removed and the 54.6 kB firebase-vendor chunk no longer ships. In-app notifications (US-049) are unaffected; they use Supabase Realtime over the notifications table. KNOWN_UNDEFINED_TABLES is now empty and verify:schema passes with all 8 checks green. tsc 356 -> 322 across US-057/058/059, 274 tests pass, build and size-check pass."
     },
     {
       "id": "US-060",

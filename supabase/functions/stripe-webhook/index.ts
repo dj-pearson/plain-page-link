@@ -9,7 +9,6 @@
  * - customer.subscription.deleted: Subscription canceled
  * - invoice.payment_failed: Payment failed (dunning)
  * - invoice.paid: Payment successful
- * - payment_intent.succeeded: One-time payment completed
  *
  * Security:
  * - Stripe signature verification
@@ -270,43 +269,12 @@ serve(async (req) => {
           console.log(`Subscription created for user ${userId}: ${planName}`);
         }
 
-        // Handle one-time payment mode
-        if (session.mode === 'payment') {
-          const userId = session.metadata?.user_id;
-          const productType = session.metadata?.product_type;
+        // One-time payment mode was removed in US-059: it wrote to a `purchases`
+        // table no migration ever created, so every write silently failed, and no
+        // caller in src/ ever requests mode: 'payment' — both call sites of
+        // create-checkout-session pass a priceId only. If add-on purchases come
+        // back, they need the table, RLS, and a recording path added together.
 
-          if (userId && productType) {
-            const paymentIntentId = session.payment_intent as string;
-
-            // Idempotency: the in-memory processedEvents cache is per-instance and
-            // cleared on cold start, so a redelivered webhook can reach a fresh
-            // instance. Guard the one-time purchase insert against duplicates by
-            // checking for an existing row with the same payment intent first.
-            const { data: existingPurchase } = await supabase
-              .from('purchases')
-              .select('id')
-              .eq('stripe_payment_intent_id', paymentIntentId)
-              .maybeSingle();
-
-            if (existingPurchase) {
-              console.log(`Purchase already recorded for payment intent ${paymentIntentId}; skipping`);
-            } else {
-              // Record one-time purchase
-              await supabase
-                .from('purchases')
-                .insert({
-                  user_id: userId,
-                  product_type: productType,
-                  stripe_payment_intent_id: paymentIntentId,
-                  amount: (session.amount_total || 0) / 100,
-                  currency: session.currency || 'usd',
-                  status: 'completed',
-                });
-
-              console.log(`One-time purchase recorded for user ${userId}: ${productType}`);
-            }
-          }
-        }
         break;
       }
 
@@ -513,22 +481,6 @@ If you've already updated your details, you can ignore this message.
       // ========================================
       // PAYMENT INTENT SUCCEEDED (One-time)
       // ========================================
-      case 'payment_intent.succeeded': {
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        const userId = paymentIntent.metadata?.user_id;
-        const productType = paymentIntent.metadata?.product_type;
-
-        if (userId && productType) {
-          // Update purchase status
-          await supabase
-            .from('purchases')
-            .update({ status: 'completed' })
-            .eq('stripe_payment_intent_id', paymentIntent.id);
-
-          console.log(`Payment intent succeeded for user ${userId}: ${productType}`);
-        }
-        break;
-      }
 
       default:
         console.log(`Unhandled event type: ${event.type}`);
