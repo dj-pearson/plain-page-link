@@ -1021,8 +1021,8 @@
         "CLAUDE.md documents npm run types:generate and npm run verify:schema"
       ],
       "priority": 61,
-      "passes": false,
-      "notes": "This is not cosmetic: the gdpr-export bug fixed in this branch queried `blog_posts`, exactly the table CLAUDE.md describes. Keep the Pearson Media shared block between its markers untouched. See docs/PLATFORM_AUDIT_2026-07.md item 6."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Section rewritten against the real schema pulled from a rebuilt Postgres, not from memory. blog_posts replaced by articles with its 19 real columns, and the old name kept only in a short note explaining that it is what put `blog_posts` into gdpr-export. types.ts named authoritative up front with the 134-table count, and types:generate / types:check / verify:schema / verify:migrations all documented. The four documented tables were more wrong than the story assumed: listings had no `title` column, `price` is text not numeric, and `images` does not exist (it is `photos`, plus a legacy single `image`) -- while beds, baths and city are NOT NULL and went unmentioned. leads' type column is `lead_type`, the name that once aborted every insert. profiles has ~45 columns, not 7. Checking the prose turned up three more false claims, now corrected: there is no `usesSoftDelete` hook anywhere in src/, exactly one table carries deleted_at rather than 'some', and 10 tables have no created_at against a claim that all do. Added what a reader actually needs next to each: the links click_count write path and why not to re-add an UPDATE policy, the TO service_role rule behind US-063, the search_path pin behind US-062, and the migration-ordering caveat behind US-060. The Pearson Media shared block between its markers is untouched (0 lines in the diff)."
     },
     {
       "id": "US-062",

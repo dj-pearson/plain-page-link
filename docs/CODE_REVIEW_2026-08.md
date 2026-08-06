@@ -1,5 +1,12 @@
 # Code review — August 2026
 
+> **Status.** This document is the review as found. Work against it is tracked in
+> `prd.json`, not here. Closed since: US-063 and US-064 (the two anon-exploitable
+> RLS holes), US-065 (the guard that stops them regressing), US-062 (`search_path`
+> pinning), US-051 (logger migration), US-061 (this document's schema section).
+> Building the US-065 guard surfaced twelve further exposures on the `/tools/*`
+> tables, filed as US-067.
+
 A verification pass over `prd.json`: every gate re-run from a clean checkout, the
 schema rebuilt in a real Postgres 16, and each story's acceptance criteria checked
 against what the repo actually does rather than against what the previous pass

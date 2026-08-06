@@ -560,95 +560,148 @@ try {
 
 ## Database Schema
 
-### Key Tables
+### `src/integrations/supabase/types.ts` is authoritative
 
-**profiles** - User profile data
-```sql
-- id (uuid, FK to auth.users)
-- username (text, unique)
-- full_name (text)
-- bio (text)
-- avatar_url (text)
-- theme (text)
-- created_at, updated_at
+The `public` schema has **134 tables**. Do not guess a table or column name from
+this document, from a table's name, or from what a feature "should" have — read
+`src/integrations/supabase/types.ts`, which is generated from the applied
+schema and covers all of them.
+
+This matters more than it sounds. An earlier version of this section described a
+`blog_posts` table that has never existed (the real one is `articles`), and the
+`gdpr-export` edge function duly queried `blog_posts`. The result was coalesced
+with `|| []`, so the export did not fail — it silently returned zero articles on
+every subject access request. Getting this section wrong propagates.
+
+**Keeping types in sync:**
+
+```bash
+npm run types:generate   # regenerate types.ts from a live database
+npm run types:check      # fail if types.ts has drifted from the schema
+npm run verify:schema    # apply the migrations to a real Postgres and interrogate the result
+npm run verify:migrations # structural lint of the migration files (no database needed)
 ```
 
-**listings** - Property listings
-```sql
-- id (uuid)
-- user_id (uuid, FK to profiles)
-- title (text)
-- description (text)
-- price (numeric)
-- address (text)
-- status (text) -- 'active', 'sold', 'pending'
-- images (jsonb)
-- created_at, updated_at
+`types:generate` reads the schema over `psql` rather than
+`supabase gen types typescript`, which needs Docker that CI and sandboxes lack.
+`verify:schema` is what catches the defects `tsc`, the unit tests and the build
+all miss: a trigger naming a column that does not exist, a table the app queries
+that no migration creates, an RPC called under the wrong name, an RLS policy
+that grants far more than it appears to. It runs in CI against a real Postgres —
+see `.github/workflows/verify-backend.yml` and `scripts/README-types-generation.md`.
+
+### The tables you will touch most
+
+Columns below are the real ones as of 2026-08. Everything is `uuid`/`text`
+unless noted.
+
+**profiles** — one row per agent, keyed by `auth.users.id`. ~45 columns.
+```
+id (PK, = auth.users.id), username (unique, NOT NULL), full_name, bio, avatar_url, theme
+title, license_number, license_state, brokerage_name, brokerage_logo, years_experience (int)
+specialties / certifications / service_cities / service_zip_codes (jsonb)
+phone, sms_enabled (bool), email_display, calendly_url, zapier_webhook_url
+instagram_url, facebook_url, linkedin_url, tiktok_url, youtube_url, zillow_url,
+  realtor_com_url, website_url
+seo_title, seo_description, og_image, custom_css, custom_domain, is_published (bool)
+view_count / lead_count / link_click_count (int, denormalised counters)
+created_at, updated_at
 ```
 
-**leads** - Lead capture data
-```sql
-- id (uuid)
-- user_id (uuid, FK to profiles)
-- name (text)
-- email (text)
-- phone (text)
-- message (text)
-- source (text)
-- status (text)
-- created_at
+**listings** — properties. Note `price` is **text**, not numeric, and there is
+no `title` or `images` column.
+```
+id, user_id (NOT NULL), address (NOT NULL), city (NOT NULL), price (text, NOT NULL)
+beds (int, NOT NULL), baths (int, NOT NULL), sqft (int)
+bedrooms / bathrooms (numeric), square_feet (int), lot_size_acres (numeric)
+image (single, legacy), photos (jsonb, the real gallery), virtual_tour_url
+status ('active' | 'sold' | 'pending'), property_type, description, mls_number
+listed_date, sold_date (date), days_on_market (int), is_featured (bool), sort_order (int)
+created_at, updated_at
 ```
 
-**links** - Social/custom links
-```sql
-- id (uuid)
-- user_id (uuid, FK to profiles)
-- title (text)
-- url (text)
-- icon (text)
-- position (int)
-- is_active (boolean)
-- click_count (int)
-- created_at, updated_at
+**leads** — captured leads. The type column is `lead_type`, **not** `type`; a
+trigger referencing `NEW.type` once aborted every insert.
+```
+id, user_id (NOT NULL), lead_type (NOT NULL), name (NOT NULL), email (NOT NULL), phone
+encrypted_email, encrypted_phone   -- US-016 dual-write; plaintext still populated
+message, notes, status, source, form_data (jsonb)
+assigned_to, listing_id, price_range, timeline, property_address, preapproved (bool)
+first_responded_at, contacted_at, closed_at
+referrer_url, utm_source, utm_medium, utm_campaign, device
+created_at, updated_at
 ```
 
-**user_roles** - Role-based access control
-```sql
-- id (uuid)
-- user_id (uuid, FK to profiles)
-- role (text) -- 'admin' or 'user'
+**links** — the link-in-bio rows.
+```
+id, user_id (NOT NULL), title (NOT NULL), url (NOT NULL), icon
+position (int, NOT NULL), is_active (bool), click_count (int)
+created_at, updated_at
+```
+`click_count` is written **only** through `increment_link_clicks(link_id)`, a
+`SECURITY DEFINER` function. There is deliberately no UPDATE policy on `links`
+for anonymous visitors — the one that used to exist let any visitor rewrite any
+profile's link targets. Do not add one back.
+
+**articles** — the blog. This is the table; `blog_posts` does not exist.
+```
+id, title (NOT NULL), slug (NOT NULL), content (NOT NULL), excerpt
+featured_image_url, author_id, status, category, tags (text[])
+seo_title, seo_description, seo_keywords (text[]), view_count (int)
+published_at, created_at, updated_at
+generated_from_suggestion_id, keyword_id
 ```
 
-**blog_posts** - SEO blog content
-```sql
-- id (uuid)
-- title (text)
-- slug (text, unique)
-- content (text)
-- excerpt (text)
-- featured_image (text)
-- published (boolean)
-- created_at, updated_at
+**user_roles** — RBAC. `role` is the `app_role` enum, not text; check it with
+`has_role(auth.uid(), 'admin'::app_role)`.
 ```
+id, user_id (NOT NULL), role (app_role enum, NOT NULL)
+```
+
+The other ~128 tables cluster into: SEO tooling (`seo_*`, ~40 tables), search
+console integrations (`gsc_*`, `ga4_*`, `bing_*`, `yandex_*`), billing
+(`subscriptions`, `user_subscriptions`, `invoices`, `stripe_*`, `feature_*`),
+auth and security (`mfa_*`, `sso_*`, `login_attempts`, `user_sessions`,
+`audit_logs`), workflows (`workflow_*`), teams (`teams`, `team_members`), and
+the free tools (`instagram_bio_*`, `listing_*`).
 
 ### Database Patterns
 
 **Row Level Security (RLS):**
-- All tables have RLS enabled
-- Users can only access their own data (unless admin)
-- Public profiles are readable by everyone
+- RLS is enabled on every table in `public`, enforced by `verify:schema`.
+- Enabling RLS is not the same as scoping it. Supabase grants `ALL` on public
+  tables to `anon` and `authenticated`, and the anon key ships in the frontend
+  bundle, so a policy written `FOR ALL USING (true)` with no `TO` clause grants
+  the world — Postgres defaults an omitted `TO` to `TO PUBLIC`. Sixteen policies
+  were written that way; see migration `20260806000001`.
+- A policy meant for the backend must say `TO service_role` explicitly.
+- `verify:schema` fails on any unconditional policy reaching
+  `anon`/`authenticated` that is not declared in `PUBLIC_BY_DESIGN`.
 
-**Soft Deletes:**
-- Some tables use `deleted_at` for soft deletes
-- Use `usesSoftDelete` hook for queries
+**SECURITY DEFINER functions:**
+- Must pin `SET search_path = public, extensions, pg_temp`. Without it the
+  caller controls how unqualified names resolve inside a function running with
+  owner privileges — a temp table can shadow a real one. Enforced by
+  `verify:schema`; `extensions` is where pgcrypto lives, `pg_temp` is named last
+  so it is searched last rather than first.
+
+**Soft deletes:**
+- Effectively unused: exactly one table carries `deleted_at`. There is no
+  `usesSoftDelete` hook, despite what this document used to claim.
 
 **Timestamps:**
-- All tables have `created_at`
-- Most have `updated_at` with triggers
+- Most tables have `created_at`; 10 do not, so do not assume it.
+- Many have `updated_at` maintained by a trigger. A trigger for a column the
+  table lacks aborts every UPDATE — this happened to `seo_monitoring_schedules`.
 
-**Foreign Keys:**
-- Strict FK constraints
-- ON DELETE CASCADE where appropriate
+**Foreign keys:**
+- Enforced, with `ON DELETE CASCADE` where appropriate.
+
+**Migrations:**
+- Applying `supabase/migrations/` to an empty database in filename order
+  currently fails in ten places (duplicate timestamp prefixes, files indexing
+  columns a later migration adds). CI works around it with three passes. See
+  US-060.
 
 ---
 
