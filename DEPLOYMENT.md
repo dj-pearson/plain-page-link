@@ -91,6 +91,27 @@ supabase db push          # applies pending migrations
   columns) so re-runs are safe.
 - Review the diff on staging first (see §6).
 
+#### One-time step for the squashed baseline (US-060)
+
+`supabase/migrations/` was collapsed to a single baseline,
+`20260806000005_squashed_baseline.sql`, on 2026-08-06. The 89 migrations it
+replaces are preserved under `supabase/migrations/archive/`, which `db push`
+does not read.
+
+The baseline **must not be applied to the existing production database** — it
+creates 134 tables that are already there. Before the next `db push` against a
+project that predates it, mark it as applied:
+
+```bash
+supabase link --project-ref <project-ref>
+supabase migration repair --status applied 20260806000005
+supabase db push          # now a no-op for the baseline
+```
+
+A **new** environment needs no repair step: `db push` applies the baseline to
+the empty database in one pass, which is the whole point of the change. Verify
+with `npm run verify:schema` afterwards.
+
 ### 3.3 Edge functions (Supabase, Deno)
 
 ```bash
