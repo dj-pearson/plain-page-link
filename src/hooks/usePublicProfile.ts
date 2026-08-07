@@ -1,5 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import type { PublicProfile } from '@/types/profile';
+import { toStringList } from '@/types/profile';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export const usePublicProfile = (username: string) => {
   return useQuery({
@@ -8,7 +10,8 @@ export const usePublicProfile = (username: string) => {
       // Fetch profile by username - ONLY PUBLIC FIELDS
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select(`
+        .select(
+          `
           id,
           username,
           full_name,
@@ -26,6 +29,7 @@ export const usePublicProfile = (username: string) => {
           license_number,
           license_state,
           phone,
+          sms_enabled,
           email_display,
           calendly_url,
           instagram_url,
@@ -41,7 +45,8 @@ export const usePublicProfile = (username: string) => {
           og_image,
           created_at,
           is_published
-        `)
+        `
+        )
         .eq('username', username)
         .neq('is_published', false)
         .single();
@@ -50,21 +55,29 @@ export const usePublicProfile = (username: string) => {
       if (!profile) throw new Error('Profile not found');
 
       // Increment view count (non-blocking - fire and forget)
-      supabase.rpc('increment_profile_views', {
-        _profile_id: profile.id
-      }).then(() => {}).catch(() => {});
+      supabase
+        .rpc('increment_profile_views', {
+          _profile_id: profile.id,
+          // Fire and forget; a view-count failure must not fail the page.
+          // (No .catch(): PostgrestBuilder's .then() returns a PromiseLike.)
+        })
+        .then(
+          () => {},
+          () => {}
+        );
 
       // Fetch all related data in parallel instead of sequential
       const [
         { data: listings, error: listingsError },
         { data: testimonials, error: testimonialsError },
         { data: links, error: linksError },
-        { data: settings, error: settingsError }
+        { data: settings, error: settingsError },
       ] = await Promise.all([
         // Fetch listings with only needed columns
         supabase
           .from('listings')
-          .select(`
+          .select(
+            `
             id,
             image,
             photos,
@@ -83,7 +96,8 @@ export const usePublicProfile = (username: string) => {
             days_on_market,
             description,
             property_type
-          `)
+          `
+          )
           .eq('user_id', profile.id)
           .in('status', ['active', 'pending', 'under_contract', 'sold'])
           .order('sort_order', { ascending: true }),
@@ -91,7 +105,8 @@ export const usePublicProfile = (username: string) => {
         // Fetch testimonials with only needed columns
         supabase
           .from('testimonials')
-          .select(`
+          .select(
+            `
             id,
             client_name,
             client_title,
@@ -105,7 +120,8 @@ export const usePublicProfile = (username: string) => {
             property_type,
             created_at,
             is_published
-          `)
+          `
+          )
           .eq('user_id', profile.id)
           .eq('is_published', true)
           .order('sort_order', { ascending: true }),
@@ -113,14 +129,16 @@ export const usePublicProfile = (username: string) => {
         // Fetch links with only needed columns
         supabase
           .from('links')
-          .select(`
+          .select(
+            `
             id,
             title,
             url,
             icon,
             position,
             is_active
-          `)
+          `
+          )
           .eq('user_id', profile.id)
           .eq('is_active', true)
           .order('position', { ascending: true }),
@@ -128,9 +146,11 @@ export const usePublicProfile = (username: string) => {
         // Fetch user settings
         supabase
           .from('user_settings')
-          .select('show_listings, show_sold_properties, show_testimonials, show_social_proof, show_contact_buttons')
+          .select(
+            'show_listings, show_sold_properties, show_testimonials, show_social_proof, show_contact_buttons'
+          )
           .eq('user_id', profile.id)
-          .maybeSingle()
+          .maybeSingle(),
       ]);
 
       // Handle errors from parallel queries
@@ -139,24 +159,38 @@ export const usePublicProfile = (username: string) => {
       if (linksError) throw linksError;
       if (settingsError) throw settingsError;
 
-      // Transform testimonials to match expected type (review -> review_text)
-      const transformedTestimonials = (testimonials || []).map(t => ({
+      // `review_text` and `title` used to be synthesized here to satisfy types
+      // that named columns the schema does not have. Those types now derive from
+      // the generated Row (US-056), and the consumers read `review` and
+      // `address` directly, so the aliases are gone rather than kept as a second
+      // name for the same value.
+      const transformedTestimonials = (testimonials || []).map((t) => ({
         ...t,
-        review_text: t.review,
-        date: t.date || t.created_at, // Fallback to created_at if date is null
+        date: t.date || t.created_at, // date is nullable; fall back to created_at
       }));
 
-      // Transform listings to add expected fields
-      const transformedListings = (listings || []).map(l => ({
+      // The listings table carries both naming conventions (beds/bedrooms,
+      // sqft/square_feet) from an earlier reconciliation; normalise to one.
+      const transformedListings = (listings || []).map((l) => ({
         ...l,
-        title: l.address, // Use address as title since title column doesn't exist
         bedrooms: l.bedrooms ?? l.beds,
         bathrooms: l.bathrooms ?? l.baths,
         square_feet: l.square_feet ?? l.sqft,
       }));
 
+      // specialties/certifications/service_* are jsonb. Every consumer maps
+      // over them as string lists, so narrow once here rather than at each
+      // render site; a malformed value degrades to [] instead of throwing.
+      const publicProfile: PublicProfile = {
+        ...profile,
+        specialties: toStringList(profile.specialties),
+        certifications: toStringList(profile.certifications),
+        service_cities: toStringList(profile.service_cities),
+        service_zip_codes: toStringList(profile.service_zip_codes),
+      };
+
       return {
-        profile,
+        profile: publicProfile,
         listings: transformedListings,
         testimonials: transformedTestimonials,
         links: links || [],
@@ -166,7 +200,7 @@ export const usePublicProfile = (username: string) => {
           show_testimonials: true,
           show_social_proof: true,
           show_contact_buttons: true,
-        }
+        },
       };
     },
     enabled: !!username,

@@ -1,9 +1,9 @@
 import { MapPin, Award, ShieldCheck, Zap, Star, Building2, CheckCircle2 } from 'lucide-react';
-import type { Profile } from '@/types';
+import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
 
 interface ProfileHeaderProps {
-  profile: Profile;
+  profile: PublicProfile;
   stats?: {
     propertiesSold?: number;
     averageRating?: number;

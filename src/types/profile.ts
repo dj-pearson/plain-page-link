@@ -44,3 +44,52 @@ export type Profile = Omit<
 export function toStringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
+
+/**
+ * The subset of the profile that a public profile page receives.
+ *
+ * usePublicProfile deliberately selects only these columns — the comment there
+ * reads "ONLY PUBLIC FIELDS" — so the public components must not be typed
+ * against the full row. They were, which is why assigning the hook's result
+ * produced "missing the following properties" for every column the query
+ * omits (custom_css, zapier_webhook_url, the denormalised counters, and so on).
+ *
+ * Kept in lockstep with the query by construction: add a column there and it
+ * belongs here, and Pick will reject a name that is not a real column.
+ */
+export type PublicProfileFields =
+  | 'id'
+  | 'username'
+  | 'full_name'
+  | 'bio'
+  | 'avatar_url'
+  | 'theme'
+  | 'title'
+  | 'brokerage_name'
+  | 'brokerage_logo'
+  | 'years_experience'
+  | 'certifications'
+  | 'specialties'
+  | 'service_cities'
+  | 'service_zip_codes'
+  | 'license_number'
+  | 'license_state'
+  | 'phone'
+  | 'sms_enabled'
+  | 'email_display'
+  | 'calendly_url'
+  | 'instagram_url'
+  | 'facebook_url'
+  | 'linkedin_url'
+  | 'tiktok_url'
+  | 'youtube_url'
+  | 'zillow_url'
+  | 'realtor_com_url'
+  | 'website_url'
+  | 'seo_title'
+  | 'seo_description'
+  | 'og_image'
+  | 'created_at'
+  | 'is_published';
+
+export type PublicProfile = Pick<Profile, PublicProfileFields>;

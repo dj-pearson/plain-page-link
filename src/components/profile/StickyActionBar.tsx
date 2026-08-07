@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, MessageSquare, Mail, Calendar, Home, X, ChevronUp } from 'lucide-react';
-import type { Profile } from '@/types';
+import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
 
 interface StickyActionBarProps {
-  profile: Profile;
+  profile: PublicProfile;
   onScheduleShowing?: () => void;
   onGetHomeValue?: () => void;
   onContactFormOpen?: () => void;
