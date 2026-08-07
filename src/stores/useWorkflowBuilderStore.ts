@@ -3,10 +3,11 @@
  * Zustand store for managing workflow builder state
  */
 
-import { create } from "zustand";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { logger } from "@/lib/logger";
+import { create } from 'zustand';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
+import type { Database, Json } from '@/integrations/supabase/types';
 import type {
   Workflow,
   WorkflowNode,
@@ -15,7 +16,8 @@ import type {
   WorkflowCategory,
   WorkflowViewport,
   WorkflowNodeTemplate,
-} from "@/types/workflow";
+  WorkflowTriggerConfig,
+} from '@/types/workflow';
 
 interface WorkflowBuilderStore {
   // State
@@ -94,12 +96,12 @@ const generateId = () => crypto.randomUUID();
 const createDefaultWorkflow = (
   userId: string,
   name: string,
-  category: WorkflowCategory = "general"
+  category: WorkflowCategory = 'general'
 ): Workflow => ({
   id: generateId(),
   userId,
   name,
-  description: "",
+  description: '',
   category,
   nodes: [],
   edges: [],
@@ -114,6 +116,76 @@ const createDefaultWorkflow = (
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 });
+
+/** Narrows a jsonb value to a plain object, defaulting to {}. */
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * Widens a domain value on the way into a jsonb column. Interfaces have no
+ * index signature, so they do not satisfy the generated `Json` union even when
+ * they serialize perfectly well.
+ */
+function toJson(value: unknown): Json {
+  return (value ?? null) as Json;
+}
+
+/**
+ * Maps a `workflows` row to the domain type.
+ *
+ * `nodes`, `edges`, `viewport` and `trigger_config` are jsonb, so the generated
+ * types give them the `Json` union — which is honest, because Postgres will
+ * hand back whatever was written. The two call sites used to assert
+ * `data.nodes as WorkflowNode[]`, which is a lie the compiler rejected once
+ * types.ts became accurate (US-056): a malformed row would have produced a
+ * `nodes` that is not an array and crashed the canvas on render instead of at
+ * the boundary.
+ *
+ * These check the shape and fall back to an empty/default value. That is the
+ * same failure mode the `|| []` fallbacks already intended, just applied to
+ * "wrong shape" as well as "null". The element types are still trusted — a
+ * full per-node validation belongs with a schema library, not here — but the
+ * container is now guaranteed, which is what the callers actually index into.
+ *
+ * The nullable scalars are coalesced rather than asserted for the same reason:
+ * the columns really are nullable in the schema, and the domain type says they
+ * are not.
+ */
+function rowToWorkflow(row: WorkflowRow): Workflow {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    description: row.description ?? '',
+    category: row.category as WorkflowCategory,
+    nodes: Array.isArray(row.nodes) ? (row.nodes as unknown as WorkflowNode[]) : [],
+    edges: Array.isArray(row.edges) ? (row.edges as unknown as WorkflowEdge[]) : [],
+    viewport: isViewport(row.viewport) ? row.viewport : { x: 0, y: 0, zoom: 1 },
+    isPublished: row.is_published ?? false,
+    isActive: row.is_active ?? false,
+    triggerConfig: (row.trigger_config as WorkflowTriggerConfig | null) ?? undefined,
+    version: row.version ?? 1,
+    executionCount: row.execution_count ?? 0,
+    successCount: row.success_count ?? 0,
+    failureCount: row.failure_count ?? 0,
+    lastExecutedAt: row.last_executed_at ?? undefined,
+    tags: row.tags ?? [],
+    createdAt: row.created_at ?? '',
+    updatedAt: row.updated_at ?? '',
+  };
+}
+
+/** Narrows a jsonb value to the viewport shape the canvas needs. */
+function isViewport(value: unknown): value is WorkflowViewport {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.x === 'number' && typeof v.y === 'number' && typeof v.zoom === 'number';
+}
+
+type WorkflowRow = Database['public']['Tables']['workflows']['Row'];
 
 export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) => ({
   // Initial state
@@ -144,40 +216,20 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
   loadWorkflow: async (workflowId) => {
     try {
       const { data, error } = await supabase
-        .from("workflows")
-        .select("*")
-        .eq("id", workflowId)
+        .from('workflows')
+        .select('*')
+        .eq('id', workflowId)
         .single();
 
       if (error) throw error;
-      if (!data) throw new Error("Workflow not found");
+      if (!data) throw new Error('Workflow not found');
 
-      const workflow: Workflow = {
-        id: data.id,
-        userId: data.user_id,
-        name: data.name,
-        description: data.description || "",
-        category: data.category as WorkflowCategory,
-        nodes: (data.nodes as WorkflowNode[]) || [],
-        edges: (data.edges as WorkflowEdge[]) || [],
-        viewport: (data.viewport as WorkflowViewport) || { x: 0, y: 0, zoom: 1 },
-        isPublished: data.is_published,
-        isActive: data.is_active,
-        triggerConfig: data.trigger_config,
-        version: data.version,
-        executionCount: data.execution_count,
-        successCount: data.success_count,
-        failureCount: data.failure_count,
-        lastExecutedAt: data.last_executed_at,
-        tags: data.tags || [],
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
+      const workflow = rowToWorkflow(data);
 
       get().setWorkflow(workflow);
     } catch (error) {
-      logger.error("Failed to load workflow", error as Error);
-      toast.error("Failed to load workflow");
+      logger.error('Failed to load workflow', error as Error);
+      toast.error('Failed to load workflow');
       throw error;
     }
   },
@@ -188,39 +240,19 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
-        .from("workflows")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false });
+        .from('workflows')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
 
       if (error) throw error;
 
-      return (data || []).map((d) => ({
-        id: d.id,
-        userId: d.user_id,
-        name: d.name,
-        description: d.description || "",
-        category: d.category as WorkflowCategory,
-        nodes: (d.nodes as WorkflowNode[]) || [],
-        edges: (d.edges as WorkflowEdge[]) || [],
-        viewport: (d.viewport as WorkflowViewport) || { x: 0, y: 0, zoom: 1 },
-        isPublished: d.is_published,
-        isActive: d.is_active,
-        triggerConfig: d.trigger_config,
-        version: d.version,
-        executionCount: d.execution_count,
-        successCount: d.success_count,
-        failureCount: d.failure_count,
-        lastExecutedAt: d.last_executed_at,
-        tags: d.tags || [],
-        createdAt: d.created_at,
-        updatedAt: d.updated_at,
-      }));
+      return (data || []).map(rowToWorkflow);
     } catch (error) {
-      logger.error("Failed to load workflows", error as Error);
+      logger.error('Failed to load workflows', error as Error);
       return [];
     }
   },
@@ -229,40 +261,43 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
   loadNodeTemplates: async () => {
     try {
       const { data, error } = await supabase
-        .from("workflow_node_templates")
-        .select("*")
-        .eq("is_active", true)
-        .order("category");
+        .from('workflow_node_templates')
+        .select('*')
+        .eq('is_active', true)
+        .order('category');
 
       if (error) throw error;
 
+      // Same shape problem as rowToWorkflow: config_schema/default_config are
+      // jsonb, and icon/color are nullable in the schema while the domain type
+      // requires them. Coalesce rather than assert.
       const templates: WorkflowNodeTemplate[] = (data || []).map((d) => ({
         id: d.id,
         type: d.type as WorkflowNodeType,
         subtype: d.subtype,
         name: d.name,
-        description: d.description,
-        icon: d.icon,
+        description: d.description ?? undefined,
+        icon: d.icon ?? '',
         category: d.category,
-        configSchema: d.config_schema || {},
-        defaultConfig: d.default_config || {},
-        color: d.color,
-        isPremium: d.is_premium,
+        configSchema: asRecord(d.config_schema),
+        defaultConfig: asRecord(d.default_config),
+        color: d.color ?? '',
+        isPremium: d.is_premium ?? false,
       }));
 
       set({ nodeTemplates: templates });
     } catch (error) {
-      logger.error("Failed to load node templates", error as Error);
+      logger.error('Failed to load node templates', error as Error);
     }
   },
 
   // Create new workflow
-  createNewWorkflow: async (name, category = "general") => {
+  createNewWorkflow: async (name, category = 'general') => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      toast.error("Not authenticated");
+      toast.error('Not authenticated');
       return;
     }
 
@@ -280,9 +315,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
     const { workflow, nodeTemplates, pushToHistory } = get();
     if (!workflow) return;
 
-    const template = nodeTemplates.find(
-      (t) => t.type === type && t.subtype === subtype
-    );
+    const template = nodeTemplates.find((t) => t.type === type && t.subtype === subtype);
 
     const newNode: WorkflowNode = {
       id: generateId(),
@@ -292,7 +325,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
       description: template?.description,
       position,
       config: { ...template?.defaultConfig, ...config },
-      outputs: type === "condition" ? ["true", "false"] : undefined,
+      outputs: type === 'condition' ? ['true', 'false'] : undefined,
     };
 
     const newWorkflow = {
@@ -334,9 +367,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
 
     // Remove node and connected edges
     const newNodes = workflow.nodes.filter((n) => n.id !== nodeId);
-    const newEdges = workflow.edges.filter(
-      (e) => e.source !== nodeId && e.target !== nodeId
-    );
+    const newEdges = workflow.edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
 
     pushToHistory();
     set({
@@ -391,10 +422,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
 
     // Check if edge already exists
     const exists = workflow.edges.some(
-      (e) =>
-        e.source === source &&
-        e.target === target &&
-        e.sourceHandle === sourceHandle
+      (e) => e.source === source && e.target === target && e.sourceHandle === sourceHandle
     );
     if (exists) return;
 
@@ -554,35 +582,40 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!user) throw new Error('Not authenticated');
 
+      // nodes/edges/viewport/trigger_config are jsonb columns. The domain
+      // types are structurally JSON-compatible but TypeScript will not accept
+      // an interface where the generated `Json` union is expected (an interface
+      // has no index signature), so they are widened on the way out. The read
+      // path re-validates in rowToWorkflow.
       const workflowData = {
         user_id: user.id,
         name: workflow.name,
-        description: workflow.description,
+        description: workflow.description ?? null,
         category: workflow.category,
-        nodes: workflow.nodes,
-        edges: workflow.edges,
-        viewport: workflow.viewport,
+        nodes: toJson(workflow.nodes),
+        edges: toJson(workflow.edges),
+        viewport: toJson(workflow.viewport),
         is_published: workflow.isPublished,
         is_active: workflow.isActive,
-        trigger_config: workflow.triggerConfig,
+        trigger_config: toJson(workflow.triggerConfig),
         tags: workflow.tags,
       };
 
       // Check if workflow exists
       const { data: existing } = await supabase
-        .from("workflows")
-        .select("id")
-        .eq("id", workflow.id)
+        .from('workflows')
+        .select('id')
+        .eq('id', workflow.id)
         .single();
 
       if (existing) {
         // Update existing
         const { error } = await supabase
-          .from("workflows")
+          .from('workflows')
           .update(workflowData)
-          .eq("id", workflow.id)
+          .eq('id', workflow.id)
           .select('id')
           .single();
 
@@ -590,16 +623,16 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
       } else {
         // Insert new
         const { error } = await supabase
-          .from("workflows")
+          .from('workflows')
           .insert({ ...workflowData, id: workflow.id });
 
         if (error) throw error;
       }
 
-      toast.success("Workflow saved");
+      toast.success('Workflow saved');
     } catch (error) {
-      logger.error("Failed to save workflow", error as Error);
-      toast.error("Failed to save workflow");
+      logger.error('Failed to save workflow', error as Error);
+      toast.error('Failed to save workflow');
       throw error;
     } finally {
       set({ isSaving: false });
@@ -620,7 +653,7 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
     });
 
     await saveWorkflow();
-    toast.success("Workflow published");
+    toast.success('Workflow published');
   },
 
   // Activate/deactivate workflow
@@ -637,30 +670,30 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
     });
 
     await saveWorkflow();
-    toast.success(active ? "Workflow activated" : "Workflow deactivated");
+    toast.success(active ? 'Workflow activated' : 'Workflow deactivated');
   },
 
   // Execute workflow manually
   executeWorkflow: async (triggerData = {}) => {
     const { workflow } = get();
-    if (!workflow) throw new Error("No workflow loaded");
+    if (!workflow) throw new Error('No workflow loaded');
 
     set({ isExecuting: true });
 
     try {
-      const { data, error } = await supabase.rpc("start_workflow_execution", {
+      const { data, error } = await supabase.rpc('start_workflow_execution', {
         p_workflow_id: workflow.id,
-        p_trigger_type: "manual",
+        p_trigger_type: 'manual',
         p_trigger_data: triggerData,
       });
 
       if (error) throw error;
 
-      toast.success("Workflow execution started");
+      toast.success('Workflow execution started');
       return data as string;
     } catch (error) {
-      logger.error("Failed to execute workflow", error as Error);
-      toast.error("Failed to execute workflow");
+      logger.error('Failed to execute workflow', error as Error);
+      toast.error('Failed to execute workflow');
       throw error;
     } finally {
       set({ isExecuting: false });
