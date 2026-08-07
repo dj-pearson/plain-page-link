@@ -42,7 +42,7 @@ Format the response as JSON with this structure:
 
 function buildBaseContext(details: PropertyDetails): string {
   const features = details.selectedFeatures
-    .map(id => PROPERTY_FEATURES.find(f => f.id === id)?.label)
+    .map((id) => PROPERTY_FEATURES.find((f) => f.id === id)?.label)
     .filter(Boolean)
     .join(', ');
 
@@ -65,7 +65,7 @@ ${details.uniqueSellingPoints ? `Unique Selling Points:\n${details.uniqueSelling
 Target Buyer: ${formatTargetBuyer(details.targetBuyer)}`;
 }
 
-function getStylePrompt(style: DescriptionStyle, details: PropertyDetails): string {
+function getStylePrompt(style: DescriptionStyle, _details: PropertyDetails): string {
   const prompts: Record<DescriptionStyle, string> = {
     luxury: `You are an elite luxury real estate copywriter specializing in high-end properties.
 
@@ -122,11 +122,11 @@ Target Audience: Real estate investors, landlords, house flippers, buyers lookin
 function formatPropertyType(type: string): string {
   const formatted: Record<string, string> = {
     'single-family': 'Single-Family Home',
-    'condo': 'Condominium',
-    'townhouse': 'Townhouse',
+    condo: 'Condominium',
+    townhouse: 'Townhouse',
     'multi-family': 'Multi-Family',
-    'land': 'Land',
-    'commercial': 'Commercial Property',
+    land: 'Land',
+    commercial: 'Commercial Property',
   };
   return formatted[type] || type;
 }
@@ -134,11 +134,11 @@ function formatPropertyType(type: string): string {
 function formatTargetBuyer(buyer: string): string {
   const formatted: Record<string, string> = {
     'first-time': 'First-time homebuyers',
-    'luxury': 'Luxury homebuyers',
-    'investor': 'Real estate investors',
-    'family': 'Growing families',
-    'downsizer': 'Downsizers/Empty nesters',
-    'relocating': 'Relocating professionals',
+    luxury: 'Luxury homebuyers',
+    investor: 'Real estate investors',
+    family: 'Growing families',
+    downsizer: 'Downsizers/Empty nesters',
+    relocating: 'Relocating professionals',
   };
   return formatted[buyer] || buyer;
 }
@@ -212,19 +212,47 @@ export function validateDescription(description: string, maxLength?: number): st
  */
 export function extractPowerWords(description: string): string[] {
   const powerWords = [
-    'stunning', 'impeccable', 'pristine', 'luxurious', 'spectacular',
-    'charming', 'elegant', 'sophisticated', 'custom', 'exquisite',
-    'immaculate', 'premier', 'exclusive', 'private', 'serene',
-    'spacious', 'bright', 'airy', 'meticulously', 'thoughtfully',
-    'coveted', 'sought-after', 'rare', 'unique', 'exceptional',
-    'breathtaking', 'magnificent', 'gorgeous', 'beautiful', 'picturesque',
-    'modern', 'updated', 'renovated', 'designer', 'resort-style'
+    'stunning',
+    'impeccable',
+    'pristine',
+    'luxurious',
+    'spectacular',
+    'charming',
+    'elegant',
+    'sophisticated',
+    'custom',
+    'exquisite',
+    'immaculate',
+    'premier',
+    'exclusive',
+    'private',
+    'serene',
+    'spacious',
+    'bright',
+    'airy',
+    'meticulously',
+    'thoughtfully',
+    'coveted',
+    'sought-after',
+    'rare',
+    'unique',
+    'exceptional',
+    'breathtaking',
+    'magnificent',
+    'gorgeous',
+    'beautiful',
+    'picturesque',
+    'modern',
+    'updated',
+    'renovated',
+    'designer',
+    'resort-style',
   ];
 
   const found: string[] = [];
   const lowerDesc = description.toLowerCase();
 
-  powerWords.forEach(word => {
+  powerWords.forEach((word) => {
     if (lowerDesc.includes(word) && !found.includes(word)) {
       found.push(word);
     }

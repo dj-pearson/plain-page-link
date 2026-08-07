@@ -47,7 +47,7 @@ export default function Settings() {
   });
 
   // Profile state
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile, isLoading: _profileLoading } = useQuery({
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;

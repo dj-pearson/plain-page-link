@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -21,9 +21,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/table';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   Users,
   Plus,
@@ -33,7 +33,8 @@ import {
   ExternalLink,
   Trash2,
   RefreshCw,
-} from "lucide-react";
+} from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface CompetitorTracking {
   id: string;
@@ -93,7 +94,7 @@ export const CompetitorMatrix = () => {
       if (error) throw error;
       setCompetitors(data || []);
     } catch (error: any) {
-      console.error('Error loading competitors:', error);
+      logger.error('Error loading competitors', error);
     }
   };
 
@@ -108,16 +109,16 @@ export const CompetitorMatrix = () => {
       if (error) throw error;
       setAnalysis(data || []);
     } catch (error: any) {
-      console.error('Error loading analysis:', error);
+      logger.error('Error loading analysis', error);
     }
   };
 
   const addCompetitor = async () => {
     if (!formData.competitor_domain) {
       toast({
-        title: "Domain Required",
-        description: "Please enter a competitor domain",
-        variant: "destructive",
+        title: 'Domain Required',
+        description: 'Please enter a competitor domain',
+        variant: 'destructive',
       });
       return;
     }
@@ -126,28 +127,26 @@ export const CompetitorMatrix = () => {
     try {
       const keywordsArray = formData.keywords
         .split(',')
-        .map(k => k.trim())
-        .filter(k => k.length > 0);
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0);
 
-      const { error } = await supabase
-        .from('seo_competitor_tracking')
-        .insert([
-          {
-            competitor_domain: formData.competitor_domain,
-            competitor_name: formData.competitor_name || formData.competitor_domain,
-            keywords: keywordsArray,
-            check_frequency: formData.check_frequency,
-            alert_on_rank_change: formData.alert_on_rank_change,
-            alert_on_new_backlinks: formData.alert_on_new_backlinks,
-            rank_change_threshold: formData.rank_change_threshold,
-          },
-        ]);
+      const { error } = await supabase.from('seo_competitor_tracking').insert([
+        {
+          competitor_domain: formData.competitor_domain,
+          competitor_name: formData.competitor_name || formData.competitor_domain,
+          keywords: keywordsArray,
+          check_frequency: formData.check_frequency,
+          alert_on_rank_change: formData.alert_on_rank_change,
+          alert_on_new_backlinks: formData.alert_on_new_backlinks,
+          rank_change_threshold: formData.rank_change_threshold,
+        },
+      ]);
 
       if (error) throw error;
 
       toast({
-        title: "Competitor Added",
-        description: "Competitor tracking has been configured",
+        title: 'Competitor Added',
+        description: 'Competitor tracking has been configured',
       });
 
       setIsDialogOpen(false);
@@ -164,9 +163,9 @@ export const CompetitorMatrix = () => {
       await loadCompetitors();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -177,24 +176,21 @@ export const CompetitorMatrix = () => {
     if (!confirm('Are you sure you want to stop tracking this competitor?')) return;
 
     try {
-      const { error } = await supabase
-        .from('seo_competitor_tracking')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('seo_competitor_tracking').delete().eq('id', id);
 
       if (error) throw error;
 
       toast({
-        title: "Competitor Removed",
-        description: "Competitor tracking has been stopped",
+        title: 'Competitor Removed',
+        description: 'Competitor tracking has been stopped',
       });
 
       await loadCompetitors();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -204,23 +200,23 @@ export const CompetitorMatrix = () => {
     try {
       // This would call an edge function to refresh competitor analysis
       toast({
-        title: "Analysis Refreshing",
-        description: "Competitor analysis is being updated...",
+        title: 'Analysis Refreshing',
+        description: 'Competitor analysis is being updated...',
       });
 
       // Simulate refresh - in production, call edge function
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       await loadAnalysis();
 
       toast({
-        title: "Analysis Complete",
-        description: "Competitor data has been refreshed",
+        title: 'Analysis Complete',
+        description: 'Competitor data has been refreshed',
       });
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -228,10 +224,10 @@ export const CompetitorMatrix = () => {
   };
 
   // Calculate insights
-  const keywordGaps = analysis.filter(a => a.gap < 0 && Math.abs(a.gap) <= 10);
-  const winningKeywords = analysis.filter(a => a.gap > 0 && a.our_position <= 10);
+  const keywordGaps = analysis.filter((a) => a.gap < 0 && Math.abs(a.gap) <= 10);
+  const winningKeywords = analysis.filter((a) => a.gap > 0 && a.our_position <= 10);
   const opportunityKeywords = analysis.filter(
-    a => a.their_position <= 10 && a.our_position > 10 && a.search_volume > 100
+    (a) => a.their_position <= 10 && a.our_position > 10 && a.search_volume > 100
   );
 
   return (
@@ -262,9 +258,7 @@ export const CompetitorMatrix = () => {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Competitor</DialogTitle>
-                <DialogDescription>
-                  Configure automated competitor tracking
-                </DialogDescription>
+                <DialogDescription>Configure automated competitor tracking</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -285,9 +279,7 @@ export const CompetitorMatrix = () => {
                     id="name"
                     placeholder="Competitor Inc."
                     value={formData.competitor_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, competitor_name: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, competitor_name: e.target.value })}
                   />
                 </div>
 
@@ -297,13 +289,9 @@ export const CompetitorMatrix = () => {
                     id="keywords"
                     placeholder="keyword1, keyword2, keyword3"
                     value={formData.keywords}
-                    onChange={(e) =>
-                      setFormData({ ...formData, keywords: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Comma-separated list of keywords
-                  </p>
+                  <p className="text-xs text-muted-foreground">Comma-separated list of keywords</p>
                 </div>
 
                 <div className="space-y-2">
@@ -351,7 +339,7 @@ export const CompetitorMatrix = () => {
                   Cancel
                 </Button>
                 <Button onClick={addCompetitor} disabled={loading}>
-                  {loading ? "Adding..." : "Add Competitor"}
+                  {loading ? 'Adding...' : 'Add Competitor'}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -376,12 +364,8 @@ export const CompetitorMatrix = () => {
             <CardTitle className="text-sm">Keyword Gaps</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {keywordGaps.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Close to outranking
-            </p>
+            <div className="text-3xl font-bold text-yellow-600">{keywordGaps.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Close to outranking</p>
           </CardContent>
         </Card>
 
@@ -390,12 +374,8 @@ export const CompetitorMatrix = () => {
             <CardTitle className="text-sm">Winning Keywords</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">
-              {winningKeywords.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Outranking competitors
-            </p>
+            <div className="text-3xl font-bold text-green-600">{winningKeywords.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Outranking competitors</p>
           </CardContent>
         </Card>
 
@@ -407,12 +387,8 @@ export const CompetitorMatrix = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-600">
-              {opportunityKeywords.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              High-value targets
-            </p>
+            <div className="text-3xl font-bold text-blue-600">{opportunityKeywords.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">High-value targets</p>
           </CardContent>
         </Card>
       </div>
@@ -421,9 +397,7 @@ export const CompetitorMatrix = () => {
       <Card>
         <CardHeader>
           <CardTitle>Tracked Competitors</CardTitle>
-          <CardDescription>
-            {competitors.length} competitors being monitored
-          </CardDescription>
+          <CardDescription>{competitors.length} competitors being monitored</CardDescription>
         </CardHeader>
         <CardContent>
           {competitors.length === 0 ? (
@@ -453,20 +427,16 @@ export const CompetitorMatrix = () => {
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
-                      <Badge variant={competitor.active ? "default" : "secondary"}>
-                        {competitor.active ? "Active" : "Paused"}
+                      <Badge variant={competitor.active ? 'default' : 'secondary'}>
+                        {competitor.active ? 'Active' : 'Paused'}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
                       {competitor.competitor_domain}
                     </p>
                     <div className="flex gap-2 mt-2">
-                      <Badge variant="outline">
-                        {competitor.keywords?.length || 0} keywords
-                      </Badge>
-                      <Badge variant="outline">
-                        Check {competitor.check_frequency}
-                      </Badge>
+                      <Badge variant="outline">{competitor.keywords?.length || 0} keywords</Badge>
+                      <Badge variant="outline">Check {competitor.check_frequency}</Badge>
                       {competitor.alert_on_rank_change && (
                         <Badge variant="outline">
                           <AlertCircle className="h-3 w-3 mr-1" />
@@ -551,9 +521,7 @@ export const CompetitorMatrix = () => {
         <Card>
           <CardHeader>
             <CardTitle>Close Keyword Gaps</CardTitle>
-            <CardDescription>
-              Keywords where you're close to outranking competitors
-            </CardDescription>
+            <CardDescription>Keywords where you're close to outranking competitors</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -564,18 +532,14 @@ export const CompetitorMatrix = () => {
                 >
                   <div className="flex-1">
                     <h4 className="font-semibold">{item.keyword}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      vs {item.competitor_domain}
-                    </p>
+                    <p className="text-sm text-muted-foreground">vs {item.competitor_domain}</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground">You</div>
                       <Badge variant="outline">#{item.our_position}</Badge>
                     </div>
-                    <div className="text-yellow-600 font-bold">
-                      {Math.abs(item.gap)} positions
-                    </div>
+                    <div className="text-yellow-600 font-bold">{Math.abs(item.gap)} positions</div>
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground">Them</div>
                       <Badge variant="default">#{item.their_position}</Badge>

@@ -2765,12 +2765,14 @@ export type Database = {
           created_at: string | null;
           days_on_market: number | null;
           description: string | null;
+          highlights: string[] | null;
           id: string;
           image: string | null;
           is_featured: boolean | null;
           listed_date: string | null;
           lot_size_acres: number | null;
           mls_number: string | null;
+          open_house_date: string | null;
           photos: Json | null;
           price: string;
           property_type: string | null;
@@ -2778,10 +2780,12 @@ export type Database = {
           sort_order: number | null;
           sqft: number | null;
           square_feet: number | null;
+          state: string | null;
           status: string | null;
           updated_at: string | null;
           user_id: string;
           virtual_tour_url: string | null;
+          zip_code: string | null;
         };
         Insert: {
           address: string;
@@ -2793,12 +2797,14 @@ export type Database = {
           created_at?: string | null;
           days_on_market?: number | null;
           description?: string | null;
+          highlights?: string[] | null;
           id?: string;
           image?: string | null;
           is_featured?: boolean | null;
           listed_date?: string | null;
           lot_size_acres?: number | null;
           mls_number?: string | null;
+          open_house_date?: string | null;
           photos?: Json | null;
           price: string;
           property_type?: string | null;
@@ -2806,10 +2812,12 @@ export type Database = {
           sort_order?: number | null;
           sqft?: number | null;
           square_feet?: number | null;
+          state?: string | null;
           status?: string | null;
           updated_at?: string | null;
           user_id: string;
           virtual_tour_url?: string | null;
+          zip_code?: string | null;
         };
         Update: {
           address?: string;
@@ -2821,12 +2829,14 @@ export type Database = {
           created_at?: string | null;
           days_on_market?: number | null;
           description?: string | null;
+          highlights?: string[] | null;
           id?: string;
           image?: string | null;
           is_featured?: boolean | null;
           listed_date?: string | null;
           lot_size_acres?: number | null;
           mls_number?: string | null;
+          open_house_date?: string | null;
           photos?: Json | null;
           price?: string;
           property_type?: string | null;
@@ -2834,10 +2844,12 @@ export type Database = {
           sort_order?: number | null;
           sqft?: number | null;
           square_feet?: number | null;
+          state?: string | null;
           status?: string | null;
           updated_at?: string | null;
           user_id?: string;
           virtual_tour_url?: string | null;
+          zip_code?: string | null;
         };
         Relationships: [];
       };

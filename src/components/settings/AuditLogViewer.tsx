@@ -4,24 +4,23 @@
  */
 
 import { useState } from 'react';
-import { History, ChevronDown, ChevronUp, Shield, AlertTriangle, AlertCircle, Info } from 'lucide-react';
+import {
+  History,
+  ChevronDown,
+  ChevronUp,
+  Shield,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+} from 'lucide-react';
 import { useAuditLog, AuditLogEntry } from '@/hooks/useAuditLog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 export function AuditLogViewer() {
-  const {
-    logs,
-    totalLogs,
-    isLoading,
-    error,
-    refetch,
-    getActionLabel,
-    getRiskLevelColor,
-    formatLogDetails,
-    groupLogsByDate,
-  } = useAuditLog({ limit: 20 });
+  const { logs, totalLogs, isLoading, error, refetch, getActionLabel, groupLogsByDate } =
+    useAuditLog({ limit: 20 });
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
@@ -64,26 +63,17 @@ export function AuditLogViewer() {
           <History className="h-5 w-5 text-primary" />
           <div>
             <CardTitle>Security Activity</CardTitle>
-            <CardDescription>
-              Recent security-related actions on your account
-            </CardDescription>
+            <CardDescription>Recent security-related actions on your account</CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         {isLoading && logs.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Loading activity...
-          </div>
+          <div className="text-center py-8 text-muted-foreground">Loading activity...</div>
         ) : error ? (
           <div className="text-center py-8 text-red-600">
             <p>Failed to load activity</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="mt-4"
-            >
+            <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-4">
               Try Again
             </Button>
           </div>
@@ -108,9 +98,7 @@ export function AuditLogViewer() {
                       <div className="flex items-center gap-3">
                         {getStatusIcon(log.status)}
                         <div>
-                          <div className="font-medium text-sm">
-                            {getActionLabel(log.action)}
-                          </div>
+                          <div className="font-medium text-sm">{getActionLabel(log.action)}</div>
                           <div className="text-xs text-muted-foreground">
                             {new Date(log.created_at).toLocaleTimeString()}
                             {log.ip_address && ` • ${log.ip_address}`}
@@ -160,11 +148,7 @@ export function AuditLogViewer() {
           <div className="mt-4 p-4 bg-muted rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium">{getActionLabel(selectedLog.action)}</h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedLog(null)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setSelectedLog(null)}>
                 Close
               </Button>
             </div>
@@ -186,7 +170,9 @@ export function AuditLogViewer() {
               {selectedLog.resource_type && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Resource:</span>
-                  <span>{selectedLog.resource_type} {selectedLog.resource_id?.slice(0, 8)}</span>
+                  <span>
+                    {selectedLog.resource_type} {selectedLog.resource_id?.slice(0, 8)}
+                  </span>
                 </div>
               )}
               {selectedLog.details && (

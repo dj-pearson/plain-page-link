@@ -14,6 +14,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface QuickStatusUpdateProps {
   listingId: string;
@@ -67,7 +68,7 @@ export function QuickStatusUpdate({
       // Call callback if provided
       onStatusChange?.(newStatus);
     } catch (error) {
-      console.error('Failed to update status:', error);
+      logger.error('Failed to update status', error);
       // Revert status on error
       setStatus(currentStatus);
       toast({
@@ -98,11 +99,7 @@ export function QuickStatusUpdate({
         </SelectTrigger>
         <SelectContent>
           {statusOptions.map((option) => (
-            <SelectItem
-              key={option.value}
-              value={option.value}
-              className={option.color}
-            >
+            <SelectItem key={option.value} value={option.value} className={option.color}>
               {option.label}
             </SelectItem>
           ))}

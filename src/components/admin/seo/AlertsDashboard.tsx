@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 interface SEONotification {
   id: string;
@@ -83,7 +84,7 @@ export const AlertsDashboard = () => {
       setNotifications(data || []);
       updateCounts(data || []);
     } catch (error: any) {
-      console.error('Error loading alerts:', error);
+      logger.error('Error loading alerts', error);
     }
   };
 
@@ -100,7 +101,7 @@ export const AlertsDashboard = () => {
 
       setRecentAudits(data || []);
     } catch (error: any) {
-      console.error('Error loading recent audits:', error);
+      logger.error('Error loading recent audits', error);
     }
   };
 

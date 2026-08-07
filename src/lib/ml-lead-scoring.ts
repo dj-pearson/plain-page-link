@@ -375,7 +375,6 @@ export class MLLeadScoringSystem {
   private model: LogisticRegressionModel;
   private modelVersion: string;
   private trainingExamples: TrainingExample[];
-  private abTestConfig: ABTestConfig;
 
   // Default model weights (pre-trained on synthetic data)
   private static DEFAULT_WEIGHTS: ModelWeights = {
@@ -651,7 +650,6 @@ export class MLLeadScoringSystem {
 export class ABTestManager {
   private testConfig: ABTestConfig;
   private results: ABTestResult[];
-  private storageKey = 'ab_test_results';
 
   constructor() {
     this.testConfig = {

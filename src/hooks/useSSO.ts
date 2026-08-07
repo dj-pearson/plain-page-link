@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { edgeFunctions } from "@/lib/edgeFunctions";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 export interface SSOConfig {
   id: string;
@@ -60,7 +60,7 @@ export interface SSOCallbackResponse {
 }
 
 export function useSSO() {
-  const { user, session, role } = useAuthStore();
+  const { user, role } = useAuthStore();
   const queryClient = useQueryClient();
   const isAdmin = role === 'admin';
 
@@ -71,12 +71,12 @@ export function useSSO() {
     error: configsError,
     refetch: refetchConfigs,
   } = useQuery({
-    queryKey: ["sso-configs"],
+    queryKey: ['sso-configs'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("enterprise_sso_config")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .from('enterprise_sso_config')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as SSOConfig[];
@@ -90,12 +90,12 @@ export function useSSO() {
     isLoading: isLoadingLogs,
     refetch: refetchLogs,
   } = useQuery({
-    queryKey: ["sso-audit-logs"],
+    queryKey: ['sso-audit-logs'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("sso_audit_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
+        .from('sso_audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
@@ -107,7 +107,7 @@ export function useSSO() {
   // Check if SSO is available for an email domain
   const checkSSOAvailability = useMutation({
     mutationFn: async (email: string): Promise<SSOInitiateResponse> => {
-      const response = await edgeFunctions.invoke("sso-initiate", {
+      const response = await edgeFunctions.invoke('sso-initiate', {
         body: { email },
       });
 
@@ -125,7 +125,7 @@ export function useSSO() {
       email: string;
       redirectUri?: string;
     }): Promise<SSOInitiateResponse> => {
-      const response = await edgeFunctions.invoke("sso-initiate", {
+      const response = await edgeFunctions.invoke('sso-initiate', {
         body: { email, redirectUri },
       });
 
@@ -154,7 +154,7 @@ export function useSSO() {
       error?: string;
       error_description?: string;
     }): Promise<SSOCallbackResponse> => {
-      const response = await edgeFunctions.invoke("sso-callback", {
+      const response = await edgeFunctions.invoke('sso-callback', {
         body: params,
       });
 
@@ -166,10 +166,10 @@ export function useSSO() {
   // Create SSO config (admin only)
   const createSSOConfig = useMutation({
     mutationFn: async (config: Partial<SSOConfig>) => {
-      if (!user?.id) throw new Error("Not authenticated");
+      if (!user?.id) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
-        .from("enterprise_sso_config")
+        .from('enterprise_sso_config')
         .insert({
           ...config,
           created_by: user.id,
@@ -181,23 +181,17 @@ export function useSSO() {
       return data as SSOConfig;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sso-configs"] });
+      queryClient.invalidateQueries({ queryKey: ['sso-configs'] });
     },
   });
 
   // Update SSO config (admin only)
   const updateSSOConfig = useMutation({
-    mutationFn: async ({
-      id,
-      updates,
-    }: {
-      id: string;
-      updates: Partial<SSOConfig>;
-    }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<SSOConfig> }) => {
       const { data, error } = await supabase
-        .from("enterprise_sso_config")
+        .from('enterprise_sso_config')
         .update(updates)
-        .eq("id", id)
+        .eq('id', id)
         .select()
         .single();
 
@@ -205,22 +199,19 @@ export function useSSO() {
       return data as SSOConfig;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sso-configs"] });
+      queryClient.invalidateQueries({ queryKey: ['sso-configs'] });
     },
   });
 
   // Delete SSO config (admin only)
   const deleteSSOConfig = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("enterprise_sso_config")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from('enterprise_sso_config').delete().eq('id', id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sso-configs"] });
+      queryClient.invalidateQueries({ queryKey: ['sso-configs'] });
     },
   });
 
@@ -228,9 +219,9 @@ export function useSSO() {
   const toggleSSOConfig = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
       const { data, error } = await supabase
-        .from("enterprise_sso_config")
+        .from('enterprise_sso_config')
         .update({ active })
-        .eq("id", id)
+        .eq('id', id)
         .select()
         .single();
 
@@ -238,19 +229,17 @@ export function useSSO() {
       return data as SSOConfig;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sso-configs"] });
+      queryClient.invalidateQueries({ queryKey: ['sso-configs'] });
     },
   });
 
   // Get SSO config by domain
-  const getSSOConfigByDomain = async (
-    domain: string
-  ): Promise<SSOConfig | null> => {
+  const getSSOConfigByDomain = async (domain: string): Promise<SSOConfig | null> => {
     const { data, error } = await supabase
-      .from("enterprise_sso_config")
-      .select("*")
-      .eq("organization_domain", domain)
-      .eq("active", true)
+      .from('enterprise_sso_config')
+      .select('*')
+      .eq('organization_domain', domain)
+      .eq('active', true)
       .single();
 
     if (error) return null;

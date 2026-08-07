@@ -15,16 +15,16 @@ import { formatPrice, parsePrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { PublicListing } from '@/types';
+import type { PublicProfileListing } from '@/types';
 
 interface FeaturedListingsCarouselProps {
-  listings: PublicListing[];
-  onViewDetails?: (listing: PublicListing) => void;
+  listings: PublicProfileListing[];
+  onViewDetails?: (listing: PublicProfileListing) => void;
   autoRotate?: boolean;
   interval?: number;
 }
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   active: 'bg-green-500 text-white',
   pending: 'bg-yellow-500 text-white',
   under_contract: 'bg-orange-500 text-white',
@@ -32,7 +32,7 @@ const statusColors = {
   draft: 'bg-gray-500 text-white',
 };
 
-const statusLabels = {
+const statusLabels: Record<string, string> = {
   active: 'Active',
   pending: 'Pending',
   under_contract: 'Under Contract',
@@ -122,7 +122,7 @@ export function FeaturedListingsCarousel({
 
   // Handle share listing
   const handleShareClick = async () => {
-    const address = currentListing.address || currentListing.title || 'Property';
+    const address = currentListing.address || 'Property';
     const city = currentListing.city || '';
     const price = formatPrice(parsePrice(currentListing.price));
 
@@ -192,7 +192,7 @@ export function FeaturedListingsCarousel({
           {/* Background Image */}
           <img
             src={primaryPhoto}
-            alt={currentListing.title || currentListing.address || 'Featured Property'}
+            alt={currentListing.address || 'Featured Property'}
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.src = '/placeholder-property.jpg';
@@ -210,10 +210,10 @@ export function FeaturedListingsCarousel({
                 <span
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold shadow-lg backdrop-blur-sm',
-                    statusColors[currentListing.status]
+                    statusColors[currentListing.status ?? 'active']
                   )}
                 >
-                  {statusLabels[currentListing.status]}
+                  {statusLabels[currentListing.status ?? 'active']}
                 </span>
                 <span className="px-3 py-1.5 bg-purple-600 text-white rounded-full text-xs md:text-sm font-semibold shadow-lg">
                   Featured
@@ -250,13 +250,6 @@ export function FeaturedListingsCarousel({
                 >
                   {formatPrice(parsePrice(currentListing.price))}
                 </motion.h2>
-                {currentListing.original_price &&
-                  parsePrice(currentListing.original_price) !==
-                    parsePrice(currentListing.price) && (
-                    <p className="text-lg md:text-xl text-white/70 line-through">
-                      {formatPrice(parsePrice(currentListing.original_price))}
-                    </p>
-                  )}
               </div>
 
               {/* Address */}

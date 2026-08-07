@@ -1,23 +1,36 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Loader2, Plus, Sparkles } from "lucide-react";
-import { useSocialMedia } from "@/hooks/useSocialMedia";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Loader2, Plus, Sparkles } from 'lucide-react';
+import { useSocialMedia } from '@/hooks/useSocialMedia';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export function CreateSocialPostDialog() {
   const [open, setOpen] = useState(false);
-  const [contentType, setContentType] = useState("property_highlight");
-  const [subjectType, setSubjectType] = useState("listing_of_the_day");
-  const [platformType, setPlatformType] = useState("combined");
-  const [listingId, setListingId] = useState("");
-  const [customPrompt, setCustomPrompt] = useState("");
-  const [postTitle, setPostTitle] = useState("");
+  const [contentType, setContentType] = useState('property_highlight');
+  const [subjectType, setSubjectType] = useState('listing_of_the_day');
+  const [platformType, setPlatformType] = useState('combined');
+  const [listingId, setListingId] = useState('');
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [postTitle, setPostTitle] = useState('');
   const [generatedContent, setGeneratedContent] = useState<any>(null);
 
   const { generatePost, isGenerating, createPost } = useSocialMedia();
@@ -32,48 +45,54 @@ export function CreateSocialPostDialog() {
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(20);
-      
+
       if (error) throw error;
       return data;
     },
   });
 
   const handleGenerate = () => {
-    generatePost({
-      contentType,
-      subjectType,
-      platformType,
-      listingId: listingId || undefined,
-      customPrompt: customPrompt || undefined,
-    }, {
-      onSuccess: (data) => {
-        if (data.success) {
-          setGeneratedContent(data.content);
-        }
+    generatePost(
+      {
+        contentType,
+        subjectType,
+        platformType,
+        listingId: listingId || undefined,
+        customPrompt: customPrompt || undefined,
+      },
+      {
+        onSuccess: (data) => {
+          if (data.success) {
+            setGeneratedContent(data.content);
+          }
+        },
       }
-    });
+    );
   };
 
   const handleSave = () => {
     if (!generatedContent) return;
 
-    createPost({
-      content_type: contentType,
-      subject_type: subjectType,
-      platform_type: platformType,
-      post_content: generatedContent,
-      post_title: postTitle || `${contentType} - ${new Date().toLocaleDateString()}`,
-      listing_id: listingId || null,
-      status: 'draft',
-      ai_prompt_used: customPrompt || undefined,
-    }, {
-      onSuccess: () => {
-        setOpen(false);
-        setGeneratedContent(null);
-        setPostTitle("");
-        setCustomPrompt("");
+    createPost(
+      {
+        content_type: contentType,
+        subject_type: subjectType,
+        platform_type: platformType,
+        post_content: generatedContent,
+        post_title: postTitle || `${contentType} - ${new Date().toLocaleDateString()}`,
+        listing_id: listingId ?? undefined,
+        status: 'draft',
+        ai_prompt_used: customPrompt || undefined,
+      },
+      {
+        onSuccess: () => {
+          setOpen(false);
+          setGeneratedContent(null);
+          setPostTitle('');
+          setCustomPrompt('');
+        },
       }
-    });
+    );
   };
 
   return (
@@ -177,11 +196,7 @@ export function CreateSocialPostDialog() {
           </div>
 
           {/* Generate Button */}
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="w-full gap-2"
-          >
+          <Button onClick={handleGenerate} disabled={isGenerating} className="w-full gap-2">
             {isGenerating ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />

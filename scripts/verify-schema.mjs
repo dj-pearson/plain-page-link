@@ -76,17 +76,45 @@ function sourceFiles(roots) {
 // tables. `.from()` alone cannot distinguish them, so they are listed here.
 const STORAGE_BUCKETS = new Set(['avatars', 'listings', 'listing-images', 'documents', 'logos']);
 
-// Tables referenced only by edge functions that no migration defines, and whose
-// callers are not reachable from the frontend. Recorded so this script can be
-// blocking today; remove an entry as its feature is either built or deleted.
-// See the deep-dive findings in docs/PLATFORM_AUDIT_2026-07.md.
-const KNOWN_UNDEFINED_TABLES = new Set([
-  'analytics_events', // ingest-analytics; src/lib/visitorAnalytics.ts is unimported
-  'purchases', // stripe-webhook, inside a try/catch
-  'push_tokens', // register/unregister-push-token, never invoked from src/
-  'seo_backlinks', // sync-backlinks, never invoked from src/
-  'seo_keyword_tracking_summary', // track-serp-positions, never invoked from src/
+// Tables the code references that no migration creates. Empty since US-059:
+// each of the five former entries was an unfinished feature whose caller was
+// unreachable from src/, and all five callers were deleted rather than having
+// tables invented for them. Adding an entry here needs a story against it.
+const KNOWN_UNDEFINED_TABLES = new Set([]);
+
+// Policies that reach anon/authenticated with an unconditional predicate and are
+// meant to. Keyed `table:CMD`. Everything not listed here (and not in
+// KNOWN_OVERPERMISSIVE below) fails check 3.
+//
+// The bar for this list: the data is already public, or the command is an
+// append-only submission from a page that has no session to authenticate with.
+const PUBLIC_BY_DESIGN = new Map([
+  ['leads:INSERT', 'public lead-capture forms on every profile — the core product'],
+  ['analytics_views:INSERT', 'profile view counter, fired by anonymous visitors'],
+  ['mortgage_calculations:INSERT', 'anonymous mortgage calculator on public profiles'],
+  ['feature_catalog:SELECT', 'plan/pricing catalog, rendered on the public pricing page'],
+  ['seo_settings:SELECT', 'site-wide SEO config that is emitted into every page head'],
+  ['seo_core_web_vitals:SELECT', 'aggregate page-speed numbers, no per-user data'],
+  ['seo_keyword_history:SELECT', 'aggregate ranking history, no per-user data'],
+  // The free lead-gen tools under /tools/* are used by visitors with no account,
+  // so the submission itself has to be open. Reading them back is not — see
+  // KNOWN_OVERPERMISSIVE.
+  ['instagram_bio_analyses:INSERT', 'anonymous submission from the Instagram bio tool'],
+  ['instagram_bio_analytics:INSERT', 'anonymous usage event from the Instagram bio tool'],
+  ['instagram_bio_email_captures:INSERT', 'anonymous email capture from the Instagram bio tool'],
+  ['listing_descriptions:INSERT', 'anonymous submission from the listing description tool'],
+  ['listing_generator_analytics:INSERT', 'anonymous usage event from the listing tool'],
+  ['listing_email_captures:INSERT', 'anonymous email capture from the listing tool'],
 ]);
+
+// Pre-existing over-permissive policies, recorded so this check can be blocking
+// today rather than someday. These are defects, not decisions -- each one needs a
+// real exposure with a story against it. Take an entry off the list as it is
+// fixed; do not add to it without one.
+//
+// Empty since US-067 closed the last twelve (the /tools/* lead-gen tables,
+// content_suggestions and seo_alert_rules) in migration 20260806000004.
+const KNOWN_OVERPERMISSIVE = new Map([]);
 
 const failures = [];
 const notes = [];
@@ -148,7 +176,68 @@ check('row level security enabled on every table', () =>
 );
 
 // ---------------------------------------------------------------------------
-// 3. Every table the code queries must exist.
+// 3. RLS being *enabled* says nothing about what the policies *grant*. Check 2
+//    passed on every table involved in the two worst defects this repo has had:
+//
+//      CREATE POLICY "Service role can manage audit logs"
+//        ON audit_logs FOR ALL USING (true);
+//
+//    Postgres defaults an omitted TO clause to TO PUBLIC, and Supabase grants
+//    ALL on public tables to anon — whose key ships in the frontend bundle — so
+//    that policy let any visitor read and delete the compliance audit trail.
+//    The same shape on `links` let any visitor repoint any profile's links.
+//    Both were invisible to every gate in the repo. (US-063, US-064.)
+//
+//    So: a permissive policy that reaches anon/authenticated with an
+//    unconditional predicate must be declared, either as intentional
+//    (PUBLIC_BY_DESIGN) or as a known defect with a story (KNOWN_OVERPERMISSIVE).
+//    Anything else fails. `TO service_role` is always fine — service_role is
+//    BYPASSRLS anyway and never reachable with a publishable key.
+// ---------------------------------------------------------------------------
+check('no undeclared over-permissive RLS policy', () => {
+  const rows = q(`
+    SELECT tablename || ':' || cmd || '\t' || policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND permissive = 'PERMISSIVE'
+      AND (roles::text = '{public}' OR roles::text ~ '\\manon\\M|\\mauthenticated\\M')
+      AND ( (cmd <> 'INSERT' AND qual = 'true')
+         OR (cmd = 'INSERT'  AND with_check = 'true') )
+    ORDER BY 1;
+  `);
+  const out = [];
+  for (const row of rows) {
+    const [key, policyname] = row.split('\t');
+    if (PUBLIC_BY_DESIGN.has(key)) continue;
+    if (KNOWN_OVERPERMISSIVE.has(key)) continue;
+    out.push(
+      `${key} "${policyname}" is unconditional and reaches anon/authenticated. ` +
+        `Scope it (TO service_role, or a real USING predicate), or declare it in ` +
+        `PUBLIC_BY_DESIGN with a reason.`
+    );
+  }
+  return out;
+});
+
+// Stale allowlist entries are their own kind of rot: they read as "still broken"
+// long after the fix landed, and they hide the next regression on that table.
+for (const [key, story] of KNOWN_OVERPERMISSIVE) {
+  const [table, cmd] = key.split(':');
+  const still = q(`
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = '${table}' AND cmd = '${cmd}'
+      AND permissive = 'PERMISSIVE'
+      AND (roles::text = '{public}' OR roles::text ~ '\\manon\\M|\\mauthenticated\\M')
+      AND ( (cmd <> 'INSERT' AND qual = 'true') OR (cmd = 'INSERT' AND with_check = 'true') )
+    LIMIT 1;
+  `);
+  if (!still.length) {
+    notes.push(`KNOWN_OVERPERMISSIVE entry ${key} (${story}) is fixed — remove it from the list`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4. Every table the code queries must exist.
 // ---------------------------------------------------------------------------
 const relations = new Set(
   q(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';`)
@@ -172,7 +261,7 @@ check('every table referenced in code exists', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Every RPC the code calls must exist. A missing one is a run-time 404 that
+// 5. Every RPC the code calls must exist. A missing one is a run-time 404 that
 //    no build step surfaces.
 // ---------------------------------------------------------------------------
 const routines = new Set(
@@ -196,7 +285,7 @@ check('every RPC referenced in code exists', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. The ownership map in src/lib/security/ownership.ts must name real columns.
+// 6. The ownership map in src/lib/security/ownership.ts must name real columns.
 //    These helpers fail closed, so a wrong column name does not open a hole —
 //    it silently denies every operation on that table, which is just as broken
 //    and much harder to notice. `articles` was mapped to user_id when the column
@@ -226,7 +315,7 @@ check('security ownership map names real columns', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. Smoke test the lead pipeline. Lead capture is the platform's core value
+// 7. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the
 //    side effects too.
@@ -279,26 +368,30 @@ check('lead insert pipeline works end to end', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Informational: SECURITY DEFINER functions without a pinned search_path are a
-// privilege-escalation risk. Reported, not enforced, because the existing
-// codebase has a backlog of them.
+// 8. Every SECURITY DEFINER function must pin search_path. Such a function runs
+//    with its owner's privileges, so if the caller controls how unqualified
+//    names inside it resolve, the caller controls what it operates on. Postgres
+//    searches the temporary schema first for relation names unless pg_temp is
+//    named explicitly, and any role may create temp tables -- so without a pin,
+//    `CREATE TEMP TABLE audit_logs (...)` diverts an unqualified
+//    `INSERT INTO audit_logs` inside the function into the attacker's table.
+//    Demonstrated both ways in the US-062 write-up.
+//
+//    Was a note rather than a check while a backlog of 50 existed; the backlog
+//    is cleared (20260806000003), so this is blocking now.
 // ---------------------------------------------------------------------------
-const unpinned = q(`
-  SELECT p.proname
-  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-  WHERE n.nspname = 'public' AND p.prosecdef
-    AND NOT EXISTS (
-      SELECT 1 FROM unnest(COALESCE(p.proconfig, '{}')) cfg WHERE cfg LIKE 'search\\_path=%'
-    )
-  ORDER BY 1;
-`);
-if (unpinned.length) {
-  notes.push(
-    `${unpinned.length} SECURITY DEFINER function(s) do not pin search_path: ` +
-      unpinned.slice(0, 10).join(', ') +
-      (unpinned.length > 10 ? ', ...' : '')
-  );
-}
+check('SECURITY DEFINER functions pin search_path', () =>
+  q(`
+    SELECT p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+             || ' is SECURITY DEFINER without a pinned search_path'
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.prosecdef
+      AND NOT EXISTS (
+        SELECT 1 FROM unnest(COALESCE(p.proconfig, '{}')) cfg WHERE cfg LIKE 'search\\_path=%'
+      )
+    ORDER BY 1;
+  `)
+);
 
 console.log();
 for (const n of notes) console.log(`note  ${n}`);

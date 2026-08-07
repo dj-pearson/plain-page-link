@@ -97,7 +97,7 @@ export class SyncManager {
   }
 
   private async syncItem(item: any) {
-    const { type, action, data } = item;
+    const { type, data } = item;
 
     switch (type) {
       case 'listing_create':

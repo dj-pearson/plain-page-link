@@ -1,15 +1,16 @@
-import { useState } from "react";
-import { Share2, Copy, Check, Facebook, Instagram, Twitter, Linkedin, X } from "lucide-react";
+import { useState } from 'react';
+import { Share2, Copy, Check, Facebook, Instagram, Twitter, Linkedin, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 interface Listing {
   address: string;
@@ -29,12 +30,7 @@ interface SocialShareDialogProps {
   agentName?: string;
 }
 
-export function SocialShareDialog({
-  open,
-  onOpenChange,
-  listing,
-  agentName = "Your Real Estate Agent",
-}: SocialShareDialogProps) {
+export function SocialShareDialog({ open, onOpenChange, listing }: SocialShareDialogProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
@@ -86,15 +82,15 @@ export function SocialShareDialog({
       await navigator.clipboard.writeText(postText);
       setCopied(true);
       toast({
-        title: "Copied!",
-        description: "Post text copied to clipboard",
+        title: 'Copied!',
+        description: 'Post text copied to clipboard',
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       toast({
-        title: "Failed to copy",
-        description: "Please copy manually",
-        variant: "destructive",
+        title: 'Failed to copy',
+        description: 'Please copy manually',
+        variant: 'destructive',
       });
     }
   };
@@ -123,7 +119,7 @@ export function SocialShareDialog({
           text: postText,
         });
       } catch (err) {
-        console.log("Share cancelled");
+        logger.debug('Share cancelled');
       }
     } else {
       copyToClipboard();
@@ -147,11 +143,7 @@ export function SocialShareDialog({
           {/* Preview Card */}
           {listing.image && (
             <div className="relative rounded-lg overflow-hidden border border-border">
-              <img
-                src={listing.image}
-                alt={listing.address}
-                className="w-full h-48 object-cover"
-              />
+              <img src={listing.image} alt={listing.address} className="w-full h-48 object-cover" />
               <div className="absolute top-2 right-2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-bold">
                 NEW
               </div>
@@ -160,9 +152,7 @@ export function SocialShareDialog({
 
           {/* Post Text Editor */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              Post Caption
-            </label>
+            <label className="block text-sm font-semibold mb-2">Post Caption</label>
             <Textarea
               value={postText}
               onChange={(e) => setPostText(e.target.value)}
@@ -174,55 +164,33 @@ export function SocialShareDialog({
               <p className="text-xs text-muted-foreground">
                 💡 Tip: Add your phone number or website for easy contact
               </p>
-              <span className="text-xs text-muted-foreground">
-                {postText.length} characters
-              </span>
+              <span className="text-xs text-muted-foreground">{postText.length} characters</span>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
-              <Button
-                onClick={shareToFacebook}
-                variant="outline"
-                className="justify-start"
-              >
+              <Button onClick={shareToFacebook} variant="outline" className="justify-start">
                 <Facebook className="h-4 w-4 mr-2 text-blue-600" />
                 Facebook
               </Button>
-              <Button
-                onClick={shareToTwitter}
-                variant="outline"
-                className="justify-start"
-              >
+              <Button onClick={shareToTwitter} variant="outline" className="justify-start">
                 <Twitter className="h-4 w-4 mr-2 text-sky-500" />
                 Twitter/X
               </Button>
-              <Button
-                onClick={shareToLinkedIn}
-                variant="outline"
-                className="justify-start"
-              >
+              <Button onClick={shareToLinkedIn} variant="outline" className="justify-start">
                 <Linkedin className="h-4 w-4 mr-2 text-blue-700" />
                 LinkedIn
               </Button>
-              <Button
-                onClick={shareNative}
-                variant="outline"
-                className="justify-start"
-              >
+              <Button onClick={shareNative} variant="outline" className="justify-start">
                 <Share2 className="h-4 w-4 mr-2" />
                 More...
               </Button>
             </div>
 
             <div className="flex gap-2">
-              <Button
-                onClick={copyToClipboard}
-                variant="secondary"
-                className="flex-1"
-              >
+              <Button onClick={copyToClipboard} variant="secondary" className="flex-1">
                 {copied ? (
                   <>
                     <Check className="h-4 w-4 mr-2 text-green-600" />
@@ -235,10 +203,7 @@ export function SocialShareDialog({
                   </>
                 )}
               </Button>
-              <Button
-                onClick={() => onOpenChange(false)}
-                variant="outline"
-              >
+              <Button onClick={() => onOpenChange(false)} variant="outline">
                 <X className="h-4 w-4 mr-2" />
                 Close
               </Button>
@@ -250,12 +215,10 @@ export function SocialShareDialog({
             <div className="flex items-start gap-3">
               <Instagram className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm">
-                <p className="font-semibold text-purple-900 mb-1">
-                  For Instagram:
-                </p>
+                <p className="font-semibold text-purple-900 mb-1">For Instagram:</p>
                 <p className="text-purple-800">
-                  Copy the text above and paste it when creating your Instagram post.
-                  Don't forget to upload your listing photo!
+                  Copy the text above and paste it when creating your Instagram post. Don't forget
+                  to upload your listing photo!
                 </p>
               </div>
             </div>

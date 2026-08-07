@@ -1,47 +1,47 @@
-import { Helmet } from "react-helmet-async";
-import { getSafeOrigin } from "@/lib/utils";
+import { Helmet } from 'react-helmet-async';
+import { getSafeOrigin } from '@/lib/utils';
 
 interface BlogListSEOProps {
   totalArticles: number;
   latestArticleDate?: string;
 }
 
-export function BlogListSEO({ totalArticles, latestArticleDate }: BlogListSEOProps) {
-  const siteName = "AgentBio";
+export function BlogListSEO({ latestArticleDate }: BlogListSEOProps) {
+  const siteName = 'AgentBio';
   const siteUrl = getSafeOrigin();
   const blogUrl = `${siteUrl}/blog`;
-  const title = "Real Estate Blog - Tips, Guides & Market Insights";
+  const title = 'Real Estate Blog - Tips, Guides & Market Insights';
   const description =
-    "Discover expert real estate advice, market insights, buying and selling guides, investment tips, and neighborhood information. Stay informed with our comprehensive blog for agents, buyers, and sellers.";
+    'Discover expert real estate advice, market insights, buying and selling guides, investment tips, and neighborhood information. Stay informed with our comprehensive blog for agents, buyers, and sellers.';
 
   // Structured data for Blog
   const blogStructuredData = {
-    "@context": "https://schema.org",
-    "@type": "Blog",
-    "@id": blogUrl,
+    '@context': 'https://schema.org',
+    '@type': 'Blog',
+    '@id': blogUrl,
     name: title,
     description: description,
     url: blogUrl,
     publisher: {
-      "@type": "Organization",
+      '@type': 'Organization',
       name: siteName,
       logo: {
-        "@type": "ImageObject",
+        '@type': 'ImageObject',
         url: `${siteUrl}/Cover.png`,
       },
     },
-    inLanguage: "en-US",
+    inLanguage: 'en-US',
     ...(latestArticleDate && { dateModified: latestArticleDate }),
   };
 
   // Structured data for Organization
   const organizationStructuredData = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
     name: siteName,
     url: siteUrl,
     logo: {
-      "@type": "ImageObject",
+      '@type': 'ImageObject',
       url: `${siteUrl}/Cover.png`,
     },
     sameAs: [
@@ -51,36 +51,36 @@ export function BlogListSEO({ totalArticles, latestArticleDate }: BlogListSEOPro
 
   // Structured data for WebSite with SearchAction
   const websiteStructuredData = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "@id": siteUrl,
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': siteUrl,
     name: siteName,
     url: siteUrl,
     potentialAction: {
-      "@type": "SearchAction",
+      '@type': 'SearchAction',
       target: {
-        "@type": "EntryPoint",
+        '@type': 'EntryPoint',
         urlTemplate: `${blogUrl}?search={search_term_string}`,
       },
-      "query-input": "required name=search_term_string",
+      'query-input': 'required name=search_term_string',
     },
   };
 
   // Breadcrumb list for blog homepage
   const breadcrumbStructuredData = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
     itemListElement: [
       {
-        "@type": "ListItem",
+        '@type': 'ListItem',
         position: 1,
-        name: "Home",
+        name: 'Home',
         item: siteUrl,
       },
       {
-        "@type": "ListItem",
+        '@type': 'ListItem',
         position: 2,
-        name: "Blog",
+        name: 'Blog',
         item: blogUrl,
       },
     ],
@@ -115,7 +115,10 @@ export function BlogListSEO({ totalArticles, latestArticleDate }: BlogListSEOPro
       <meta name="twitter:image" content={`${siteUrl}/Cover.png`} />
 
       {/* AI Search Engine Optimization */}
-      <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+      <meta
+        name="robots"
+        content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+      />
       <meta name="googlebot" content="index, follow" />
       <meta name="bingbot" content="index, follow" />
 

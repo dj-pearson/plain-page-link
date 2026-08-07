@@ -10,7 +10,7 @@
  * Use these utilities for building secure data access patterns.
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { fromDynamic } from '@/lib/supabaseDynamic';
 import { logger } from '@/lib/logger';
 import { requireAuth, getSecurityContext } from './authentication';
 import { requirePermission } from './authorization';
@@ -70,7 +70,7 @@ export async function secureSelect<T = unknown>(
     const context = await getSecurityContext();
 
     // Build query
-    let query = supabase.from(options.table).select(options.columns || '*', { count: 'exact' });
+    let query = fromDynamic(options.table).select(options.columns || '*', { count: 'exact' });
 
     // Layer 3: Ownership filter
     if (options.scopeToUser && context.userId) {
@@ -149,8 +149,7 @@ export async function secureInsert<T extends Record<string, unknown>>(
     };
 
     // Execute insert
-    const { data, error } = await supabase
-      .from(options.table)
+    const { data, error } = await fromDynamic(options.table)
       .insert(insertData)
       .select(options.columns || '*')
       .single();
@@ -163,7 +162,8 @@ export async function secureInsert<T extends Record<string, unknown>>(
       return { data: null, error: new Error(error.message) };
     }
 
-    return { data: data as T, error: null };
+    // See src/lib/supabaseDynamic.ts: the row shape is the caller's T.
+    return { data: data as unknown as T, error: null };
   } catch (error) {
     return {
       data: null,
@@ -199,8 +199,7 @@ export async function secureUpdate<T extends OwnedResource>(
     const canBypass = options.allowAdminBypass && context.role === 'admin';
 
     // Build update query with ownership check
-    let query = supabase
-      .from(options.table)
+    let query = fromDynamic(options.table)
       .update({
         ...options.data,
         updated_at: new Date().toISOString(),
@@ -235,7 +234,8 @@ export async function secureUpdate<T extends OwnedResource>(
       return { data: null, error: new Error(error.message) };
     }
 
-    return { data: data as T, error: null };
+    // See src/lib/supabaseDynamic.ts: the row shape is the caller's T.
+    return { data: data as unknown as T, error: null };
   } catch (error) {
     return {
       data: null,
@@ -270,7 +270,7 @@ export async function secureDelete(
     const canBypass = options.allowAdminBypass && context.role === 'admin';
 
     // Build delete query with ownership check
-    let query = supabase.from(options.table).delete().eq('id', options.id);
+    let query = fromDynamic(options.table).delete().eq('id', options.id);
 
     // Layer 3: Ownership filter (unless admin bypass)
     if (!canBypass) {

@@ -34,6 +34,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 interface User {
   id: string;
@@ -48,11 +49,6 @@ interface Profile {
   username: string;
   bio: string;
   avatar_url: string;
-}
-
-interface UserRole {
-  user_id: string;
-  role: string;
 }
 
 interface Subscription {
@@ -158,7 +154,7 @@ export const UserManagementPanel = () => {
         });
       }
     } catch (error: any) {
-      console.error('Error loading statistics:', error);
+      logger.error('Error loading statistics', error);
     }
   };
 
@@ -247,7 +243,7 @@ export const UserManagementPanel = () => {
       if (error) throw error;
       setUserActivity(data || []);
     } catch (error: any) {
-      console.error('Error loading user activity:', error);
+      logger.error('Error loading user activity', error);
     }
   };
 

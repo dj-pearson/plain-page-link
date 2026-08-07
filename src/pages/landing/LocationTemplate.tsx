@@ -1,13 +1,13 @@
-import { ArrowRight, Home, TrendingUp, Users, Star, CheckCircle, MapPin } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
-import { Breadcrumb } from "@/components/seo/Breadcrumb";
-import { SEO_CONFIG, getBaseUrl, getOgImageUrl } from "@/config/seo.config";
-import { getNearbyLocations, getFeaturedLocations, type LocationData } from "@/data/locations";
+import { ArrowRight, Home, TrendingUp, Users, Star, CheckCircle, MapPin } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import { Breadcrumb } from '@/components/seo/Breadcrumb';
+import { SEO_CONFIG, getBaseUrl, getOgImageUrl } from '@/config/seo.config';
+import { getFeaturedLocations, type LocationData } from '@/data/locations';
 
 // Re-export LocationData for backward compatibility
-export type { LocationData } from "@/data/locations";
+export type { LocationData } from '@/data/locations';
 
 interface LocationTemplateProps {
   location: LocationData;
@@ -24,7 +24,6 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
     agentCount,
     marketDescription,
     neighborhoods,
-    population,
     avgDaysOnMarket,
   } = location;
 
@@ -34,133 +33,132 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
   const pageDescription = `Join ${city}, ${stateAbbr} real estate agents using AgentBio to convert Instagram followers into leads. Property listings, lead capture forms, and calendar booking built for ${city} agents.`;
 
   // Get related locations for internal linking
-  const nearbyLocations = getNearbyLocations(slug, 4);
   const featuredLocations = getFeaturedLocations(slug, 6);
 
   // Enhanced schema with more structured data
   const schema = {
-    "@context": "https://schema.org",
-    "@graph": [
+    '@context': 'https://schema.org',
+    '@graph': [
       // WebPage schema
       {
-        "@type": "WebPage",
-        "@id": `${canonicalUrl}#webpage`,
-        "url": canonicalUrl,
-        "name": pageTitle,
-        "description": pageDescription,
-        "isPartOf": { "@id": `${baseUrl}/#website` },
-        "about": { "@id": `${canonicalUrl}#service` },
-        "breadcrumb": { "@id": `${canonicalUrl}#breadcrumb` },
-        "inLanguage": "en-US",
-        "dateModified": new Date().toISOString(),
-        "publisher": {
-          "@type": "Organization",
-          "name": SEO_CONFIG.organization.name,
-          "@id": `${baseUrl}/#organization`,
+        '@type': 'WebPage',
+        '@id': `${canonicalUrl}#webpage`,
+        url: canonicalUrl,
+        name: pageTitle,
+        description: pageDescription,
+        isPartOf: { '@id': `${baseUrl}/#website` },
+        about: { '@id': `${canonicalUrl}#service` },
+        breadcrumb: { '@id': `${canonicalUrl}#breadcrumb` },
+        inLanguage: 'en-US',
+        dateModified: new Date().toISOString(),
+        publisher: {
+          '@type': 'Organization',
+          name: SEO_CONFIG.organization.name,
+          '@id': `${baseUrl}/#organization`,
         },
       },
       // BreadcrumbList schema
       {
-        "@type": "BreadcrumbList",
-        "@id": `${canonicalUrl}#breadcrumb`,
-        "itemListElement": [
+        '@type': 'BreadcrumbList',
+        '@id': `${canonicalUrl}#breadcrumb`,
+        itemListElement: [
           {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "Home",
-            "item": baseUrl,
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: baseUrl,
           },
           {
-            "@type": "ListItem",
-            "position": 2,
-            "name": "For Real Estate Agents",
-            "item": `${baseUrl}/for-real-estate-agents`,
+            '@type': 'ListItem',
+            position: 2,
+            name: 'For Real Estate Agents',
+            item: `${baseUrl}/for-real-estate-agents`,
           },
           {
-            "@type": "ListItem",
-            "position": 3,
-            "name": `${city} Real Estate Agents`,
-            "item": canonicalUrl,
+            '@type': 'ListItem',
+            position: 3,
+            name: `${city} Real Estate Agents`,
+            item: canonicalUrl,
           },
         ],
       },
       // LocalBusiness/Service schema
       {
-        "@type": "ProfessionalService",
-        "@id": `${canonicalUrl}#service`,
-        "name": `AgentBio for ${city} Real Estate Agents`,
-        "description": `Link in bio platform for ${city}, ${stateAbbr} real estate agents. Showcase property listings, capture leads, and book appointments.`,
-        "url": canonicalUrl,
-        "provider": {
-          "@type": "Organization",
-          "name": SEO_CONFIG.organization.name,
-          "@id": `${baseUrl}/#organization`,
+        '@type': 'ProfessionalService',
+        '@id': `${canonicalUrl}#service`,
+        name: `AgentBio for ${city} Real Estate Agents`,
+        description: `Link in bio platform for ${city}, ${stateAbbr} real estate agents. Showcase property listings, capture leads, and book appointments.`,
+        url: canonicalUrl,
+        provider: {
+          '@type': 'Organization',
+          name: SEO_CONFIG.organization.name,
+          '@id': `${baseUrl}/#organization`,
         },
-        "areaServed": {
-          "@type": "City",
-          "name": city,
-          "addressRegion": stateAbbr,
-          "addressCountry": "US",
+        areaServed: {
+          '@type': 'City',
+          name: city,
+          addressRegion: stateAbbr,
+          addressCountry: 'US',
         },
-        "serviceType": "Real Estate Marketing Software",
-        "offers": {
-          "@type": "Offer",
-          "price": SEO_CONFIG.pricing.startingPrice,
-          "priceCurrency": SEO_CONFIG.pricing.currency,
-          "priceValidUntil": SEO_CONFIG.pricing.priceValidUntil,
-          "availability": "https://schema.org/InStock",
+        serviceType: 'Real Estate Marketing Software',
+        offers: {
+          '@type': 'Offer',
+          price: SEO_CONFIG.pricing.startingPrice,
+          priceCurrency: SEO_CONFIG.pricing.currency,
+          priceValidUntil: SEO_CONFIG.pricing.priceValidUntil,
+          availability: 'https://schema.org/InStock',
         },
-        "aggregateRating": {
-          "@type": "AggregateRating",
-          "ratingValue": SEO_CONFIG.ratings.ratingValue,
-          "reviewCount": SEO_CONFIG.ratings.reviewCount,
-          "bestRating": SEO_CONFIG.ratings.bestRating,
-          "worstRating": SEO_CONFIG.ratings.worstRating,
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: SEO_CONFIG.ratings.ratingValue,
+          reviewCount: SEO_CONFIG.ratings.reviewCount,
+          bestRating: SEO_CONFIG.ratings.bestRating,
+          worstRating: SEO_CONFIG.ratings.worstRating,
         },
       },
       // FAQPage schema
       {
-        "@type": "FAQPage",
-        "@id": `${canonicalUrl}#faq`,
-        "mainEntity": [
+        '@type': 'FAQPage',
+        '@id': `${canonicalUrl}#faq`,
+        mainEntity: [
           {
-            "@type": "Question",
-            "name": `How do ${city} real estate agents use AgentBio?`,
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": `${city} real estate agents use AgentBio as their Instagram link in bio to showcase ${city} property listings, capture local buyer and seller leads, and book consultations. The platform is optimized for mobile traffic from Instagram and includes features specifically for real estate professionals.`,
+            '@type': 'Question',
+            name: `How do ${city} real estate agents use AgentBio?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `${city} real estate agents use AgentBio as their Instagram link in bio to showcase ${city} property listings, capture local buyer and seller leads, and book consultations. The platform is optimized for mobile traffic from Instagram and includes features specifically for real estate professionals.`,
             },
           },
           {
-            "@type": "Question",
-            "name": `Can I showcase ${city} property listings on AgentBio?`,
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": `Yes! AgentBio allows ${city} agents to display property listing cards with photos, addresses, prices, and details. You can update listings instantly when properties go pending or sell, ensuring your ${city} followers always see current inventory.`,
+            '@type': 'Question',
+            name: `Can I showcase ${city} property listings on AgentBio?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `Yes! AgentBio allows ${city} agents to display property listing cards with photos, addresses, prices, and details. You can update listings instantly when properties go pending or sell, ensuring your ${city} followers always see current inventory.`,
             },
           },
           {
-            "@type": "Question",
-            "name": `Does AgentBio work with ${city} MLS systems?`,
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": `AgentBio integrates with major MLS and IDX providers used in ${city}. You can automatically sync your active ${city} listings or manually add properties with photos and details.`,
+            '@type': 'Question',
+            name: `Does AgentBio work with ${city} MLS systems?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `AgentBio integrates with major MLS and IDX providers used in ${city}. You can automatically sync your active ${city} listings or manually add properties with photos and details.`,
             },
           },
           {
-            "@type": "Question",
-            "name": `How much does AgentBio cost for ${city} agents?`,
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": `AgentBio pricing starts at $${SEO_CONFIG.pricing.startingPrice}/month with a free trial. All plans include unlimited property listings, lead capture forms, calendar booking, and analytics—perfect for growing ${city} real estate businesses.`,
+            '@type': 'Question',
+            name: `How much does AgentBio cost for ${city} agents?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `AgentBio pricing starts at $${SEO_CONFIG.pricing.startingPrice}/month with a free trial. All plans include unlimited property listings, lead capture forms, calendar booking, and analytics—perfect for growing ${city} real estate businesses.`,
             },
           },
           {
-            "@type": "Question",
-            "name": `Can I customize my AgentBio page for ${city} branding?`,
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": `Absolutely! You can customize colors, fonts, logos, and background images to match your personal brand or brokerage guidelines. Many ${city} agents maintain consistent branding across Instagram, their website, and AgentBio.`,
+            '@type': 'Question',
+            name: `Can I customize my AgentBio page for ${city} branding?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `Absolutely! You can customize colors, fonts, logos, and background images to match your personal brand or brokerage guidelines. Many ${city} agents maintain consistent branding across Instagram, their website, and AgentBio.`,
             },
           },
         ],
@@ -175,7 +173,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         <title>{pageTitle}</title>
         <meta name="title" content={pageTitle} />
         <meta name="description" content={pageDescription} />
-        <meta name="keywords" content={`${city} real estate agents, ${city} realtor, ${city} real estate, link in bio for realtors ${city}, Instagram bio ${city} agents, ${stateAbbr} real estate marketing`} />
+        <meta
+          name="keywords"
+          content={`${city} real estate agents, ${city} realtor, ${city} real estate, link in bio for realtors ${city}, Instagram bio ${city} agents, ${stateAbbr} real estate marketing`}
+        />
 
         {/* Canonical URL */}
         <link rel="canonical" href={canonicalUrl} />
@@ -217,9 +218,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         <section className="container mx-auto px-4 pt-6">
           <Breadcrumb
             items={[
-              { name: "Home", url: baseUrl },
-              { name: "For Real Estate Agents", url: `${baseUrl}/for-real-estate-agents` },
-              { name: `${city} Real Estate Agents`, url: canonicalUrl }
+              { name: 'Home', url: baseUrl },
+              { name: 'For Real Estate Agents', url: `${baseUrl}/for-real-estate-agents` },
+              { name: `${city} Real Estate Agents`, url: canonicalUrl },
             ]}
           />
         </section>
@@ -237,7 +238,8 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
             </h1>
 
             <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-              Convert Instagram followers into {city} buyer and seller leads with property showcases, lead capture forms, and calendar booking—all in one link.
+              Convert Instagram followers into {city} buyer and seller leads with property
+              showcases, lead capture forms, and calendar booking—all in one link.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
@@ -263,9 +265,18 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
           <div className="container max-w-4xl mx-auto px-4">
             <p className="text-base md:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
               <strong>
-                AgentBio is a specialized link-in-bio platform designed for {city}, {state} real estate agents who want to convert Instagram followers into qualified leads.
-              </strong>{" "}
-              Unlike generic tools like Linktree or Beacons, AgentBio includes features specifically for real estate: {city} property listing galleries with photos and prices, built-in lead capture forms for buyer/seller qualification, calendar booking for consultation scheduling, and testimonial showcases. {city} agents use AgentBio to consolidate their property portfolio, contact information, and lead generation tools into one mobile-optimized link that turns Instagram traffic into actual clients. The platform integrates with popular CRM systems used by {city} real estate professionals and provides detailed analytics to track which {city} neighborhoods and property types generate the most engagement.
+                AgentBio is a specialized link-in-bio platform designed for {city}, {state} real
+                estate agents who want to convert Instagram followers into qualified leads.
+              </strong>{' '}
+              Unlike generic tools like Linktree or Beacons, AgentBio includes features specifically
+              for real estate: {city} property listing galleries with photos and prices, built-in
+              lead capture forms for buyer/seller qualification, calendar booking for consultation
+              scheduling, and testimonial showcases. {city} agents use AgentBio to consolidate their
+              property portfolio, contact information, and lead generation tools into one
+              mobile-optimized link that turns Instagram traffic into actual clients. The platform
+              integrates with popular CRM systems used by {city} real estate professionals and
+              provides detailed analytics to track which {city} neighborhoods and property types
+              generate the most engagement.
             </p>
           </div>
         </section>
@@ -340,7 +351,8 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   <div>
                     <h3 className="text-xl font-bold mb-2">Showcase {city} Property Listings</h3>
                     <p className="text-muted-foreground">
-                      Display your active {city} listings with photos, addresses, prices, and details. Update instantly when properties sell or go pending.
+                      Display your active {city} listings with photos, addresses, prices, and
+                      details. Update instantly when properties sell or go pending.
                     </p>
                   </div>
                 </div>
@@ -354,7 +366,8 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   <div>
                     <h3 className="text-xl font-bold mb-2">Capture Local Buyer/Seller Leads</h3>
                     <p className="text-muted-foreground">
-                      Built-in forms for buyer pre-qualification, seller consultations, and home valuations. Perfect for capturing serious {city} leads.
+                      Built-in forms for buyer pre-qualification, seller consultations, and home
+                      valuations. Perfect for capturing serious {city} leads.
                     </p>
                   </div>
                 </div>
@@ -368,7 +381,8 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   <div>
                     <h3 className="text-xl font-bold mb-2">Mobile-Optimized for Instagram</h3>
                     <p className="text-muted-foreground">
-                      90% of Instagram users are on mobile. Your AgentBio page loads fast and looks perfect on all devices.
+                      90% of Instagram users are on mobile. Your AgentBio page loads fast and looks
+                      perfect on all devices.
                     </p>
                   </div>
                 </div>
@@ -382,7 +396,8 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   <div>
                     <h3 className="text-xl font-bold mb-2">Track {city} Market Engagement</h3>
                     <p className="text-muted-foreground">
-                      See which {city} neighborhoods, property types, and price ranges generate the most clicks and leads.
+                      See which {city} neighborhoods, property types, and price ranges generate the
+                      most clicks and leads.
                     </p>
                   </div>
                 </div>
@@ -401,7 +416,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {neighborhoods.map((neighborhood, index) => (
-                  <div key={index} className="glass-panel p-4 text-center hover:border-primary/50 transition-colors">
+                  <div
+                    key={index}
+                    className="glass-panel p-4 text-center hover:border-primary/50 transition-colors"
+                  >
                     <MapPin className="h-4 w-4 text-primary mx-auto mb-2" />
                     <p className="font-medium text-sm">{neighborhood}</p>
                   </div>
@@ -419,7 +437,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
             </h2>
 
             <div className="grid md:grid-cols-3 gap-8">
-              <Link to="/features/property-listings" className="glass-panel p-6 hover:border-primary/50 transition-colors group">
+              <Link
+                to="/features/property-listings"
+                className="glass-panel p-6 hover:border-primary/50 transition-colors group"
+              >
                 <Home className="h-10 w-10 text-primary mb-4 group-hover:scale-110 transition-transform" />
                 <h3 className="text-xl font-bold mb-2">Property Listings</h3>
                 <p className="text-muted-foreground text-sm">
@@ -427,7 +448,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                 </p>
               </Link>
 
-              <Link to="/features/lead-capture" className="glass-panel p-6 hover:border-primary/50 transition-colors group">
+              <Link
+                to="/features/lead-capture"
+                className="glass-panel p-6 hover:border-primary/50 transition-colors group"
+              >
                 <Users className="h-10 w-10 text-primary mb-4 group-hover:scale-110 transition-transform" />
                 <h3 className="text-xl font-bold mb-2">Lead Capture</h3>
                 <p className="text-muted-foreground text-sm">
@@ -435,7 +459,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                 </p>
               </Link>
 
-              <Link to="/features/calendar-booking" className="glass-panel p-6 hover:border-primary/50 transition-colors group">
+              <Link
+                to="/features/calendar-booking"
+                className="glass-panel p-6 hover:border-primary/50 transition-colors group"
+              >
                 <CheckCircle className="h-10 w-10 text-primary mb-4 group-hover:scale-110 transition-transform" />
                 <h3 className="text-xl font-bold mb-2">Calendar Booking</h3>
                 <p className="text-muted-foreground text-sm">
@@ -443,7 +470,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                 </p>
               </Link>
 
-              <Link to="/features/testimonials" className="glass-panel p-6 hover:border-primary/50 transition-colors group">
+              <Link
+                to="/features/testimonials"
+                className="glass-panel p-6 hover:border-primary/50 transition-colors group"
+              >
                 <Star className="h-10 w-10 text-primary mb-4 group-hover:scale-110 transition-transform" />
                 <h3 className="text-xl font-bold mb-2">Testimonials</h3>
                 <p className="text-muted-foreground text-sm">
@@ -451,7 +481,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                 </p>
               </Link>
 
-              <Link to="/features/analytics" className="glass-panel p-6 hover:border-primary/50 transition-colors group">
+              <Link
+                to="/features/analytics"
+                className="glass-panel p-6 hover:border-primary/50 transition-colors group"
+              >
                 <TrendingUp className="h-10 w-10 text-primary mb-4 group-hover:scale-110 transition-transform" />
                 <h3 className="text-xl font-bold mb-2">Analytics</h3>
                 <p className="text-muted-foreground text-sm">
@@ -489,7 +522,8 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   </div>
                 </div>
                 <p className="text-muted-foreground mb-4">
-                  "AgentBio helped me convert my Instagram followers into real {city} buyers. I've closed 3 deals in the past 2 months directly from Instagram leads."
+                  "AgentBio helped me convert my Instagram followers into real {city} buyers. I've
+                  closed 3 deals in the past 2 months directly from Instagram leads."
                 </p>
                 <div className="flex items-center gap-4 text-sm font-medium">
                   <span className="text-primary">3 closings</span>
@@ -509,7 +543,8 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   </div>
                 </div>
                 <p className="text-muted-foreground mb-4">
-                  "The property listing cards make it so easy to showcase my {city} luxury homes. My Instagram followers love browsing properties right from my bio link."
+                  "The property listing cards make it so easy to showcase my {city} luxury homes. My
+                  Instagram followers love browsing properties right from my bio link."
                 </p>
                 <div className="flex items-center gap-4 text-sm font-medium">
                   <span className="text-primary">$2M+ in sales</span>
@@ -534,7 +569,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   How do {city} real estate agents use AgentBio?
                 </h3>
                 <p className="text-muted-foreground">
-                  {city} real estate agents use AgentBio as their Instagram link in bio to showcase {city} property listings, capture local buyer and seller leads, and book consultations. The platform is optimized for mobile traffic from Instagram and includes features specifically for real estate professionals.
+                  {city} real estate agents use AgentBio as their Instagram link in bio to showcase{' '}
+                  {city} property listings, capture local buyer and seller leads, and book
+                  consultations. The platform is optimized for mobile traffic from Instagram and
+                  includes features specifically for real estate professionals.
                 </p>
               </div>
 
@@ -543,7 +581,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   Can I showcase {city} property listings on AgentBio?
                 </h3>
                 <p className="text-muted-foreground">
-                  Yes! AgentBio allows {city} agents to display property listing cards with photos, addresses, prices, and details. You can update listings instantly when properties go pending or sell, ensuring your {city} followers always see current inventory.
+                  Yes! AgentBio allows {city} agents to display property listing cards with photos,
+                  addresses, prices, and details. You can update listings instantly when properties
+                  go pending or sell, ensuring your {city} followers always see current inventory.
                 </p>
               </div>
 
@@ -552,7 +592,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   Does AgentBio work with {city} MLS systems?
                 </h3>
                 <p className="text-muted-foreground">
-                  AgentBio integrates with major MLS and IDX providers used in {city}. You can automatically sync your active {city} listings or manually add properties with photos and details.
+                  AgentBio integrates with major MLS and IDX providers used in {city}. You can
+                  automatically sync your active {city} listings or manually add properties with
+                  photos and details.
                 </p>
               </div>
 
@@ -561,7 +603,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   How much does AgentBio cost for {city} agents?
                 </h3>
                 <p className="text-muted-foreground">
-                  AgentBio pricing starts at ${SEO_CONFIG.pricing.startingPrice}/month with a free trial. All plans include unlimited property listings, lead capture forms, calendar booking, and analytics—perfect for growing {city} real estate businesses.
+                  AgentBio pricing starts at ${SEO_CONFIG.pricing.startingPrice}/month with a free
+                  trial. All plans include unlimited property listings, lead capture forms, calendar
+                  booking, and analytics—perfect for growing {city} real estate businesses.
                 </p>
               </div>
 
@@ -570,7 +614,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   Can I customize my AgentBio page for {city} branding?
                 </h3>
                 <p className="text-muted-foreground">
-                  Absolutely! You can customize colors, fonts, logos, and background images to match your personal brand or brokerage guidelines. Many {city} agents maintain consistent branding across Instagram, their website, and AgentBio.
+                  Absolutely! You can customize colors, fonts, logos, and background images to match
+                  your personal brand or brokerage guidelines. Many {city} agents maintain
+                  consistent branding across Instagram, their website, and AgentBio.
                 </p>
               </div>
             </div>
@@ -617,7 +663,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                   className="glass-panel p-4 text-center hover:border-primary/50 transition-colors group"
                 >
                   <MapPin className="h-4 w-4 text-primary mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                  <p className="font-medium text-sm">{loc.city}, {loc.stateAbbr}</p>
+                  <p className="font-medium text-sm">
+                    {loc.city}, {loc.stateAbbr}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">Real Estate Agents</p>
                 </Link>
               ))}
@@ -644,7 +692,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                 Free Bio Analyzer
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/tools/listing-description-generator" className="text-primary hover:underline">
+              <Link
+                to="/tools/listing-description-generator"
+                className="text-primary hover:underline"
+              >
                 Listing Generator
               </Link>
               <span className="text-muted-foreground">•</span>

@@ -1,22 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { encryptPII, decryptPII } from '@/lib/pii';
+import { encryptPIIBatch, decryptPIIBatch } from '@/lib/pii';
 import type { Lead } from '@/types/lead';
 
 /**
- * Decrypts the PII fields of a fetched lead row. Prefers the encrypted_*
- * columns (US-016); falls back to the still-present plaintext columns for
- * rows not yet backfilled. decryptPII passes plaintext through unchanged.
+ * Decrypts the PII fields of fetched lead rows. Prefers the encrypted_*
+ * columns (US-016); falls back to the still-present plaintext columns for rows
+ * not yet backfilled — decryptPIIBatch passes plaintext through unchanged.
+ *
+ * Batched across the whole page rather than per row: since US-066 the crypto
+ * lives in the pii-crypto Edge Function, so a per-field call would be two
+ * network round trips per lead.
  */
-async function decryptLeadRow(row: Lead): Promise<Lead> {
-  const r = row as Lead & {
-    encrypted_email?: string | null;
-    encrypted_phone?: string | null;
-  };
-  const email = await decryptPII(r.encrypted_email ?? r.email);
-  const phone = await decryptPII(r.encrypted_phone ?? r.phone);
-  return { ...row, email: email ?? row.email, phone: phone ?? row.phone };
+async function decryptLeadRows(rows: Lead[]): Promise<Lead[]> {
+  type WithEncrypted = Lead & { encrypted_email?: string | null; encrypted_phone?: string | null };
+
+  const emails = rows.map((row) => (row as WithEncrypted).encrypted_email ?? row.email);
+  const phones = rows.map((row) => (row as WithEncrypted).encrypted_phone ?? row.phone);
+
+  const [decryptedEmails, decryptedPhones] = await Promise.all([
+    decryptPIIBatch(emails),
+    decryptPIIBatch(phones),
+  ]);
+
+  return rows.map((row, i) => ({
+    ...row,
+    email: decryptedEmails[i] ?? row.email,
+    phone: decryptedPhones[i] ?? row.phone,
+  }));
 }
 
 export function useLeads() {
@@ -41,7 +53,7 @@ export function useLeads() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return Promise.all(((data as Lead[]) ?? []).map(decryptLeadRow));
+      return decryptLeadRows((data as Lead[]) ?? []);
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
@@ -54,11 +66,17 @@ export function useLeads() {
 
       // Dual-write: keep plaintext (transition phase) + encrypted columns.
       // Force ownership to the authenticated user rather than trusting caller-supplied user_id.
+      // Both fields go in one encryptPIIBatch call — two encryptPII calls would
+      // be two round trips to pii-crypto (US-066).
+      const [encryptedEmail, encryptedPhone] = await encryptPIIBatch([
+        leadData.email,
+        leadData.phone,
+      ]);
       const payload = {
         ...leadData,
         user_id: user.id,
-        encrypted_email: await encryptPII(leadData.email),
-        encrypted_phone: await encryptPII(leadData.phone),
+        encrypted_email: encryptedEmail,
+        encrypted_phone: encryptedPhone,
       } as typeof leadData;
 
       const { data, error } = await supabase.from('leads').insert(payload).select().single();
@@ -75,13 +93,15 @@ export function useLeads() {
     mutationFn: async ({ id, ...updates }: Partial<Lead> & { id: string }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Dual-write encrypted columns when PII fields are being updated.
+      // Dual-write encrypted columns when PII fields are being updated, in a
+      // single batched call (US-066).
       const encryptedUpdates: Record<string, unknown> = { ...updates };
-      if ('email' in updates) {
-        encryptedUpdates.encrypted_email = await encryptPII(updates.email);
-      }
-      if ('phone' in updates) {
-        encryptedUpdates.encrypted_phone = await encryptPII(updates.phone);
+      const changed = (['email', 'phone'] as const).filter((f) => f in updates);
+      if (changed.length > 0) {
+        const encrypted = await encryptPIIBatch(changed.map((f) => updates[f]));
+        changed.forEach((field, i) => {
+          encryptedUpdates[`encrypted_${field}`] = encrypted[i];
+        });
       }
 
       // Security: Verify user owns this lead by requiring both id and user_id match

@@ -1,77 +1,95 @@
-export interface Profile {
-    id: number;
-    user_id: number;
-    slug: string;
-    display_name: string;
-    title: string | null;
-    bio: string | null;
-    profile_photo: string | null;
+/**
+ * The agent profile, as the `profiles` table actually stores it.
+ *
+ * This file previously described a schema that does not exist: `id: number`
+ * (it is a uuid), plus `user_id`, `slug`, `display_name` and `profile_photo`,
+ * none of which are columns. That is the same failure the `blog_posts` entry in
+ * CLAUDE.md caused for `gdpr-export` — a type written from what a feature
+ * "should" have rather than from the schema — and it had the same result:
+ * ProfileHeader and StickyActionBar rendered `profile.profile_photo`, which is
+ * always undefined, so **every public profile showed the initials placeholder
+ * instead of the agent's headshot**. The real column is `avatar_url`, which
+ * usePublicProfile was selecting correctly all along. Fixed in US-056.
+ *
+ * Derived from `Database['public']['Tables']['profiles']['Row']` rather than
+ * restated, so it cannot drift again — `npm run types:generate` regenerates the
+ * source of truth, and anything this file adds on top is opt-in.
+ */
 
-    // Professional Info
-    license_number: string;
-    license_state: string;
-    brokerage_name: string | null;
-    brokerage_logo: string | null;
-    years_experience: number | null;
-    specialties: string[];
-    certifications: string[];
+import type { Database } from '@/integrations/supabase/types';
 
-    // Service Areas
-    service_cities: string[];
-    service_zip_codes: string[];
+/** A row from `profiles`, exactly as stored. */
+export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
-    // Contact
-    phone: string | null;
-    sms_enabled: boolean;
-    email_display: string | null;
+/**
+ * The profile as the public-facing components consume it.
+ *
+ * Identical to the row. The jsonb columns (`specialties`, `certifications`,
+ * `service_cities`, `service_zip_codes`) are narrowed to string arrays, which
+ * is what every reader already assumes and what the settings UI writes; a
+ * malformed value degrades to an empty list at the read boundary rather than
+ * throwing mid-render.
+ */
+export type Profile = Omit<
+  ProfileRow,
+  'specialties' | 'certifications' | 'service_cities' | 'service_zip_codes'
+> & {
+  specialties: string[] | null;
+  certifications: string[] | null;
+  service_cities: string[] | null;
+  service_zip_codes: string[] | null;
+};
 
-    // Social Links
-    instagram_url: string | null;
-    facebook_url: string | null;
-    linkedin_url: string | null;
-    tiktok_url: string | null;
-    youtube_url: string | null;
-    zillow_url: string | null;
-    realtor_com_url: string | null;
-    website_url: string | null;
-
-    // Settings
-    is_published: boolean;
-    theme_id: string;
-    custom_css: string | null;
-    seo_title: string | null;
-    seo_description: string | null;
-
-    // Analytics
-    view_count: number;
-    lead_count: number;
-
-    created_at: string;
-    updated_at: string;
+/** Narrows one of the jsonb list columns to the string[] the UI expects. */
+export function toStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
 
-export interface ProfileUpdateData {
-    display_name?: string;
-    title?: string;
-    bio?: string;
-    license_number?: string;
-    license_state?: string;
-    brokerage_name?: string;
-    phone?: string;
-    sms_enabled?: boolean;
-    email_display?: string;
-    specialties?: string[];
-    certifications?: string[];
-    service_cities?: string[];
-    service_zip_codes?: string[];
-    instagram_url?: string;
-    facebook_url?: string;
-    linkedin_url?: string;
-    tiktok_url?: string;
-    youtube_url?: string;
-    zillow_url?: string;
-    realtor_com_url?: string;
-    website_url?: string;
-    seo_title?: string;
-    seo_description?: string;
-}
+/**
+ * The subset of the profile that a public profile page receives.
+ *
+ * usePublicProfile deliberately selects only these columns — the comment there
+ * reads "ONLY PUBLIC FIELDS" — so the public components must not be typed
+ * against the full row. They were, which is why assigning the hook's result
+ * produced "missing the following properties" for every column the query
+ * omits (custom_css, zapier_webhook_url, the denormalised counters, and so on).
+ *
+ * Kept in lockstep with the query by construction: add a column there and it
+ * belongs here, and Pick will reject a name that is not a real column.
+ */
+export type PublicProfileFields =
+  | 'id'
+  | 'username'
+  | 'full_name'
+  | 'bio'
+  | 'avatar_url'
+  | 'theme'
+  | 'title'
+  | 'brokerage_name'
+  | 'brokerage_logo'
+  | 'years_experience'
+  | 'certifications'
+  | 'specialties'
+  | 'service_cities'
+  | 'service_zip_codes'
+  | 'license_number'
+  | 'license_state'
+  | 'phone'
+  | 'sms_enabled'
+  | 'email_display'
+  | 'calendly_url'
+  | 'instagram_url'
+  | 'facebook_url'
+  | 'linkedin_url'
+  | 'tiktok_url'
+  | 'youtube_url'
+  | 'zillow_url'
+  | 'realtor_com_url'
+  | 'website_url'
+  | 'seo_title'
+  | 'seo_description'
+  | 'og_image'
+  | 'created_at'
+  | 'is_published';
+
+export type PublicProfile = Pick<Profile, PublicProfileFields>;

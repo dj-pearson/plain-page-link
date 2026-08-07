@@ -103,17 +103,15 @@ jobs:
         run: psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f scripts/supabase-prelude.sql
 
       - name: Apply migrations
-        # Three passes: a handful of migrations are not order-independent (four
-        # duplicated timestamp prefixes, files that index columns a later
-        # migration adds), so the schema needs more than one pass to converge.
-        # Errors are tolerated per statement here; verify-schema.mjs is what
-        # decides whether the resulting schema is acceptable.
+        # One pass, and errors are fatal. This was three passes with errors
+        # swallowed until US-060 replaced the 89 non-order-independent
+        # migrations with a squashed baseline; if that ever regresses, this step
+        # fails rather than quietly converging on the next pass.
+        # supabase/migrations/archive/ is deliberately not applied.
         run: |
-          for pass in 1 2 3; do
-            echo "--- pass $pass ---"
-            for f in $(ls supabase/migrations/*.sql | sort); do
-              psql "$DB_URL" -q -f "$f" >/dev/null 2>&1 || true
-            done
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            echo "--- $f ---"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"
           done
           psql "$DB_URL" -tAc "SELECT 'tables: ' || count(*) FROM information_schema.tables WHERE table_schema='public';"
 

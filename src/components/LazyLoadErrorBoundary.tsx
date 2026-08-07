@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertCircle, RefreshCcw, Home } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -36,14 +37,15 @@ export class LazyLoadErrorBoundary extends Component<Props, State> {
       error.message.includes('Importing a module script failed');
 
     if (isChunkLoadError) {
-      console.error('[LazyLoad] Chunk loading failed:', error.message);
+      logger.error('[LazyLoad] Chunk loading failed', error);
 
-      // Store error info for debugging
       if (import.meta.env.DEV) {
-        console.error('[LazyLoad] Error details:', errorInfo);
+        logger.debug('[LazyLoad] Error details', { componentStack: errorInfo.componentStack });
       }
     } else {
-      console.error('[LazyLoad] Unexpected error:', error, errorInfo);
+      logger.error('[LazyLoad] Unexpected error', error, {
+        componentStack: errorInfo.componentStack,
+      });
     }
   }
 

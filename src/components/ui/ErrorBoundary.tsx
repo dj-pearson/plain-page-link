@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertCircle, RefreshCcw, Home } from 'lucide-react';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
+import { logger } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -53,9 +54,10 @@ export default class ErrorBoundary extends Component<Props, State> {
       eventId,
     });
 
-    // Log to console in development
+    // Log in development. logger.error redacts sensitive values and suppresses
+    // stack traces in production, so the DEV guard only controls the noise.
     if (import.meta.env.DEV) {
-      console.error('Uncaught error:', error, errorInfo);
+      logger.error('Uncaught error', error, { componentStack: errorInfo.componentStack });
     }
   }
 

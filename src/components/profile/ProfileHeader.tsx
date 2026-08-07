@@ -1,9 +1,9 @@
 import { MapPin, Award, ShieldCheck, Zap, Star, Building2, CheckCircle2 } from 'lucide-react';
-import type { Profile } from '@/types';
+import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
 
 interface ProfileHeaderProps {
-  profile: Profile;
+  profile: PublicProfile;
   stats?: {
     propertiesSold?: number;
     averageRating?: number;
@@ -60,16 +60,16 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
           <div className="flex flex-col items-center md:items-start">
             {/* Profile Photo */}
             <div className="relative mb-3">
-              {profile.profile_photo ? (
+              {profile.avatar_url ? (
                 <img
-                  src={profile.profile_photo}
-                  alt={profile.display_name}
+                  src={profile.avatar_url}
+                  alt={profile.full_name || profile.username}
                   className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-white shadow-xl"
                 />
               ) : (
                 <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-4 border-white shadow-xl">
                   <span className="text-3xl md:text-4xl font-bold text-white">
-                    {(profile.display_name || profile.full_name || profile.username || 'U')
+                    {(profile.full_name || profile.username || 'U')
                       .split(' ')
                       .map((n) => n[0])
                       .join('')
@@ -97,7 +97,7 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
             {/* Name & Title */}
             <div className="mb-4">
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-1">
-                {profile.display_name || profile.full_name || profile.username}
+                {profile.full_name || profile.username}
               </h1>
               {profile.title && (
                 <p className="text-base md:text-lg text-blue-600 font-semibold">{profile.title}</p>

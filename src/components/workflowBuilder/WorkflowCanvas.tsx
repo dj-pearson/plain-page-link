@@ -17,32 +17,14 @@ export const WorkflowCanvas = ({ className }: WorkflowCanvasProps) => {
     connectionStart,
     selectNode,
     addNode,
-    updateNode,
     startConnection,
     completeConnection,
     cancelConnection,
-    addEdge,
     updateViewport,
   } = useWorkflowBuilderStore();
 
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-
-  // Handle node drag within canvas
-  const handleNodeDrag = useCallback(
-    (nodeId: string, e: React.DragEvent) => {
-      if (!canvasRef.current) return;
-
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left - (workflow?.viewport.x || 0);
-      const y = e.clientY - rect.top - (workflow?.viewport.y || 0);
-
-      updateNode(nodeId, { position: { x, y } });
-    },
-    [workflow?.viewport, updateNode]
-  );
 
   // Handle dropping new node from palette
   const handleDrop = useCallback(

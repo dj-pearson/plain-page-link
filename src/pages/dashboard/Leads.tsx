@@ -54,7 +54,7 @@ export default function Leads() {
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date');
   const { user } = useAuthStore();
   const { toast } = useToast();
-  const { subscription, hasFeature } = useSubscriptionLimits();
+  const { subscription } = useSubscriptionLimits();
   const { scoreLeadObject } = useMLLeadScoring();
 
   const [slaHours, setSlaHours] = useState(2);

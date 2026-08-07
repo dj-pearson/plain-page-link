@@ -74,7 +74,6 @@ export function LeadDetailView({
   onClose,
   onUpdateStatus,
   onAddNote,
-  onSendEmail,
   onScheduleCall,
   className,
 }: LeadDetailViewProps) {

@@ -860,7 +860,7 @@
       ],
       "priority": 51,
       "passes": true,
-      "notes": "Partial migration completed: auth pages, leads dashboard, lead detail modal, and ML scoring hook. Remaining files need systematic migration. Run: grep -rn 'console\\.' src/ --include='*.ts' --include='*.tsx' | grep -v logger.ts to find remaining instances."
+      "notes": "DONE 2026-08-06. All 38 raw console statements migrated across 25 files; grep over src/components, src/hooks, src/pages and src/stores now returns zero, which is what the acceptance criterion asks for. eslint no-console is down from 20 to 17, the remainder all in src/lib/ and src/integrations/ (logger.ts itself, sw-cleanup, web-vitals, offline-storage, sentry, the supabase client) which the criterion does not cover and where a raw console is the right call -- those are the low-level modules the logger is built on top of. Mostly scripted, then reviewed call by call rather than trusted: console.log/debug -> logger.debug, console.warn -> logger.warn with the second argument wrapped as a context object (logger.warn takes context, not an error), console.error -> logger.error which does take an error second. Four hand corrections the script got wrong or crudely: the two error boundaries pass three arguments, so errorInfo became { componentStack }; LazyLoadErrorBoundary was passing error.message where the Error itself is more useful; and OptimizedImage/ProgressiveImage were logging a failed image URL at error level with the URL in the error slot, now logger.warn with { src } as context. The script also mis-inserted the import into the middle of a multi-line import in four files -- caught by eslint (4 parsing errors) and fixed. Final: eslint 0 errors / 899 warnings (was 0 / 902), tsc back at the 356 baseline, 274 tests pass, build passes."
     },
     {
       "id": "US-052",
@@ -944,7 +944,7 @@
       ],
       "priority": 56,
       "passes": false,
-      "notes": "Largest clusters: src/stores/useWorkflowBuilderStore.ts (20), src/pages/public/FullProfilePage.tsx (19), src/lib/security/ownership.ts (18). 85 of the remainder are TS6133 unused locals/params - unlike unused imports these can mark genuinely missing logic, so read each rather than deleting mechanically. Do NOT silence errors with `as any`. See docs/PLATFORM_AUDIT_2026-07.md item 1. A design decision is needed before grinding the TS2769 'No overload matches this call' cluster (48 errors): modules that address tables dynamically - src/lib/security/ownership.ts (17), secureQuery.ts, useWorkflowBuilderStore.ts - take `table: string` and pass it to supabase.from(), which no longer type-checks now that types.ts is accurate. Pick one approach and apply it consistently: either narrow these to a `keyof Database['public']['Tables']` union, or give each inherently dynamic module a single narrow documented escape hatch (as src/pages/dashboard/SubscriptionPage.tsx already does for its invoices query). Scattered `as any` is not acceptable per CLAUDE.md. Note that fixing ownership.ts already surfaced a real bug (articles mapped to user_id), so expect more genuine defects in this cluster rather than pure noise."
+      "notes": "IN PROGRESS 2026-08-06: 694 -> 357 (earlier pass) -> 321 at the start of this work -> 148. NOT DONE: the acceptance criteria require 0 errors and CI re-gated, and CI is still un-gated. DESIGN DECISION (settled): dynamically-addressed tables go through one shared escape hatch, src/lib/supabaseDynamic.ts. Narrowing to a keyof union was rejected on evidence — ownership.ts already emitted TS2589 'excessively deep' before any narrowing. The hatch widens the schema generics at the client, not just the table name, because a builder from the strict client resolves insert/update args to `never` for an unidentifiable table. WHAT THIS BACKLOG KEEPS TURNING UP: eight live defects so far, every one hidden behind a type that described what a feature should have rather than what the schema has — the missing profile headshot, failed listing inserts (agents could not add a property at all), discarded property highlights, the missing Text button, a mangled approveFiximestamp() call that made the SEO Approve button throw, a drop-off indicator gated on an undefined variable, HeroSection ignoring the title/subtitle/description every landing page passes it, and ListingDetailModal rendering state/zip/MLS/lot-size/virtual-tour/highlights that the query never selected. The pattern is now closed structurally: Profile, PublicProfile, PublicListing, PublicProfileListing and Testimonial all derive from Database['public']['Tables'][...]['Row'], and the two query boundaries are modelled with Pick so a column the UI reads but the query omits is a compile error. REMAINING 148 across 74 files, no cluster larger than 9: TS2322 45, TS2345 30, TS2769 24, TS2339 20. Largest files: BlogArticle 9, useAuthStore 6, FullProfilePage 6, Analytics 5, LeadManagementDashboard 5, usePSEO 5, SystemHealthMonitor 5. DO NOT batch-fix these mechanically. Every cluster typed honestly in this session surfaced a real defect, and the two times a script was trusted over reading it produced `______totalArticles`, three `const {} =` empty patterns, and two files broken badly enough that tsc bailed and reported 3 errors instead of 189. Work file by file. Re-gate CI (remove the carve-out comment in ci.yml, restore `needs: typecheck`) only once the count is 0. src/lib/security/validation.ts's TS2769s are a DOMPurify ALLOWED_ATTR config-shape mismatch, unrelated to anything above."
     },
     {
       "id": "US-057",
@@ -960,8 +960,8 @@
         "npx tsc --noEmit reports no errors in the affected files"
       ],
       "priority": 57,
-      "passes": false,
-      "notes": "This is a product call, not a mechanical fix - per-feature stats cannot be derived from monthly_usage_summary.features_used (a jsonb blob) without knowing the intended shape. Full inventory of the mismatches is in docs/PLATFORM_AUDIT_2026-07.md item 2. The hooks currently have zero callers, so nothing regresses either way."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Decision recorded: DELETE, chosen by the product owner. Removed src/lib/usageTracking.ts, src/hooks/useFeatureUsage.ts and src/types/features.ts. All three had zero importers, confirmed by grep before deleting, so nothing regressed. Clears 25 of the tsc errors in US-056. No tests existed for them. Metered/overage billing can be rebuilt against the real schema when it is actually on the roadmap; the feature_usage, monthly_usage_summary and feature_catalog tables are untouched."
     },
     {
       "id": "US-058",
@@ -975,8 +975,8 @@
         "npm run build passes and npx tsc --noEmit reports no errors in the file"
       ],
       "priority": 58,
-      "passes": false,
-      "notes": "The mortgage_calculations table now exists (migration 20260730000001) with an anon INSERT policy and owner-only SELECT, so the backend is ready either way. Note .order()/.limit() do not scope an UPDATE the way the current code implies. See docs/PLATFORM_AUDIT_2026-07.md item 3."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Decision recorded: DELETE, chosen by the product owner. Removed src/components/features/MortgageCalculator.tsx. It had never been reachable — zero importers, and it could not have built anyway since @/components/ui/slider does not exist and @radix-ui/react-slider is not a dependency — so no user has ever seen it. Clears 7 tsc errors. The mortgage_calculations table (20260730000001) is deliberately left in place with its anon INSERT / owner SELECT policies, so the feature can come back without schema work."
     },
     {
       "id": "US-059",
@@ -991,8 +991,8 @@
         "npm run verify:schema passes with the shrunken allowlist"
       ],
       "priority": 59,
-      "passes": false,
-      "notes": "Deliberately allowlisted rather than invented during the audit, so the CI schema job could be blocking today. Take entries off the list one at a time. See docs/PLATFORM_AUDIT_2026-07.md item 4."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Decision recorded: DELETE the unreachable callers, chosen by the product owner. Removed five edge functions (ingest-analytics, register-push-token, unregister-push-token, sync-backlinks, track-serp-positions) and src/lib/visitorAnalytics.ts, which nothing imported. `purchases` needed different handling: its caller is stripe-webhook, which obviously stays. Checked reachability rather than assuming — create-checkout-session supports mode: 'payment', but neither src/ call site (Pricing.tsx, SubscriptionPage.tsx) passes mode or productType, so the one-time-purchase path was unreachable and its writes had always failed silently against a table that does not exist. Removed both purchases blocks from the webhook with a comment saying what would be needed to bring add-ons back. Push: the AC's 'work end to end or remove' clause resolved to remove. registerToken POSTed to /api/v1/notifications/register, a route that exists nowhere in this repo, so registration had never worked even before the missing table. Removed src/lib/push-notifications.ts, public/firebase-messaging-sw.js and the App.tsx effect that asked every logged-in visitor for notification permission to no purpose. That left firebase with no consumers, so the dependency and its manualChunks entry are gone too — 83 packages removed and the 54.6 kB firebase-vendor chunk no longer ships. In-app notifications (US-049) are unaffected; they use Supabase Realtime over the notifications table. KNOWN_UNDEFINED_TABLES is now empty and verify:schema passes with all 8 checks green. tsc 356 -> 322 across US-057/058/059, 274 tests pass, build and size-check pass."
     },
     {
       "id": "US-060",
@@ -1007,8 +1007,8 @@
         "npm run verify:schema still passes afterwards"
       ],
       "priority": 60,
-      "passes": false,
-      "notes": "A squashed baseline migration is probably cleaner than patching 85 files. Duplicated prefixes: 20250110, 20251031000001, 20251031000002, 20251031000003. Full list of the ten failures is in scripts/README-types-generation.md and docs/PLATFORM_AUDIT_2026-07.md item 5."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Approach chosen by the product owner: squashed baseline. supabase/migrations/ now holds one file, 20260806000005_squashed_baseline.sql — the converged schema the previous 89 produce, taken with pg_dump --schema-only --schema=public from a real three-pass build. The 89 originals move verbatim to supabase/migrations/archive/ with a README, one level below the directory `supabase db push` reads, so they are preserved for history but never re-run. Proved equivalent rather than assumed: a normalised pg_dump of the single-pass baseline build is byte-for-byte IDENTICAL to the three-pass build it replaces. 134 tables, 101 functions, 277 policies, 402 indexes, 80 triggers, 2 enums. pg_net is guarded in a DO block on pg_available_extensions rather than dropped: hosted Supabase ships it and notify_lead_on_insert() calls net.http_post(), but a plain Postgres does not, and the unguarded CREATE EXTENSION was one of the ten failures. Checked what the old failure had actually cost — the profiles.notification_preferences column, the function and its trigger all survived, because the old CI loop ran psql without ON_ERROR_STOP and continued past the failing statement; only the extension itself was missing. verify-backend.yml's three-pass loop is now one pass with ON_ERROR_STOP=1 and errors fatal, so a regression fails the job instead of quietly converging on a later pass. DEPLOYMENT.md documents the one-time production step: `supabase migration repair --status applied 20260806000005` before the next db push against a pre-existing project, since the baseline must not re-run where its 134 tables already exist. A new environment needs no repair — that is the point of the change. Verified from empty in a single pass with zero errors: 134 tables, all 8 verify:schema checks green including the lead pipeline smoke test, types.ts still in sync, validate-migrations green."
     },
     {
       "id": "US-061",
@@ -1021,8 +1021,8 @@
         "CLAUDE.md documents npm run types:generate and npm run verify:schema"
       ],
       "priority": 61,
-      "passes": false,
-      "notes": "This is not cosmetic: the gdpr-export bug fixed in this branch queried `blog_posts`, exactly the table CLAUDE.md describes. Keep the Pearson Media shared block between its markers untouched. See docs/PLATFORM_AUDIT_2026-07.md item 6."
+      "passes": true,
+      "notes": "DONE 2026-08-06. Section rewritten against the real schema pulled from a rebuilt Postgres, not from memory. blog_posts replaced by articles with its 19 real columns, and the old name kept only in a short note explaining that it is what put `blog_posts` into gdpr-export. types.ts named authoritative up front with the 134-table count, and types:generate / types:check / verify:schema / verify:migrations all documented. The four documented tables were more wrong than the story assumed: listings had no `title` column, `price` is text not numeric, and `images` does not exist (it is `photos`, plus a legacy single `image`) -- while beds, baths and city are NOT NULL and went unmentioned. leads' type column is `lead_type`, the name that once aborted every insert. profiles has ~45 columns, not 7. Checking the prose turned up three more false claims, now corrected: there is no `usesSoftDelete` hook anywhere in src/, exactly one table carries deleted_at rather than 'some', and 10 tables have no created_at against a claim that all do. Added what a reader actually needs next to each: the links click_count write path and why not to re-add an UPDATE policy, the TO service_role rule behind US-063, the search_path pin behind US-062, and the migration-ordering caveat behind US-060. The Pearson Media shared block between its markers is untouched (0 lines in the diff)."
     },
     {
       "id": "US-062",
@@ -1035,8 +1035,86 @@
         "The lead pipeline smoke test still passes, confirming no function broke"
       ],
       "priority": 62,
-      "passes": false,
-      "notes": "scripts/verify-schema.mjs already enumerates them - run it to get the current list. Reported rather than enforced during the audit because it is a pre-existing backlog. Prefer a single corrective migration using ALTER FUNCTION ... SET search_path = public over rewriting each body. See docs/PLATFORM_AUDIT_2026-07.md item 6."
+      "passes": true,
+      "notes": "DONE 2026-08-06 in migration 20260806000003_pin_security_definer_search_path.sql. All 50 pinned via ALTER FUNCTION rather than rewriting bodies, so there is no chance of a transcription error in the logic and the migration is idempotent for the CI three-pass loop. Pin is `public, extensions, pg_temp`, not bare `public`: pgcrypto and uuid-ossp live in `extensions` both locally and on hosted Supabase, and generate_encryption_key() calls gen_random_bytes(), so a bare public pin would have broken it -- confirmed by calling it after the pin. pg_temp is named last precisely so it is searched last instead of first, which is the actual attack. The two functions already pinned (search_path=public and search_path=public, auth) were left alone. Demonstrated both ways on a clone of log_audit_event: unpinned, an authenticated attacker's `CREATE TEMP TABLE audit_logs` captured the audit row (temp=1, real=0) -- the audit trail silently diverted; pinned, the same attack captured nothing and the row reached the real table (temp=0, real=1). The search_path check in verify-schema.mjs is promoted from a note to blocking check 8, proven to fire by unpinning one function (exit 1) and restoring it (exit 0). Verified on a from-scratch three-pass rebuild: 146 tables, all 8 checks pass including the lead pipeline smoke test, validate-migrations passes on 88 files, and types.ts is still in sync."
+    },
+    {
+      "id": "US-063",
+      "title": "Scope the twelve service-role RLS policies so anon cannot read or write them",
+      "description": "Twelve policies are written as CREATE POLICY \"Service role can manage X\" ON t FOR ALL USING (true) with no TO clause. Postgres defaults that to TO PUBLIC, and Supabase grants ALL on every public table to anon, whose key ships in the frontend bundle. Every anonymous visitor therefore has unrestricted SELECT/INSERT/UPDATE/DELETE on audit_logs, user_subscriptions, login_attempts, mfa_temp_codes, user_sessions, sso_login_sessions, gdpr_data_requests, account_deletion_scheduled, usage_tracking, rate_limit_entries, workflow_executions and workflow_execution_queue.",
+      "acceptanceCriteria": [
+        "A corrective migration drops and recreates each of the twelve policies with TO service_role",
+        "No policy in the public schema grants ALL/SELECT/UPDATE/DELETE to PUBLIC with a `true` qualifier on a non-public-data table",
+        "Connected as anon, SELECT and DELETE on audit_logs are denied; UPDATE on user_subscriptions is denied",
+        "The edge functions that write these tables still work (they use service_role, which is BYPASSRLS)",
+        "npm run verify:schema passes",
+        "The lead pipeline smoke test still passes"
+      ],
+      "priority": 63,
+      "passes": true,
+      "notes": "DONE 2026-08-06 in migration 20260806000001_scope_service_role_policies.sql. Scoped 16 policies to TO service_role - the 12 FOR ALL ones plus four FOR INSERT ones with the same defect (mfa_verification_logs, notifications, pii_encryption_audit, query_metrics); the notifications one let any visitor inject arbitrary title/message/data into any user's notification bell. Safe to narrow because every edge-function writer uses SUPABASE_SERVICE_ROLE_KEY (the one exception, _shared/db-monitor.ts, has no callers) and every in-database writer (log_audit_event, notify_new_lead, record_login_attempt, check_rate_limit, update_usage_count, log_encryption_operation, start_workflow_execution) is SECURITY DEFINER. Narrowing user_subscriptions removed the admin health dashboard's cross-user read, so the migration adds an explicit \"Admins can view all subscriptions\" policy using the same has_role() pattern as audit_logs. Verified against a rebuilt Postgres with rows present: anon SELECT/DELETE returns 0 on audit_logs, user_subscriptions, user_sessions, login_attempts, mfa_temp_codes and notifications; owners still read their own rows; admin reads all 4 audit_logs; cross-tenant reads return 0; anon INSERT into notifications is denied by RLS. verify:schema passes including the lead pipeline smoke test, validate-migrations passes (86 files), and the migration is idempotent across the CI three-pass loop."
+    },
+    {
+      "id": "US-064",
+      "title": "Stop anonymous visitors rewriting any user's public profile links",
+      "description": "The \"Anyone can increment link clicks\" policy on links is FOR UPDATE USING (true) WITH CHECK (true). It is intended to let a visitor bump click_count, but it grants UPDATE on every column of every row - so any visitor can repoint any published profile link at a site of their choosing.",
+      "acceptanceCriteria": [
+        "Connected as anon, UPDATE links SET url=... is denied",
+        "Click counting still works from a public profile page with no authenticated session",
+        "Either the policy is replaced by a SECURITY DEFINER increment_link_click(link_id) RPC, or WITH CHECK pins every column except click_count",
+        "If an RPC is added it pins search_path (see US-062) and is called by the profile click handler",
+        "npm run verify:schema passes"
+      ],
+      "priority": 64,
+      "passes": true,
+      "notes": "DONE 2026-08-06 in migration 20260806000002_fix_links_click_policy.sql. Took the RPC route: public.increment_link_clicks() already existed, was already SECURITY DEFINER and already pinned search_path, so the permissive UPDATE policy was redundant as well as dangerous - it was propping up nothing but the 'fallback: try direct update' branch in src/hooks/useProfileTracking.ts, which is removed alongside it. Migration drops the policy, grants EXECUTE on the function to anon/authenticated and adds a COMMENT warning against re-adding a permissive UPDATE policy. Verified: anon UPDATE of links.url is now UPDATE 0 and the url is intact, anon can still SELECT active links and still increments click_count through the RPC (0 -> 1), the owner can still update their own link, and another authenticated user gets UPDATE 0. Also fixed a double-count found while tracing the write path: FullProfilePage called trackLinkClick (which already increments) and then increment_link_clicks again, so every click counted twice. tsc unchanged at 356 errors, 274 tests pass, build passes, eslint clean on both changed files."
+    },
+    {
+      "id": "US-065",
+      "title": "Make verify-schema.mjs fail on over-permissive RLS policies",
+      "description": "The schema job checks that RLS is enabled on every table but never inspects what the policies grant, so both US-063 and US-064 passed CI. Add a blocking check for permissive policies that apply to PUBLIC with a `true` qualifier.",
+      "acceptanceCriteria": [
+        "verify-schema.mjs gains a blocking check for policies with roles = {public} and qual/with_check `true` on write commands",
+        "Tables that are legitimately public (leads INSERT, analytics_views INSERT, mortgage_calculations INSERT, feature_catalog SELECT, the seo_* public reads) are allowlisted by name with a one-line reason each, as KNOWN_UNDEFINED_TABLES already does",
+        "The check fails on the current schema before US-063/US-064 land and passes after",
+        "npm run verify:schema passes with the new check enabled"
+      ],
+      "priority": 65,
+      "passes": true,
+      "notes": "DONE 2026-08-06 in scripts/verify-schema.mjs as check 3, 'no undeclared over-permissive RLS policy'. Flags any PERMISSIVE policy reaching anon/authenticated with an unconditional predicate (qual=true, or with_check=true for INSERT) unless declared. Two lists, following the KNOWN_UNDEFINED_TABLES precedent: PUBLIC_BY_DESIGN (13 entries, each with a one-line reason) for genuinely public reads and anonymous submissions, and KNOWN_OVERPERMISSIVE (12 entries) for pre-existing defects, each tagged with its story so the check can be blocking today. A companion loop emits a note when a KNOWN_OVERPERMISSIVE entry has been fixed, so the list cannot rot into hiding the next regression. Proven in both directions: re-introducing the exact US-063 shape (audit_logs FOR ALL USING (true)) and the US-064 shape (links FOR UPDATE USING (true)) makes it FAIL with exit code 1 naming both, dropping them returns exit code 0, and fixing an allowlisted entry emits the stale-entry note. Building it surfaced 12 pre-existing exposures now filed as US-067."
+    },
+    {
+      "id": "US-066",
+      "title": "Move the PII encryption key off the client bundle",
+      "description": "src/lib/pii.ts derives its AES-256-GCM master key from import.meta.env.VITE_PII_ENCRYPTION_KEY. Vite inlines every VITE_-prefixed value into the production bundle, so the key protecting encrypted_email and encrypted_phone is publicly downloadable. US-015/US-016 met their criteria, but the control protects nothing as deployed.",
+      "acceptanceCriteria": [
+        "PII encrypt/decrypt happens where the key is not shipped to the browser - an edge function using PII_ENCRYPTION_KEY, or Supabase Vault",
+        "VITE_PII_ENCRYPTION_KEY is removed from .env.example and from src/lib/pii.ts",
+        "src/hooks/useLeads.ts and src/hooks/useProfile.ts still round-trip PII correctly through the new path",
+        "src/lib/pii.test.ts still passes",
+        "A note records how existing enc:v1: values are re-keyed, or that the old key stays valid for decryption only",
+        "The plaintext email/phone columns retire on the schedule US-016 describes, once this lands"
+      ],
+      "priority": 66,
+      "passes": true,
+      "notes": "DONE 2026-08-06. Crypto moved into a new `pii-crypto` Edge Function holding PII_ENCRYPTION_KEY; src/lib/pii.ts is now a thin client that cannot decrypt anything on its own, which is the point. VITE_PII_ENCRYPTION_KEY is gone from src/lib/pii.ts, .env.example and DEPLOYMENT.md's env table. Existing ciphertext survives: supabase/functions/_shared/encryption.ts already produced a byte-identical envelope to the old client (same enc:v1: prefix, PBKDF2-SHA256 at 100k iterations, 16-byte salt prepended to the 12-byte IV, base64-of-JSON), verified by reading both implementations side by side. So the migration is carrying the key across, not re-keying -- DEPLOYMENT.md §2.1 documents setting the function secret to the current VITE_PII_ENCRYPTION_KEY value, then removing it from Cloudflare Pages. Rotation is written up as a separate job needing a decrypt-old/re-encrypt-new backfill, and is the reason the plaintext columns should not retire until after it. Batched rather than per-value, or the leads list would have been two round trips per row: pii.ts gains encryptPIIBatch/decryptPIIBatch, useLeads decrypts a whole page in two calls and encrypts both fields in one, and values needing no work (empty, or lacking the enc:v1: prefix) short-circuit locally so an all-plaintext page makes no request at all. The function requires a JWT and is rate limited per user rather than per IP (agents behind one office NAT should not share a budget); confirmed check_rate_limit takes p_identifier text so a `user:<uuid>` key works. Encrypt fails closed, decrypt fails open. Found and removed an adjacent instance of the same defect while checking for leftovers: src/hooks/useEncryption.ts had zero callers and read VITE_ENCRYPTION_SECRET with a hardcoded fallback default -- another bundled key, one import away from being picked up. Deleted along with its env var. src/lib/encryption.ts is kept (pure primitives that take the secret as an argument and read no env var, plus its tests guard the envelope the edge function must stay compatible with) with a header note saying so. pii.test.ts rewritten against a stubbed edge function, covering position preservation, the local short-circuits, and both failure directions: 14 tests, suite total 274 -> 277. tsc unchanged at 321, eslint 0 errors, build and verify:schema green."
+    },
+    {
+      "id": "US-067",
+      "title": "Fix the free-tool tables: prospect list exposure, visitor IP leak, and broken anonymous email capture",
+      "description": "The /tools/* lead-gen tables carry `ALL TO authenticated USING (true)`, so any registered user can read and delete every prospect email, name, phone number and brokerage the free tools have ever captured. instagram_bio_analyses and listing_descriptions additionally carry `SELECT TO anon USING (true)` over rows holding visitor ip_address and user_agent. And the tools' own anonymous email capture is broken: the client issues .insert().select().single(), whose RETURNING needs a SELECT policy that anon does not have, so the insert is rejected and the code rethrows.",
+      "acceptanceCriteria": [
+        "Reading the lead-gen tables is restricted to admins (has_role) and service_role; anonymous submission still works",
+        "No anonymous SELECT over rows carrying ip_address or user_agent",
+        "Anonymous email capture works end to end on both /tools/instagram-bio-analyzer and /tools/listing-description-generator — verified as anon, not reasoned about",
+        "content_suggestions is scoped to its owner (suggested_by) or to admins rather than every authenticated user",
+        "seo_alert_rules is not readable by anon",
+        "Every entry this story covers is removed from KNOWN_OVERPERMISSIVE in scripts/verify-schema.mjs",
+        "npm run verify:schema passes with the shrunken list and emits no stale-entry notes"
+      ],
+      "priority": 67,
+      "passes": true,
+      "notes": "DONE 2026-08-06 in migration 20260806000004_scope_free_tool_tables.sql plus the two tool pages. Access model applied uniformly to the eight lead-gen tables: anon INSERT only, authenticated nothing, admin SELECT via has_role, service_role ALL. Dropped the eight `ALL TO authenticated USING (true)` policies and the two `SELECT TO anon` policies over rows carrying ip_address/user_agent. content_suggestions is now suggested_by = auth.uid() OR admin; seo_alert_rules is admin-only. The broken anonymous capture is fixed on the client rather than by widening the policy: both tools now generate the row id with crypto.randomUUID() and insert it, dropping the .select().single() whose implied RETURNING needed a SELECT policy anon must not have. Exercising it as anon caught a regression that reading the diff would not have: initialize_bio_email_sequence and init_listing_email_sequence are AFTER INSERT triggers on the capture tables that write seven placeholder rows into the *_email_sequences tables, and both were SECURITY INVOKER -- so with the blanket policy gone they ran as anon and their inserts were refused, aborting the visitor's capture. The bio one has a WHEN (new.email_sequence_started = true) clause that only the real client path satisfies, so a careless test would have missed it. Both are now SECURITY DEFINER with search_path pinned per US-062 -- correct because those rows are system-generated and should not be forgeable by a visitor. Also fixed an adjacent bug that was unreachable while capture was broken: the Instagram tool passed `captureData?.id || analysisId` as the edge function's analysisId, but send-bio-analyzer-email looks that id up in instagram_bio_email_captures and stores it as email_capture_id, so it wants the capture row -- the fallback would have failed the lookup. Now passes the capture id. Verified as anon: both captures succeed, 7 and 6 sequence rows are created, and anon reads back 0 from every affected table; a freshly registered user reads and deletes 0; admin still reads the funnel. KNOWN_OVERPERMISSIVE is now empty alongside KNOWN_UNDEFINED_TABLES. Fresh three-pass rebuild green on all 8 checks, validate-migrations green on 89 files, tsc 322 -> 321, 274 tests, build and lint clean."
     }
   ]
 }

@@ -124,23 +124,13 @@ function App() {
     offlineStorage.init();
   }, [initialize]);
 
-  // Handle push notification registration when user logs in
-  // Firebase is dynamically imported to avoid loading ~200KB on initial page load
-  useEffect(() => {
-    const initAndRegisterPushNotifications = async () => {
-      if (user) {
-        // Dynamically import push notifications only when user is logged in
-        const { pushNotifications } = await import('./lib/push-notifications');
-        await pushNotifications.init();
-        const hasPermission = await pushNotifications.requestPermission();
-        if (hasPermission) {
-          await pushNotifications.registerToken(user.id);
-        }
-      }
-    };
-
-    initAndRegisterPushNotifications();
-  }, [user]);
+  // Web push was removed in US-059. The client asked the visitor for
+  // notification permission on every login and then POSTed the FCM token to
+  // /api/v1/notifications/register — a route that does not exist in this app —
+  // while the register/unregister edge functions wrote to a `push_tokens` table
+  // no migration ever created. Nothing worked end to end, so the whole path is
+  // gone rather than half-present. In-app notifications (US-049) are unaffected;
+  // they use Supabase Realtime over the `notifications` table.
 
   // Set user context for error monitoring
   useEffect(() => {

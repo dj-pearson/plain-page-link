@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 interface Listing {
   id: string;
@@ -48,7 +49,6 @@ interface BulkUpdateData {
 export function BulkEditMode({
   listings,
   selectedIds,
-  onToggleSelect,
   onSelectAll,
   onClearSelection,
   onBulkUpdate,
@@ -94,7 +94,7 @@ export function BulkEditMode({
       setBulkUpdates({});
       setPriceValue('');
     } catch (error) {
-      console.error('Bulk update failed:', error);
+      logger.error('Bulk update failed', error);
       toast.error('Failed to update listings');
     }
   };
@@ -114,7 +114,7 @@ export function BulkEditMode({
       toast.success(`${selectedIds.length} listing(s) deleted`);
       onClearSelection();
     } catch (error) {
-      console.error('Bulk delete failed:', error);
+      logger.error('Bulk delete failed', error);
       toast.error('Failed to delete listings');
     }
   };

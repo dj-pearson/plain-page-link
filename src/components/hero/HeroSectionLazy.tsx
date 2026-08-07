@@ -1,9 +1,11 @@
 import { lazy, Suspense } from 'react';
 
 // Lazy load the full HeroSection with GSAP and 3D components
-const HeroSectionFull = lazy(() => import('./HeroSection').then(module => ({
-  default: module.HeroSection
-})));
+const HeroSectionFull = lazy(() =>
+  import('./HeroSection').then((module) => ({
+    default: module.HeroSection,
+  }))
+);
 
 interface HeroSectionProps {
   title?: string;
@@ -30,8 +32,6 @@ interface HeroSectionProps {
  * Saves ~900KB+ on initial page load (GSAP + Three.js)
  */
 function HeroFallback({
-  title = 'AgentBio Intelligence',
-  subtitle = 'Stop Guessing. Start Closing.',
   primaryCta = { text: 'Start Building Your Data Moat', href: '/auth/register' },
   secondaryCta = { text: 'See How It Works', href: '#demo-profiles' },
   badge,
@@ -44,7 +44,10 @@ function HeroFallback({
       {/* Animated gradient orbs - pure CSS */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-teal-400/20 to-blue-400/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div
+          className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-teal-400/20 to-blue-400/20 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: '1s' }}
+        />
       </div>
 
       {/* Content */}
@@ -74,7 +77,9 @@ function HeroFallback({
 
           {/* Description */}
           <p className="text-lg text-slate-600 dark:text-slate-400 mb-10 max-w-2xl leading-relaxed">
-            While your competitors use basic link-in-bio tools, you'll have a complete real estate portfolio with property galleries, lead capture forms, and appointment booking—all optimized to convert social media traffic into closings.
+            While your competitors use basic link-in-bio tools, you'll have a complete real estate
+            portfolio with property galleries, lead capture forms, and appointment booking—all
+            optimized to convert social media traffic into closings.
           </p>
 
           {/* CTAs */}
@@ -85,7 +90,12 @@ function HeroFallback({
             >
               {primaryCta.text}
               <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 8l4 4m0 0l-4 4m4-4H3"
+                />
               </svg>
             </a>
 

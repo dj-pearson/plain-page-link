@@ -23,11 +23,11 @@ import { getImageUrls } from '@/lib/images';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { PublicListing } from '@/types';
+import type { PublicProfileListing } from '@/types';
 import { realEstateListingSchema } from '@/lib/structured-data';
 
 interface ListingDetailModalProps {
-  listing: PublicListing;
+  listing: PublicProfileListing;
   isOpen: boolean;
   onClose: () => void;
   calendlyUrl?: string;
@@ -75,7 +75,7 @@ export default function ListingDetailModal({
     'listings'
   );
 
-  const address = listing.address || listing.title || '';
+  const address = listing.address || '';
   const city = listing.city || '';
   const state = listing.state || '';
   const zipCode = listing.zip_code || '';
@@ -170,21 +170,15 @@ export default function ListingDetailModal({
 
   if (!isOpen) return null;
 
-  const highlightsList = highlights
-    ? typeof highlights === 'string'
-      ? highlights
-          .split(',')
-          .map((h: string) => h.trim())
-          .filter(Boolean)
-      : Array.isArray(highlights)
-        ? highlights
-        : []
-    : [];
+  // `highlights` is text[] since US-056 added the column, so the old
+  // string-splitting branch is unreachable. Kept the array guard: the value
+  // comes from the database and an older row could hold anything.
+  const highlightsList = Array.isArray(highlights) ? highlights : [];
 
   // JSON-LD structured data for this listing (price, address, details) so
   // shared/indexed property views are search-engine readable.
   const listingSchema = realEstateListingSchema({
-    title: address || listing.title || 'Property listing',
+    title: address || 'Property listing',
     description,
     price: price || undefined,
     address,
@@ -194,7 +188,7 @@ export default function ListingDetailModal({
     bathrooms: baths || undefined,
     squareFeet: sqft || undefined,
     images: photos ?? undefined,
-    status: listing.status,
+    status: listing.status ?? undefined,
   });
 
   return (
@@ -228,10 +222,10 @@ export default function ListingDetailModal({
             <span
               className={cn(
                 'px-2.5 py-1 rounded-full text-xs font-semibold',
-                statusColors[listing.status] || 'bg-gray-500 text-white'
+                statusColors[listing.status ?? 'active'] || 'bg-gray-500 text-white'
               )}
             >
-              {statusLabels[listing.status] || listing.status}
+              {statusLabels[listing.status ?? 'active'] || listing.status}
             </span>
             {mlsNumber && <span className="text-xs text-gray-500">MLS# {mlsNumber}</span>}
           </div>

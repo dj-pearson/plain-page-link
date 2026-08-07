@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Check,
   ArrowRight,
@@ -49,8 +48,6 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
     },
     importOption: null as 'scratch' | 'linktree' | null,
   });
-
-  const navigate = useNavigate();
 
   const totalSteps = 5;
   const progress = (currentStep / totalSteps) * 100;

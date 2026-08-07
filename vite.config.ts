@@ -95,7 +95,6 @@ export default defineConfig(({ mode }) => ({
           // Markdown rendering - only needed for blog
           'markdown-vendor': ['react-markdown', 'remark-gfm'],
           // Firebase - only needed for push notifications
-          'firebase-vendor': ['firebase/app', 'firebase/messaging'],
           // Form handling
           'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
           // State management

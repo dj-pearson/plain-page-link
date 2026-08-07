@@ -1,5 +1,6 @@
-import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 /**
  * Hook to track profile page views
@@ -12,21 +13,19 @@ export function useProfileTracking(userId: string | undefined, username: string)
     const trackView = async () => {
       try {
         // Generate or retrieve visitor ID from localStorage
-        let visitorId = localStorage.getItem("visitor_id");
+        let visitorId = localStorage.getItem('visitor_id');
         if (!visitorId) {
           visitorId = crypto.randomUUID();
-          localStorage.setItem("visitor_id", visitorId);
+          localStorage.setItem('visitor_id', visitorId);
         }
 
         // Get basic device/location info
-        const device = /Mobile|Android|iPhone/i.test(navigator.userAgent)
-          ? "mobile"
-          : "desktop";
-        
-        const source = document.referrer || "direct";
+        const device = /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+
+        const source = document.referrer || 'direct';
 
         // Insert analytics view (table may not exist yet — fail silently)
-        await supabase.from("analytics_views").insert({
+        await supabase.from('analytics_views').insert({
           user_id: userId,
           visitor_id: visitorId,
           device,
@@ -48,29 +47,20 @@ export function useProfileTracking(userId: string | undefined, username: string)
  */
 export async function trackLinkClick(linkId: string) {
   try {
-    // Increment click count
-    const { error } = await supabase.rpc("increment_link_clicks", {
+    // increment_link_clicks is SECURITY DEFINER, so it works for anonymous
+    // visitors without any UPDATE grant on `links`. There is deliberately no
+    // direct-update fallback: the permissive UPDATE policy that made one
+    // possible let any visitor rewrite any profile's link targets, and was
+    // dropped in migration 20260806000002. A failed click count is not worth
+    // reopening that.
+    const { error } = await supabase.rpc('increment_link_clicks', {
       link_id: linkId,
     });
 
     if (error) {
-      // Fallback: try direct update
-      const { data: link } = await supabase
-        .from("links")
-        .select("click_count")
-        .eq("id", linkId)
-        .single();
-
-      if (link) {
-        await supabase
-          .from("links")
-          .update({ click_count: (link.click_count || 0) + 1 })
-          .eq("id", linkId)
-          .select('id')
-          .single();
-      }
+      logger.warn('Failed to increment link click count', { linkId });
     }
   } catch (error) {
-    console.error("Error tracking link click:", error);
+    logger.error('Error tracking link click', error);
   }
 }

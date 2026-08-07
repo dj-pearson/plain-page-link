@@ -19,8 +19,12 @@ export function TestimonialSection({ testimonials }: TestimonialSectionProps) {
     // Featured first, then by sort_order, then by date
     if (a.is_featured && !b.is_featured) return -1;
     if (!a.is_featured && b.is_featured) return 1;
-    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
+    // sort_order and date are nullable in the schema; treat a missing
+    // sort_order as last and a missing date as epoch rather than producing NaN.
+    const ao = a.sort_order ?? Number.MAX_SAFE_INTEGER;
+    const bo = b.sort_order ?? Number.MAX_SAFE_INTEGER;
+    if (ao !== bo) return ao - bo;
+    return new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime();
   });
 
   const averageRating =

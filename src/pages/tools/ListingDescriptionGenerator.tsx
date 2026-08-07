@@ -66,26 +66,27 @@ export default function ListingDescriptionGenerator() {
 
       if (error) throw error;
 
-      // Store in database
-      const { data: savedListing, error: saveError } = await supabase
-        .from('listing_descriptions')
-        .insert({
-          property_details: details,
-          descriptions: data.descriptions,
-          session_id: sessionId,
-        })
-        .select()
-        .single();
+      // Store in database. The id is generated here rather than read back with
+      // .select(): anon has INSERT on this table but deliberately no SELECT
+      // (US-067), and a RETURNING clause needs SELECT, so .select() would fail
+      // the insert.
+      const newListingId = crypto.randomUUID();
+      const { error: saveError } = await supabase.from('listing_descriptions').insert({
+        id: newListingId,
+        property_details: details,
+        descriptions: data.descriptions,
+        session_id: sessionId,
+      });
 
       if (saveError) throw saveError;
 
-      setListingId(savedListing.id);
+      setListingId(newListingId);
       setDescriptions(data.descriptions);
       setCurrentStep('results');
 
       // Track completion
       await trackEvent('generator_completed', {
-        listingId: savedListing.id,
+        listingId: newListingId,
         stylesGenerated: data.descriptions.length,
       });
 
@@ -100,18 +101,19 @@ export default function ListingDescriptionGenerator() {
   // Handle email capture
   const handleEmailCapture = async (data: EmailCaptureData) => {
     try {
-      // Save email capture to database
-      const { data: captureData, error: captureError } = await supabase
-        .from('listing_email_captures')
-        .insert({
-          listing_id: listingId,
-          email: data.email,
-          first_name: data.firstName,
-          brokerage_name: data.brokerageName,
-          phone_number: data.phoneNumber,
-        })
-        .select()
-        .single();
+      // Same as above: id generated client-side, no .select() read-back. This
+      // insert used to be rejected outright — the RETURNING that .select()
+      // implies needs a SELECT policy anon does not have, so every anonymous
+      // email capture threw. See US-067.
+      const captureId = crypto.randomUUID();
+      const { error: captureError } = await supabase.from('listing_email_captures').insert({
+        id: captureId,
+        listing_id: listingId,
+        email: data.email,
+        first_name: data.firstName,
+        brokerage_name: data.brokerageName,
+        phone_number: data.phoneNumber,
+      });
 
       if (captureError) throw captureError;
 

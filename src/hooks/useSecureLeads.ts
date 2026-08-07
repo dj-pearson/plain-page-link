@@ -13,7 +13,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/stores/useAuthStore';
 import { useSecurity } from '@/hooks/useSecurity';
 import { logger } from '@/lib/logger';
 import type { Lead } from '@/types/lead';
@@ -23,16 +22,8 @@ import type { Lead } from '@/types/lead';
 // ============================================================
 
 export function useSecureLeads() {
-  const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  const {
-    isAuthenticated,
-    isAdmin,
-    userId,
-    requireAccess,
-    sanitize,
-    validate,
-  } = useSecurity();
+  const { isAuthenticated, isAdmin, userId, requireAccess, sanitize, validate } = useSecurity();
 
   // --------------------------------------------------------
   // Query: Fetch Leads (with ownership filtering)
@@ -53,10 +44,7 @@ export function useSecureLeads() {
       });
 
       // Build query
-      let query = supabase
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false });
+      let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
 
       // Layer 3: Ownership filtering (admins see all, users see own)
       if (!isAdmin && userId) {
@@ -81,9 +69,7 @@ export function useSecureLeads() {
   // Mutation: Add Lead
   // --------------------------------------------------------
   const addLead = useMutation({
-    mutationFn: async (
-      leadData: Omit<Lead, 'id' | 'user_id' | 'created_at' | 'updated_at'>
-    ) => {
+    mutationFn: async (leadData: Omit<Lead, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
       // Layer 1 & 2: Authentication + Authorization
       await requireAccess({
         authenticated: true,
@@ -96,8 +82,8 @@ export function useSecureLeads() {
       const sanitizedData = sanitize.lead({
         name: leadData.name,
         email: leadData.email,
-        phone: leadData.phone,
-        message: leadData.message,
+        phone: leadData.phone ?? undefined,
+        message: leadData.message ?? undefined,
         source: leadData.source,
       });
 
@@ -148,8 +134,8 @@ export function useSecureLeads() {
       const sanitizedUpdates = sanitize.lead({
         name: updates.name,
         email: updates.email,
-        phone: updates.phone,
-        message: updates.message,
+        phone: updates.phone ?? undefined,
+        message: updates.message ?? undefined,
         source: updates.source,
       });
 
@@ -161,17 +147,12 @@ export function useSecureLeads() {
       // Build update with sanitized data
       const updateData = {
         ...updates,
-        ...Object.fromEntries(
-          Object.entries(sanitizedUpdates).filter(([_, v]) => v !== undefined)
-        ),
+        ...Object.fromEntries(Object.entries(sanitizedUpdates).filter(([_, v]) => v !== undefined)),
         updated_at: new Date().toISOString(),
       };
 
       // Layer 3: Ownership check in query (RLS backup)
-      let query = supabase
-        .from('leads')
-        .update(updateData)
-        .eq('id', id);
+      let query = supabase.from('leads').update(updateData).eq('id', id);
 
       // Non-admins must own the resource
       if (!isAdmin) {
