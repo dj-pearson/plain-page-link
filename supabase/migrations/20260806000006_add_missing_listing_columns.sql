@@ -37,3 +37,18 @@ COMMENT ON COLUMN public.listings.open_house_date IS
 CREATE INDEX IF NOT EXISTS idx_listings_city_state
   ON public.listings (city, state)
   WHERE state IS NOT NULL;
+
+-- `highlights` is the same defect, one step further along: the add-listing form
+-- has a "Property Highlights" textarea, ListingDetailModal renders the list, and
+-- src/types/listing.ts declared the field — but no column ever received it, and
+-- handleAddListing did not even include it in its payload. So an agent could
+-- type highlights and they were silently discarded on save, with the detail
+-- modal always showing none.
+--
+-- Stored as text[] rather than a single blob: the modal iterates it, and the
+-- form's comma-separated input splits cleanly.
+ALTER TABLE public.listings
+  ADD COLUMN IF NOT EXISTS highlights text[];
+
+COMMENT ON COLUMN public.listings.highlights IS
+  'Selling points shown in ListingDetailModal, entered comma-separated in the add-listing form. Added in US-056 — the UI existed on both ends with no column between them.';

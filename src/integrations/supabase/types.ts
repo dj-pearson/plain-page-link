@@ -2765,6 +2765,7 @@ export type Database = {
           created_at: string | null;
           days_on_market: number | null;
           description: string | null;
+          highlights: string[] | null;
           id: string;
           image: string | null;
           is_featured: boolean | null;
@@ -2796,6 +2797,7 @@ export type Database = {
           created_at?: string | null;
           days_on_market?: number | null;
           description?: string | null;
+          highlights?: string[] | null;
           id?: string;
           image?: string | null;
           is_featured?: boolean | null;
@@ -2827,6 +2829,7 @@ export type Database = {
           created_at?: string | null;
           days_on_market?: number | null;
           description?: string | null;
+          highlights?: string[] | null;
           id?: string;
           image?: string | null;
           is_featured?: boolean | null;
