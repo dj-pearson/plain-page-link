@@ -1,34 +1,20 @@
-export interface Testimonial {
-    id: number;
-    profile_id: number;
-    client_name: string;
-    client_photo?: string | null;
-    client_title?: string | null; // e.g., "First-Time Homebuyer"
-    rating: number; // 1-5 stars
-    review_text: string;
-    property_type?: string | null; // e.g., "Single Family Home"
-    transaction_type?: "buyer" | "seller" | null;
-    date: string; // ISO date
-    is_featured: boolean;
-    sort_order: number;
-    created_at: string;
-    updated_at: string;
-}
+/**
+ * A client testimonial, as the `testimonials` table actually stores it.
+ *
+ * This file previously described a schema that does not exist: `id: number`
+ * (it is a uuid), `profile_id` (the column is `user_id`), and `review_text`
+ * (the column is `review`). TestimonialCard rendered
+ * `{testimonial.review_text}`, always undefined, while usePublicProfile was
+ * selecting `review` correctly — so **every testimonial on every public profile
+ * rendered an empty quote**. Fixed in US-056, alongside the identical defect in
+ * types/profile.ts.
+ *
+ * Derived from the generated Row type so it cannot drift again.
+ */
 
-export interface CreateTestimonialData {
-    profile_id: number;
-    client_name: string;
-    client_photo?: string | null;
-    client_title?: string | null;
-    rating: number;
-    review_text: string;
-    property_type?: string | null;
-    transaction_type?: "buyer" | "seller" | null;
-    date: string;
-    is_featured?: boolean;
-    sort_order?: number;
-}
+import type { Database } from '@/integrations/supabase/types';
 
-export interface UpdateTestimonialData extends Partial<CreateTestimonialData> {
-    id: number;
-}
+/** A row from `testimonials`, exactly as stored. */
+export type TestimonialRow = Database['public']['Tables']['testimonials']['Row'];
+
+export type Testimonial = TestimonialRow;

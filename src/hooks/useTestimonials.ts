@@ -1,35 +1,37 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { useToast } from "./use-toast";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useToast } from './use-toast';
 
-export interface Testimonial {
-  id: string;
-  user_id: string;
-  client_name: string;
-  rating: number;
-  review: string;
-  property_type?: string;
-  date: string;
-  created_at: string;
-  updated_at: string;
-}
+// Re-exported from the schema-derived type rather than restated. The local
+// interface used to omit client_title, transaction_type, client_photo,
+// is_featured, sort_order, is_published and listing_id — all real columns that
+// Testimonials.tsx reads, so the page was type-checking against a narrower
+// shape than it actually received (US-056).
+export type { Testimonial } from '@/types/testimonial';
+import type { Testimonial } from '@/types/testimonial';
 
 export function useTestimonials() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: testimonials = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["testimonials", user?.id],
+  const {
+    data: testimonials = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['testimonials', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
-        .from("testimonials")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("date", { ascending: false });
+        .from('testimonials')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
 
       if (error) throw error;
       return data as Testimonial[];
@@ -38,11 +40,13 @@ export function useTestimonials() {
   });
 
   const addTestimonial = useMutation({
-    mutationFn: async (testimonialData: Omit<Testimonial, "id" | "user_id" | "created_at" | "updated_at">) => {
-      if (!user?.id) throw new Error("User not authenticated");
+    mutationFn: async (
+      testimonialData: Omit<Testimonial, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+    ) => {
+      if (!user?.id) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from("testimonials")
+        .from('testimonials')
         .insert({
           user_id: user.id,
           ...testimonialData,
@@ -54,31 +58,31 @@ export function useTestimonials() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["testimonials", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['testimonials', user?.id] });
       toast({
-        title: "Testimonial Added",
-        description: "Your testimonial has been added successfully.",
+        title: 'Testimonial Added',
+        description: 'Your testimonial has been added successfully.',
       });
     },
     onError: (error) => {
       toast({
-        title: "Failed to Add Testimonial",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
+        title: 'Failed to Add Testimonial',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
       });
     },
   });
 
   const updateTestimonial = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Testimonial> & { id: string }) => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) throw new Error('User not authenticated');
 
       // Security: Verify user owns this testimonial by requiring both id and user_id match
       const { data, error } = await supabase
-        .from("testimonials")
+        .from('testimonials')
         .update(updates)
-        .eq("id", id)
-        .eq("user_id", user.id)
+        .eq('id', id)
+        .eq('user_id', user.id)
         .select()
         .single();
 
@@ -86,46 +90,46 @@ export function useTestimonials() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["testimonials", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['testimonials', user?.id] });
       toast({
-        title: "Testimonial Updated",
-        description: "Your testimonial has been updated successfully.",
+        title: 'Testimonial Updated',
+        description: 'Your testimonial has been updated successfully.',
       });
     },
     onError: (error) => {
       toast({
-        title: "Failed to Update Testimonial",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
+        title: 'Failed to Update Testimonial',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
       });
     },
   });
 
   const deleteTestimonial = useMutation({
     mutationFn: async (id: string) => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) throw new Error('User not authenticated');
 
       // Security: Verify user owns this testimonial by requiring both id and user_id match
       const { error } = await supabase
-        .from("testimonials")
+        .from('testimonials')
         .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["testimonials", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['testimonials', user?.id] });
       toast({
-        title: "Testimonial Deleted",
-        description: "Your testimonial has been deleted successfully.",
+        title: 'Testimonial Deleted',
+        description: 'Your testimonial has been deleted successfully.',
       });
     },
     onError: (error) => {
       toast({
-        title: "Failed to Delete Testimonial",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
+        title: 'Failed to Delete Testimonial',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
       });
     },
   });
