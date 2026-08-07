@@ -324,38 +324,36 @@ export default function FullProfilePage() {
       },
       // Individual Review schemas
       ...(testimonials.length > 0
-        ? testimonials
-            .slice(0, 10)
-            .map(
-              (
-                testimonial: {
-                  author?: string;
-                  rating?: number;
-                  content?: string;
-                  created_at?: string;
-                },
-                index: number
-              ) => ({
-                '@type': 'Review',
-                '@id': `${currentUrl}#review-${index}`,
-                itemReviewed: {
-                  '@id': `${currentUrl}#agent`,
-                },
-                author: {
-                  '@type': 'Person',
-                  name: testimonial.author || 'Anonymous',
-                },
-                reviewRating: {
-                  '@type': 'Rating',
-                  ratingValue: testimonial.rating?.toString() || '5',
-                  bestRating: '5',
-                },
-                reviewBody: testimonial.content,
-                ...(testimonial.created_at && {
-                  datePublished: new Date(testimonial.created_at).toISOString().split('T')[0],
-                }),
-              })
-            )
+        ? testimonials.slice(0, 10).map(
+            (
+              testimonial: {
+                author?: string;
+                rating?: number;
+                content?: string;
+                created_at?: string;
+              },
+              index: number
+            ) => ({
+              '@type': 'Review',
+              '@id': `${currentUrl}#review-${index}`,
+              itemReviewed: {
+                '@id': `${currentUrl}#agent`,
+              },
+              author: {
+                '@type': 'Person',
+                name: testimonial.author || 'Anonymous',
+              },
+              reviewRating: {
+                '@type': 'Rating',
+                ratingValue: testimonial.rating?.toString() || '5',
+                bestRating: '5',
+              },
+              reviewBody: testimonial.content,
+              ...(testimonial.created_at && {
+                datePublished: new Date(testimonial.created_at).toISOString().split('T')[0],
+              }),
+            })
+          )
         : []),
     ],
   };
@@ -439,7 +437,7 @@ export default function FullProfilePage() {
                     totalVolume: totalVolume,
                     averageRating: averageRating,
                     reviewCount: testimonials.length,
-                    yearsExperience: profile.years_experience,
+                    yearsExperience: profile.years_experience ?? undefined,
                   }}
                 />
               </div>

@@ -155,7 +155,7 @@ export default function LinkManager({ userId }: LinkManagerProps) {
       link: link.link || '',
       custom_icon: link.custom_icon,
       custom_css: link.custom_css,
-      type_params: link.type_params,
+      type_params: link.type_params ?? undefined,
       button_id: link.button_id || undefined,
     });
     setLinkType(link.type);

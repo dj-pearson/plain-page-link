@@ -299,9 +299,9 @@ export default function Testimonials() {
             client_name: editingTestimonial.client_name,
             review: editingTestimonial.review,
             rating: editingTestimonial.rating,
-            client_title: editingTestimonial.client_title,
-            property_type: editingTestimonial.property_type,
-            transaction_type: editingTestimonial.transaction_type,
+            client_title: editingTestimonial.client_title ?? undefined,
+            property_type: editingTestimonial.property_type ?? undefined,
+            transaction_type: editingTestimonial.transaction_type ?? undefined,
           }}
         />
       )}

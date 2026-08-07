@@ -82,8 +82,8 @@ export function useSecureLeads() {
       const sanitizedData = sanitize.lead({
         name: leadData.name,
         email: leadData.email,
-        phone: leadData.phone,
-        message: leadData.message,
+        phone: leadData.phone ?? undefined,
+        message: leadData.message ?? undefined,
         source: leadData.source,
       });
 
@@ -134,8 +134,8 @@ export function useSecureLeads() {
       const sanitizedUpdates = sanitize.lead({
         name: updates.name,
         email: updates.email,
-        phone: updates.phone,
-        message: updates.message,
+        phone: updates.phone ?? undefined,
+        message: updates.message ?? undefined,
         source: updates.source,
       });
 

@@ -3,10 +3,10 @@
  * Manages lead timeline activities for CRM
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { logger } from "@/lib/logger";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export interface LeadActivity {
   id: string;
@@ -35,18 +35,18 @@ export interface LeadActivity {
 }
 
 export type ActivityType =
-  | "note"
-  | "email"
-  | "call"
-  | "meeting"
-  | "status_change"
-  | "task"
-  | "sms"
-  | "form_submission";
+  | 'note'
+  | 'email'
+  | 'call'
+  | 'meeting'
+  | 'status_change'
+  | 'task'
+  | 'sms'
+  | 'form_submission';
 
-export type CallOutcome = "answered" | "voicemail" | "no_answer" | "busy";
-export type MeetingType = "in_person" | "video" | "phone";
-export type TaskPriority = "low" | "medium" | "high";
+export type CallOutcome = 'answered' | 'voicemail' | 'no_answer' | 'busy';
+export type MeetingType = 'in_person' | 'video' | 'phone';
+export type TaskPriority = 'low' | 'medium' | 'high';
 
 export interface LeadActivitySummary {
   lead_id: string;
@@ -97,15 +97,15 @@ export function useLeadActivities(leadId?: string) {
 
   // Fetch activities for a specific lead
   const activitiesQuery = useQuery({
-    queryKey: ["lead-activities", leadId],
+    queryKey: ['lead-activities', leadId],
     queryFn: async () => {
       if (!leadId) return [];
 
       const { data, error } = await supabase
-        .from("lead_activities")
-        .select("*")
-        .eq("lead_id", leadId)
-        .order("activity_at", { ascending: false })
+        .from('lead_activities')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('activity_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
@@ -116,17 +116,17 @@ export function useLeadActivities(leadId?: string) {
 
   // Fetch activity summary for a lead
   const summaryQuery = useQuery({
-    queryKey: ["lead-activity-summary", leadId],
+    queryKey: ['lead-activity-summary', leadId],
     queryFn: async () => {
       if (!leadId) return null;
 
       const { data, error } = await supabase
-        .from("lead_activity_summary")
-        .select("*")
-        .eq("lead_id", leadId)
+        .from('lead_activity_summary')
+        .select('*')
+        .eq('lead_id', leadId)
         .single();
 
-      if (error && error.code !== "PGRST116") throw error; // Ignore not found
+      if (error && error.code !== 'PGRST116') throw error; // Ignore not found
       return data as LeadActivitySummary | null;
     },
     enabled: !!leadId,
@@ -135,11 +135,11 @@ export function useLeadActivities(leadId?: string) {
   // Log a generic activity
   const logActivityMutation = useMutation({
     mutationFn: async (params: LogActivityParams) => {
-      const { data, error } = await supabase.rpc("log_lead_activity", {
+      const { data, error } = await supabase.rpc('log_lead_activity', {
         _lead_id: params.leadId,
         _activity_type: params.activityType,
-        _content: params.content || null,
-        _title: params.title || null,
+        _content: params.content ?? undefined,
+        _title: params.title ?? undefined,
         _metadata: params.metadata || {},
       });
 
@@ -147,23 +147,23 @@ export function useLeadActivities(leadId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead-activities", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["lead-activity-summary", leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
     },
     onError: (error) => {
-      logger.error("Failed to log activity", error as Error);
-      toast.error("Failed to log activity");
+      logger.error('Failed to log activity', error as Error);
+      toast.error('Failed to log activity');
     },
   });
 
   // Log a note
   const logNoteMutation = useMutation({
     mutationFn: async (params: { leadId: string; content: string }) => {
-      const { data, error } = await supabase.rpc("log_lead_activity", {
+      const { data, error } = await supabase.rpc('log_lead_activity', {
         _lead_id: params.leadId,
-        _activity_type: "note",
+        _activity_type: 'note',
         _content: params.content,
-        _title: "Note added",
+        _title: 'Note added',
         _metadata: {},
       });
 
@@ -171,63 +171,63 @@ export function useLeadActivities(leadId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead-activities", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["lead-activity-summary", leadId] });
-      toast.success("Note added");
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+      toast.success('Note added');
     },
     onError: (error) => {
-      logger.error("Failed to add note", error as Error);
-      toast.error("Failed to add note");
+      logger.error('Failed to add note', error as Error);
+      toast.error('Failed to add note');
     },
   });
 
   // Log an email
   const logEmailMutation = useMutation({
     mutationFn: async (params: LogEmailParams) => {
-      const { data, error } = await supabase.rpc("log_lead_email", {
+      const { data, error } = await supabase.rpc('log_lead_email', {
         _lead_id: params.leadId,
         _subject: params.subject,
         _recipient: params.recipient,
-        _body: params.body || null,
+        _body: params.body ?? undefined,
       });
 
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead-activities", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["lead-activity-summary", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["leads"] }); // Update last_contacted_at
-      toast.success("Email logged");
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update last_contacted_at
+      toast.success('Email logged');
     },
     onError: (error) => {
-      logger.error("Failed to log email", error as Error);
-      toast.error("Failed to log email");
+      logger.error('Failed to log email', error as Error);
+      toast.error('Failed to log email');
     },
   });
 
   // Log a call
   const logCallMutation = useMutation({
     mutationFn: async (params: LogCallParams) => {
-      const { data, error } = await supabase.rpc("log_lead_call", {
+      const { data, error } = await supabase.rpc('log_lead_call', {
         _lead_id: params.leadId,
         _outcome: params.outcome,
-        _duration_seconds: params.durationSeconds || null,
-        _notes: params.notes || null,
+        _duration_seconds: params.durationSeconds ?? undefined,
+        _notes: params.notes ?? undefined,
       });
 
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead-activities", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["lead-activity-summary", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["leads"] }); // Update last_contacted_at
-      toast.success("Call logged");
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update last_contacted_at
+      toast.success('Call logged');
     },
     onError: (error) => {
-      logger.error("Failed to log call", error as Error);
-      toast.error("Failed to log call");
+      logger.error('Failed to log call', error as Error);
+      toast.error('Failed to log call');
     },
   });
 
@@ -237,12 +237,12 @@ export function useLeadActivities(leadId?: string) {
       const { data: userData } = await supabase.auth.getUser();
 
       const { data, error } = await supabase
-        .from("lead_activities")
+        .from('lead_activities')
         .insert({
           lead_id: params.leadId,
           user_id: userData.user?.id,
-          activity_type: "meeting",
-          title: `${params.meetingType === "in_person" ? "In-person" : params.meetingType === "video" ? "Video" : "Phone"} meeting`,
+          activity_type: 'meeting',
+          title: `${params.meetingType === 'in_person' ? 'In-person' : params.meetingType === 'video' ? 'Video' : 'Phone'} meeting`,
           content: params.notes,
           meeting_type: params.meetingType,
           meeting_location: params.location,
@@ -256,35 +256,32 @@ export function useLeadActivities(leadId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead-activities", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["lead-activity-summary", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast.success("Meeting logged");
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      toast.success('Meeting logged');
     },
     onError: (error) => {
-      logger.error("Failed to log meeting", error as Error);
-      toast.error("Failed to log meeting");
+      logger.error('Failed to log meeting', error as Error);
+      toast.error('Failed to log meeting');
     },
   });
 
   // Delete an activity
   const deleteActivityMutation = useMutation({
     mutationFn: async (activityId: string) => {
-      const { error } = await supabase
-        .from("lead_activities")
-        .delete()
-        .eq("id", activityId);
+      const { error } = await supabase.from('lead_activities').delete().eq('id', activityId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead-activities", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["lead-activity-summary", leadId] });
-      toast.success("Activity deleted");
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+      toast.success('Activity deleted');
     },
     onError: (error) => {
-      logger.error("Failed to delete activity", error as Error);
-      toast.error("Failed to delete activity");
+      logger.error('Failed to delete activity', error as Error);
+      toast.error('Failed to delete activity');
     },
   });
 
@@ -320,14 +317,14 @@ export function useLeadActivities(leadId?: string) {
 // Hook to fetch activities for multiple leads (for list views)
 export function useLeadsActivitySummaries(leadIds: string[]) {
   return useQuery({
-    queryKey: ["lead-activity-summaries", leadIds],
+    queryKey: ['lead-activity-summaries', leadIds],
     queryFn: async () => {
       if (leadIds.length === 0) return [];
 
       const { data, error } = await supabase
-        .from("lead_activity_summary")
-        .select("*")
-        .in("lead_id", leadIds);
+        .from('lead_activity_summary')
+        .select('*')
+        .in('lead_id', leadIds);
 
       if (error) throw error;
       return data as LeadActivitySummary[];

@@ -839,12 +839,12 @@ export default function Listings() {
             price: editingListing.price,
             beds: editingListing.beds,
             baths: editingListing.baths,
-            sqft: editingListing.sqft,
+            sqft: editingListing.sqft ?? undefined,
             status: editingListing.status,
-            image: editingListing.image,
-            description: editingListing.description,
-            mls_number: editingListing.mls_number,
-            property_type: editingListing.property_type,
+            image: editingListing.image ?? undefined,
+            description: editingListing.description ?? undefined,
+            mls_number: editingListing.mls_number ?? undefined,
+            property_type: editingListing.property_type ?? undefined,
           }}
         />
       )}
