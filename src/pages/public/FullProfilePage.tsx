@@ -26,7 +26,7 @@ import { applyTheme, type ThemeConfig } from '@/lib/themes';
 import { parsePrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 import { logger } from '@/lib/logger';
-import type { PublicListing } from '@/types';
+import type { PublicProfileListing } from '@/types';
 import NotFound from './NotFound';
 import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
@@ -34,7 +34,7 @@ import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
 
 export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
-  const [selectedListing, setSelectedListing] = useState<PublicListing | null>(null);
+  const [selectedListing, setSelectedListing] = useState<PublicProfileListing | null>(null);
   const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
   const [customPageSlug, setCustomPageSlug] = useState<string | null>(null);
   const [checkingCustomPage, setCheckingCustomPage] = useState(true);
@@ -166,12 +166,12 @@ export default function FullProfilePage() {
 
   const { profile, listings, testimonials, links, settings } = data;
 
-  const activeListings = listings.filter((l: PublicListing) => l.status === 'active');
-  const soldListings = listings.filter((l: PublicListing) => l.status === 'sold');
+  const activeListings = listings.filter((l: PublicProfileListing) => l.status === 'active');
+  const soldListings = listings.filter((l: PublicProfileListing) => l.status === 'sold');
 
   // Calculate social proof stats
   const totalVolume = soldListings.reduce(
-    (sum: number, listing: PublicListing) => sum + parsePrice(listing.price),
+    (sum: number, listing: PublicProfileListing) => sum + parsePrice(listing.price),
     0
   );
   const averageRating =

@@ -15,11 +15,11 @@ import { formatPrice, parsePrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { PublicListing } from '@/types';
+import type { PublicProfileListing } from '@/types';
 
 interface FeaturedListingsCarouselProps {
-  listings: PublicListing[];
-  onViewDetails?: (listing: PublicListing) => void;
+  listings: PublicProfileListing[];
+  onViewDetails?: (listing: PublicProfileListing) => void;
   autoRotate?: boolean;
   interval?: number;
 }

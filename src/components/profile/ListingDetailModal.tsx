@@ -23,11 +23,11 @@ import { getImageUrls } from '@/lib/images';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { PublicListing } from '@/types';
+import type { PublicProfileListing } from '@/types';
 import { realEstateListingSchema } from '@/lib/structured-data';
 
 interface ListingDetailModalProps {
-  listing: PublicListing;
+  listing: PublicProfileListing;
   isOpen: boolean;
   onClose: () => void;
   calendlyUrl?: string;

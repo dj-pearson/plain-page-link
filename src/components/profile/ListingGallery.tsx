@@ -3,12 +3,12 @@ import { Search, SlidersHorizontal, ArrowUpDown, Home, X } from 'lucide-react';
 import ListingCard from './ListingCard';
 import { parsePrice } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type { PublicListing } from '@/types';
+import type { PublicProfileListing } from '@/types';
 
 interface ListingGalleryProps {
-  listings: PublicListing[];
+  listings: PublicProfileListing[];
   title?: string;
-  onListingClick?: (listing: PublicListing) => void;
+  onListingClick?: (listing: PublicProfileListing) => void;
   calendlyUrl?: string;
 }
 

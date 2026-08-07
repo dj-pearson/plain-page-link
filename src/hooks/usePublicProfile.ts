@@ -1,4 +1,5 @@
 import type { PublicProfile } from '@/types/profile';
+import type { PublicProfileListing } from '@/types/listing';
 import { toStringList } from '@/types/profile';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -95,7 +96,14 @@ export const usePublicProfile = (username: string) => {
             is_featured,
             days_on_market,
             description,
-            property_type
+            property_type,
+            state,
+            zip_code,
+            mls_number,
+            lot_size_acres,
+            virtual_tour_url,
+            highlights,
+            created_at
           `
           )
           .eq('user_id', profile.id)
@@ -171,11 +179,13 @@ export const usePublicProfile = (username: string) => {
 
       // The listings table carries both naming conventions (beds/bedrooms,
       // sqft/square_feet) from an earlier reconciliation; normalise to one.
-      const transformedListings = (listings || []).map((l) => ({
+      const transformedListings: PublicProfileListing[] = (listings || []).map((l) => ({
         ...l,
         bedrooms: l.bedrooms ?? l.beds,
         bathrooms: l.bathrooms ?? l.baths,
         square_feet: l.square_feet ?? l.sqft,
+        // photos is jsonb; every consumer treats it as a URL list.
+        photos: toStringList(l.photos),
       }));
 
       // specialties/certifications/service_* are jsonb. Every consumer maps

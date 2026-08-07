@@ -4,10 +4,10 @@ import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { PublicListing } from '@/types';
+import type { PublicProfileListing } from '@/types';
 
 interface ListingCardProps {
-  listing: PublicListing;
+  listing: PublicProfileListing;
   onClick?: () => void;
 }
 

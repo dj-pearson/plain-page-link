@@ -110,3 +110,40 @@ export interface ListingUpdateData extends Partial<PublicListing> {
   open_house_end_date?: string;
   is_featured?: boolean;
 }
+
+/**
+ * The subset of a listing that a public profile page receives.
+ *
+ * usePublicProfile selects these columns only, so the profile components must
+ * not be typed against the full row — the same boundary problem PublicProfile
+ * solves for `profiles`. Pick rejects a name that is not a real column, so the
+ * list cannot drift from the schema without a compile error.
+ */
+export type PublicListingFields =
+  | 'id'
+  | 'image'
+  | 'photos'
+  | 'address'
+  | 'city'
+  | 'price'
+  | 'beds'
+  | 'baths'
+  | 'bedrooms'
+  | 'bathrooms'
+  | 'sqft'
+  | 'square_feet'
+  | 'status'
+  | 'sort_order'
+  | 'is_featured'
+  | 'days_on_market'
+  | 'description'
+  | 'property_type'
+  | 'state'
+  | 'zip_code'
+  | 'mls_number'
+  | 'lot_size_acres'
+  | 'virtual_tour_url'
+  | 'highlights'
+  | 'created_at';
+
+export type PublicProfileListing = Pick<PublicListing, PublicListingFields>;
