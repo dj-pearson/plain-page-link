@@ -1,18 +1,23 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, TestTube, Brain } from "lucide-react";
-import { useAIConfiguration } from "@/hooks/useAIConfiguration";
-import { AddModelDialog } from "./AddModelDialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, TestTube, Brain } from 'lucide-react';
+import { useAIConfiguration } from '@/hooks/useAIConfiguration';
+import { AddModelDialog } from './AddModelDialog';
 
 export function AIConfigurationManager() {
   const {
     models,
-    config,
     isLoading,
     getConfigValue,
     handleUpdateConfig,
@@ -41,9 +46,7 @@ export function AIConfigurationManager() {
             <Brain className="h-5 w-5" />
             AI Model Configuration
           </CardTitle>
-          <CardDescription>
-            Configure AI models and settings for content generation
-          </CardDescription>
+          <CardDescription>Configure AI models and settings for content generation</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Default Model Selection */}
@@ -92,7 +95,9 @@ export function AIConfigurationManager() {
                 min="0"
                 max="1"
                 value={getConfigValue('temperature_precise')}
-                onChange={(e) => handleUpdateConfig('temperature_precise', parseFloat(e.target.value))}
+                onChange={(e) =>
+                  handleUpdateConfig('temperature_precise', parseFloat(e.target.value))
+                }
               />
               <p className="text-xs text-muted-foreground">For data extraction and precise tasks</p>
             </div>
@@ -105,9 +110,13 @@ export function AIConfigurationManager() {
                 min="0"
                 max="1"
                 value={getConfigValue('temperature_creative')}
-                onChange={(e) => handleUpdateConfig('temperature_creative', parseFloat(e.target.value))}
+                onChange={(e) =>
+                  handleUpdateConfig('temperature_creative', parseFloat(e.target.value))
+                }
               />
-              <p className="text-xs text-muted-foreground">For content generation and creative tasks</p>
+              <p className="text-xs text-muted-foreground">
+                For content generation and creative tasks
+              </p>
             </div>
           </div>
 
@@ -120,7 +129,9 @@ export function AIConfigurationManager() {
                 type="number"
                 step="100"
                 value={getConfigValue('max_tokens_standard')}
-                onChange={(e) => handleUpdateConfig('max_tokens_standard', parseInt(e.target.value))}
+                onChange={(e) =>
+                  handleUpdateConfig('max_tokens_standard', parseInt(e.target.value))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -151,7 +162,10 @@ export function AIConfigurationManager() {
         <CardContent>
           <div className="space-y-4">
             {models?.map((model) => (
-              <div key={model.id} className="flex items-start justify-between p-4 border rounded-lg gap-4">
+              <div
+                key={model.id}
+                className="flex items-start justify-between p-4 border rounded-lg gap-4"
+              >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <h4 className="font-semibold">{model.model_name}</h4>
@@ -160,7 +174,7 @@ export function AIConfigurationManager() {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{model.description}</p>
-                  
+
                   <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground">
                     <span>Context: {model.context_window.toLocaleString()} tokens</span>
                     <span>Max Output: {model.max_output_tokens.toLocaleString()} tokens</span>
@@ -171,21 +185,17 @@ export function AIConfigurationManager() {
                     <Badge variant="secondary">
                       {model.auth_type === 'bearer' ? 'Bearer Token' : 'X-API-Key'}
                     </Badge>
-                    <Badge variant="secondary">
-                      Secret: {model.secret_name}
-                    </Badge>
+                    <Badge variant="secondary">Secret: {model.secret_name}</Badge>
                   </div>
-                  
+
                   <p className="text-xs text-muted-foreground mt-2 font-mono truncate">
                     {model.api_endpoint}
                   </p>
                 </div>
-                
+
                 <Switch
                   checked={model.is_active}
-                  onCheckedChange={(checked) => 
-                    toggleModel({ id: model.id, isActive: checked })
-                  }
+                  onCheckedChange={(checked) => toggleModel({ id: model.id, isActive: checked })}
                 />
               </div>
             ))}

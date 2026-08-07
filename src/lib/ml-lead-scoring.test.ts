@@ -52,7 +52,7 @@ describe('FeatureExtractor', () => {
       const features = createMockFeatures();
       const vector = FeatureExtractor.extractFeatureVector(features);
 
-      vector.forEach((value, index) => {
+      vector.forEach((value, _index) => {
         expect(value).toBeGreaterThanOrEqual(0);
         expect(value).toBeLessThanOrEqual(1);
       });

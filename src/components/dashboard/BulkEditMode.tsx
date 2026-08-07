@@ -49,7 +49,6 @@ interface BulkUpdateData {
 export function BulkEditMode({
   listings,
   selectedIds,
-  onToggleSelect,
   onSelectAll,
   onClearSelection,
   onBulkUpdate,

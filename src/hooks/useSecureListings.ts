@@ -13,7 +13,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/stores/useAuthStore';
 import { useSecurity } from '@/hooks/useSecurity';
 import { logger } from '@/lib/logger';
 
@@ -45,16 +44,8 @@ type ListingStatus = (typeof VALID_STATUSES)[number];
 // ============================================================
 
 export function useSecureListings() {
-  const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  const {
-    isAuthenticated,
-    isAdmin,
-    userId,
-    requireAccess,
-    sanitize,
-    validate,
-  } = useSecurity();
+  const { isAuthenticated, isAdmin, userId, requireAccess, sanitize, validate } = useSecurity();
 
   // --------------------------------------------------------
   // Query: Fetch Listings (with ownership filtering)
@@ -75,10 +66,7 @@ export function useSecureListings() {
       });
 
       // Build query
-      let query = supabase
-        .from('listings')
-        .select('*')
-        .order('created_at', { ascending: false });
+      let query = supabase.from('listings').select('*').order('created_at', { ascending: false });
 
       // Layer 3: Ownership filtering (admins see all, users see own)
       if (!isAdmin && userId) {
@@ -183,7 +171,10 @@ export function useSecureListings() {
       });
 
       // Validate status if being updated
-      if (sanitizedUpdates.status && !VALID_STATUSES.includes(sanitizedUpdates.status as ListingStatus)) {
+      if (
+        sanitizedUpdates.status &&
+        !VALID_STATUSES.includes(sanitizedUpdates.status as ListingStatus)
+      ) {
         throw new Error('Invalid listing status');
       }
 
@@ -201,17 +192,12 @@ export function useSecureListings() {
       // Build update with sanitized data
       const updateData = {
         ...updates,
-        ...Object.fromEntries(
-          Object.entries(sanitizedUpdates).filter(([_, v]) => v !== undefined)
-        ),
+        ...Object.fromEntries(Object.entries(sanitizedUpdates).filter(([_, v]) => v !== undefined)),
         updated_at: new Date().toISOString(),
       };
 
       // Layer 3: Ownership check in query (RLS backup)
-      let query = supabase
-        .from('listings')
-        .update(updateData)
-        .eq('id', id);
+      let query = supabase.from('listings').update(updateData).eq('id', id);
 
       // Non-admins must own the resource
       if (!isAdmin) {

@@ -407,32 +407,6 @@ function StatsBadge({
 }
 
 /**
- * Ambient Lighting Orbs
- */
-function LightingOrb({ position, color }: { position: [number, number, number]; color: string }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-
-  useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.position.y = position[1] + Math.sin(state.clock.getElapsedTime() * 2) * 0.1;
-    }
-  });
-
-  return (
-    <mesh ref={meshRef} position={position}>
-      <sphereGeometry args={[0.15, 32, 32]} />
-      <meshStandardMaterial
-        color={color}
-        emissive={color}
-        emissiveIntensity={0.6}
-        transparent
-        opacity={0.6}
-      />
-    </mesh>
-  );
-}
-
-/**
  * 3D Scene Component
  */
 function Scene() {

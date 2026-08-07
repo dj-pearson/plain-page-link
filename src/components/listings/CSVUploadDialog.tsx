@@ -1,22 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Upload,
-  FileSpreadsheet,
-  Check,
-  X,
-  AlertCircle,
-  Download,
-  Loader2,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Upload, FileSpreadsheet, Check, X, AlertCircle, Download, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface CSVRow {
   address: string;
@@ -60,27 +52,26 @@ interface ParsedListing {
 interface CSVUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (listings: Omit<ParsedListing, "errors">[]) => Promise<void>;
+  onImport: (listings: Omit<ParsedListing, 'errors'>[]) => Promise<void>;
 }
 
-const REQUIRED_HEADERS = ["address", "city", "state", "price"];
 const SAMPLE_CSV = `address,city,state,zip_code,price,bedrooms,bathrooms,square_feet,property_type,status,description,mls_number,lot_size,year_built,is_featured
 "123 Oak Street",Springfield,IL,62701,425000,3,2,1800,single_family,active,"Beautiful ranch home with updated kitchen",ML12345,0.25,2005,false
 "456 Maple Ave Unit 3B",Chicago,IL,60601,350000,2,2,1200,condo,active,"Modern condo in downtown Chicago",ML67890,,2018,true
 "789 Pine Road",Naperville,IL,60540,675000,4,3.5,2800,single_family,sold,"Stunning colonial on a quiet cul-de-sac",ML11111,0.5,1998,false`;
 
 function parseCSV(text: string): CSVRow[] {
-  const lines = text.split(/\r?\n/).filter(line => line.trim());
+  const lines = text.split(/\r?\n/).filter((line) => line.trim());
   if (lines.length < 2) return [];
 
   // Parse header
-  const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase().replace(/\s+/g, "_"));
+  const headers = parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'));
 
-  return lines.slice(1).map(line => {
+  return lines.slice(1).map((line) => {
     const values = parseCSVLine(line);
     const row: CSVRow = {} as CSVRow;
     headers.forEach((header, i) => {
-      row[header] = (values[i] || "").trim();
+      row[header] = (values[i] || '').trim();
     });
     return row;
   });
@@ -88,7 +79,7 @@ function parseCSV(text: string): CSVRow[] {
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
-  let current = "";
+  let current = '';
   let inQuotes = false;
 
   for (let i = 0; i < line.length; i++) {
@@ -100,9 +91,9 @@ function parseCSVLine(line: string): string[] {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (char === "," && !inQuotes) {
+    } else if (char === ',' && !inQuotes) {
       result.push(current);
-      current = "";
+      current = '';
     } else {
       current += char;
     }
@@ -111,32 +102,36 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
-function validateRow(row: CSVRow, index: number): ParsedListing {
+function validateRow(row: CSVRow, _index: number): ParsedListing {
   const errors: string[] = [];
 
-  if (!row.address) errors.push("Address is required");
-  if (!row.city) errors.push("City is required");
-  if (!row.state) errors.push("State is required");
+  if (!row.address) errors.push('Address is required');
+  if (!row.city) errors.push('City is required');
+  if (!row.state) errors.push('State is required');
 
-  const price = Number(String(row.price || "0").replace(/[^0-9.]/g, ""));
-  if (!price || price <= 0) errors.push("Valid price is required");
+  const price = Number(String(row.price || '0').replace(/[^0-9.]/g, ''));
+  if (!price || price <= 0) errors.push('Valid price is required');
 
   const bedrooms = Number(row.bedrooms) || 0;
   const bathrooms = Number(row.bathrooms) || 0;
-  const sqft = row.square_feet ? Number(row.square_feet.replace(/[^0-9]/g, "")) : null;
+  const sqft = row.square_feet ? Number(row.square_feet.replace(/[^0-9]/g, '')) : null;
   const lotSize = row.lot_size ? Number(row.lot_size) : null;
 
-  const validStatuses = ["active", "pending", "under_contract", "sold", "draft"];
-  const status = validStatuses.includes(row.status?.toLowerCase()) ? row.status.toLowerCase() : "active";
+  const validStatuses = ['active', 'pending', 'under_contract', 'sold', 'draft'];
+  const status = validStatuses.includes(row.status?.toLowerCase())
+    ? row.status.toLowerCase()
+    : 'active';
 
-  const validTypes = ["single_family", "condo", "townhouse", "multi_family", "land", "commercial"];
-  const propType = validTypes.includes(row.property_type?.toLowerCase()) ? row.property_type.toLowerCase() : "single_family";
+  const validTypes = ['single_family', 'condo', 'townhouse', 'multi_family', 'land', 'commercial'];
+  const propType = validTypes.includes(row.property_type?.toLowerCase())
+    ? row.property_type.toLowerCase()
+    : 'single_family';
 
   return {
-    address: row.address || "",
-    city: row.city || "",
-    state: (row.state || "").toUpperCase().slice(0, 2),
-    zip_code: row.zip_code || "",
+    address: row.address || '',
+    city: row.city || '',
+    state: (row.state || '').toUpperCase().slice(0, 2),
+    zip_code: row.zip_code || '',
     price,
     bedrooms,
     bathrooms,
@@ -146,23 +141,23 @@ function validateRow(row: CSVRow, index: number): ParsedListing {
     description: row.description || null,
     mls_number: row.mls_number || null,
     lot_size_acres: lotSize,
-    is_featured: row.is_featured?.toLowerCase() === "true",
+    is_featured: row.is_featured?.toLowerCase() === 'true',
     virtual_tour_url: row.virtual_tour_url || null,
     errors,
   };
 }
 
 export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialogProps) {
-  const [file, setFile] = useState<File | null>(null);
+  const [_file, setFile] = useState<File | null>(null);
   const [parsedListings, setParsedListings] = useState<ParsedListing[]>([]);
   const [importing, setImporting] = useState(false);
-  const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
+  const [step, setStep] = useState<'upload' | 'preview' | 'done'>('upload');
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!selectedFile.name.endsWith(".csv")) {
+    if (!selectedFile.name.endsWith('.csv')) {
       return;
     }
 
@@ -174,7 +169,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
       const rows = parseCSV(text);
       const parsed = rows.map((row, i) => validateRow(row, i));
       setParsedListings(parsed);
-      setStep("preview");
+      setStep('preview');
     };
     reader.readAsText(selectedFile);
   }, []);
@@ -182,7 +177,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile?.name.endsWith(".csv")) {
+    if (droppedFile?.name.endsWith('.csv')) {
       setFile(droppedFile);
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -190,21 +185,21 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
         const rows = parseCSV(text);
         const parsed = rows.map((row, i) => validateRow(row, i));
         setParsedListings(parsed);
-        setStep("preview");
+        setStep('preview');
       };
       reader.readAsText(droppedFile);
     }
   }, []);
 
-  const validListings = parsedListings.filter(l => l.errors.length === 0);
-  const invalidListings = parsedListings.filter(l => l.errors.length > 0);
+  const validListings = parsedListings.filter((l) => l.errors.length === 0);
+  const invalidListings = parsedListings.filter((l) => l.errors.length > 0);
 
   const handleImport = async () => {
     setImporting(true);
     try {
       const toImport = validListings.map(({ errors, ...listing }) => listing);
       await onImport(toImport);
-      setStep("done");
+      setStep('done');
     } catch {
       // Error handling in parent
     } finally {
@@ -216,15 +211,15 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
     onOpenChange(false);
     setFile(null);
     setParsedListings([]);
-    setStep("upload");
+    setStep('upload');
   };
 
   const downloadSample = () => {
-    const blob = new Blob([SAMPLE_CSV], { type: "text/csv" });
+    const blob = new Blob([SAMPLE_CSV], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = "sample_listings.csv";
+    a.download = 'sample_listings.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -244,7 +239,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
 
         <div className="flex-1 overflow-y-auto">
           {/* Upload Step */}
-          {step === "upload" && (
+          {step === 'upload' && (
             <div className="space-y-4 py-4">
               <div
                 onDrop={handleDrop}
@@ -260,7 +255,9 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
                 />
                 <label htmlFor="csv-upload" className="cursor-pointer">
                   <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-base font-medium">Drop your CSV file here or click to browse</p>
+                  <p className="text-base font-medium">
+                    Drop your CSV file here or click to browse
+                  </p>
                   <p className="text-sm text-muted-foreground mt-2">Supports .csv files</p>
                 </label>
               </div>
@@ -268,10 +265,12 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
               <div className="bg-muted/50 rounded-lg p-4">
                 <h4 className="text-sm font-semibold mb-2">CSV Format Requirements</h4>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Required columns: <span className="font-medium text-foreground">address, city, state, price</span>
+                  Required columns:{' '}
+                  <span className="font-medium text-foreground">address, city, state, price</span>
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Optional: zip_code, bedrooms, bathrooms, square_feet, property_type, status, description, mls_number, lot_size, year_built, virtual_tour_url, is_featured
+                  Optional: zip_code, bedrooms, bathrooms, square_feet, property_type, status,
+                  description, mls_number, lot_size, year_built, virtual_tour_url, is_featured
                 </p>
                 <Button variant="outline" size="sm" onClick={downloadSample} className="gap-2">
                   <Download className="h-3.5 w-3.5" />
@@ -282,7 +281,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
           )}
 
           {/* Preview Step */}
-          {step === "preview" && (
+          {step === 'preview' && (
             <div className="space-y-4 py-4">
               {/* Summary */}
               <div className="grid grid-cols-3 gap-3">
@@ -294,11 +293,26 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
                   <div className="text-2xl font-bold text-green-600">{validListings.length}</div>
                   <div className="text-xs text-green-600">Ready to Import</div>
                 </div>
-                <div className={cn("rounded-lg p-3 text-center", invalidListings.length > 0 ? "bg-red-50" : "bg-muted")}>
-                  <div className={cn("text-2xl font-bold", invalidListings.length > 0 ? "text-red-600" : "text-muted-foreground")}>
+                <div
+                  className={cn(
+                    'rounded-lg p-3 text-center',
+                    invalidListings.length > 0 ? 'bg-red-50' : 'bg-muted'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'text-2xl font-bold',
+                      invalidListings.length > 0 ? 'text-red-600' : 'text-muted-foreground'
+                    )}
+                  >
                     {invalidListings.length}
                   </div>
-                  <div className={cn("text-xs", invalidListings.length > 0 ? "text-red-600" : "text-muted-foreground")}>
+                  <div
+                    className={cn(
+                      'text-xs',
+                      invalidListings.length > 0 ? 'text-red-600' : 'text-muted-foreground'
+                    )}
+                  >
                     With Errors
                   </div>
                 </div>
@@ -310,17 +324,20 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
                   <div className="flex items-center gap-2 mb-2">
                     <AlertCircle className="h-4 w-4 text-red-600" />
                     <span className="text-sm font-medium text-red-800">
-                      {invalidListings.length} row{invalidListings.length !== 1 ? "s" : ""} have errors and will be skipped
+                      {invalidListings.length} row{invalidListings.length !== 1 ? 's' : ''} have
+                      errors and will be skipped
                     </span>
                   </div>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {invalidListings.slice(0, 5).map((listing, idx) => (
                       <p key={idx} className="text-xs text-red-600">
-                        Row {parsedListings.indexOf(listing) + 2}: {listing.errors.join(", ")}
+                        Row {parsedListings.indexOf(listing) + 2}: {listing.errors.join(', ')}
                       </p>
                     ))}
                     {invalidListings.length > 5 && (
-                      <p className="text-xs text-red-500">...and {invalidListings.length - 5} more</p>
+                      <p className="text-xs text-red-500">
+                        ...and {invalidListings.length - 5} more
+                      </p>
                     )}
                   </div>
                 </div>
@@ -342,7 +359,7 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
                     </thead>
                     <tbody className="divide-y">
                       {parsedListings.slice(0, 20).map((listing, idx) => (
-                        <tr key={idx} className={listing.errors.length > 0 ? "bg-red-50/50" : ""}>
+                        <tr key={idx} className={listing.errors.length > 0 ? 'bg-red-50/50' : ''}>
                           <td className="px-3 py-2">
                             {listing.errors.length > 0 ? (
                               <X className="h-4 w-4 text-red-500" />
@@ -350,7 +367,9 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
                               <Check className="h-4 w-4 text-green-500" />
                             )}
                           </td>
-                          <td className="px-3 py-2 text-xs truncate max-w-[150px]">{listing.address}</td>
+                          <td className="px-3 py-2 text-xs truncate max-w-[150px]">
+                            {listing.address}
+                          </td>
                           <td className="px-3 py-2 text-xs">{listing.city}</td>
                           <td className="px-3 py-2 text-xs text-right font-medium">
                             ${listing.price.toLocaleString()}
@@ -372,14 +391,15 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
           )}
 
           {/* Done Step */}
-          {step === "done" && (
+          {step === 'done' && (
             <div className="py-12 text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check className="h-8 w-8 text-green-600" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Import Complete!</h3>
               <p className="text-muted-foreground">
-                Successfully imported {validListings.length} listing{validListings.length !== 1 ? "s" : ""}.
+                Successfully imported {validListings.length} listing
+                {validListings.length !== 1 ? 's' : ''}.
               </p>
             </div>
           )}
@@ -388,18 +408,29 @@ export function CSVUploadDialog({ open, onOpenChange, onImport }: CSVUploadDialo
         {/* Footer */}
         <div className="flex items-center justify-between pt-4 border-t">
           <Button variant="outline" onClick={handleClose}>
-            {step === "done" ? "Close" : "Cancel"}
+            {step === 'done' ? 'Close' : 'Cancel'}
           </Button>
-          {step === "preview" && (
+          {step === 'preview' && (
             <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={() => { setStep("upload"); setFile(null); setParsedListings([]); }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStep('upload');
+                  setFile(null);
+                  setParsedListings([]);
+                }}
+              >
                 Choose Different File
               </Button>
               <Button onClick={handleImport} disabled={validListings.length === 0 || importing}>
                 {importing ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importing...</>
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importing...
+                  </>
                 ) : (
-                  <>Import {validListings.length} Listing{validListings.length !== 1 ? "s" : ""}</>
+                  <>
+                    Import {validListings.length} Listing{validListings.length !== 1 ? 's' : ''}
+                  </>
                 )}
               </Button>
             </div>

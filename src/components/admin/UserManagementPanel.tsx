@@ -51,11 +51,6 @@ interface Profile {
   avatar_url: string;
 }
 
-interface UserRole {
-  user_id: string;
-  role: string;
-}
-
 interface Subscription {
   user_id: string;
   plan: string;

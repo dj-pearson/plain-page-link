@@ -37,7 +37,7 @@ interface RevokeResponse {
 }
 
 export function useSessions() {
-  const { user, session } = useAuthStore();
+  const { user } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -100,7 +100,7 @@ export function useSessions() {
   const revokeAllOthersMutation = useMutation({
     mutationFn: async (): Promise<RevokeResponse> => {
       // Get current session ID for preservation
-      const currentSessionId = sessionsData?.sessions.find(s => s.is_current)?.id;
+      const currentSessionId = sessionsData?.sessions.find((s) => s.is_current)?.id;
 
       const { data, error } = await edgeFunctions.invoke('revoke-session', {
         body: {

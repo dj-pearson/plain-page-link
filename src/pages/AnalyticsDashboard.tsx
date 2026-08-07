@@ -28,11 +28,12 @@ import { subDays } from 'date-fns';
 import { BarChart3, TrendingUp, Users, FileText, Loader2 } from 'lucide-react';
 
 export default function AnalyticsDashboard() {
-  const [showPredictions, setShowPredictions] = useState(true);
+  // The predictions toggle was never rendered; the panel below reads this flag.
+  const showPredictions = true;
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
 
   // Fetch real data from database
-  const { stats, viewsData, leadsData, recentLeads, isLoading } = useAnalytics(timeRange);
+  const { stats, viewsData, isLoading } = useAnalytics(timeRange);
   const { leads } = useLeads();
 
   // Build analytics data from real stats

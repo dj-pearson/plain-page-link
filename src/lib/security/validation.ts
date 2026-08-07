@@ -13,7 +13,7 @@
 
 import DOMPurify from 'dompurify';
 import { logger } from '@/lib/logger';
-import type { ValidationResult, ValidationRules, SecurityViolation } from './types';
+import type { ValidationResult, ValidationRules } from './types';
 
 // ============================================================
 // DOMPurify Configuration
@@ -382,7 +382,11 @@ export function containsSqlInjection(input: string): boolean {
  */
 export function validateNoSqlInjection(input: string, fieldName: string = 'input'): void {
   if (containsSqlInjection(input)) {
-    logValidationViolation('sql_injection_attempt', `SQL injection pattern detected in ${fieldName}`, input);
+    logValidationViolation(
+      'sql_injection_attempt',
+      `SQL injection pattern detected in ${fieldName}`,
+      input
+    );
     throw new ValidationError('Invalid input detected');
   }
 }
@@ -426,11 +430,7 @@ const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 /**
  * Check if an action is rate limited
  */
-export function isRateLimited(
-  key: string,
-  maxAttempts: number,
-  windowMs: number
-): boolean {
+export function isRateLimited(key: string, maxAttempts: number, windowMs: number): boolean {
   const now = Date.now();
   const entry = rateLimitStore.get(key);
 
@@ -460,13 +460,6 @@ export function resetRateLimit(key: string): void {
 // ============================================================
 
 function logValidationViolation(type: string, details: string, input?: string): void {
-  const violation: SecurityViolation = {
-    type: 'input_validation',
-    action: type,
-    details,
-    timestamp: new Date(),
-  };
-
   logger.warn('Input validation violation', {
     type,
     details,

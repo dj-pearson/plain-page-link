@@ -16,7 +16,7 @@ export function PullToRefresh({
   threshold = 80,
   disabled = false,
 }: PullToRefreshProps) {
-  const { containerRef, isPulling, isRefreshing, pullDistance } = usePullToRefresh({
+  const { containerRef, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh,
     threshold,
     disabled,
@@ -67,9 +67,7 @@ export function PullToRefresh({
       <div
         className="transition-transform duration-200"
         style={{
-          transform: isRefreshing
-            ? `translateY(${threshold}px)`
-            : `translateY(${pullDistance}px)`,
+          transform: isRefreshing ? `translateY(${threshold}px)` : `translateY(${pullDistance}px)`,
         }}
       >
         {children}

@@ -204,7 +204,7 @@ const ABTestControls = () => {
 
 const ModelStats = () => {
   const { toast } = useToast();
-  const { stats, isLoading, isSaving, isRetraining, retrain, save, refresh, error } = useMLModel();
+  const { stats, isLoading, isSaving, isRetraining, retrain, save, refresh } = useMLModel();
 
   const handleRetrain = async () => {
     try {
@@ -525,8 +525,7 @@ const ABTestVisualization = () => {
 // ============================================================================
 
 export const MLLeadScoringDashboard = () => {
-  const { getAllCachedScores, getModelStats } = useMLLeadScoring();
-  const { analysis } = useABTest();
+  const { getAllCachedScores } = useMLLeadScoring();
   const { stats } = useMLModel();
 
   const cachedScores = getAllCachedScores();

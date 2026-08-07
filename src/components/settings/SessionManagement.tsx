@@ -36,7 +36,6 @@ export function SessionManagement() {
     revokeAllOtherSessions,
     isRevoking,
     isRevokingAll,
-    formatSessionInfo,
     formatRelativeTime,
   } = useSessions();
 
@@ -66,7 +65,7 @@ export function SessionManagement() {
     setShowRevokeAllDialog(false);
   };
 
-  const otherSessionsCount = sessions.filter(s => !s.is_current).length;
+  const otherSessionsCount = sessions.filter((s) => !s.is_current).length;
 
   return (
     <>
@@ -82,12 +81,7 @@ export function SessionManagement() {
                 </CardDescription>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isLoading}
-            >
+            <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
@@ -102,19 +96,12 @@ export function SessionManagement() {
             <div className="text-center py-8 text-red-600">
               <p>Failed to load sessions</p>
               <p className="text-sm text-muted-foreground mt-1">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetch()}
-                className="mt-4"
-              >
+              <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-4">
                 Try Again
               </Button>
             </div>
           ) : sessions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No active sessions found
-            </div>
+            <div className="text-center py-8 text-muted-foreground">No active sessions found</div>
           ) : (
             <div className="space-y-4">
               {/* Session list */}
@@ -129,9 +116,13 @@ export function SessionManagement() {
                     } transition-colors`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-full ${
-                        session.is_current ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                      }`}>
+                      <div
+                        className={`p-2 rounded-full ${
+                          session.is_current
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
                         {getDeviceIcon(session.device_type)}
                       </div>
                       <div>
@@ -147,11 +138,12 @@ export function SessionManagement() {
                           )}
                         </div>
                         <div className="text-sm text-muted-foreground mt-0.5">
-                          {session.ip_address && (
-                            <span>{session.ip_address}</span>
-                          )}
+                          {session.ip_address && <span>{session.ip_address}</span>}
                           {session.location_city && session.location_country && (
-                            <span> • {session.location_city}, {session.location_country}</span>
+                            <span>
+                              {' '}
+                              • {session.location_city}, {session.location_country}
+                            </span>
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -192,7 +184,9 @@ export function SessionManagement() {
                     className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
                     <LogOut className="h-4 w-4 mr-2" />
-                    {isRevokingAll ? 'Signing out...' : `Sign out all other devices (${otherSessionsCount})`}
+                    {isRevokingAll
+                      ? 'Signing out...'
+                      : `Sign out all other devices (${otherSessionsCount})`}
                   </Button>
                 </div>
               )}
@@ -238,9 +232,9 @@ export function SessionManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Sign out all other devices?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will sign out {otherSessionsCount} other session{otherSessionsCount !== 1 ? 's' : ''}.
-              Your current session will remain active. This is useful if you think someone else
-              may have access to your account.
+              This will sign out {otherSessionsCount} other session
+              {otherSessionsCount !== 1 ? 's' : ''}. Your current session will remain active. This
+              is useful if you think someone else may have access to your account.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

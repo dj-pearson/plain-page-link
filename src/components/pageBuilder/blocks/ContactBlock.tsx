@@ -108,7 +108,7 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
       };
 
       // Call the submit-lead edge function
-      const { data, error } = await edgeFunctions.invoke('submit-lead', {
+      const { error } = await edgeFunctions.invoke('submit-lead', {
         body: leadData,
       });
 

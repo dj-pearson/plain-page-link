@@ -30,12 +30,7 @@ interface SocialShareDialogProps {
   agentName?: string;
 }
 
-export function SocialShareDialog({
-  open,
-  onOpenChange,
-  listing,
-  agentName = 'Your Real Estate Agent',
-}: SocialShareDialogProps) {
+export function SocialShareDialog({ open, onOpenChange, listing }: SocialShareDialogProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 

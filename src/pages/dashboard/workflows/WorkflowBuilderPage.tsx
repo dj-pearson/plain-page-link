@@ -1,69 +1,64 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useWorkflowBuilderStore } from "@/stores/useWorkflowBuilderStore";
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useWorkflowBuilderStore } from '@/stores/useWorkflowBuilderStore';
 import {
   WorkflowCanvas,
   WorkflowNodePalette,
   WorkflowNodeInspector,
   WorkflowToolbar,
-} from "@/components/workflowBuilder";
+} from '@/components/workflowBuilder';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Loader2, ArrowLeft } from "lucide-react";
-import { logger } from "@/lib/logger";
-import type { WorkflowCategory, WorkflowNodeTemplate } from "@/types/workflow";
+} from '@/components/ui/select';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import { logger } from '@/lib/logger';
+import type { WorkflowCategory, WorkflowNodeTemplate } from '@/types/workflow';
 
 const CATEGORY_OPTIONS: { value: WorkflowCategory; label: string }[] = [
-  { value: "lead_management", label: "Lead Management" },
-  { value: "listing_automation", label: "Listing Automation" },
-  { value: "marketing", label: "Marketing" },
-  { value: "notifications", label: "Notifications" },
-  { value: "integrations", label: "Integrations" },
-  { value: "general", label: "General" },
+  { value: 'lead_management', label: 'Lead Management' },
+  { value: 'listing_automation', label: 'Listing Automation' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'notifications', label: 'Notifications' },
+  { value: 'integrations', label: 'Integrations' },
+  { value: 'general', label: 'General' },
 ];
 
 export const WorkflowBuilderPage = () => {
   const { workflowId } = useParams();
   const navigate = useNavigate();
-  const {
-    workflow,
-    loadWorkflow,
-    createNewWorkflow,
-    resetBuilder,
-    updateWorkflowMeta,
-  } = useWorkflowBuilderStore();
+  const { workflow, loadWorkflow, createNewWorkflow, resetBuilder, updateWorkflowMeta } =
+    useWorkflowBuilderStore();
 
   const [isLoading, setIsLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const [draggedTemplate, setDraggedTemplate] = useState<WorkflowNodeTemplate | null>(null);
+  const [_draggedTemplate, setDraggedTemplate] = useState<WorkflowNodeTemplate | null>(null);
 
   useEffect(() => {
     const initWorkflow = async () => {
       setIsLoading(true);
       try {
-        if (workflowId && workflowId !== "new") {
+        if (workflowId && workflowId !== 'new') {
           await loadWorkflow(workflowId);
         } else {
-          createNewWorkflow("Untitled Workflow");
+          createNewWorkflow('Untitled Workflow');
         }
       } catch (error) {
-        logger.error("Failed to initialize workflow", error as Error);
-        navigate("/dashboard/workflows");
+        logger.error('Failed to initialize workflow', error as Error);
+        navigate('/dashboard/workflows');
       } finally {
         setIsLoading(false);
       }
@@ -77,7 +72,7 @@ export const WorkflowBuilderPage = () => {
   }, [workflowId]);
 
   const handleBack = () => {
-    navigate("/dashboard/workflows");
+    navigate('/dashboard/workflows');
   };
 
   const handleDragStart = (template: WorkflowNodeTemplate) => {
@@ -105,9 +100,7 @@ export const WorkflowBuilderPage = () => {
       </div>
 
       {/* Toolbar */}
-      <WorkflowToolbar
-        onOpenSettings={() => setShowSettings(true)}
-      />
+      <WorkflowToolbar onOpenSettings={() => setShowSettings(true)} />
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
@@ -126,43 +119,31 @@ export const WorkflowBuilderPage = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Workflow Settings</DialogTitle>
-            <DialogDescription>
-              Configure your workflow settings and metadata
-            </DialogDescription>
+            <DialogDescription>Configure your workflow settings and metadata</DialogDescription>
           </DialogHeader>
 
           {workflow && (
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Workflow Name
-                </label>
+                <label className="text-sm font-medium text-gray-700">Workflow Name</label>
                 <Input
                   value={workflow.name}
-                  onChange={(e) =>
-                    updateWorkflowMeta({ name: e.target.value })
-                  }
+                  onChange={(e) => updateWorkflowMeta({ name: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Description
-                </label>
+                <label className="text-sm font-medium text-gray-700">Description</label>
                 <Textarea
-                  value={workflow.description || ""}
-                  onChange={(e) =>
-                    updateWorkflowMeta({ description: e.target.value })
-                  }
+                  value={workflow.description || ''}
+                  onChange={(e) => updateWorkflowMeta({ description: e.target.value })}
                   placeholder="Describe what this workflow does..."
                   rows={3}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Category
-                </label>
+                <label className="text-sm font-medium text-gray-700">Category</label>
                 <Select
                   value={workflow.category}
                   onValueChange={(value) =>
@@ -183,15 +164,13 @@ export const WorkflowBuilderPage = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Tags
-                </label>
+                <label className="text-sm font-medium text-gray-700">Tags</label>
                 <Input
-                  value={workflow.tags.join(", ")}
+                  value={workflow.tags.join(', ')}
                   onChange={(e) =>
                     updateWorkflowMeta({
                       tags: e.target.value
-                        .split(",")
+                        .split(',')
                         .map((t) => t.trim())
                         .filter(Boolean),
                     })

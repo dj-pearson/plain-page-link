@@ -747,7 +747,7 @@ export function getTemplateById(id: string): PageTemplate | undefined {
  * Apply a template to create a new page
  * Assigns proper IDs and order to blocks
  */
-export function applyTemplate(template: PageTemplate, userId: string, slug: string) {
+export function applyTemplate(template: PageTemplate, _userId: string, _slug: string) {
   const blocks: PageBlock[] = template.blocks.map((block, index) => ({
     ...block,
     id: `block_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,

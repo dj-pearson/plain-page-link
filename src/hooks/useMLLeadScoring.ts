@@ -75,7 +75,10 @@ export interface UseMLLeadScoringOptions {
 // ============================================================================
 
 export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
-  const { autoLoadModel = true, persistScores = false } = options;
+  // `persistScores` is accepted by the options type but nothing consumes it —
+  // scores are never persisted. Left destructured out rather than silently
+  // implying support.
+  const { autoLoadModel = true } = options;
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -90,11 +93,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
   // ============================================================================
 
   // Fetch saved model weights from Supabase
-  const {
-    data: savedModel,
-    isLoading: isLoadingModel,
-    refetch: refetchModel,
-  } = useQuery({
+  const { data: savedModel, isLoading: isLoadingModel } = useQuery({
     queryKey: ['ml-model-weights', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -167,11 +166,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
   // ============================================================================
 
   // Fetch A/B test results
-  const {
-    data: abTestResults,
-    isLoading: isLoadingABTests,
-    refetch: refetchABTests,
-  } = useQuery({
+  const { data: abTestResults, isLoading: isLoadingABTests } = useQuery({
     queryKey: ['ab-test-results', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];

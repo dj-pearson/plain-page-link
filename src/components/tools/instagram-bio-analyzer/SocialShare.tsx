@@ -28,7 +28,7 @@ export function SocialShare({ score, toolUrl, onShare }: SocialShareProps) {
   const [copied, setCopied] = React.useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { grade, color, label } = getScoreGrade(score);
+  const { grade, color} = getScoreGrade(score);
 
   // Pre-populated social posts
   const socialPosts = {

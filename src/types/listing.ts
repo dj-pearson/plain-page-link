@@ -100,7 +100,7 @@ export type PublicListing = Omit<
   photos: string[] | null;
 };
 
-export interface ListingUpdateData extends Partial<ListingCreateData> {
+export interface ListingUpdateData extends Partial<PublicListing> {
   highlights?: string[];
   title?: string;
   year_built?: number;

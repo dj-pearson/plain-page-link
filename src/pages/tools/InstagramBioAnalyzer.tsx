@@ -128,7 +128,7 @@ export default function InstagramBioAnalyzer() {
       // Send welcome email with bio rewrites via Resend
       if (analysisResult) {
         try {
-          const { data: functionData, error: functionError } = await edgeFunctions.invoke(
+          const { data: _functionData, error: functionError } = await edgeFunctions.invoke(
             'send-bio-analyzer-email',
             {
               body: {

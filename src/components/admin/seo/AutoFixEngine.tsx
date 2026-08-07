@@ -157,7 +157,7 @@ export const AutoFixEngine = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('seo_autofix_rules')
         .insert([
           {
@@ -623,11 +623,7 @@ export const AutoFixEngine = () => {
                       </CardDescription>
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => approveFiximestamp(approval.id)}
-                      >
+                      <Button size="sm" variant="outline" onClick={() => approveFix(approval.id)}>
                         <CheckCircle2 className="h-4 w-4 mr-1" />
                         Approve
                       </Button>

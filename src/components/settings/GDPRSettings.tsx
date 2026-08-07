@@ -25,7 +25,6 @@ export function GDPRSettings() {
   const {
     exportData,
     isExporting,
-    deletionStatus,
     isDeletionStatusLoading,
     isAccountDeletionScheduled,
     daysUntilDeletion,
@@ -67,22 +66,17 @@ export function GDPRSettings() {
             <Download className="h-5 w-5 text-primary" />
             <div>
               <CardTitle>Export Your Data</CardTitle>
-              <CardDescription>
-                Download a copy of all your data in JSON format
-              </CardDescription>
+              <CardDescription>Download a copy of all your data in JSON format</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Your data export will include your profile, listings, leads, testimonials,
-              links, blog posts, analytics, and security activity logs.
+              Your data export will include your profile, listings, leads, testimonials, links, blog
+              posts, analytics, and security activity logs.
             </p>
-            <Button
-              onClick={() => setShowExportDialog(true)}
-              disabled={isExporting}
-            >
+            <Button onClick={() => setShowExportDialog(true)} disabled={isExporting}>
               <Download className="h-4 w-4 mr-2" />
               {isExporting ? 'Preparing Export...' : 'Export My Data'}
             </Button>
@@ -112,15 +106,14 @@ export function GDPRSettings() {
               <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900">
                 <Clock className="h-5 w-5 text-red-600 mt-0.5" />
                 <div>
-                  <h4 className="font-medium text-red-600">
-                    Account Deletion Scheduled
-                  </h4>
+                  <h4 className="font-medium text-red-600">Account Deletion Scheduled</h4>
                   <p className="text-sm text-red-800 dark:text-red-200 mt-1">
                     Your account will be permanently deleted{' '}
                     <strong>{formatDaysRemaining(daysUntilDeletion || 0)}</strong>
                     {deletionScheduledFor && (
                       <> ({new Date(deletionScheduledFor).toLocaleDateString()})</>
-                    )}.
+                    )}
+                    .
                   </p>
                   <p className="text-sm text-red-800 dark:text-red-200 mt-2">
                     You can cancel this request before the deletion date to keep your account.
@@ -147,8 +140,8 @@ export function GDPRSettings() {
                     This action is irreversible
                   </h4>
                   <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    Deleting your account will permanently remove all your data, including
-                    your profile, listings, leads, and analytics. This cannot be undone.
+                    Deleting your account will permanently remove all your data, including your
+                    profile, listings, leads, and analytics. This cannot be undone.
                   </p>
                 </div>
               </div>
@@ -205,14 +198,12 @@ export function GDPRSettings() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600">
-              Delete Your Account?
-            </AlertDialogTitle>
+            <AlertDialogTitle className="text-red-600">Delete Your Account?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-4">
                 <p>
-                  This will schedule your account for permanent deletion. You'll have
-                  30 days to cancel this request if you change your mind.
+                  This will schedule your account for permanent deletion. You'll have 30 days to
+                  cancel this request if you change your mind.
                 </p>
                 <div>
                   <Label htmlFor="reason" className="text-sm font-medium">
@@ -230,7 +221,8 @@ export function GDPRSettings() {
                 <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
                   <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5" />
                   <p className="text-sm text-red-800 dark:text-red-200">
-                    After 30 days, all your data will be permanently deleted and cannot be recovered.
+                    After 30 days, all your data will be permanently deleted and cannot be
+                    recovered.
                   </p>
                 </div>
               </div>
@@ -258,8 +250,8 @@ export function GDPRSettings() {
               <div className="flex items-start gap-3">
                 <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
                 <p>
-                  Your account deletion will be cancelled and your account will remain active.
-                  All your data will be preserved.
+                  Your account deletion will be cancelled and your account will remain active. All
+                  your data will be preserved.
                 </p>
               </div>
             </AlertDialogDescription>

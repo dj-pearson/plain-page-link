@@ -19,13 +19,6 @@ interface DeletionStatus {
   message?: string;
 }
 
-interface ExportRequestResponse {
-  success: boolean;
-  requestId?: string;
-  message?: string;
-  error?: string;
-}
-
 interface DeletionRequestResponse {
   success: boolean;
   requestId?: string;
@@ -38,7 +31,7 @@ interface DeletionRequestResponse {
 }
 
 export function useGDPR() {
-  const { user, signOut } = useAuthStore();
+  const { user } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isExporting, setIsExporting] = useState(false);
