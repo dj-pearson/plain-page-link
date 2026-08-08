@@ -1315,8 +1315,8 @@
         "npm run verify:schema passes"
       ],
       "priority": 80,
-      "passes": false,
-      "notes": "Depends on US-068: today a new user has no subscriptions row at all, so a trigger that reads one has to handle the missing case explicitly or every insert will fail. Do US-068 first and still handle NULL defensively."
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000007_enforce_plan_limits.sql. BEFORE INSERT triggers on listings, links and testimonials. check_subscription_limit() was NOT reused as the enforcement point because it gets two cases wrong, both of which would have been worse than no enforcement: -1 means unlimited everywhere else in the product, but `count < -1` is false, so it blocked every insert on an unlimited plan; and with no subscriptions row max_allowed is NULL and `count < NULL` is NULL, not false, so a naive guard failed open. It is fixed here as well (-1 short-circuits to true, a missing row falls back to the free tier) and a dedicated enforce_plan_limit() trigger function raises check_violation with a hint. Deliberate exemption: only owner-initiated inserts are metered (auth.uid() = NEW.user_id). An anonymous visitor submitting a review under US-074 or a lead has no way to know or influence the agent's plan, and silently dropping someone's review because the agent is at their tier is a worse failure than the overage; service-role writes are exempt for the same reason. Verified as a free-plan user against a rebuilt Postgres: listings 1, 2 and 3 created, the 4th rejected by enforce_plan_limit, and an anonymous testimonial for that same at-limit user still accepted."
     },
     {
       "id": "US-081",
@@ -1329,8 +1329,8 @@
         "npm run build passes and the tsc count drops by the 5 errors this file currently contributes"
       ],
       "priority": 81,
-      "passes": false,
-      "notes": "Deleting is the honest default — /dashboard/leads already exists and is backed by useLeads. Only build this out if the inbox/templates/hot-lead UI is genuinely wanted, and if so treat it as a new feature story rather than smuggling it in here."
+      "passes": true,
+      "notes": "DONE 2026-08-08. Deleted src/pages/LeadManagementDashboard.tsx and its route. Deleting was the honest option: /dashboard/leads already exists and is backed by useLeads, whereas this page rendered four hardcoded leads (\"Sarah Johnson\", \"Michael Chen\", ...) inside ProtectedRoute and toasted \"Email sent!\" after awaiting a 500ms setTimeout commented \"Simulate API call\". Building it out properly is a feature, not a bugfix, and should get its own story. NOTE FOR WHOEVER PICKS THAT UP: four substantive components are now imported by nothing — LeadInbox, ResponseTemplates, HotLeadAlert and LeadDetailView. They are real presentational UI rather than fakes, so they were left in place rather than deleted unilaterally; nothing bundles them (tree-shaking) but they are dead until that story exists. Removing the page also cleared 7 of the tsc backlog (5 from the page, 2 from ResponseTemplates via its former importer)."
     },
     {
       "id": "US-082",
@@ -1422,8 +1422,8 @@
         "npm run test:run and npm run build still pass"
       ],
       "priority": 87,
-      "passes": false,
-      "notes": "useAnalytics already accepts a TimeRange, so the second query is a small extension rather than new infrastructure. Showing a real 'no comparison data yet' state is better than any estimate."
+      "passes": true,
+      "notes": "DONE 2026-08-08. useAnalytics now queries the preceding window of the same length and returns previousStats, replacing AnalyticsDashboard's `Math.round(stats.totalViews * 0.85)` with the comment \"Estimate 15% growth\" — which made every trend arrow read a constant +17.6% regardless of what happened, including during a decline, when it showed growth. The previous-window query selects only what it counts rather than pulling another 1,500 rows to length them. Also returns hasPreviousPeriod, and the dashboard now says so explicitly when there is no prior data instead of rendering a meaningless +100%. The two hardcoded zeros were handled differently because they are different problems: avgResponseTime IS computable — leads.first_responded_at exists — so it is now the mean minutes to first response over responded leads, null when none have been; revenue is not tracked anywhere in the product, so the Revenue KPI was removed from calculateKPIs rather than left rendering $0 beside real numbers, which reads as \"you earned nothing\" rather than \"not measured\". analytics.test.ts updated to expect 7 metrics and to assert Revenue is absent. tsc 147 -> 143 across this batch, 295 tests, build green."
     },
     {
       "id": "US-088",
@@ -1452,8 +1452,8 @@
         "npm run verify:schema passes"
       ],
       "priority": 89,
-      "passes": false,
-      "notes": "Same shape as US-063 and US-067; follow the access model those established — anon nothing, authenticated nothing unless it owns the row, admin SELECT via has_role, service_role ALL."
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000008_scope_seo_tables.sql. Dropped two anon-readable policies (seo_core_web_vitals and seo_keyword_history, both USING (true) with no TO clause) and eight USING (auth.uid() IS NOT NULL) policies that let any registered user read the whole SEO programme, including seo_security_analysis. Each table already carries an \"Admins can manage ...\" ALL policy, so no replacement was needed; seo_alerts keeps its per-user policy so an agent still sees alerts raised for them. seo_settings is deliberately untouched — it holds the site-wide title, description, robots.txt and verification tags emitted into every page head, so the public read is the point. The two PUBLIC_BY_DESIGN entries in scripts/verify-schema.mjs were removed in the same commit, or the checker emits a stale-entry note. Verified: anon reads 0 from seo_core_web_vitals, a plain authenticated user reads 0 from seo_security_analysis, an admin reads 1."
     },
     {
       "id": "US-090",
@@ -1495,7 +1495,7 @@
       ],
       "priority": 92,
       "passes": false,
-      "notes": "Anonymous insert into analytics_views is probably an accepted trade-off for a public link-in-bio — the point is to make that a decision rather than an accident, and to stop the counters being presented to agents as trustworthy. PARTIAL 2026-08-08: the HealthDashboard item is done — it queried user_subscriptions.plan_name (that table has plan_id; plan_name is on the flat subscriptions table) inside a catch that swallowed the 400, so the revenue widget rendered empty indefinitely. Now reads subscriptions and logs the error instead of swallowing it. Found by the new check 9 from US-082, not by hand. The LinkManager deletion and the analytics_views rate limiting are still open. The analytics_views item is still open. The LinkManager deletion is still open."
+      "notes": "Anonymous insert into analytics_views is probably an accepted trade-off for a public link-in-bio — the point is to make that a decision rather than an accident, and to stop the counters being presented to agents as trustworthy. PARTIAL 2026-08-08: the HealthDashboard item is done — it queried user_subscriptions.plan_name (that table has plan_id; plan_name is on the flat subscriptions table) inside a catch that swallowed the 400, so the revenue widget rendered empty indefinitely. Now reads subscriptions and logs the error instead of swallowing it. Found by the new check 9 from US-082, not by hand. The LinkManager deletion and the analytics_views rate limiting are still open. The analytics_views item is still open. The LinkManager deletion is still open. PARTIAL 2026-08-08 (2/3): src/components/dashboard/LinkManager.tsx deleted alongside US-081 — nothing imported it, it kept links in React state, never called Supabase, toasted \"Link added successfully!\" and modelled a schema that does not match the links table. The HealthDashboard widget was fixed earlier. Only the analytics_views item remains: FOR INSERT WITH CHECK (true) with no TO clause means anyone can inflate any profile's view counters, and the counters are presented to agents as trustworthy."
     },
     {
       "id": "US-093",
@@ -1510,8 +1510,8 @@
         "npm run verify:schema passes"
       ],
       "priority": 93,
-      "passes": false,
-      "notes": "This is a compliance finding, not just a bug: the product accepts erasure requests it cannot fulfil, and process-account-deletions returns success:true with processed:0 rather than surfacing the failure. Sequence the FK additions carefully — adding ON DELETE CASCADE to leads.user_id on a production table with orphaned rows will fail; add NOT VALID, clean up, then VALIDATE. Check whether gdpr-deletion (the user-facing request path) has the same problem before assuming only the scheduler is affected."
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000006_fix_account_deletion.sql. Two defects. (1) The DELETE aborted: deleting auth.users cascades to profiles, the audit trigger fires, audit_table_change() finds auth.uid() NULL under the cron caller and falls back to the row's own id, and log_audit_event() then inserts that as user_id/actor_id — referencing an auth.users row already removed in the same statement. ON DELETE SET NULL on audit_logs does not help, because the row is being INSERTED with a dangling reference rather than updated to one. log_audit_event now nulls either id when the referenced user is gone, so the erasure RECORD survives while the reference does not — losing the audit trail of a deletion would be worse than losing the actor on it. (2) leads, listings, testimonials, user_settings, article_webhooks and analytics_views carried a user_id with no foreign key at all, so nothing cascaded to them even once the delete worked. Added ON DELETE CASCADE, NOT VALID: production may hold orphans from before this and a validating ADD CONSTRAINT would fail on them, while NOT VALID still enforces on new rows and still cascades, which is what erasure needs. Sweep orphans and VALIDATE as a follow-up. account_deletion_log deliberately gets no cascading FK — it has to outlive the user. Verified end to end on a rebuilt Postgres by seeding a user with a profile, lead, listing, testimonial, settings row and analytics row and running the exact DELETE the scheduler runs: it now succeeds (previously an FK error), every one of those counts goes to 0, and 3 audit rows survive with actor_id nulled."
     }
   ]
 }

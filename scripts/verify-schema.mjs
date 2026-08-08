@@ -98,8 +98,6 @@ const PUBLIC_BY_DESIGN = new Map([
   ['mortgage_calculations:INSERT', 'anonymous mortgage calculator on public profiles'],
   ['feature_catalog:SELECT', 'plan/pricing catalog, rendered on the public pricing page'],
   ['seo_settings:SELECT', 'site-wide SEO config that is emitted into every page head'],
-  ['seo_core_web_vitals:SELECT', 'aggregate page-speed numbers, no per-user data'],
-  ['seo_keyword_history:SELECT', 'aggregate ranking history, no per-user data'],
   // The free lead-gen tools under /tools/* are used by visitors with no account,
   // so the submission itself has to be open. Reading them back is not — see
   // KNOWN_OVERPERMISSIVE.

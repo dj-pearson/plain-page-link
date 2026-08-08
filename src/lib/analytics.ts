@@ -73,7 +73,9 @@ export class AnalyticsEngine {
       this.createMetric('Unique Visitors', current.uniqueVisitors, '', previous.uniqueVisitors),
       this.createMetric('Total Leads', current.leads, '', previous.leads),
       this.createMetric('Conversions', current.conversions, '', previous.conversions),
-      this.createMetric('Revenue', current.revenue, '$', previous.revenue),
+      // US-087: no Revenue metric. Nothing in the product tracks per-agent
+      // revenue, so this rendered a hardcoded $0 next to real numbers, which
+      // reads as "you earned nothing" rather than "not measured".
       this.createMetric(
         'Avg Response Time',
         current.avgResponseTime,

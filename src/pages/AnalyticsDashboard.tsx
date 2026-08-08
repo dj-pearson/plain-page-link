@@ -33,7 +33,7 @@ export default function AnalyticsDashboard() {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
 
   // Fetch real data from database
-  const { stats, viewsData, isLoading } = useAnalytics(timeRange);
+  const { stats, previousStats, hasPreviousPeriod, viewsData, isLoading } = useAnalytics(timeRange);
   const { leads } = useLeads();
 
   // Build analytics data from real stats
@@ -44,8 +44,8 @@ export default function AnalyticsDashboard() {
       uniqueVisitors: stats.uniqueVisitors,
       leads: stats.totalLeads,
       conversions: leads.filter((l) => l.status === 'converted').length,
-      revenue: 0, // Revenue tracking not implemented yet
-      avgResponseTime: 0, // Response time tracking not implemented yet
+      revenue: 0, // not tracked; the Revenue KPI was removed in US-087
+      avgResponseTime: stats.avgResponseMinutes ?? 0,
       period: timeRange === '7d' ? 'week' : timeRange === '30d' ? 'month' : 'quarter',
       startDate: subDays(now, timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90),
       endDate: now,
@@ -53,20 +53,23 @@ export default function AnalyticsDashboard() {
     [stats, leads, timeRange, now]
   );
 
-  // Previous period data (estimate based on current - would need separate query for accurate comparison)
+  // US-087: the preceding window, queried. This used to be
+  // `current * 0.85` with the comment "Estimate 15% growth", so every trend
+  // arrow read a constant +17.6% no matter what the numbers did — including
+  // during a decline, when it showed growth.
   const previous: AnalyticsData = useMemo(
     () => ({
-      pageViews: Math.round(stats.totalViews * 0.85), // Estimate 15% growth
-      uniqueVisitors: Math.round(stats.uniqueVisitors * 0.85),
-      leads: Math.round(stats.totalLeads * 0.85),
-      conversions: Math.round(leads.filter((l) => l.status === 'converted').length * 0.85),
+      pageViews: previousStats.views,
+      uniqueVisitors: previousStats.visitors,
+      leads: previousStats.leads,
+      conversions: previousStats.conversions,
       revenue: 0,
       avgResponseTime: 0,
       period: current.period,
       startDate: subDays(current.startDate, timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90),
       endDate: current.startDate,
     }),
-    [stats, leads, current, timeRange]
+    [previousStats, current, timeRange]
   );
 
   // Convert viewsData to TimeSeriesData format
@@ -258,6 +261,11 @@ export default function AnalyticsDashboard() {
 
       {/* KPIs */}
       <KPICards metrics={kpis} />
+      {!hasPreviousPeriod && (
+        <p className="text-sm text-muted-foreground">
+          No data for the preceding period yet, so the comparisons above are measured against zero.
+        </p>
+      )}
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="w-full">
