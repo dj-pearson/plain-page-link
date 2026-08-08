@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { Plus, Star, Edit, Trash2, Quote, Share2, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  Plus,
+  Star,
+  Edit,
+  Trash2,
+  Quote,
+  Share2,
+  AlertCircle,
+  RefreshCw,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import { AddTestimonialModal } from '@/components/modals/AddTestimonialModal';
 import {
   EditTestimonialModal,
@@ -31,6 +42,7 @@ export default function Testimonials() {
     addTestimonial,
     updateTestimonial,
     deleteTestimonial,
+    setTestimonialPublished,
   } = useTestimonials();
   const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
   const { profile } = useProfile();
@@ -205,9 +217,15 @@ export default function Testimonials() {
               key={testimonial.id}
               className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow relative"
             >
-              {/* Quote Icon */}
-              <div className="mb-4">
+              {/* Quote Icon + pending marker */}
+              <div className="mb-4 flex items-start justify-between gap-3">
                 <Quote className="h-8 w-8 text-primary opacity-20" />
+                {!testimonial.is_published && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                    <EyeOff className="h-3 w-3" />
+                    Pending review
+                  </span>
+                )}
               </div>
 
               {/* Review */}
@@ -235,6 +253,30 @@ export default function Testimonials() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1">
+                  <button
+                    onClick={() =>
+                      setTestimonialPublished.mutate({
+                        id: testimonial.id,
+                        isPublished: !testimonial.is_published,
+                      })
+                    }
+                    disabled={setTestimonialPublished.isPending}
+                    title={
+                      testimonial.is_published
+                        ? 'Hide from your public profile'
+                        : 'Publish to your public profile'
+                    }
+                    aria-label={
+                      testimonial.is_published ? 'Hide testimonial' : 'Publish testimonial'
+                    }
+                    className="p-2 hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {testimonial.is_published ? (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <EyeOff className="h-4 w-4 text-amber-600" />
+                    )}
+                  </button>
                   <button
                     onClick={() => setEditingTestimonial(testimonial)}
                     className="p-2 hover:bg-accent rounded-lg transition-colors"

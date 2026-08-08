@@ -84,6 +84,26 @@ serve(async (req: Request) => {
 
         const result = data?.[0] || { is_blocked: false, attempts_remaining: 5 };
 
+        // US-079: this used to answer 429 when blocked. callEdgeFunction throws
+        // on any non-2xx, so edgeFunctions.invoke returned { data: null, error }
+        // and checkLoginThrottle's fail-open branch turned the block into
+        // `blocked: false` — the one answer the throttle exists to produce was
+        // the one answer it discarded, and Login.tsx's `if (blocked)` was
+        // unreachable. A throttle verdict is a successful query about state,
+        // not a transport failure, so it is now 200 with the verdict in the
+        // body. Retry-After is kept for any caller that wants it.
+        const throttleHeaders: Record<string, string> = {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        };
+        if (result.is_blocked && result.blocked_until) {
+          const seconds = Math.max(
+            0,
+            Math.ceil((new Date(result.blocked_until).getTime() - Date.now()) / 1000)
+          );
+          throttleHeaders['Retry-After'] = String(seconds);
+        }
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -92,10 +112,7 @@ serve(async (req: Request) => {
             blockedUntil: result.blocked_until,
             reason: result.reason,
           }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: result.is_blocked ? 429 : 200,
-          }
+          { headers: throttleHeaders, status: 200 }
         );
       }
 

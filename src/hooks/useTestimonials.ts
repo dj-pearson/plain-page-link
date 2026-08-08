@@ -48,8 +48,13 @@ export function useTestimonials() {
       const { data, error } = await supabase
         .from('testimonials')
         .insert({
-          user_id: user.id,
           ...testimonialData,
+          user_id: user.id,
+          // US-074 set the column default to false so anonymous public
+          // submissions arrive pending. A testimonial the agent adds here is
+          // their own decision, so it goes live unless they explicitly say
+          // otherwise.
+          is_published: testimonialData.is_published ?? true,
         })
         .select()
         .single();
@@ -67,6 +72,41 @@ export function useTestimonials() {
     onError: (error) => {
       toast({
         title: 'Failed to Add Testimonial',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  /**
+   * Approve (or unpublish) a testimonial. Public submissions arrive with
+   * is_published = false — see US-074 — and are invisible on the profile until
+   * the agent approves them here.
+   */
+  const setTestimonialPublished = useMutation({
+    mutationFn: async ({ id, isPublished }: { id: string; isPublished: boolean }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const { error } = await supabase
+        .from('testimonials')
+        .update({ is_published: isPublished })
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: (_data, { isPublished }) => {
+      queryClient.invalidateQueries({ queryKey: ['testimonials', user?.id] });
+      toast({
+        title: isPublished ? 'Testimonial published' : 'Testimonial hidden',
+        description: isPublished
+          ? 'It is now visible on your public profile.'
+          : 'It is no longer visible on your public profile.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Could not update the testimonial',
         description: error instanceof Error ? error.message : 'An error occurred',
         variant: 'destructive',
       });
@@ -142,6 +182,7 @@ export function useTestimonials() {
     refetch,
     addTestimonial,
     updateTestimonial,
+    setTestimonialPublished,
     deleteTestimonial,
   };
 }
