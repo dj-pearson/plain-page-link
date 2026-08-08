@@ -19,6 +19,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { Activity, Users, UserPlus, Building2, MessageSquare, DollarSign } from 'lucide-react';
+import { logger } from '@/lib/logger';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { edgeFunctions } from '@/lib/edgeFunctions';
@@ -124,18 +125,22 @@ export default function HealthDashboard() {
       ]);
 
       // Subscriptions for revenue metrics (best-effort).
+      //
+      // US-092: this queried user_subscriptions.plan_name, which does not exist
+      // on that table — the relational model stores plan_id and the flat model
+      // (subscriptions) stores plan_name alongside the limit columns. PostgREST
+      // rejected the whole query, the catch swallowed it, and the widget
+      // rendered empty revenue metrics forever. `subscriptions` is the table
+      // that carries plan_name, and it is what useSubscriptionLimits reads.
       let subs: SubscriptionRow[] = [];
       try {
-        const client = supabase as unknown as {
-          from: (t: string) => {
-            select: (c: string) => Promise<{ data: SubscriptionRow[] | null }>;
-          };
-        };
-        const { data: subData } = await client
-          .from('user_subscriptions')
+        const { data: subData, error: subError } = await supabase
+          .from('subscriptions')
           .select('plan_name, status');
-        subs = subData ?? [];
-      } catch {
+        if (subError) throw subError;
+        subs = (subData as SubscriptionRow[] | null) ?? [];
+      } catch (error) {
+        logger.error('Health dashboard: subscription metrics unavailable', error as Error);
         subs = [];
       }
 

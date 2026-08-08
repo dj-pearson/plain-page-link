@@ -393,6 +393,202 @@ check('SECURITY DEFINER functions pin search_path', () =>
   `)
 );
 
+// ---------------------------------------------------------------------------
+// 9. Every column named in a .select('...') list must exist on the target table.
+//    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and
+//    that gap is what shipped US-070 and US-083. Five edge functions selected
+//    `profiles.email`, a column that has never existed — PostgREST rejects the
+//    whole query for one unknown column, and because every one of those call
+//    sites destructured the result without an error branch, the value came back
+//    undefined and the path silently did nothing. That cost agent lead
+//    notifications, Zapier webhook deliveries, contact-form alerts and Stripe
+//    dunning email, all returning HTTP 200. generate-sitemap lost every article
+//    and every listing the same way.
+//
+//    tsc catches this in src/ when types.ts is in sync, but it does not run over
+//    supabase/functions/ (Deno, and CI's deno check does not know the schema),
+//    and the tsc baseline is not blocking. This check covers both trees.
+// ---------------------------------------------------------------------------
+const columnsByTable = new Map();
+for (const row of q(`
+  SELECT table_name || '|' || string_agg(column_name, ',')
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+  GROUP BY table_name;
+`)) {
+  const [t, cols] = row.split('|');
+  columnsByTable.set(t, new Set(cols.split(',')));
+}
+
+/**
+ * PostgREST select lists carry more than bare column names: embedded resources
+ * `profiles(username)` / `profiles!inner(...)`, aliases `alias:column`, JSON
+ * paths `col->>key`, casts `col::text` and aggregates `count(...)`. Strip all of
+ * that and return the plain top-level column names.
+ */
+function selectedColumns(list) {
+  if (list.includes('*')) return [];
+  const withoutEmbeds = list.replace(/[a-z0-9_]+\s*(?:!\s*[a-z]+)?\s*\([^()]*\)/gi, '');
+  return withoutEmbeds
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((c) => c.replace(/^[a-z0-9_]+\s*:\s*/i, ''))
+    .map((c) => c.split(/->>?|::/)[0].trim())
+    .filter((c) => c && c !== '*' && /^[a-z0-9_]+$/.test(c));
+}
+
+check('every column referenced in a .select() exists', () => {
+  const out = [];
+  for (const file of sourceFiles(['src', 'supabase/functions'])) {
+    if (file.endsWith('src/integrations/supabase/types.ts')) continue;
+    const text = stripComments(readFileSync(file, 'utf8')).replace(
+      /storage\s*\.\s*from\([^)]*\)/g,
+      ''
+    );
+    // `.from('t')` followed by `.select('...')`, allowing whitespace/newlines
+    // and template literals between them.
+    for (const m of text.matchAll(
+      /\.from\(\s*['"]([a-z0-9_]+)['"]\s*\)\s*\.select\(\s*[`'"]([^`'"]*)[`'"]/g
+    )) {
+      const [, table, list] = m;
+      const cols = columnsByTable.get(table);
+      if (!cols) continue; // check 4 owns unknown tables
+      for (const col of selectedColumns(list)) {
+        if (cols.has(col)) continue;
+        out.push(`${table}.${col} <- ${file.replace(ROOT + '/', '')}`);
+      }
+    }
+  }
+  return [...new Set(out)].sort();
+});
+
+// ---------------------------------------------------------------------------
+// 10. Every trigger function defined in public must be attached to something.
+//     handle_new_user() survived the US-060 squash but `on_auth_user_created`
+//     did not — the baseline came from a public-schema dump and the trigger
+//     lives on auth.users. Check 1 happily validated the orphaned function's
+//     column references. Signup created no profile, no role and no default
+//     subscription until US-068 restored it.
+// ---------------------------------------------------------------------------
+check('every trigger function is attached to a table', () =>
+  q(`
+    SELECT p.proname || '() returns trigger but no trigger references it'
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prorettype = 'trigger'::regtype
+      AND NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgfoid = p.oid)
+    ORDER BY 1;
+  `)
+);
+
+// ---------------------------------------------------------------------------
+// 11. A view granted to anon/authenticated must set security_invoker.
+//     Without it a view runs with its OWNER's privileges and RLS on the base
+//     tables does not apply, so the view is a hole straight through every
+//     policy behind it. Twelve views were granted to anon this way:
+//     user_subscription_details handed out stripe_customer_id and
+//     stripe_subscription_id, lead_activity_summary handed out cross-tenant
+//     lead activity. Fixed in US-071.
+// ---------------------------------------------------------------------------
+check('views granted to anon/authenticated set security_invoker', () =>
+  q(`
+    SELECT DISTINCT c.relname || ' is granted to ' || g.grantee || ' without security_invoker'
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN information_schema.role_table_grants g
+      ON g.table_schema = n.nspname AND g.table_name = c.relname
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('v', 'm')
+      AND g.grantee IN ('anon', 'authenticated')
+      AND g.privilege_type = 'SELECT'
+      AND NOT EXISTS (
+        SELECT 1 FROM unnest(COALESCE(c.reloptions, '{}')) o
+        WHERE o = 'security_invoker=on' OR o = 'security_invoker=true'
+      )
+    ORDER BY 1;
+  `)
+);
+
+// ---------------------------------------------------------------------------
+// 12. A secret-shaped column must not sit on a table anon can actually read.
+//     RLS filters rows, not columns, so a policy cannot make a column private —
+//     only a column privilege can. "Public can view limited profile info" was
+//     row-scoped and published every agent's zapier_webhook_url, a bearer token
+//     for their automations; enterprise_sso_config published oidc_client_secret
+//     and saml_certificate. Neither tripped check 3, because both quals are
+//     conditional (`is_published = true`, `active = true`) rather than a literal
+//     `true`. Fixed in US-072 and US-073.
+//
+//     Reachability, not the grant, is what matters here. Supabase grants ALL on
+//     every public table to anon by default, so a column privilege on its own
+//     says nothing. The dangerous combination is: anon still holds the column
+//     privilege AND the table has a SELECT policy anon can actually satisfy —
+//     one whose qualifier does not depend on auth.uid() or has_role(), both of
+//     which are empty for an anonymous caller.
+// ---------------------------------------------------------------------------
+check('no secret-shaped column is reachable by anon', () =>
+  q(`
+    WITH anon_readable AS (
+      SELECT DISTINCT p.tablename
+      FROM pg_policies p
+      WHERE p.schemaname = 'public'
+        AND p.cmd IN ('SELECT', 'ALL')
+        AND ('anon' = ANY (p.roles) OR 'public' = ANY (p.roles))
+        AND COALESCE(p.qual, 'true') NOT ILIKE '%auth.uid()%'
+        AND COALESCE(p.qual, 'true') NOT ILIKE '%has_role%'
+        AND COALESCE(p.qual, 'true') NOT ILIKE '%auth.role()%'
+        AND COALESCE(p.qual, 'true') NOT ILIKE '%auth.jwt()%'
+    )
+    SELECT g.table_name || '.' || g.column_name
+             || ' is reachable by ' || g.grantee
+             || ' (table has an anon-satisfiable SELECT policy)'
+    FROM information_schema.column_privileges g
+    JOIN anon_readable a ON a.tablename = g.table_name
+    WHERE g.table_schema = 'public'
+      AND g.grantee = 'anon'
+      AND g.privilege_type = 'SELECT'
+      AND (
+        g.column_name LIKE '%secret%'
+        OR g.column_name LIKE '%webhook_url%'
+        OR g.column_name LIKE '%certificate%'
+        OR g.column_name LIKE '%refresh_token%'
+        OR g.column_name LIKE '%access_token%'
+        OR g.column_name LIKE '%password%'
+        OR g.column_name LIKE '%api_key%'
+      )
+    ORDER BY 1;
+  `)
+);
+
+// ---------------------------------------------------------------------------
+// 13. Every bucket named in storage.from() must be created by a migration.
+//     There are no storage.buckets rows and no storage.objects policies in the
+//     applied schema at all — bucket creation lives only in the unapplied
+//     archive, another US-060 casualty. Three different names are in use for
+//     listing photos ('listings', 'listing-images', archived 'listing-photos'),
+//     so at least one upload path writes to a bucket that does not exist.
+//     US-075 owns the fix; this check is a NOTE until then so it can land
+//     blocking the moment that story does.
+// ---------------------------------------------------------------------------
+{
+  const declared = new Set(q(`SELECT id FROM storage.buckets;`));
+  const referenced = new Set();
+  for (const file of sourceFiles(['src', 'supabase/functions'])) {
+    const text = stripComments(readFileSync(file, 'utf8'));
+    for (const m of text.matchAll(/storage\s*\.\s*from\(\s*['"]([a-z0-9_-]+)['"]/g)) {
+      referenced.add(m[1]);
+    }
+  }
+  const missing = [...referenced].filter((b) => !declared.has(b)).sort();
+  if (missing.length) {
+    notes.push(
+      `US-075: ${missing.length} storage bucket(s) referenced in code but created by no migration: ${missing.join(', ')}`
+    );
+  }
+}
+
 console.log();
 for (const n of notes) console.log(`note  ${n}`);
 
