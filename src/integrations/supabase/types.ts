@@ -333,7 +333,15 @@ export type Database = {
           viewed_at?: string | null;
           visitor_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'analytics_views_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       api_keys: {
         Row: {
@@ -477,7 +485,15 @@ export type Database = {
           user_id?: string;
           webhook_url?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'article_webhooks_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       articles: {
         Row: {
@@ -2505,6 +2521,13 @@ export type Database = {
             referencedRelation: 'listings';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'leads_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
         ];
       };
       links: {
@@ -2851,7 +2874,15 @@ export type Database = {
           virtual_tour_url?: string | null;
           zip_code?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'listings_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       login_attempts: {
         Row: {
@@ -6885,6 +6916,24 @@ export type Database = {
           },
         ];
       };
+      stripe_processed_events: {
+        Row: {
+          event_id: string;
+          event_type: string;
+          processed_at: string;
+        };
+        Insert: {
+          event_id: string;
+          event_type: string;
+          processed_at?: string;
+        };
+        Update: {
+          event_id?: string;
+          event_type?: string;
+          processed_at?: string;
+        };
+        Relationships: [];
+      };
       stripe_usage_records: {
         Row: {
           action: string | null;
@@ -7280,6 +7329,13 @@ export type Database = {
             referencedRelation: 'listings';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'testimonials_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
         ];
       };
       unified_search_analytics: {
@@ -7637,7 +7693,15 @@ export type Database = {
           user_id?: string;
           weekly_report?: boolean | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'user_settings_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       user_subscriptions: {
         Row: {

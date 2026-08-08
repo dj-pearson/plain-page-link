@@ -13,7 +13,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
-import { checkRateLimit, getRateLimitHeaders } from "../_shared/rateLimit.ts";
+import { checkRateLimitDb, getRateLimitHeaders, RATE_LIMITS } from "../_shared/rate-limiter.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
@@ -34,10 +34,15 @@ serve(async (req) => {
   try {
     // Rate limiting
     const clientIp = req.headers.get('x-forwarded-for') || 'unknown';
-    const rateLimit = checkRateLimit(`create-customer:${clientIp}`, {
-      maxRequests: 3,
-      windowMs: 60000, // 3 requests per minute
-    });
+    // US-084: was _shared/rateLimit.ts, a module-level Map. Edge isolates are
+    // ephemeral and horizontally scaled, so that limiter reset on every cold
+    // start and never saw a sibling's counts — the money endpoints had the one
+    // limiter that did not work. checkRateLimitDb is atomic in Postgres.
+    const rateLimitClient = createClient(
+      Deno.env.get('SUPABASE_URL') as string,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string
+    );
+    const rateLimit = await checkRateLimitDb(rateLimitClient, clientIp, 'create-stripe-customer', RATE_LIMITS.auth);
 
     if (!rateLimit.allowed) {
       return new Response(

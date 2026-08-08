@@ -29,32 +29,37 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
 
-// In-memory idempotency cache (for edge functions)
-// In production, consider using Redis or database table
-const processedEvents = new Map<string, number>();
-
-// Clean old entries every 5 minutes
-setInterval(() => {
-  const oneHourAgo = Date.now() - (60 * 60 * 1000);
-  for (const [eventId, timestamp] of processedEvents.entries()) {
-    if (timestamp < oneHourAgo) {
-      processedEvents.delete(eventId);
-    }
-  }
-}, 5 * 60 * 1000);
-
 /**
- * Check if event was already processed (idempotency)
+ * Durable idempotency (US-084).
+ *
+ * This was a module-level Map plus a setInterval sweeper. Edge isolates are
+ * ephemeral and horizontally scaled, so Stripe's retries landed on cold
+ * instances with an empty map and reprocessed the event; the setInterval also
+ * pinned the isolate for no benefit. The unique constraint on
+ * stripe_processed_events IS the check — an insert that conflicts means the
+ * event is already handled, which is race-free in a way read-then-write is not.
+ *
+ * Returns true when this call claimed the event and should process it.
  */
-function isEventProcessed(eventId: string): boolean {
-  return processedEvents.has(eventId);
-}
+async function claimEvent(
+  supabase: ReturnType<typeof createClient>,
+  eventId: string,
+  eventType: string
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('stripe_processed_events')
+    .insert({ event_id: eventId, event_type: eventType });
 
-/**
- * Mark event as processed
- */
-function markEventProcessed(eventId: string): void {
-  processedEvents.set(eventId, Date.now());
+  if (!error) return true;
+
+  // 23505 = unique_violation: another delivery got there first.
+  if (error.code === '23505') return false;
+
+  // Anything else is a real failure. Fail OPEN — Stripe will retry, and
+  // processing an event twice is far less damaging than dropping a
+  // subscription change on the floor.
+  console.error('Idempotency claim failed, processing anyway:', error.message);
+  return true;
 }
 
 /**
@@ -86,7 +91,14 @@ function getPlanNameFromPriceId(priceId: string): string {
     return planName;
   }
 
-  return priceMap[priceId] || 'professional';
+  // US-084: this used to fall back to 'professional'. Any price id not in the
+  // map or the STRIPE_PRICE_* env vars — a new tier, an add-on, a typo —
+  // silently granted professional entitlements. Entitlement defaults fail
+  // closed, and an unrecognised price is a configuration error worth shouting
+  // about.
+  if (priceMap[priceId]) return priceMap[priceId];
+  console.error(`Unrecognised Stripe price id ${priceId}; defaulting to the free plan`);
+  return 'free';
 }
 
 /**
@@ -168,8 +180,11 @@ serve(async (req) => {
     const body = await req.text();
     const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
 
-    // Idempotency check
-    if (isEventProcessed(event.id)) {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Idempotency check — durable, so a retry on a cold isolate is still a
+    // duplicate rather than a re-run.
+    if (!(await claimEvent(supabase, event.id, event.type))) {
       console.log(`Event ${event.id} already processed, skipping`);
       return new Response(
         JSON.stringify({ received: true, skipped: true }),
@@ -178,8 +193,6 @@ serve(async (req) => {
     }
 
     console.log(`Processing event: ${event.type} (${event.id})`);
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Audit every webhook event (best-effort; never blocks processing).
     // user_id is extracted from metadata when present, otherwise null (system).
@@ -492,7 +505,6 @@ If you've already updated your details, you can ignore this message.
     }
 
     // Mark event as processed
-    markEventProcessed(event.id);
 
     return new Response(
       JSON.stringify({ received: true }),
