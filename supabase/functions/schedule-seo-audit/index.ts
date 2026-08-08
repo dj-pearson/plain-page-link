@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAdmin } from '../_shared/auth.ts';
 
 interface AuditSchedule {
   id: string
@@ -28,6 +29,12 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+
+    // US-078: this builds a SERVICE-ROLE client and acted on the request body
+    // alone. verify_jwt would not have helped — the anon key is itself a valid
+    // project JWT, so it separates "has the public key" from "has no key",
+    // not "is an admin".
+    await requireAdmin(req, supabase);
     // This function can be called in two ways:
     // 1. With a schedule_id to run a specific scheduled audit
     // 2. Without params to check all schedules and run due audits (cron mode)

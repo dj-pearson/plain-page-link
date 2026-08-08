@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
@@ -20,6 +21,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+
+    // US-078: scheduled job. Only the scheduler, which calls with the
+    // service-role key, should be able to drive a batch of email sends.
+    if (!isServiceRoleRequest(req)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     // Get email captures from last 7 days that need sequences sent
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)

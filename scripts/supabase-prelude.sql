@@ -108,6 +108,15 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 -- which is exactly the half of the check that catches over-tightening.
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 
+-- Likewise `storage`: hosted Supabase grants the API roles USAGE on the schema
+-- and ALL on storage.objects/storage.buckets, leaving RLS to do the restricting.
+-- Without it every storage policy is unexercisable locally — the insert fails
+-- with "permission denied for schema storage" before any policy is consulted,
+-- so an owner-scoped upload rule cannot be tested either way (US-075).
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+GRANT ALL ON TABLE storage.objects TO anon, authenticated, service_role;
+GRANT ALL ON TABLE storage.buckets TO anon, authenticated, service_role;
+
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public

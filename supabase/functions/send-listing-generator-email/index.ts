@@ -4,6 +4,8 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
+import { getClientIP } from '../_shared/auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 
@@ -30,6 +32,28 @@ serve(async (req) => {
 
     // Create Supabase client
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // US-078: public by design (the free tool has no session), so the limiter
+    // is the only thing standing between this and an open email relay.
+    const rateLimitResult = await checkRateLimitDb(
+      supabase,
+      getClientIP(req),
+      'send-listing-generator-email',
+      RATE_LIMITS.submission
+    );
+    if (!rateLimitResult.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again shortly.' }),
+        {
+          status: 429,
+          headers: {
+            ...getCorsHeaders(req.headers.get('origin')),
+            'Content-Type': 'application/json',
+            'Retry-After': String(rateLimitResult.retryAfterSeconds),
+          },
+        }
+      );
+    }
 
     // Send welcome email with all 3 styles
     const emailSent = await sendWelcomeEmail({

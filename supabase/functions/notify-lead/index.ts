@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail, createLeadNotificationEmail } from '../_shared/email.ts';
@@ -47,19 +48,33 @@ serve(async (req) => {
   }
 
   try {
+    // US-078: destructive-adjacent and unauthenticated — anyone could drive
+    // email sends. It is invoked by the leads-INSERT trigger via pg_net with
+    // the service-role key, so that is the only caller it needs to accept.
+    if (!isServiceRoleRequest(req)) {
+      return errorResponse('Unauthorized', 'UNAUTHORIZED', req, 401);
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
     const payload = await req.json();
-    let lead: LeadRecord | null = payload.record ?? null;
 
-    // Allow lookup by id (manual invocation path).
-    if (!lead && payload.lead_id) {
-      const { data } = await supabase.from('leads').select('*').eq('id', payload.lead_id).single();
-      lead = data as LeadRecord | null;
+    // US-078: the lead is always re-read from the database. This used to accept
+    // `payload.record` verbatim, so an unauthenticated caller could POST an
+    // arbitrary record and drive an email with contents of their choosing. The
+    // trigger sends `{ record }`, so its id is used as the lookup key rather
+    // than its body.
+    const leadId = payload.lead_id ?? payload.record?.id ?? null;
+
+    if (!leadId) {
+      return errorResponse('A lead_id is required', 'REQUEST_VALIDATION_FAILED', req);
     }
+
+    const { data: leadRow } = await supabase.from('leads').select('*').eq('id', leadId).single();
+    const lead = leadRow as LeadRecord | null;
 
     if (!lead || !lead.user_id) {
       return errorResponse('A lead record or lead_id is required', 'REQUEST_VALIDATION_FAILED', req);

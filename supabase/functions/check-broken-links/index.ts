@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireAdmin } from '../_shared/auth.ts';
+import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
@@ -34,8 +36,12 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
+    // US-078: admin SEO tooling running with the service role. It was
+    // callable by anyone holding the anon key, which ships in the bundle.
+    await requireAdmin(req, supabase);
+
     // Fetch the page
-    const response = await fetch(url);
+    const response = await safeFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.status}`);
     }
@@ -72,7 +78,7 @@ serve(async (req) => {
         }
 
         // Check the link
-        const linkResponse = await fetch(absoluteUrl, {
+        const linkResponse = await safeFetch(absoluteUrl, {
           method: 'HEAD',
           headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; LinkChecker/1.0)',

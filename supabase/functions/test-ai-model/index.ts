@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireAdmin } from '../_shared/auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { successResponse, errorResponse, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts';
@@ -17,6 +18,12 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // US-078: this builds a SERVICE-ROLE client and acted on the request body
+    // alone. verify_jwt would not have helped — the anon key is itself a valid
+    // project JWT, so it separates "has the public key" from "has no key",
+    // not "is an admin".
+    await requireAdmin(req, supabase);
 
     console.log(`Testing AI model: ${model || 'google/gemini-2.5-flash'}`);
 

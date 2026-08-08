@@ -4,6 +4,8 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
+import { getClientIP } from '../_shared/auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 
@@ -94,6 +96,30 @@ serve(async (req) => {
   }
 
   try {
+    // US-078: public by design (the free tool has no session), but it spends
+    // OpenAI credits on every call, so it needs the same DB-backed limiter the
+    // other public capture endpoints use rather than being left wide open.
+    const rateClient = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const rateLimit = await checkRateLimitDb(
+      rateClient,
+      getClientIP(req),
+      'generate-listing-description',
+      RATE_LIMITS.submission
+    );
+    if (!rateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again shortly.' }),
+        {
+          status: 429,
+          headers: {
+            ...getCorsHeaders(req.headers.get('origin')),
+            'Content-Type': 'application/json',
+            'Retry-After': String(rateLimit.retryAfterSeconds),
+          },
+        }
+      );
+    }
+
     const { propertyDetails } = await req.json();
 
     if (!propertyDetails) {

@@ -74,7 +74,11 @@ function sourceFiles(roots) {
 
 // Names addressed through supabase.storage.from(), which are buckets rather than
 // tables. `.from()` alone cannot distinguish them, so they are listed here.
-const STORAGE_BUCKETS = new Set(['avatars', 'listings', 'listing-images', 'documents', 'logos']);
+// US-075 reconciled three names for listing photos ('listings',
+// 'listing-images', 'listing-photos') onto the one the migration creates.
+// Check 13 now verifies every referenced bucket exists, so a stale name here
+// would let check 4 mistake it for a table.
+const STORAGE_BUCKETS = new Set(['avatars', 'listing-photos', 'brokerage-logos']);
 
 // Tables the code references that no migration creates. Empty since US-059:
 // each of the five former entries was an unfinished feature whose caller was

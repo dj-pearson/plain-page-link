@@ -5,6 +5,7 @@ import {
   initialize,
   MagickFormat,
 } from 'https://deno.land/x/imagemagick_deno@0.0.31/mod.ts';
+import { validateFileType } from '../_shared/fileValidation.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
@@ -91,6 +92,20 @@ serve(async (req) => {
     }
 
     const originalBytes = new Uint8Array(await original.arrayBuffer());
+
+    // US-076: the stored object's declared content type is whatever the
+    // uploader claimed. Confirm the bytes really are the image they say they
+    // are before handing them to a decoder — feeding arbitrary input to an
+    // image parser is the classic way to turn an upload into an exploit.
+    const declaredType = original.type || 'image/jpeg';
+    if (!validateFileType(originalBytes.buffer, declaredType)) {
+      return errorResponse(
+        `Object at ${path} is not a valid ${declaredType}`,
+        'INVALID_IMAGE',
+        req,
+        422
+      );
+    }
 
     await ensureMagick();
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { validateUpload } from '@/lib/fileValidation';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/hooks/use-toast';
@@ -21,15 +22,9 @@ export function useListingImageUpload() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress>({ current: 0, total: 0, percentage: 0 });
 
-  const validateFile = (file: File): string | null => {
-    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-      return `Invalid file type: ${file.name}. Please upload JPG, PNG, or WEBP images`;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      return `File too large: ${file.name}. Maximum size is 5MB`;
-    }
-    return null;
-  };
+  // US-076: file.type is inferred from the extension, so sniff the bytes too.
+  const validateFile = (file: File): Promise<string | null> =>
+    validateUpload(file, { accept: ACCEPTED_FILE_TYPES, maxBytes: MAX_FILE_SIZE });
 
   const uploadListingImages = async (files: File[], listingId?: string): Promise<string[]> => {
     if (!user?.id) {
@@ -56,7 +51,7 @@ export function useListingImageUpload() {
 
     // Validate all files
     for (const file of files) {
-      const validationError = validateFile(file);
+      const validationError = await validateFile(file);
       if (validationError) {
         toast({
           title: 'Invalid file',
@@ -82,7 +77,7 @@ export function useListingImageUpload() {
 
         // Upload to Supabase storage
         const { error: uploadError } = await supabase.storage
-          .from('listings')
+          .from('listing-photos')
           .upload(fileName, file, {
             cacheControl: '3600',
             upsert: false,
@@ -96,7 +91,7 @@ export function useListingImageUpload() {
         // Get public URL
         const {
           data: { publicUrl },
-        } = supabase.storage.from('listings').getPublicUrl(fileName);
+        } = supabase.storage.from('listing-photos').getPublicUrl(fileName);
 
         uploadedUrls.push(publicUrl);
 
@@ -167,7 +162,7 @@ export function useListingImageUpload() {
         return false;
       }
 
-      const { error } = await supabase.storage.from('listings').remove(filePaths);
+      const { error } = await supabase.storage.from('listing-photos').remove(filePaths);
 
       if (error) throw error;
 

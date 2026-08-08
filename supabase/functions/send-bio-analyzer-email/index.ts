@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { validateEmail, sanitizeString } from '../_shared/validation.ts'
-import { checkRateLimit } from '../_shared/rateLimit.ts'
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { getErrorMessage } from '../_shared/errorHelpers.ts'
 
 interface BioAnalyzerEmailData {
@@ -56,19 +56,27 @@ serve(async (req) => {
     const sanitizedMarket = sanitizeString(data.market)
     const sanitizedBrokerage = data.brokerage ? sanitizeString(data.brokerage) : undefined
 
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
     // Rate limiting - 5 requests per minute
-    const rateLimitResult = checkRateLimit(`bio_email_${data.email}`, { maxRequests: 5, windowMs: 60 * 1000 })
+    // US-078/US-084: was _shared/rateLimit.ts, a module-level Map — useless
+    // across ephemeral, horizontally-scaled isolates. The DB-backed limiter
+    // is the one that actually holds.
+    const rateLimitResult = await checkRateLimitDb(
+      supabase,
+      `bio_email_${data.email}`,
+      'send-bio-analyzer-email',
+      RATE_LIMITS.submission
+    );
     if (!rateLimitResult.allowed) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Verify analysis ID exists
     const { data: analysis, error: analysisError } = await supabase

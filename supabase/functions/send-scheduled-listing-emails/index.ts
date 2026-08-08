@@ -4,6 +4,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 
@@ -33,6 +34,15 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // US-078: scheduled job. Only the scheduler, which calls with the
+    // service-role key, should be able to drive a batch of email sends.
+    if (!isServiceRoleRequest(req)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // Get pending emails from database function
     const { data: pendingEmails, error: queryError } = await supabase.rpc('get_pending_listing_emails');
