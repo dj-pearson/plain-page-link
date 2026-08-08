@@ -1176,8 +1176,8 @@
         "npm run verify:schema passes"
       ],
       "priority": 71,
-      "passes": false,
-      "notes": "The twelve are bio_analyzer_funnel, bio_email_performance, instagram_bio_stats, lead_activity_summary, listing_email_performance, listing_generator_funnel, listing_generator_stats, listing_popular_features, listing_property_types, seo_content_optimization_summary, seo_semantic_analysis_summary, user_subscription_details. Turning on security_invoker will make the aggregate views return 0 for admins too unless the underlying admin SELECT policies cover them — check each one as an admin after the change, not just as anon."
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000002_close_anon_data_exposure.sql. security_invoker = on for all twelve views, plus REVOKE SELECT from anon and authenticated on eleven of them. Only lead_activity_summary has a caller in the application (src/hooks/useLeadActivities.ts, twice, for the signed-in agent's own leads); the other eleven are referenced by nothing but the generated types, so a grant nothing uses is a grant waiting to be misused. Verified as anon on a rebuilt Postgres with rows present: user_subscription_details and lead_activity_summary both now return \"permission denied for view\" where before they returned the Stripe customer/subscription ids and cross-tenant call/email counts. Verified as the owning agent that lead_activity_summary still returns their 1 row, and as a second tenant that it returns 0 — the half of the check that catches over-tightening. That owner-side verification was impossible before this session: scripts/supabase-prelude.sql never granted USAGE ON SCHEMA auth, so auth.uid() raised \"permission denied for schema auth\" for anon/authenticated and every owner-scoped policy errored rather than evaluating. The grant is now in the prelude. Note for future tests: the prelude's auth.uid() shim reads request.jwt.claim.sub, not the request.jwt.claims JSON that production reads, so set both."
     },
     {
       "id": "US-072",
@@ -1192,8 +1192,8 @@
         "npm run verify:schema passes"
       ],
       "priority": 72,
-      "passes": false,
-      "notes": "OPERATIONAL: any OIDC client secret that has been live under this policy must be treated as disclosed and rotated at the identity provider. That is a human step outside the migration — call it out in the PR description rather than assuming it happened."
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000002_close_anon_data_exposure.sql. Dropped \"Users can view active SSO configs for their domain\", which had no TO clause and so defaulted to TO PUBLIC over a table holding oidc_client_secret and saml_certificate. No replacement discovery surface was added, which was the original plan: both discovery paths already run privileged — sso-initiate builds a SERVICE_ROLE client, and public.find_sso_config_by_email(text) is an existing SECURITY DEFINER function returning only the config id — so a new RPC would have been redundant surface. An initial draft added one and it was removed after checking the callers. useSSO.ts reads the table only under enabled: isAdmin and is covered by the surviving \"Admins can manage SSO configs\" policy. Verified as anon: enterprise_sso_config returns 0 rows (previously the full row including SUPER_SECRET). OPERATIONAL, NOT DONE BY THIS MIGRATION: any OIDC client secret that has been live under the old policy must be treated as disclosed and rotated at the identity provider."
     },
     {
       "id": "US-073",
@@ -1207,8 +1207,8 @@
         "npm run verify:schema passes and npm run build still passes"
       ],
       "priority": 73,
-      "passes": false,
-      "notes": "Coordinate with US-070: submit-lead reads zapier_webhook_url with the service role, which is BYPASSRLS, so narrowing the anon policy does not break the webhook — but confirm that by executing it. usePublicProfile.ts and FullProfilePage.tsx are the read sites to repoint at the view. ALSO FOUND 2026-08-08 while verifying US-083: profiles.is_published DEFAULTS TO TRUE, so every account is publicly visible the moment the signup trigger creates it — before onboarding, with an empty profile and an auto-derived username. Decide deliberately whether that is wanted; defaulting to false and publishing at the end of onboarding is the usual shape, and it interacts directly with whatever this story exposes publicly."
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000002_close_anon_data_exposure.sql. RLS filters rows, not columns, so the fix needed column-level privileges, not a better policy: REVOKE SELECT ON profiles FROM anon, then GRANT SELECT on exactly the column list in PublicProfileFields (src/types/profile.ts), plus a security_invoker view public_profiles over the same set. What leaves anon reach: zapier_webhook_url (a bearer secret), custom_domain, custom_css, notification_preferences, onboarding_completed_at, updated_at and the denormalised counters. An earlier draft also revoked phone and license_number and was WRONG — executing usePublicProfile.ts's actual column list against it showed the public profile page would have broken, and both fields are legitimately public (phone drives the tel: contact buttons, a licence number is commonly required to be displayed). Reading the policy alone would have shipped that. Verified as anon: usePublicProfile's exact column list still returns the row; zapier_webhook_url, custom_domain and select * all return \"permission denied for table profiles\"; the public_profiles view returns the published agent. Verified as the owning agent that select * on their own row still returns everything including zapier_webhook_url, and as a second tenant that cross-tenant reads return 0. ALSO FOUND: profiles.is_published DEFAULTS TO TRUE, so every account is public the moment the signup trigger creates it — before onboarding, with an empty profile and an auto-derived username. Left as a deliberate decision for the product owner rather than changed here; raised as a follow-up."
     },
     {
       "id": "US-074",
@@ -1437,8 +1437,8 @@
         "npm run verify:schema passes"
       ],
       "priority": 88,
-      "passes": false,
-      "notes": "Small and fully self-contained — a good candidate to land early alongside US-082's check 6, which enforces the invariant afterwards."
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000003_fix_keywords_admin_policies.sql. The three write policies now use has_role(auth.uid(), 'admin'::app_role) TO authenticated, matching the ~270 other policies. Verified on a rebuilt Postgres: an admin can insert, update and delete; a non-admin is rejected with \"new row violates row-level security policy\" on insert, and their UPDATE and DELETE affect 0 rows. The non-admin used in the test has raw_user_meta_data set to {\"role\":\"admin\"} — the exact escalation the old policy would have permitted had the auth.users grant ever existed — and is still denied. anon still reads active keywords. Worth recording how nearly this was mis-verified: the first test run reported \"UNEXPECTEDLY ALLOWED\" for the non-admin insert, which was an artefact of psql continuing past a failed statement without ON_ERROR_STOP and printing the trailing SELECT anyway. The same trap produced a false \"SELF-GRANT SUCCEEDED\" during the original review. Always set ON_ERROR_STOP when a test asserts that something is denied."
     },
     {
       "id": "US-089",

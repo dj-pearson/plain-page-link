@@ -8491,6 +8491,44 @@ export type Database = {
         };
         Relationships: [];
       };
+      public_profiles: {
+        Row: {
+          avatar_url: string | null;
+          bio: string | null;
+          brokerage_logo: string | null;
+          brokerage_name: string | null;
+          calendly_url: string | null;
+          certifications: Json | null;
+          created_at: string | null;
+          email_display: string | null;
+          facebook_url: string | null;
+          full_name: string | null;
+          id: string | null;
+          instagram_url: string | null;
+          is_published: boolean | null;
+          license_number: string | null;
+          license_state: string | null;
+          linkedin_url: string | null;
+          og_image: string | null;
+          phone: string | null;
+          realtor_com_url: string | null;
+          seo_description: string | null;
+          seo_title: string | null;
+          service_cities: Json | null;
+          service_zip_codes: Json | null;
+          sms_enabled: boolean | null;
+          specialties: Json | null;
+          theme: string | null;
+          tiktok_url: string | null;
+          title: string | null;
+          username: string | null;
+          website_url: string | null;
+          years_experience: number | null;
+          youtube_url: string | null;
+          zillow_url: string | null;
+        };
+        Relationships: [];
+      };
       seo_content_optimization_summary: {
         Row: {
           avg_optimization_score: number | null;
@@ -8623,6 +8661,10 @@ export type Database = {
           p_status: string;
         };
         Returns: undefined;
+      };
+      derive_available_username: {
+        Args: { p_email: string; p_requested: string; p_user_id: string };
+        Returns: string;
       };
       find_duplicate_content: {
         Args: Record<PropertyKey, never>;

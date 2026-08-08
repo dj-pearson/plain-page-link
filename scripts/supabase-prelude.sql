@@ -99,6 +99,15 @@ CREATE OR REPLACE FUNCTION vault.create_secret(text, text, text) RETURNS uuid
 -- and RLS policies cannot be exercised at all.
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
+-- Hosted Supabase also grants USAGE on `auth` to the API roles. Without it,
+-- auth.uid() raises "permission denied for schema auth" for anon/authenticated,
+-- so every RLS policy built on auth.uid() = user_id — which is nearly all of
+-- them — silently evaluates to an error rather than to true/false, and no
+-- owner-scoped policy can be exercised locally at all. That made it impossible
+-- to verify "the owner can still read their own rows" after narrowing a policy,
+-- which is exactly the half of the check that catches over-tightening.
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
