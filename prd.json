@@ -1144,8 +1144,8 @@
         "npm run test:run and npm run build still pass"
       ],
       "priority": 69,
-      "passes": false,
-      "notes": "A mechanical cross-check of every .insert/.update/.upsert payload in src/ against the applied schema found this file and nothing else, so this is one bad file rather than a pattern. ContactBlock.tsx:111 already calls submit-lead correctly and is the model to follow. Do not simply rename the columns in place — the direct-insert path bypasses the hardened edge function and the leads RLS policy 'Anyone can submit leads' WITH CHECK (true) means it would accept anything."
+      "passes": true,
+      "notes": "DONE 2026-08-08. src/lib/leadSubmission.ts now calls the submit-lead edge function instead of inserting directly, which is what ContactBlock.tsx already did — renaming the four columns in place was rejected because a direct browser insert also bypasses submit-lead's rate limiting, validation and sanitisation, and the leads policy \"Anyone can submit leads\" is WITH CHECK (true) so it would accept anything. The three forms send a nested \"data\" bag, so submitLead() now splits it: keys with a real column (priceRange, timeline, address, preApproved, message) are lifted to price_range/timeline/property_address/preapproved/message, and the remainder (propertyType, bedrooms, bathrooms, squareFeet, yearBuilt, condition, reason) goes to leads.form_data. That required two additions to submit-lead, which previously dropped both: a form_data passthrough with a sanitiser (keys and values sanitised and length-capped, nested objects dropped rather than walked, 40-key cap) and \"source\", which the function accepted in its payload but never copied into the insert. The three-retry loop is gone — the edge function is rate limited at 5/min per IP, so retrying a rejection just burned the visitor's budget, and the old loop retried validation failures it could never recover from. Verified by replaying the exact payload each of the three forms produces through the same mapping and inserting the resulting column set: buyer -> price_range 400k-500k plus form_data{bedrooms,propertyType}; seller -> property_address \"12 Elm St\" plus form_data{reason,bedrooms,bathrooms,propertyType}; valuation -> property_address \"9 Oak Ave\" plus form_data{bedrooms,bathrooms,condition,yearBuilt,squareFeet,propertyType}. tsc 148 -> 147 (the TS2769 at leadSubmission.ts:41 is gone), 277 tests, build clean."
     },
     {
       "id": "US-070",
@@ -1160,8 +1160,8 @@
         "npm run verify:schema passes"
       ],
       "priority": 70,
-      "passes": false,
-      "notes": "Found by cross-checking every .select('…') column list in supabase/functions/ against the applied schema; verify:schema currently checks that tables exist but not that columns do, which is exactly this blind spot. Verified: SELECT full_name, email, notification_preferences FROM public.profiles → ERROR: column \"email\" does not exist. Combined with US-069 the lead pipeline fails at three independent points — the form does not write, no email is sent, and no automation fires. Fix US-089 alongside this or the class comes back."
+      "passes": true,
+      "notes": "DONE 2026-08-08. Added supabase/functions/_shared/agent-contact.ts with getAgentContact(supabase, userId), which reads the real profile columns (full_name, email_display, phone, zapier_webhook_url, notification_preferences) and resolves the account address from auth.users via auth.admin.getUserById — profiles has never had an \"email\" column. All four call sites now use it: submit-lead (the agent notification AND the Zapier webhook, which came from the same failed query and so had never fired for anyone), notify-lead, submit-contact, and stripe-webhook's dunning email. Each site previously destructured the result with no error branch, so PostgREST rejecting the whole query for the unknown column surfaced as undefined and the path silently skipped; they now log an explicit error when the address cannot be resolved. notify-lead changed behaviour deliberately: it used to return HTTP 200 with reason \"no_agent_email\", which every single lead hit, so a total failure looked like a considered no-op — it now returns an AGENT_EMAIL_UNRESOLVED error. Verified by executing the exact queries getAgentContact issues against a rebuilt Postgres (they return rows; the old one raises: column \"email\" does not exist) and by re-running the column sweep across all 87 edge functions: 6 bad column selects -> 0. The systemic guard that stops this class returning is US-082."
     },
     {
       "id": "US-071",
@@ -1208,7 +1208,7 @@
       ],
       "priority": 73,
       "passes": false,
-      "notes": "Coordinate with US-070: submit-lead reads zapier_webhook_url with the service role, which is BYPASSRLS, so narrowing the anon policy does not break the webhook — but confirm that by executing it. usePublicProfile.ts and FullProfilePage.tsx are the read sites to repoint at the view."
+      "notes": "Coordinate with US-070: submit-lead reads zapier_webhook_url with the service role, which is BYPASSRLS, so narrowing the anon policy does not break the webhook — but confirm that by executing it. usePublicProfile.ts and FullProfilePage.tsx are the read sites to repoint at the view. ALSO FOUND 2026-08-08 while verifying US-083: profiles.is_published DEFAULTS TO TRUE, so every account is publicly visible the moment the signup trigger creates it — before onboarding, with an empty profile and an auto-derived username. Decide deliberately whether that is wanted; defaulting to false and publishing at the end of onboarding is the usual shape, and it interacts directly with whatever this story exposes publicly."
     },
     {
       "id": "US-074",
@@ -1361,8 +1361,8 @@
         "npm run verify:schema passes with the US-082 column check enabled"
       ],
       "priority": 83,
-      "passes": false,
-      "notes": "The listings query also uses profiles!inner(username, is_published) — confirm the foreign key that embed relies on actually exists before assuming only the column names are wrong."
+      "passes": true,
+      "notes": "DONE 2026-08-08. articles.featured_image -> featured_image_url. The listings query needed more than a rename: it selected \"title\" and \"images\" (the real columns are address/city and photos, with image as the legacy single) AND joined with profiles!inner(username, is_published), which cannot resolve at all because there is NO foreign key from listings.user_id to profiles — PostgREST has no relationship to infer, so that embed would have 400d even with correct column names. That is exactly the caveat this story's notes said to check first. Published profiles are now fetched separately and joined in memory through a Map. A listing has no title column, so the sitemap image titles and captions are built from \"address, city\". Verified by executing all three queries against seeded data on a rebuilt Postgres: the article query returns market-report with its featured_image_url, the listing query returns the seeded active listing with both photos, and the in-memory join resolves it to the published profile janesmith-2. The missing foreign key is deliberately not fixed here — it belongs to US-093, which found the same gap breaks account deletion."
     },
     {
       "id": "US-084",
@@ -1496,6 +1496,22 @@
       "priority": 92,
       "passes": false,
       "notes": "Anonymous insert into analytics_views is probably an accepted trade-off for a public link-in-bio — the point is to make that a decision rather than an accident, and to stop the counters being presented to agents as trustworthy."
+    },
+    {
+      "id": "US-093",
+      "title": "Account deletion fails outright, and would orphan tenant data if it did not",
+      "description": "Found while verifying US-083. process_scheduled_account_deletions() performs DELETE FROM auth.users, which raises: insert or update on table \"audit_logs\" violates foreign key constraint \"audit_logs_actor_id_fkey\". The chain is: deleting auth.users cascades to profiles (FK ON DELETE CASCADE) -> the audit_profiles_changes trigger fires -> audit_table_change calls log_audit_event with p_actor_id => auth.uid(), which is NULL under the cron/service-role caller, so log_audit_event COALESCEs it to the user being deleted -> that INSERT references an auth.users row already removed in the same statement -> FK violation -> the whole DELETE aborts. ON DELETE SET NULL on audit_logs does not help because the row is being inserted, not updated. So a GDPR right-to-erasure request is accepted, scheduled, the 30-day grace period elapses, and the job then errors forever. Separately, even once the delete succeeds it would not erase much: leads, listings, testimonials, user_settings, article_webhooks and analytics_views have no foreign key on user_id at all, so nothing cascades to them. Those rows carry lead names, emails and phone numbers.",
+      "acceptanceCriteria": [
+        "DELETE FROM auth.users for a provisioned account succeeds — verified by executing it, not by reading the function",
+        "The audit trigger does not write an actor_id that no longer exists (skip the audit row on cascade-delete, or drop the FK to ON DELETE SET NULL semantics that apply at insert time)",
+        "An erased account leaves no rows in leads, listings, testimonials, user_settings, article_webhooks or analytics_views — verified by counting them after the delete",
+        "Foreign keys with ON DELETE CASCADE exist on the tenant tables that lack them, added NOT VALID first if production may hold orphans",
+        "The audit trail of the deletion itself survives the deletion (an erasure record with a null actor is fine; losing the record is not)",
+        "npm run verify:schema passes"
+      ],
+      "priority": 93,
+      "passes": false,
+      "notes": "This is a compliance finding, not just a bug: the product accepts erasure requests it cannot fulfil, and process-account-deletions returns success:true with processed:0 rather than surfacing the failure. Sequence the FK additions carefully — adding ON DELETE CASCADE to leads.user_id on a production table with orphaned rows will fail; add NOT VALID, clean up, then VALIDATE. Check whether gdpr-deletion (the user-facing request path) has the same problem before assuming only the scheduler is affected."
     }
   ]
 }

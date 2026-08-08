@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail, createLeadNotificationEmail } from '../_shared/email.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { getAgentContact } from '../_shared/agent-contact.ts';
 
 /**
  * Notify Lead
@@ -64,20 +65,25 @@ serve(async (req) => {
       return errorResponse('A lead record or lead_id is required', 'REQUEST_VALIDATION_FAILED', req);
     }
 
-    // Resolve the agent + their notification preference.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, email, notification_preferences')
-      .eq('id', lead.user_id)
-      .single();
+    // Resolve the agent + their notification preference. The account address
+    // is in auth.users, not on the profile — see _shared/agent-contact.ts.
+    const contact = await getAgentContact(supabase, lead.user_id);
 
-    const agentEmail = profile?.email;
+    const agentEmail = contact?.email;
     if (!agentEmail) {
-      // Nothing to notify; not an error.
-      return successResponse({ notified: false, reason: 'no_agent_email' }, req);
+      // US-070: this used to return 200 with reason 'no_agent_email' because
+      // the profiles query named a column that does not exist, so EVERY lead
+      // notification landed here and looked like a no-op by choice. An agent
+      // we cannot reach is a failure, and it must be reported as one.
+      console.error(`No account email for agent ${lead.user_id}; cannot notify for lead ${lead.id ?? 'unknown'}`);
+      return errorResponse(
+        'Could not resolve the agent notification address',
+        'AGENT_EMAIL_UNRESOLVED',
+        req
+      );
     }
 
-    const leadPref = (profile?.notification_preferences?.leads as string | undefined) ?? 'instant';
+    const leadPref = (contact?.notificationPreferences?.leads as string | undefined) ?? 'instant';
     if (leadPref !== 'instant') {
       return successResponse({ notified: false, reason: `preference_${leadPref}` }, req);
     }

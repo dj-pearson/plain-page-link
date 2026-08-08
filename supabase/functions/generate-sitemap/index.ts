@@ -149,7 +149,7 @@ serve(async (req) => {
     if (includeArticles) {
       const { data: articles, error: articlesError } = await supabase
         .from('articles')
-        .select('slug, updated_at, published_at, title, featured_image')
+        .select('slug, updated_at, published_at, title, featured_image_url')
         .eq('status', 'published')
         .order('published_at', { ascending: false });
 
@@ -159,9 +159,9 @@ serve(async (req) => {
         console.log(`Adding ${articles.length} blog articles to sitemap`);
         for (const article of articles) {
           const images: Array<{ url: string; title?: string; caption?: string }> = [];
-          if (article.featured_image) {
+          if (article.featured_image_url) {
             images.push({
-              url: article.featured_image,
+              url: article.featured_image_url,
               title: article.title,
               caption: `Featured image for: ${article.title}`
             });
@@ -179,11 +179,31 @@ serve(async (req) => {
 
     // Add property listings with property images
     if (includeListings) {
+      // US-083: this used to select `title` and `images` (neither column
+      // exists — they are `address` and `photos`) and to join with
+      // `profiles!inner(...)`. That embed cannot resolve either: there is no
+      // foreign key from listings.user_id to profiles, so PostgREST has no
+      // relationship to infer. The whole query 400d, the error was logged and
+      // skipped, and every listing silently vanished from the sitemap.
+      // Published profiles are therefore fetched separately and joined here.
+      const { data: publishedProfiles, error: publishedProfilesError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .eq('is_published', true)
+        .not('username', 'is', null);
+
+      if (publishedProfilesError) {
+        console.error('Error fetching published profiles for listings:', publishedProfilesError);
+      }
+
+      const usernameByUserId = new Map<string, string>(
+        (publishedProfiles ?? []).map((p: { id: string; username: string }) => [p.id, p.username])
+      );
+
       const { data: listings, error: listingsError } = await supabase
         .from('listings')
-        .select('id, title, updated_at, images, address, user_id, profiles!inner(username, is_published)')
+        .select('id, address, city, updated_at, photos, image, user_id')
         .eq('status', 'active')
-        .eq('profiles.is_published', true)
         .order('updated_at', { ascending: false })
         .limit(500); // Limit to avoid massive sitemaps
 
@@ -194,23 +214,30 @@ serve(async (req) => {
         for (const listing of listings) {
           const images: Array<{ url: string; title?: string; caption?: string }> = [];
 
-          // Parse images from JSON if they exist
-          if (listing.images) {
-            const listingImages = Array.isArray(listing.images) ? listing.images : [];
-            listingImages.slice(0, 5).forEach((img: string | { url: string }, index: number) => {
-              const imageUrl = typeof img === 'string' ? img : img.url;
-              if (imageUrl) {
-                images.push({
-                  url: imageUrl,
-                  title: `${listing.title} - Photo ${index + 1}`,
-                  caption: listing.address ? `Property at ${listing.address}` : listing.title
-                });
-              }
-            });
-          }
+          // `photos` is the real gallery (jsonb); `image` is the legacy single
+          // column. There is no `title` column — a listing is identified by its
+          // address.
+          const listingLabel = [listing.address, listing.city].filter(Boolean).join(', ')
+            || 'Property listing';
+          const gallery = Array.isArray(listing.photos)
+            ? listing.photos
+            : (listing.image ? [listing.image] : []);
 
-          // Get username from the joined profile
-          const profile = listing.profiles as unknown as { username: string } | null;
+          gallery.slice(0, 5).forEach((img: string | { url: string }, index: number) => {
+            const imageUrl = typeof img === 'string' ? img : img?.url;
+            if (imageUrl) {
+              images.push({
+                url: imageUrl,
+                title: `${listingLabel} - Photo ${index + 1}`,
+                caption: `Property at ${listingLabel}`
+              });
+            }
+          });
+
+          // Joined in memory — see the note on the query above.
+          const profile = usernameByUserId.has(listing.user_id)
+            ? { username: usernameByUserId.get(listing.user_id) as string }
+            : null;
           if (profile?.username) {
             urls.push({
               loc: `${baseUrl}/${profile.username}/listing/${listing.id}`,

@@ -20,6 +20,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { sendEmail } from '../_shared/email.ts';
+import { getAgentContact } from '../_shared/agent-contact.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   apiVersion: '2023-10-16',
@@ -400,18 +401,22 @@ serve(async (req) => {
             }
 
             // Send a dunning email (best-effort; sendEmail never throws).
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('email, full_name')
-              .eq('id', sub.user_id)
-              .single();
+            // The account address is in auth.users, not on the profile —
+            // see _shared/agent-contact.ts (US-070). This selected a column
+            // that does not exist, so no customer whose card failed was ever
+            // told about it.
+            const profile = await getAgentContact(supabase, sub.user_id);
+
+            if (!profile?.email) {
+              console.error(`Dunning email skipped: no account email for ${sub.user_id}`);
+            }
 
             if (profile?.email) {
               const portalUrl = `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/subscription`;
               await sendEmail({
                 to: profile.email,
                 subject: 'Action needed: your AgentBio payment failed',
-                body: `Hi ${profile.full_name || 'there'},
+                body: `Hi ${profile.fullName || 'there'},
 
 We were unable to process your most recent AgentBio subscription payment${
                   invoice.amount_due ? ` of $${(invoice.amount_due / 100).toFixed(2)}` : ''

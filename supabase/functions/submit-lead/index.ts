@@ -4,6 +4,7 @@ import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { validateLeadData, sanitizeString, getClientIP } from '../_shared/validation.ts'
+import { getAgentContact } from '../_shared/agent-contact.ts'
 import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts'
 
 interface LeadData {
@@ -13,6 +14,7 @@ interface LeadData {
   phone?: string
   message?: string
   lead_type: string
+  source?: string
   listing_id?: string
   price_range?: string
   timeline?: string
@@ -23,6 +25,33 @@ interface LeadData {
   utm_medium?: string
   utm_campaign?: string
   device?: string
+  /**
+   * Structured extras the capture form collected that have no dedicated column
+   * (bedrooms, condition, year built, …). Persisted to leads.form_data so the
+   * richer inquiry and valuation forms do not lose the answers they ask for.
+   */
+  form_data?: Record<string, unknown>
+}
+
+/**
+ * Sanitise a flat bag of form answers before it goes into leads.form_data.
+ * Values are stringified and length-capped; nested objects are dropped rather
+ * than walked, since no caller sends them and unbounded nesting is a DoS shape.
+ */
+function sanitizeFormData(raw: unknown): Record<string, unknown> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (Object.keys(out).length >= 40) break
+    if (value === null || value === undefined || value === '') continue
+    if (typeof value === 'boolean' || typeof value === 'number') {
+      out[sanitizeString(key).slice(0, 64)] = value
+    } else if (typeof value === 'string') {
+      out[sanitizeString(key).slice(0, 64)] = sanitizeString(value).slice(0, 1000)
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
 }
 
 serve(async (req) => {
@@ -69,6 +98,7 @@ serve(async (req) => {
       phone: rawData.phone ? sanitizeString(rawData.phone) : undefined,
       message: rawData.message ? sanitizeString(rawData.message) : undefined,
       lead_type: rawData.lead_type,
+      source: rawData.source ? sanitizeString(rawData.source) : 'website',
       listing_id: rawData.listing_id,
       price_range: rawData.price_range ? sanitizeString(rawData.price_range) : undefined,
       timeline: rawData.timeline ? sanitizeString(rawData.timeline) : undefined,
@@ -79,6 +109,7 @@ serve(async (req) => {
       utm_medium: rawData.utm_medium ? sanitizeString(rawData.utm_medium) : undefined,
       utm_campaign: rawData.utm_campaign ? sanitizeString(rawData.utm_campaign) : undefined,
       device: rawData.device ? sanitizeString(rawData.device) : undefined,
+      form_data: sanitizeFormData(rawData.form_data),
     };
 
     // Insert lead into database
@@ -93,16 +124,20 @@ serve(async (req) => {
       throw insertError
     }
 
-    // Get agent profile for personalized email and Zapier webhook
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, email, zapier_webhook_url')
-      .eq('id', leadData.user_id)
-      .single()
+    // Get agent contact details for the personalised email and the Zapier
+    // webhook. The account address lives in auth.users, not on the profile —
+    // see _shared/agent-contact.ts (US-070).
+    const agentContact = await getAgentContact(supabase, leadData.user_id)
 
-    const agentName = profile?.full_name || 'Your Real Estate Agent'
-    const agentEmail = profile?.email
-    const zapierWebhookUrl = profile?.zapier_webhook_url
+    if (!agentContact) {
+      // The lead is already saved, so this is not fatal to the visitor — but it
+      // must be visible rather than silently skipping the notification.
+      console.error(`Could not resolve agent contact for ${leadData.user_id}; lead ${lead.id} saved without notification`)
+    }
+
+    const agentName = agentContact?.fullName || 'Your Real Estate Agent'
+    const agentEmail = agentContact?.email
+    const zapierWebhookUrl = agentContact?.zapierWebhookUrl
 
     // Send lead to Zapier webhook if configured
     if (zapierWebhookUrl) {
