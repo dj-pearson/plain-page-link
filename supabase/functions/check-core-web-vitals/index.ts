@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireAdmin } from '../_shared/auth.ts';
+import { assertFetchableUrl } from '../_shared/ssrf-guard.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
@@ -39,8 +41,24 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
+    // US-078: admin SEO tooling running with the service role. It was
+    // callable by anyone holding the anon key, which ships in the bundle.
+    await requireAdmin(req, supabase);
+
     // Call PageSpeed Insights API
     const strategy = device === 'mobile' ? 'mobile' : 'desktop';
+    // US-077: the caller-supplied URL is handed to Google's API rather than
+    // fetched directly, so it cannot reach our network — but a private
+    // address here is still a request we should not be making on someone's
+    // behalf, and it leaks internal hostnames into a third party.
+    const guard = await assertFetchableUrl(url);
+    if (!guard.ok) {
+      return new Response(JSON.stringify({ error: guard.reason }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const apiUrl = new URL('https://www.googleapis.com/pagespeedonline/v5/runPagespeed');
     apiUrl.searchParams.append('url', url);
     apiUrl.searchParams.append('strategy', strategy);

@@ -8,6 +8,7 @@ import { sendEmail } from '../_shared/email.ts';
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 import { validateContactData, sanitizeString, getClientIP } from '../_shared/validation.ts';
 import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { getAgentContact } from '../_shared/agent-contact.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -60,15 +61,16 @@ serve(async (req) => {
       leadData = lead
     }
 
-    // Get agent info for personalized emails
-    const { data: agentProfile } = await supabaseClient
-      .from('profiles')
-      .select('full_name, email, phone')
-      .eq('id', agentId)
-      .single()
+    // Get agent info for personalized emails. The account address is in
+    // auth.users, not on the profile — see _shared/agent-contact.ts (US-070).
+    const agentContact = await getAgentContact(supabaseClient, agentId)
 
-    const agentName = agentProfile?.full_name || 'Your Agent'
-    const agentEmail = agentProfile?.email
+    if (!agentContact?.email) {
+      console.error(`Could not resolve agent email for ${agentId}; contact submission saved without notification`)
+    }
+
+    const agentName = agentContact?.fullName || 'Your Agent'
+    const agentEmail = agentContact?.email
 
     // Send email notification to agent
     if (agentEmail) {

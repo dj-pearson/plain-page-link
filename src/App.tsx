@@ -91,7 +91,6 @@ const ApiKeysPage = lazy(() => import('./pages/dashboard/ApiKeysPage'));
 const TeamPage = lazy(() => import('./pages/dashboard/TeamPage'));
 const DeleteAccount = lazy(() => import('./pages/dashboard/DeleteAccount'));
 const QuickActionsDashboard = lazy(() => import('./pages/QuickActionsDashboard'));
-const LeadManagementDashboard = lazy(() => import('./pages/LeadManagementDashboard'));
 const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
 const PageBuilderEditor = lazy(() => import('./pages/PageBuilder'));
 
@@ -270,7 +269,6 @@ function App() {
               <Route path="listings" element={<Listings />} />
               <Route path="quick-actions" element={<QuickActionsDashboard />} />
               <Route path="leads" element={<Leads />} />
-              <Route path="lead-management" element={<LeadManagementDashboard />} />
               <Route path="analytics-advanced" element={<AnalyticsDashboard />} />
               <Route path="page-builder" element={<PageBuilderEditor />} />
               <Route path="profile" element={<Profile />} />

@@ -99,6 +99,24 @@ CREATE OR REPLACE FUNCTION vault.create_secret(text, text, text) RETURNS uuid
 -- and RLS policies cannot be exercised at all.
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
+-- Hosted Supabase also grants USAGE on `auth` to the API roles. Without it,
+-- auth.uid() raises "permission denied for schema auth" for anon/authenticated,
+-- so every RLS policy built on auth.uid() = user_id — which is nearly all of
+-- them — silently evaluates to an error rather than to true/false, and no
+-- owner-scoped policy can be exercised locally at all. That made it impossible
+-- to verify "the owner can still read their own rows" after narrowing a policy,
+-- which is exactly the half of the check that catches over-tightening.
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+
+-- Likewise `storage`: hosted Supabase grants the API roles USAGE on the schema
+-- and ALL on storage.objects/storage.buckets, leaving RLS to do the restricting.
+-- Without it every storage policy is unexercisable locally — the insert fails
+-- with "permission denied for schema storage" before any policy is consulted,
+-- so an owner-scoped upload rule cannot be tested either way (US-075).
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+GRANT ALL ON TABLE storage.objects TO anon, authenticated, service_role;
+GRANT ALL ON TABLE storage.buckets TO anon, authenticated, service_role;
+
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public

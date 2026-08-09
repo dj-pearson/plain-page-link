@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireAdmin } from '../_shared/auth.ts';
+import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
@@ -33,7 +35,11 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    const response = await fetch(url);
+    // US-078: admin SEO tooling running with the service role. It was
+    // callable by anyone holding the anon key, which ships in the bundle.
+    await requireAdmin(req, supabase);
+
+    const response = await safeFetch(url);
     const headers = response.headers;
 
     // Check SSL

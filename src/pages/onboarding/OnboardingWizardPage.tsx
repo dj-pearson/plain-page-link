@@ -60,8 +60,11 @@ export default function OnboardingWizardPage() {
       if (wizardData.profileBasics.photo) {
         try {
           const fileExt = wizardData.profileBasics.photo.name.split('.').pop();
-          const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-          const filePath = `avatars/${fileName}`;
+          // US-075: the first path segment must be the uploader's id — the
+          // storage policies key on it. This used to be `avatars/<uid>-<ts>`,
+          // whose first segment was the literal string 'avatars', which an
+          // owner-scoped policy rejects.
+          const filePath = `${user.id}/${Date.now()}.${fileExt}`;
 
           const { error: uploadError } = await supabase.storage
             .from('avatars')
@@ -75,8 +78,14 @@ export default function OnboardingWizardPage() {
 
           profileUpdates.avatar_url = publicUrl;
         } catch (error) {
+          // US-075: still non-fatal — onboarding should not be blocked by a
+          // photo — but no longer silent.
           logger.error('Error uploading avatar', error as Error);
-          // Continue even if avatar upload fails
+          toast({
+            title: 'Profile photo upload failed',
+            description: 'Everything else was saved. You can add a photo from Settings.',
+            variant: 'destructive',
+          });
         }
       }
 
@@ -106,17 +115,28 @@ export default function OnboardingWizardPage() {
           // Upload listing photo if provided
           if (wizardData.firstListing.photo) {
             const fileExt = wizardData.firstListing.photo.name.split('.').pop();
-            const fileName = `${user.id}-listing-${Date.now()}.${fileExt}`;
-            const filePath = `listings/${fileName}`;
+            // Same owner-scoped layout as above, and the bucket the rest of the
+            // app uses — this wrote to 'listing-images', which exists nowhere.
+            const filePath = `${user.id}/${Date.now()}.${fileExt}`;
 
             const { error: uploadError } = await supabase.storage
-              .from('listing-images')
+              .from('listing-photos')
               .upload(filePath, wizardData.firstListing.photo);
 
-            if (!uploadError) {
+            if (uploadError) {
+              // US-075: this failure used to be swallowed by a bare
+              // `if (!uploadError)` with no else, so a new agent's first
+              // listing photo vanished without a word.
+              logger.error('Failed to upload the first listing photo', uploadError);
+              toast({
+                title: 'Photo upload failed',
+                description: 'Your listing was saved without its photo. You can add one later.',
+                variant: 'destructive',
+              });
+            } else {
               const {
                 data: { publicUrl },
-              } = supabase.storage.from('listing-images').getPublicUrl(filePath);
+              } = supabase.storage.from('listing-photos').getPublicUrl(filePath);
 
               photoUrl = publicUrl;
             }

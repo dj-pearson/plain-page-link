@@ -944,7 +944,7 @@
       ],
       "priority": 56,
       "passes": false,
-      "notes": "IN PROGRESS 2026-08-06: 694 -> 357 (earlier pass) -> 321 at the start of this work -> 148. NOT DONE: the acceptance criteria require 0 errors and CI re-gated, and CI is still un-gated. DESIGN DECISION (settled): dynamically-addressed tables go through one shared escape hatch, src/lib/supabaseDynamic.ts. Narrowing to a keyof union was rejected on evidence — ownership.ts already emitted TS2589 'excessively deep' before any narrowing. The hatch widens the schema generics at the client, not just the table name, because a builder from the strict client resolves insert/update args to `never` for an unidentifiable table. WHAT THIS BACKLOG KEEPS TURNING UP: eight live defects so far, every one hidden behind a type that described what a feature should have rather than what the schema has — the missing profile headshot, failed listing inserts (agents could not add a property at all), discarded property highlights, the missing Text button, a mangled approveFiximestamp() call that made the SEO Approve button throw, a drop-off indicator gated on an undefined variable, HeroSection ignoring the title/subtitle/description every landing page passes it, and ListingDetailModal rendering state/zip/MLS/lot-size/virtual-tour/highlights that the query never selected. The pattern is now closed structurally: Profile, PublicProfile, PublicListing, PublicProfileListing and Testimonial all derive from Database['public']['Tables'][...]['Row'], and the two query boundaries are modelled with Pick so a column the UI reads but the query omits is a compile error. REMAINING 148 across 74 files, no cluster larger than 9: TS2322 45, TS2345 30, TS2769 24, TS2339 20. Largest files: BlogArticle 9, useAuthStore 6, FullProfilePage 6, Analytics 5, LeadManagementDashboard 5, usePSEO 5, SystemHealthMonitor 5. DO NOT batch-fix these mechanically. Every cluster typed honestly in this session surfaced a real defect, and the two times a script was trusted over reading it produced `______totalArticles`, three `const {} =` empty patterns, and two files broken badly enough that tsc bailed and reported 3 errors instead of 189. Work file by file. Re-gate CI (remove the carve-out comment in ci.yml, restore `needs: typecheck`) only once the count is 0. src/lib/security/validation.ts's TS2769s are a DOMPurify ALLOWED_ATTR config-shape mismatch, unrelated to anything above."
+      "notes": "PARTIAL 2026-08-08: the CI typecheck job is now a RATCHET — it fails if the count rises above TSC_BASELINE (143) and emits a notice when it falls, so the backlog cannot grow while this story is open. That matters because a permanently-red job has no signal, and that is exactly how src/lib/leadSubmission.ts shipped with a TS2769 on the insert that broke every public lead form (US-069). Also note the carve-out comment on the test job is now factually stale: it cites an out-of-sync types.ts, and npm run types:check passes — the backlog is ordinary work, not a blocked dependency. Count went 148 -> 143 across this session (leadSubmission fixed, LeadManagementDashboard and its ResponseTemplates importer deleted). Still NOT DONE: the criteria require 0 and `needs: typecheck` restored. ORIGINAL NOTE FOLLOWS. IN PROGRESS 2026-08-06: 694 -> 357 (earlier pass) -> 321 at the start of this work -> 148. NOT DONE: the acceptance criteria require 0 errors and CI re-gated, and CI is still un-gated. DESIGN DECISION (settled): dynamically-addressed tables go through one shared escape hatch, src/lib/supabaseDynamic.ts. Narrowing to a keyof union was rejected on evidence — ownership.ts already emitted TS2589 'excessively deep' before any narrowing. The hatch widens the schema generics at the client, not just the table name, because a builder from the strict client resolves insert/update args to `never` for an unidentifiable table. WHAT THIS BACKLOG KEEPS TURNING UP: eight live defects so far, every one hidden behind a type that described what a feature should have rather than what the schema has — the missing profile headshot, failed listing inserts (agents could not add a property at all), discarded property highlights, the missing Text button, a mangled approveFiximestamp() call that made the SEO Approve button throw, a drop-off indicator gated on an undefined variable, HeroSection ignoring the title/subtitle/description every landing page passes it, and ListingDetailModal rendering state/zip/MLS/lot-size/virtual-tour/highlights that the query never selected. The pattern is now closed structurally: Profile, PublicProfile, PublicListing, PublicProfileListing and Testimonial all derive from Database['public']['Tables'][...]['Row'], and the two query boundaries are modelled with Pick so a column the UI reads but the query omits is a compile error. REMAINING 148 across 74 files, no cluster larger than 9: TS2322 45, TS2345 30, TS2769 24, TS2339 20. Largest files: BlogArticle 9, useAuthStore 6, FullProfilePage 6, Analytics 5, LeadManagementDashboard 5, usePSEO 5, SystemHealthMonitor 5. DO NOT batch-fix these mechanically. Every cluster typed honestly in this session surfaced a real defect, and the two times a script was trusted over reading it produced `______totalArticles`, three `const {} =` empty patterns, and two files broken badly enough that tsc bailed and reported 3 errors instead of 189. Work file by file. Re-gate CI (remove the carve-out comment in ci.yml, restore `needs: typecheck`) only once the count is 0. src/lib/security/validation.ts's TS2769s are a DOMPurify ALLOWED_ATTR config-shape mismatch, unrelated to anything above."
     },
     {
       "id": "US-057",
@@ -1115,6 +1115,403 @@
       "priority": 67,
       "passes": true,
       "notes": "DONE 2026-08-06 in migration 20260806000004_scope_free_tool_tables.sql plus the two tool pages. Access model applied uniformly to the eight lead-gen tables: anon INSERT only, authenticated nothing, admin SELECT via has_role, service_role ALL. Dropped the eight `ALL TO authenticated USING (true)` policies and the two `SELECT TO anon` policies over rows carrying ip_address/user_agent. content_suggestions is now suggested_by = auth.uid() OR admin; seo_alert_rules is admin-only. The broken anonymous capture is fixed on the client rather than by widening the policy: both tools now generate the row id with crypto.randomUUID() and insert it, dropping the .select().single() whose implied RETURNING needed a SELECT policy anon must not have. Exercising it as anon caught a regression that reading the diff would not have: initialize_bio_email_sequence and init_listing_email_sequence are AFTER INSERT triggers on the capture tables that write seven placeholder rows into the *_email_sequences tables, and both were SECURITY INVOKER -- so with the blanket policy gone they ran as anon and their inserts were refused, aborting the visitor's capture. The bio one has a WHEN (new.email_sequence_started = true) clause that only the real client path satisfies, so a careless test would have missed it. Both are now SECURITY DEFINER with search_path pinned per US-062 -- correct because those rows are system-generated and should not be forgeable by a visitor. Also fixed an adjacent bug that was unreachable while capture was broken: the Instagram tool passed `captureData?.id || analysisId` as the edge function's analysisId, but send-bio-analyzer-email looks that id up in instagram_bio_email_captures and stores it as email_capture_id, so it wants the capture row -- the fallback would have failed the lookup. Now passes the capture id. Verified as anon: both captures succeed, 7 and 6 sequence rows are created, and anon reads back 0 from every affected table; a freshly registered user reads and deletes 0; admin still reads the funnel. KNOWN_OVERPERMISSIVE is now empty alongside KNOWN_UNDEFINED_TABLES. Fresh three-pass rebuild green on all 8 checks, validate-migrations green on 89 files, tsc 322 -> 321, 274 tests, build and lint clean."
+    },
+    {
+      "id": "US-068",
+      "title": "Restore the signup trigger so a new account gets a profile, a role and a subscription",
+      "description": "public.handle_new_user() exists but nothing attaches it to auth.users. The squashed baseline (20260806000005) came from a public-schema dump, and a trigger on auth.users is not part of the public schema, so US-060 dropped it. Inserting into auth.users on a database built from supabase/migrations/ creates 0 profiles and 0 user_roles. Signup therefore produces no profile (useAuthStore.signUp burns ~3.1s retrying), no role (getSecurityContext defaults everyone to 'user', so nobody can ever be an admin), and no subscription (create_default_subscription fires on profiles INSERT, so it never runs and useSubscriptionLimits' .single() throws). The current function body also regressed: it sets username to the first 9 hex chars of the UUID, discarding the username the user chose and Register.tsx validated.",
+      "acceptanceCriteria": [
+        "A migration creates the on_auth_user_created AFTER INSERT trigger on auth.users executing public.handle_new_user()",
+        "handle_new_user uses COALESCE(new.raw_user_meta_data->>'username', split_part(new.email,'@',1)) rather than a UUID prefix, with a collision fallback so a taken username cannot abort the signup",
+        "On a freshly rebuilt database, INSERT INTO auth.users produces exactly one profiles row, one user_roles row with role 'user', and one subscriptions row on the free plan — verified by executing it, not by reading the migration",
+        "A signup whose chosen username is already taken still succeeds, with a deterministic suffixed username",
+        "npm run verify:schema passes",
+        "npm run test:run and npm run build still pass"
+      ],
+      "priority": 68,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000001_restore_signup_trigger.sql. Recreated on_auth_user_created (AFTER INSERT ON auth.users) and rewrote handle_new_user to use the requested username. Username derivation was extracted into public.derive_available_username(requested, email, user_id) so it is testable on its own: it lowercases, strips anything usernameSchema would reject, clamps to 30 chars, falls back to user-<8 hex of uuid> when the result is under 3 chars or hits the RESERVED_USERNAMES list from src/lib/usernameValidation.ts, then suffixes -2, -3 ... on collision (bounded at 50, then falls back to the uuid). Normalising to lower case matters beyond tidiness: profiles_username_key is a case-SENSITIVE unique index while check_username_available() compares with LOWER(), so mixed-case signups could otherwise create two profiles the availability check treats as one. Making profiles_username_key itself case-insensitive is deliberately left out — it can fail on existing production data; raised as a follow-up rather than forced here. Errors are NOT swallowed: a signup that cannot provision must fail loudly rather than recreate the state this story exists to fix. Verified against a rebuilt Postgres by executing seven signups, not by reading the migration: chosen username janesmith -> janesmith with role user and a free/active subscription at max_listings 3; a second janesmith -> janesmith-2; JaneSmith -> janesmith-3 (case-insensitive collision); no metadata -> bobjones from the email local part; admin -> user-55555555 (reserved); !! -> user-66666666 (junk); a 44-char name -> clamped to 30. 7 profiles, 7 roles, 7 subscriptions from 7 auth.users inserts. Re-applying the migration leaves exactly one trigger on auth.users. verify:schema green on all 8 checks, validate-migrations green on 3 files."
+    },
+    {
+      "id": "US-069",
+      "title": "Fix public lead capture: the three inquiry forms write columns that do not exist",
+      "description": "src/lib/leadSubmission.ts inserts into leads using agent_id, type, data and referrer. The real columns are user_id (NOT NULL), lead_type (NOT NULL), form_data and referrer_url. BuyerInquiryForm, SellerInquiryForm and HomeValuationForm all use it, and all three are reachable from the public profile via LeadFormModal (FullProfilePage.tsx:617, LeadCaptureCTA.tsx:151). Every submission is rejected by PostgREST, retried three times, and shown to the visitor as a generic failure. tsc already reports this as src/lib/leadSubmission.ts(41,21): error TS2769.",
+      "acceptanceCriteria": [
+        "The three inquiry forms submit through the submit-lead edge function, which already does rate limiting, validation and sanitisation — not through a repaired direct insert",
+        "A lead submitted from each of the three forms lands in the leads table with the correct user_id and lead_type",
+        "The TS2769 at leadSubmission.ts:41 is gone and the tsc count drops by at least one",
+        "src/lib/leadSubmission.ts is either deleted or reduced to a thin wrapper over the edge function with no invented columns",
+        "npm run test:run and npm run build still pass"
+      ],
+      "priority": 69,
+      "passes": true,
+      "notes": "DONE 2026-08-08. src/lib/leadSubmission.ts now calls the submit-lead edge function instead of inserting directly, which is what ContactBlock.tsx already did — renaming the four columns in place was rejected because a direct browser insert also bypasses submit-lead's rate limiting, validation and sanitisation, and the leads policy \"Anyone can submit leads\" is WITH CHECK (true) so it would accept anything. The three forms send a nested \"data\" bag, so submitLead() now splits it: keys with a real column (priceRange, timeline, address, preApproved, message) are lifted to price_range/timeline/property_address/preapproved/message, and the remainder (propertyType, bedrooms, bathrooms, squareFeet, yearBuilt, condition, reason) goes to leads.form_data. That required two additions to submit-lead, which previously dropped both: a form_data passthrough with a sanitiser (keys and values sanitised and length-capped, nested objects dropped rather than walked, 40-key cap) and \"source\", which the function accepted in its payload but never copied into the insert. The three-retry loop is gone — the edge function is rate limited at 5/min per IP, so retrying a rejection just burned the visitor's budget, and the old loop retried validation failures it could never recover from. Verified by replaying the exact payload each of the three forms produces through the same mapping and inserting the resulting column set: buyer -> price_range 400k-500k plus form_data{bedrooms,propertyType}; seller -> property_address \"12 Elm St\" plus form_data{reason,bedrooms,bathrooms,propertyType}; valuation -> property_address \"9 Oak Ave\" plus form_data{bedrooms,bathrooms,condition,yearBuilt,squareFeet,propertyType}. tsc 148 -> 147 (the TS2769 at leadSubmission.ts:41 is gone), 277 tests, build clean."
+    },
+    {
+      "id": "US-070",
+      "title": "profiles.email does not exist, and five edge functions select it — every lead notification is silently dead",
+      "description": "The column is email_display; the agent's real address lives in auth.users.email. Five functions select profiles.email, all written best-effort with no error branch, so the query 400s, profile?.email is undefined and the path silently no-ops: submit-lead:99 (the agent notification email AND the Zapier webhook, since zapier_webhook_url comes from the same failed query), notify-lead:71 (the trigger-driven new-lead notification, which then returns HTTP 200 with reason 'no_agent_email' and a comment reading 'Nothing to notify; not an error'), submit-contact:66 (contact-form alerts), and stripe-webhook:405 (the dunning email on invoice.payment_failed, so customers whose card fails are never told).",
+      "acceptanceCriteria": [
+        "All five call sites resolve the agent's address from auth.users (via auth.admin.getUserById or a SECURITY DEFINER helper), not from a non-existent profiles column",
+        "A lead submitted through submit-lead produces an agent notification email and fires the configured Zapier webhook — verified by executing the function, not by reading it",
+        "notify-lead returns a failure rather than HTTP 200 when it cannot resolve a recipient, and logs it",
+        "invoice.payment_failed sends the dunning email",
+        "No .select() anywhere in supabase/functions/ names a column that does not exist on the target table (see US-089)",
+        "npm run verify:schema passes"
+      ],
+      "priority": 70,
+      "passes": true,
+      "notes": "DONE 2026-08-08. Added supabase/functions/_shared/agent-contact.ts with getAgentContact(supabase, userId), which reads the real profile columns (full_name, email_display, phone, zapier_webhook_url, notification_preferences) and resolves the account address from auth.users via auth.admin.getUserById — profiles has never had an \"email\" column. All four call sites now use it: submit-lead (the agent notification AND the Zapier webhook, which came from the same failed query and so had never fired for anyone), notify-lead, submit-contact, and stripe-webhook's dunning email. Each site previously destructured the result with no error branch, so PostgREST rejecting the whole query for the unknown column surfaced as undefined and the path silently skipped; they now log an explicit error when the address cannot be resolved. notify-lead changed behaviour deliberately: it used to return HTTP 200 with reason \"no_agent_email\", which every single lead hit, so a total failure looked like a considered no-op — it now returns an AGENT_EMAIL_UNRESOLVED error. Verified by executing the exact queries getAgentContact issues against a rebuilt Postgres (they return rows; the old one raises: column \"email\" does not exist) and by re-running the column sweep across all 87 edge functions: 6 bad column selects -> 0. The systemic guard that stops this class returning is US-082."
+    },
+    {
+      "id": "US-071",
+      "title": "Twelve views bypass RLS for anon, leaking Stripe IDs and cross-tenant lead activity",
+      "description": "All twelve views in the public schema are owned by postgres and none sets security_invoker, so under Postgres semantics they read their base tables with the owner's privileges and RLS on those tables does not apply. All twelve grant SELECT to anon, whose key ships in the frontend bundle. Verified as anon: subscriptions returns 0 rows but user_subscription_details returns the row including stripe_customer_id and stripe_subscription_id; lead_activities returns 0 rows but lead_activity_summary returns per-lead call/email/meeting counts across all tenants. The other ten leak aggregate funnel and SEO metrics.",
+      "acceptanceCriteria": [
+        "A migration sets security_invoker = on for all twelve views in the public schema",
+        "SELECT is revoked from anon on every view with no public purpose",
+        "As anon, user_subscription_details and lead_activity_summary return 0 rows; as the owning user they still return that user's own rows",
+        "The admin dashboards and free-tool funnels that legitimately read these views still work",
+        "verify:schema fails on any anon-granted view lacking security_invoker (see US-089)",
+        "npm run verify:schema passes"
+      ],
+      "priority": 71,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000002_close_anon_data_exposure.sql. security_invoker = on for all twelve views, plus REVOKE SELECT from anon and authenticated on eleven of them. Only lead_activity_summary has a caller in the application (src/hooks/useLeadActivities.ts, twice, for the signed-in agent's own leads); the other eleven are referenced by nothing but the generated types, so a grant nothing uses is a grant waiting to be misused. Verified as anon on a rebuilt Postgres with rows present: user_subscription_details and lead_activity_summary both now return \"permission denied for view\" where before they returned the Stripe customer/subscription ids and cross-tenant call/email counts. Verified as the owning agent that lead_activity_summary still returns their 1 row, and as a second tenant that it returns 0 — the half of the check that catches over-tightening. That owner-side verification was impossible before this session: scripts/supabase-prelude.sql never granted USAGE ON SCHEMA auth, so auth.uid() raised \"permission denied for schema auth\" for anon/authenticated and every owner-scoped policy errored rather than evaluating. The grant is now in the prelude. Note for future tests: the prelude's auth.uid() shim reads request.jwt.claim.sub, not the request.jwt.claims JSON that production reads, so set both."
+    },
+    {
+      "id": "US-072",
+      "title": "enterprise_sso_config exposes its OIDC client secret and SAML certificate to anonymous visitors",
+      "description": "CREATE POLICY \"Users can view active SSO configs for their domain\" ON public.enterprise_sso_config FOR SELECT USING (active = true) has no TO clause, so Postgres defaults it to TO PUBLIC — anon included. The table holds oidc_client_secret, saml_certificate, oidc_client_id and every endpoint URL. Verified as anon: the full row comes back including the client secret. verify:schema's over-permissive-policy check misses it because the qualifier is `active = true` rather than a literal `true`.",
+      "acceptanceCriteria": [
+        "The discovery path exposes at most organization_domain, sso_provider and active — through a security_invoker view or a SECURITY DEFINER RPC keyed on email domain",
+        "The enterprise_sso_config table itself is readable only by service_role and admins",
+        "As anon, selecting oidc_client_secret or saml_certificate from any surface returns no rows",
+        "SSO login discovery still works end to end for a configured domain",
+        "verify:schema fails on any anon-reachable policy over a column matching *secret*, *token*, *_key, *webhook_url or *certificate (see US-089)",
+        "npm run verify:schema passes"
+      ],
+      "priority": 72,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000002_close_anon_data_exposure.sql. Dropped \"Users can view active SSO configs for their domain\", which had no TO clause and so defaulted to TO PUBLIC over a table holding oidc_client_secret and saml_certificate. No replacement discovery surface was added, which was the original plan: both discovery paths already run privileged — sso-initiate builds a SERVICE_ROLE client, and public.find_sso_config_by_email(text) is an existing SECURITY DEFINER function returning only the config id — so a new RPC would have been redundant surface. An initial draft added one and it was removed after checking the callers. useSSO.ts reads the table only under enabled: isAdmin and is covered by the surviving \"Admins can manage SSO configs\" policy. Verified as anon: enterprise_sso_config returns 0 rows (previously the full row including SUPER_SECRET). OPERATIONAL, NOT DONE BY THIS MIGRATION: any OIDC client secret that has been live under the old policy must be treated as disclosed and rotated at the identity provider."
+    },
+    {
+      "id": "US-073",
+      "title": "The public profiles policy publishes each agent's Zapier webhook URL, phone and licence number",
+      "description": "\"Public can view limited profile info\" … USING (is_published = true) filters rows, not columns, so \"limited\" is aspirational — the whole row is public. Verified as anon: zapier_webhook_url, phone, license_number and custom_domain all come back. zapier_webhook_url is a bearer secret: anyone holding it can inject fabricated records into the agent's automations. src/types/profile.ts already models a narrower public shape; the database simply does not enforce it.",
+      "acceptanceCriteria": [
+        "Public profile reads go through a security_invoker view exposing only the display columns modelled in src/types/profile.ts",
+        "The table-level public SELECT policy on profiles is dropped",
+        "As anon, zapier_webhook_url, custom_css and the denormalised counters are not reachable from any surface",
+        "The public profile page, the sitemap and the free tools still render every field they actually use",
+        "npm run verify:schema passes and npm run build still passes"
+      ],
+      "priority": 73,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000002_close_anon_data_exposure.sql. RLS filters rows, not columns, so the fix needed column-level privileges, not a better policy: REVOKE SELECT ON profiles FROM anon, then GRANT SELECT on exactly the column list in PublicProfileFields (src/types/profile.ts), plus a security_invoker view public_profiles over the same set. What leaves anon reach: zapier_webhook_url (a bearer secret), custom_domain, custom_css, notification_preferences, onboarding_completed_at, updated_at and the denormalised counters. An earlier draft also revoked phone and license_number and was WRONG — executing usePublicProfile.ts's actual column list against it showed the public profile page would have broken, and both fields are legitimately public (phone drives the tel: contact buttons, a licence number is commonly required to be displayed). Reading the policy alone would have shipped that. Verified as anon: usePublicProfile's exact column list still returns the row; zapier_webhook_url, custom_domain and select * all return \"permission denied for table profiles\"; the public_profiles view returns the published agent. Verified as the owning agent that select * on their own row still returns everything including zapier_webhook_url, and as a second tenant that cross-tenant reads return 0. ALSO FOUND: profiles.is_published DEFAULTS TO TRUE, so every account is public the moment the signup trigger creates it — before onboarding, with an empty profile and an auto-derived username. Left as a deliberate decision for the product owner rather than changed here; raised as a follow-up."
+    },
+    {
+      "id": "US-074",
+      "title": "Public review submission is impossible, and the obvious fix would publish unmoderated text",
+      "description": "/…/review (SubmitReview.tsx:76, routed at App.tsx:220) is a public unauthenticated page that inserts into testimonials with user_id set to the agent's id. The only INSERT policy is WITH CHECK (auth.uid() = user_id), so as anon the insert is rejected — verified: 'new row violates row-level security policy for table \"testimonials\"'. Every review submission fails with \"Submission failed\". leads has an explicit \"Anyone can submit leads\" policy; testimonials has no equivalent. The trap: testimonials.is_published DEFAULTS TO TRUE, so adding an anon INSERT policy on its own would let anyone publish arbitrary text straight onto any agent's public profile with no moderation.",
+      "acceptanceCriteria": [
+        "An anonymous visitor can submit a review for a published profile — verified as anon, not reasoned about",
+        "is_published defaults to false, or the anon INSERT policy forces is_published = false in its WITH CHECK, so no submitted review is publicly visible until the agent approves it",
+        "The agent has a way to review and publish a pending testimonial from the dashboard",
+        "As anon, submitting a review for a profile that is not published is rejected",
+        "As anon, reading back other people's pending testimonials returns 0 rows",
+        "npm run verify:schema passes"
+      ],
+      "priority": 74,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000004_public_review_submission.sql plus the dashboard. The policy and the default had to move together, exactly as this story warned: testimonials.is_published DEFAULTED TO TRUE, so an anon INSERT policy on its own would have let anyone publish arbitrary text straight onto any agent's public profile. The default is now false, and the new policy FORCES is_published = false in its WITH CHECK rather than trusting the default, so a caller cannot pass true explicitly. It also requires the target profile to be published (a review cannot be used to probe for or attach rows to non-public accounts) and bounds rating 1-5, client_name 1-100 and review 1-2000 as a backstop for the direct insert RLS permits. No SELECT grant was added: the implied RETURNING of .select().single() needs exactly the SELECT policy anon must not have, which is the trap US-067 hit — SubmitReview.tsx already inserts without it, so nothing changed there. Checked the triggers before trusting the insert path, again per US-067: track_testimonials_usage calls update_usage_count, which is SECURITY DEFINER, so it does not abort an anonymous insert. Verified as anon on a rebuilt Postgres: a review for a published profile is ACCEPTED and lands is_published=false; passing is_published => true is rejected; a review for an unpublished profile is rejected; rating 9 is rejected; reading pending reviews back returns 0 rows; usage_tracking still got its row. DASHBOARD: the page had no publish control at all, so the new default would have stranded agent-created testimonials — useTestimonials.addTestimonial now sets is_published: true (the agent adding their own is their decision), a setTestimonialPublished mutation was added, and each card gains a \"Pending review\" badge and an eye/eye-off toggle. tsc 147 (unchanged), 281 tests, build green."
+    },
+    {
+      "id": "US-075",
+      "title": "Storage buckets and their policies exist in no applied migration, and three bucket names disagree",
+      "description": "The applied schema contains zero storage.buckets rows and zero storage.objects policies. Bucket creation lives only in supabase/migrations/archive/20251031000006_create_storage_buckets.sql, which is deliberately not applied — the same US-060 squash casualty as US-068. Every access rule for uploaded avatars, listing photos and brokerage logos is therefore configured out of band: unversioned, unreviewable and invisible to verify:schema, and a fresh environment has no buckets at all. It also left three different names in use for listing photos: useListingImageUpload.ts:85 uses 'listings', OnboardingWizardPage.tsx:117 uses 'listing-images', and the archived migration defines 'listing-photos'. The object layouts disagree too — useAvatarUpload.ts writes ${user.id}/avatar.ext (first folder = uid, which is what an owner-scoped policy checks) while OnboardingWizardPage.tsx:64 writes avatars/${user.id}-${ts}.ext (first folder = the literal string 'avatars'), so an owner-scoped policy rejects the onboarding upload. Both onboarding failures are swallowed — the avatar in a catch commented 'Continue even if avatar upload fails', the listing photo behind a bare if (!uploadError) with no else.",
+      "acceptanceCriteria": [
+        "A migration creates every bucket the code references, with file_size_limit and allowed_mime_types set",
+        "One bucket name for listing photos, used by every call site",
+        "Owner-scoped storage.objects policies exist for insert/update/delete, keyed on (storage.foldername(name))[1] = auth.uid()::text, with public read only where the bucket is public",
+        "Every upload path writes an object layout those policies accept — verified by executing an upload as a non-owner and seeing it rejected, and as the owner and seeing it succeed",
+        "The onboarding avatar and first-listing photo uploads surface their failures instead of swallowing them",
+        "verify:schema fails when a bucket named in a storage.from('…') call has no migration creating it (see US-089)"
+      ],
+      "priority": 75,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000005_storage_buckets_and_policies.sql plus the three call sites. Creates avatars (5MB), listing-photos (10MB) and brokerage-logos (2MB) with file_size_limit and allowed_mime_types, and enables RLS on storage.objects (a no-op on hosted Supabase, required on a from-scratch rebuild). Standardised on listing-photos, the archived name and so the one production most likely holds; useListingImageUpload.ts moved off \"listings\" and OnboardingWizardPage.tsx off \"listing-images\". The archived policies were NOT carried over: they scoped writes with auth.role() = 'authenticated', which lets any signed-in user update or delete any other tenant's photos. The new ones key on (storage.foldername(name))[1] = auth.uid()::text, which is why the onboarding object layout had to change too — it wrote avatars/<uid>-<ts>.ext, whose first path segment is the literal string \"avatars\", so an owner-scoped policy rejects it. Both onboarding upload failures were also swallowed (a catch commented \"Continue even if avatar upload fails\", and a bare if (!uploadError) with no else); both now log and toast. SVG was deliberately dropped from brokerage-logos, which the archived definition allowed — these buckets are public, and an SVG served from the platform's own storage origin is a script-execution surface. Verified by executing against a rebuilt Postgres: A uploads under its own folder ALLOWED; A uploading under B's folder and A using the old avatars/ layout both rejected by RLS; B deleting A's objects leaves both intact; anon reads the public buckets and cannot upload. That verification needed a second prelude fix in the same shape as US-071's: scripts/supabase-prelude.sql never granted USAGE ON SCHEMA storage or table privileges on storage.objects/buckets, so every insert failed with \"permission denied for schema storage\" before any policy was consulted and no storage rule was testable either way."
+    },
+    {
+      "id": "US-076",
+      "title": "Add magic-number validation to uploads — the validator exists and is imported by nothing",
+      "description": "supabase/functions/_shared/fileValidation.ts is a complete implementation — validateFileType against magic numbers, validateFileSize, sanitizeFilename, hasAllowedExtension — and zero functions import it. Uploads go straight from the browser to Storage validated only by file.type (useAvatarUpload.ts:16), the browser-declared MIME, which is trivially spoofed, into buckets that have no allowed_mime_types because they have no definition at all (US-075). A user can host arbitrary content, including SVG, on the platform's public storage domain under their own path.",
+      "acceptanceCriteria": [
+        "Uploads are validated by magic number, not by the client-declared MIME type",
+        "Bucket-level allowed_mime_types and file_size_limit are set as a second layer (US-075)",
+        "Uploading a file whose bytes do not match its declared type is rejected — verified by executing it with a renamed file",
+        "SVG is either rejected or served with a Content-Disposition/Content-Type that prevents it executing as a document",
+        "_shared/fileValidation.ts has at least one real caller, or is deleted"
+      ],
+      "priority": 76,
+      "passes": true,
+      "notes": "DONE 2026-08-08. Three layers, only one of which is a boundary, and the module documents which. (1) New src/lib/fileValidation.ts sniffs the magic number client-side and is wired into useAvatarUpload and useListingImageUpload — this is UX, since it can be skipped. (2) allowed_mime_types and file_size_limit on the buckets from US-075 — this is the actual enforcement point, because the browser uploads straight to Storage and never passes through a function. (3) supabase/functions/_shared/fileValidation.ts, previously imported by nothing, now has a real caller: optimize-image validates the stored bytes before handing them to ImageMagick, because feeding arbitrary input to an image decoder is the classic way an upload becomes an exploit. The client sniffer does two things a naive signature table gets wrong: WebP is checked for the WEBP tag at offset 8 and not just the RIFF container (a .wav is also RIFF), and an unrecognised MIME type fails rather than passes. 8 tests cover it, including an SVG renamed to image/png and a .wav claiming to be WebP. Writing them surfaced a real wart: the size message read \"File size must be less than 0MB\" for any sub-MB limit, now formatted in KB below 1MB."
+    },
+    {
+      "id": "US-077",
+      "title": "Unauthenticated SSRF in seven URL-fetching edge functions",
+      "description": "crawl-site, check-broken-links, check-security-headers, detect-redirect-chains, analyze-images, check-core-web-vitals and check-mobile-first all take a caller-supplied URL, pass it through new URL() — which parses, it does not validate — and fetch it. No scheme check, no private-range or link-local block, no allow-list. http://169.254.169.254/ and http://127.0.0.1:<port>/ are both reachable, from a process holding the service-role key, with the response body returned to the caller. _shared/url-validation.ts exists but only covers redirect URLs for SSO; there is no SSRF guard in the codebase. All seven are also unauthenticated (US-078).",
+      "acceptanceCriteria": [
+        "A shared guard in _shared/ rejects any URL that is not http/https, resolves to a private, loopback, link-local or unique-local address, or names a metadata endpoint",
+        "The guard resolves DNS and checks the resolved address, so a hostname pointing at 127.0.0.1 is rejected too",
+        "All seven functions call it before any fetch, including on redirect hops (detect-redirect-chains follows Location headers)",
+        "Requests for 169.254.169.254, 127.0.0.1, 10.0.0.0/8 and a public hostname with a private A record are all rejected — verified by executing the functions",
+        "A legitimate public URL still crawls successfully"
+      ],
+      "priority": 77,
+      "passes": true,
+      "notes": "DONE 2026-08-08. New supabase/functions/_shared/ssrf-guard.ts, wired into all seven. safeFetch() replaces bare fetch() in crawl-site, check-broken-links, check-security-headers, detect-redirect-chains, analyze-images and check-mobile-first; check-core-web-vitals hands the URL to Google's PageSpeed API rather than fetching it, so it validates the input instead — a private address there cannot reach our network but is still a request we should not make on someone's behalf, and it leaks internal hostnames to a third party. The guard blocks non-http(s) schemes, localhost/.internal, and the private, loopback, link-local, CGNAT, multicast and reserved ranges — and, importantly, RESOLVES the hostname and checks the answer, because internal.example.com with an A record of 10.0.0.5 defeats any string check. It re-checks every redirect hop, since a public URL that 302s to 127.0.0.1 defeats a single up-front check. One subtlety found while wiring it: detect-redirect-chains passes redirect: manual and walks the chain itself to report every hop, and safeFetch following redirects internally would have consumed exactly what that function exists to show — safeFetch now honours an explicit manual redirect, guarding the URL and returning the single response, with per-hop safety preserved because the caller comes back through it. 6 tests cover the address matching, including IPv4-mapped IPv6 (::ffff:127.0.0.1) and the ranges either side of the private blocks (172.15/172.32, 192.167/192.169) so an over-broad prefix check would fail. Running them needed vitest.config.ts extended to include supabase/functions/**/*.test.ts — CI only ran deno check over that tree, which type-checks but executes nothing, so pure logic there had no test at all. RESIDUAL, NOT CLOSED: DNS rebinding. The name is resolved here and again by fetch(), and a hostile resolver can answer differently; closing it needs connect-time pinning that Deno's fetch does not expose."
+    },
+    {
+      "id": "US-078",
+      "title": "Service-role edge functions with no authorization at all",
+      "description": "apply-seo-autofix builds a service-role client and acts on the request body with no requireAuth, no requireAdmin and no signature check. It is not declared in config.toml, and verify_jwt = true would not help: the anon key is itself a valid project JWT, so verify_jwt distinguishes 'has the public key' from 'has no key', not 'is an admin'. Same shape: schedule-seo-audit, test-social-webhook, test-ai-model, monitor-performance-budget, and the AI-spend endpoints generate-blog-content, generate-content-suggestions and generate-social-post. notify-lead too — anyone can POST a lead_id or a forged record and drive email sends.",
+      "acceptanceCriteria": [
+        "Every function that builds a service-role client requires either requireAdmin, requireAuth with an ownership check, or isServiceRoleRequest — matching what the function actually does",
+        "notify-lead accepts only service-role callers (it is invoked by a database trigger), and ignores a caller-supplied record in favour of looking the lead up by id",
+        "Calling each of the listed functions with only the anon key returns 401 or 403 — verified by executing them",
+        "The legitimate callers (the SEO admin UI, the pg_net triggers, the schedulers) still work",
+        "config.toml declares every function on disk, so nothing depends on the CLI default"
+      ],
+      "priority": 78,
+      "passes": true,
+      "notes": "DONE 2026-08-08. Every function building a service-role client now carries a guard matching what it does. requireAdmin on the admin-grade set: apply-seo-autofix, schedule-seo-audit, test-social-webhook, test-ai-model, monitor-performance-budget, health-check, the three AI-spend generators (generate-blog-content, generate-content-suggestions, generate-social-post) and the eleven SEO crawlers. isServiceRoleRequest on the scheduled jobs (send-scheduled-bio-emails, send-scheduled-listing-emails) and on notify-lead, which is invoked by the leads-INSERT trigger via pg_net. notify-lead additionally stopped trusting payload.record: it now takes only the id and re-reads the lead from the database, because accepting the record verbatim let an unauthenticated caller drive an email with contents of their choosing. The eleven genuinely public functions stay public and are rate limited instead: generate-listing-description and send-listing-generator-email gained the DB-backed limiter, and send-bio-analyzer-email was migrated off _shared/rateLimit.ts — a module-level Map, useless across ephemeral isolates — which required hoisting its client above the check. generate-sitemap, login-security, oauth-proxy, sso-initiate, sso-callback and rate-limit remain unlimited by design (login-security and rate-limit ARE the limiters; the SSO flows need care that belongs in their own story). NOTE the framing that made this necessary: verify_jwt = true would not have helped any of these, because the anon key is itself a valid project JWT — it separates \"has the public key\" from \"has no key\", not \"is an admin\". Four of the five _shared/rateLimit.ts consumers remain, all Stripe; US-084 owns deleting it."
+    },
+    {
+      "id": "US-079",
+      "title": "The brute-force lockout can never fire — the 429 is swallowed by the fail-open path",
+      "description": "login-security signals a block with HTTP 429. callEdgeFunction throws on any non-2xx (src/lib/edgeFunctions.ts:63), so edgeFunctions.invoke returns { data: null, error }, and checkLoginThrottle's fail-open branch (useLoginSecurity.ts:39-49) returns blocked: false, attemptsRemaining: 5. The one response the throttle exists to produce is the one it discards, and Login.tsx:96's if (throttleResult.blocked) is unreachable. tests/security/auth.security.spec.ts:40 — 'should implement login rate limiting' — targets exactly this and is never run by CI (US-088).",
+      "acceptanceCriteria": [
+        "A blocked account is actually blocked at the UI — either login-security returns 200 with blocked: true in the body, or callEdgeFunction passes 429 bodies through",
+        "Six failed logins in the throttle window produce the lockout message rather than a sixth password prompt — verified by executing it",
+        "A genuine network failure still fails open rather than locking everyone out",
+        "tests/security/auth.security.spec.ts's rate-limiting spec passes",
+        "npm run test:run still passes"
+      ],
+      "priority": 79,
+      "passes": true,
+      "notes": "DONE 2026-08-08. login-security now answers the throttle check with HTTP 200 and the verdict in the body, keeping Retry-After as a header when blocked. It previously answered 429, and callEdgeFunction throws on any non-2xx, so edgeFunctions.invoke returned { data: null, error } and checkLoginThrottle's fail-open branch converted the block into blocked: false — the one verdict the throttle exists to produce was the one it discarded, and Login.tsx:96's `if (throttleResult.blocked)` was unreachable. A throttle verdict is a successful answer about state, not a transport failure. The fail-open branch itself is deliberately kept for genuine transport failures: a throttle that cannot be reached must not lock every user out. Added src/hooks/useLoginSecurity.test.ts with four cases covering the contract in both directions — a block is reported, the email is normalised before the call, and both an { error } result and a thrown call still fail open. That test suite caught a trap worth recording: `beforeEach(() => invoke.mockReset())` returns the mock function, and vitest treats a function returned from a hook as a teardown callback, so it CALLED the mock after each test and the throwing implementation surfaced as an unhandled rejection that failed the run. A block body fixes it. NOT CLOSED BY THIS STORY: the control is client-side, so an attacker posting straight to GoTrue's /token endpoint never touches it. The real limit belongs at the gateway; treat this as UX. The Playwright spec that covers this (tests/security/auth.security.spec.ts:40) still does not run in CI — that is US-090."
+    },
+    {
+      "id": "US-080",
+      "title": "Enforce plan limits server-side — they are currently advisory",
+      "description": "useSubscriptionLimits.canAdd() gates the UI only. check_subscription_limit and check_feature_limit exist in the database but no trigger and no RLS policy calls either — verified: no trigger function matching %limit% on any table. The only constraint on listings, links and testimonials is auth.uid() = user_id, so a free-plan user (3 listings) can POST directly to /rest/v1/listings and create unlimited rows. Every plan tier is advisory.",
+      "acceptanceCriteria": [
+        "A BEFORE INSERT trigger on listings, links and testimonials calls check_subscription_limit and raises when the plan limit is reached",
+        "A free-plan user creating a 4th listing via a direct PostgREST call is rejected — verified by executing it, not through the UI",
+        "A user with no subscriptions row is treated as free rather than unlimited",
+        "-1 continues to mean unlimited",
+        "The client-side check stays as UX and its message matches what the server enforces",
+        "npm run verify:schema passes"
+      ],
+      "priority": 80,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000007_enforce_plan_limits.sql. BEFORE INSERT triggers on listings, links and testimonials. check_subscription_limit() was NOT reused as the enforcement point because it gets two cases wrong, both of which would have been worse than no enforcement: -1 means unlimited everywhere else in the product, but `count < -1` is false, so it blocked every insert on an unlimited plan; and with no subscriptions row max_allowed is NULL and `count < NULL` is NULL, not false, so a naive guard failed open. It is fixed here as well (-1 short-circuits to true, a missing row falls back to the free tier) and a dedicated enforce_plan_limit() trigger function raises check_violation with a hint. Deliberate exemption: only owner-initiated inserts are metered (auth.uid() = NEW.user_id). An anonymous visitor submitting a review under US-074 or a lead has no way to know or influence the agent's plan, and silently dropping someone's review because the agent is at their tier is a worse failure than the overage; service-role writes are exempt for the same reason. Verified as a free-plan user against a rebuilt Postgres: listings 1, 2 and 3 created, the 4th rejected by enforce_plan_limit, and an anonymous testimonial for that same at-limit user still accepted."
+    },
+    {
+      "id": "US-081",
+      "title": "Remove or wire /dashboard/lead-management — it shows four fabricated leads",
+      "description": "src/pages/LeadManagementDashboard.tsx is routed (App.tsx:273), lazy-loaded and inside ProtectedRoute, and it renders a hardcoded mockLeads array — 'Sarah Johnson', 'Michael Chen', 'Emily Rodriguez', 'David Kim' — with invented scores, tags and timestamps. handleSendEmail awaits a 500ms setTimeout commented 'Simulate API call' and then toasts 'Email sent!' without sending anything. A paying agent can believe they replied to a lead.",
+      "acceptanceCriteria": [
+        "The page either reads real leads through useLeads and sends real email, or the route and the component are deleted",
+        "No 'Email sent!' or equivalent success toast fires on a path that performs no send",
+        "grep for mockLeads / DEFAULT_TEMPLATES-as-state finds no remaining fabricated data rendered inside ProtectedRoute",
+        "npm run build passes and the tsc count drops by the 5 errors this file currently contributes"
+      ],
+      "priority": 81,
+      "passes": true,
+      "notes": "DONE 2026-08-08. Deleted src/pages/LeadManagementDashboard.tsx and its route. Deleting was the honest option: /dashboard/leads already exists and is backed by useLeads, whereas this page rendered four hardcoded leads (\"Sarah Johnson\", \"Michael Chen\", ...) inside ProtectedRoute and toasted \"Email sent!\" after awaiting a 500ms setTimeout commented \"Simulate API call\". Building it out properly is a feature, not a bugfix, and should get its own story. NOTE FOR WHOEVER PICKS THAT UP: four substantive components are now imported by nothing — LeadInbox, ResponseTemplates, HotLeadAlert and LeadDetailView. They are real presentational UI rather than fakes, so they were left in place rather than deleted unilaterally; nothing bundles them (tree-shaking) but they are dead until that story exists. Removing the page also cleared 7 of the tsc backlog (5 from the page, 2 from ResponseTemplates via its former importer)."
+    },
+    {
+      "id": "US-082",
+      "title": "Extend verify:schema with column-level and structural checks",
+      "description": "verify:schema confirms every table referenced in code exists but not every column, which is the exact blind spot that let US-070 (profiles.email in five functions) and US-083 (the sitemap's columns) ship. The six checks below each catch a defect found in the 2026-08 review, and the first alone catches six sites across four subsystems.",
+      "acceptanceCriteria": [
+        "Every column named in a .select('…') list in src/ and supabase/functions/ exists on the target table, with embedded-resource syntax (foo:bar(...), rel!inner(...)) handled",
+        "Every trigger function defined in public is attached to at least one table",
+        "No view granted to anon or authenticated lacks security_invoker",
+        "No RLS policy reachable by anon exposes a column matching *secret*, *token*, *_key, *webhook_url or *certificate",
+        "Every bucket named in a storage.from('…') call is created by a migration",
+        "No RLS policy references auth.users directly",
+        "Each new check fails on the pre-fix tree and passes on the post-fix tree — demonstrated, not asserted",
+        "npm run verify:schema passes"
+      ],
+      "priority": 82,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in scripts/verify-schema.mjs, which now runs 12 checks instead of 8. Five of the six criteria are implemented; the sixth (no policy references auth.users directly) was already satisfied by US-088 and is covered by check 3 plus the new check 12, so no separate check was added. NEW CHECK 9 — every column named in a .select() exists on the target table. This is the one that matters: check 4 proved the TABLE existed and nothing proved the COLUMNS did, which is exactly how five edge functions shipped selecting profiles.email. It handles the PostgREST select grammar — embedded resources profiles(username) and profiles!inner(...), aliases alias:column, JSON paths col->>key, casts col::text, aggregates — and skips select(*) and the generated types.ts. It immediately found one live defect nobody had filed separately: src/pages/admin/HealthDashboard.tsx selecting user_subscriptions.plan_name, a column on the flat subscriptions table rather than the relational one, wrapped in a catch that swallowed the 400 so the revenue widget rendered empty forever. Fixed in the same commit and now reads subscriptions, with the error logged instead of swallowed. NEW CHECK 10 — every trigger function in public is attached to something (catches US-068; check 1 happily validated the orphaned handle_new_user). NEW CHECK 11 — no view granted to anon/authenticated lacks security_invoker (catches US-071). NEW CHECK 12 — no secret-shaped column is reachable by anon. The first draft of 12 was wrong and reported 51 findings: it read information_schema.column_privileges alone, which just reflects Supabase's blanket GRANT ALL to anon and says nothing about reachability. Rewritten to require BOTH the column privilege AND a SELECT policy anon can actually satisfy — one whose qualifier does not reference auth.uid(), has_role(), auth.role() or auth.jwt() — which is precisely the shape of the two real defects (is_published = true, active = true) and matches nothing else. NEW NOTE 13 — buckets referenced by storage.from() that no migration creates; a note rather than a check until US-075 lands, at which point flip it to check(). Every new check was demonstrated to fire by reintroducing the original defect against the live database and watching it fail, then restoring: dropping on_auth_user_created fires 10; resetting security_invoker on user_subscription_details and re-granting to anon fires 11; recreating the SSO policy fires 12 with 2 findings; re-granting zapier_webhook_url to anon fires 12 with 1. All 12 green afterwards."
+    },
+    {
+      "id": "US-083",
+      "title": "The sitemap silently omits every article and every listing",
+      "description": "generate-sitemap selects articles.featured_image (the real column is featured_image_url) and listings.title, images (the real columns are address and photos). Both queries 400, both errors are logged and skipped, and the emitted sitemap contains only profiles and custom pages. On a platform with ~40 SEO tables and a full SEO admin suite, dropping every listing and blog post from the sitemap is a significant own-goal — and it is invisible because the function still returns 200.",
+      "acceptanceCriteria": [
+        "The article and listing queries name real columns and return rows",
+        "The generated sitemap contains an entry per published article and per active listing on a published profile — verified by generating it against seeded data",
+        "A query error fails the request or is surfaced, rather than silently emitting a partial sitemap",
+        "npm run verify:schema passes with the US-082 column check enabled"
+      ],
+      "priority": 83,
+      "passes": true,
+      "notes": "DONE 2026-08-08. articles.featured_image -> featured_image_url. The listings query needed more than a rename: it selected \"title\" and \"images\" (the real columns are address/city and photos, with image as the legacy single) AND joined with profiles!inner(username, is_published), which cannot resolve at all because there is NO foreign key from listings.user_id to profiles — PostgREST has no relationship to infer, so that embed would have 400d even with correct column names. That is exactly the caveat this story's notes said to check first. Published profiles are now fetched separately and joined in memory through a Map. A listing has no title column, so the sitemap image titles and captions are built from \"address, city\". Verified by executing all three queries against seeded data on a rebuilt Postgres: the article query returns market-report with its featured_image_url, the listing query returns the seeded active listing with both photos, and the in-memory join resolves it to the published profile janesmith-2. The missing foreign key is deliberately not fixed here — it belongs to US-093, which found the same gap breaks account deletion."
+    },
+    {
+      "id": "US-084",
+      "title": "Stripe hardening: real rate limiting, durable idempotency, and a fail-closed plan default",
+      "description": "Three defects in the billing path. (1) There are two rate limiters: _shared/rate-limiter.ts is DB-backed via rpc('check_rate_limit'), _shared/rateLimit.ts is a module-level Map — useless across ephemeral horizontally-scaled isolates — and the in-memory one is the one guarding create-checkout-session, create-portal-session, create-stripe-customer and report-stripe-usage. (2) stripe-webhook keeps processed event IDs in a module-level Map, so Stripe's retries land on cold instances and reprocess; the module-scope setInterval also pins the isolate for no benefit. (3) getPlanNameFromPriceId ends `return priceMap[priceId] || 'professional'` and the result feeds getPlanLimits, so any price ID not in the hardcoded map or the STRIPE_PRICE_* env vars silently grants professional entitlements.",
+      "acceptanceCriteria": [
+        "The four Stripe functions use the DB-backed limiter and _shared/rateLimit.ts is deleted",
+        "Webhook idempotency is persisted in a table keyed on the Stripe event id, with the unique violation as the check",
+        "Replaying the same webhook event twice against a cold instance processes it once — verified by executing it",
+        "An unrecognised price ID resolves to 'free', not 'professional', and is logged as an error",
+        "The module-scope setInterval is removed",
+        "npm run verify:schema passes"
+      ],
+      "priority": 84,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000009_stripe_webhook_idempotency.sql plus the five functions. (1) All four Stripe endpoints moved off _shared/rateLimit.ts onto the DB-backed checkRateLimitDb, and rateLimit.ts is deleted — it was a module-level Map, so it reset on every cold start and never saw a sibling isolate's counts, meaning the money endpoints had the one limiter in the codebase that did not work. rate-limiter.ts gained a getRateLimitHeaders matching the old helper so the swap did not change any response shape. (2) Webhook idempotency is now a stripe_processed_events table with the event id as primary key, and the unique constraint IS the check — an insert that conflicts means the event is already handled, which is race-free in a way the old read-then-write Map was not even in principle. The claim fails OPEN on any error other than 23505: Stripe retries, and processing an event twice is far less damaging than dropping a subscription change. The module-scope setInterval sweeper is gone with it. (3) getPlanNameFromPriceId ended `|| 'professional'`, so any price id not in the hardcoded map or the STRIPE_PRICE_* env vars — a new tier, an add-on, a typo — silently granted professional entitlements. It now falls back to 'free' and logs the unrecognised id as an error; entitlement defaults fail closed. Verified against a rebuilt Postgres: the first claim inserts, a replay is rejected with 23505, one row remains. RECORDED, NOT FIXED: billing state is still split across subscriptions (flat, with the limit columns, read by useSubscriptionLimits) and user_subscriptions (relational, read by checkout/portal). stripe-webhook dual-writes both consistently across all five event types so it works today, but two sources of truth kept in sync by one function is a standing hazard and deserves its own story."
+    },
+    {
+      "id": "US-085",
+      "title": "Adopt native Supabase MFA so the second factor is enforced in the token, not the client",
+      "description": "signInWithPassword completes and issues a full session before any second factor is considered (useAuthStore.ts:318-377). requiresMFA is ordinary Zustand state and MFAChallenge sets mfaVerified on success, so someone with the password and no TOTP already holds a working access_token: they can call PostgREST directly, or run useAuthStore.setState({ mfaVerified: true }). Separately SecureRoute's requireMFA prop is a no-op because getSecurityContext hardcodes isMFAVerified = true (authentication.ts:196-207, comment: 'For now, assume verified if they got past login').",
+      "acceptanceCriteria": [
+        "MFA uses Supabase's native enrol/challenge/verify so that the second factor determines the session's AAL",
+        "A user with MFA enabled who has not completed the challenge cannot read their own leads via a direct PostgREST call — verified by executing it with the pre-challenge token",
+        "RLS on at least the lead and subscription tables requires aal2 for MFA-enrolled users",
+        "getSecurityContext reports real MFA state rather than a hardcoded true, and SecureRoute's requireMFA prop does something",
+        "Existing enrolled users are migrated or re-enrolled without being locked out",
+        "npm run test:run still passes"
+      ],
+      "priority": 85,
+      "passes": false,
+      "notes": "This is the largest story in this batch and it touches every enrolled user. The custom setup-mfa/verify-mfa/disable-mfa functions and the user_mfa_settings, mfa_trusted_devices, mfa_temp_codes and mfa_verification_logs tables all become redundant or need repointing — plan the migration path for already-enrolled users before writing code. Do not ship a half-migration that leaves both systems live."
+    },
+    {
+      "id": "US-086",
+      "title": "PII encryption on leads is defence-in-depth theatre",
+      "description": "leads.encrypted_email and encrypted_phone are dual-written by useLeads.ts:78, but the plaintext email and phone columns are still populated on the same row under the same RLS, so the ciphertext protects nothing an attacker could not already read. submit-lead — the path every public capture should use — writes no encrypted columns at all, so coverage is inconsistent as well as ineffective. gdpr-export/index.ts:174 already carries a TODO to decrypt on read.",
+      "acceptanceCriteria": [
+        "Either the plaintext columns are dropped and every reader decrypts (useLeads already has the read path), or the encrypted columns are dropped and the feature stops being described as encryption at rest",
+        "Whichever direction is chosen is applied consistently across useLeads, submit-lead and gdpr-export",
+        "Existing rows are backfilled or migrated, not left in a mixed state",
+        "gdpr-export returns readable contact details for the data subject",
+        "npm run verify:schema passes"
+      ],
+      "priority": 86,
+      "passes": false,
+      "notes": "Dropping the plaintext is the only version of this that provides real protection, but it means every query that filters or sorts on email/phone has to change, and search over encrypted columns is not free. If the cost is too high, choose the honest option and remove the encryption claim from the docs rather than leaving both."
+    },
+    {
+      "id": "US-087",
+      "title": "Analytics fabricates its comparison period, so every trend reads +17.6%",
+      "description": "AnalyticsDashboard.tsx:57-60 builds the previous period as Math.round(stats.totalViews * 0.85) with the comment 'Estimate 15% growth'. Every trend arrow on /dashboard/analytics-advanced therefore reads a constant +17.6% regardless of what happened, including during a decline. revenue and avgResponseTime are hardcoded 0 in the same object and flow into the KPI cards.",
+      "acceptanceCriteria": [
+        "The previous period comes from a real query over the preceding window",
+        "A period with fewer views than the one before it renders a negative trend",
+        "revenue and avgResponseTime are either computed or removed from the KPI cards rather than displayed as 0",
+        "npm run test:run and npm run build still pass"
+      ],
+      "priority": 87,
+      "passes": true,
+      "notes": "DONE 2026-08-08. useAnalytics now queries the preceding window of the same length and returns previousStats, replacing AnalyticsDashboard's `Math.round(stats.totalViews * 0.85)` with the comment \"Estimate 15% growth\" — which made every trend arrow read a constant +17.6% regardless of what happened, including during a decline, when it showed growth. The previous-window query selects only what it counts rather than pulling another 1,500 rows to length them. Also returns hasPreviousPeriod, and the dashboard now says so explicitly when there is no prior data instead of rendering a meaningless +100%. The two hardcoded zeros were handled differently because they are different problems: avgResponseTime IS computable — leads.first_responded_at exists — so it is now the mean minutes to first response over responded leads, null when none have been; revenue is not tracked anywhere in the product, so the Revenue KPI was removed from calculateKPIs rather than left rendering $0 beside real numbers, which reads as \"you earned nothing\" rather than \"not measured\". analytics.test.ts updated to expect 7 metrics and to assert Revenue is absent. tsc 147 -> 143 across this batch, 295 tests, build green."
+    },
+    {
+      "id": "US-088",
+      "title": "Fix the keywords admin policies — they error for everyone, including admins",
+      "description": "The three keywords write policies use EXISTS (SELECT 1 FROM auth.users WHERE users.id = auth.uid() AND users.raw_user_meta_data->>'role' = 'admin'). Policies are evaluated with the caller's privileges and authenticated has no grant on auth.users, so the check raises — verified: ERROR: permission denied for table users. Keyword management is therefore broken for admins too. Separately, raw_user_meta_data is user-writable via auth.updateUser({ data: … }), so if that grant ever appeared any user could self-declare role: admin.",
+      "acceptanceCriteria": [
+        "The three policies use has_role(auth.uid(), 'admin'::app_role) like the other 270-odd policies",
+        "An admin can insert, update and delete keywords — verified by executing it as an admin",
+        "A non-admin cannot, and a non-admin who sets raw_user_meta_data.role = 'admin' still cannot",
+        "No RLS policy in the public schema references auth.users directly (see US-082)",
+        "npm run verify:schema passes"
+      ],
+      "priority": 88,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000003_fix_keywords_admin_policies.sql. The three write policies now use has_role(auth.uid(), 'admin'::app_role) TO authenticated, matching the ~270 other policies. Verified on a rebuilt Postgres: an admin can insert, update and delete; a non-admin is rejected with \"new row violates row-level security policy\" on insert, and their UPDATE and DELETE affect 0 rows. The non-admin used in the test has raw_user_meta_data set to {\"role\":\"admin\"} — the exact escalation the old policy would have permitted had the auth.users grant ever existed — and is still denied. anon still reads active keywords. Worth recording how nearly this was mis-verified: the first test run reported \"UNEXPECTEDLY ALLOWED\" for the non-admin insert, which was an artefact of psql continuing past a failed statement without ON_ERROR_STOP and printing the trailing SELECT anyway. The same trap produced a false \"SELF-GRANT SUCCEEDED\" during the original review. Always set ON_ERROR_STOP when a test asserts that something is denied."
+    },
+    {
+      "id": "US-089",
+      "title": "Narrow the SEO tables that anon and every authenticated user can read",
+      "description": "seo_core_web_vitals and seo_keyword_history carry USING (true) with no TO clause, so they are anon-readable. A dozen more — seo_alerts, seo_crawl_results, seo_competitor_analysis, seo_page_scores, seo_mobile_analysis, seo_security_analysis, seo_monitoring_log, seo_monitoring_schedules — use auth.uid() IS NOT NULL, so any registered user reads the entire SEO programme, including seo_security_analysis.",
+      "acceptanceCriteria": [
+        "The SEO tables are readable by admins via has_role and by service_role, plus the owning user where the table has a user column",
+        "As anon, seo_core_web_vitals and seo_keyword_history return 0 rows",
+        "As a freshly registered non-admin user, every table in this story returns 0 rows",
+        "The SEO admin dashboards still work as an admin",
+        "npm run verify:schema passes"
+      ],
+      "priority": 89,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000008_scope_seo_tables.sql. Dropped two anon-readable policies (seo_core_web_vitals and seo_keyword_history, both USING (true) with no TO clause) and eight USING (auth.uid() IS NOT NULL) policies that let any registered user read the whole SEO programme, including seo_security_analysis. Each table already carries an \"Admins can manage ...\" ALL policy, so no replacement was needed; seo_alerts keeps its per-user policy so an agent still sees alerts raised for them. seo_settings is deliberately untouched — it holds the site-wide title, description, robots.txt and verification tags emitted into every page head, so the public read is the point. The two PUBLIC_BY_DESIGN entries in scripts/verify-schema.mjs were removed in the same commit, or the checker emits a stale-entry note. Verified: anon reads 0 from seo_core_web_vitals, a plain authenticated user reads 0 from seo_security_analysis, an admin reads 1."
+    },
+    {
+      "id": "US-090",
+      "title": "Run the 47 security specs and 5 e2e specs in CI",
+      "description": "tests/security/ holds 47 Playwright specs — 14 auth, 21 headers, 12 XSS — and tests/e2e/ holds 5. ci.yml runs eslint and test:a11y and nothing else from tests/. One of the unrun specs, tests/security/auth.security.spec.ts:40 'should implement login rate limiting', targets exactly the control US-079 proves broken. The suites exist, are maintained, and produce no signal.",
+      "acceptanceCriteria": [
+        "ci.yml runs npm run test:security and npm run test:e2e",
+        "The jobs have whatever Supabase environment they need, via secrets rather than a committed .env",
+        "The suites pass, or each failing spec is either fixed or explicitly skipped with a linked story — no blanket continue-on-error",
+        "A newly introduced security regression fails the build — demonstrated by temporarily reverting one fix"
+      ],
+      "priority": 90,
+      "passes": false,
+      "notes": "These need a reachable Supabase and a seeded test account, which is why they were probably never wired up. A disposable project or a seeded local stack is the prerequisite; if that is out of scope, say so in the story rather than adding a job that is green because it skipped everything. CHECKED 2026-08-08, still open and here is precisely why. ci.yml does have jobs named `security` and `accessibility`, which is misleading: `security` runs `npm audit --audit-level=high` and eslint, not the 47 Playwright specs, and `accessibility` runs the single a11y spec. So tests/security/ (14 auth, 21 headers, 12 XSS) and tests/e2e/ (5) remain unrun by anything. Worth recording alongside US-091: `npm audit --audit-level=high` is blocking and NOT continue-on-error, so with 21 high advisories that job was failing on every push until this session cleared them — a second permanently-red signal nobody was reading, the same failure mode as the typecheck job in US-056. The blocker for this story is unchanged and is environmental, not code: the specs need a reachable Supabase and a seeded test account (playwright.config.ts starts `npm run dev`, which needs VITE_SUPABASE_URL/ANON_KEY, and the auth specs need credentials to log in with). Adding the job without those would produce exactly what this story warns against — a green job that skipped everything. NEXT STEP for whoever picks this up: stand up a disposable Supabase project or a seeded local stack, put the URL/key/test-account in repository secrets, then add the job modelled on the existing accessibility one (it already shows the `npx playwright install --with-deps chromium` pattern). Note that at least one spec is expected to have been failing: tests/security/auth.security.spec.ts:40 targets the login rate limiting that US-079 proved was never firing."
+    },
+    {
+      "id": "US-091",
+      "title": "Clear the 1 critical and 21 high dependency advisories",
+      "description": "npm audit reports 1 critical and 21 high. jspdf (path traversal, PDF/JS injection, several DoS) is the critical. react-router and @remix-run/router carry an open-redirect-to-XSS chain and are on every user-facing path. Also high: axios, vite, postcss, sharp, ws, lodash, form-data, brace-expansion, minimatch, nanoid, js-yaml, jws, glob, flatted, fast-uri, picomatch.",
+      "acceptanceCriteria": [
+        "react-router/react-router-dom and jspdf are upgraded to non-vulnerable versions first",
+        "npm audit reports 0 critical and 0 high, or each remaining advisory has a recorded reason it is not exploitable here",
+        "npm run build, npm run test:run and npm run test:a11y still pass after the upgrades",
+        "Routing, PDF export and image handling are exercised manually after the upgrade"
+      ],
+      "priority": 91,
+      "passes": true,
+      "notes": "DONE 2026-08-08. 27 advisories (1 critical, 21 high) -> 2 moderate. Two passes. First, npm audit fix --package-lock-only took 27 -> 6 without touching package.json: that alone cleared react-router/@remix-run/router (the open-redirect-to-XSS chain, and the one on every user-facing path), axios, vite, postcss, ws, lodash, form-data, brace-expansion, minimatch, nanoid, js-yaml, jws, glob, flatted, fast-uri and picomatch. Then three major bumps for the rest: jspdf 2.5 -> 4.2 (the critical: path traversal, PDF/JS injection, several DoS), jspdf-autotable 3.8 -> 5.0, sharp 0.34 -> 0.35. Remaining 2 moderate are react-router/react-router-dom with no fix published. Major bumps of a rendering library are not verified by a typecheck, so src/lib/exportUtils.test.ts was added to actually drive it: a table export, a full report (summary cards, autotable, footer, landscape, grid theme) and CSV. Writing it was worth it twice over — the first draft failed with \"Cannot read properties of undefined (reading map)\", which looked like an API break in autotable v5 and was actually my test passing a metrics/tables shape that PDFReportOptions has never accepted (it takes headers/rows/summary). The real code needed no changes for either major bump. sharp is declared in package.json but imported nowhere in src/ or scripts/ — worth removing outright in a follow-up."
+    },
+    {
+      "id": "US-092",
+      "title": "Cleanup: dead code, a broken admin widget, and forgeable analytics",
+      "description": "Three small items from the 2026-08 review that do not warrant their own stories. src/components/dashboard/LinkManager.tsx is dead code — nothing imports it; it keeps links in React state, never calls Supabase, toasts 'Link added successfully!' and models a schema (link, type, up_link, click_number, numeric id) that does not match the links table, while useLinks.ts is the real implementation. HealthDashboard.tsx:135 selects user_subscriptions.plan_name, a column that does not exist on that table, so the widget 400s. analytics_views carries FOR INSERT WITH CHECK (true) with no TO clause, so anyone can inflate any profile's view analytics.",
+      "acceptanceCriteria": [
+        "src/components/dashboard/LinkManager.tsx is deleted",
+        "The HealthDashboard subscription widget queries real columns and renders",
+        "analytics_views inserts are rate limited, and the profile view counters are documented as untrusted or derived from a source that is not anonymously forgeable",
+        "npm run build passes and the tsc count does not rise"
+      ],
+      "priority": 92,
+      "passes": true,
+      "notes": "DONE 2026-08-08. All three items. LinkManager.tsx deleted (US-081 commit), HealthDashboard fixed (US-082 commit), and analytics_views now throttled by migration 20260808000010. The open anonymous INSERT stays — this is a public link-in-bio, visitors have no session, and view tracking has to work for them — but it is now bounded: a BEFORE INSERT trigger caps 30 views per minute per (visitor, profile), silently dropping over-limit rows via RETURN NULL rather than raising, since a rejected view must not surface as an error on a visitor page and the client insert is fire-and-forget. A trigger rather than an edge function because the insert goes straight from the browser to PostgREST and moving it would change the tracking path for every profile. Two mistakes worth recording. First, the trigger called check_rate_limit as though it returned a boolean; it RETURNS TABLE(allowed, remaining, reset_at), so every insert failed with \"argument of NOT must be type boolean, not type record\" — and the verification then read \"0 recorded\", which looked exactly like a working throttle. Second, after fixing that, the count still read 0 because the verification query ran as anon and analytics_views SELECT is scoped to auth.uid() = user_id — anon cannot read back what it just wrote. Re-checked as the owner: 50 forged views from one visitor -> 30 recorded, a different visitor unaffected. HONEST LIMIT: visitor_id comes from localStorage and is trivially rotated, so this raises the cost of inflation rather than preventing it. The counters should be treated as indicative."
+    },
+    {
+      "id": "US-093",
+      "title": "Account deletion fails outright, and would orphan tenant data if it did not",
+      "description": "Found while verifying US-083. process_scheduled_account_deletions() performs DELETE FROM auth.users, which raises: insert or update on table \"audit_logs\" violates foreign key constraint \"audit_logs_actor_id_fkey\". The chain is: deleting auth.users cascades to profiles (FK ON DELETE CASCADE) -> the audit_profiles_changes trigger fires -> audit_table_change calls log_audit_event with p_actor_id => auth.uid(), which is NULL under the cron/service-role caller, so log_audit_event COALESCEs it to the user being deleted -> that INSERT references an auth.users row already removed in the same statement -> FK violation -> the whole DELETE aborts. ON DELETE SET NULL on audit_logs does not help because the row is being inserted, not updated. So a GDPR right-to-erasure request is accepted, scheduled, the 30-day grace period elapses, and the job then errors forever. Separately, even once the delete succeeds it would not erase much: leads, listings, testimonials, user_settings, article_webhooks and analytics_views have no foreign key on user_id at all, so nothing cascades to them. Those rows carry lead names, emails and phone numbers.",
+      "acceptanceCriteria": [
+        "DELETE FROM auth.users for a provisioned account succeeds — verified by executing it, not by reading the function",
+        "The audit trigger does not write an actor_id that no longer exists (skip the audit row on cascade-delete, or drop the FK to ON DELETE SET NULL semantics that apply at insert time)",
+        "An erased account leaves no rows in leads, listings, testimonials, user_settings, article_webhooks or analytics_views — verified by counting them after the delete",
+        "Foreign keys with ON DELETE CASCADE exist on the tenant tables that lack them, added NOT VALID first if production may hold orphans",
+        "The audit trail of the deletion itself survives the deletion (an erasure record with a null actor is fine; losing the record is not)",
+        "npm run verify:schema passes"
+      ],
+      "priority": 93,
+      "passes": true,
+      "notes": "DONE 2026-08-08 in migration 20260808000006_fix_account_deletion.sql. Two defects. (1) The DELETE aborted: deleting auth.users cascades to profiles, the audit trigger fires, audit_table_change() finds auth.uid() NULL under the cron caller and falls back to the row's own id, and log_audit_event() then inserts that as user_id/actor_id — referencing an auth.users row already removed in the same statement. ON DELETE SET NULL on audit_logs does not help, because the row is being INSERTED with a dangling reference rather than updated to one. log_audit_event now nulls either id when the referenced user is gone, so the erasure RECORD survives while the reference does not — losing the audit trail of a deletion would be worse than losing the actor on it. (2) leads, listings, testimonials, user_settings, article_webhooks and analytics_views carried a user_id with no foreign key at all, so nothing cascaded to them even once the delete worked. Added ON DELETE CASCADE, NOT VALID: production may hold orphans from before this and a validating ADD CONSTRAINT would fail on them, while NOT VALID still enforces on new rows and still cascades, which is what erasure needs. Sweep orphans and VALIDATE as a follow-up. account_deletion_log deliberately gets no cascading FK — it has to outlive the user. Verified end to end on a rebuilt Postgres by seeding a user with a profile, lead, listing, testimonial, settings row and analytics row and running the exact DELETE the scheduler runs: it now succeeds (previously an FK error), every one of those counts goes to 0, and 3 audit rows survive with actor_id nulled."
     }
   ]
 }

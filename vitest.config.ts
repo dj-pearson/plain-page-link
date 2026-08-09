@@ -8,7 +8,14 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    include: [
+      'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      // Edge-function helpers. CI only runs `deno check` over
+      // supabase/functions, which type-checks but executes nothing — so pure
+      // logic like the SSRF guard's address-range matching had no test at all.
+      // Only files that avoid Deno globals at module scope can be covered here.
+      'supabase/functions/**/*.test.ts',
+    ],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
     // src/integrations/supabase/client.ts throws at module load when these are
     // unset. Any test that transitively imports it — even one only exercising

@@ -23,7 +23,10 @@ describe('AnalyticsEngine', () => {
       const kpis = AnalyticsEngine.calculateKPIs(current, previous);
 
       expect(Array.isArray(kpis)).toBe(true);
-      expect(kpis.length).toBe(8);
+      // US-087 removed the Revenue metric: nothing tracks per-agent revenue, so it
+      // could only ever render $0 beside real numbers.
+      expect(kpis.length).toBe(7);
+      expect(kpis.map((k) => k.label)).not.toContain('Revenue');
     });
 
     it('should calculate correct percentage changes', () => {
