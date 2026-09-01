@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logger } from '@/lib/logger';
+import { clearAuthCache } from '@/lib/security/authentication';
 
 /**
  * MFA through Supabase's own enrol/challenge/verify (US-085).
@@ -126,6 +127,11 @@ export function useNativeMFA() {
   });
 
   const invalidate = useCallback(() => {
+    // A successful verify mints a new access token carrying aal2. getAuthState
+    // caches the session for 30s, so clear it — otherwise SecureRoute could
+    // keep evaluating against the pre-challenge session for up to that long
+    // after the user has legitimately passed.
+    clearAuthCache();
     queryClient.invalidateQueries({ queryKey: ['mfa-status', user?.id] });
   }, [queryClient, user?.id]);
 
