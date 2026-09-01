@@ -32,39 +32,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run TypeScript type check (ratchet)
-        # US-056 is still open, so this cannot yet require zero. It CAN require
-        # that the backlog does not grow, which is what actually matters: the
-        # job has been permanently red for long enough that its signal was
-        # gone, and a red-by-default check is how src/lib/leadSubmission.ts
-        # shipped with a TS2769 on the insert that broke every public lead form
-        # (US-069). Lower TSC_BASELINE as the count comes down; the job fails if
-        # anyone raises it.
-        #
-        # Note the original carve-out below cited an out-of-sync types.ts as the
-        # reason. That is no longer true — `npm run types:check` passes — so the
-        # backlog is now ordinary work rather than a blocked dependency.
-        run: |
-          set -o pipefail
-          TSC_BASELINE=3
-          COUNT=$(npx tsc --noEmit 2>&1 | grep -cE '^src/.*error TS' || true)
-          echo "tsc errors: $COUNT (baseline $TSC_BASELINE)"
-          if [ "$COUNT" -gt "$TSC_BASELINE" ]; then
-            echo "::error::TypeScript errors rose from $TSC_BASELINE to $COUNT."
-            npx tsc --noEmit 2>&1 | grep -E '^src/.*error TS' || true
-            exit 1
-          fi
-          if [ "$COUNT" -lt "$TSC_BASELINE" ]; then
-            echo "::notice::Down to $COUNT — lower TSC_BASELINE in .github/workflows/ci.yml."
-          fi
+      - name: Run TypeScript type check
+        # US-056 closed the backlog: 143 errors -> 0. The ratchet that stood
+        # here (fail if the count rises above TSC_BASELINE) existed only
+        # because a permanently-red job has no signal — which is how
+        # src/lib/leadSubmission.ts shipped with a TS2769 on the insert that
+        # broke every public lead form (US-069). With the count at zero the
+        # ordinary check is the stronger one, so the ratchet is gone.
+        run: npx tsc --noEmit
 
   test:
     name: Test
-    # Intentionally NOT gated on typecheck: the repo carries a known tsc
-    # baseline (out-of-sync src/integrations/supabase/types.ts) that keeps the
-    # typecheck job red, which would otherwise skip tests entirely. Tests must
-    # run on every push/PR regardless. Re-add `needs: typecheck` once the
-    # baseline is cleared.
+    needs: typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
