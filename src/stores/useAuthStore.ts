@@ -349,12 +349,24 @@ export const useAuthStore = create<AuthState>()(
             resourceId: data.user.id,
           });
 
-          // Check if MFA is enabled and verified for this user
-          const mfaEnabled = mfaResult.data?.mfa_enabled && mfaResult.data?.verified_at;
+          // US-085: whether a second factor is outstanding is read from the
+          // TOKEN, not decided here. signInWithPassword returns an aal1
+          // session; only mfa.verify() upgrades it to aal2, and RLS keyed on
+          // the `aal` claim is what actually refuses the pre-challenge token.
+          // The flags below drive routing only — setting mfaVerified from a
+          // console no longer buys access to anything.
+          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const needsNativeChallenge = aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1';
 
-          if (mfaEnabled) {
-            // User has MFA enabled - require verification before granting full access
-            // Note: The user will need to be redirected to MFA verification page
+          // A user still enrolled under the pre-US-085 system has no native
+          // factor yet, so the token cannot ask for one. They are routed to
+          // the same challenge screen, which migrates them (see
+          // useNativeMFA.migrateLegacyFactor).
+          const hasLegacyFactor = !!(mfaResult.data?.mfa_enabled && mfaResult.data?.verified_at);
+
+          if (needsNativeChallenge || hasLegacyFactor) {
+            // Second factor outstanding — route to the challenge. The session
+            // is real but is aal1, which is exactly what it should be.
             set({
               user: data.user,
               session: data.session,

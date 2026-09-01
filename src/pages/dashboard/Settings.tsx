@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ProfileDisplaySettings } from '@/components/settings/ProfileDisplaySettings';
 import { SessionManagement } from '@/components/settings/SessionManagement';
 import { LeadNotificationPreferences } from '@/components/settings/LeadNotificationPreferences';
-import { MFASettings } from '@/components/auth/mfa';
+import { NativeMFASettings } from '@/components/auth/mfa/NativeMFASettings';
 import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
 import { GDPRSettings } from '@/components/settings/GDPRSettings';
 
@@ -622,7 +622,7 @@ export default function Settings() {
       <LeadNotificationPreferences />
 
       {/* Two-Factor Authentication */}
-      <MFASettings />
+      <NativeMFASettings />
 
       {/* Session Management */}
       <SessionManagement />

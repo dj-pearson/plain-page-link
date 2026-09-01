@@ -56,7 +56,10 @@ async function getAuthState(): Promise<AuthenticationState> {
   }
 
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
 
     if (error) {
       logger.warn('Auth session check failed', { error: error.message });
@@ -192,22 +195,41 @@ export async function getSecurityContext(): Promise<SecurityContext> {
     role = 'user'; // Default to user role on error
   }
 
-  // Check MFA status
-  let isMFAVerified = true; // Default to true if MFA not enabled
+  // MFA status, read from the session's assurance level (US-085).
+  //
+  // This used to be `let isMFAVerified = true` with the comment "For now,
+  // assume verified if they got past login" — which made SecureRoute's
+  // requireMFA prop a no-op for every user, including those who had enrolled.
+  // getAuthenticatorAssuranceLevel() reports what the JWT actually carries, so
+  // this now agrees with what RLS will decide rather than guessing.
+  //
+  // A user with no factor has nextLevel 'aal1' and is verified by definition —
+  // there is no second factor outstanding. A user with a factor is verified
+  // only once currentLevel has reached 'aal2'.
+  let isMFAVerified = true;
   try {
-    const { data: mfaSettings } = await supabase
-      .from('user_mfa_settings')
-      .select('mfa_enabled, verified_at')
-      .eq('user_id', authState.user.id)
-      .maybeSingle();
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.nextLevel === 'aal2') {
+      isMFAVerified = aal.currentLevel === 'aal2';
+    }
 
-    if (mfaSettings?.mfa_enabled && mfaSettings?.verified_at) {
-      // MFA is enabled - we'd need to check session state for MFA verification
-      // For now, assume verified if they got past login
-      isMFAVerified = true;
+    // A pre-US-085 enrolment has no native factor, so the token cannot reflect
+    // it. Treat it as outstanding until the user migrates; failing closed is
+    // the right side to err on for someone who deliberately turned MFA on.
+    if (isMFAVerified) {
+      const { data: legacy } = await supabase
+        .from('user_mfa_settings')
+        .select('mfa_enabled, verified_at')
+        .eq('user_id', authState.user.id)
+        .maybeSingle();
+      if (legacy?.mfa_enabled && legacy?.verified_at && aal?.currentLevel !== 'aal2') {
+        isMFAVerified = false;
+      }
     }
   } catch {
-    // MFA check failed - continue with default
+    // The check itself failed. Do not fall back to "verified" — that is the
+    // assumption this change exists to remove.
+    isMFAVerified = false;
   }
 
   return {
