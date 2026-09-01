@@ -10,7 +10,7 @@ export const PSEO_PAGE_TYPES = [
   'city-situation',
 ] as const;
 
-export type PSEOPageType = typeof PSEO_PAGE_TYPES[number];
+export type PSEOPageType = (typeof PSEO_PAGE_TYPES)[number];
 
 export const PSEO_PAGE_TYPE_LABELS: Record<PSEOPageType, string> = {
   'city-directory': 'City Agent Directory',
@@ -30,7 +30,7 @@ export const PSEO_QUEUE_STATUSES = [
   'insufficient_data',
 ] as const;
 
-export type PSEOQueueStatus = typeof PSEO_QUEUE_STATUSES[number];
+export type PSEOQueueStatus = (typeof PSEO_QUEUE_STATUSES)[number];
 
 export const PSEO_TAXONOMY_TYPES = [
   'city',
@@ -41,7 +41,7 @@ export const PSEO_TAXONOMY_TYPES = [
   'property_type',
 ] as const;
 
-export type PSEOTaxonomyType = typeof PSEO_TAXONOMY_TYPES[number];
+export type PSEOTaxonomyType = (typeof PSEO_TAXONOMY_TYPES)[number];
 
 export const PSEO_ERROR_TYPES = [
   'api_error',
@@ -51,7 +51,7 @@ export const PSEO_ERROR_TYPES = [
   'parse_error',
 ] as const;
 
-export type PSEOErrorType = typeof PSEO_ERROR_TYPES[number];
+export type PSEOErrorType = (typeof PSEO_ERROR_TYPES)[number];
 
 // Database row types
 
@@ -85,16 +85,25 @@ export interface PSEOQueueItem {
   attempt_count: number;
 }
 
+/**
+ * A row from `pseo_taxonomy`.
+ *
+ * `taxonomy_type` and `context` are narrowed past what the schema can express
+ * (the column is plain text, and context is jsonb) — that is deliberate, and
+ * the read boundary in usePSEO applies it. `is_active`, `tier`, `created_at`
+ * and `updated_at` are NOT narrowings: they are nullable in the schema and
+ * were declared non-null here, which is the drift this file otherwise avoids.
+ */
 export interface PSEOTaxonomyItem {
   id: string;
   taxonomy_type: PSEOTaxonomyType;
   display_name: string;
   parent_id: string | null;
   context: Record<string, unknown>;
-  is_active: boolean;
-  tier: number;
-  created_at: string;
-  updated_at: string;
+  is_active: boolean | null;
+  tier: number | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface PSEOGenerationError {

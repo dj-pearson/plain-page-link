@@ -48,6 +48,7 @@ import {
   type PSEOPageType,
   type PSEOTaxonomyType,
 } from '@/types/pseo';
+import type { Json } from '@/integrations/supabase/types';
 
 // --- Stats Overview Sub-Component ---
 
@@ -705,9 +706,14 @@ function TaxonomyTab() {
   const handleCreate = () => {
     if (!newId || !newDisplayName) return;
 
-    let context: Record<string, unknown>;
+    // JSON.parse returns any, so "5" or "[1,2]" would have been stored as the
+    // context of a taxonomy item that every reader treats as an object.
+    let context: Json = {};
     try {
-      context = JSON.parse(newContext);
+      const parsed: unknown = JSON.parse(newContext);
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        context = parsed as Json;
+      }
     } catch {
       context = {};
     }
