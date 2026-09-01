@@ -18,3 +18,30 @@ import type { Database } from '@/integrations/supabase/types';
 export type TestimonialRow = Database['public']['Tables']['testimonials']['Row'];
 
 export type Testimonial = TestimonialRow;
+
+/**
+ * The subset of a testimonial a public profile page receives.
+ *
+ * usePublicProfile deliberately selects a column list rather than `*`, so the
+ * public components must not be typed against the full row — they were, which
+ * made every render site reject the hook's result for missing `user_id`,
+ * `updated_at` and `listing_id`. Same construction as `PublicProfile`: add a
+ * column to that select and it belongs here, and `Pick` rejects a name that is
+ * not a real column.
+ */
+export type PublicTestimonialFields =
+  | 'id'
+  | 'client_name'
+  | 'client_title'
+  | 'client_photo'
+  | 'review'
+  | 'rating'
+  | 'sort_order'
+  | 'date'
+  | 'is_featured'
+  | 'transaction_type'
+  | 'property_type'
+  | 'created_at'
+  | 'is_published';
+
+export type PublicTestimonial = Pick<Testimonial, PublicTestimonialFields>;

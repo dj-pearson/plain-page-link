@@ -2,11 +2,11 @@ import { Star, Quote } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import type { Testimonial } from '@/types/testimonial';
+import type { PublicTestimonial } from '@/types/testimonial';
 import { formatRelativeTime } from '@/lib/format';
 
 interface TestimonialCardProps {
-  testimonial: Testimonial;
+  testimonial: PublicTestimonial;
   variant?: 'default' | 'compact';
 }
 

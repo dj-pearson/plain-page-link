@@ -23,16 +23,20 @@ import {
   Newspaper,
   ExternalLink,
   type LucideIcon,
-} from "lucide-react";
+} from 'lucide-react';
+import type { Database } from '@/integrations/supabase/types';
 
-interface CustomLink {
-  id: string;
-  title: string;
-  url: string;
-  icon: string;
-  position: number;
-  is_active: boolean;
-}
+/**
+ * The subset of a `links` row usePublicProfile selects.
+ *
+ * Restated by hand this typed `icon` and `is_active` as non-nullable, which
+ * the schema does not guarantee; derived from the row, `Pick` keeps it in step
+ * with the query.
+ */
+type CustomLink = Pick<
+  Database['public']['Tables']['links']['Row'],
+  'id' | 'title' | 'url' | 'icon' | 'position' | 'is_active'
+>;
 
 interface CustomLinksProps {
   links: CustomLink[];
@@ -66,16 +70,16 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 // Platform-specific brand colors for link buttons
 const ICON_COLORS: Record<string, string> = {
-  instagram: "hover:border-pink-500 hover:text-pink-600",
-  facebook: "hover:border-blue-600 hover:text-blue-600",
-  linkedin: "hover:border-blue-700 hover:text-blue-700",
-  tiktok: "hover:border-gray-900 hover:text-gray-900",
-  youtube: "hover:border-red-600 hover:text-red-600",
-  zillow: "hover:border-blue-500 hover:text-blue-600",
-  realtor: "hover:border-red-600 hover:text-red-600",
-  calendar: "hover:border-indigo-500 hover:text-indigo-600",
-  whatsapp: "hover:border-green-500 hover:text-green-600",
-  star: "hover:border-yellow-500 hover:text-yellow-600",
+  instagram: 'hover:border-pink-500 hover:text-pink-600',
+  facebook: 'hover:border-blue-600 hover:text-blue-600',
+  linkedin: 'hover:border-blue-700 hover:text-blue-700',
+  tiktok: 'hover:border-gray-900 hover:text-gray-900',
+  youtube: 'hover:border-red-600 hover:text-red-600',
+  zillow: 'hover:border-blue-500 hover:text-blue-600',
+  realtor: 'hover:border-red-600 hover:text-red-600',
+  calendar: 'hover:border-indigo-500 hover:text-indigo-600',
+  whatsapp: 'hover:border-green-500 hover:text-green-600',
+  star: 'hover:border-yellow-500 hover:text-yellow-600',
 };
 
 export default function CustomLinks({ links, onLinkClick }: CustomLinksProps) {
@@ -101,8 +105,9 @@ export default function CustomLinks({ links, onLinkClick }: CustomLinksProps) {
       </h2>
       <div className="space-y-2.5">
         {activeLinks.map((link) => {
-          const IconComponent = ICON_MAP[link.icon] || LinkIcon;
-          const hoverColor = ICON_COLORS[link.icon] || "hover:border-primary hover:text-primary";
+          const IconComponent = (link.icon && ICON_MAP[link.icon]) || LinkIcon;
+          const hoverColor =
+            (link.icon && ICON_COLORS[link.icon]) || 'hover:border-primary hover:text-primary';
 
           return (
             <a
