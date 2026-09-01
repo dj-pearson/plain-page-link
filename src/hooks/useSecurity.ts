@@ -25,6 +25,7 @@ import {
   hasPermission,
   hasAllPermissions,
   hasAnyPermission,
+  hasRoleLevel,
   requirePermission,
   requireAdmin,
   checkPermission,
@@ -92,6 +93,7 @@ export interface UseSecurityResult {
   hasPermission: (permission: Permission) => Promise<boolean>;
   hasAllPermissions: (permissions: Permission[]) => Promise<boolean>;
   hasAnyPermission: (permissions: Permission[]) => Promise<boolean>;
+  hasRoleLevel: (requiredLevel: number) => Promise<boolean>;
   requirePermission: typeof requirePermission;
   requireAdmin: typeof requireAdmin;
   checkPermission: typeof checkPermission;
@@ -374,6 +376,7 @@ export function useSecurity(): UseSecurityResult {
     hasPermission,
     hasAllPermissions,
     hasAnyPermission,
+    hasRoleLevel,
     requirePermission,
     requireAdmin,
     checkPermission,

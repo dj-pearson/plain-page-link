@@ -2,34 +2,41 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useAuthStore } from '@/stores/useAuthStore';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface SSOConfig {
-  id: string;
-  organization_name: string;
-  organization_domain: string;
+type SSOConfigRow = Database['public']['Tables']['enterprise_sso_config']['Row'];
+
+/**
+ * A row from `enterprise_sso_config`.
+ *
+ * Restated by hand this omitted `oidc_client_secret`, `saml_name_id_format`,
+ * `organization_id` and `created_by` — all real columns — and typed
+ * `default_role`, `auto_provision_users`, `active`, `created_at` and
+ * `updated_at` non-nullable when the schema allows null. SSOConfigForm assigns
+ * oidc_client_secret onto a Partial<SSOConfig>, which TypeScript rejected
+ * while JavaScript happily carried it to the insert; the value was saved, but
+ * nothing type-checked the path that saves it.
+ *
+ * `sso_provider` and `default_role` are plain text columns; the unions are the
+ * app's convention and are applied at the read boundary below.
+ */
+export type SSOConfig = Omit<
+  SSOConfigRow,
+  'sso_provider' | 'default_role' | 'attribute_mappings'
+> & {
   sso_provider: 'saml' | 'oidc' | 'azure_ad' | 'okta' | 'google_workspace';
-  saml_entity_id?: string;
-  saml_sso_url?: string;
-  saml_slo_url?: string;
-  saml_certificate?: string;
-  saml_metadata_url?: string;
-  oidc_client_id?: string;
-  oidc_issuer?: string;
-  oidc_authorization_endpoint?: string;
-  oidc_token_endpoint?: string;
-  oidc_userinfo_endpoint?: string;
-  oidc_jwks_uri?: string;
-  oidc_scopes?: string[];
-  attribute_mappings?: Record<string, string>;
-  allowed_groups?: string[];
-  default_role: 'user' | 'admin';
-  auto_provision_users: boolean;
-  active: boolean;
-  verified_at?: string;
-  last_used_at?: string;
-  created_at: string;
-  updated_at: string;
-}
+  default_role: 'user' | 'admin' | null;
+  attribute_mappings: Record<string, string> | null;
+};
+
+/** The columns a caller may supply when creating a config. */
+export type NewSSOConfig = Omit<
+  Database['public']['Tables']['enterprise_sso_config']['Insert'],
+  'created_by'
+>;
+
+/** The columns a caller may change on an existing config. */
+export type SSOConfigUpdate = Database['public']['Tables']['enterprise_sso_config']['Update'];
 
 export interface SSOAuditLog {
   id: string;
@@ -165,7 +172,7 @@ export function useSSO() {
 
   // Create SSO config (admin only)
   const createSSOConfig = useMutation({
-    mutationFn: async (config: Partial<SSOConfig>) => {
+    mutationFn: async (config: NewSSOConfig) => {
       if (!user?.id) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -187,7 +194,7 @@ export function useSSO() {
 
   // Update SSO config (admin only)
   const updateSSOConfig = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<SSOConfig> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: SSOConfigUpdate }) => {
       const { data, error } = await supabase
         .from('enterprise_sso_config')
         .update(updates)
