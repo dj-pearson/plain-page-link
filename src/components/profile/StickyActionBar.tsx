@@ -58,7 +58,7 @@ export function StickyActionBar({
       id: 'email',
       label: 'Email',
       icon: Mail,
-      action: () => handleAction('email', profile.email_display),
+      action: () => handleAction('email', profile.email_display ?? ''),
       color: 'bg-purple-600 hover:bg-purple-700',
       mobileColor: 'bg-purple-600',
     },

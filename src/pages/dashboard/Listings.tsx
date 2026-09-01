@@ -854,7 +854,7 @@ export default function Listings() {
           open={showSocialShareDialog}
           onOpenChange={setShowSocialShareDialog}
           listing={newlyCreatedListing}
-          agentName={profile?.full_name}
+          agentName={profile?.full_name ?? undefined}
         />
       )}
 
