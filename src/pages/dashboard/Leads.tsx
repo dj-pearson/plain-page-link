@@ -21,9 +21,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { useLeads } from '@/hooks/useLeads';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
@@ -52,7 +51,6 @@ export default function Leads() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [isBulkActing, setIsBulkActing] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date');
-  const { user } = useAuthStore();
   const { toast } = useToast();
   const { subscription } = useSubscriptionLimits();
   const { scoreLeadObject } = useMLLeadScoring();
@@ -60,45 +58,13 @@ export default function Leads() {
   const [slaHours, setSlaHours] = useState(2);
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
 
-  const {
-    data: leads,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ['leads', user?.id],
-    queryFn: async (): Promise<Lead[]> => {
-      if (!user?.id) return [];
-
-      // first_responded_at isn't in the (out-of-sync) generated types yet —
-      // isolated cast keeps the query typed to our Lead shape.
-      const leadsTable = supabase.from('leads') as unknown as {
-        select: (c: string) => {
-          eq: (
-            c: string,
-            v: string
-          ) => {
-            order: (
-              c: string,
-              o: { ascending: boolean }
-            ) => Promise<{ data: Lead[] | null; error: { message: string } | null }>;
-          };
-        };
-      };
-
-      const { data, error } = await leadsTable
-        .select(
-          'id, user_id, lead_type, name, email, phone, message, status, source, form_data, created_at, updated_at, first_responded_at'
-        )
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!user?.id,
-  });
+  // The one reader of `leads`. useLeads owns the query, the cache key and the
+  // decryption of encrypted_email / encrypted_phone — the page used to run its
+  // own query beside it, selecting the plaintext columns US-086 dropped, under
+  // the same ['leads', userId] key. That select was rejected by PostgREST (the
+  // page never loaded) and the duplicate key meant whichever of this page and
+  // AnalyticsDashboard mounted first decided the row shape for both (US-094).
+  const { leads, isLoading, isError, error, refetch } = useLeads();
 
   // Score all leads and cache results
   const leadScores = useMemo(() => {
