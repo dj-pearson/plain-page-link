@@ -360,7 +360,6 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
                 <div className="flex items-start gap-3">
                   <input
                     type="radio"
-                    name="primaryGoal"
                     value={goal.value}
                     {...register('primaryGoal', { required: true })}
                     className="mt-1"

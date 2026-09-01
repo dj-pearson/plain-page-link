@@ -116,13 +116,13 @@ export function initSentry(): void {
       if (event.breadcrumbs) {
         event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => ({
           ...breadcrumb,
-          data: breadcrumb.data ? scrubSensitiveData(breadcrumb.data) : undefined,
+          data: breadcrumb.data ? scrubRecord(breadcrumb.data) : undefined,
         }));
       }
 
       // Scrub sensitive data from extra context
       if (event.extra) {
-        event.extra = scrubSensitiveData(event.extra);
+        event.extra = scrubRecord(event.extra as Record<string, unknown>);
       }
 
       return event;
@@ -205,6 +205,21 @@ function scrubSensitiveData(data: unknown): unknown {
   }
 
   return data;
+}
+
+/**
+ * scrubSensitiveData for a value already known to be a record.
+ *
+ * The recursive version has to return `unknown` because it accepts anything,
+ * but the object branch always produces a Record. Sentry's breadcrumb `data`
+ * and event `extra` are both typed as records, so this keeps that shape rather
+ * than making each call site assert it.
+ */
+function scrubRecord(data: Record<string, unknown>): Record<string, unknown> {
+  const scrubbed = scrubSensitiveData(data);
+  return scrubbed !== null && typeof scrubbed === 'object' && !Array.isArray(scrubbed)
+    ? (scrubbed as Record<string, unknown>)
+    : {};
 }
 
 /**

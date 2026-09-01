@@ -26,7 +26,7 @@ export interface PlanFeatures {
   // Advanced features
   aiListingDescriptions: boolean | 'limited';
   leadScoring: boolean;
-  followUpSequences: boolean;
+  followUpSequences: boolean | 'limited';
   marketReports: boolean | 'limited';
   virtualStaging: boolean | 'limited';
   predictiveAnalytics: boolean;
@@ -302,37 +302,37 @@ export const USAGE_PRICING: UsagePricing[] = [
   {
     feature_key: 'ai_listing_description',
     name: 'AI Listing Description',
-    price_per_use: 2.00,
-    cost_to_provide: 0.30,
+    price_per_use: 2.0,
+    cost_to_provide: 0.3,
   },
   {
     feature_key: 'market_reports',
     name: 'Market Report',
-    price_per_use: 10.00,
-    cost_to_provide: 2.00,
+    price_per_use: 10.0,
+    cost_to_provide: 2.0,
   },
   {
     feature_key: 'virtual_staging',
     name: 'Virtual Staging (per photo)',
-    price_per_use: 5.00,
-    cost_to_provide: 3.00,
+    price_per_use: 5.0,
+    cost_to_provide: 3.0,
   },
   {
     feature_key: 'video_tours',
     name: 'Video Tour',
-    price_per_use: 15.00,
-    cost_to_provide: 8.00,
+    price_per_use: 15.0,
+    cost_to_provide: 8.0,
   },
   {
     feature_key: 'cma_generator',
     name: 'CMA Report',
     price_per_use: 19.99,
-    cost_to_provide: 3.00,
+    cost_to_provide: 3.0,
   },
   {
     feature_key: 'sms_messages',
     name: 'SMS Messages (per 100)',
-    price_per_use: 10.00,
+    price_per_use: 10.0,
     cost_to_provide: 0.75, // ~$0.0075 per SMS
     min_purchase: 100,
   },
@@ -372,14 +372,14 @@ export const FEATURE_KEYS = {
  * Get pricing plan by ID
  */
 export function getPlanById(planId: string): PricingTier | undefined {
-  return PRICING_PLANS.find(plan => plan.id === planId);
+  return PRICING_PLANS.find((plan) => plan.id === planId);
 }
 
 /**
  * Get usage pricing for a feature
  */
 export function getUsagePricing(featureKey: string): UsagePricing | undefined {
-  return USAGE_PRICING.find(pricing => pricing.feature_key === featureKey);
+  return USAGE_PRICING.find((pricing) => pricing.feature_key === featureKey);
 }
 
 /**
@@ -423,10 +423,7 @@ export function getFeatureLimit(planId: string, limitKey: keyof PlanLimits): num
 /**
  * Calculate overage charges
  */
-export function calculateOverageCharge(
-  featureKey: string,
-  overageCount: number
-): number {
+export function calculateOverageCharge(featureKey: string, overageCount: number): number {
   const pricing = getUsagePricing(featureKey);
   if (!pricing) return 0;
 
@@ -465,10 +462,7 @@ export function getRecommendedPlan(monthlyUsage: {
 /**
  * Calculate monthly cost with usage
  */
-export function calculateMonthlyCost(
-  planId: string,
-  usage: Partial<PlanLimits>
-): number {
+export function calculateMonthlyCost(planId: string, usage: Partial<PlanLimits>): number {
   const plan = getPlanById(planId);
   if (!plan) return 0;
 
@@ -482,7 +476,10 @@ export function calculateMonthlyCost(
     if (typeof value === 'number' && limit !== -1 && value > limit) {
       const overage = value - limit;
       // Map limit keys to feature keys for pricing
-      const featureKey = limitKey.replace('PerMonth', '').replace(/([A-Z])/g, '_$1').toLowerCase();
+      const featureKey = limitKey
+        .replace('PerMonth', '')
+        .replace(/([A-Z])/g, '_$1')
+        .toLowerCase();
       const charge = calculateOverageCharge(featureKey, overage);
       totalCost += charge;
     }

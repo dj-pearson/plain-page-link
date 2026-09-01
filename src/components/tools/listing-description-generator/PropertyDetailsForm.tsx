@@ -499,7 +499,6 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
                 <div className="flex items-start gap-3">
                   <input
                     type="radio"
-                    name="targetBuyer"
                     value={buyer.value}
                     {...register('targetBuyer', { required: true })}
                     className="mt-1"
