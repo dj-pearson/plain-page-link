@@ -1,22 +1,22 @@
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Link,
   Globe,
@@ -25,10 +25,10 @@ import {
   CheckCircle,
   Sparkles,
   ClipboardPaste,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface ImportedListingData {
+export interface ImportedListingData {
   address: string;
   city: string;
   state: string;
@@ -52,30 +52,40 @@ interface URLImportDialogProps {
 }
 
 export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialogProps) {
-  const [mode, setMode] = useState<"url" | "paste">("paste");
-  const [url, setUrl] = useState("");
-  const [pastedText, setPastedText] = useState("");
+  const [mode, setMode] = useState<'url' | 'paste'>('paste');
+  const [url, setUrl] = useState('');
+  const [pastedText, setPastedText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parsedData, setParsedData] = useState<ImportedListingData | null>(null);
-  const [step, setStep] = useState<"input" | "review">("input");
+  const [step, setStep] = useState<'input' | 'review'>('input');
 
   // Parse pasted listing text with pattern matching
   const parseListingText = (text: string): ImportedListingData => {
     const data: ImportedListingData = {
-      address: "", city: "", state: "", zip_code: "",
-      price: "", bedrooms: 0, bathrooms: 0, square_feet: null,
-      property_type: "single_family", status: "active",
-      description: "", mls_number: "", lot_size_acres: null, photos: [],
+      address: '',
+      city: '',
+      state: '',
+      zip_code: '',
+      price: '',
+      bedrooms: 0,
+      bathrooms: 0,
+      square_feet: null,
+      property_type: 'single_family',
+      status: 'active',
+      description: '',
+      mls_number: '',
+      lot_size_acres: null,
+      photos: [],
     };
 
     // Extract price ($XXX,XXX or $X.XM patterns)
     const priceMatch = text.match(/\$[\d,]+(?:\.\d+)?(?:\s*[MmKk])?/);
     if (priceMatch) {
-      let priceStr = priceMatch[0].replace(/[$,\s]/g, "");
-      if (priceStr.toLowerCase().endsWith("m")) {
+      const priceStr = priceMatch[0].replace(/[$,\s]/g, '');
+      if (priceStr.toLowerCase().endsWith('m')) {
         data.price = String(parseFloat(priceStr) * 1000000);
-      } else if (priceStr.toLowerCase().endsWith("k")) {
+      } else if (priceStr.toLowerCase().endsWith('k')) {
         data.price = String(parseFloat(priceStr) * 1000);
       } else {
         data.price = priceStr;
@@ -91,7 +101,7 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
 
     // Extract sqft: "1,800 sq ft" "1800sqft" "1,800 square feet"
     const sqftMatch = text.match(/([\d,]+)\s*(?:sq\.?\s*(?:ft|feet)|sqft|square\s*feet)/i);
-    if (sqftMatch) data.square_feet = parseInt(sqftMatch[1].replace(/,/g, ""));
+    if (sqftMatch) data.square_feet = parseInt(sqftMatch[1].replace(/,/g, ''));
 
     // Extract lot size: "0.25 acres" "10,000 sq ft lot"
     const lotMatch = text.match(/([\d.]+)\s*acres?/i);
@@ -102,11 +112,15 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
     if (mlsMatch) data.mls_number = mlsMatch[1];
 
     // Extract address - look for street number + street name pattern
-    const addressMatch = text.match(/(\d+\s+[A-Z][a-zA-Z\s]+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Way|Court|Ct|Circle|Cir|Place|Pl|Terrace|Ter)[.,]?)/i);
-    if (addressMatch) data.address = addressMatch[1].trim().replace(/[,.]$/, "");
+    const addressMatch = text.match(
+      /(\d+\s+[A-Z][a-zA-Z\s]+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Way|Court|Ct|Circle|Cir|Place|Pl|Terrace|Ter)[.,]?)/i
+    );
+    if (addressMatch) data.address = addressMatch[1].trim().replace(/[,.]$/, '');
 
     // Extract city, state, zip from address-like patterns
-    const cityStateZipMatch = text.match(/([A-Z][a-z]+(?:\s[A-Z][a-z]+)?),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
+    const cityStateZipMatch = text.match(
+      /([A-Z][a-z]+(?:\s[A-Z][a-z]+)?),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/
+    );
     if (cityStateZipMatch) {
       data.city = cityStateZipMatch[1];
       data.state = cityStateZipMatch[2];
@@ -115,16 +129,28 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
 
     // Detect property type from keywords
     const textLower = text.toLowerCase();
-    if (textLower.includes("condo") || textLower.includes("condominium")) {
-      data.property_type = "condo";
-    } else if (textLower.includes("townhouse") || textLower.includes("townhome")) {
-      data.property_type = "townhouse";
-    } else if (textLower.includes("multi-family") || textLower.includes("duplex") || textLower.includes("triplex")) {
-      data.property_type = "multi_family";
-    } else if (textLower.includes("land") || textLower.includes("lot") || textLower.includes("vacant")) {
-      data.property_type = "land";
-    } else if (textLower.includes("commercial") || textLower.includes("office") || textLower.includes("retail")) {
-      data.property_type = "commercial";
+    if (textLower.includes('condo') || textLower.includes('condominium')) {
+      data.property_type = 'condo';
+    } else if (textLower.includes('townhouse') || textLower.includes('townhome')) {
+      data.property_type = 'townhouse';
+    } else if (
+      textLower.includes('multi-family') ||
+      textLower.includes('duplex') ||
+      textLower.includes('triplex')
+    ) {
+      data.property_type = 'multi_family';
+    } else if (
+      textLower.includes('land') ||
+      textLower.includes('lot') ||
+      textLower.includes('vacant')
+    ) {
+      data.property_type = 'land';
+    } else if (
+      textLower.includes('commercial') ||
+      textLower.includes('office') ||
+      textLower.includes('retail')
+    ) {
+      data.property_type = 'commercial';
     }
 
     // Use remaining text as description (clean up)
@@ -135,7 +161,7 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
 
   const handleParsePaste = () => {
     if (!pastedText.trim()) {
-      setError("Please paste listing details");
+      setError('Please paste listing details');
       return;
     }
     setError(null);
@@ -145,14 +171,14 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
     setTimeout(() => {
       const parsed = parseListingText(pastedText);
       setParsedData(parsed);
-      setStep("review");
+      setStep('review');
       setLoading(false);
     }, 300);
   };
 
   const handleURLFetch = () => {
     if (!url.trim()) {
-      setError("Please enter a URL");
+      setError('Please enter a URL');
       return;
     }
 
@@ -160,7 +186,7 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
     try {
       new URL(url);
     } catch {
-      setError("Please enter a valid URL");
+      setError('Please enter a valid URL');
       return;
     }
 
@@ -185,11 +211,11 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
 
   const handleClose = () => {
     onOpenChange(false);
-    setUrl("");
-    setPastedText("");
+    setUrl('');
+    setPastedText('');
     setError(null);
     setParsedData(null);
-    setStep("input");
+    setStep('input');
     setLoading(false);
   };
 
@@ -216,25 +242,25 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
-          {step === "input" && (
+          {step === 'input' && (
             <div className="space-y-4 py-4">
               {/* Mode Tabs */}
               <div className="flex rounded-lg border p-1 gap-1">
                 <button
-                  onClick={() => setMode("paste")}
+                  onClick={() => setMode('paste')}
                   className={cn(
-                    "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2",
-                    mode === "paste" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                    'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2',
+                    mode === 'paste' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
                   )}
                 >
                   <ClipboardPaste className="h-4 w-4" />
                   Paste Details
                 </button>
                 <button
-                  onClick={() => setMode("url")}
+                  onClick={() => setMode('url')}
                   className={cn(
-                    "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2",
-                    mode === "url" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                    'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2',
+                    mode === 'url' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
                   )}
                 >
                   <Link className="h-4 w-4" />
@@ -242,11 +268,16 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
                 </button>
               </div>
 
-              {mode === "paste" && (
+              {mode === 'paste' && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label>Paste Listing Details</Label>
-                    <Button variant="ghost" size="sm" onClick={handlePasteFromClipboard} className="gap-1.5 text-xs">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePasteFromClipboard}
+                      className="gap-1.5 text-xs"
+                    >
                       <ClipboardPaste className="h-3.5 w-3.5" />
                       Paste from Clipboard
                     </Button>
@@ -275,7 +306,7 @@ Beautiful ranch home with updated kitchen...`}
                 </div>
               )}
 
-              {mode === "url" && (
+              {mode === 'url' && (
                 <div className="space-y-3">
                   <Label>Listing URL</Label>
                   <Input
@@ -286,8 +317,8 @@ Beautiful ranch home with updated kitchen...`}
                   />
                   <div className="bg-muted/50 rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">
-                      Supported sites: Realtor.com, Zillow, Redfin, your own website.
-                      Copy the full listing URL and paste it above.
+                      Supported sites: Realtor.com, Zillow, Redfin, your own website. Copy the full
+                      listing URL and paste it above.
                     </p>
                   </div>
                 </div>
@@ -303,40 +334,68 @@ Beautiful ranch home with updated kitchen...`}
           )}
 
           {/* Review Step */}
-          {step === "review" && parsedData && (
+          {step === 'review' && parsedData && (
             <div className="space-y-4 py-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-green-800">Listing details extracted. Review and edit before importing.</p>
+                <p className="text-sm text-green-800">
+                  Listing details extracted. Review and edit before importing.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label>Address</Label>
-                  <Input value={parsedData.address} onChange={(e) => setParsedData({ ...parsedData, address: e.target.value })} className="mt-1" />
+                  <Input
+                    value={parsedData.address}
+                    onChange={(e) => setParsedData({ ...parsedData, address: e.target.value })}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>City</Label>
-                  <Input value={parsedData.city} onChange={(e) => setParsedData({ ...parsedData, city: e.target.value })} className="mt-1" />
+                  <Input
+                    value={parsedData.city}
+                    onChange={(e) => setParsedData({ ...parsedData, city: e.target.value })}
+                    className="mt-1"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label>State</Label>
-                    <Input value={parsedData.state} onChange={(e) => setParsedData({ ...parsedData, state: e.target.value })} maxLength={2} className="mt-1" />
+                    <Input
+                      value={parsedData.state}
+                      onChange={(e) => setParsedData({ ...parsedData, state: e.target.value })}
+                      maxLength={2}
+                      className="mt-1"
+                    />
                   </div>
                   <div>
                     <Label>Zip</Label>
-                    <Input value={parsedData.zip_code} onChange={(e) => setParsedData({ ...parsedData, zip_code: e.target.value })} className="mt-1" />
+                    <Input
+                      value={parsedData.zip_code}
+                      onChange={(e) => setParsedData({ ...parsedData, zip_code: e.target.value })}
+                      className="mt-1"
+                    />
                   </div>
                 </div>
                 <div>
                   <Label>Price</Label>
-                  <Input value={parsedData.price} onChange={(e) => setParsedData({ ...parsedData, price: e.target.value })} className="mt-1" />
+                  <Input
+                    value={parsedData.price}
+                    onChange={(e) => setParsedData({ ...parsedData, price: e.target.value })}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>Property Type</Label>
-                  <Select value={parsedData.property_type} onValueChange={(v) => setParsedData({ ...parsedData, property_type: v })}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <Select
+                    value={parsedData.property_type}
+                    onValueChange={(v) => setParsedData({ ...parsedData, property_type: v })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="single_family">Single Family</SelectItem>
                       <SelectItem value="condo">Condo</SelectItem>
@@ -349,23 +408,57 @@ Beautiful ranch home with updated kitchen...`}
                 </div>
                 <div>
                   <Label>Bedrooms</Label>
-                  <Input type="number" value={parsedData.bedrooms} onChange={(e) => setParsedData({ ...parsedData, bedrooms: parseInt(e.target.value) || 0 })} className="mt-1" />
+                  <Input
+                    type="number"
+                    value={parsedData.bedrooms}
+                    onChange={(e) =>
+                      setParsedData({ ...parsedData, bedrooms: parseInt(e.target.value) || 0 })
+                    }
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>Bathrooms</Label>
-                  <Input type="number" step={0.5} value={parsedData.bathrooms} onChange={(e) => setParsedData({ ...parsedData, bathrooms: parseFloat(e.target.value) || 0 })} className="mt-1" />
+                  <Input
+                    type="number"
+                    step={0.5}
+                    value={parsedData.bathrooms}
+                    onChange={(e) =>
+                      setParsedData({ ...parsedData, bathrooms: parseFloat(e.target.value) || 0 })
+                    }
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>Square Feet</Label>
-                  <Input type="number" value={parsedData.square_feet || ""} onChange={(e) => setParsedData({ ...parsedData, square_feet: parseInt(e.target.value) || null })} className="mt-1" />
+                  <Input
+                    type="number"
+                    value={parsedData.square_feet || ''}
+                    onChange={(e) =>
+                      setParsedData({
+                        ...parsedData,
+                        square_feet: parseInt(e.target.value) || null,
+                      })
+                    }
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>MLS Number</Label>
-                  <Input value={parsedData.mls_number} onChange={(e) => setParsedData({ ...parsedData, mls_number: e.target.value })} className="mt-1" />
+                  <Input
+                    value={parsedData.mls_number}
+                    onChange={(e) => setParsedData({ ...parsedData, mls_number: e.target.value })}
+                    className="mt-1"
+                  />
                 </div>
                 <div className="col-span-2">
                   <Label>Description</Label>
-                  <Textarea value={parsedData.description} onChange={(e) => setParsedData({ ...parsedData, description: e.target.value })} rows={3} className="mt-1" />
+                  <Textarea
+                    value={parsedData.description}
+                    onChange={(e) => setParsedData({ ...parsedData, description: e.target.value })}
+                    rows={3}
+                    className="mt-1"
+                  />
                 </div>
               </div>
             </div>
@@ -374,26 +467,29 @@ Beautiful ranch home with updated kitchen...`}
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-4 border-t">
-          <Button variant="outline" onClick={step === "review" ? () => setStep("input") : handleClose}>
-            {step === "review" ? "Back" : "Cancel"}
+          <Button
+            variant="outline"
+            onClick={step === 'review' ? () => setStep('input') : handleClose}
+          >
+            {step === 'review' ? 'Back' : 'Cancel'}
           </Button>
-          {step === "input" && (
+          {step === 'input' && (
             <Button
-              onClick={mode === "paste" ? handleParsePaste : handleURLFetch}
-              disabled={loading || (mode === "paste" ? !pastedText.trim() : !url.trim())}
+              onClick={mode === 'paste' ? handleParsePaste : handleURLFetch}
+              disabled={loading || (mode === 'paste' ? !pastedText.trim() : !url.trim())}
             >
               {loading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...
+                </>
               ) : (
-                <><Sparkles className="h-4 w-4 mr-2" /> Extract Details</>
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" /> Extract Details
+                </>
               )}
             </Button>
           )}
-          {step === "review" && (
-            <Button onClick={handleImport}>
-              Import Listing
-            </Button>
-          )}
+          {step === 'review' && <Button onClick={handleImport}>Import Listing</Button>}
         </div>
       </DialogContent>
     </Dialog>

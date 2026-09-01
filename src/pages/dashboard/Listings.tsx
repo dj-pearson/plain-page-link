@@ -30,7 +30,9 @@ import type { ListingFormData } from '@/components/modals/AddListingModal';
 import { CSVUploadDialog } from '@/components/listings/CSVUploadDialog';
 import { URLImportDialog } from '@/components/listings/URLImportDialog';
 import { useToast } from '@/hooks/use-toast';
-import { useListings, type Listing } from '@/hooks/useListings';
+import { useListings, type Listing, type NewListing } from '@/hooks/useListings';
+import type { ImportedListingData } from '@/components/listings/URLImportDialog';
+import type { SharedListing } from '@/components/listings/SocialShareDialog';
 import { useListingImageUpload } from '@/hooks/useListingImageUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,17 +48,6 @@ import { cn } from '@/lib/utils';
 import { parsePrice, formatPrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 
-interface SocialShareListingData {
-  address: string;
-  city: string;
-  price: string;
-  beds?: number;
-  baths?: number;
-  sqft?: number;
-  property_type?: string;
-  image?: string;
-}
-
 type ViewMode = 'grid' | 'list';
 type StatusFilter = 'all' | 'active' | 'pending' | 'under_contract' | 'sold' | 'draft';
 
@@ -71,9 +62,7 @@ export default function Listings() {
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showSocialShareDialog, setShowSocialShareDialog] = useState(false);
-  const [newlyCreatedListing, setNewlyCreatedListing] = useState<SocialShareListingData | null>(
-    null
-  );
+  const [newlyCreatedListing, setNewlyCreatedListing] = useState<SharedListing | null>(null);
   const [listingToDelete, setListingToDelete] = useState<{ id: string; address: string } | null>(
     null
   );
@@ -151,7 +140,7 @@ export default function Listings() {
         if (imageUrls.length === 0) return;
       }
 
-      const listingData: Partial<Omit<Listing, 'id' | 'user_id' | 'created_at' | 'updated_at'>> = {
+      const listingData: NewListing = {
         address: data.address,
         city: data.city,
         state: data.state,
@@ -251,25 +240,29 @@ export default function Listings() {
     });
   };
 
-  const handleURLImport = (importedListing: Record<string, unknown>) => {
+  const handleURLImport = (importedListing: ImportedListingData) => {
     addListing
       .mutateAsync({
-        address: importedListing.address as string,
-        city: importedListing.city as string,
-        state: importedListing.state as string,
-        zip_code: importedListing.zip_code as string,
-        price: importedListing.price as string,
-        beds: importedListing.bedrooms as number,
-        baths: importedListing.bathrooms as number,
-        bedrooms: importedListing.bedrooms as number,
-        bathrooms: importedListing.bathrooms as number,
-        sqft: importedListing.square_feet as number,
-        square_feet: importedListing.square_feet as number,
-        status: (importedListing.status as string) || 'active',
-        description: importedListing.description as string,
-        mls_number: importedListing.mls_number as string,
-        property_type: importedListing.property_type as string,
-        lot_size_acres: importedListing.lot_size_acres as number,
+        address: importedListing.address,
+        city: importedListing.city,
+        state: importedListing.state,
+        zip_code: importedListing.zip_code,
+        price: importedListing.price,
+        beds: importedListing.bedrooms,
+        baths: importedListing.bathrooms,
+        bedrooms: importedListing.bedrooms,
+        bathrooms: importedListing.bathrooms,
+        sqft: importedListing.square_feet,
+        square_feet: importedListing.square_feet,
+        status: importedListing.status || 'active',
+        description: importedListing.description,
+        mls_number: importedListing.mls_number,
+        property_type: importedListing.property_type,
+        lot_size_acres: importedListing.lot_size_acres,
+        // The dialog scrapes photos and they were dropped here, so every
+        // URL-imported listing arrived with no images at all.
+        photos: importedListing.photos.length > 0 ? importedListing.photos : null,
+        image: importedListing.photos[0] ?? null,
       })
       .then(() => {
         toast({
@@ -591,8 +584,8 @@ export default function Listings() {
                   <QuickStatusUpdate
                     listingId={listing.id}
                     currentStatus={listing.status}
-                    onStatusChange={(s) => {
-                      listing.status = s;
+                    onStatusChange={() => {
+                      refetch();
                     }}
                   />
                 </div>
@@ -648,7 +641,8 @@ export default function Listings() {
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <div className="text-xs text-muted-foreground">
-                    Listed {new Date(listing.created_at).toLocaleDateString()}
+                    Listed{' '}
+                    {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : '—'}
                   </div>
                   {listing.mls_number && (
                     <div className="text-xs text-muted-foreground">MLS# {listing.mls_number}</div>
@@ -715,8 +709,8 @@ export default function Listings() {
                     <QuickStatusUpdate
                       listingId={listing.id}
                       currentStatus={listing.status}
-                      onStatusChange={(s) => {
-                        listing.status = s;
+                      onStatusChange={() => {
+                        refetch();
                       }}
                     />
                   </td>
@@ -730,9 +724,7 @@ export default function Listings() {
                     {listing.baths || listing.bathrooms || '-'}
                   </td>
                   <td className="px-4 py-3 text-right text-sm hidden lg:table-cell">
-                    {listing.sqft || listing.square_feet
-                      ? (listing.sqft || listing.square_feet).toLocaleString()
-                      : '-'}
+                    {(listing.sqft ?? listing.square_feet)?.toLocaleString() ?? '-'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -840,7 +832,7 @@ export default function Listings() {
             beds: editingListing.beds,
             baths: editingListing.baths,
             sqft: editingListing.sqft ?? undefined,
-            status: editingListing.status,
+            status: editingListing.status ?? 'active',
             image: editingListing.image ?? undefined,
             description: editingListing.description ?? undefined,
             mls_number: editingListing.mls_number ?? undefined,

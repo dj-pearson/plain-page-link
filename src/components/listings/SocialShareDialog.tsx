@@ -11,22 +11,37 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { formatPrice, parsePrice } from '@/lib/format';
 
-interface Listing {
+/**
+ * Just the fields this dialog reads.
+ *
+ * `price` is text in the schema, and both callers pass it through unchanged —
+ * but this declared `number`, so formatPrice() received the raw string. For a
+ * price the agent typed as "$450,000" that is Intl.NumberFormat.format() on a
+ * non-numeric string, i.e. a share caption reading "$NaN". Everywhere else in
+ * the dashboard the pair is formatPrice(parsePrice(...)); it is here now too.
+ *
+ * The component also carried its own `const formatPrice`, declared two lines
+ * AFTER `useState(generatePostText())` called it — a temporal dead zone, so
+ * opening the dialog threw "Cannot access 'formatPrice' before initialization"
+ * before it could render. The shared helper from @/lib/format replaces it.
+ */
+export interface SharedListing {
   address: string;
   city: string;
-  price: number;
-  beds?: number;
-  baths?: number;
-  sqft?: number;
-  property_type?: string;
-  image?: string;
+  price: string;
+  beds?: number | null;
+  baths?: number | null;
+  sqft?: number | null;
+  property_type?: string | null;
+  image?: string | null;
 }
 
 interface SocialShareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  listing: Listing;
+  listing: SharedListing;
   agentName?: string;
 }
 
@@ -41,7 +56,7 @@ export function SocialShareDialog({ open, onOpenChange, listing }: SocialShareDi
     parts.push(`🏡 NEW LISTING ALERT! 🏡`);
     parts.push('');
     parts.push(`📍 ${listing.address}, ${listing.city}`);
-    parts.push(`💰 ${formatPrice(listing.price)}`);
+    parts.push(`💰 ${formatPrice(parsePrice(listing.price))}`);
 
     if (listing.beds || listing.baths) {
       const details = [];
@@ -68,14 +83,6 @@ export function SocialShareDialog({ open, onOpenChange, listing }: SocialShareDi
   };
 
   const [postText, setPostText] = useState(generatePostText());
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
 
   const copyToClipboard = async () => {
     try {
