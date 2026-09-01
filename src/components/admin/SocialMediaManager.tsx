@@ -1,23 +1,34 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Loader2, Eye, Edit, Trash, Calendar, Send, Plus, Link2, ToggleLeft, ToggleRight } from "lucide-react";
-import { format } from "date-fns";
-import { useSocialMedia } from "@/hooks/useSocialMedia";
-import { CreateSocialPostDialog } from "./CreateSocialPostDialog";
-import { SocialMediaWebhookDialog } from "./SocialMediaWebhookDialog";
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Loader2,
+  Eye,
+  Edit,
+  Trash,
+  Calendar,
+  Send,
+  Plus,
+  Link2,
+  ToggleLeft,
+  ToggleRight,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { useSocialMedia } from '@/hooks/useSocialMedia';
+import { CreateSocialPostDialog } from './CreateSocialPostDialog';
+import { SocialMediaWebhookDialog } from './SocialMediaWebhookDialog';
 
 export function SocialMediaManager() {
-  const [activeTab, setActiveTab] = useState("all");
-  const { 
+  const [activeTab, setActiveTab] = useState('all');
+  const {
     posts,
     marketingPosts,
-    webhooks, 
-    isLoading, 
-    deletePost, 
-    updateWebhook, 
+    webhooks,
+    isLoading,
+    deletePost,
+    updateWebhook,
     deleteWebhook,
     testWebhook,
     isTestingWebhook,
@@ -28,20 +39,26 @@ export function SocialMediaManager() {
     isRetryingPost,
   } = useSocialMedia();
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
-      case 'posted': return 'bg-green-500';
-      case 'scheduled': return 'bg-blue-500';
-      case 'draft': return 'bg-gray-500';
-      case 'archived': return 'bg-orange-500';
-      default: return 'bg-gray-500';
+      case 'posted':
+        return 'bg-green-500';
+      case 'scheduled':
+        return 'bg-blue-500';
+      case 'draft':
+        return 'bg-gray-500';
+      case 'archived':
+        return 'bg-orange-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
   const getContentTypeLabel = (type: string) => {
-    return type.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    return type
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   if (isLoading) {
@@ -52,9 +69,7 @@ export function SocialMediaManager() {
     );
   }
 
-  const filteredPosts = activeTab === "all" 
-    ? posts 
-    : posts?.filter(p => p.status === activeTab);
+  const filteredPosts = activeTab === 'all' ? posts : posts?.filter((p) => p.status === activeTab);
 
   return (
     <div className="space-y-6">
@@ -82,7 +97,10 @@ export function SocialMediaManager() {
             <TabsContent value={activeTab} className="space-y-4 mt-6">
               {filteredPosts && filteredPosts.length > 0 ? (
                 filteredPosts.map((post) => (
-                  <div key={post.id} className="border rounded-lg p-4 hover:border-primary transition-colors">
+                  <div
+                    key={post.id}
+                    className="border rounded-lg p-4 hover:border-primary transition-colors"
+                  >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
@@ -93,21 +111,33 @@ export function SocialMediaManager() {
                         </div>
                         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mb-3">
                           <span className="inline-flex items-center gap-1">
-                            <Badge variant="outline">{getContentTypeLabel(post.content_type)}</Badge>
+                            <Badge variant="outline">
+                              {getContentTypeLabel(post.content_type)}
+                            </Badge>
                           </span>
                           <span className="inline-flex items-center gap-1">
-                            <Badge variant="outline">{getContentTypeLabel(post.subject_type)}</Badge>
+                            <Badge variant="outline">
+                              {getContentTypeLabel(post.subject_type)}
+                            </Badge>
                           </span>
                           <span className="inline-flex items-center gap-1">
-                            <Badge variant="outline">{getContentTypeLabel(post.platform_type)}</Badge>
+                            <Badge variant="outline">
+                              {getContentTypeLabel(post.platform_type)}
+                            </Badge>
                           </span>
                         </div>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span>Created: {format(new Date(post.created_at), 'MMM d, yyyy h:mm a')}</span>
+                          <span>
+                            Created:{' '}
+                            {post.created_at
+                              ? format(new Date(post.created_at), 'MMM d, yyyy h:mm a')
+                              : 'unknown'}
+                          </span>
                           {post.scheduled_for && (
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              Scheduled: {format(new Date(post.scheduled_for), 'MMM d, yyyy h:mm a')}
+                              Scheduled:{' '}
+                              {format(new Date(post.scheduled_for), 'MMM d, yyyy h:mm a')}
                             </span>
                           )}
                           {post.posted_at && (
@@ -125,8 +155,8 @@ export function SocialMediaManager() {
                         <Button variant="outline" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => {
                             if (confirm('Are you sure you want to delete this post?')) {
@@ -166,7 +196,10 @@ export function SocialMediaManager() {
           {webhooks && webhooks.length > 0 ? (
             <div className="space-y-3">
               {webhooks.map((webhook) => (
-                <div key={webhook.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div
+                  key={webhook.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <Link2 className="h-5 w-5 text-muted-foreground" />
                     <div>
@@ -194,10 +227,12 @@ export function SocialMediaManager() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => updateWebhook({ 
-                        id: webhook.id, 
-                        updates: { is_active: !webhook.is_active } 
-                      })}
+                      onClick={() =>
+                        updateWebhook({
+                          id: webhook.id,
+                          updates: { is_active: !webhook.is_active },
+                        })
+                      }
                     >
                       {webhook.is_active ? (
                         <ToggleRight className="h-5 w-5 text-green-600" />
@@ -240,8 +275,8 @@ export function SocialMediaManager() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
-            <Button 
-              onClick={() => generateMarketingPost()}
+            <Button
+              onClick={() => generateMarketingPost(undefined)}
               disabled={isGeneratingMarketingPost}
               className="flex-1"
             >
@@ -258,15 +293,15 @@ export function SocialMediaManager() {
               )}
             </Button>
             {webhooks && webhooks.length > 0 && (
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => {
-                  const activeWebhook = webhooks.find(w => w.is_active);
+                  const activeWebhook = webhooks.find((w) => w.is_active);
                   if (activeWebhook) {
                     generateMarketingPost(activeWebhook.webhook_url);
                   }
                 }}
-                disabled={isGeneratingMarketingPost || !webhooks.some(w => w.is_active)}
+                disabled={isGeneratingMarketingPost || !webhooks.some((w) => w.is_active)}
               >
                 Generate & Send
               </Button>
@@ -291,7 +326,9 @@ export function SocialMediaManager() {
                 <h4 className="font-semibold mb-2">Hashtags:</h4>
                 <div className="flex flex-wrap gap-2">
                   {marketingPostData.payload.hashtags.map((tag: string, idx: number) => (
-                    <Badge key={idx} variant="secondary">{tag}</Badge>
+                    <Badge key={idx} variant="secondary">
+                      {tag}
+                    </Badge>
                   ))}
                 </div>
               </div>
@@ -304,9 +341,7 @@ export function SocialMediaManager() {
       <Card>
         <CardHeader>
           <CardTitle>Marketing Post History</CardTitle>
-          <CardDescription>
-            View and redeploy previously generated marketing posts
-          </CardDescription>
+          <CardDescription>View and redeploy previously generated marketing posts</CardDescription>
         </CardHeader>
         <CardContent>
           {marketingPosts && marketingPosts.length > 0 ? (
@@ -321,7 +356,9 @@ export function SocialMediaManager() {
                           {post.status}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
-                          {format(new Date(post.created_at), 'MMM d, yyyy h:mm a')}
+                          {post.created_at
+                            ? format(new Date(post.created_at), 'MMM d, yyyy h:mm a')
+                            : 'unknown'}
                         </span>
                       </div>
                       <div className="flex gap-2">
@@ -330,15 +367,15 @@ export function SocialMediaManager() {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const activeWebhook = webhooks.find(w => w.is_active);
+                              const activeWebhook = webhooks.find((w) => w.is_active);
                               if (activeWebhook) {
-                                retryMarketingPost({ 
-                                  postId: post.id, 
-                                  webhookUrl: activeWebhook.webhook_url 
+                                retryMarketingPost({
+                                  postId: post.id,
+                                  webhookUrl: activeWebhook.webhook_url,
                                 });
                               }
                             }}
-                            disabled={isRetryingPost || !webhooks.some(w => w.is_active)}
+                            disabled={isRetryingPost || !webhooks.some((w) => w.is_active)}
                           >
                             {isRetryingPost ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -363,7 +400,7 @@ export function SocialMediaManager() {
                         </Button>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-3">
                       <div>
                         <h4 className="text-sm font-semibold mb-1">Long Form:</h4>
@@ -373,9 +410,7 @@ export function SocialMediaManager() {
                       </div>
                       <div>
                         <h4 className="text-sm font-semibold mb-1">Short Form:</h4>
-                        <div className="bg-muted p-3 rounded text-sm">
-                          {content.shortFormPost}
-                        </div>
+                        <div className="bg-muted p-3 rounded text-sm">{content.shortFormPost}</div>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {content.hashtags?.map((tag: string, idx: number) => (

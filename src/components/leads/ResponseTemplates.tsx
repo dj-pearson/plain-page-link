@@ -47,19 +47,17 @@ export function ResponseTemplates({
   className,
 }: ResponseTemplatesProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  // The template search box was never wired up; the filter below still reads
-  // this value, so it is kept as a constant rather than dead state.
-  const searchQuery = '';
   const [isCreating, setIsCreating] = useState(false);
 
-  const filteredTemplates = templates.filter((template) => {
-    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
-    const matchesSearch =
-      searchQuery === '' ||
-      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.body.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // There is no search box in this component — the two Inputs below belong to
+  // the create-template form. The name/body filter that used to sit here read
+  // a `const searchQuery = ''`, so its first clause was always true and the
+  // other two were unreachable (tsc narrowed searchQuery to `never`). Removed
+  // rather than left as a filter that cannot filter; adding a real search box
+  // is a product decision, not a typecheck one.
+  const filteredTemplates = templates.filter(
+    (template) => selectedCategory === 'all' || template.category === selectedCategory
+  );
 
   const categories = [
     { value: 'all', label: 'All Templates' },

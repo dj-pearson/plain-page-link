@@ -8,21 +8,36 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logger } from '@/lib/logger';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface AuditLogEntry {
-  id: string;
-  user_id: string;
-  actor_id: string | null;
-  action: string;
-  resource_type: string | null;
-  resource_id: string | null;
+type AuditLogRow = Database['public']['Tables']['audit_logs']['Row'];
+
+/**
+ * A row from `audit_logs`.
+ *
+ * `status` and `risk_level` are plain text columns; the unions below are the
+ * app's convention, not a constraint, so they are narrowed at the read
+ * boundary. `user_id`, `created_at` and `details` were typed non-nullable here
+ * and are nullable in the schema.
+ */
+export type AuditLogEntry = Omit<AuditLogRow, 'status' | 'risk_level'> & {
   status: 'success' | 'failure' | 'blocked';
-  ip_address: string | null;
-  user_agent: string | null;
-  details: Record<string, unknown> | null;
   risk_level: 'low' | 'medium' | 'high' | 'critical';
-  created_at: string;
-}
+};
+
+const AUDIT_STATUSES = ['success', 'failure', 'blocked'] as const;
+const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const;
+
+const toAuditLogEntry = (row: AuditLogRow): AuditLogEntry => ({
+  ...row,
+  status: (AUDIT_STATUSES as readonly string[]).includes(row.status)
+    ? (row.status as AuditLogEntry['status'])
+    : 'failure',
+  risk_level:
+    row.risk_level !== null && (RISK_LEVELS as readonly string[]).includes(row.risk_level)
+      ? (row.risk_level as AuditLogEntry['risk_level'])
+      : 'low',
+});
 
 interface AuditLogsResponse {
   success: boolean;
@@ -115,10 +130,18 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
       params.set('offset', offset.toString());
 
       // For GET requests, we use direct DB query since edge functions default to POST
-      const { data: logs, error: dbError, count } = await supabase
+      if (!user?.id) {
+        return { success: true, logs: [], total: 0, limit, offset };
+      }
+
+      const {
+        data: logs,
+        error: dbError,
+        count,
+      } = await supabase
         .from('audit_logs')
         .select('*', { count: 'exact' })
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -128,7 +151,7 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
 
       return {
         success: true,
-        logs: logs || [],
+        logs: (logs ?? []).map(toAuditLogEntry),
         total: count || 0,
         limit,
         offset,
@@ -158,7 +181,10 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
 
   // Helper to get action label
   const getActionLabel = (actionName: string): string => {
-    return ACTION_LABELS[actionName] || actionName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return (
+      ACTION_LABELS[actionName] ||
+      actionName.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+    );
   };
 
   // Helper to get risk level color classes
@@ -171,7 +197,9 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
     const parts: string[] = [];
 
     if (log.resource_type) {
-      parts.push(`${log.resource_type}${log.resource_id ? ` #${log.resource_id.slice(0, 8)}` : ''}`);
+      parts.push(
+        `${log.resource_type}${log.resource_id ? ` #${log.resource_id.slice(0, 8)}` : ''}`
+      );
     }
 
     if (log.ip_address) {
@@ -183,14 +211,19 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
 
   // Helper to group logs by date
   const groupLogsByDate = (logs: AuditLogEntry[]): Record<string, AuditLogEntry[]> => {
-    return logs.reduce((groups, log) => {
-      const date = new Date(log.created_at).toLocaleDateString();
-      if (!groups[date]) {
-        groups[date] = [];
-      }
-      groups[date].push(log);
-      return groups;
-    }, {} as Record<string, AuditLogEntry[]>);
+    return logs.reduce(
+      (groups, log) => {
+        // created_at is nullable; an undated entry groups under 'Unknown'
+        // rather than under 1/1/1970.
+        const date = log.created_at ? new Date(log.created_at).toLocaleDateString() : 'Unknown';
+        if (!groups[date]) {
+          groups[date] = [];
+        }
+        groups[date].push(log);
+        return groups;
+      },
+      {} as Record<string, AuditLogEntry[]>
+    );
   };
 
   return {
