@@ -1512,6 +1512,515 @@
       "priority": 93,
       "passes": true,
       "notes": "DONE 2026-08-08 in migration 20260808000006_fix_account_deletion.sql. Two defects. (1) The DELETE aborted: deleting auth.users cascades to profiles, the audit trigger fires, audit_table_change() finds auth.uid() NULL under the cron caller and falls back to the row's own id, and log_audit_event() then inserts that as user_id/actor_id — referencing an auth.users row already removed in the same statement. ON DELETE SET NULL on audit_logs does not help, because the row is being INSERTED with a dangling reference rather than updated to one. log_audit_event now nulls either id when the referenced user is gone, so the erasure RECORD survives while the reference does not — losing the audit trail of a deletion would be worse than losing the actor on it. (2) leads, listings, testimonials, user_settings, article_webhooks and analytics_views carried a user_id with no foreign key at all, so nothing cascaded to them even once the delete worked. Added ON DELETE CASCADE, NOT VALID: production may hold orphans from before this and a validating ADD CONSTRAINT would fail on them, while NOT VALID still enforces on new rows and still cascades, which is what erasure needs. Sweep orphans and VALIDATE as a follow-up. account_deletion_log deliberately gets no cascading FK — it has to outlive the user. Verified end to end on a rebuilt Postgres by seeding a user with a profile, lead, listing, testimonial, settings row and analytics row and running the exact DELETE the scheduler runs: it now succeeds (previously an FK error), every one of those counts goes to 0, and 3 audit rows survive with actor_id nulled."
+    },
+    {
+      "id": "US-094",
+      "title": "The Leads page cannot load: it selects the email and phone columns US-086 dropped",
+      "description": "src/pages/dashboard/Leads.tsx:69-101 bypasses useLeads with its own query, cast through `as unknown as`, and selects 'id, user_id, lead_type, name, email, phone, ...'. Migration 20260901000001_leads_drop_plaintext_pii.sql:57-59 dropped email and phone, and types.ts confirms neither exists, so PostgREST rejects the whole select and every agent sees the 'Failed to load leads' card. The migration header asserts Leads.tsx 'runs client-side over rows useLeads has already decrypted', which is false: useLeads has exactly one importer, AnalyticsDashboard.tsx:26. Both use queryKey ['leads', user.id] with different queryFns and row shapes, so whichever page mounts first poisons the cache for the other. tsc is green only because the cast removes the check. The same pattern hides two more stale casts: useNotifications.ts:27 and useLeadRouting.ts:171 both say a table 'isn't in the generated types yet' when it is.",
+      "acceptanceCriteria": [
+        "/dashboard/leads renders the agent's leads with decrypted email and phone, using useLeads() and nothing else",
+        "The local query, the `as unknown as` cast and the stale comment in Leads.tsx are deleted; search, CSV export and the mailto:/tel: links use the decrypted values",
+        "The casts in useNotifications.ts and useLeadRouting.ts are removed and the typed client is used",
+        "A component test mounts Leads.tsx against the mocked client and asserts the rendered names, so the page can no longer break without a test going red",
+        "npx tsc --noEmit reports 0 errors and npm run test:run passes"
+      ],
+      "priority": 94,
+      "passes": false,
+      "notes": "Highest priority in this batch: the CRM is the second half of the product and it is currently a blank error card. Found by the 2026-09 review."
+    },
+    {
+      "id": "US-095",
+      "title": "The \"Send Message\" contact form can never submit",
+      "description": "src/components/forms/ContactForm.tsx:28 drops the agentId prop, and lines 47-53 call EdgeFunctions.submitLead with only name/email/phone/message/source. supabase/functions/_shared/validation.ts:156-162 requires lead_type in {buyer,seller,valuation,contact} and a user_id, so every submission is a 400 and the visitor sees 'Failed to send message.' This form sits behind 'Just Have Questions? -> Send Message', the sticky bar's contact action and the Schedule fallback when the agent has no Calendly URL (FullProfilePage.tsx:614-620, 647-659). The other three forms go through src/lib/leadSubmission.ts correctly. Two dead siblings invite the same mistake again: supabase/functions/submit-contact has no caller and, if invoked, emails without saving a lead (index.ts:383-392), and EdgeFunctions.submitContact is unused.",
+      "acceptanceCriteria": [
+        "ContactForm submits through submitLead() in src/lib/leadSubmission.ts with the agent's id and leadType 'contact', and a submission lands in leads with lead_type='contact'",
+        "EdgeFunctions.submitLead and EdgeFunctions.submitContact are deleted from src/lib/edgeFunctions.ts",
+        "supabase/functions/submit-contact is deleted and removed from edge-functions-server.ts FUNCTIONS_MAP",
+        "A vitest for ContactForm asserts the payload passed to submitLead includes agentId and leadType",
+        "npx tsc --noEmit reports 0 errors"
+      ],
+      "priority": 95,
+      "passes": false,
+      "notes": "Depends on nothing. Pair with US-096 since both are in the public lead forms."
+    },
+    {
+      "id": "US-096",
+      "title": "Buyer inquiries fail for three of four pre-approval answers, and no form ever tells the CRM which listing the lead asked about",
+      "description": "BuyerInquiryForm.tsx:343-346 offers preApproved values 'yes' | 'in-process' | 'not-yet' | 'cash'. leadSubmission.ts:338 maps that string straight onto leads.preapproved, which is boolean. Postgres accepts 'yes' but 'in-process', 'not-yet' and 'cash' raise 22P02, submit-lead rethrows (index.ts:140-143) and the buyer sees 'Submission Failed'. The leads an agent most wants to nurture, the not-yet-approved ones, are exactly the ones lost. Separately, submit-lead accepts listing_id (index.ts:19,103) but no client ever sends it: ListingDetailModal.tsx:520-523 renders a 'Request a Showing' button with no onClick, ListingGallery.tsx:42 accepts calendlyUrl and drops it, and the Calendly path at 510-518 is a raw target=_blank link rather than the CalendlyModal the page already mounts. So a lead about a specific property arrives in the CRM with no property attached.",
+      "acceptanceCriteria": [
+        "splitFormData stores preapproved as a boolean (true for 'yes' and 'cash') and keeps the raw answer in form_data.preApprovalStatus; validateLeadData rejects a non-boolean preapproved",
+        "All four pre-approval answers submit successfully, covered by a unit test on splitFormData",
+        "'Request a Showing' opens LeadFormModal (or CalendlyModal when a URL exists) pre-filled with the address and passes listing_id to submit-lead",
+        "A lead created from a listing shows that listing's address in the Leads page card and detail modal",
+        "npx tsc --noEmit reports 0 errors"
+      ],
+      "priority": 96,
+      "passes": false,
+      "notes": "Found by the 2026-09 review. The listing_id half is what makes the CRM useful to an agent with several active listings."
+    },
+    {
+      "id": "US-097",
+      "title": "Anonymous visitors can insert leads directly into any agent's CRM, bypassing validation, encryption and the edge function",
+      "description": "20260806000005_squashed_baseline.sql:13525 creates policy \"Anyone can submit leads\" ON public.leads FOR INSERT WITH CHECK (true), and scripts/verify-schema.mjs:96 whitelists it in PUBLIC_BY_DESIGN as 'public lead-capture forms on every profile'. No public form uses it: leadSubmission.ts:92 and ContactBlock.tsx call submit-lead, which runs with the service role (index.ts:68). Verified live as anon: INSERT INTO leads (user_id, name, lead_type) VALUES (<any agent>, 'Spam Bot', 'buyer') succeeds with encrypted_email NULL, increments profiles.lead_count, writes a notifications row, a lead_activities row and three audit_logs rows, and fires trg_notify_lead_on_insert. Anyone holding the anon key, which ships in the bundle, can flood every agent's CRM at PostgREST speed with contact-less leads. Related: profiles.lead_count has an AFTER INSERT trigger and no DELETE counterpart (baseline:11208), so it only ever rises.",
+      "acceptanceCriteria": [
+        "The \"Anyone can submit leads\" policy is dropped in a new migration and leads:INSERT is removed from PUBLIC_BY_DESIGN",
+        "An anon INSERT into leads is rejected, verified by executing it against the applied schema, and submit-lead still inserts successfully",
+        "npm run verify:schema passes with no new PUBLIC_BY_DESIGN entries",
+        "profiles.lead_count is either maintained by INSERT and DELETE triggers or replaced by a count(*) in the one place it is read"
+      ],
+      "priority": 97,
+      "passes": false,
+      "notes": "Found by the 2026-09 backend review. Pairs with US-098 (rate limiting), because today there is neither a policy nor a limiter in the way."
+    },
+    {
+      "id": "US-098",
+      "title": "Rate limiting is silently disabled in every edge function: the RPC is called with the wrong argument names",
+      "description": "supabase/functions/_shared/rate-limiter.ts:51-56 calls supabase.rpc('check_rate_limit', { p_ip_address, p_endpoint, p_max_requests, p_window_seconds }). The SQL function at baseline:638 is check_rate_limit(p_identifier text, p_limit_type text, p_max_requests integer, p_window_seconds integer). PostgREST cannot match the signature, returns 404, and the error branch at line 58 fails open with allowed: true. Every function that believes it is rate limited is not: submit-lead, check-username, create-checkout-session, create-portal-session, create-stripe-customer, report-stripe-usage, gdpr-export, generate-article, generate-listing-description, send-bio-analyzer-email, send-listing-generator-email, pii-crypto, verify-mfa. rate-limit/index.ts:139 uses the correct names, which is how it went unnoticed, and verify-schema.mjs:277-287 matches RPCs by name only, so the gate passes.",
+      "acceptanceCriteria": [
+        "rate-limiter.ts passes p_identifier and p_limit_type, and a call against the applied schema returns an allowed/remaining/reset_at row",
+        "The submission and auth presets fail closed when the RPC errors; other presets log at error level with the PostgREST message rather than silently allowing",
+        "verify:schema compares each rpc() call's named arguments against pg_proc.proargnames and fails on a mismatch",
+        "An integration test (or the verify script) demonstrates the 11th call to submit-lead from one IP inside the window is rejected",
+        "cleanup_rate_limits() targets rate_limit_entries, the table check_rate_limit actually writes, or is replaced"
+      ],
+      "priority": 98,
+      "passes": false,
+      "notes": "Found by the 2026-09 backend review. The verify:schema extension is the part that stops this class of bug recurring; US-082 added column checks, this adds argument checks."
+    },
+    {
+      "id": "US-099",
+      "title": "Lead notifications: no contact details in the email, two emails per lead, preferences ignored, and a trigger that has never fired",
+      "description": "Four defects in one path. (1) notify-lead/index.ts:76 re-reads the lead with select('*') and lines 119-120 pass lead.email and lead.phone, both dropped by 20260901000001, so the text body reads 'Email: undefined' and the HTML row filter drops both contact rows; the agent gets a New Lead email with no way to reply. (2) submit-lead/index.ts:263-321 emails the agent directly AND trg_notify_lead_on_insert calls notify-lead for the same row, so when both work every lead sends two emails. (3) submit-lead ignores notification_preferences.leads while notify-lead honours 'off' and 'daily_digest' (index.ts:101-104), and no digest job exists, so agents on daily_digest are never emailed at all. (4) The trigger (baseline:2405-2410) returns early unless the GUCs app.settings.functions_url and app.settings.service_role_key are set; no live migration sets them (the instruction is in archive/20260525000001), so in practice it has never fired, and if it were set as documented the service-role key would live as a plaintext database GUC. Also _shared/email.ts:26-30,54-59 swallows every failure including a missing RESEND_API_KEY, and notify-lead:131-140 logs 'success' before knowing whether anything sent.",
+      "acceptanceCriteria": [
+        "Exactly one notification path exists: submit-lead (and useLeads.createLead for manually added leads) calls notify-lead explicitly and trg_notify_lead_on_insert plus notify_new_lead's GUC dependency are dropped",
+        "notify-lead decrypts encrypted_email and encrypted_phone with the _shared/encryption.ts counterpart before rendering; the email shows the lead's email and phone",
+        "notification_preferences.leads = 'off' sends nothing; 'daily_digest' is treated as 'instant' until a digest job exists, and that is stated in the settings UI",
+        "sendEmail returns { ok, providerId, error }; a send failure or missing RESEND_API_KEY in production is logged at error level and recorded, not reported as success",
+        "Each agent email sent for a lead is recorded as a lead_activities row of activity_type 'email' so the timeline shows it",
+        "npm run test:run and deno check both pass"
+      ],
+      "priority": 99,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (CRM and backend slices). Depends on US-094 only for verifying the timeline row shows up."
+    },
+    {
+      "id": "US-100",
+      "title": "Three lead-activity RPCs and one workflow node write columns that do not exist",
+      "description": "log_lead_activity, log_lead_call and log_lead_email (baseline ~2177, ~2236, ~2291) all end with UPDATE public.leads SET last_contacted_at = NOW(). leads has contacted_at, never last_contacted_at; plpgsql resolves the name at run time, so the first real call raises 'column last_contacted_at does not exist' after the activity row is inserted and the whole transaction rolls back. It is latent only because nothing in src/ calls them yet (see US-102, which will). supabase/functions/execute-workflow/index.ts:69-87 does `if (score) updates.score = score` and updates leads; there is no score column (lead_scores is the table), so any workflow that sets a score fails. notify-lead/index.ts:35-36,124 reads lead.score ?? lead.lead_score, both absent, so the score badge never renders. verify:schema checks columns referenced by triggers, but not by plain functions or by edge-function payloads.",
+      "acceptanceCriteria": [
+        "The three log_lead_* functions are replaced in a new migration to set contacted_at = COALESCE(contacted_at, NOW()) and each is executed against a fixture lead in verify:schema",
+        "execute-workflow's update_lead node writes to lead_scores (lead_id, user_id, score, priority) and notify-lead joins lead_scores for the badge",
+        "verify:schema extracts UPDATE/INSERT column lists from every plpgsql function body, not just triggers, and fails on an unknown column",
+        "npm run verify:schema passes"
+      ],
+      "priority": 100,
+      "passes": false,
+      "notes": "Found by the 2026-09 review. Do this before US-102, which starts calling these functions from the UI."
+    },
+    {
+      "id": "US-101",
+      "title": "Lead detail modal shows the previous lead's status and draft note, and status changes never record when the agent made contact",
+      "description": "LeadDetailModal.tsx:109-110 initialises status and note with useState(lead?.status) once; Leads.tsx:790-797 keeps a single instance mounted and swaps the lead prop, so opening a 'converted' lead then a 'new' one shows Converted on the second, with the previous half-typed note still in the box. Only loadNotes() re-runs. Status changes (LeadDetailModal.tsx:149-154, Leads.tsx:214-218) do .update({ status }) and nothing else: no code in src/ writes contacted_at or closed_at. first_responded_at is set by the set_lead_first_responded_at trigger only on new -> anything, so an agent who taps the tel:/mailto:/sms: links (349-376) and calls the lead straight away still shows 'No response . 3h' and drags the Avg Response KPI down. Bulk-setting leads back to 'new' (Leads.tsx:559) silently keeps first_responded_at.",
+      "acceptanceCriteria": [
+        "The modal re-initialises status and note when lead.id changes (key={lead.id} or an effect)",
+        "Tapping call, email or text from the card or modal logs a lead_activities row via log_lead_call/log_lead_email and moves a 'new' lead to 'contacted' with contacted_at set",
+        "Setting status to converted or lost writes closed_at; resetting to new clears first_responded_at and contacted_at",
+        "Response time on the Leads page and Overview reflects the first contact action, not only a dropdown change",
+        "A component test opens two leads in sequence and asserts the second shows its own status"
+      ],
+      "priority": 101,
+      "passes": false,
+      "notes": "Found by the 2026-09 CRM review. Depends on US-100 (the RPCs must reference real columns first)."
+    },
+    {
+      "id": "US-102",
+      "title": "The activity timeline is dead: the modal reads lead_notes while every trigger writes lead_activities",
+      "description": "src/hooks/useLeadActivities.ts is 336 lines with seven mutations and zero importers. LeadDetailModal.tsx:129-133 loads lead_notes and, on status change (line 163), writes a system note there, while the DB trigger on_lead_status_change (baseline:11215) writes a lead_activities row for the same event. auto_log_lead_creation (baseline:11201) writes 'Lead created' to lead_activities too. Two stores, one displayed, so the timeline the agent sees is missing every trigger-logged event and every call/email logged by US-101. useLeadsActivitySummaries, which would show 'last contacted' on the list, is likewise unused. Four fully-built components carry their own incompatible Lead shapes and are imported by nothing: LeadDetailView.tsx (375 lines), LeadInbox.tsx (344), HotLeadAlert.tsx (342), ResponseTemplates.tsx (412, templates held in memory only).",
+      "acceptanceCriteria": [
+        "LeadDetailModal renders activities from useLeadActivities(lead.id) with icons per activity_type (note, call, email, sms, status_change, task) and 'Add Note' calls logNote",
+        "The duplicate system note on status change is removed; a migration copies existing lead_notes rows into lead_activities(activity_type='note') and lead_notes is dropped or left read-only",
+        "The Leads list shows last-contacted from useLeadsActivitySummaries",
+        "LeadDetailView, LeadInbox, HotLeadAlert and ResponseTemplates are either wired on top of useLeads/useLeadActivities with the single Lead type from src/types/lead.ts, or deleted; not left as a second CRM",
+        "npx tsc --noEmit reports 0 errors and npm run test:run passes"
+      ],
+      "priority": 102,
+      "passes": false,
+      "notes": "Found by the 2026-09 CRM review. Recommendation: delete the four dead components and port LeadInbox's status/type filters into Leads.tsx under US-103 rather than keep two shapes."
+    },
+    {
+      "id": "US-103",
+      "title": "Guide the agent: next step, follow-up reminders and an SLA that fires when nobody is looking",
+      "description": "The product promise is a CRM that guides a non-technical agent through the process, and nothing pulls them back to an unanswered lead. lead-scoring.ts:76-100 getRecommendedActions() produces 'Send personalized message within 5 minutes' etc. and no component renders it. lead_activities has task_due_date/task_priority/task_completed_at (types.ts:2190-2192) and nothing inserts a task or lists due ones. execute-workflow's create_task and send_sms nodes only console.log (index.ts:55-67, 90-104) and no workflow fires on lead_created (start_workflow_execution is called only from the builder's manual run, useWorkflowBuilderStore.ts:684). The SLA threshold is useState(2) in Leads.tsx:60, reset on every load and evaluated nowhere off-page. The in-app New Lead notification (notification-dropdown.tsx:61-62) marks itself read and does nothing else; data.lead_id is never used. There is no scheduler of any kind in the repo (no cron.schedule, no workflow schedule:, no wrangler.toml).",
+      "acceptanceCriteria": [
+        "The lead detail header shows a 'Next step' from getRecommendedActions(score, { hasPhone, hasEmail, timeline }) and a one-tap button that performs it and logs the activity",
+        "An agent can add a follow-up task with a due date on a lead; open tasks appear in a 'Due today' block on Overview and in the lead modal, and completing one writes task_completed_at",
+        "sla_hours is stored in profiles.notification_preferences and edited in Settings, not in component state",
+        "A scheduled job (pg_cron on self-hosted Supabase, or a GitHub Actions schedule calling a service-role endpoint) runs at least hourly, finds leads with status='new' and first_responded_at IS NULL older than sla_hours, and inserts a notifications row plus one email per lead, at most once per lead",
+        "The same scheduler runs process-account-deletions and the cleanup_* functions, which currently never execute",
+        "Tapping a New Lead notification navigates to /dashboard/leads?lead=<id> and opens that lead",
+        "execute-workflow's create_task node inserts a real task activity; send_sms either sends or is removed from the node palette"
+      ],
+      "priority": 103,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (CRM and backend slices). This is the story that makes the 'guide them through the process' claim true. Depends on US-101 and US-102."
+    },
+    {
+      "id": "US-104",
+      "title": "Leads list: no pagination, no status filter, stale sibling caches, and a CSV export that breaks on commas",
+      "description": "useLeads.ts:46-50 selects every lead and decryptLeadRows sends every ciphertext to pii-crypto on each visit; there is no range(), no status or type filter (only name search and a 'needs attention' toggle), and the Contacted/Converted stat cards are not clickable. Bulk update and delete (Leads.tsx:214-228, 254-264) bypass the hook and refetch only ['leads'], so ['analytics-leads'] (useAnalytics.ts:155) and ['conversion-funnel'] (ConversionFunnel.tsx:47) stay stale for up to five minutes and Overview contradicts the Leads page. The CSV export (Leads.tsx:294-308) quotes only message, so 'Smith, John' splits into two columns in Excel, and it exports all leads rather than the filtered set. Overview.tsx:132-136 labels the 30-day total as 'New Leads' and its recent-leads rows are not links. QuickActionsDashboard.tsx:44-45,83-84 ships views: 0 and leadsChange: 0 as placeholders and handleRefreshStale only toasts.",
+      "acceptanceCriteria": [
+        "useLeads takes { status, leadType, search } and pages with useInfiniteQuery and .range() in pages of 50; status and type are pushed into the query",
+        "Stat cards on the Leads page set the status filter; a filter is reflected in the URL so a notification deep link can preselect it",
+        "Bulk status and delete go through useLeads mutations that invalidate ['leads'], ['analytics-leads'] and ['conversion-funnel'] by prefix",
+        "CSV export quotes every cell, exports the filtered set, and includes phone, source and first_responded_at",
+        "Overview labels the count 'Leads (30d)' or filters to status='new', and each recent lead links to /dashboard/leads?lead=<id>",
+        "QuickActionsDashboard shows real deltas from previousStats and its refresh action navigates to the listing editor, or the page is removed from App.tsx"
+      ],
+      "priority": 104,
+      "passes": false,
+      "notes": "Found by the 2026-09 CRM review. Depends on US-094."
+    },
+    {
+      "id": "US-105",
+      "title": "Lead scoring and routing: the AI score is time-of-day plus message length, and zip rules never match",
+      "description": "useMLLeadScoring.ts:287-316 reads listingViews, pageViewCount, timeOnSite, scrollDepth, hasViewedMultipleListings, utm_source, device, preapproval_status and timeline from lead.form_data. None are written: leadSubmission.ts:48-54 lifts timeline and preApproved into columns (so form_data.timeline is always absent), utm_source and device are columns, and nothing records listing views against a lead. assignVariant (ml-lead-scoring.ts:685-688) returns 'ml' by default, so leads are scored by DEFAULT_WEIGHTS on mostly-zero inputs; the 'accuracy: 0.75, auc: 0.82' at line 380 are literals and recordConversion has no caller, so nothing learns. The Hot/Warm/Cold badges the agent sorts by mean 'included a phone and wrote at 10am'. In routing, auto_assign_lead (baseline:191) compares criteria->>'zip' to NEW.property_address, a full street address, so zip rules silently fall through to round-robin; useLeadRouting.ts:144-150 exposes zip, price_min and price_max but LeadRoutingRules.tsx:53 only ever writes lead_type. And the leads policies are user_id only (no assigned_to), so a team member a lead is routed to cannot read it.",
+      "acceptanceCriteria": [
+        "extractFeaturesFromLead reads lead.timeline, lead.preapproved, lead.utm_source and lead.device from their real columns; unmeasured behavioural features are removed from the weight vector",
+        "The badge is labelled 'Priority' and the settings copy says it is rules-based until behavioural capture exists; the literal accuracy/auc figures are removed from the UI",
+        "auto_assign_lead matches zip with a word-boundary regex against property_address or a dedicated zip column, verified with a fixture in verify:schema",
+        "LeadRoutingRules exposes exactly the criteria the trigger evaluates, and the rest are removed from RoutingCriteria",
+        "leads, lead_activities and lead_notes SELECT/UPDATE policies include OR auth.uid() = assigned_to, verified by executing as the assignee"
+      ],
+      "priority": 105,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (CRM and backend slices)."
+    },
+    {
+      "id": "US-106",
+      "title": "Editing a listing does not reach the public page, and half-baths and \"2,400 sqft\" cannot be saved",
+      "description": "listings carries both beds/baths (integer NOT NULL) and bedrooms/bathrooms (numeric), both sqft and square_feet. Create (Listings.tsx:149-154) writes both pairs; edit (Listings.tsx:293-307) writes only beds/baths/sqft. The public read normalises with bedrooms ?? beds (usePublicProfile.ts:184-186), so the stale bedrooms wins: an agent changes 3 to 4 beds and their clients still see 3. ListingsBlock.tsx:163-168 reads bedrooms only. AddListingModal.tsx:373-380 renders baths with step 0.5, and 2.5 into an integer column fails with the generic 'Failed to add listing'. The sqft placeholder is '2,400' (line 387) and Listings.tsx:153-154 does parseInt, so '2,400' stores 2 and the card shows '$625,000/sqft'. AddListingModal also collects yearBuilt, stories, garage, videoUrl and openHouseEndDate, none of which are columns, and drops them silently; the CSV template advertises year_built and drops it too.",
+      "acceptanceCriteria": [
+        "A migration makes bedrooms/bathrooms/square_feet the canonical columns (bathrooms numeric), backfills them from beds/baths/sqft where null, and either drops beds/baths/sqft or turns them into generated columns",
+        "Create, edit, CSV import and the onboarding wizard all write the canonical columns; the public read, ListingCard, ListingsBlock and FeaturedListingsCarousel read only them",
+        "2.5 baths saves and renders as 2.5; '2,400' saves as 2400; the zod schema rejects a non-numeric sqft",
+        "Fields with no column are either removed from the form and CSV template or added by migration and persisted",
+        "npm run verify:schema and npx tsc --noEmit pass; useListings.test.ts covers an edit round trip"
+      ],
+      "priority": 106,
+      "passes": false,
+      "notes": "Found by the 2026-09 content review. The dual columns came from an earlier reconciliation; finish it rather than keep writing both."
+    },
+    {
+      "id": "US-107",
+      "title": "The six-step Add Listing form discards everything on a photo upload failure, and the edit modal cannot manage photos at all",
+      "description": "Listings.tsx:139-140 does `imageUrls = await uploadListingImages(data.images); if (imageUrls.length === 0) return;`, a normal return, and the catch at 194-200 toasts without rethrowing. AddListingModal.tsx:204-208 then runs onOpenChange(false); reset(); regardless, so a 6 MB photo (limit 5 MB, useListingImageUpload.ts:9) means the agent re-enters the whole listing. EditListingModal.tsx:15-27 exposes only address/city/price/beds/baths/sqft/status/image/description/mls/property_type with a raw 'Image URL' text input at 185-194: no add/remove/reorder of photos, no is_featured, state, zip_code, highlights, lot_size_acres, virtual_tour_url or open_house_date. useListingImageUpload.ts:101-102 invokes optimize-image with bucket 'listings'; the bucket is 'listing-photos' (20260808000005:36-44), so optimisation 404s (caught as debug) and every public listing serves the 5 MB original; the cleanup regex at line 156 never matches the real URL, so partial uploads orphan objects. Status changes to sold never write sold_date, nothing writes sort_order (the public gallery orders by it), and QuickStatusUpdate offers off_market while the dashboard chips do not know it and draft renders an empty dropdown.",
+      "acceptanceCriteria": [
+        "handleAddListing throws on upload or insert failure and the modal stays open with the form intact; files are validated for size and type at selection time",
+        "Add and edit share one form; edit has a photo manager that adds, removes and reorders photos, writing photos and image = photos[0], and can set is_featured and the remaining columns",
+        "optimize-image is invoked with bucket 'listing-photos', produces WebP variants, and the rollback cleanup deletes the uploaded objects on failure",
+        "Setting status to sold writes sold_date (and create writes listed_date); a drag reorder on the Listings page persists sort_order and the public gallery follows it",
+        "One status list is shared by the form, QuickStatusUpdate and the dashboard filter chips",
+        "The avatar upload uses a content-hashed or timestamped object name and invalidates ['profile'] so a replaced headshot shows immediately"
+      ],
+      "priority": 107,
+      "passes": false,
+      "notes": "Found by the 2026-09 content review. Depends on US-106 for the column names."
+    },
+    {
+      "id": "US-108",
+      "title": "Onboarding: filling in Location loses everything, the first listing never saves, and the chosen template is never applied",
+      "description": "OnboardingWizardPage.tsx:50-57 splits 'Austin, TX' (the placeholder's own example) into profileUpdates.city and license_state. profiles has no city column (the real one is service_cities jsonb), PostgREST rejects the whole .update() at 101-108, which throws, so name, title, bio, phone, avatar, theme and onboarding_completed_at are all lost, the agent sees 'Failed to save your information', and Login.tsx:77 sends them back into the wizard on every login. Lines 155-170 insert the first listing with bedrooms/bathrooms only (beds/baths are NOT NULL) and `featured: true` (the column is is_featured); the error is swallowed at 174-177 and the listing never exists. OnboardingWizard.tsx:101-126 requires a template from luxury/modern/coastal/classic; themes.ts has no luxury or coastal, and FullProfilePage.tsx:101-104 skips preset names anyway ('It's just a theme name like default, skip applying'), so the mandatory step changes nothing. Line 191 sends the welcome email with user_metadata.username || 'agent' although derive_available_username may have assigned something else. The onboarding gate exists only on the password login path (Login.tsx:75-78); AuthCallback.tsx:63-66 goes straight to /dashboard, so a Google or Apple signup never sees the wizard.",
+      "acceptanceCriteria": [
+        "The wizard writes service_cities = [city] and license_state, and a unit test asserts every key in profileUpdates is a key of Database['public']['Tables']['profiles']['Update']",
+        "The first listing is inserted with the canonical listing columns and is_featured true, and a failure is surfaced to the agent rather than swallowed",
+        "Template ids map to real DEFAULT_THEMES ids, FullProfilePage resolves a preset name with getCurrentTheme(name) and applies it, and the chosen template is visible on the public page after finishing",
+        "The welcome email uses profile.username from the store",
+        "The onboarding check lives in ProtectedRoute or DashboardLayout so every auth path reaches the wizard once",
+        "An e2e spec completes the wizard with a Location filled in and lands on /dashboard with the profile saved"
+      ],
+      "priority": 108,
+      "passes": false,
+      "notes": "Found by the 2026-09 onboarding review. This is the first thing every new agent touches; do it early. Depends on US-106 for listing column names."
+    },
+    {
+      "id": "US-109",
+      "title": "Sample data generation on signup publishes four fake reviews and eats the free listing quota",
+      "description": "useAuthStore.ts:247-297 calls generateSampleData when signup returns a session (only when email confirmation is off; with the OTP flow in Register.tsx:96-123 it never runs, so the code is dead in the current configuration). When it does run, sample-data-service.ts inserts 4 listings against a free limit of 3 (enforce_listing_limit rejects the 4th and the agent's first real listing shows 'Upgrade required', Listings.tsx:123-131), 4 fake testimonials with is_published: true ('Robert & Lisa Thompson... Highly recommend!', lines 326-334) on a real licensed agent's public page, and 5 fake leads. deleteSampleData (line 647) is exported and called by nothing.",
+      "acceptanceCriteria": [
+        "Sample data is no longer generated on signup; the admin SampleDataManager remains the only entry point",
+        "If demo content is kept for admin use, rows are tagged, testimonials are never published, and check_subscription_limit excludes tagged rows",
+        "deleteSampleData is reachable from the UI wherever generation is, or both are deleted",
+        "npx tsc --noEmit reports 0 errors and the auth tests pass"
+      ],
+      "priority": 109,
+      "passes": false,
+      "notes": "Found by the 2026-09 onboarding review."
+    },
+    {
+      "id": "US-110",
+      "title": "The public page ignores the agent's visibility settings and hides pending listings",
+      "description": "usePublicProfile.ts:155-161 reads user_settings with the anon client; the only SELECT policy is auth.uid() = user_id (baseline:14700; no anon grant in any later migration), so maybeSingle() returns null and lines 207-213 fall back to all-true. Settings.tsx writes show-sold/show-testimonials/show-social-proof toggles, the agent flips 'Show sold properties' off, and every real visitor still sees them; only the agent, logged in, sees the toggle work. usePublicProfile.ts:110 fetches active, pending, under_contract and sold, but FullProfilePage.tsx:171-172 renders only active and sold, so marking a listing Pending in the dashboard makes it vanish from the public page even though ListingCard has a Pending badge.",
+      "acceptanceCriteria": [
+        "The five visibility booleans are readable by anon for published profiles (a column-limited policy on user_settings, or columns on the public_profiles view), and an anon fetch returns them",
+        "Flipping a toggle in Settings changes the public page for a logged-out visitor, covered by an e2e spec",
+        "The public gallery shows active, pending and under_contract with their badges, active first",
+        "npm run verify:schema passes"
+      ],
+      "priority": 110,
+      "passes": false,
+      "notes": "Found by the 2026-09 public-surface review."
+    },
+    {
+      "id": "US-111",
+      "title": "Remove the hard-coded trust claims: \"Available Now\", \"Verified Agent\", \"Responds in < 1 hour\", \"Trusted by Hundreds\", SOC 2, and the fabricated stats block",
+      "description": "ProfileHeader.tsx:82-85 shows 'Available Now' with a pulsing green dot for every agent, always; 89-92 shows 'Verified Agent' though no verification exists. FullProfilePage.tsx:416 sets responseTime: '< 1 hour' and StickyActionBar.tsx:225 repeats it with no data behind it. SocialProofBanner.tsx:69 says 'Trusted by Hundreds of Happy Clients' with 1 sale and 0 reviews. pageBuilder.ts:411-415 defaults the Stats block to '150 Homes Sold', '98% Client Satisfaction', '15 Years', '$50M in Sales' and StatsBlock.tsx:60 publishes it unchanged; the Bio block defaults to 'Your Name' / '[Your City]'. Register.tsx:243 claims 'SOC 2 compliant'; Register.tsx:272 says '2,500+ agents' while Landing.tsx:210,525 says '5,000+'; the Landing JSON-LD carries ratingValue 4.8 and Login.tsx:243-252 quotes a named testimonial. These are advertising claims on a licensed professional's page and on the company's own signup.",
+      "acceptanceCriteria": [
+        "The static availability, verification, response-time and 'hundreds' strings are removed; a response-time badge appears only when computed from leads.first_responded_at - created_at over the last 90 days",
+        "'Verified' is replaced by 'Licensed' and shown only when license_number and license_state are present",
+        "Stats block defaults to an empty list (the block already renders 'Add stats in the settings panel' when empty) and Bio block defaults come from the profile",
+        "SOC 2 wording is removed unless an attestation exists; agent counts and the aggregate rating come from one config value or are removed; the login testimonial is real or removed"
+      ],
+      "priority": 111,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (public-surface, content and onboarding slices)."
+    },
+    {
+      "id": "US-112",
+      "title": "Public listing UX: the modal shows a placeholder for photos the card displays, stray \"0\"s, a leaking scroll listener, and dead buttons",
+      "description": "usePublicProfile.ts:188 normalises photos with toStringList, which returns [] for null; ListingDetailModal.tsx:73-76 does `listing.photos || (listing.image ? [listing.image] : null)`, and [] is truthy, so a legacy single-image listing shows the grey placeholder in the modal while ListingCard.tsx:46 shows the photo. ProfileHeader.tsx:124,131,138 and FeaturedListingsCarousel.tsx:277-293 use `stats.propertiesSold && ...`, so a new agent's badge row renders '00'. QuickNav.tsx:20-24 calls window.addEventListener in the render body with no cleanup; each state change adds a listener and each scroll fires all of them. SoldProperties.tsx:78-83 renders 'View All {n} Sold Properties' with no handler, duplicates the stats bar above it and formats missing prices as '$0K+'. StickyActionBar's desktop panel overlaps content between 768 and 1150px and its mobile panel overlaps QuickNav's scroll-to-top. FullProfilePage.tsx:165-167 renders NotFound for any error, including a transient network failure; 57-66 uses .single() for the custom-page check and silently skips the redirect on PGRST116. Forms call setValue without shouldValidate, two error boxes lack role=alert, and two DialogContents have no DialogTitle.",
+      "acceptanceCriteria": [
+        "The modal shows the same photo the card shows for every listing in the seeded fixtures",
+        "No literal 0 is rendered by a falsy guard; the badge rows use > 0 or Boolean()",
+        "QuickNav registers one passive scroll listener in an effect with cleanup",
+        "'View All' expands the sold list; the duplicate stats bar is removed; the floating panels do not overlap content or each other at 375, 768, 1024 and 1280px widths",
+        "A load error shows a retry state and only a real 404 shows NotFound; the custom-page check uses maybeSingle with limit(1)",
+        "Form selects validate on change, all error boxes carry role=alert, and every DialogContent has a DialogTitle (visually hidden where needed)"
+      ],
+      "priority": 112,
+      "passes": false,
+      "notes": "Found by the 2026-09 public-surface review. Small items, one story, all client-visible."
+    },
+    {
+      "id": "US-113",
+      "title": "Public page accessibility and the review page",
+      "description": "ListingCard.tsx:152 hides save/share behind opacity-0 group-hover, invisible on touch devices, and nests two <button>s inside a role=button card whose onKeyDown handles Enter but not Space. ListingDetailModal.tsx:195-218 is a hand-rolled overlay with no role=dialog, aria-modal, focus trap or focus restore, and its icon buttons (233-257, 282-295) have no aria-label; the page already uses the Radix Dialog elsewhere. FeaturedListingsCarousel.tsx:91-99 auto-rotates every 4 s, pauses on hover only, and ignores prefers-reduced-motion. SubmitReview.tsx:241-252 requires a client email 'for verification only', never stores it (no column) and never verifies; 147-148 promises '{agent} will be notified' and no notification exists (the only testimonials trigger is track_testimonials_usage); transaction_type 'both' renders as Seller in TestimonialCard.tsx:104; the star buttons have no accessible name; and the public profile has no 'Leave a review' link, only RequestTestimonialModal builds the URL.",
+      "acceptanceCriteria": [
+        "Card actions are visible below md, the card is a single interactive element or uses a link plus separate buttons, and Space activates it",
+        "ListingDetailModal uses @/components/ui/dialog with labelled controls; the carousel pauses on touch and does not auto-rotate under prefers-reduced-motion",
+        "npm run test:a11y passes on the public profile with a listing modal open",
+        "SubmitReview either drops the email field or stores it and sends an agent notification through an edge function; 'both' renders as 'Buyer & Seller'; stars have aria-labels",
+        "A 'Worked with {name}? Leave a review' link appears near the testimonials section"
+      ],
+      "priority": 113,
+      "passes": false,
+      "notes": "Found by the 2026-09 public-surface review."
+    },
+    {
+      "id": "US-114",
+      "title": "Sharing a listing shares the profile, and every social unfurl shows the generic AgentBio card instead of the agent",
+      "description": "ListingCard.tsx:82,89, ListingDetailModal.tsx:150 and FeaturedListingsCarousel.tsx:131 share window.location.href; there is no ?listing= deep link and no state restore, so the recipient lands at the top of the profile. The JSON-LD injected inside the modal (ListingDetailModal.tsx:196-201) can never be indexed because the modal has no URL. public/_redirects is '/* /index.html 200' with no Pages Function or prerender, so iMessage, Facebook and Slack unfurls of agentbio.net/jane show index.html's generic tags ('Real Estate Agent Bio Page Builder', Cover.png) rather than the agent's name and headshot that SEOHead sets client-side. Agents share their link from business cards and Instagram; the unfurl is the first impression.",
+      "acceptanceCriteria": [
+        "/:username?listing=<id> opens that listing's modal on load and is the URL every share button copies",
+        "A Cloudflare Pages Function for /:username (and the listing variant) injects the agent's title, description, og:image and JSON-LD server-side for crawlers, verified with curl -A facebookexternalhit",
+        "Sharing a listing from a phone produces an unfurl with the property photo and address"
+      ],
+      "priority": 114,
+      "passes": false,
+      "notes": "Found by the 2026-09 public-surface review."
+    },
+    {
+      "id": "US-115",
+      "title": "Analytics counters: unthrottled view and click increments, no tracking on page-builder pages, and contact taps the agent never sees",
+      "description": "usePublicProfile.ts:59-68 calls increment_profile_views, a SECURITY DEFINER RPC with no throttle (baseline:1806-1814), from the anon client; the analytics_views throttle from US-092 does not cover profiles.view_count, so the headline number and the analytics rows diverge and anyone can loop it. increment_link_clicks has no throttle either. An agent with a custom page gets the full profile fetch and both increments (FullProfilePage.tsx:49-85) and is then redirected to /p/, where PublicPage.tsx tracks nothing, so page-builder users have no analytics. Call, Email and Text taps are only logger.info'd (FullProfilePage.tsx:424), so the agent never learns that 30 people tapped Call this week.",
+      "acceptanceCriteria": [
+        "profiles.view_count is derived from throttled analytics_views inserts (a trigger) or the RPC applies the same per-visitor limit; increment_link_clicks gets an equivalent limit",
+        "PublicPage.tsx records views through the same path as FullProfilePage, and the redirect no longer double-counts",
+        "Call, email and text taps insert an analytics event and the dashboard Analytics page shows contact taps alongside link clicks",
+        "The Analytics page states the counters are indicative (visitor ids are client-generated)"
+      ],
+      "priority": 115,
+      "passes": false,
+      "notes": "Found by the 2026-09 public-surface review. Builds on US-092."
+    },
+    {
+      "id": "US-116",
+      "title": "One public page, not two: the page builder silently replaces the listings profile, autosaves in a loop, and collides on slugs",
+      "description": "FullProfilePage.tsx:48-82,157-158 queries custom_pages on every profile view and <Navigate to='/p/...'> if the agent has any active published page, so building a page in the page builder replaces the entire listings and lead-capture profile. DemoProfilesShowcase.tsx:107 links /p/${username}, which 404s unless the slug equals the username. PageList.tsx:71 creates every page with slug = username and there is no slug editor (PageBuilder.tsx:355-361 edits only title), so a second page fails on custom_pages_user_id_slug_key with 'Failed to save page'; PublicPage.tsx:105-109 looks slugs up globally (.eq('slug').single()) so two agents with the same slug break each other; setAsActivePage (pageBuilderStore.ts:437-443) never clears other actives and the .single() checks then fail. PageBuilder.tsx:133-145's autosave effect depends on isSaving, which savePage flips, so the editor writes and toasts 'Page saved successfully' every three seconds for as long as it is open.",
+      "acceptanceCriteria": [
+        "Decide and implement one public surface: page-builder blocks render as sections inside FullProfilePage (recommended), or pages live at /:username/:pageSlug with the redirect and the /p/ route removed",
+        "Autosave fires only when the serialised page differs from the last saved version, and only callers toast",
+        "New pages get unique slugs, the slug is editable, lookups are scoped to the user, and setAsActivePage deactivates siblings",
+        "DemoProfilesShowcase links resolve; an e2e spec visits a demo profile and a page-builder page",
+        "npx tsc --noEmit reports 0 errors"
+      ],
+      "priority": 116,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (content and architecture slices). This is the 'better way to lay things out' item the user suspected; decide direction before US-114's Pages Function so the function covers the surviving routes."
+    },
+    {
+      "id": "US-117",
+      "title": "Settings page shows fake billing to every agent, edits the username unsafely, and caches the profile under the wrong shape",
+      "description": "Settings.tsx:583-606 renders 'Professional - $49/month', card '4242' and 'February 15, 2024' as literals with Manage/Update/View Invoices buttons that have no handlers; a free-plan agent reads that they are paying $49 with a card on file. Profile.tsx:308-319 is a plain required <input name='username'> sent raw by handleSubmit, while Settings.tsx:272-276 uses UsernameInput with lowercasing and an availability check: two editors, one unsafe. The public lookup (usePublicProfile.ts:51) is case-sensitive, so 'JohnSmith' saved from Profile is reachable only at /JohnSmith, unique-key collisions surface as 'Failed to update profile', and nothing warns that every printed card breaks. useUsernameCheck.ts:33-37 queries profiles as anon, which since 20260808000002 sees only published rows, so a username held by an unpublished profile reads 'available'. Settings.tsx:50-65 redeclares queryKey ['profile', user.id] returning the raw row while useProfile returns toProfile(data) with the decrypted phone, so Profile.tsx can render ciphertext after a visit to Settings.",
+      "acceptanceCriteria": [
+        "The billing block reads useSubscription() and links to /dashboard/subscription, or is removed",
+        "One username editor remains, lowercases, validates, checks availability through a SECURITY DEFINER RPC that sees unpublished profiles, and confirms 'existing links will break' before saving",
+        "Settings uses useProfile(); no second ['profile'] query exists",
+        "Vitest covers the username RPC and the Settings profile query"
+      ],
+      "priority": 117,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (content and onboarding slices)."
+    },
+    {
+      "id": "US-118",
+      "title": "Billing: the dashboard upgrade sends placeholder Stripe price ids, pricing copy contradicts the config, and a scheduled cancel drops the agent to Free today",
+      "description": "SubscriptionPage.tsx:89 uses plan.stripe_price_id_monthly from src/config/pricing-plans.ts:151-152, which are the literals 'price_starter_monthly' / 'price_starter_yearly'; create-checkout-session only checks /^price_/, so Stripe replies 'No such price' and the agent sees 'Could not start checkout'. Pricing.tsx already uses stripePriceIdFor over the subscription_plans rows, but no migration seeds that table, so a fresh environment renders an empty pricing grid, and stripe-webhook/index.ts:116-162 keeps a third copy of the limits (analytics 7 days vs 30 in config). Pricing.tsx:401 and its JSON-LD at :121 say Starter $19, Professional $39, Team $29 per agent with a 5-agent minimum; the card at 282-284 repeats 'per agent (5 minimum)'; Landing.tsx:34 says '$39/month'; the config says 29/49/99 flat and checkout sends quantity 1. Pricing.tsx:357's Free CTA links to /register, which does not exist and falls into /:slug as 'profile not found'; VsLater.tsx:107,740 link /get-started and :113 /demo, neither routed. stripe-webhook:306-308 writes status 'canceled' the day cancel_at_period_end is set and get_user_plan (baseline:1560) joins only status='active', so a paid-up agent loses Pro features immediately; invoice.payment_failed to past_due has the same effect with no grace.",
+      "acceptanceCriteria": [
+        "SubscriptionPage uses useSubscription().plans and stripePriceIdFor(plan, interval) with a monthly/yearly toggle; the placeholder ids are deleted from config",
+        "A migration seeds subscription_plans and the webhook and frontend config read limits from it (or CI generates the config from it); one source of truth",
+        "FAQ, JSON-LD and landing copy render prices from the plan rows; the per-agent claim is removed or seat quantity is implemented end to end",
+        "All links on Pricing, Landing and VsLater resolve to routes in App.tsx, checked by a test that greps to= and href= against the route table",
+        "A subscription with cancel_at_period_end stays active until current_period_end, and past_due keeps access for a stated grace window; both covered by webhook unit tests"
+      ],
+      "priority": 118,
+      "passes": false,
+      "notes": "Found by the 2026-09 onboarding/billing review. Builds on US-036/037/084."
+    },
+    {
+      "id": "US-119",
+      "title": "Backend authorization gaps: an unauthenticated SSRF proxy, an open email relay, account lockout by anyone, a workflow IDOR, and unguarded webhook fetches",
+      "description": "test-article-webhook/index.ts:11,56,86-92 has no auth, POSTs to a body-supplied webhookUrl and echoes the response status and body; on self-hosted Supabase the edge runtime shares a Docker network with postgres-meta, Kong and GoTrue, so this is a full unauthenticated internal read. publish-article-to-social/index.ts:195 fetches stored article_webhooks.webhook_url with no guard. send-welcome-email/index.ts:14-35 takes to/name/username from the body with no auth or limit: an AgentBio-branded relay from noreply@agentbio.net to any address with any link. login-security/index.ts:37-60,119-140,160-180 has no auth: five POSTs of {action:'record_attempt', email, success:false} lock any account for 30 minutes, and register_session inserts a user_sessions row for any userId. execute-workflow/index.ts:277-290 loads workflow_executions by executionId with the service-role client and never compares user.id, so any user can run anyone's workflow. submit-lead/index.ts:182 fetches the agent-controlled zapier_webhook_url with no SSRF guard, ZapierIntegrationModal.tsx:38-40 writes it unvalidated and there is no CHECK on the column, so an agent can aim it at http://postgres-meta:8080. pii-crypto/index.ts:66-118 decrypts up to 200 arbitrary ciphertexts for any JWT, and audit_table_change (baseline:102-155) stores to_jsonb(NEW) for leads and profiles, so audit_logs holds every ciphertext and every Zapier URL for that oracle to decrypt.",
+      "acceptanceCriteria": [
+        "test-article-webhook requires admin, validates the URL with ssrf-guard and does not echo the response body; publish-article-to-social guards its fetch the same way",
+        "send-welcome-email requires a JWT and takes the address from user.email and the username from the profile",
+        "record_attempt and register_session require the service role (or are driven from a GoTrue hook); check_throttle remains public and is rate limited by IP",
+        "execute-workflow rejects an execution whose workflow.user_id is not the caller",
+        "zapier_webhook_url is validated with isValidWebhookUrl on write and guarded with ssrf-guard on fetch, and a CHECK constraint limits it to hooks.zapier.com and hook.*.make.com",
+        "pii-crypto decrypts by lead id for rows the caller owns rather than accepting raw ciphertext; audit_table_change strips encrypted_* and zapier_webhook_url before serialising",
+        "npm run test:security covers each of the six endpoints"
+      ],
+      "priority": 119,
+      "passes": false,
+      "notes": "Found by the 2026-09 backend review; verified by reading current code, not the prior review. Do before US-098's fail-closed change so the newly-effective limiter does not mask these."
+    },
+    {
+      "id": "US-120",
+      "title": "Agents are shown the platform's search-console admin tooling, and the dashboard has orphan routes and two analytics pages",
+      "description": "dashboard/Analytics.tsx:5,324 mounts @/components/admin/SearchAnalyticsDashboard (GSC, GA4, Bing and Yandex OAuth connections) in a 'search' tab of the agent-facing page with no admin gate. /dashboard/analytics-advanced -> src/pages/AnalyticsDashboard.tsx (417 lines) is linked from nothing but route-announcer.tsx:34; /dashboard/settings/delete-account has no Link anywhere; /dashboard/api-keys, /team and /subscription are in the desktop sidebar (DashboardLayout.tsx) but absent from MobileNav.tsx; route-announcer names /dashboard/lead-management, which US-081 removed. The sidebar has 15 entries for a link-in-bio product aimed at non-technical agents. ProtectedRoute.tsx and SecureRoute.tsx are two guards with different state machines writing the same lastVisitedRoute key; RouteErrorBoundary wraps dashboard and admin but not the 13 public/legal/blog routes, 5 landings, 5 feature pages or 7 auth routes; FullProfilePage with its 20 imports is eager-loaded into the entry chunk.",
+      "acceptanceCriteria": [
+        "The search-console tab is removed from the agent Analytics page and lives under /admin only",
+        "AnalyticsDashboard.tsx is deleted or its KPI/funnel widgets merged into dashboard/Analytics.tsx; delete-account is linked from Settings; MobileNav and the sidebar list the same destinations",
+        "The dashboard nav is Overview, Profile, Links, Listings, Leads, Analytics, Settings, with billing, team, API keys, workflows and theme reachable from Settings",
+        "One RequireAuth layout route (with a requireAdmin prop) replaces ProtectedRoute and SecureRoute; RouteErrorBoundary sits in the public and dashboard layout routes; FullProfilePage is lazy",
+        "npm run test:e2e and test:a11y pass"
+      ],
+      "priority": 120,
+      "passes": false,
+      "notes": "Found by the 2026-09 architecture review."
+    },
+    {
+      "id": "US-121",
+      "title": "Repository root: 121 markdown files, committed PDFs, backups and screenshots, and a test that writes reports into the tree",
+      "description": "The root has 179 entries including 121 .md files, lead_report_2026-08-08.pdf, lead_report_2026-09-01.pdf, performance_2026-08-08.pdf, performance_2026-09-01.pdf (all written by src/lib/exportUtils.test.ts driving jsPDF's doc.save under jsdom, so every npm run test:run dirties the tree), migrations.zip, Keywords.csv, keywords-template.csv, three import-articles*.sql, update-article-authors.sql, four .ps1 scripts, setup-runner.sh, update-cors.sh, INSTALLING (0 bytes), .styleci.yml (a Laravel preset), and test-reports/ (13 MB, a 9.5 MB JSON and 31 screenshots) plus public/logo.psd (2.7 MB) tracked in git. db-backup/ (9.9 MB) commits cluster backups and article rows; .gitignore covers 2 of its 14 files. docs/ has two files and docs/CODE_REVIEW_2026-08.md has diverged from the root copy by 771 lines. .claude/settings.local.json is committed. .gitignore still lists /vendor, Homestead.*, /public/hot and other PHP entries; src/types/linkstack.ts, LinkStackBlocks.tsx, .lovable-rebuild, lovable-tagger in vite.config.ts:34 and the [Lovable] prefixes in main.tsx:39,71 are leftovers of two earlier platforms.",
+      "acceptanceCriteria": [
+        "exportUtils.test.ts stubs doc.save (or writes to the scratch dir) and a test run leaves git status clean",
+        "The PDFs, CSVs, .ps1 and shell scripts, import SQL, migrations.zip, INSTALLING, .styleci.yml, test-reports/, logo.psd and db-backup/ are removed from the tree; .gitignore excludes test-reports/, *.pdf, db-backup/, *.backup* and .claude/settings.local.json and drops the PHP entries",
+        "Markdown moves under docs/{setup,deploy,architecture,product,seo,reviews,archive}/ with README, CLAUDE, CONTRIBUTING, SECURITY, LICENSE and CODE_OF_CONDUCT left in the root; the two CODE_REVIEW_2026-08 copies are reconciled into one",
+        "LinkStack and Lovable remnants are deleted and lovable-tagger is removed from devDependencies and vite.config.ts",
+        "CLAUDE.md's internal-docs section points at the new locations and the stale 'migrations fail in ten places' sentence is corrected (verify:schema now applies all 13 in one pass)"
+      ],
+      "priority": 121,
+      "passes": false,
+      "notes": "Found by the 2026-09 architecture review. prd.json and progress.txt stay in the root because the Ralph loop reads them there."
+    },
+    {
+      "id": "US-122",
+      "title": "One deployment path, one migration tree, one CI directory",
+      "description": "Edge functions have four documented deployment paths: edge-functions-server.ts (unused; its FUNCTIONS_MAP lists 15 of 89 functions including the dead submit-contact), Dockerfile, edge-functions.Dockerfile, Dockerfile.gitclone, docker-compose.edge-functions.yml, nixpacks.toml, six COOLIFY_/EDGE_FUNCTIONS_/DOCKERFILE_ docs and two migrate-*.ps1 scripts. supabase/ holds all_migrations_combined.sql, all_migrations_safe.sql and migration_part_1..9.sql (1.3 MB) referenced by nothing; database/performance-indexes.sql says 'run these in the SQL editor' and 18 of its 23 indexes exist in no migration, so production indexes are unknowable from the repo; database/database.sqlite is an empty Laravel file. github-actions/ holds six workflow files GitHub never runs (only .github/workflows/ executes), its ci.yml differs from the live one by 350 lines, and cd/deploy/pr-preview/performance/security exist only there while GITHUB_ACTIONS_SETUP_COMPLETE.md documents them as done. mobile-native-js/ is a separate React Native app (32 files) nothing builds and tools/automated-testing/ (39 files) is a Playwright crawler whose only output is the committed test-reports/.",
+      "acceptanceCriteria": [
+        "docs/deploy/edge-functions.md documents the one real path; the other Dockerfiles, the compose file, nixpacks.toml, edge-functions-server.ts and the .ps1 scripts are deleted",
+        "The 18 missing indexes are added in a migration (CREATE INDEX IF NOT EXISTS); database/, supabase/all_migrations_*.sql, supabase/migration_part_*.sql and migrations.zip are deleted",
+        "github-actions/ is deleted; any workflow from it that is wanted is moved into .github/workflows/ and runs green",
+        "mobile-native-js/ and tools/automated-testing/ are moved to their own repositories or deleted, with a note in docs/archive",
+        "npm run verify:migrations and the verify-backend workflow pass"
+      ],
+      "priority": 122,
+      "passes": false,
+      "notes": "Found by the 2026-09 architecture review."
+    },
+    {
+      "id": "US-123",
+      "title": "Environment variables: three names for the site URL, two PII key schemes, and an .env.example that documents removed features",
+      "description": ".env.example declares seven VITE_FIREBASE_* (push was removed in US-059), PII_ENCRYPTION_KEY (a server secret in the frontend template) and VITE_STRIPE_PUBLISHABLE_KEY (@stripe/stripe-js is unused). Read in src/ but undocumented: VITE_APP_VERSION, VITE_GOOGLE_CLIENT_ID, VITE_MICROSOFT_CLIENT_ID, VITE_YANDEX_CLIENT_ID, VITE_SENTRY_ENABLED, VITE_ENABLE_LOGGING, VITE_DEPLOYMENT_REGION, VITE_API_URL. Edge functions read 40 names with alias clusters: SITE_URL (19 uses) / APP_URL / FRONTEND_URL (oauth-proxy:15) / PUBLIC_SITE_URL (schedule-seo-audit:91); FUNCTIONS_URL / EDGE_FUNCTIONS_URL / app.settings.functions_url; PAGESPEED_API_KEY / PAGESPEED_INSIGHTS_API_KEY. Set one and the others fall back to https://agentbio.net, wrong on staging. _shared/encryption.ts:35 (PII_ENCRYPTION_KEY ?? ENCRYPTION_KEY, PBKDF2, enc:v1 envelope) and encrypt-pii/index.ts:42 (ENCRYPTION_MASTER_KEY, raw 32-byte key, different envelope) cannot read each other's output. email.ts:73 falls back to a single global AGENT_EMAIL in a multi-tenant product. The app URL has three sources (seo.config.ts:8, lib/utils.ts:57, lib/constants.ts:6) and the GA id is hard-coded in public/scripts/analytics.js:9. Seven functions still use the static corsHeaders pinned to https://agentbio.net, so www.agentbio.net users fail CORS on the sessions and GDPR pages.",
+      "acceptanceCriteria": [
+        ".env.example is regenerated from a grep of import.meta.env.VITE_* and contains exactly those keys; supabase/functions/.env.example lists every Deno.env.get name with a one-line purpose",
+        "_shared exports one SITE_URL and one FUNCTIONS_URL helper and every function uses them; the alias names are removed",
+        "encrypt-pii is deleted and createAgentNotificationEmail/AGENT_EMAIL removed",
+        "The app URL comes from lib/utils.ts everywhere; the GA id comes from an env var",
+        "The seven static-CORS functions use getCorsHeaders(origin), and no Origin header yields no ACAO header rather than *"
+      ],
+      "priority": 123,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (architecture and backend slices)."
+    },
+    {
+      "id": "US-124",
+      "title": "Dead code sweep: 222 unused files, 264 unused exports, and a dozen unused dependencies",
+      "description": "npx knip reports 222 unused files and 264 unused exports. Beyond the CRM components in US-102: hooks useSecureListings (its VALID_STATUSES lacks under_contract and draft), useListingUpdate, useAutoSave, useLinkValidation and lib/image-seo.ts; MobileListingCard vs profile/ListingCard; components/LoadingSpinner.tsx vs ui/LoadingSpinner.tsx with SkeletonCard defined in both places; Hero3D.tsx and Hero3DPhone.tsx (react-three) while the rendered Hero3DShowpiece is CSS-only, yet three stays in deps and manualChunks; four sitemap implementations (pages/Sitemap.tsx, functions/sitemap, functions/generate-sitemap, static public/sitemap.xml); five static city pages superseded by DynamicLocationPage; RouterCheck, ReviewSchema, seo/PageSEO, seo/SchemaMarkup; five admin panels (AdminOperationsHub, ErrorLogViewer, MLLeadScoringDashboard, SystemHealthMonitor, UserManagementPanel), SubscriptionGuard, EnterpriseLogin and SSOConfigForm (mounted nowhere), useFeatureFlag/isFeatureEnabled with no consumer so flags control nothing, and the unused barrels pages/admin/index.ts and pages/dashboard/workflows/index.ts. Unused deps: axios, jsonwebtoken, @stripe/stripe-js, qrcode.react, react-dropzone, remark-gfm, three-mesh-bvh, tailwindcss-animate, @radix-ui/react-accordion, @radix-ui/react-toast; dev: workbox-build/precaching/routing/strategies, @vitejs/plugin-legacy, sharp, ts-node, @types/dompurify, @types/testing-library__jest-dom. TeamPage.tsx:35's 'teams aren't in the generated types' comment is stale and hides an any cast.",
+      "acceptanceCriteria": [
+        "Every file knip lists as unused is deleted or wired, and knip runs in CI with the remaining allowlist committed",
+        "Feature flags either gate at least the SSO and workflows entry points or the table, manager and hook are removed together; SSO login/config are either routed or removed with their functions",
+        "One sitemap implementation remains and robots.txt points at it; one LoadingSpinner and one SkeletonCard",
+        "The listed dependencies are uninstalled; three is removed if Hero3D/Hero3DPhone go",
+        "npm run build, test:run and tsc pass; bundle size does not rise"
+      ],
+      "priority": 124,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (architecture and content slices). Do after US-102 and US-116 so those decisions are not undone here."
+    },
+    {
+      "id": "US-125",
+      "title": "Build output ships 17 MB of source maps to Cloudflare, two vendor chunks are over budget, and lint cannot fail",
+      "description": "vite.config.ts sets sourcemap: 'hidden', which drops the sourceMappingURL comment but still emits 144 .map files into dist/assets (three-vendor 2.6 MB, index 1.66 MB); Cloudflare Pages uploads the whole of dist/, so the full source is fetchable by URL. dist is 26 MB, 17 MB of it maps. three-vendor is 820 KB and export-vendor 619 KB against the 600 KB vendor budget the file's own comment claims is enforced (the comment says 594; index is 466 KB against a noted 407). manualChunks hardcodes 14 Radix packages by name. eslint reports 726 warnings and 0 errors: react/no-unescaped-entities 343, @typescript-eslint/no-explicit-any 251 (CLAUDE.md says no any), no-unused-vars 52, react-hooks/exhaustive-deps 21, no-empty-function 17, no-console 17. CI runs eslint --max-warnings=-1, which never fails on warnings, so the count is invisible and only rises.",
+      "acceptanceCriteria": [
+        "Source maps are uploaded to Sentry in CI and deleted from dist/ before deploy (or sourcemap is false and the Sentry Vite plugin uploads them); a deployed build serves no .map file",
+        "check-bundle-size.mjs budgets are real and enforced; export-vendor is split or lazy so the PDF library loads only on export; the baseline comments in vite.config.ts are refreshed or removed",
+        "manualChunks routes node_modules/@radix-ui/* by prefix rather than by name",
+        "eslint runs in CI with --max-warnings set to the current count and the number is ratcheted down in each PR; no-explicit-any and exhaustive-deps are errors for new code via an overrides block",
+        "react/no-unescaped-entities is cleared with eslint --fix in one commit"
+      ],
+      "priority": 125,
+      "passes": false,
+      "notes": "Found by the 2026-09 architecture review. Builds on US-026."
+    },
+    {
+      "id": "US-126",
+      "title": "Decide the fate of the SEO suite: 32 tables, 37 uncalled functions and 460 KB of admin UI that the agent never sees",
+      "description": "Of 135 public tables, 32 are seo_* plus gsc_*, yandex_*, ga4_* and pseo_*; src/ queries 8 of the 32. Of 89 edge functions, 33 are invoked from src/ and 37 are referenced by nothing (analyze-*, check-*, crawl-site, detect-*, gsc-*, apply-seo-*, optimize-page-content, validate-structured-data, run-scheduled-audit and more), and no migration or workflow schedules any of them. 24 tables are touched by neither src/ nor supabase/functions (seo_automation_logs, seo_page_scores, seo_report_history, seo_settings, workflow_execution_queue, workflow_templates, workflow_triggers, workflow_versions, lead_scores, ml_training_examples, team_round_robin, rate_limits, mortgage_calculations, ...). src/components/admin is 460 KB across 33 components and SEODashboard.tsx is an 11-line wrapper around the same SEOManager that AdminDashboard.tsx:23 mounts as a tab. This is the platform's own marketing tooling living inside the agent product; it doubles the schema, the deno check surface and the migration risk for a product whose users are agents.",
+      "acceptanceCriteria": [
+        "A written decision in docs/architecture: extract the SEO suite to its own repository, or keep it as an isolated src/admin-seo/ package with its own lazy entry and its own migration prefix",
+        "The 37 uninvoked functions are each either scheduled (US-103's scheduler), invoked from the admin UI, or deleted with their tables in a migration",
+        "The 24 orphan tables are dropped or claimed by a caller; verify:schema fails on a public table referenced by no code",
+        "/admin/seo is removed as a duplicate of the AdminDashboard tab",
+        "CLAUDE.md's table count and cluster description are updated"
+      ],
+      "priority": 126,
+      "passes": false,
+      "notes": "Found by the 2026-09 architecture review. A decision story like US-057; the work that follows is a separate batch."
+    },
+    {
+      "id": "US-127",
+      "title": "Advertised but unbuilt: URL import from Zillow, custom domains, and a first-run checklist that would replace them",
+      "description": "Listings.tsx:403-406 offers 'Copy from Zillow, Realtor.com, etc.' and URLImportDialog.tsx:196-202 fakes a one-second load then errors 'Direct URL scraping requires a backend service'; photos is always [] (line 79). UpgradeModal.tsx:26,90-92 sells 'Connect your own domain' and useSubscriptionLimits.ts:11 gates custom_domain_enabled, but no component reads or writes profiles.custom_domain and no verification or Cloudflare hostname flow exists. Meanwhile the thing a new agent actually needs is missing: Overview.tsx:49 swaps the greeting for 48 hours, the copy-link block appears only inside the empty-leads card (196-213), there is no QR code anywhere (qrcode.react is installed and unused) and no setup checklist. Links.tsx/useSoftDelete cancel a pending delete on unmount so navigating away within 10 s silently keeps the link, visibleLinks memoises on a stable callback so the list never recomputes, and add/update/reorder toast twice. Testimonials.tsx shows Total Reviews twice, its empty-state button has no onClick, clientPhoto is never uploaded and edit cannot change is_featured.",
+      "acceptanceCriteria": [
+        "The URL import mode is hidden until a scraper exists and the menu reads 'Paste listing text'; the custom-domain bullet is removed from UpgradeModal and the plan config until the feature ships",
+        "Overview shows a persistent setup checklist for new agents (add headshot, add first listing, copy your link, download QR code, share on Instagram) with a QR code generated from qrcode.react",
+        "Pending link deletes flush on unmount, the visible list recomputes on pendingCount, and each action toasts once",
+        "The Testimonials page shows each stat once, the empty-state button opens the add modal, client photos upload, and edit can toggle featured"
+      ],
+      "priority": 127,
+      "passes": false,
+      "notes": "Found by the 2026-09 review (content and onboarding slices)."
     }
   ]
 }
