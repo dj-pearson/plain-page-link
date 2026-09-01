@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { Database } from '@/integrations/supabase/types';
+import { decryptPIIBatch } from '@/lib/pii';
 
 export type TimeRange = '7d' | '30d' | '90d';
 
@@ -30,11 +31,52 @@ export type LeadsDatum = {
   value: number;
 };
 
-/** Exactly the lead columns this hook selects, and LeadsTable renders. */
+/**
+ * Exactly the lead columns this hook exposes, and LeadsTable renders.
+ *
+ * `email` and `phone` are not columns any more — US-086 dropped the plaintext
+ * pair — so they are produced by decrypting encrypted_email/encrypted_phone at
+ * the read boundary below, the same way useLeads does.
+ */
 export type RecentLead = Pick<
   Database['public']['Tables']['leads']['Row'],
-  'id' | 'name' | 'created_at' | 'lead_type' | 'status' | 'email' | 'phone' | 'first_responded_at'
+  'id' | 'name' | 'created_at' | 'lead_type' | 'status' | 'first_responded_at'
+> & {
+  email: string | null;
+  phone: string | null;
+};
+
+type EncryptedLeadRow = Pick<
+  Database['public']['Tables']['leads']['Row'],
+  | 'id'
+  | 'name'
+  | 'created_at'
+  | 'lead_type'
+  | 'status'
+  | 'encrypted_email'
+  | 'encrypted_phone'
+  | 'first_responded_at'
 >;
+
+/**
+ * Decrypts a page of leads in one batched call.
+ *
+ * Batched for the same reason useLeads batches: since US-066 the crypto lives
+ * in the pii-crypto Edge Function, so a call per field would be two network
+ * round trips per row.
+ */
+async function decryptRecentLeads(rows: EncryptedLeadRow[]): Promise<RecentLead[]> {
+  const [emails, phones] = await Promise.all([
+    decryptPIIBatch(rows.map((row) => row.encrypted_email)),
+    decryptPIIBatch(rows.map((row) => row.encrypted_phone)),
+  ]);
+
+  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }, i) => ({
+    ...rest,
+    email: emails[i] ?? null,
+    phone: phones[i] ?? null,
+  }));
+}
 
 export function useAnalytics(timeRange: TimeRange = '30d') {
   const { user } = useAuthStore();
@@ -118,14 +160,18 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
         .from('leads')
         // id and name are here because LeadsTable renders both — it keyed every
         // row on an undefined id and printed an empty name cell without them.
-        .select('id, name, created_at, lead_type, status, email, phone, first_responded_at')
+        // email/phone come from the encrypted columns (US-086 dropped the
+        // plaintext ones) and are decrypted below before any consumer sees them.
+        .select(
+          'id, name, created_at, lead_type, status, encrypted_email, encrypted_phone, first_responded_at'
+        )
         .eq('user_id', user.id)
         .gte('created_at', cutoffDate) // Filter by time range
         .order('created_at', { ascending: false })
         .limit(500); // Hard limit for safety
 
       if (error) throw error;
-      return data;
+      return decryptRecentLeads(data ?? []);
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds

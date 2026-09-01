@@ -336,9 +336,12 @@ check('lead insert pipeline works end to end', () => {
     `);
 
     // The insert itself. A trigger referencing a bad column aborts this.
+    // Contact details go in encrypted_email — US-086 dropped the plaintext
+    // columns, so an insert naming `email` would fail here for the wrong
+    // reason. The value is not real ciphertext; nothing in this check decrypts.
     q(`
-      INSERT INTO public.leads (id, user_id, name, email, lead_type, source)
-      VALUES ('${lid}', '${uid}', 'Schema Check', 'lead@example.test', 'buyer', 'contact_form');
+      INSERT INTO public.leads (id, user_id, name, encrypted_email, lead_type, source)
+      VALUES ('${lid}', '${uid}', 'Schema Check', 'enc:v1:schemacheck', 'buyer', 'contact_form');
     `);
 
     // auto_log_lead_creation must have logged an activity.

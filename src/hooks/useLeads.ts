@@ -2,32 +2,29 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { encryptPIIBatch, decryptPIIBatch } from '@/lib/pii';
-import type { Lead } from '@/types/lead';
+import type { Lead, LeadRow } from '@/types/lead';
 
 /**
- * Decrypts the PII fields of fetched lead rows. Prefers the encrypted_*
- * columns (US-016); falls back to the still-present plaintext columns for rows
- * not yet backfilled — decryptPIIBatch passes plaintext through unchanged.
+ * Turns stored lead rows into the app's Lead shape by decrypting the contact
+ * details. Since US-086 dropped the plaintext columns, encrypted_email and
+ * encrypted_phone are the only store; decryptPIIBatch passes through any value
+ * that is not `enc:v1:` prefixed, so a row written before the backfill still
+ * reads correctly.
  *
  * Batched across the whole page rather than per row: since US-066 the crypto
  * lives in the pii-crypto Edge Function, so a per-field call would be two
  * network round trips per lead.
  */
-async function decryptLeadRows(rows: Lead[]): Promise<Lead[]> {
-  type WithEncrypted = Lead & { encrypted_email?: string | null; encrypted_phone?: string | null };
-
-  const emails = rows.map((row) => (row as WithEncrypted).encrypted_email ?? row.email);
-  const phones = rows.map((row) => (row as WithEncrypted).encrypted_phone ?? row.phone);
-
+async function decryptLeadRows(rows: LeadRow[]): Promise<Lead[]> {
   const [decryptedEmails, decryptedPhones] = await Promise.all([
-    decryptPIIBatch(emails),
-    decryptPIIBatch(phones),
+    decryptPIIBatch(rows.map((row) => row.encrypted_email)),
+    decryptPIIBatch(rows.map((row) => row.encrypted_phone)),
   ]);
 
-  return rows.map((row, i) => ({
-    ...row,
-    email: decryptedEmails[i] ?? row.email,
-    phone: decryptedPhones[i] ?? row.phone,
+  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }, i) => ({
+    ...rest,
+    email: decryptedEmails[i] ?? null,
+    phone: decryptedPhones[i] ?? null,
   }));
 }
 
@@ -53,7 +50,7 @@ export function useLeads() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return decryptLeadRows((data as Lead[]) ?? []);
+      return decryptLeadRows(data ?? []);
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
@@ -64,7 +61,10 @@ export function useLeads() {
     mutationFn: async (leadData: Omit<Lead, 'id' | 'created_at' | 'updated_at'>) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Dual-write: keep plaintext (transition phase) + encrypted columns.
+      // US-086: the plaintext email/phone columns are gone, so the encrypted
+      // ones are the only store. This used to dual-write both, which meant the
+      // ciphertext protected nothing an attacker could not already read from
+      // the plaintext beside it under the same RLS.
       // Force ownership to the authenticated user rather than trusting caller-supplied user_id.
       // Both fields go in one encryptPIIBatch call — two encryptPII calls would
       // be two round trips to pii-crypto (US-066).
@@ -72,12 +72,13 @@ export function useLeads() {
         leadData.email,
         leadData.phone,
       ]);
+      const { email: _email, phone: _phone, ...rest } = leadData;
       const payload = {
-        ...leadData,
+        ...rest,
         user_id: user.id,
         encrypted_email: encryptedEmail,
         encrypted_phone: encryptedPhone,
-      } as typeof leadData;
+      };
 
       const { data, error } = await supabase.from('leads').insert(payload).select().single();
 
@@ -93,14 +94,16 @@ export function useLeads() {
     mutationFn: async ({ id, ...updates }: Partial<Lead> & { id: string }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Dual-write encrypted columns when PII fields are being updated, in a
-      // single batched call (US-066).
+      // Encrypt PII fields being updated, in a single batched call (US-066),
+      // and drop the plaintext keys — there are no plaintext columns to
+      // receive them since US-086.
       const encryptedUpdates: Record<string, unknown> = { ...updates };
       const changed = (['email', 'phone'] as const).filter((f) => f in updates);
       if (changed.length > 0) {
         const encrypted = await encryptPIIBatch(changed.map((f) => updates[f]));
         changed.forEach((field, i) => {
           encryptedUpdates[`encrypted_${field}`] = encrypted[i];
+          delete encryptedUpdates[field];
         });
       }
 
