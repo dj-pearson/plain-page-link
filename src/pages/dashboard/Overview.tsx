@@ -142,7 +142,7 @@ export default function Overview() {
         <StatCard
           icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />}
           label="Conversion Rate"
-          value={`${stats.conversionRate}%`}
+          value={`${stats.conversionRate.toFixed(2)}%`}
         />
       </div>
 
