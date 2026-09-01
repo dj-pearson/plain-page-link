@@ -5,9 +5,11 @@
 
 import { create } from 'zustand';
 import { PageConfig, BlockConfig } from '@/types/pageBuilder';
+import type { PageBlock, PageTheme, PageSEO } from '@/types/pageBuilder';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import type { Json } from '@/integrations/supabase/types';
 import {
   addBlock,
   removeBlock,
@@ -50,6 +52,31 @@ interface PageBuilderStore {
   setAsActivePage: (pageId: string) => Promise<void>;
   resetBuilder: () => void;
 }
+
+/**
+ * The jsonb round trip for `custom_pages`.
+ *
+ * blocks, theme and seo are jsonb columns, and PageBlock/PageTheme/PageSEO are
+ * interfaces — so they have no implicit index signature and do not satisfy
+ * Json on the way in, while on the way out Json does not narrow to them. The
+ * six `as any` casts that used to sit at these boundaries meant a shape change
+ * on either side went unnoticed. Confined to this pair: toJson asserts once on
+ * write, fromJson gives back a typed default when the stored value is not the
+ * shape it should be, so a malformed row degrades instead of throwing
+ * mid-render.
+ */
+const toJson = (value: unknown): Json => value as unknown as Json;
+
+const blocksFromJson = (value: Json): PageBlock[] =>
+  Array.isArray(value) ? (value as unknown as PageBlock[]) : [];
+
+const objectFromJson = <T>(value: Json, fallback: T): T =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as unknown as T)
+    : fallback;
+
+const EMPTY_THEME = {} as PageTheme;
+const EMPTY_SEO = {} as PageSEO;
 
 export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
   // Initial state
@@ -99,9 +126,9 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         slug: data.slug,
         title: data.title,
         description: data.description || '',
-        blocks: data.blocks as any[],
-        theme: data.theme as any,
-        seo: data.seo as any,
+        blocks: blocksFromJson(data.blocks),
+        theme: objectFromJson(data.theme, EMPTY_THEME),
+        seo: objectFromJson(data.seo, EMPTY_SEO),
         published: data.published,
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at),
@@ -137,9 +164,9 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         slug: d.slug,
         title: d.title,
         description: d.description || '',
-        blocks: d.blocks as any[],
-        theme: d.theme as any,
-        seo: d.seo as any,
+        blocks: blocksFromJson(d.blocks),
+        theme: objectFromJson(d.theme, EMPTY_THEME),
+        seo: objectFromJson(d.seo, EMPTY_SEO),
         published: d.published,
         createdAt: new Date(d.created_at),
         updatedAt: new Date(d.updated_at),
@@ -348,9 +375,9 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         slug: page.slug,
         title: page.title,
         description: page.description,
-        blocks: page.blocks,
-        theme: page.theme,
-        seo: page.seo,
+        blocks: toJson(page.blocks),
+        theme: toJson(page.theme),
+        seo: toJson(page.seo),
         published: page.published,
       };
 

@@ -68,20 +68,25 @@ function detectSocialPlatform(url: string): SocialLink['platform'] | null {
 /**
  * Converts user links to social links format
  */
-function convertToSocialLinks(links: any[]): SocialLink[] {
-  return links
-    .map((link) => {
-      const platform = detectSocialPlatform(link.url);
-      if (!platform) return null;
+function convertToSocialLinks(
+  links: Array<{ id: string; url: string; title: string }>
+): SocialLink[] {
+  // flatMap rather than map().filter(predicate): the predicate had to assert
+  // its own parameter type, and got it wrong — SocialLink.username is optional
+  // and the inferred element type made it required, so tsc rejected the guard.
+  return links.flatMap((link): SocialLink[] => {
+    const platform = detectSocialPlatform(link.url);
+    if (!platform) return [];
 
-      return {
+    return [
+      {
         id: link.id,
         platform,
         url: link.url,
         username: link.title,
-      };
-    })
-    .filter((link): link is SocialLink => link !== null);
+      },
+    ];
+  });
 }
 
 /**
