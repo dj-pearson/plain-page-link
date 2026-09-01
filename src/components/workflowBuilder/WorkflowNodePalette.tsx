@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { useWorkflowBuilderStore } from "@/stores/useWorkflowBuilderStore";
-import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect } from 'react';
+import { useWorkflowBuilderStore } from '@/stores/useWorkflowBuilderStore';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 import {
   Play,
   Mail,
@@ -24,24 +24,25 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
-} from "lucide-react";
-import type { WorkflowNodeTemplate } from "@/types/workflow";
+  type LucideIcon,
+} from 'lucide-react';
+import type { WorkflowNodeTemplate } from '@/types/workflow';
 
 interface WorkflowNodePaletteProps {
   onDragStart: (template: WorkflowNodeTemplate) => void;
 }
 
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+const ICON_MAP: Record<string, LucideIcon> = {
   play: Play,
   mail: Mail,
-  "message-square": MessageSquare,
+  'message-square': MessageSquare,
   clock: Clock,
-  "git-branch": GitBranch,
+  'git-branch': GitBranch,
   repeat: Repeat,
   globe: Globe,
   user: User,
   tag: Tag,
-  "check-square": CheckSquare,
+  'check-square': CheckSquare,
   zap: Zap,
   calendar: Calendar,
   link: Link,
@@ -53,50 +54,51 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 const CATEGORY_ORDER = [
-  "triggers",
-  "communication",
-  "crm",
-  "productivity",
-  "integrations",
-  "organization",
-  "logic",
-  "timing",
-  "data",
-  "iteration",
+  'triggers',
+  'communication',
+  'crm',
+  'productivity',
+  'integrations',
+  'organization',
+  'logic',
+  'timing',
+  'data',
+  'iteration',
 ];
 
 const CATEGORY_LABELS: Record<string, string> = {
-  triggers: "Triggers",
-  communication: "Communication",
-  crm: "CRM",
-  productivity: "Productivity",
-  integrations: "Integrations",
-  organization: "Organization",
-  logic: "Logic",
-  timing: "Timing",
-  data: "Data",
-  iteration: "Iteration",
+  triggers: 'Triggers',
+  communication: 'Communication',
+  crm: 'CRM',
+  productivity: 'Productivity',
+  integrations: 'Integrations',
+  organization: 'Organization',
+  logic: 'Logic',
+  timing: 'Timing',
+  data: 'Data',
+  iteration: 'Iteration',
 };
 
 export const WorkflowNodePalette = ({ onDragStart }: WorkflowNodePaletteProps) => {
   const { nodeTemplates, loadNodeTemplates } = useWorkflowBuilderStore();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(["triggers"])
-  );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['triggers']));
 
   useEffect(() => {
     loadNodeTemplates();
   }, [loadNodeTemplates]);
 
   // Group templates by category
-  const templatesByCategory = nodeTemplates.reduce((acc, template) => {
-    if (!acc[template.category]) {
-      acc[template.category] = [];
-    }
-    acc[template.category].push(template);
-    return acc;
-  }, {} as Record<string, WorkflowNodeTemplate[]>);
+  const templatesByCategory = nodeTemplates.reduce(
+    (acc, template) => {
+      if (!acc[template.category]) {
+        acc[template.category] = [];
+      }
+      acc[template.category].push(template);
+      return acc;
+    },
+    {} as Record<string, WorkflowNodeTemplate[]>
+  );
 
   // Filter templates by search
   const filteredCategories = Object.entries(templatesByCategory)
@@ -109,10 +111,7 @@ export const WorkflowNodePalette = ({ onDragStart }: WorkflowNodePaletteProps) =
       ),
     }))
     .filter((c) => c.templates.length > 0)
-    .sort(
-      (a, b) =>
-        CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category)
-    );
+    .sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category));
 
   const toggleCategory = (category: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -124,12 +123,9 @@ export const WorkflowNodePalette = ({ onDragStart }: WorkflowNodePaletteProps) =
     setExpandedCategories(newExpanded);
   };
 
-  const handleDragStart = (
-    e: React.DragEvent,
-    template: WorkflowNodeTemplate
-  ) => {
-    e.dataTransfer.setData("application/workflow-node", JSON.stringify(template));
-    e.dataTransfer.effectAllowed = "copy";
+  const handleDragStart = (e: React.DragEvent, template: WorkflowNodeTemplate) => {
+    e.dataTransfer.setData('application/workflow-node', JSON.stringify(template));
+    e.dataTransfer.effectAllowed = 'copy';
     onDragStart(template);
   };
 
@@ -153,8 +149,7 @@ export const WorkflowNodePalette = ({ onDragStart }: WorkflowNodePaletteProps) =
       {/* Node list */}
       <div className="flex-1 overflow-y-auto p-2">
         {filteredCategories.map(({ category, templates }) => {
-          const isExpanded =
-            expandedCategories.has(category) || searchQuery.length > 0;
+          const isExpanded = expandedCategories.has(category) || searchQuery.length > 0;
 
           return (
             <div key={category} className="mb-2">
@@ -168,9 +163,7 @@ export const WorkflowNodePalette = ({ onDragStart }: WorkflowNodePaletteProps) =
                   <ChevronRight className="w-4 h-4" />
                 )}
                 {CATEGORY_LABELS[category] || category}
-                <span className="ml-auto text-xs text-gray-400">
-                  {templates.length}
-                </span>
+                <span className="ml-auto text-xs text-gray-400">{templates.length}</span>
               </button>
 
               {isExpanded && (
@@ -184,34 +177,29 @@ export const WorkflowNodePalette = ({ onDragStart }: WorkflowNodePaletteProps) =
                         draggable
                         onDragStart={(e) => handleDragStart(e, template)}
                         className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-lg",
-                          "cursor-grab active:cursor-grabbing",
-                          "border border-transparent hover:border-gray-200",
-                          "hover:bg-gray-50 transition-colors",
-                          template.isPremium && "opacity-75"
+                          'flex items-center gap-2 px-3 py-2 rounded-lg',
+                          'cursor-grab active:cursor-grabbing',
+                          'border border-transparent hover:border-gray-200',
+                          'hover:bg-gray-50 transition-colors',
+                          template.isPremium && 'opacity-75'
                         )}
                         style={{
                           borderLeftColor: template.color,
-                          borderLeftWidth: "3px",
+                          borderLeftWidth: '3px',
                         }}
                       >
                         <div
                           className="w-8 h-8 rounded flex items-center justify-center"
                           style={{ backgroundColor: `${template.color}20` }}
                         >
-                          <Icon
-                            className="w-4 h-4"
-                            style={{ color: template.color }}
-                          />
+                          <Icon className="w-4 h-4" style={{ color: template.color }} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">
                             {template.name}
                           </p>
                           {template.description && (
-                            <p className="text-xs text-gray-500 truncate">
-                              {template.description}
-                            </p>
+                            <p className="text-xs text-gray-500 truncate">{template.description}</p>
                           )}
                         </div>
                         {template.isPremium && (
@@ -229,9 +217,7 @@ export const WorkflowNodePalette = ({ onDragStart }: WorkflowNodePaletteProps) =
         })}
 
         {filteredCategories.length === 0 && (
-          <p className="text-center text-sm text-gray-500 py-8">
-            No nodes found
-          </p>
+          <p className="text-center text-sm text-gray-500 py-8">No nodes found</p>
         )}
       </div>
 
