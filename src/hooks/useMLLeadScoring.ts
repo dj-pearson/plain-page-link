@@ -23,6 +23,7 @@ import {
 } from '@/lib/ml-lead-scoring';
 import type { Lead } from '@/types/lead';
 import { logger } from '@/lib/logger';
+import type { Json } from '@/integrations/supabase/types';
 
 // ============================================================================
 // Types
@@ -143,7 +144,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
         .upsert(
           {
             user_id: user.id,
-            weights,
+            weights: weights as unknown as Json,
             updated_at: new Date().toISOString(),
           },
           {
@@ -183,7 +184,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
         return [];
       }
 
-      return data as Array<{
+      return data as unknown as Array<{
         id: string;
         user_id: string;
         test_id: string;
@@ -204,7 +205,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
         .insert({
           user_id: user.id,
           test_id: analysis.testId,
-          analysis,
+          analysis: analysis as unknown as Json,
         })
         .select()
         .single();
