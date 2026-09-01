@@ -7,8 +7,60 @@ import DOMPurify from 'dompurify';
 
 export interface SanitizeOptions {
   allowedTags?: string[];
-  allowedAttributes?: { [key: string]: string[] };
+  /**
+   * A flat list of attribute names, e.g. ['href', 'target', 'rel'].
+   *
+   * This was typed (and defaulted) as a per-tag map, `{ a: ['href', ...] }`.
+   * DOMPurify has no such option: it reads ALLOWED_ATTR through addToSet,
+   * which returns early on anything that is not an array. The map therefore
+   * produced an EMPTY allowed-attribute set, so sanitizeHtml stripped every
+   * attribute — href included — and the afterSanitizeAttributes hook below
+   * found no href to act on. Nothing imports sanitizeHtml today (only
+   * sanitizeUrl is used), so this never shipped as a live defect; it would
+   * have bitten the first caller.
+   */
+  allowedAttributes?: string[];
 }
+
+const DEFAULT_ALLOWED_TAGS = [
+  'p',
+  'br',
+  'strong',
+  'em',
+  'u',
+  'a',
+  'ul',
+  'ol',
+  'li',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'blockquote',
+  'code',
+  'pre',
+];
+
+const DEFAULT_ALLOWED_ATTR = ['href', 'target', 'rel'];
+
+/**
+ * Registered once at module scope.
+ *
+ * This used to be inside sanitizeHtml. DOMPurify.addHook appends rather than
+ * replaces, so every call added another copy of the same hook and they ran
+ * cumulatively — unbounded growth on any render path that sanitizes.
+ */
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.nodeName === 'A') {
+    const href = node.getAttribute('href');
+    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+      node.setAttribute('target', '_blank');
+      node.setAttribute('rel', 'noopener noreferrer');
+    }
+  }
+});
 
 /**
  * Sanitize HTML content to prevent XSS attacks
@@ -16,33 +68,12 @@ export interface SanitizeOptions {
  * @param options - Optional configuration for allowed tags and attributes
  * @returns Sanitized HTML string safe for rendering
  */
-export const sanitizeHtml = (
-  dirty: string,
-  options?: SanitizeOptions
-): string => {
-  const config = {
-    ALLOWED_TAGS: options?.allowedTags || [
-      'p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'
-    ],
-    ALLOWED_ATTR: options?.allowedAttributes || {
-      'a': ['href', 'target', 'rel']
-    },
+export const sanitizeHtml = (dirty: string, options?: SanitizeOptions): string => {
+  return DOMPurify.sanitize(dirty, {
+    ALLOWED_TAGS: options?.allowedTags ?? DEFAULT_ALLOWED_TAGS,
+    ALLOWED_ATTR: options?.allowedAttributes ?? DEFAULT_ALLOWED_ATTR,
     ALLOW_DATA_ATTR: false,
-  };
-
-  // Ensure external links open safely
-  DOMPurify.addHook('afterSanitizeAttributes', function (node) {
-    if (node.tagName === 'A') {
-      const href = node.getAttribute('href');
-      if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-        node.setAttribute('target', '_blank');
-        node.setAttribute('rel', 'noopener noreferrer');
-      }
-    }
   });
-
-  return DOMPurify.sanitize(dirty, config);
 };
 
 /**
@@ -61,7 +92,7 @@ export const sanitizeText = (text: string): string => {
 export const sanitizeBio = (bio: string): string => {
   return sanitizeHtml(bio, {
     allowedTags: ['p', 'br', 'strong', 'em'],
-    allowedAttributes: {}
+    allowedAttributes: [],
   });
 };
 
@@ -71,11 +102,8 @@ export const sanitizeBio = (bio: string): string => {
  */
 export const sanitizeRichContent = (content: string): string => {
   return sanitizeHtml(content, {
-    allowedTags: [
-      'p', 'br', 'strong', 'em', 'u', 'h2', 'h3', 'h4',
-      'ul', 'ol', 'li', 'blockquote'
-    ],
-    allowedAttributes: {}
+    allowedTags: ['p', 'br', 'strong', 'em', 'u', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote'],
+    allowedAttributes: [],
   });
 };
 

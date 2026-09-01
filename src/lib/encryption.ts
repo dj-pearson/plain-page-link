@@ -46,14 +46,14 @@ const KEY_ITERATIONS = 100000;
 /**
  * Generate a random salt for key derivation
  */
-function generateSalt(length: number = SALT_LENGTH): Uint8Array {
+function generateSalt(length: number = SALT_LENGTH): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 
 /**
  * Generate a random initialization vector for AES-GCM
  */
-function generateIV(): Uint8Array {
+function generateIV(): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(IV_LENGTH));
 }
 
@@ -62,7 +62,7 @@ function generateIV(): Uint8Array {
  */
 async function deriveKey(
   password: string,
-  salt: Uint8Array,
+  salt: Uint8Array<ArrayBuffer>,
   iterations: number = KEY_ITERATIONS
 ): Promise<CryptoKey> {
   const encoder = new TextEncoder();

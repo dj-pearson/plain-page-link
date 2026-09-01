@@ -17,11 +17,11 @@ import type { Metric } from 'web-vitals';
 
 // Performance budgets — Google's "Good" thresholds
 export const PERFORMANCE_BUDGETS = {
-  LCP: 2500,   // ms
-  FID: 100,    // ms
-  CLS: 0.1,    // score
-  TTFB: 800,   // ms
-  INP: 200,    // ms
+  LCP: 2500, // ms
+  FID: 100, // ms
+  CLS: 0.1, // score
+  TTFB: 800, // ms
+  INP: 200, // ms
 } as const;
 
 type MetricName = keyof typeof PERFORMANCE_BUDGETS;
@@ -46,7 +46,7 @@ function formatValue(name: string, value: number): string {
  * Send metric to Google Analytics (if gtag is available)
  */
 function sendToAnalytics(metric: Metric): void {
-  const gtag = (window as Record<string, unknown>).gtag as
+  const gtag = (window as unknown as Record<string, unknown>).gtag as
     | ((...args: unknown[]) => void)
     | undefined;
 
@@ -102,10 +102,14 @@ function reportMetric(metric: Metric): void {
  */
 export async function initWebVitals(): Promise<void> {
   try {
-    const { onLCP, onFID, onCLS, onTTFB, onINP } = await import('web-vitals');
+    // onFID is gone as of web-vitals v4 — FID was retired in favour of INP,
+    // which is already registered below. It was still destructured and called
+    // here, so it was undefined and `onFID(reportMetric)` threw a TypeError
+    // straight into the silent catch: LCP registered, and CLS, TTFB and INP
+    // never did. Four of the five vitals were unreported and nothing said so.
+    const { onLCP, onCLS, onTTFB, onINP } = await import('web-vitals');
 
     onLCP(reportMetric);
-    onFID(reportMetric);
     onCLS(reportMetric);
     onTTFB(reportMetric);
     onINP(reportMetric);

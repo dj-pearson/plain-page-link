@@ -12,6 +12,7 @@
  */
 
 import DOMPurify from 'dompurify';
+import type { Config as DOMPurifyConfig } from 'dompurify';
 import { logger } from '@/lib/logger';
 import type { ValidationResult, ValidationRules } from './types';
 
@@ -20,7 +21,7 @@ import type { ValidationResult, ValidationRules } from './types';
 // ============================================================
 
 // Configure DOMPurify for strict sanitization
-const DOMPURIFY_CONFIG: DOMPurify.Config = {
+const DOMPURIFY_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [
     'b',
     'i',
@@ -50,7 +51,7 @@ const DOMPURIFY_CONFIG: DOMPurify.Config = {
 };
 
 // Stricter config for plain text fields (no HTML allowed)
-const PLAIN_TEXT_CONFIG: DOMPurify.Config = {
+const PLAIN_TEXT_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [],
   ALLOWED_ATTR: [],
 };
