@@ -18,15 +18,53 @@ import { Progress } from '@/components/ui/progress';
  * 5-step guided onboarding to get agents from signup to shareable profile in <10 minutes
  */
 
+/** One of the starter themes offered on step 1. */
+interface OnboardingTemplate {
+  id: string;
+  name: string;
+  description: string;
+  colors: string[];
+}
+
+/** Step 2's fields. */
+interface ProfileBasics {
+  photo: File | null;
+  photoPreview: string | null;
+  fullName: string;
+  title: string;
+  bio: string;
+  phone: string;
+  location: string;
+}
+
+/** Step 3's fields. `price`, `beds` and `baths` are the raw input strings. */
+interface FirstListing {
+  photo: File | null;
+  photoPreview: string | null;
+  address: string;
+  price: string;
+  beds: string;
+  baths: string;
+  status: 'active' | 'sold';
+}
+
+/** Everything the wizard collects, handed to onComplete for persisting. */
+export interface OnboardingWizardData {
+  templateChoice: string | null;
+  profileBasics: ProfileBasics;
+  firstListing: FirstListing;
+  importOption: 'scratch' | 'linktree' | null;
+}
+
 interface OnboardingWizardProps {
   // Receives the collected wizard data on finish (persisted by the page).
-  onComplete: (wizardData: any) => void;
-  userProfile?: any;
+  onComplete: (wizardData: OnboardingWizardData) => void;
+  userProfile?: { full_name?: string | null; username?: string | null } | null;
 }
 
 export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [wizardData, setWizardData] = useState({
+  const [wizardData, setWizardData] = useState<OnboardingWizardData>({
     templateChoice: null as string | null,
     profileBasics: {
       photo: null as File | null,
@@ -216,7 +254,15 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
 }
 
 // Step Components
-function StepChooseTemplate({ templates, selected, onSelect }: any) {
+function StepChooseTemplate({
+  templates,
+  selected,
+  onSelect,
+}: {
+  templates: OnboardingTemplate[];
+  selected: string | null;
+  onSelect: (id: string) => void;
+}) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-2">Choose Your Style</h2>
@@ -224,7 +270,7 @@ function StepChooseTemplate({ templates, selected, onSelect }: any) {
         Select a template to match your brand. You can customize it later.
       </p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {templates.map((template: any) => (
+        {templates.map((template) => (
           <button
             key={template.id}
             onClick={() => onSelect(template.id)}
@@ -249,7 +295,13 @@ function StepChooseTemplate({ templates, selected, onSelect }: any) {
   );
 }
 
-function StepProfileBasics({ data, onChange }: any) {
+function StepProfileBasics({
+  data,
+  onChange,
+}: {
+  data: ProfileBasics;
+  onChange: (data: ProfileBasics) => void;
+}) {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -358,7 +410,13 @@ function StepProfileBasics({ data, onChange }: any) {
   );
 }
 
-function StepFirstListing({ data, onChange }: any) {
+function StepFirstListing({
+  data,
+  onChange,
+}: {
+  data: FirstListing;
+  onChange: (data: FirstListing) => void;
+}) {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -483,7 +541,7 @@ function StepFirstListing({ data, onChange }: any) {
   );
 }
 
-function StepPreview({ wizardData }: any) {
+function StepPreview({ wizardData }: { wizardData: OnboardingWizardData }) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-2">Preview Your Profile</h2>
@@ -546,7 +604,7 @@ function StepPreview({ wizardData }: any) {
   );
 }
 
-function StepShare({ username }: any) {
+function StepShare({ username }: { username: string }) {
   const profileUrl = `agentbio.net/${username}`;
   const [copied, setCopied] = useState(false);
 

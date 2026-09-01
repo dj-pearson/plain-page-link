@@ -14,7 +14,7 @@ export interface AnalyticsData {
   conversions: number;
   revenue: number;
   avgResponseTime: number; // minutes
-  period: 'day' | 'week' | 'month' | 'year';
+  period: 'day' | 'week' | 'month' | 'quarter' | 'year';
   startDate: Date;
   endDate: Date;
 }
