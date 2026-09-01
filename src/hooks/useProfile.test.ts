@@ -10,10 +10,10 @@ import { mockAuthenticatedUser } from '@/test/mocks/auth';
 
 let queryResult: MockQueryResult;
 let authUser: { id: string } | null;
-const fromMock = vi.fn(() => createQueryBuilder(queryResult));
+const fromMock = vi.fn((_table: string) => createQueryBuilder(queryResult));
 
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (...args: unknown[]) => fromMock(...args) },
+  supabase: { from: (table: string) => fromMock(table) },
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({

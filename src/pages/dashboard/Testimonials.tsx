@@ -57,7 +57,26 @@ export default function Testimonials() {
 
   const handleAddTestimonial = async (data: TestimonialFormData) => {
     try {
-      await addTestimonial.mutateAsync(data);
+      // The form is camelCase (clientName/propertyType/featured); the table is
+      // not. Passing the form object straight through sent PostgREST columns
+      // that do not exist and omitted client_name, which is NOT NULL — so
+      // adding a testimonial from the dashboard always failed.
+      await addTestimonial.mutateAsync({
+        client_name: data.clientName,
+        review: data.review,
+        rating: data.rating,
+        property_type: data.propertyType,
+        is_featured: data.featured,
+        client_title: null,
+        // clientPhoto is a File the modal collects but nothing uploads yet;
+        // the column stores a URL, so it stays null rather than a filename.
+        client_photo: null,
+        listing_id: null,
+        transaction_type: null,
+        sort_order: null,
+        date: new Date().toISOString().split('T')[0],
+        is_published: true,
+      });
       toast({
         title: 'Testimonial added!',
         description: 'Client review has been added successfully.',
