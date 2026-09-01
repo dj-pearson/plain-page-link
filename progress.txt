@@ -670,3 +670,38 @@ to `never[]`; corrected with `strict:false`).
   Run `supabase gen types typescript --project-id <ref> > src/integrations/
   supabase/types.ts`, then the CI `test` job's `needs: typecheck` can be
   restored and Type Check flipped back to a hard gate.
+
+---
+
+## Product-Flow Review — 2026-09-01 (stories US-094 to US-127 added)
+
+Six parallel read-only passes over the agent's product journey: public page
+and lead capture, CRM, listings/profile management, onboarding/billing,
+backend pipeline, architecture and repo hygiene. Findings verified against
+types.ts and the applied migrations; the backend pass applied all 13
+migrations to a real Postgres 16 and executed the anon exploit paths. Index
+and verdict in docs/CODE_REVIEW_2026-09.md.
+
+Gates at review time: tsc 0 errors, vitest 304/304, eslint 0 errors / 726
+warnings, verify:migrations OK, verify:schema 12/12 on PG16 (the CLAUDE.md
+sentence about migrations failing in ten places is stale; US-121 corrects it).
+
+Headline: the gates are green and two of the three legs of the core flow are
+broken. /dashboard/leads selects the email/phone columns US-086 dropped (US-094);
+the "Send Message" form omits lead_type/user_id and the buyer form writes a
+string into a boolean (US-095/096); onboarding writes profiles.city, which does
+not exist, and loses every field (US-108); listing edits write beds/baths while
+the public page reads bedrooms/bathrooms (US-106); the shared rate limiter calls
+check_rate_limit with the wrong argument names and fails open everywhere
+(US-098). None of these are caught by tsc because each hides behind an
+`as unknown as` cast, a swallowed error, or an RPC matched by name only —
+US-098 and US-100 extend verify:schema to close those gaps.
+
+34 stories, all passes:false, ordered: fix the flow (094-100, 106, 108, 119),
+make the CRM guide (101-105, 107, 110, 111, 117, 118), lay it out (116, 120-127).
+
+Note for the next runner: src/lib/exportUtils.test.ts writes
+lead_report_<date>.pdf and performance_<date>.pdf into the repo root on every
+test run (jsdom lets jsPDF's doc.save through). The two files dated today are
+tracked, so a test run shows them modified. Restore with git checkout until
+US-121 stubs the save.
