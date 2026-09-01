@@ -46,7 +46,7 @@ jobs:
         # backlog is now ordinary work rather than a blocked dependency.
         run: |
           set -o pipefail
-          TSC_BASELINE=83
+          TSC_BASELINE=79
           COUNT=$(npx tsc --noEmit 2>&1 | grep -cE '^src/.*error TS' || true)
           echo "tsc errors: $COUNT (baseline $TSC_BASELINE)"
           if [ "$COUNT" -gt "$TSC_BASELINE" ]; then
