@@ -1,17 +1,22 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { edgeFunctions } from "@/lib/edgeFunctions";
-import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
+import { toast } from 'sonner';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface ArticleWebhook {
-  id: string;
-  user_id: string;
-  name: string;
-  webhook_url: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+/** A row from `article_webhooks`, exactly as stored. */
+export type ArticleWebhook = Database['public']['Tables']['article_webhooks']['Row'];
+
+/**
+ * The columns a caller may supply when creating a webhook.
+ *
+ * The table's Insert type rather than Partial<Row>: name and webhook_url are
+ * NOT NULL, and a Partial let a caller omit them and find out at the database.
+ */
+export type NewArticleWebhook = Database['public']['Tables']['article_webhooks']['Insert'];
+
+/** The columns a caller may change on an existing webhook. */
+export type ArticleWebhookUpdate = Database['public']['Tables']['article_webhooks']['Update'];
 
 export function useArticleWebhooks() {
   const queryClient = useQueryClient();
@@ -24,7 +29,7 @@ export function useArticleWebhooks() {
         .from('article_webhooks')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as ArticleWebhook[];
     },
@@ -32,18 +37,18 @@ export function useArticleWebhooks() {
 
   // Create webhook
   const createWebhookMutation = useMutation({
-    mutationFn: async (webhook: Partial<ArticleWebhook>) => {
+    mutationFn: async (webhook: NewArticleWebhook) => {
       const { data: userData } = await supabase.auth.getUser();
-      
+
       const { data, error } = await supabase
         .from('article_webhooks')
         .insert({
           ...webhook,
-          user_id: userData.user?.id
+          user_id: userData.user?.id,
         })
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -58,7 +63,7 @@ export function useArticleWebhooks() {
 
   // Update webhook
   const updateWebhookMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<ArticleWebhook> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: ArticleWebhookUpdate }) => {
       const { error } = await supabase
         .from('article_webhooks')
         .update(updates)
@@ -80,11 +85,8 @@ export function useArticleWebhooks() {
   // Delete webhook
   const deleteWebhookMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('article_webhooks')
-        .delete()
-        .eq('id', id);
-      
+      const { error } = await supabase.from('article_webhooks').delete().eq('id', id);
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -100,7 +102,7 @@ export function useArticleWebhooks() {
   const testWebhookMutation = useMutation({
     mutationFn: async (webhookUrl: string) => {
       const { data, error } = await edgeFunctions.invoke('test-article-webhook', {
-        body: { webhookUrl }
+        body: { webhookUrl },
       });
 
       if (error) throw error;

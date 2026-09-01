@@ -78,10 +78,47 @@ Environment variables and redeploy the frontend.
 
 Rotating to a fresh key is a **separate** job: every stored `enc:v1:` value
 would become undecryptable, so it needs a backfill that decrypts under the old
-key and re-encrypts under the new one before the old key is retired. The
-plaintext `email`/`phone` columns are still dual-written (US-016), so that
-backfill can be reconstructed from them if it comes to it — which is also why
-retiring those columns should wait until after any rotation.
+key and re-encrypts under the new one before the old key is retired.
+
+### 2.2 Retiring the plaintext lead columns (US-086)
+
+`leads.email` and `leads.phone` are gone. They were dual-written beside
+`encrypted_email` / `encrypted_phone` on the same row under the same RLS
+policies, so the ciphertext protected nothing an attacker could not already
+read — and `submit-lead`, the path every public capture form uses, wrote no
+ciphertext at all.
+
+**`PII_ENCRYPTION_KEY` is now the only way to read a lead's contact details.**
+That is the point of the change, and it is also the risk: there is no longer a
+plaintext column to reconstruct from. Back the key up somewhere durable and
+separate from the database before deploying this, and treat losing it as
+losing every lead's email and phone number. Key rotation now requires
+decrypting under the old key first — it can no longer be reconstructed from
+plaintext.
+
+The order matters, because the AES key lives only in the function secrets and
+no SQL migration can encrypt:
+
+```bash
+# 1. Deploy the functions that read and write the encrypted columns.
+supabase functions deploy backfill-lead-pii
+supabase functions deploy submit-lead
+supabase functions deploy gdpr-export
+
+# 2. Encrypt any lead still holding plaintext. Idempotent — safe to re-run,
+#    and it reports how many rows it touched. Requires an admin JWT.
+curl -X POST "$SUPABASE_URL/functions/v1/backfill-lead-pii" \
+  -H "Authorization: Bearer <admin access token>"
+
+# 3. Only then apply the migration that drops the columns.
+supabase db push
+```
+
+Step 3 is guarded: `20260901000001_leads_drop_plaintext_pii.sql` counts rows
+that still hold plaintext with no ciphertext and raises an exception rather
+than dropping anything if it finds any. Running it out of order fails loudly
+and changes nothing, so a partial or skipped backfill cannot silently destroy
+contact data — but run the steps in order anyway.
 
 ---
 

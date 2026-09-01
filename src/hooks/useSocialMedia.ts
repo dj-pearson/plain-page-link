@@ -1,33 +1,30 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { edgeFunctions } from "@/lib/edgeFunctions";
-import { toast } from "sonner";
-import { logger } from "@/lib/logger";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface SocialMediaPost {
-  id: string;
-  content_type: string;
-  subject_type: string;
-  platform_type: string;
-  post_content: any;
-  post_title: string;
-  listing_id?: string;
-  property_address?: string;
-  status: string;
-  created_at: string;
-  scheduled_for?: string;
-  posted_at?: string;
-  ai_prompt_used?: string;
-}
+/** A row from `social_media_posts`, exactly as stored. */
+export type SocialMediaPost = Database['public']['Tables']['social_media_posts']['Row'];
 
-export interface SocialMediaWebhook {
-  id: string;
-  name: string;
-  platform: string;
-  webhook_url: string;
-  is_active: boolean;
-  headers: any;
-}
+/** A row from `social_media_webhooks`, exactly as stored. */
+export type SocialMediaWebhook = Database['public']['Tables']['social_media_webhooks']['Row'];
+
+/**
+ * The mutations take the tables' own Insert types rather than a Partial of
+ * the Row: content_type, subject_type and platform_type are NOT NULL on posts,
+ * and name, platform and webhook_url are NOT NULL on webhooks, so a Partial
+ * let a caller omit them and find out at the database. The hand-written types
+ * these replace also missed `created_by`, `metadata` and `webhook_urls`
+ * entirely, and typed post_title/status/created_at non-nullable.
+ */
+export type NewSocialMediaPost = Omit<
+  Database['public']['Tables']['social_media_posts']['Insert'],
+  'created_by'
+>;
+
+export type NewSocialMediaWebhook = Database['public']['Tables']['social_media_webhooks']['Insert'];
 
 export function useSocialMedia() {
   const queryClient = useQueryClient();
@@ -40,7 +37,7 @@ export function useSocialMedia() {
         .from('social_media_posts')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as SocialMediaPost[];
     },
@@ -55,7 +52,7 @@ export function useSocialMedia() {
         .select('*')
         .eq('content_type', 'marketing')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as SocialMediaPost[];
     },
@@ -69,7 +66,7 @@ export function useSocialMedia() {
         .from('social_media_webhooks')
         .select('*')
         .order('name', { ascending: true });
-      
+
       if (error) throw error;
       return data as SocialMediaWebhook[];
     },
@@ -85,7 +82,7 @@ export function useSocialMedia() {
       customPrompt?: string;
     }) => {
       const { data, error } = await edgeFunctions.invoke('generate-social-post', {
-        body: params
+        body: params,
       });
 
       if (error) throw error;
@@ -105,18 +102,18 @@ export function useSocialMedia() {
 
   // Create post
   const createPostMutation = useMutation({
-    mutationFn: async (post: Partial<SocialMediaPost>) => {
+    mutationFn: async (post: NewSocialMediaPost) => {
       const { data: userData } = await supabase.auth.getUser();
-      
+
       const { data, error } = await supabase
         .from('social_media_posts')
         .insert({
           ...post,
-          created_by: userData.user?.id
+          created_by: userData.user?.id,
         })
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -153,11 +150,8 @@ export function useSocialMedia() {
   // Delete post
   const deletePostMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('social_media_posts')
-        .delete()
-        .eq('id', id);
-      
+      const { error } = await supabase.from('social_media_posts').delete().eq('id', id);
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -171,13 +165,13 @@ export function useSocialMedia() {
 
   // Create webhook
   const createWebhookMutation = useMutation({
-    mutationFn: async (webhook: Partial<SocialMediaWebhook>) => {
+    mutationFn: async (webhook: NewSocialMediaWebhook) => {
       const { data, error } = await supabase
         .from('social_media_webhooks')
         .insert(webhook)
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -214,11 +208,8 @@ export function useSocialMedia() {
   // Delete webhook
   const deleteWebhookMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('social_media_webhooks')
-        .delete()
-        .eq('id', id);
-      
+      const { error } = await supabase.from('social_media_webhooks').delete().eq('id', id);
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -234,9 +225,9 @@ export function useSocialMedia() {
   const testWebhookMutation = useMutation({
     mutationFn: async (webhookId: string) => {
       const { data, error } = await edgeFunctions.invoke('test-social-webhook', {
-        body: { webhookId }
+        body: { webhookId },
       });
-      
+
       if (error) throw error;
       return data;
     },
@@ -256,9 +247,9 @@ export function useSocialMedia() {
   const generateMarketingPostMutation = useMutation({
     mutationFn: async (webhookUrl?: string) => {
       const { data, error } = await edgeFunctions.invoke('generate-marketing-post', {
-        body: { webhookUrl }
+        body: { webhookUrl },
       });
-      
+
       if (error) throw error;
       return data;
     },
@@ -301,7 +292,7 @@ export function useSocialMedia() {
         .update({
           status: 'posted',
           posted_at: new Date().toISOString(),
-          webhook_urls: [webhookUrl]
+          webhook_urls: [webhookUrl],
         })
         .eq('id', postId)
         .select('id')

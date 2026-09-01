@@ -2,34 +2,36 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
+import { toStringList } from '@/types/profile';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface Listing {
-  id: string;
-  user_id: string;
-  image?: string | null;
-  photos?: string[] | null;
-  address: string;
-  city: string;
-  state?: string | null;
-  zip_code?: string | null;
-  price: string;
-  beds: number;
-  baths: number;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  sqft?: number | null;
-  square_feet?: number | null;
-  status: string;
-  description?: string | null;
-  property_type?: string | null;
-  mls_number?: string | null;
-  lot_size_acres?: number | null;
-  virtual_tour_url?: string | null;
-  open_house_date?: string | null;
-  is_featured?: boolean;
-  created_at: string;
-  updated_at: string;
-}
+type ListingRow = Database['public']['Tables']['listings']['Row'];
+
+/**
+ * A listing as the dashboard consumes it.
+ *
+ * Restated by hand this omitted `highlights`, `sort_order`, `listed_date`,
+ * `sold_date` and `days_on_market` — and the omission was not harmless: the
+ * add-listing form collects Property Highlights and passes them to
+ * addListing, where `Partial<Omit<Listing, ...>>` silently rejected the key.
+ * `as Listing[]` on the query hid all of it.
+ *
+ * `photos` is jsonb; every consumer treats it as a URL list, so it is narrowed
+ * at the read boundary the same way usePublicProfile does.
+ */
+export type Listing = Omit<ListingRow, 'photos'> & { photos: string[] | null };
+
+/**
+ * The columns a caller may supply when creating a listing.
+ *
+ * The table's own Insert type, not a Partial of the Row: address, city, price,
+ * beds and baths are NOT NULL, and a Partial let a caller omit them and find
+ * out at the database.
+ */
+export type NewListing = Omit<Database['public']['Tables']['listings']['Insert'], 'user_id'>;
+
+/** The columns a caller may change on an existing listing. */
+export type ListingUpdate = Database['public']['Tables']['listings']['Update'];
 
 export function useListings() {
   const { user } = useAuthStore();
@@ -53,7 +55,7 @@ export function useListings() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Listing[];
+      return (data ?? []).map((row): Listing => ({ ...row, photos: toStringList(row.photos) }));
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
@@ -61,9 +63,7 @@ export function useListings() {
   });
 
   const addListing = useMutation({
-    mutationFn: async (
-      listingData: Partial<Omit<Listing, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
-    ) => {
+    mutationFn: async (listingData: NewListing) => {
       if (!user?.id) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
@@ -88,7 +88,7 @@ export function useListings() {
   });
 
   const updateListing = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Listing> & { id: string }) => {
+    mutationFn: async ({ id, ...updates }: ListingUpdate & { id: string }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
       // Security: Verify user owns this listing by requiring both id and user_id match

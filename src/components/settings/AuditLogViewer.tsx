@@ -100,7 +100,9 @@ export function AuditLogViewer() {
                         <div>
                           <div className="font-medium text-sm">{getActionLabel(log.action)}</div>
                           <div className="text-xs text-muted-foreground">
-                            {new Date(log.created_at).toLocaleTimeString()}
+                            {log.created_at
+                              ? new Date(log.created_at).toLocaleTimeString()
+                              : 'unknown'}
                             {log.ip_address && ` • ${log.ip_address}`}
                           </div>
                         </div>
@@ -159,7 +161,11 @@ export function AuditLogViewer() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Time:</span>
-                <span>{new Date(selectedLog.created_at).toLocaleString()}</span>
+                <span>
+                  {selectedLog.created_at
+                    ? new Date(selectedLog.created_at).toLocaleString()
+                    : 'unknown'}
+                </span>
               </div>
               {selectedLog.ip_address && (
                 <div className="flex justify-between">

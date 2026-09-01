@@ -410,12 +410,10 @@ export class MLLeadScoringSystem {
     this.model = new LogisticRegressionModel(numFeatures);
     this.modelVersion = MLLeadScoringSystem.DEFAULT_WEIGHTS.version;
     this.trainingExamples = [];
-    this.abTestConfig = {
-      enabled: false,
-      mlTrafficPercent: 50,
-      testId: '',
-      startedAt: new Date(),
-    };
+    // An `this.abTestConfig = {...}` assignment stood here against a field
+    // MLLeadScoringSystem never declared and nothing ever read — vestigial
+    // from an earlier design. A/B assignment lives in ABTestManager below,
+    // which UnifiedLeadScorer owns and calls through assignVariant().
 
     // Load default weights
     this.loadDefaultWeights();

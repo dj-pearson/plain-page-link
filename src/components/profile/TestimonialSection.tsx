@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { TestimonialCard } from './TestimonialCard';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { hapticFeedback } from '@/lib/haptics';
-import type { Testimonial } from '@/types/testimonial';
+import type { PublicTestimonial } from '@/types/testimonial';
 
 interface TestimonialSectionProps {
-  testimonials: Testimonial[];
+  testimonials: PublicTestimonial[];
 }
 
 export function TestimonialSection({ testimonials }: TestimonialSectionProps) {

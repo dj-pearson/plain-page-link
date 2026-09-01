@@ -3,46 +3,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
 import { encryptPII, decryptPII } from '@/lib/pii';
+import { toProfile } from '@/types/profile';
+import type { Profile } from '@/types/profile';
 
-export interface Profile {
-  id: string;
-  username: string;
-  full_name?: string;
-  bio?: string;
-  avatar_url?: string;
-  theme?: string;
-
-  // Professional Information
-  title?: string;
-  license_number?: string;
-  license_state?: string;
-  brokerage_name?: string;
-  brokerage_logo?: string;
-  years_experience?: number;
-  specialties?: string[];
-  certifications?: string[];
-
-  // Contact Information
-  phone?: string;
-  email_display?: string;
-  website_url?: string;
-
-  // Service Areas
-  service_cities?: string[];
-  service_zip_codes?: string[];
-
-  // Social Media URLs
-  facebook_url?: string;
-  instagram_url?: string;
-  linkedin_url?: string;
-  tiktok_url?: string;
-  youtube_url?: string;
-  zillow_url?: string;
-  realtor_com_url?: string;
-
-  created_at: string;
-  updated_at: string;
-}
+/**
+ * The agent profile, re-exported from the one place it is defined.
+ *
+ * This file used to declare a fourth Profile by hand, listing 30 of the 42
+ * columns on `profiles` and typing every optional one `?: string` rather than
+ * `string | null`. It omitted calendly_url, seo_title, seo_description,
+ * sms_enabled, custom_css, custom_domain, is_published, zapier_webhook_url,
+ * onboarding_completed_at, notification_preferences and the three counters —
+ * and the dashboard's own profile form reads and writes calendly_url,
+ * seo_title and seo_description, so `Partial<Profile>` silently dropped all
+ * three from every save. `data as Profile` on the query hid it.
+ */
+export type { Profile, ProfileRow } from '@/types/profile';
 
 export function useProfile() {
   const { user } = useAuthStore();
@@ -66,12 +42,12 @@ export function useProfile() {
         .single();
 
       if (error) throw error;
-      const profileData = data as Profile;
+      const profileData = toProfile(data);
       // Decrypt PII (decryptPII passes legacy plaintext through unchanged).
       return {
         ...profileData,
         phone: (await decryptPII(profileData.phone)) ?? profileData.phone,
-      } as Profile;
+      };
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
@@ -86,7 +62,7 @@ export function useProfile() {
       // decryptPII on read passes any legacy plaintext through).
       const encryptedUpdates: Partial<Profile> = { ...updates };
       if ('phone' in updates) {
-        encryptedUpdates.phone = (await encryptPII(updates.phone)) as string | undefined;
+        encryptedUpdates.phone = await encryptPII(updates.phone ?? null);
       }
 
       const { data, error } = await supabase

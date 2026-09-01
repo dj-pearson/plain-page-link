@@ -5,15 +5,15 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createTestQueryClient } from '@/test/test-utils';
 import { createQueryBuilder, type MockQueryResult } from '@/test/mocks/supabase';
-import { mockLead } from '@/test/fixtures/lead';
+import { mockLead, mockLeadRow } from '@/test/fixtures/lead';
 import { mockAuthenticatedUser } from '@/test/mocks/auth';
 
 let queryResult: MockQueryResult;
 let authUser: { id: string } | null;
-const fromMock = vi.fn(() => createQueryBuilder(queryResult));
+const fromMock = vi.fn((_table: string) => createQueryBuilder(queryResult));
 
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (...args: unknown[]) => fromMock(...args) },
+  supabase: { from: (table: string) => fromMock(table) },
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
@@ -29,7 +29,8 @@ describe('useLeads', () => {
   beforeEach(() => {
     fromMock.mockClear();
     authUser = { id: mockAuthenticatedUser.id };
-    queryResult = { data: [mockLead], error: null };
+    // A stored row, not the decrypted app shape — see mockLeadRow.
+    queryResult = { data: [mockLeadRow], error: null };
   });
 
   it('fetches leads for the authenticated user', async () => {

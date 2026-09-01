@@ -79,7 +79,7 @@ export function InsightsWidget({
     insights.push({
       id: 'high-conversion',
       type: 'positive',
-      title: `Strong ${stats.conversionRate}% conversion rate`,
+      title: `Strong ${stats.conversionRate.toFixed(1)}% conversion rate`,
       description: "You're converting visitors to leads at an excellent rate!",
     });
   }

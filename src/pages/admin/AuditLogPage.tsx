@@ -197,7 +197,7 @@ export default function AuditLogPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap p-3">
-                      {new Date(log.created_at).toLocaleString()}
+                      {log.created_at ? new Date(log.created_at).toLocaleString() : 'unknown'}
                     </td>
                     <td className="p-3">
                       {log.user_id ? (
@@ -205,7 +205,7 @@ export default function AuditLogPage() {
                           className="font-mono text-xs text-primary hover:underline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            updateFilter('userId', log.user_id);
+                            updateFilter('userId', log.user_id ?? '');
                           }}
                           title="Filter by this user"
                         >

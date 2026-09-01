@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Star, Send, CheckCircle, Home } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import { logger } from "@/lib/logger";
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Star, Send, CheckCircle, Home } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { logger } from '@/lib/logger';
 
 export default function SubmitReview() {
   const { username } = useParams();
@@ -22,31 +22,33 @@ export default function SubmitReview() {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [formData, setFormData] = useState({
-    client_name: "",
-    client_email: "",
-    client_title: "",
-    review: "",
-    property_type: "",
-    transaction_type: "buyer",
+    client_name: '',
+    client_email: '',
+    client_title: '',
+    review: '',
+    property_type: '',
+    transaction_type: 'buyer',
   });
 
   useEffect(() => {
     const fetchProfile = async () => {
+      if (!username) return;
+
       try {
         const { data, error } = await supabase
-          .from("profiles")
-          .select("id, full_name, avatar_url, bio")
-          .eq("username", username)
+          .from('profiles')
+          .select('id, full_name, avatar_url, bio')
+          .eq('username', username)
           .single();
 
         if (error) throw error;
         setProfile(data);
       } catch (error) {
-        logger.error("Error fetching profile", error as Error);
+        logger.error('Error fetching profile', error as Error);
         toast({
-          title: "Agent not found",
-          description: "The agent profile could not be found.",
-          variant: "destructive",
+          title: 'Agent not found',
+          description: 'The agent profile could not be found.',
+          variant: 'destructive',
         });
       } finally {
         setLoading(false);
@@ -63,9 +65,9 @@ export default function SubmitReview() {
 
     if (rating === 0) {
       toast({
-        title: "Rating required",
-        description: "Please select a star rating.",
-        variant: "destructive",
+        title: 'Rating required',
+        description: 'Please select a star rating.',
+        variant: 'destructive',
       });
       return;
     }
@@ -73,32 +75,30 @@ export default function SubmitReview() {
     setSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from("testimonials")
-        .insert({
-          user_id: profile.id,
-          client_name: formData.client_name,
-          client_title: formData.client_title || "",
-          rating: rating,
-          review: formData.review,
-          property_type: formData.property_type || "",
-          transaction_type: formData.transaction_type,
-          date: new Date().toISOString(),
-        });
+      const { error } = await supabase.from('testimonials').insert({
+        user_id: profile.id,
+        client_name: formData.client_name,
+        client_title: formData.client_title || '',
+        rating: rating,
+        review: formData.review,
+        property_type: formData.property_type || '',
+        transaction_type: formData.transaction_type,
+        date: new Date().toISOString(),
+      });
 
       if (error) throw error;
 
       setSubmitted(true);
       toast({
-        title: "Review submitted!",
+        title: 'Review submitted!',
         description: `Thank you for sharing your experience with ${profile.full_name}!`,
       });
     } catch (error) {
-      logger.error("Error submitting review", error as Error);
+      logger.error('Error submitting review', error as Error);
       toast({
-        title: "Submission failed",
-        description: "There was an error submitting your review. Please try again.",
-        variant: "destructive",
+        title: 'Submission failed',
+        description: 'There was an error submitting your review. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setSubmitting(false);
@@ -119,15 +119,10 @@ export default function SubmitReview() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Agent Not Found</CardTitle>
-            <CardDescription>
-              The agent profile you're looking for doesn't exist.
-            </CardDescription>
+            <CardDescription>The agent profile you're looking for doesn't exist.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button
-              onClick={() => navigate("/")}
-              className="w-full"
-            >
+            <Button onClick={() => navigate('/')} className="w-full">
               <Home className="mr-2 h-4 w-4" />
               Go to Homepage
             </Button>
@@ -149,16 +144,12 @@ export default function SubmitReview() {
             </div>
             <CardTitle className="text-2xl">Thank You!</CardTitle>
             <CardDescription className="text-base mt-2">
-              Your review has been submitted successfully. {profile.full_name} will be
-              notified and may feature your testimonial on their profile.
+              Your review has been submitted successfully. {profile.full_name} will be notified and
+              may feature your testimonial on their profile.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button
-              onClick={() => navigate(`/${username}`)}
-              className="w-full"
-              variant="outline"
-            >
+            <Button onClick={() => navigate(`/${username}`)} className="w-full" variant="outline">
               View {profile.full_name}'s Profile
             </Button>
           </CardContent>
@@ -187,11 +178,7 @@ export default function SubmitReview() {
                 </CardDescription>
               </div>
             </div>
-            {profile.bio && (
-              <p className="text-sm text-muted-foreground italic">
-                "{profile.bio}"
-              </p>
-            )}
+            {profile.bio && <p className="text-sm text-muted-foreground italic">"{profile.bio}"</p>}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -213,8 +200,8 @@ export default function SubmitReview() {
                       <Star
                         className={`w-10 h-10 ${
                           star <= (hoveredRating || rating)
-                            ? "fill-yellow-400 text-yellow-400"
-                            : "text-gray-300"
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-gray-300'
                         }`}
                       />
                     </button>
@@ -223,7 +210,15 @@ export default function SubmitReview() {
                 <p className="text-sm text-muted-foreground mt-2">
                   {rating > 0 && (
                     <span className="text-blue-600 font-medium">
-                      {rating === 5 ? "Excellent!" : rating === 4 ? "Great!" : rating === 3 ? "Good" : rating === 2 ? "Fair" : "Poor"}
+                      {rating === 5
+                        ? 'Excellent!'
+                        : rating === 4
+                          ? 'Great!'
+                          : rating === 3
+                            ? 'Good'
+                            : rating === 2
+                              ? 'Fair'
+                              : 'Poor'}
                     </span>
                   )}
                 </p>
@@ -235,9 +230,7 @@ export default function SubmitReview() {
                 <Input
                   id="client_name"
                   value={formData.client_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, client_name: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                   placeholder="John Doe"
                   required
                 />
@@ -250,9 +243,7 @@ export default function SubmitReview() {
                   id="client_email"
                   type="email"
                   value={formData.client_email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, client_email: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
                   placeholder="john@example.com"
                   required
                 />
@@ -267,9 +258,7 @@ export default function SubmitReview() {
                 <Input
                   id="client_title"
                   value={formData.client_title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, client_title: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, client_title: e.target.value })}
                   placeholder="e.g., First-time Homebuyer, Real Estate Investor"
                 />
               </div>
@@ -280,9 +269,7 @@ export default function SubmitReview() {
                 <select
                   id="transaction_type"
                   value={formData.transaction_type}
-                  onChange={(e) =>
-                    setFormData({ ...formData, transaction_type: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, transaction_type: e.target.value })}
                   className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="buyer">Buyer</option>
@@ -297,9 +284,7 @@ export default function SubmitReview() {
                 <Input
                   id="property_type"
                   value={formData.property_type}
-                  onChange={(e) =>
-                    setFormData({ ...formData, property_type: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, property_type: e.target.value })}
                   placeholder="e.g., Single Family Home, Condo, Townhouse"
                 />
               </div>
@@ -310,9 +295,7 @@ export default function SubmitReview() {
                 <Textarea
                   id="review"
                   value={formData.review}
-                  onChange={(e) =>
-                    setFormData({ ...formData, review: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, review: e.target.value })}
                   placeholder="Share your experience working with this agent..."
                   rows={6}
                   required
@@ -344,8 +327,8 @@ export default function SubmitReview() {
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
-                By submitting this review, you agree that it may be displayed publicly
-                on {profile.full_name}'s profile page.
+                By submitting this review, you agree that it may be displayed publicly on{' '}
+                {profile.full_name}'s profile page.
               </p>
             </form>
           </CardContent>

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useSSO, SSOConfig } from '@/hooks/useSSO';
+import { useSSO } from '@/hooks/useSSO';
+import type { SSOConfig, NewSSOConfig } from '@/hooks/useSSO';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -90,7 +91,7 @@ export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProp
     setError('');
     try {
       // Clean up data based on provider type
-      const cleanedData: Partial<SSOConfig> = {
+      const cleanedData: NewSSOConfig = {
         organization_name: data.organization_name,
         organization_domain: data.organization_domain.toLowerCase(),
         sso_provider: data.sso_provider,

@@ -10,6 +10,12 @@ import type {
   PSEOStats,
   PSEOQueueInput,
 } from '@/types/pseo';
+import type { Database } from '@/integrations/supabase/types';
+
+/** The columns a caller may supply when creating a taxonomy item. */
+type TaxonomyInsert = Database['public']['Tables']['pseo_taxonomy']['Insert'];
+/** The columns a caller may change on an existing taxonomy item. */
+type TaxonomyUpdate = Database['public']['Tables']['pseo_taxonomy']['Update'];
 
 export function usePSEO() {
   const queryClient = useQueryClient();
@@ -190,7 +196,7 @@ export function usePSEO() {
   });
 
   const createTaxonomyMutation = useMutation({
-    mutationFn: async (item: Omit<PSEOTaxonomyItem, 'created_at' | 'updated_at'>) => {
+    mutationFn: async (item: TaxonomyInsert) => {
       const { error } = await supabase.from('pseo_taxonomy').insert(item);
       if (error) throw error;
     },
@@ -204,7 +210,7 @@ export function usePSEO() {
   });
 
   const updateTaxonomyMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<PSEOTaxonomyItem> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: TaxonomyUpdate }) => {
       const { error } = await supabase
         .from('pseo_taxonomy')
         .update(updates)
@@ -318,7 +324,9 @@ export function usePSEO() {
       const errors = errorsRes.data ?? [];
 
       const publishedPages = pages.filter((p) => p.is_published);
-      const qualityScores = pages.map((p) => p.quality_score).filter(Boolean);
+      const qualityScores = pages
+        .map((p) => p.quality_score)
+        .filter((score): score is number => score !== null);
 
       const pagesByType: Record<string, number> = {};
       pages.forEach((p) => {

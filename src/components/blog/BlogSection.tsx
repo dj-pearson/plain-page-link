@@ -155,7 +155,9 @@ export function BlogSection({
                     <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        {new Date(article.published_at).toLocaleDateString()}
+                        {article.published_at
+                          ? new Date(article.published_at).toLocaleDateString()
+                          : '—'}
                       </div>
                       <div className="flex items-center gap-1">
                         <Eye className="h-4 w-4" />

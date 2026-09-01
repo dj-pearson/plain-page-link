@@ -4,6 +4,7 @@
  */
 
 import { PageConfig } from '@/types/pageBuilder';
+import type { BlockConfig } from '@/types/pageBuilder';
 import { getSafeOrigin } from '@/lib/utils';
 
 /**
@@ -34,29 +35,46 @@ export const generateBreadcrumbSchema = (items: BreadcrumbItem[]): Record<string
 };
 
 /**
+ * Finds a block's config, narrowed to that block type's own shape.
+ *
+ * PageBlock is `{ type: BlockType; config: BlockConfig }` — the two are not a
+ * discriminated pair, so `blocks.find(b => b.type === 'bio')` leaves config as
+ * the full union and every read needed an `as any`. BlockConfig carries its
+ * own `type` discriminant, so matching on that narrows properly and the one
+ * remaining assertion is confined here.
+ */
+function findBlockConfig<T extends BlockConfig['type']>(
+  page: PageConfig,
+  type: T
+): Extract<BlockConfig, { type: T }> | undefined {
+  const block = page.blocks.find((b) => b.config.type === type);
+  return block?.config as Extract<BlockConfig, { type: T }> | undefined;
+}
+
+/**
  * Generate Person Schema for Real Estate Agent
  */
 export const generatePersonSchema = (page: PageConfig): Record<string, any> => {
-  const bioBlock = page.blocks.find((b) => b.type === 'bio');
-  const socialBlock = page.blocks.find((b) => b.type === 'social');
+  const bioBlock = findBlockConfig(page, 'bio');
+  const socialBlock = findBlockConfig(page, 'social');
 
   const schema: Record<string, any> = {
     '@context': 'https://schema.org',
     '@type': 'Person',
-    name: bioBlock?.config.title || page.title,
-    jobTitle: (bioBlock as any)?.config.subtitle || 'Real Estate Professional',
-    description: (bioBlock as any)?.config.description || page.description,
+    name: bioBlock?.title || page.title,
+    jobTitle: bioBlock?.subtitle || 'Real Estate Professional',
+    description: bioBlock?.description || page.description,
     url: `${getSafeOrigin()}/p/${page.slug}`,
   };
 
   // Add image if available
-  if ((bioBlock as any)?.config.avatarUrl) {
-    schema.image = (bioBlock as any).config.avatarUrl;
+  if (bioBlock?.avatarUrl) {
+    schema.image = bioBlock.avatarUrl;
   }
 
   // Add social media links
   if (socialBlock) {
-    const socialLinks = (socialBlock as any).config.links || [];
+    const socialLinks = socialBlock.links || [];
     schema.sameAs = socialLinks.map((link: any) => link.url);
   }
 
@@ -67,20 +85,20 @@ export const generatePersonSchema = (page: PageConfig): Record<string, any> => {
  * Generate RealEstateAgent Schema
  */
 export const generateRealEstateAgentSchema = (page: PageConfig): Record<string, any> => {
-  const bioBlock = page.blocks.find((b) => b.type === 'bio');
+  const bioBlock = findBlockConfig(page, 'bio');
   const listingsBlock = page.blocks.find((b) => b.type === 'listings');
 
   const schema: Record<string, any> = {
     '@context': 'https://schema.org',
     '@type': 'RealEstateAgent',
-    name: bioBlock?.config.title || page.title,
-    description: (bioBlock as any)?.config.description || page.description,
+    name: bioBlock?.title || page.title,
+    description: bioBlock?.description || page.description,
     url: `${getSafeOrigin()}/p/${page.slug}`,
   };
 
   // Add image if available
-  if ((bioBlock as any)?.config.avatarUrl) {
-    schema.image = (bioBlock as any).config.avatarUrl;
+  if (bioBlock?.avatarUrl) {
+    schema.image = bioBlock.avatarUrl;
   }
 
   // Add number of listings
@@ -342,12 +360,12 @@ export const validateSEO = (
  * Generate social media preview
  */
 export const generateSocialPreview = (page: PageConfig) => {
-  const bioBlock = page.blocks.find((b) => b.type === 'bio') as any;
+  const bioBlock = findBlockConfig(page, 'bio');
 
   return {
     title: page.seo.title || page.title,
     description: page.seo.description || page.description,
-    image: page.seo.ogImage || bioBlock?.config?.avatarUrl || '/default-og-image.png',
+    image: page.seo.ogImage || bioBlock?.avatarUrl || '/default-og-image.png',
     url: `${getSafeOrigin()}/p/${page.slug}`,
     siteName: 'AgentBio',
     twitterCard: page.seo.twitterCard || 'summary_large_image',

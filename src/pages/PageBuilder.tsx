@@ -7,7 +7,6 @@
 import { useEffect, useState } from 'react';
 import { usePageBuilderStore } from '@/stores/pageBuilderStore';
 import { getBlockTemplates } from '@/lib/pageBuilder';
-import { useAuthStore } from '@/stores/useAuthStore';
 import { PageList } from '@/components/pageBuilder/PageList';
 import { BlockRenderer } from '@/components/pageBuilder/BlockRenderer';
 import { BlockSettings } from '@/components/pageBuilder/BlockSettings';
@@ -83,7 +82,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 export default function PageBuilderEditor() {
-  const { user, profile } = useAuthStore();
+  // Neither user nor profile is read in this component.
   const [showPageList, setShowPageList] = useState(true);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isMobilePreview, setIsMobilePreview] = useState(false);

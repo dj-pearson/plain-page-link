@@ -19,6 +19,7 @@ import { analyzeBio } from '@/lib/instagram-bio-analyzer/scoring';
 import { generateBioRewrites } from '@/lib/instagram-bio-analyzer/bio-generator';
 import { analyzeLinkStrategy, calculateLeadLoss } from '@/lib/instagram-bio-analyzer/link-strategy';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import {
   TrendingUp,
@@ -67,8 +68,8 @@ export default function InstagramBioAnalyzer() {
       const newAnalysisId = crypto.randomUUID();
       const { error } = await supabase.from('instagram_bio_analyses').insert({
         id: newAnalysisId,
-        input_data: data,
-        result_data: result,
+        input_data: data as unknown as Json,
+        result_data: result as unknown as Json,
         overall_score: result.overallScore,
         market: data.location,
       });

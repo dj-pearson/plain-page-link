@@ -1,709 +1,670 @@
-import { useState, useEffect } from "react";
-import { ThemeCard } from "@/components/dashboard/ThemeCard";
-import { ColorPicker } from "@/components/dashboard/ColorPicker";
-import { SavedThemesManager } from "@/components/theme/SavedThemesManager";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { ThemeCard } from '@/components/dashboard/ThemeCard';
+import { ColorPicker } from '@/components/dashboard/ColorPicker';
+import { SavedThemesManager } from '@/components/theme/SavedThemesManager';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Save, RotateCcw, Eye, Palette, Monitor, Smartphone } from "lucide-react";
-import {
-    DEFAULT_THEMES,
-    getCurrentTheme,
-    applyTheme,
-    type ThemeConfig,
-} from "@/lib/themes";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { logger } from "@/lib/logger";
-import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
-import { UpgradeModal } from "@/components/UpgradeModal";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Save, RotateCcw, Eye, Palette, Monitor, Smartphone } from 'lucide-react';
+import { DEFAULT_THEMES, getCurrentTheme, applyTheme, type ThemeConfig } from '@/lib/themes';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { logger } from '@/lib/logger';
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
+import { UpgradeModal } from '@/components/UpgradeModal';
 
 const AVAILABLE_FONTS = [
-    "Inter",
-    "Roboto",
-    "Open Sans",
-    "Lato",
-    "Montserrat",
-    "Poppins",
-    "Playfair Display",
-    "Merriweather",
-    "Bebas Neue",
-    "Source Sans Pro",
+  'Inter',
+  'Roboto',
+  'Open Sans',
+  'Lato',
+  'Montserrat',
+  'Poppins',
+  'Playfair Display',
+  'Merriweather',
+  'Bebas Neue',
+  'Source Sans Pro',
 ];
 
 export default function Theme() {
-    const { toast } = useToast();
-    const { user } = useAuthStore();
-    const [selectedTheme, setSelectedTheme] = useState<ThemeConfig>(
-        getCurrentTheme()
-    );
-    const [customColors, setCustomColors] = useState(selectedTheme.colors);
-    const [customFonts, setCustomFonts] = useState(selectedTheme.fonts);
-    const [isCustomizing, setIsCustomizing] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-    const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
-    const { subscription } = useSubscriptionLimits();
+  const { toast } = useToast();
+  const { user } = useAuthStore();
+  const [selectedTheme, setSelectedTheme] = useState<ThemeConfig>(getCurrentTheme());
+  const [customColors, setCustomColors] = useState(selectedTheme.colors);
+  const [customFonts, setCustomFonts] = useState(selectedTheme.fonts);
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const { subscription } = useSubscriptionLimits();
 
-    // Load saved theme from database
-    useEffect(() => {
-        loadSavedTheme();
-    }, [user]);
+  // Load saved theme from database
+  useEffect(() => {
+    loadSavedTheme();
+  }, [user]);
 
-    const loadSavedTheme = async () => {
-        if (!user) return;
+  const loadSavedTheme = async () => {
+    if (!user) return;
 
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('theme')
-                .eq('id', user.id)
-                .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('theme')
+        .eq('id', user.id)
+        .single();
 
-            if (error) throw error;
+      if (error) throw error;
 
-            if (data?.theme) {
-                let savedTheme: ThemeConfig;
-                
-                // Handle different theme formats
-                if (typeof data.theme === 'string') {
-                    // Check if it's JSON or just a preset name
-                    if (data.theme.startsWith('{')) {
-                        savedTheme = JSON.parse(data.theme);
-                    } else {
-                        // It's a preset name, find the matching theme
-                        const matchingTheme = DEFAULT_THEMES.find(t => t.id === data.theme);
-                        savedTheme = matchingTheme || DEFAULT_THEMES[0];
-                    }
-                } else {
-                    savedTheme = data.theme as ThemeConfig;
-                }
-                
-                setSelectedTheme(savedTheme);
-                setCustomColors(savedTheme.colors);
-                setCustomFonts(savedTheme.fonts);
-                applyTheme(savedTheme);
-            }
-        } catch (error) {
-            logger.error('Failed to load saved theme', error as Error);
-            // Load default theme on error
-            const defaultTheme = DEFAULT_THEMES[0];
-            setSelectedTheme(defaultTheme);
-            setCustomColors(defaultTheme.colors);
-            setCustomFonts(defaultTheme.fonts);
-        }
-    };
+      if (data?.theme) {
+        let savedTheme: ThemeConfig;
 
-    const handleThemeSelect = async (theme: ThemeConfig) => {
-        // Check if theme is premium and user doesn't have access
-        if (theme.isPremium && subscription?.plan_name === 'free') {
-            setShowUpgradeModal(true);
-            return;
+        // Handle different theme formats
+        if (typeof data.theme === 'string') {
+          // Check if it's JSON or just a preset name
+          if (data.theme.startsWith('{')) {
+            savedTheme = JSON.parse(data.theme);
+          } else {
+            // It's a preset name, find the matching theme
+            const matchingTheme = DEFAULT_THEMES.find((t) => t.id === data.theme);
+            savedTheme = matchingTheme || DEFAULT_THEMES[0];
+          }
+        } else {
+          savedTheme = data.theme as ThemeConfig;
         }
 
-        setSelectedTheme(theme);
-        setCustomColors(theme.colors);
-        setCustomFonts(theme.fonts);
-        setIsCustomizing(false);
-        
-        // Auto-apply theme for instant preview
-        applyTheme(theme);
-    };
+        setSelectedTheme(savedTheme);
+        setCustomColors(savedTheme.colors);
+        setCustomFonts(savedTheme.fonts);
+        applyTheme(savedTheme);
+      }
+    } catch (error) {
+      logger.error('Failed to load saved theme', error as Error);
+      // Load default theme on error
+      const defaultTheme = DEFAULT_THEMES[0];
+      setSelectedTheme(defaultTheme);
+      setCustomColors(defaultTheme.colors);
+      setCustomFonts(defaultTheme.fonts);
+    }
+  };
 
-    const handleSaveTheme = async () => {
-        if (!user) {
-            toast({
-                title: "Error",
-                description: "You must be logged in to save themes",
-                variant: "destructive",
-            });
-            return;
-        }
+  const handleThemeSelect = async (theme: ThemeConfig) => {
+    // Check if theme is premium and user doesn't have access
+    if (theme.isPremium && subscription?.plan_name === 'free') {
+      setShowUpgradeModal(true);
+      return;
+    }
 
-        setIsSaving(true);
-        
-        try {
-            const themeToApply: ThemeConfig = {
-                ...selectedTheme,
-                colors: customColors,
-                fonts: customFonts,
-            };
+    setSelectedTheme(theme);
+    setCustomColors(theme.colors);
+    setCustomFonts(theme.fonts);
+    setIsCustomizing(false);
 
-            // Save to database
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    theme: JSON.stringify(themeToApply)
-                })
-                .eq('id', user.id)
-                .select('id')
-                .single();
+    // Auto-apply theme for instant preview
+    applyTheme(theme);
+  };
 
-            if (error) throw error;
+  const handleSaveTheme = async () => {
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to save themes',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-            // Apply locally
-            applyTheme(themeToApply);
+    setIsSaving(true);
 
-            toast({
-                title: "Theme saved!",
-                description: "Your profile theme has been updated successfully.",
-            });
-            
-            setIsCustomizing(false);
-        } catch (error) {
-            logger.error('Failed to save theme', error as Error);
-            toast({
-                title: "Error",
-                description: "Failed to save theme. Please try again.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsSaving(false);
-        }
-    };
+    try {
+      const themeToApply: ThemeConfig = {
+        ...selectedTheme,
+        colors: customColors,
+        fonts: customFonts,
+      };
 
-    const handlePreviewTheme = async () => {
-        if (!user) {
-            toast({
-                title: "Error",
-                description: "You must be logged in to preview",
-                variant: "destructive",
-            });
-            return;
-        }
+      // Save to database
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          theme: JSON.stringify(themeToApply),
+        })
+        .eq('id', user.id)
+        .select('id')
+        .single();
 
-        try {
-            // Get user's username
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('username')
-                .eq('id', user.id)
-                .single();
+      if (error) throw error;
 
-            if (error) throw error;
+      // Apply locally
+      applyTheme(themeToApply);
 
-            if (data?.username) {
-                // Open profile in new tab
-                window.open(`/${data.username}`, '_blank');
-            }
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to open preview",
-                variant: "destructive",
-            });
-        }
-    };
+      toast({
+        title: 'Theme saved!',
+        description: 'Your profile theme has been updated successfully.',
+      });
 
-    const handleResetToDefault = () => {
-        setCustomColors(selectedTheme.colors);
-        setCustomFonts(selectedTheme.fonts);
-        setIsCustomizing(false);
-        toast({
-            title: "Reset to default",
-            description: "Theme has been reset to its default settings.",
-        });
-    };
+      setIsCustomizing(false);
+    } catch (error) {
+      logger.error('Failed to save theme', error as Error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save theme. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    const handleColorChange = (
-        key: keyof typeof customColors,
-        value: string
-    ) => {
-        setCustomColors((prev) => ({ ...prev, [key]: value }));
-        setIsCustomizing(true);
-    };
+  const handlePreviewTheme = async () => {
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to preview',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    const handleFontChange = (key: keyof typeof customFonts, value: string) => {
-        setCustomFonts((prev) => ({ ...prev, [key]: value }));
-        setIsCustomizing(true);
-    };
+    try {
+      // Get user's username
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
 
-    const freeThemes = DEFAULT_THEMES.filter((t) => !t.isPremium);
-    const premiumThemes = DEFAULT_THEMES.filter((t) => t.isPremium);
+      if (error) throw error;
 
-    return (
-        <div className="space-y-4 sm:space-y-6">
-            {/* Header - Mobile optimized */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold">Theme Customization</h1>
-                    <p className="text-sm sm:text-base text-muted-foreground mt-0.5 sm:mt-1">
-                        Customize your profile's look and feel
-                    </p>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handlePreviewTheme}
-                        title="Open your public profile in a new tab to see your theme"
-                        className="flex-1 sm:flex-none"
-                    >
-                        <Eye className="w-4 h-4 sm:mr-2" />
-                        <span className="hidden sm:inline">Preview Live</span>
-                    </Button>
-                    {isCustomizing && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleResetToDefault}
-                            className="flex-1 sm:flex-none"
-                        >
-                            <RotateCcw className="w-4 h-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Reset</span>
-                        </Button>
-                    )}
-                    <Button size="sm" onClick={handleSaveTheme} disabled={isSaving} className="flex-1 sm:flex-none">
-                        {isSaving ? (
-                            <LoadingSpinner size="sm" className="mr-2" />
-                        ) : (
-                            <Save className="w-4 h-4 mr-2" />
-                        )}
-                        <span className="text-xs sm:text-sm">Save Theme</span>
-                    </Button>
-                </div>
-            </div>
+      if (data?.username) {
+        // Open profile in new tab
+        window.open(`/${data.username}`, '_blank');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to open preview',
+        variant: 'destructive',
+      });
+    }
+  };
 
-            {/* Info Banner - Mobile optimized */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 sm:p-4">
-                <div className="flex items-start gap-2 sm:gap-3">
-                    <div className="text-xl sm:text-2xl flex-shrink-0">✨</div>
-                    <div className="flex-1">
-                        <p className="text-xs sm:text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                            How to see your theme changes:
-                        </p>
-                        <ol className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 space-y-0.5 sm:space-y-1 list-decimal list-inside">
-                            <li>Select a theme below and click <strong>"Save Theme"</strong></li>
-                            <li>Click <strong>"Preview Live"</strong> button above to open your public profile in a new tab</li>
-                            <li>Premium themes with 3D effects will show animated backgrounds on your public page!</li>
-                        </ol>
-                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 sm:mt-2">
-                            💡 Note: Theme effects only appear on your <strong>public profile page</strong>, not in this dashboard.
-                        </p>
-                    </div>
-                </div>
-            </div>
+  const handleResetToDefault = () => {
+    setCustomColors(selectedTheme.colors);
+    setCustomFonts(selectedTheme.fonts);
+    setIsCustomizing(false);
+    toast({
+      title: 'Reset to default',
+      description: 'Theme has been reset to its default settings.',
+    });
+  };
 
-            <Tabs defaultValue="presets" className="space-y-6">
-                <TabsList>
-                    <TabsTrigger value="presets">
-                        <Palette className="w-4 h-4 mr-2" />
-                        <span className="hidden sm:inline">Theme Presets</span>
-                        <span className="sm:hidden">Presets</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="saved">
-                        <Save className="w-4 h-4 mr-2" />
-                        <span className="hidden sm:inline">My Themes</span>
-                        <span className="sm:hidden">Saved</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="customize">
-                        <Eye className="w-4 h-4 mr-2" />
-                        <span className="hidden sm:inline">Customize</span>
-                        <span className="sm:hidden">Custom</span>
-                    </TabsTrigger>
-                </TabsList>
+  const handleColorChange = (key: keyof typeof customColors, value: string) => {
+    setCustomColors((prev) => ({ ...prev, [key]: value }));
+    setIsCustomizing(true);
+  };
 
-                {/* Theme Presets Tab - Mobile optimized */}
-                <TabsContent value="presets" className="space-y-4 sm:space-y-6">
-                    {/* Free Themes */}
-                    <div>
-                        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">
-                            Free Themes
-                        </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {freeThemes.map((theme) => (
-                                <ThemeCard
-                                    key={theme.id}
-                                    theme={theme}
-                                    isSelected={selectedTheme.id === theme.id}
-                                    onSelect={handleThemeSelect}
-                                />
-                            ))}
-                        </div>
-                    </div>
+  const handleFontChange = (key: keyof typeof customFonts, value: string) => {
+    setCustomFonts((prev) => ({ ...prev, [key]: value }));
+    setIsCustomizing(true);
+  };
 
-                    {/* Premium Themes */}
-                    <div>
-                        <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                            <h3 className="text-base sm:text-lg font-semibold">
-                                Premium Themes
-                            </h3>
-                            <Badge>Pro</Badge>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {premiumThemes.map((theme) => (
-                                <ThemeCard
-                                    key={theme.id}
-                                    theme={theme}
-                                    isSelected={selectedTheme.id === theme.id}
-                                    onSelect={handleThemeSelect}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                </TabsContent>
+  const freeThemes = DEFAULT_THEMES.filter((t) => !t.isPremium);
+  const premiumThemes = DEFAULT_THEMES.filter((t) => t.isPremium);
 
-                {/* Saved Themes Tab */}
-                <TabsContent value="saved">
-                    <SavedThemesManager
-                        currentTheme={{
-                            ...selectedTheme,
-                            colors: customColors,
-                            fonts: customFonts,
-                        }}
-                        onApplyTheme={(theme) => {
-                            setSelectedTheme(theme);
-                            setCustomColors(theme.colors);
-                            setCustomFonts(theme.fonts);
-                            applyTheme(theme);
-                        }}
-                    />
-                </TabsContent>
-
-                {/* Customize Tab - Mobile optimized */}
-                <TabsContent value="customize" className="space-y-4 sm:space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        {/* Colors */}
-                        <Card>
-                            <CardHeader className="pb-3 sm:pb-4">
-                                <CardTitle className="text-base sm:text-lg">Colors</CardTitle>
-                                <CardDescription className="text-xs sm:text-sm">
-                                    Customize the color scheme of your profile
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3 sm:space-y-4">
-                                <ColorPicker
-                                    label="Primary Color"
-                                    value={customColors.primary}
-                                    onChange={(value) =>
-                                        handleColorChange("primary", value)
-                                    }
-                                    description="Main brand color (buttons, links)"
-                                />
-                                <ColorPicker
-                                    label="Secondary Color"
-                                    value={customColors.secondary}
-                                    onChange={(value) =>
-                                        handleColorChange("secondary", value)
-                                    }
-                                    description="Secondary accent color"
-                                />
-                                <ColorPicker
-                                    label="Accent Color"
-                                    value={customColors.accent}
-                                    onChange={(value) =>
-                                        handleColorChange("accent", value)
-                                    }
-                                    description="Highlights and CTAs"
-                                />
-                                <ColorPicker
-                                    label="Background Color"
-                                    value={customColors.background}
-                                    onChange={(value) =>
-                                        handleColorChange("background", value)
-                                    }
-                                    description="Page background"
-                                />
-                                <ColorPicker
-                                    label="Text Color"
-                                    value={customColors.foreground}
-                                    onChange={(value) =>
-                                        handleColorChange("foreground", value)
-                                    }
-                                    description="Primary text color"
-                                />
-                            </CardContent>
-                        </Card>
-
-                        {/* Fonts */}
-                        <Card>
-                            <CardHeader className="pb-3 sm:pb-4">
-                                <CardTitle className="text-base sm:text-lg">Typography</CardTitle>
-                                <CardDescription className="text-xs sm:text-sm">
-                                    Select fonts for headings and body text
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3 sm:space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="heading-font">
-                                        Heading Font
-                                    </Label>
-                                    <Select
-                                        value={customFonts.heading}
-                                        onValueChange={(value) =>
-                                            handleFontChange("heading", value)
-                                        }
-                                    >
-                                        <SelectTrigger id="heading-font">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {AVAILABLE_FONTS.map((font) => (
-                                                <SelectItem
-                                                    key={font}
-                                                    value={font}
-                                                >
-                                                    <span
-                                                        style={{
-                                                            fontFamily: font,
-                                                        }}
-                                                    >
-                                                        {font}
-                                                    </span>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <p className="text-xs text-muted-foreground">
-                                        Font used for titles and headings
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="body-font">Body Font</Label>
-                                    <Select
-                                        value={customFonts.body}
-                                        onValueChange={(value) =>
-                                            handleFontChange("body", value)
-                                        }
-                                    >
-                                        <SelectTrigger id="body-font">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {AVAILABLE_FONTS.map((font) => (
-                                                <SelectItem
-                                                    key={font}
-                                                    value={font}
-                                                >
-                                                    <span
-                                                        style={{
-                                                            fontFamily: font,
-                                                        }}
-                                                    >
-                                                        {font}
-                                                    </span>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <p className="text-xs text-muted-foreground">
-                                        Font used for paragraphs and text
-                                    </p>
-                                </div>
-
-                                {/* Preview Text */}
-                                <div className="mt-6 p-4 border rounded-lg space-y-2">
-                                    <h4 className="text-sm font-semibold text-muted-foreground">
-                                        Preview
-                                    </h4>
-                                    <h3
-                                        className="text-2xl font-bold"
-                                        style={{
-                                            fontFamily: customFonts.heading,
-                                            color: customColors.primary,
-                                        }}
-                                    >
-                                        Your Profile Heading
-                                    </h3>
-                                    <p
-                                        className="text-sm"
-                                        style={{
-                                            fontFamily: customFonts.body,
-                                            color: customColors.foreground,
-                                        }}
-                                    >
-                                        This is how your body text will appear
-                                        on your profile. It should be readable
-                                        and professional.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Live Preview - Mobile optimized */}
-                    <Card>
-                        <CardHeader className="pb-3 sm:pb-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="text-base sm:text-lg">Live Preview</CardTitle>
-                                    <CardDescription className="text-xs sm:text-sm">
-                                        See how your theme will look on different devices
-                                    </CardDescription>
-                                </div>
-                                <div className="flex gap-1 bg-muted p-1 rounded-lg">
-                                    <Button
-                                        variant={previewMode === "desktop" ? "default" : "ghost"}
-                                        size="sm"
-                                        onClick={() => setPreviewMode("desktop")}
-                                        className="gap-1.5"
-                                    >
-                                        <Monitor className="h-4 w-4" />
-                                        <span className="hidden sm:inline text-xs">Desktop</span>
-                                    </Button>
-                                    <Button
-                                        variant={previewMode === "mobile" ? "default" : "ghost"}
-                                        size="sm"
-                                        onClick={() => setPreviewMode("mobile")}
-                                        className="gap-1.5"
-                                    >
-                                        <Smartphone className="h-4 w-4" />
-                                        <span className="hidden sm:inline text-xs">Mobile</span>
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            {/* Preview Container */}
-                            <div className="flex justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-lg p-4 sm:p-8">
-                                <div
-                                    className={`rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4 transition-all duration-300 ${
-                                        previewMode === "mobile"
-                                            ? "w-full max-w-[375px]"
-                                            : "w-full"
-                                    }`}
-                                    style={{
-                                        backgroundColor: customColors.background,
-                                        boxShadow: previewMode === "mobile"
-                                            ? "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-                                            : "none",
-                                    }}
-                                >
-                                <div className={`flex items-start ${previewMode === "mobile" ? "flex-col items-center text-center" : "gap-4"}`}>
-                                    <div
-                                        className={`rounded-full ${previewMode === "mobile" ? "w-16 h-16 mb-3" : "w-20 h-20"}`}
-                                        style={{
-                                            backgroundColor:
-                                                customColors.primary,
-                                        }}
-                                    />
-                                    <div className="flex-1 space-y-2">
-                                        <h3
-                                            className={`font-bold ${previewMode === "mobile" ? "text-xl" : "text-2xl"}`}
-                                            style={{
-                                                fontFamily: customFonts.heading,
-                                                color: customColors.foreground,
-                                            }}
-                                        >
-                                            Agent Name
-                                        </h3>
-                                        <p
-                                            className="text-sm"
-                                            style={{
-                                                fontFamily: customFonts.body,
-                                                color: customColors.mutedForeground,
-                                            }}
-                                        >
-                                            Realtor® | Luxury Home Specialist
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className={`flex ${previewMode === "mobile" ? "flex-col w-full" : "flex-wrap"} gap-2`}>
-                                    <button
-                                        className={`py-2 rounded-lg text-white text-xs sm:text-sm font-medium min-h-[44px] ${previewMode === "mobile" ? "w-full px-4" : "px-3 sm:px-4"}`}
-                                        style={{
-                                            backgroundColor:
-                                                customColors.primary,
-                                        }}
-                                    >
-                                        Primary Button
-                                    </button>
-                                    <button
-                                        className={`py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px] ${previewMode === "mobile" ? "w-full px-4" : "px-3 sm:px-4"}`}
-                                        style={{
-                                            backgroundColor:
-                                                customColors.secondary,
-                                            color: "white",
-                                        }}
-                                    >
-                                        Secondary Button
-                                    </button>
-                                    {previewMode === "desktop" && (
-                                        <button
-                                            className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px]"
-                                            style={{
-                                                backgroundColor:
-                                                    customColors.accent,
-                                                color: "white",
-                                            }}
-                                        >
-                                            Accent Button
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div
-                                    className="p-4 rounded-lg"
-                                    style={{
-                                        backgroundColor: customColors.card,
-                                    }}
-                                >
-                                    <h4
-                                        className="font-semibold mb-2 text-sm"
-                                        style={{
-                                            fontFamily: customFonts.heading,
-                                            color: customColors.cardForeground,
-                                        }}
-                                    >
-                                        Property Card
-                                    </h4>
-                                    <p
-                                        className="text-xs"
-                                        style={{
-                                            fontFamily: customFonts.body,
-                                            color: customColors.mutedForeground,
-                                        }}
-                                    >
-                                        {previewMode === "mobile"
-                                            ? "Mobile view"
-                                            : "This is how property cards will appear with your selected theme."
-                                        }
-                                    </p>
-                                </div>
-                                </div>
-                            </div>
-
-                            {/* Preview Info */}
-                            <div className="mt-4 text-center">
-                                <p className="text-xs text-muted-foreground">
-                                    {previewMode === "mobile"
-                                        ? "📱 Viewing mobile preview (375px wide)"
-                                        : "🖥️ Viewing desktop preview (full width)"
-                                    }
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
-
-            {/* Upgrade Modal */}
-            <UpgradeModal
-                open={showUpgradeModal}
-                onOpenChange={setShowUpgradeModal}
-                feature="premium_themes"
-                currentPlan={subscription?.plan_name || "Free"}
-                requiredPlan="Professional"
-            />
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header - Mobile optimized */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold">Theme Customization</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-0.5 sm:mt-1">
+            Customize your profile's look and feel
+          </p>
         </div>
-    );
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePreviewTheme}
+            title="Open your public profile in a new tab to see your theme"
+            className="flex-1 sm:flex-none"
+          >
+            <Eye className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Preview Live</span>
+          </Button>
+          {isCustomizing && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetToDefault}
+              className="flex-1 sm:flex-none"
+            >
+              <RotateCcw className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Reset</span>
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={handleSaveTheme}
+            disabled={isSaving}
+            className="flex-1 sm:flex-none"
+          >
+            {isSaving ? (
+              <LoadingSpinner size="sm" className="mr-2" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            <span className="text-xs sm:text-sm">Save Theme</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Info Banner - Mobile optimized */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 sm:p-4">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <div className="text-xl sm:text-2xl flex-shrink-0">✨</div>
+          <div className="flex-1">
+            <p className="text-xs sm:text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+              How to see your theme changes:
+            </p>
+            <ol className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 space-y-0.5 sm:space-y-1 list-decimal list-inside">
+              <li>
+                Select a theme below and click <strong>"Save Theme"</strong>
+              </li>
+              <li>
+                Click <strong>"Preview Live"</strong> button above to open your public profile in a
+                new tab
+              </li>
+              <li>
+                Premium themes with 3D effects will show animated backgrounds on your public page!
+              </li>
+            </ol>
+            <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 sm:mt-2">
+              💡 Note: Theme effects only appear on your <strong>public profile page</strong>, not
+              in this dashboard.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Tabs defaultValue="presets" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="presets">
+            <Palette className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Theme Presets</span>
+            <span className="sm:hidden">Presets</span>
+          </TabsTrigger>
+          <TabsTrigger value="saved">
+            <Save className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">My Themes</span>
+            <span className="sm:hidden">Saved</span>
+          </TabsTrigger>
+          <TabsTrigger value="customize">
+            <Eye className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Customize</span>
+            <span className="sm:hidden">Custom</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Theme Presets Tab - Mobile optimized */}
+        <TabsContent value="presets" className="space-y-4 sm:space-y-6">
+          {/* Free Themes */}
+          <div>
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Free Themes</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {freeThemes.map((theme) => (
+                <ThemeCard
+                  key={theme.id}
+                  theme={theme}
+                  isSelected={selectedTheme.id === theme.id}
+                  onSelect={handleThemeSelect}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Premium Themes */}
+          <div>
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <h3 className="text-base sm:text-lg font-semibold">Premium Themes</h3>
+              <Badge>Pro</Badge>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {premiumThemes.map((theme) => (
+                <ThemeCard
+                  key={theme.id}
+                  theme={theme}
+                  isSelected={selectedTheme.id === theme.id}
+                  onSelect={handleThemeSelect}
+                />
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Saved Themes Tab */}
+        <TabsContent value="saved">
+          <SavedThemesManager
+            currentTheme={{
+              ...selectedTheme,
+              colors: customColors,
+              fonts: customFonts,
+            }}
+            onApplyTheme={(theme) => {
+              setSelectedTheme(theme);
+              setCustomColors(theme.colors);
+              setCustomFonts(theme.fonts);
+              applyTheme(theme);
+            }}
+          />
+        </TabsContent>
+
+        {/* Customize Tab - Mobile optimized */}
+        <TabsContent value="customize" className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            {/* Colors */}
+            <Card>
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="text-base sm:text-lg">Colors</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Customize the color scheme of your profile
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 sm:space-y-4">
+                <ColorPicker
+                  label="Primary Color"
+                  value={customColors.primary}
+                  onChange={(value) => handleColorChange('primary', value)}
+                  description="Main brand color (buttons, links)"
+                />
+                <ColorPicker
+                  label="Secondary Color"
+                  value={customColors.secondary}
+                  onChange={(value) => handleColorChange('secondary', value)}
+                  description="Secondary accent color"
+                />
+                <ColorPicker
+                  label="Accent Color"
+                  value={customColors.accent}
+                  onChange={(value) => handleColorChange('accent', value)}
+                  description="Highlights and CTAs"
+                />
+                <ColorPicker
+                  label="Background Color"
+                  value={customColors.background}
+                  onChange={(value) => handleColorChange('background', value)}
+                  description="Page background"
+                />
+                <ColorPicker
+                  label="Text Color"
+                  value={customColors.foreground}
+                  onChange={(value) => handleColorChange('foreground', value)}
+                  description="Primary text color"
+                />
+              </CardContent>
+            </Card>
+
+            {/* Fonts */}
+            <Card>
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="text-base sm:text-lg">Typography</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Select fonts for headings and body text
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 sm:space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="heading-font">Heading Font</Label>
+                  <Select
+                    value={customFonts.heading}
+                    onValueChange={(value) => handleFontChange('heading', value)}
+                  >
+                    <SelectTrigger id="heading-font">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AVAILABLE_FONTS.map((font) => (
+                        <SelectItem key={font} value={font}>
+                          <span
+                            style={{
+                              fontFamily: font,
+                            }}
+                          >
+                            {font}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Font used for titles and headings</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="body-font">Body Font</Label>
+                  <Select
+                    value={customFonts.body}
+                    onValueChange={(value) => handleFontChange('body', value)}
+                  >
+                    <SelectTrigger id="body-font">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AVAILABLE_FONTS.map((font) => (
+                        <SelectItem key={font} value={font}>
+                          <span
+                            style={{
+                              fontFamily: font,
+                            }}
+                          >
+                            {font}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Font used for paragraphs and text</p>
+                </div>
+
+                {/* Preview Text */}
+                <div className="mt-6 p-4 border rounded-lg space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground">Preview</h4>
+                  <h3
+                    className="text-2xl font-bold"
+                    style={{
+                      fontFamily: customFonts.heading,
+                      color: customColors.primary,
+                    }}
+                  >
+                    Your Profile Heading
+                  </h3>
+                  <p
+                    className="text-sm"
+                    style={{
+                      fontFamily: customFonts.body,
+                      color: customColors.foreground,
+                    }}
+                  >
+                    This is how your body text will appear on your profile. It should be readable
+                    and professional.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Live Preview - Mobile optimized */}
+          <Card>
+            <CardHeader className="pb-3 sm:pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base sm:text-lg">Live Preview</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
+                    See how your theme will look on different devices
+                  </CardDescription>
+                </div>
+                <div className="flex gap-1 bg-muted p-1 rounded-lg">
+                  <Button
+                    variant={previewMode === 'desktop' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setPreviewMode('desktop')}
+                    className="gap-1.5"
+                  >
+                    <Monitor className="h-4 w-4" />
+                    <span className="hidden sm:inline text-xs">Desktop</span>
+                  </Button>
+                  <Button
+                    variant={previewMode === 'mobile' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setPreviewMode('mobile')}
+                    className="gap-1.5"
+                  >
+                    <Smartphone className="h-4 w-4" />
+                    <span className="hidden sm:inline text-xs">Mobile</span>
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Preview Container */}
+              <div className="flex justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-lg p-4 sm:p-8">
+                <div
+                  className={`rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4 transition-all duration-300 ${
+                    previewMode === 'mobile' ? 'w-full max-w-[375px]' : 'w-full'
+                  }`}
+                  style={{
+                    backgroundColor: customColors.background,
+                    boxShadow:
+                      previewMode === 'mobile'
+                        ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                        : 'none',
+                  }}
+                >
+                  <div
+                    className={`flex items-start ${previewMode === 'mobile' ? 'flex-col items-center text-center' : 'gap-4'}`}
+                  >
+                    <div
+                      className={`rounded-full ${previewMode === 'mobile' ? 'w-16 h-16 mb-3' : 'w-20 h-20'}`}
+                      style={{
+                        backgroundColor: customColors.primary,
+                      }}
+                    />
+                    <div className="flex-1 space-y-2">
+                      <h3
+                        className={`font-bold ${previewMode === 'mobile' ? 'text-xl' : 'text-2xl'}`}
+                        style={{
+                          fontFamily: customFonts.heading,
+                          color: customColors.foreground,
+                        }}
+                      >
+                        Agent Name
+                      </h3>
+                      <p
+                        className="text-sm"
+                        style={{
+                          fontFamily: customFonts.body,
+                          color: customColors.muted,
+                        }}
+                      >
+                        Realtor® | Luxury Home Specialist
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`flex ${previewMode === 'mobile' ? 'flex-col w-full' : 'flex-wrap'} gap-2`}
+                  >
+                    <button
+                      className={`py-2 rounded-lg text-white text-xs sm:text-sm font-medium min-h-[44px] ${previewMode === 'mobile' ? 'w-full px-4' : 'px-3 sm:px-4'}`}
+                      style={{
+                        backgroundColor: customColors.primary,
+                      }}
+                    >
+                      Primary Button
+                    </button>
+                    <button
+                      className={`py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px] ${previewMode === 'mobile' ? 'w-full px-4' : 'px-3 sm:px-4'}`}
+                      style={{
+                        backgroundColor: customColors.secondary,
+                        color: 'white',
+                      }}
+                    >
+                      Secondary Button
+                    </button>
+                    {previewMode === 'desktop' && (
+                      <button
+                        className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium min-h-[44px]"
+                        style={{
+                          backgroundColor: customColors.accent,
+                          color: 'white',
+                        }}
+                      >
+                        Accent Button
+                      </button>
+                    )}
+                  </div>
+
+                  <div
+                    className="p-4 rounded-lg"
+                    style={{
+                      backgroundColor: customColors.background,
+                    }}
+                  >
+                    <h4
+                      className="font-semibold mb-2 text-sm"
+                      style={{
+                        fontFamily: customFonts.heading,
+                        color: customColors.foreground,
+                      }}
+                    >
+                      Property Card
+                    </h4>
+                    <p
+                      className="text-xs"
+                      style={{
+                        fontFamily: customFonts.body,
+                        color: customColors.muted,
+                      }}
+                    >
+                      {previewMode === 'mobile'
+                        ? 'Mobile view'
+                        : 'This is how property cards will appear with your selected theme.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview Info */}
+              <div className="mt-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                  {previewMode === 'mobile'
+                    ? '📱 Viewing mobile preview (375px wide)'
+                    : '🖥️ Viewing desktop preview (full width)'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        feature="premium_themes"
+        currentPlan={subscription?.plan_name || 'Free'}
+        requiredPlan="Professional"
+      />
+    </div>
+  );
 }

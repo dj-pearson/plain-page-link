@@ -35,27 +35,29 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { logger } from '@/lib/logger';
+import type { Database } from '@/integrations/supabase/types';
 
 interface User {
   id: string;
-  email: string;
+  /** Optional on Supabase's admin User — a user can exist with no email. */
+  email?: string;
   created_at: string;
-  last_sign_in_at: string;
-  user_metadata: any;
+  last_sign_in_at?: string;
+  user_metadata?: Record<string, unknown>;
 }
 
-interface Profile {
-  id: string;
-  username: string;
-  bio: string;
-  avatar_url: string;
-}
-
-interface Subscription {
-  user_id: string;
-  plan: string;
-  status: string;
-}
+/**
+ * Rows from `profiles` and `subscriptions`, exactly as stored.
+ *
+ * Both were restated by hand here, and the subscriptions one named `plan` — a
+ * column that does not exist; it is `plan_name`. So `subscription?.plan` was
+ * always undefined: the admin CSV export wrote "none" in the Subscription
+ * column for every user regardless of what they pay, and the plan badge
+ * rendered empty for every active subscriber. The profiles one listed four of
+ * the 42 columns and typed bio and avatar_url non-nullable.
+ */
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 
 interface UserWithDetails extends User {
   profile?: Profile;
@@ -204,8 +206,10 @@ export const UserManagementPanel = () => {
 
       // Log admin action
       const currentUser = await supabase.auth.getUser();
+      const adminId = currentUser.data.user?.id;
+      if (!adminId) throw new Error('Not authenticated');
       await supabase.rpc('log_admin_action', {
-        p_admin_id: currentUser.data.user?.id,
+        p_admin_id: adminId,
         p_action: `role_change_${newRole}`,
         p_target_type: 'user',
         p_target_id: userId,
@@ -255,7 +259,7 @@ export const UserManagementPanel = () => {
           user.email,
           user.profile?.username || '',
           user.role,
-          user.subscription?.plan || 'none',
+          user.subscription?.plan_name || 'none',
           user.created_at,
           user.last_sign_in_at || 'Never',
         ].join(',')
@@ -294,7 +298,7 @@ export const UserManagementPanel = () => {
       return <Badge variant="secondary">Free</Badge>;
     }
 
-    return <Badge variant="default">{subscription.plan}</Badge>;
+    return <Badge variant="default">{subscription.plan_name}</Badge>;
   };
 
   return (

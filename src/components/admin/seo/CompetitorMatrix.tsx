@@ -35,36 +35,76 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import type { Database, Json } from '@/integrations/supabase/types';
 
-interface CompetitorTracking {
-  id: string;
-  competitor_domain: string;
-  competitor_name: string;
-  keywords: string[];
-  check_frequency: string;
-  last_checked_at: string;
-  alert_on_rank_change: boolean;
-  alert_on_new_backlinks: boolean;
-  rank_change_threshold: number;
-  active: boolean;
-  created_at: string;
-}
+/** A row from `seo_competitor_tracking`, exactly as stored. */
+type CompetitorTracking = Database['public']['Tables']['seo_competitor_tracking']['Row'];
 
-interface CompetitorAnalysis {
+/** A row from `seo_competitor_analysis`, exactly as stored. */
+type CompetitorAnalysisRow = Database['public']['Tables']['seo_competitor_analysis']['Row'];
+
+/**
+ * One keyword's standing against one competitor.
+ *
+ * This panel was written as though `seo_competitor_analysis` held a row per
+ * keyword, with `keyword`, `their_position`, `our_position`, `gap` and
+ * `search_volume` columns. It does not have any of those five: a row is one
+ * competitor DOMAIN, carrying aggregate metrics plus a `keyword_gap_list`
+ * jsonb array, which is where the per-keyword entries live. Every insight
+ * below therefore read undefined — `a.gap < 0` is false for undefined, so the
+ * three lists were always empty and none of these cards ever rendered.
+ *
+ * Nothing in this repository writes seo_competitor_analysis yet
+ * (refreshAnalysis is an explicit stub), so this is the contract the writer
+ * has to produce rather than a shape observed in the data.
+ */
+interface CompetitorKeywordGap {
   id: string;
   competitor_domain: string;
   keyword: string;
   their_position: number;
   our_position: number;
+  /** their_position - our_position: negative means the competitor ranks better. */
   gap: number;
-  search_volume: number;
-  analyzed_at: string;
+  search_volume: number | null;
 }
+
+const asRecord = (value: Json): Record<string, Json | undefined> | null =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) ? value : null;
+
+const asNumber = (value: Json | undefined): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+/** Flattens each analysis row's keyword_gap_list into per-keyword entries. */
+const toKeywordGaps = (rows: CompetitorAnalysisRow[]): CompetitorKeywordGap[] =>
+  rows.flatMap((row) => {
+    const entries = Array.isArray(row.keyword_gap_list) ? row.keyword_gap_list : [];
+    return entries.flatMap((entry, index): CompetitorKeywordGap[] => {
+      const gap = asRecord(entry);
+      const keyword = gap?.keyword;
+      const theirPosition = asNumber(gap?.their_position);
+      const ourPosition = asNumber(gap?.our_position);
+      if (typeof keyword !== 'string' || theirPosition === null || ourPosition === null) {
+        return [];
+      }
+      return [
+        {
+          id: `${row.id}:${index}`,
+          competitor_domain: row.competitor_domain,
+          keyword,
+          their_position: theirPosition,
+          our_position: ourPosition,
+          gap: asNumber(gap?.gap) ?? theirPosition - ourPosition,
+          search_volume: asNumber(gap?.search_volume),
+        },
+      ];
+    });
+  });
 
 export const CompetitorMatrix = () => {
   const { toast } = useToast();
   const [competitors, setCompetitors] = useState<CompetitorTracking[]>([]);
-  const [analysis, setAnalysis] = useState<CompetitorAnalysis[]>([]);
+  const [analysis, setAnalysis] = useState<CompetitorKeywordGap[]>([]);
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -103,11 +143,11 @@ export const CompetitorMatrix = () => {
       const { data, error } = await supabase
         .from('seo_competitor_analysis')
         .select('*')
-        .order('analyzed_at', { ascending: false })
+        .order('analysis_date', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      setAnalysis(data || []);
+      setAnalysis(toKeywordGaps(data ?? []));
     } catch (error: any) {
       logger.error('Error loading analysis', error);
     }
@@ -227,7 +267,7 @@ export const CompetitorMatrix = () => {
   const keywordGaps = analysis.filter((a) => a.gap < 0 && Math.abs(a.gap) <= 10);
   const winningKeywords = analysis.filter((a) => a.gap > 0 && a.our_position <= 10);
   const opportunityKeywords = analysis.filter(
-    (a) => a.their_position <= 10 && a.our_position > 10 && a.search_volume > 100
+    (a) => a.their_position <= 10 && a.our_position > 10 && (a.search_volume ?? 0) > 100
   );
 
   return (

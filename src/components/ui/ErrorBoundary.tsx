@@ -51,7 +51,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     this.setState({
       error,
       errorInfo,
-      eventId,
+      eventId: eventId ?? null,
     });
 
     // Log in development. logger.error redacts sensitive values and suppresses

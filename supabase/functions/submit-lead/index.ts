@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
+import { encryptSecret } from '../_shared/encryption.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { validateLeadData, sanitizeString, getClientIP } from '../_shared/validation.ts'
@@ -112,10 +113,27 @@ serve(async (req) => {
       form_data: sanitizeFormData(rawData.form_data),
     };
 
+    // US-086: encrypt the PII before it is stored. This path — the one every
+    // public capture form uses — wrote no ciphertext at all, so coverage was
+    // inconsistent as well as ineffective: useLeads dual-wrote encrypted_*,
+    // submit-lead did not, and the plaintext columns were authoritative
+    // either way. The plaintext columns are gone now, so this is the only
+    // place the values are stored.
+    const [encryptedEmail, encryptedPhone] = await Promise.all([
+      encryptSecret(leadData.email),
+      encryptSecret(leadData.phone),
+    ])
+
+    const { email: _plaintextEmail, phone: _plaintextPhone, ...storedLead } = leadData
+
     // Insert lead into database
     const { data: lead, error: insertError } = await supabase
       .from('leads')
-      .insert(leadData)
+      .insert({
+        ...storedLead,
+        encrypted_email: encryptedEmail,
+        encrypted_phone: encryptedPhone,
+      })
       .select()
       .single()
 

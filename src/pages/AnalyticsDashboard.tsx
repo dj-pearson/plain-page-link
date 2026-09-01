@@ -24,6 +24,7 @@ import {
 } from '@/lib/analytics';
 import { useAnalytics, type TimeRange } from '@/hooks/useAnalytics';
 import { useLeads } from '@/hooks/useLeads';
+import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import { subDays } from 'date-fns';
 import { BarChart3, TrendingUp, Users, FileText, Loader2 } from 'lucide-react';
 
@@ -35,6 +36,7 @@ export default function AnalyticsDashboard() {
   // Fetch real data from database
   const { stats, previousStats, hasPreviousPeriod, viewsData, isLoading } = useAnalytics(timeRange);
   const { leads } = useLeads();
+  const { scoreLeadObject } = useMLLeadScoring();
 
   // Build analytics data from real stats
   const now = new Date();
@@ -74,8 +76,12 @@ export default function AnalyticsDashboard() {
 
   // Convert viewsData to TimeSeriesData format
   const timeSeriesData: TimeSeriesData[] = useMemo(() => {
-    return viewsData.map((day: any) => ({
-      date: new Date(day.name),
+    return viewsData.map((day) => ({
+      // TimeSeriesData.date is a formatted label, not a Date: predictTrend
+      // emits format(d, 'MMM d') for its points, and viewsData.name is already
+      // in that shape. Passing a Date here put Date objects and strings on the
+      // same axis in combinedData below.
+      date: day.name,
       value: day.views,
       label: day.name,
     }));
@@ -145,15 +151,27 @@ export default function AnalyticsDashboard() {
     // Return real lead data based on report type
     switch (config.reportType) {
       case 'leads':
-        return leads.map((lead) => ({
-          id: lead.id,
-          name: lead.name || 'Unknown',
-          email: lead.email || '',
-          source: lead.source || 'website',
-          status: lead.status || 'new',
-          score: lead.score || 0,
-          created: lead.created_at,
-        }));
+        // There is no `score` column on `leads` — the ML score is computed by
+        // useMLLeadScoring, which is what the Leads dashboard already uses.
+        // Reading lead.score meant this export shipped a Score column of
+        // zeroes for every row.
+        return leads.map((lead) => {
+          let score = 0;
+          try {
+            score = scoreLeadObject(lead).score;
+          } catch {
+            // Scoring is best-effort here; an unscoreable lead exports as 0.
+          }
+          return {
+            id: lead.id,
+            name: lead.name || 'Unknown',
+            email: lead.email || '',
+            source: lead.source || 'website',
+            status: lead.status || 'new',
+            score,
+            created: lead.created_at,
+          };
+        });
 
       case 'sources':
         return leadSources.map((s) => ({

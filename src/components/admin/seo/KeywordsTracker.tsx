@@ -17,24 +17,26 @@ import {
 import { TrendingUp, TrendingDown, Minus, RefreshCw, Search, AlertCircle } from 'lucide-react';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { logger } from '@/lib/logger';
+import type { Database } from '@/integrations/supabase/types';
 
-interface Keyword {
-  id: string;
-  keyword: string;
-  current_position: number;
-  previous_position: number;
-  search_volume: number;
-  difficulty: number;
-  url: string;
-  last_checked: string;
-  created_at: string;
-}
+/**
+ * A row from `seo_keywords`, exactly as stored.
+ *
+ * Restated by hand this named three columns the table does not have —
+ * `difficulty` (it is `difficulty_score`), `last_checked` (`last_checked_at`)
+ * and `url` (no such column on seo_keywords at all) — so the Difficulty, URL
+ * and Last Checked cells rendered from undefined on every row: every keyword
+ * showed the "Easy" badge, a dash for URL and "Never" for last checked,
+ * whatever the database held. It also typed every position and volume column
+ * non-nullable when all of them are nullable.
+ */
+type Keyword = Database['public']['Tables']['seo_keywords']['Row'];
 
-interface KeywordHistory {
-  keyword: string;
-  position: number;
-  checked_at: string;
-}
+/** Exactly the `seo_keyword_history` columns this panel selects. */
+type KeywordHistory = Pick<
+  Database['public']['Tables']['seo_keyword_history']['Row'],
+  'keyword' | 'position' | 'checked_at'
+>;
 
 export const KeywordsTracker = () => {
   const { toast } = useToast();
@@ -142,17 +144,23 @@ export const KeywordsTracker = () => {
     kw.keyword.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const gain = (kw: Keyword) => (kw.previous_position ?? 0) - (kw.current_position ?? 0);
+
   const topMovers = keywords
-    .filter((kw) => kw.previous_position && kw.current_position !== kw.previous_position)
-    .sort(
-      (a, b) =>
-        b.previous_position - b.current_position - (a.previous_position - a.current_position)
+    .filter(
+      (kw) =>
+        kw.previous_position !== null &&
+        kw.current_position !== null &&
+        kw.current_position !== kw.previous_position
     )
+    .sort((a, b) => gain(b) - gain(a))
     .slice(0, 5);
 
-  const topRanked = keywords.filter((kw) => kw.current_position <= 10);
+  const topRanked = keywords.filter(
+    (kw) => kw.current_position !== null && kw.current_position <= 10
+  );
   const needsAttention = keywords.filter(
-    (kw) => kw.current_position > 20 && kw.search_volume > 100
+    (kw) => (kw.current_position ?? 0) > 20 && (kw.search_volume ?? 0) > 100
   );
 
   return (
@@ -198,12 +206,9 @@ export const KeywordsTracker = () => {
             <CardTitle className="text-sm">Biggest Gain</CardTitle>
           </CardHeader>
           <CardContent>
-            {topMovers.length > 0 &&
-            topMovers[0].current_position < topMovers[0].previous_position ? (
+            {topMovers.length > 0 && gain(topMovers[0]) > 0 ? (
               <>
-                <div className="text-3xl font-bold text-green-600">
-                  +{topMovers[0].previous_position - topMovers[0].current_position}
-                </div>
+                <div className="text-3xl font-bold text-green-600">+{gain(topMovers[0])}</div>
                 <p className="text-xs text-muted-foreground mt-1">{topMovers[0].keyword}</p>
               </>
             ) : (
@@ -255,7 +260,6 @@ export const KeywordsTracker = () => {
                   <TableHead>Change</TableHead>
                   <TableHead>Search Volume</TableHead>
                   <TableHead>Difficulty</TableHead>
-                  <TableHead>URL</TableHead>
                   <TableHead>Last Checked</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -263,7 +267,7 @@ export const KeywordsTracker = () => {
               <TableBody>
                 {filteredKeywords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
                       No keywords found
                     </TableCell>
                   </TableRow>
@@ -272,28 +276,35 @@ export const KeywordsTracker = () => {
                     <TableRow key={keyword.id}>
                       <TableCell className="font-medium">{keyword.keyword}</TableCell>
                       <TableCell>
-                        <Badge variant={keyword.current_position <= 10 ? 'default' : 'outline'}>
-                          #{keyword.current_position}
+                        <Badge
+                          variant={
+                            keyword.current_position !== null && keyword.current_position <= 10
+                              ? 'default'
+                              : 'outline'
+                          }
+                        >
+                          {keyword.current_position === null
+                            ? 'Unranked'
+                            : `#${keyword.current_position}`}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           {getTrendIcon(
-                            keyword.current_position,
-                            keyword.previous_position || keyword.current_position
+                            keyword.current_position ?? 0,
+                            keyword.previous_position ?? keyword.current_position ?? 0
                           )}
                           {getPositionChange(
-                            keyword.current_position,
-                            keyword.previous_position || keyword.current_position
+                            keyword.current_position ?? 0,
+                            keyword.previous_position ?? keyword.current_position ?? 0
                           )}
                         </div>
                       </TableCell>
                       <TableCell>{keyword.search_volume?.toLocaleString() || 'N/A'}</TableCell>
-                      <TableCell>{getDifficultyBadge(keyword.difficulty || 0)}</TableCell>
-                      <TableCell className="max-w-xs truncate">{keyword.url || '-'}</TableCell>
+                      <TableCell>{getDifficultyBadge(keyword.difficulty_score ?? 0)}</TableCell>
                       <TableCell>
-                        {keyword.last_checked
-                          ? new Date(keyword.last_checked).toLocaleDateString()
+                        {keyword.last_checked_at
+                          ? new Date(keyword.last_checked_at).toLocaleDateString()
                           : 'Never'}
                       </TableCell>
                       <TableCell>
@@ -381,10 +392,13 @@ export const KeywordsTracker = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {getTrendIcon(keyword.current_position, keyword.previous_position)}
+                    {getTrendIcon(keyword.current_position ?? 0, keyword.previous_position ?? 0)}
                     <div className="text-right">
                       <div className="font-bold">
-                        {getPositionChange(keyword.current_position, keyword.previous_position)}
+                        {getPositionChange(
+                          keyword.current_position ?? 0,
+                          keyword.previous_position ?? 0
+                        )}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {keyword.previous_position} → {keyword.current_position}

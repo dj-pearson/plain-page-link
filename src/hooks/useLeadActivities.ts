@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface LeadActivity {
   id: string;
@@ -140,7 +141,7 @@ export function useLeadActivities(leadId?: string) {
         _activity_type: params.activityType,
         _content: params.content ?? undefined,
         _title: params.title ?? undefined,
-        _metadata: params.metadata || {},
+        _metadata: (params.metadata ?? {}) as Json,
       });
 
       if (error) throw error;
@@ -235,12 +236,13 @@ export function useLeadActivities(leadId?: string) {
   const logMeetingMutation = useMutation({
     mutationFn: async (params: LogMeetingParams) => {
       const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user?.id) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
         .from('lead_activities')
         .insert({
           lead_id: params.leadId,
-          user_id: userData.user?.id,
+          user_id: userData.user.id,
           activity_type: 'meeting',
           title: `${params.meetingType === 'in_person' ? 'In-person' : params.meetingType === 'video' ? 'Video' : 'Phone'} meeting`,
           content: params.notes,

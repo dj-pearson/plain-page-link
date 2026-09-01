@@ -62,7 +62,7 @@ export function ArticlesManager() {
     });
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'published':
         return 'bg-green-500';
@@ -150,7 +150,10 @@ export function ArticlesManager() {
                             {article.view_count} views
                           </span>
                           <span>
-                            Created: {format(new Date(article.created_at), 'MMM d, yyyy')}
+                            Created:{' '}
+                            {article.created_at
+                              ? format(new Date(article.created_at), 'MMM d, yyyy')
+                              : 'unknown'}
                           </span>
                           {article.published_at && (
                             <span>
@@ -314,7 +317,7 @@ export function ArticlesManager() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Switch
-                        checked={webhook.is_active}
+                        checked={webhook.is_active ?? false}
                         onCheckedChange={(checked) => {
                           updateWebhook({ id: webhook.id, updates: { is_active: checked } });
                         }}

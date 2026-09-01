@@ -1,55 +1,21 @@
-import type { Listing, PublicListing } from '@/types/listing';
+import type { PublicListing, PublicProfileListing } from '@/types/listing';
 
-export const mockListing: Listing = {
-  id: 1,
-  profile_id: 1,
-  address_street: '123 Maple Avenue',
-  address_city: 'Springfield',
-  address_state: 'IL',
-  address_zip: '62704',
-  address_full: '123 Maple Avenue, Springfield, IL 62704',
-  latitude: 39.7817,
-  longitude: -89.6501,
-  price: 425000,
-  original_price: 450000,
-  bedrooms: 4,
-  bathrooms: 3,
-  square_feet: 2400,
-  lot_size_acres: 0.25,
-  property_type: 'single_family',
-  year_built: 2005,
-  title: 'Charming Family Home in Springfield',
-  description: 'A beautifully maintained 4-bedroom home with a spacious yard.',
-  highlights: ['Updated kitchen', 'Finished basement', 'Two-car garage'],
-  status: 'active',
-  listed_date: '2026-02-01T00:00:00.000Z',
-  sold_date: null,
-  days_on_market: 14,
-  mls_number: 'MLS123456',
-  mls_source: 'Local MLS',
-  primary_photo: 'https://example.com/listings/1/primary.jpg',
-  photos: [
-    'https://example.com/listings/1/photo1.jpg',
-    'https://example.com/listings/1/photo2.jpg',
-  ],
-  virtual_tour_url: null,
-  video_url: null,
-  open_house_date: null,
-  open_house_end_date: null,
-  sort_order: 0,
-  is_featured: true,
-  created_at: '2026-02-01T00:00:00.000Z',
-  updated_at: '2026-02-10T00:00:00.000Z',
-};
-
-export const mockPublicListing: PublicListing = {
-  id: 1,
+/**
+ * Listing fixtures, built against the real `listings` schema.
+ *
+ * These previously described the invented `Listing` interface that used to sit
+ * in @/types/listing — `id: 1`, `price: 425000`, `address_street`,
+ * `primary_photo`. None of those are columns, so the fixtures could only ever
+ * exercise a shape production does not produce. `id` is a uuid and `price` is
+ * text; both are spelled that way here now.
+ */
+export const mockListing: PublicListing = {
+  id: '33333333-3333-3333-3333-333333333333',
   address: '123 Maple Avenue',
   city: 'Springfield',
   state: 'IL',
   zip_code: '62704',
-  price: 425000,
-  original_price: 450000,
+  price: '425000',
   beds: 4,
   baths: 3,
   bedrooms: 4,
@@ -57,24 +23,69 @@ export const mockPublicListing: PublicListing = {
   sqft: 2400,
   square_feet: 2400,
   lot_size_acres: 0.25,
-  image: 'https://example.com/listings/1/primary.jpg',
-  photos: ['https://example.com/listings/1/photo1.jpg'],
-  virtual_tour_url: null,
-  video_url: null,
-  title: 'Charming Family Home in Springfield',
-  description: 'A beautifully maintained 4-bedroom home.',
   property_type: 'single_family',
+  description: 'A beautifully maintained 4-bedroom home with a spacious yard.',
+  highlights: ['Updated kitchen', 'Finished basement', 'Two-car garage'],
   status: 'active',
-  highlights: ['Updated kitchen'],
+  listed_date: '2026-02-01',
+  sold_date: null,
+  days_on_market: 14,
   mls_number: 'MLS123456',
+  image: 'https://example.com/listings/1/primary.jpg',
+  photos: [
+    'https://example.com/listings/1/photo1.jpg',
+    'https://example.com/listings/1/photo2.jpg',
+  ],
+  virtual_tour_url: null,
+  open_house_date: null,
   sort_order: 0,
   is_featured: true,
-  days_on_market: 14,
   created_at: '2026-02-01T00:00:00.000Z',
   updated_at: '2026-02-10T00:00:00.000Z',
 };
 
-export const makeListing = (overrides: Partial<Listing> = {}): Listing => ({
+/**
+ * Exactly the columns usePublicProfile selects — no more.
+ *
+ * Built from mockListing so the two cannot drift; Pick rejects any key that is
+ * not in PublicListingFields.
+ */
+export const mockPublicListing: PublicProfileListing = {
+  id: mockListing.id,
+  image: mockListing.image,
+  photos: mockListing.photos,
+  address: mockListing.address,
+  city: mockListing.city,
+  price: mockListing.price,
+  beds: mockListing.beds,
+  baths: mockListing.baths,
+  bedrooms: mockListing.bedrooms,
+  bathrooms: mockListing.bathrooms,
+  sqft: mockListing.sqft,
+  square_feet: mockListing.square_feet,
+  status: mockListing.status,
+  sort_order: mockListing.sort_order,
+  is_featured: mockListing.is_featured,
+  days_on_market: mockListing.days_on_market,
+  description: mockListing.description,
+  property_type: mockListing.property_type,
+  state: mockListing.state,
+  zip_code: mockListing.zip_code,
+  mls_number: mockListing.mls_number,
+  lot_size_acres: mockListing.lot_size_acres,
+  virtual_tour_url: mockListing.virtual_tour_url,
+  highlights: mockListing.highlights,
+  created_at: mockListing.created_at,
+};
+
+export const makeListing = (overrides: Partial<PublicListing> = {}): PublicListing => ({
   ...mockListing,
+  ...overrides,
+});
+
+export const makePublicListing = (
+  overrides: Partial<PublicProfileListing> = {}
+): PublicProfileListing => ({
+  ...mockPublicListing,
   ...overrides,
 });

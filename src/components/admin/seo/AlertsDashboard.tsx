@@ -16,25 +16,33 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { logger } from '@/lib/logger';
+import type { Database, Json } from '@/integrations/supabase/types';
 
-interface SEONotification {
-  id: string;
-  notification_type: string;
-  title: string;
-  message: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  status: string;
-  data: any;
-  created_at: string;
-}
+/** A row from `seo_notification_queue`, exactly as stored. */
+type SEONotification = Database['public']['Tables']['seo_notification_queue']['Row'];
 
-interface AuditSchedule {
-  id: string;
-  name: string;
-  last_run_at: string;
-  last_run_status: string;
-  last_run_results: any;
-}
+/** A row from `seo_audit_schedules`, exactly as stored. */
+type AuditSchedule = Database['public']['Tables']['seo_audit_schedules']['Row'];
+
+/**
+ * The parts of the two jsonb payloads this panel renders.
+ *
+ * `seo_audit_schedules.last_run_results` and `seo_notification_queue.data` are
+ * jsonb, so nothing guarantees their shape. Read through these helpers rather
+ * than reaching into the Json union at each site: a payload that is a scalar,
+ * an array, or simply missing the key degrades to nothing rendered instead of
+ * throwing mid-render (the `.slice(0, 3)` calls below assume arrays).
+ */
+const asRecord = (value: Json | null | undefined): Record<string, Json | undefined> | null =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) ? value : null;
+
+const auditScore = (value: Json | null | undefined): number | null => {
+  const score = asRecord(value)?.overall_score;
+  return typeof score === 'number' ? score : null;
+};
+
+const stringList = (value: Json | undefined): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 
 export const AlertsDashboard = () => {
   const { toast } = useToast();
@@ -268,7 +276,7 @@ export const AlertsDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">
-              {recentAudits[0]?.last_run_results?.overall_score || 'N/A'}
+              {auditScore(recentAudits[0]?.last_run_results) ?? 'N/A'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Latest audit score</p>
           </CardContent>
@@ -395,10 +403,10 @@ export const AlertsDashboard = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
-                    {audit.last_run_results && (
+                    {audit.last_run_results !== null && (
                       <div className="text-center">
                         <div className="text-2xl font-bold">
-                          {audit.last_run_results.overall_score || 'N/A'}
+                          {auditScore(audit.last_run_results) ?? 'N/A'}
                         </div>
                         <div className="text-xs text-muted-foreground">Score</div>
                       </div>
@@ -441,9 +449,11 @@ const NotificationCard = ({
             <div>
               <CardTitle className="text-lg">{notification.title}</CardTitle>
               <CardDescription>
-                {formatDistanceToNow(new Date(notification.created_at), {
-                  addSuffix: true,
-                })}
+                {notification.created_at
+                  ? formatDistanceToNow(new Date(notification.created_at), {
+                      addSuffix: true,
+                    })
+                  : 'unknown time'}
               </CardDescription>
             </div>
           </div>
@@ -459,40 +469,45 @@ const NotificationCard = ({
         <p className="text-sm mb-4">{notification.message}</p>
 
         {/* Additional data */}
-        {notification.data && (
-          <div className="space-y-2">
-            {notification.data.critical_issues && (
-              <div>
-                <h5 className="font-semibold text-sm mb-1">Critical Issues:</h5>
-                <ul className="list-disc list-inside text-sm text-muted-foreground">
-                  {notification.data.critical_issues
-                    .slice(0, 3)
-                    .map((issue: string, idx: number) => (
+        {(() => {
+          const data = asRecord(notification.data);
+          if (!data) return null;
+          const criticalIssues = stringList(data.critical_issues);
+          const warnings = stringList(data.warnings);
+          const score = auditScore(notification.data);
+          return (
+            <div className="space-y-2">
+              {criticalIssues.length > 0 && (
+                <div>
+                  <h5 className="font-semibold text-sm mb-1">Critical Issues:</h5>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground">
+                    {criticalIssues.slice(0, 3).map((issue, idx) => (
                       <li key={idx}>{issue}</li>
                     ))}
-                </ul>
-              </div>
-            )}
+                  </ul>
+                </div>
+              )}
 
-            {notification.data.warnings && (
-              <div>
-                <h5 className="font-semibold text-sm mb-1">Warnings:</h5>
-                <ul className="list-disc list-inside text-sm text-muted-foreground">
-                  {notification.data.warnings.slice(0, 3).map((warning: string, idx: number) => (
-                    <li key={idx}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+              {warnings.length > 0 && (
+                <div>
+                  <h5 className="font-semibold text-sm mb-1">Warnings:</h5>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground">
+                    {warnings.slice(0, 3).map((warning, idx) => (
+                      <li key={idx}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-            {notification.data.overall_score && (
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-sm font-semibold">Overall Score:</span>
-                <span className="text-lg font-bold">{notification.data.overall_score}/100</span>
-              </div>
-            )}
-          </div>
-        )}
+              {score !== null && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-sm font-semibold">Overall Score:</span>
+                  <span className="text-lg font-bold">{score}/100</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </CardContent>
     </Card>
   );

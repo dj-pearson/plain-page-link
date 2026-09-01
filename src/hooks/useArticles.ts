@@ -1,28 +1,28 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { edgeFunctions } from "@/lib/edgeFunctions";
-import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
+import { toast } from 'sonner';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface Article {
-  id: string;
-  title: string;
-  slug: string;
-  content: string;
-  excerpt?: string;
-  featured_image_url?: string;
-  author_id?: string;
-  status: string;
-  category: string;
-  tags: string[];
-  seo_title?: string;
-  seo_description?: string;
-  seo_keywords?: string[];
-  keyword_id?: string;
-  view_count: number;
-  published_at?: string;
-  created_at: string;
-  updated_at: string;
-}
+/**
+ * A row from `articles`, exactly as stored.
+ *
+ * Restated by hand this omitted generated_from_suggestion_id and typed
+ * status, category, tags, view_count, created_at and updated_at non-nullable
+ * against a nullable schema.
+ */
+export type Article = Database['public']['Tables']['articles']['Row'];
+
+/**
+ * The columns a caller may supply when creating an article.
+ *
+ * The table's Insert type, not Partial<Article>: title, slug and content are
+ * NOT NULL, and a Partial let a caller omit them and find out at the database.
+ */
+export type NewArticle = Omit<Database['public']['Tables']['articles']['Insert'], 'author_id'>;
+
+/** The columns a caller may change on an existing article. */
+export type ArticleUpdate = Database['public']['Tables']['articles']['Update'];
 
 export function useArticles() {
   const queryClient = useQueryClient();
@@ -35,7 +35,7 @@ export function useArticles() {
         .from('articles')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as Article[];
     },
@@ -51,7 +51,7 @@ export function useArticles() {
       autoSelectKeyword?: boolean;
     }) => {
       const { data, error } = await edgeFunctions.invoke('generate-article', {
-        body: params
+        body: params,
       });
 
       if (error) throw error;
@@ -71,18 +71,18 @@ export function useArticles() {
 
   // Create article
   const createArticleMutation = useMutation({
-    mutationFn: async (article: Partial<Article>) => {
+    mutationFn: async (article: NewArticle) => {
       const { data: userData } = await supabase.auth.getUser();
-      
+
       const { data, error } = await supabase
         .from('articles')
         .insert({
           ...article,
-          author_id: userData.user?.id
+          author_id: userData.user?.id,
         })
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -97,7 +97,7 @@ export function useArticles() {
 
   // Update article
   const updateArticleMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Article> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: ArticleUpdate }) => {
       const { error } = await supabase
         .from('articles')
         .update(updates)
@@ -123,7 +123,7 @@ export function useArticles() {
         .from('articles')
         .update({
           status: 'published',
-          published_at: new Date().toISOString()
+          published_at: new Date().toISOString(),
         })
         .eq('id', id);
 
@@ -139,10 +139,13 @@ export function useArticles() {
   });
 
   // Helper function that accepts mutation options
-  const publishArticle = (id: string, options?: {
-    onSuccess?: () => void;
-    onError?: (error: Error) => void;
-  }) => {
+  const publishArticle = (
+    id: string,
+    options?: {
+      onSuccess?: () => void;
+      onError?: (error: Error) => void;
+    }
+  ) => {
     publishArticleMutation.mutate(id, {
       onSuccess: () => {
         options?.onSuccess?.();
@@ -157,7 +160,7 @@ export function useArticles() {
   const republishArticleMutation = useMutation({
     mutationFn: async (id: string) => {
       const { data, error } = await edgeFunctions.invoke('publish-article-to-social', {
-        body: { articleId: id }
+        body: { articleId: id },
       });
 
       if (error) throw error;
@@ -178,11 +181,8 @@ export function useArticles() {
   // Delete article
   const deleteArticleMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('articles')
-        .delete()
-        .eq('id', id);
-      
+      const { error } = await supabase.from('articles').delete().eq('id', id);
+
       if (error) throw error;
     },
     onSuccess: () => {

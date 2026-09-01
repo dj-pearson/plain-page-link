@@ -124,8 +124,10 @@ export default function FullProfilePage() {
     }
 
     // Preload first image of each featured listing
-    const featured = data.listings?.filter((l: { is_featured?: boolean }) => l.is_featured) || [];
-    featured.slice(0, 5).forEach((listing: { image?: string | null; photos?: string[] | null }) => {
+    // No inline shapes here: data.listings is PublicProfileListing[], and the
+    // hand-written annotations disagreed with it (is_featured is nullable).
+    const featured = data.listings?.filter((l) => l.is_featured) || [];
+    featured.slice(0, 5).forEach((listing) => {
       const imgSrc = getImageUrl(listing.image || listing.photos?.[0], 'listings');
       if (imgSrc && imgSrc !== '/placeholder-property.jpg') {
         imagesToPreload.push(imgSrc);
@@ -176,8 +178,7 @@ export default function FullProfilePage() {
   );
   const averageRating =
     testimonials.length > 0
-      ? testimonials.reduce((sum: number, t: { rating?: number }) => sum + (t.rating || 0), 0) /
-        testimonials.length
+      ? testimonials.reduce((sum: number, t) => sum + (t.rating || 0), 0) / testimonials.length
       : 0;
 
   // Generate SEO data with safe origin detection for SSR/crawlers
@@ -323,17 +324,13 @@ export default function FullProfilePage() {
         ],
       },
       // Individual Review schemas
+      // The columns are client_name/review/date — not author/content. This map
+      // was annotated with the latter, so every Review emitted
+      // "Anonymous" as the author and dropped reviewBody entirely.
       ...(testimonials.length > 0
-        ? testimonials.slice(0, 10).map(
-            (
-              testimonial: {
-                author?: string;
-                rating?: number;
-                content?: string;
-                created_at?: string;
-              },
-              index: number
-            ) => ({
+        ? testimonials.slice(0, 10).map((testimonial, index: number) => {
+            const publishedOn = testimonial.date ?? testimonial.created_at;
+            return {
               '@type': 'Review',
               '@id': `${currentUrl}#review-${index}`,
               itemReviewed: {
@@ -341,19 +338,19 @@ export default function FullProfilePage() {
               },
               author: {
                 '@type': 'Person',
-                name: testimonial.author || 'Anonymous',
+                name: testimonial.client_name || 'Anonymous',
               },
               reviewRating: {
                 '@type': 'Rating',
                 ratingValue: testimonial.rating?.toString() || '5',
                 bestRating: '5',
               },
-              reviewBody: testimonial.content,
-              ...(testimonial.created_at && {
-                datePublished: new Date(testimonial.created_at).toISOString().split('T')[0],
+              reviewBody: testimonial.review,
+              ...(publishedOn && {
+                datePublished: new Date(publishedOn).toISOString().split('T')[0],
               }),
-            })
-          )
+            };
+          })
         : []),
     ],
   };
@@ -462,7 +459,7 @@ export default function FullProfilePage() {
                   listings={activeListings}
                   title="All Properties"
                   onListingClick={(listing) => setSelectedListing(listing)}
-                  calendlyUrl={data?.profile?.calendly_url}
+                  calendlyUrl={data?.profile?.calendly_url ?? undefined}
                 />
               </section>
             )}
@@ -609,7 +606,7 @@ export default function FullProfilePage() {
             listing={selectedListing}
             isOpen={!!selectedListing}
             onClose={() => setSelectedListing(null)}
-            calendlyUrl={data?.profile?.calendly_url}
+            calendlyUrl={data?.profile?.calendly_url ?? undefined}
           />
         )}
 

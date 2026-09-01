@@ -15,22 +15,26 @@ export type LeadStatus =
 export type LeadPriority = 'low' | 'medium' | 'high';
 export type ContactMethod = 'email' | 'phone' | 'sms' | 'video';
 
-// Database Lead type (matches the Supabase table)
-export interface Lead {
-  id: string;
-  user_id: string;
-  lead_type: string;
-  name: string;
-  email: string;
-  phone?: string | null;
-  message?: string | null;
-  status: string;
-  source: string;
-  form_data?: Record<string, any> | null;
-  created_at: string;
-  updated_at: string;
-  first_responded_at?: string | null;
-}
+import type { Database } from '@/integrations/supabase/types';
+
+/** A row from `leads`, exactly as stored — contact details as ciphertext. */
+export type LeadRow = Database['public']['Tables']['leads']['Row'];
+
+/**
+ * A lead as the app consumes it: the row, with the contact details decrypted.
+ *
+ * US-086 dropped the plaintext `email` and `phone` columns, so the row itself
+ * carries only `encrypted_email` / `encrypted_phone`. Every reader wants the
+ * readable values, and every reader gets them from a decrypting boundary
+ * (useLeads.decryptLeadRows, useAnalytics.decryptRecentLeads) rather than from
+ * the row — so the encrypted fields are swapped out here for the plaintext
+ * ones. Nothing downstream can read ciphertext by accident, and nothing can
+ * write plaintext to a column that no longer exists.
+ */
+export type Lead = Omit<LeadRow, 'encrypted_email' | 'encrypted_phone'> & {
+  email: string | null;
+  phone: string | null;
+};
 
 // Legacy Lead type for compatibility
 export interface LegacyLead {

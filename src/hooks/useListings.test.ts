@@ -9,10 +9,10 @@ import { mockAuthenticatedUser } from '@/test/mocks/auth';
 
 let queryResult: MockQueryResult;
 let authUser: { id: string } | null;
-const fromMock = vi.fn(() => createQueryBuilder(queryResult));
+const fromMock = vi.fn((_table: string) => createQueryBuilder(queryResult));
 
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (...args: unknown[]) => fromMock(...args) },
+  supabase: { from: (table: string) => fromMock(table) },
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
@@ -75,8 +75,14 @@ describe('useListings', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     let returned: unknown;
     await act(async () => {
+      // NewListing is the table's Insert type, so the NOT NULL columns are
+      // required here rather than discovered at the database.
       returned = await result.current.addListing.mutateAsync({
         address: '1 Main St',
+        city: 'Town',
+        price: '100000',
+        beds: 3,
+        baths: 2,
       });
     });
     expect(returned).toEqual(listingRow);

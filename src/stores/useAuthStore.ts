@@ -6,6 +6,7 @@ import { logAuditEvent } from '@/lib/audit';
 import { generateSampleData } from '@/lib/sample-data-service';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
+import { toProfile } from '@/types/profile';
 
 // Auth store with Google Sign-In support and Single Sign-Out (SLO)
 
@@ -145,7 +146,7 @@ export const useAuthStore = create<AuthState>()(
             set({
               user: session.user,
               session,
-              profile: profileResult.data || null,
+              profile: toProfile(profileResult.data),
               role: role,
               isLoading: false,
             });
@@ -213,7 +214,7 @@ export const useAuthStore = create<AuthState>()(
                 rolesResult.data?.find((r) => r.role === 'admin')?.role ||
                 rolesResult.data?.[0]?.role ||
                 null;
-              set({ profile: profileResult.data || null, role });
+              set({ profile: toProfile(profileResult.data), role });
             } catch (error) {
               logger.error('Error fetching user data in auth state listener', error);
             }
@@ -244,8 +245,8 @@ export const useAuthStore = create<AuthState>()(
           // If user was created and we have a session, wait for profile to be created by DB trigger
           // The handle_new_user trigger creates the profile, but there's a race condition
           if (data.user && data.session) {
-            let profile = null;
-            let role = null;
+            let profile: Profile | null = null;
+            let role: AppRole | null = null;
 
             // Retry fetching profile with exponential backoff (trigger may not have completed yet)
             const maxRetries = 5;
@@ -262,7 +263,7 @@ export const useAuthStore = create<AuthState>()(
               ]);
 
               if (profileResult.data) {
-                profile = profileResult.data;
+                profile = toProfile(profileResult.data);
                 role =
                   rolesResult.data?.find((r) => r.role === 'admin')?.role ||
                   rolesResult.data?.[0]?.role ||
@@ -348,16 +349,28 @@ export const useAuthStore = create<AuthState>()(
             resourceId: data.user.id,
           });
 
-          // Check if MFA is enabled and verified for this user
-          const mfaEnabled = mfaResult.data?.mfa_enabled && mfaResult.data?.verified_at;
+          // US-085: whether a second factor is outstanding is read from the
+          // TOKEN, not decided here. signInWithPassword returns an aal1
+          // session; only mfa.verify() upgrades it to aal2, and RLS keyed on
+          // the `aal` claim is what actually refuses the pre-challenge token.
+          // The flags below drive routing only — setting mfaVerified from a
+          // console no longer buys access to anything.
+          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const needsNativeChallenge = aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1';
 
-          if (mfaEnabled) {
-            // User has MFA enabled - require verification before granting full access
-            // Note: The user will need to be redirected to MFA verification page
+          // A user still enrolled under the pre-US-085 system has no native
+          // factor yet, so the token cannot ask for one. They are routed to
+          // the same challenge screen, which migrates them (see
+          // useNativeMFA.migrateLegacyFactor).
+          const hasLegacyFactor = !!(mfaResult.data?.mfa_enabled && mfaResult.data?.verified_at);
+
+          if (needsNativeChallenge || hasLegacyFactor) {
+            // Second factor outstanding — route to the challenge. The session
+            // is real but is aal1, which is exactly what it should be.
             set({
               user: data.user,
               session: data.session,
-              profile: profileResult.data || null,
+              profile: toProfile(profileResult.data),
               role: role,
               isLoading: false,
               requiresMFA: true,
@@ -368,7 +381,7 @@ export const useAuthStore = create<AuthState>()(
             set({
               user: data.user,
               session: data.session,
-              profile: profileResult.data || null,
+              profile: toProfile(profileResult.data),
               role: role,
               isLoading: false,
               requiresMFA: false,
@@ -580,7 +593,7 @@ export const useAuthStore = create<AuthState>()(
           if (error) throw error;
 
           set({
-            profile: data,
+            profile: toProfile(data),
             isLoading: false,
           });
         } catch (error: any) {

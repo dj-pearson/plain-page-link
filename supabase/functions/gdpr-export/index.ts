@@ -8,6 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
+import { decryptSecret } from '../_shared/encryption.ts';
 
 interface ExportData {
   exportedAt: string;
@@ -155,6 +156,21 @@ serve(async (req: Request) => {
         serviceSupabase.from('gdpr_data_requests').select('*').eq('user_id', user.id),
       ]);
 
+      // Decrypt the lead PII for the subject's own copy. encrypted_* are the
+      // only store since US-086; decryptSecret passes through any value that
+      // is not enc:v1: prefixed, so a row written before the backfill still
+      // exports readably.
+      const decryptedLeads = await Promise.all(
+        (leadsResult.data || []).map(async (lead) => {
+          const { encrypted_phone, encrypted_email, ...rest } = lead as Record<string, unknown>;
+          const [email, phone] = await Promise.all([
+            decryptSecret(encrypted_email as string | null),
+            decryptSecret(encrypted_phone as string | null),
+          ]);
+          return { ...rest, email: email ?? null, phone: phone ?? null };
+        })
+      );
+
       // Build export data object
       const exportData: ExportData = {
         exportedAt: new Date().toISOString(),
@@ -168,15 +184,11 @@ serve(async (req: Request) => {
         settings: settingsResult.data || null,
         listings: listingsResult.data || [],
         // PII in leads must be exported in readable form, never as opaque
-        // ciphertext. During the US-016 encryption transition the plaintext
-        // phone/email columns remain authoritative, so we export those and
-        // strip the encrypted_* blobs. (Once plaintext columns are dropped,
-        // replace this with a Deno-side decrypt of encrypted_phone/email.)
-        leads: (leadsResult.data || []).map((lead) => {
-          const { encrypted_phone, encrypted_email, ...readable } =
-            lead as Record<string, unknown>;
-          return readable;
-        }),
+        // ciphertext. US-086 dropped the plaintext columns, so the encrypted_*
+        // values are now the only copy and this decrypts them rather than
+        // stripping them — a subject access request that returned ciphertext
+        // would not be an export at all.
+        leads: decryptedLeads,
         testimonials: testimonialsResult.data || [],
         links: linksResult.data || [],
         blogPosts: blogPostsResult.data || [],

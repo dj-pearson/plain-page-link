@@ -4,7 +4,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { mockSession } from '@/test/mocks/auth';
 
 const getSession = vi.fn();
-const onAuthStateChange = vi.fn(() => ({
+const onAuthStateChange = vi.fn((_callback: unknown) => ({
   data: { subscription: { unsubscribe: vi.fn() } },
 }));
 

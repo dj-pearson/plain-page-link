@@ -118,13 +118,15 @@ export default function Leads() {
 
   // Response time = first_responded_at - created_at (ms), or null if not yet responded.
   const responseMs = (lead: Lead): number | null =>
-    lead.first_responded_at
+    lead.first_responded_at && lead.created_at
       ? new Date(lead.first_responded_at).getTime() - new Date(lead.created_at).getTime()
       : null;
 
   // A 'new' lead with no response past the SLA threshold needs attention.
   const isNeedsAttention = (lead: Lead): boolean =>
-    lead.status === 'new' && Date.now() - new Date(lead.created_at).getTime() > slaMs;
+    lead.status === 'new' &&
+    !!lead.created_at &&
+    Date.now() - new Date(lead.created_at).getTime() > slaMs;
 
   const formatDuration = (ms: number): string => {
     if (ms < 0) ms = 0;
@@ -300,7 +302,7 @@ export default function Leads() {
           lead.lead_type,
           `"${(lead.message || '').replace(/"/g, '""')}"`,
           lead.status,
-          new Date(lead.created_at).toLocaleDateString(),
+          lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '',
         ].join(',')
       ),
     ].join('\n');
@@ -386,7 +388,7 @@ export default function Leads() {
     let result = leads?.filter((lead) => {
       const matchesSearch = searchQuery
         ? lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          lead.email.toLowerCase().includes(searchQuery.toLowerCase())
+          (lead.email ?? '').toLowerCase().includes(searchQuery.toLowerCase())
         : true;
       const matchesAttention = needsAttentionOnly ? isNeedsAttention(lead) : true;
       return matchesSearch && matchesAttention;
@@ -681,7 +683,7 @@ export default function Leads() {
                           {lead.name}
                         </h3>
                         {getScoreBadge(lead.id)}
-                        {getStatusBadge(lead.status)}
+                        {getStatusBadge(lead.status ?? 'new')}
                         <Badge variant="outline" className="capitalize text-xs">
                           {lead.lead_type}
                         </Badge>
@@ -721,7 +723,9 @@ export default function Leads() {
                   <div className="text-left sm:text-right flex-shrink-0 pl-12 sm:pl-0 space-y-1">
                     <div className="flex sm:justify-end items-center gap-1 text-xs text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span>{new Date(lead.created_at).toLocaleDateString()}</span>
+                      <span>
+                        {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
+                      </span>
                     </div>
                     {(() => {
                       const rm = responseMs(lead);
@@ -739,7 +743,9 @@ export default function Leads() {
                             <AlertTriangle className="h-3 w-3" />
                             <span>
                               No response ·{' '}
-                              {formatDuration(Date.now() - new Date(lead.created_at).getTime())}
+                              {formatDuration(
+                                Date.now() - new Date(lead.created_at ?? 0).getTime()
+                              )}
                             </span>
                           </div>
                         );

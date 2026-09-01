@@ -14,6 +14,8 @@ interface DescriptionDisplayProps {
   descriptions: GeneratedDescription[];
   isLocked?: boolean;
   onUnlock?: () => void;
+  /** Analytics hook: which style/format the visitor copied. */
+  onCopy?: (style: string, format: string) => void;
 }
 
 const STYLE_INFO = {
@@ -37,7 +39,12 @@ const STYLE_INFO = {
   }
 };
 
-export function DescriptionDisplay({ descriptions, isLocked = false, onUnlock }: DescriptionDisplayProps) {
+export function DescriptionDisplay({
+  descriptions,
+  isLocked = false,
+  onUnlock,
+  onCopy,
+}: DescriptionDisplayProps) {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [activeStyle, setActiveStyle] = useState(0);
 
@@ -46,6 +53,7 @@ export function DescriptionDisplay({ descriptions, isLocked = false, onUnlock }:
       await navigator.clipboard.writeText(text);
       setCopiedText(label);
       toast.success(`${label} copied to clipboard!`);
+      onCopy?.(descriptions[activeStyle]?.style ?? 'unknown', label);
 
       setTimeout(() => {
         setCopiedText(null);

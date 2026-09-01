@@ -6,6 +6,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { encryptPIIBatch } from '@/lib/pii';
 
 export interface SampleDataOptions {
   skipDuplicateCheck?: boolean;
@@ -47,14 +48,19 @@ export async function checkExistingData(userId: string): Promise<{
     const [listingsResult, leadsResult, testimonialsResult, linksResult] = await Promise.all([
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', userId),
       supabase.from('leads').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-      supabase.from('testimonials').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase
+        .from('testimonials')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId),
       supabase.from('links').select('id', { count: 'exact', head: true }).eq('user_id', userId),
     ]);
 
     // Log any errors from the queries
-    if (listingsResult.error) logger.error('Error checking listings', { error: listingsResult.error });
+    if (listingsResult.error)
+      logger.error('Error checking listings', { error: listingsResult.error });
     if (leadsResult.error) logger.error('Error checking leads', { error: leadsResult.error });
-    if (testimonialsResult.error) logger.error('Error checking testimonials', { error: testimonialsResult.error });
+    if (testimonialsResult.error)
+      logger.error('Error checking testimonials', { error: testimonialsResult.error });
     if (linksResult.error) logger.error('Error checking links', { error: linksResult.error });
 
     const counts = {
@@ -99,7 +105,8 @@ async function generateSampleListings(userId: string): Promise<number> {
       sqft: 3200,
       lot_size_acres: 0.25,
       property_type: 'Single Family Home',
-      description: 'Stunning modern home with breathtaking city views! This beautifully renovated property features an open floor plan, gourmet kitchen with premium appliances, and a luxurious master suite. The backyard oasis includes a sparkling pool and spa, perfect for entertaining.',
+      description:
+        'Stunning modern home with breathtaking city views! This beautifully renovated property features an open floor plan, gourmet kitchen with premium appliances, and a luxurious master suite. The backyard oasis includes a sparkling pool and spa, perfect for entertaining.',
       status: 'active',
       is_featured: true,
       sort_order: 1,
@@ -122,7 +129,8 @@ async function generateSampleListings(userId: string): Promise<number> {
       sqft: 4500,
       lot_size_acres: 0.5,
       property_type: 'Single Family Home',
-      description: 'Elegant Victorian masterpiece in the heart of the city! Fully restored with modern amenities while maintaining original charm. High ceilings, hardwood floors, and designer finishes throughout. Private garden and garage.',
+      description:
+        'Elegant Victorian masterpiece in the heart of the city! Fully restored with modern amenities while maintaining original charm. High ceilings, hardwood floors, and designer finishes throughout. Private garden and garage.',
       status: 'active',
       is_featured: true,
       sort_order: 2,
@@ -144,7 +152,8 @@ async function generateSampleListings(userId: string): Promise<number> {
       sqft: 2400,
       lot_size_acres: 0.15,
       property_type: 'Townhouse',
-      description: 'Contemporary townhouse with coastal living at its finest! Walking distance to the beach, featuring an open concept design, rooftop deck with ocean views, and attached two-car garage. Move-in ready!',
+      description:
+        'Contemporary townhouse with coastal living at its finest! Walking distance to the beach, featuring an open concept design, rooftop deck with ocean views, and attached two-car garage. Move-in ready!',
       status: 'pending',
       is_featured: false,
       sort_order: 3,
@@ -164,7 +173,8 @@ async function generateSampleListings(userId: string): Promise<number> {
       square_feet: 2100,
       sqft: 2100,
       property_type: 'Condo',
-      description: 'Sold in record time! Luxury beachfront condo with panoramic ocean views. Recently updated with top-of-the-line finishes, this unit offered the perfect blend of comfort and coastal elegance.',
+      description:
+        'Sold in record time! Luxury beachfront condo with panoramic ocean views. Recently updated with top-of-the-line finishes, this unit offered the perfect blend of comfort and coastal elegance.',
       status: 'sold',
       sold_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
       is_featured: false,
@@ -180,12 +190,12 @@ async function generateSampleListings(userId: string): Promise<number> {
     const { data, error } = await supabase.from('listings').insert(sampleListings).select();
 
     if (error) {
-      logger.error('Error creating sample listings', { 
-        userId, 
+      logger.error('Error creating sample listings', {
+        userId,
         error: error.message,
         details: error.details,
         hint: error.hint,
-        code: error.code 
+        code: error.code,
       });
       throw new Error(`Failed to create listings: ${error.message} - ${error.details || ''}`);
     }
@@ -193,10 +203,10 @@ async function generateSampleListings(userId: string): Promise<number> {
     logger.info('Sample listings created', { userId, count: data?.length || 0 });
     return data?.length || 0;
   } catch (error: any) {
-    logger.error('Exception in generateSampleListings', { 
-      userId, 
+    logger.error('Exception in generateSampleListings', {
+      userId,
       message: error?.message,
-      stack: error?.stack 
+      stack: error?.stack,
     });
     throw error;
   }
@@ -213,7 +223,8 @@ async function generateSampleLeads(userId: string): Promise<number> {
       name: 'Sarah Johnson',
       email: 'sarah.johnson@example.com',
       phone: '(555) 123-4567',
-      message: 'Hi! I\'m interested in learning more about properties in the area. I\'m a first-time home buyer looking for a 3-bedroom home under $800k. Would love to discuss options!',
+      message:
+        "Hi! I'm interested in learning more about properties in the area. I'm a first-time home buyer looking for a 3-bedroom home under $800k. Would love to discuss options!",
       lead_type: 'buyer',
       status: 'new',
       source: 'instagram',
@@ -223,7 +234,8 @@ async function generateSampleLeads(userId: string): Promise<number> {
       name: 'Michael Chen',
       email: 'michael.chen@example.com',
       phone: '(555) 234-5678',
-      message: 'I\'m thinking about selling my home and would like to get a market valuation. The property is a 4-bedroom single-family home in excellent condition.',
+      message:
+        "I'm thinking about selling my home and would like to get a market valuation. The property is a 4-bedroom single-family home in excellent condition.",
       lead_type: 'seller',
       status: 'contacted',
       source: 'google',
@@ -233,7 +245,8 @@ async function generateSampleLeads(userId: string): Promise<number> {
       name: 'Emily Rodriguez',
       email: 'emily.r@example.com',
       phone: '(555) 345-6789',
-      message: 'Can you provide a free home valuation for my property at 456 Oak Ave? Looking to understand current market value.',
+      message:
+        'Can you provide a free home valuation for my property at 456 Oak Ave? Looking to understand current market value.',
       lead_type: 'valuation',
       status: 'qualified',
       source: 'facebook',
@@ -243,7 +256,8 @@ async function generateSampleLeads(userId: string): Promise<number> {
       name: 'David Kim',
       email: 'david.kim@example.com',
       phone: '(555) 456-7890',
-      message: 'I saw your listing for the property on Sunset Boulevard. Is it still available? I\'d love to schedule a viewing this week if possible.',
+      message:
+        "I saw your listing for the property on Sunset Boulevard. Is it still available? I'd love to schedule a viewing this week if possible.",
       lead_type: 'buyer',
       status: 'qualified',
       source: 'website',
@@ -253,7 +267,8 @@ async function generateSampleLeads(userId: string): Promise<number> {
       name: 'Jennifer Martinez',
       email: 'jennifer.m@example.com',
       phone: '(555) 567-8901',
-      message: 'Just wanted to say thank you for all your help! The closing went smoothly and we love our new home.',
+      message:
+        'Just wanted to say thank you for all your help! The closing went smoothly and we love our new home.',
       lead_type: 'contact',
       status: 'closed',
       source: 'referral',
@@ -261,15 +276,29 @@ async function generateSampleLeads(userId: string): Promise<number> {
   ];
 
   try {
-    const { data, error } = await supabase.from('leads').insert(sampleLeads).select();
+    // The plaintext email/phone columns are gone (US-086), so the sample rows
+    // go through the same encryption every real capture does. Batched into one
+    // pii-crypto call rather than two per lead.
+    const [encryptedEmails, encryptedPhones] = await Promise.all([
+      encryptPIIBatch(sampleLeads.map((lead) => lead.email ?? null)),
+      encryptPIIBatch(sampleLeads.map((lead) => lead.phone ?? null)),
+    ]);
+
+    const encryptedLeads = sampleLeads.map(({ email: _email, phone: _phone, ...rest }, i) => ({
+      ...rest,
+      encrypted_email: encryptedEmails[i],
+      encrypted_phone: encryptedPhones[i],
+    }));
+
+    const { data, error } = await supabase.from('leads').insert(encryptedLeads).select();
 
     if (error) {
-      logger.error('Error creating sample leads', { 
-        userId, 
+      logger.error('Error creating sample leads', {
+        userId,
         error: error.message,
         details: error.details,
         hint: error.hint,
-        code: error.code 
+        code: error.code,
       });
       throw new Error(`Failed to create leads: ${error.message} - ${error.details || ''}`);
     }
@@ -277,10 +306,10 @@ async function generateSampleLeads(userId: string): Promise<number> {
     logger.info('Sample leads created', { userId, count: data?.length || 0 });
     return data?.length || 0;
   } catch (error: any) {
-    logger.error('Exception in generateSampleLeads', { 
-      userId, 
+    logger.error('Exception in generateSampleLeads', {
+      userId,
       message: error?.message,
-      stack: error?.stack 
+      stack: error?.stack,
     });
     throw error;
   }
@@ -296,7 +325,8 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
       user_id: userId,
       client_name: 'Robert & Lisa Thompson',
       rating: 5,
-      review: 'Working with this agent was an absolute pleasure! They guided us through every step of buying our first home with patience and expertise. Their knowledge of the market and negotiation skills helped us get our dream home at a great price. Highly recommend!',
+      review:
+        'Working with this agent was an absolute pleasure! They guided us through every step of buying our first home with patience and expertise. Their knowledge of the market and negotiation skills helped us get our dream home at a great price. Highly recommend!',
       transaction_type: 'buyer',
       property_type: 'Single Family Home',
       date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -308,7 +338,8 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
       user_id: userId,
       client_name: 'Amanda Foster',
       rating: 5,
-      review: 'Best real estate agent I\'ve ever worked with! Sold my home in just 3 days for over asking price. The marketing was top-notch and the communication was excellent throughout the entire process. Will definitely use again for my next transaction!',
+      review:
+        "Best real estate agent I've ever worked with! Sold my home in just 3 days for over asking price. The marketing was top-notch and the communication was excellent throughout the entire process. Will definitely use again for my next transaction!",
       transaction_type: 'seller',
       property_type: 'Condo',
       date: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -320,7 +351,8 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
       user_id: userId,
       client_name: 'James Wilson',
       rating: 5,
-      review: 'Outstanding service from start to finish. Very knowledgeable about the local market and always available to answer questions. Made the selling process stress-free and got us a great deal. Thank you!',
+      review:
+        'Outstanding service from start to finish. Very knowledgeable about the local market and always available to answer questions. Made the selling process stress-free and got us a great deal. Thank you!',
       transaction_type: 'seller',
       property_type: 'Townhouse',
       date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -332,7 +364,8 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
       user_id: userId,
       client_name: 'Maria & Carlos Garcia',
       rating: 5,
-      review: 'We can\'t thank our agent enough for helping us find the perfect family home! They listened to our needs, showed us great properties, and were always professional. Their expertise made all the difference. Highly recommended!',
+      review:
+        "We can't thank our agent enough for helping us find the perfect family home! They listened to our needs, showed us great properties, and were always professional. Their expertise made all the difference. Highly recommended!",
       transaction_type: 'buyer',
       property_type: 'Single Family Home',
       date: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -346,12 +379,12 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
     const { data, error } = await supabase.from('testimonials').insert(sampleTestimonials).select();
 
     if (error) {
-      logger.error('Error creating sample testimonials', { 
-        userId, 
+      logger.error('Error creating sample testimonials', {
+        userId,
         error: error.message,
         details: error.details,
         hint: error.hint,
-        code: error.code 
+        code: error.code,
       });
       throw new Error(`Failed to create testimonials: ${error.message} - ${error.details || ''}`);
     }
@@ -359,10 +392,10 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
     logger.info('Sample testimonials created', { userId, count: data?.length || 0 });
     return data?.length || 0;
   } catch (error: any) {
-    logger.error('Exception in generateSampleTestimonials', { 
-      userId, 
+    logger.error('Exception in generateSampleTestimonials', {
+      userId,
       message: error?.message,
-      stack: error?.stack 
+      stack: error?.stack,
     });
     throw error;
   }
@@ -434,12 +467,12 @@ async function generateSampleLinks(userId: string): Promise<number> {
     const { data, error } = await supabase.from('links').insert(sampleLinks).select();
 
     if (error) {
-      logger.error('Error creating sample links', { 
-        userId, 
+      logger.error('Error creating sample links', {
+        userId,
         error: error.message,
         details: error.details,
         hint: error.hint,
-        code: error.code 
+        code: error.code,
       });
       throw new Error(`Failed to create links: ${error.message} - ${error.details || ''}`);
     }
@@ -447,10 +480,10 @@ async function generateSampleLinks(userId: string): Promise<number> {
     logger.info('Sample links created', { userId, count: data?.length || 0 });
     return data?.length || 0;
   } catch (error: any) {
-    logger.error('Exception in generateSampleLinks', { 
-      userId, 
+    logger.error('Exception in generateSampleLinks', {
+      userId,
       message: error?.message,
-      stack: error?.stack 
+      stack: error?.stack,
     });
     throw error;
   }
@@ -513,9 +546,9 @@ export async function generateSampleData(
         try {
           counts.addedListings = await generateSampleListings(userId);
         } catch (error: any) {
-          logger.error('Failed to generate listings, continuing with other types', { 
-            userId, 
-            error: error.message 
+          logger.error('Failed to generate listings, continuing with other types', {
+            userId,
+            error: error.message,
           });
         }
       }
@@ -523,9 +556,9 @@ export async function generateSampleData(
         try {
           counts.addedLeads = await generateSampleLeads(userId);
         } catch (error: any) {
-          logger.error('Failed to generate leads, continuing with other types', { 
-            userId, 
-            error: error.message 
+          logger.error('Failed to generate leads, continuing with other types', {
+            userId,
+            error: error.message,
           });
         }
       }
@@ -533,9 +566,9 @@ export async function generateSampleData(
         try {
           counts.addedTestimonials = await generateSampleTestimonials(userId);
         } catch (error: any) {
-          logger.error('Failed to generate testimonials, continuing with other types', { 
-            userId, 
-            error: error.message 
+          logger.error('Failed to generate testimonials, continuing with other types', {
+            userId,
+            error: error.message,
           });
         }
       }
@@ -543,24 +576,24 @@ export async function generateSampleData(
         try {
           counts.addedLinks = await generateSampleLinks(userId);
         } catch (error: any) {
-          logger.error('Failed to generate links, continuing with other types', { 
-            userId, 
-            error: error.message 
+          logger.error('Failed to generate links, continuing with other types', {
+            userId,
+            error: error.message,
           });
         }
       }
     } else {
       logger.info('Skipping duplicate check, generating all requested data');
-      
+
       // Skip duplicate check - generate all requested data
       // Try each category independently so one failure doesn't stop others
       if (includeListings) {
         try {
           counts.addedListings = await generateSampleListings(userId);
         } catch (error: any) {
-          logger.error('Failed to generate listings, continuing with other types', { 
-            userId, 
-            error: error.message 
+          logger.error('Failed to generate listings, continuing with other types', {
+            userId,
+            error: error.message,
           });
         }
       }
@@ -568,9 +601,9 @@ export async function generateSampleData(
         try {
           counts.addedLeads = await generateSampleLeads(userId);
         } catch (error: any) {
-          logger.error('Failed to generate leads, continuing with other types', { 
-            userId, 
-            error: error.message 
+          logger.error('Failed to generate leads, continuing with other types', {
+            userId,
+            error: error.message,
           });
         }
       }
@@ -578,9 +611,9 @@ export async function generateSampleData(
         try {
           counts.addedTestimonials = await generateSampleTestimonials(userId);
         } catch (error: any) {
-          logger.error('Failed to generate testimonials, continuing with other types', { 
-            userId, 
-            error: error.message 
+          logger.error('Failed to generate testimonials, continuing with other types', {
+            userId,
+            error: error.message,
           });
         }
       }
@@ -588,9 +621,9 @@ export async function generateSampleData(
         try {
           counts.addedLinks = await generateSampleLinks(userId);
         } catch (error: any) {
-          logger.error('Failed to generate links, continuing with other types', { 
-            userId, 
-            error: error.message 
+          logger.error('Failed to generate links, continuing with other types', {
+            userId,
+            error: error.message,
           });
         }
       }
@@ -599,10 +632,10 @@ export async function generateSampleData(
     logger.info('Sample data generation completed', { userId, counts });
     return counts;
   } catch (error: any) {
-    logger.error('Error in generateSampleData', { 
-      userId, 
+    logger.error('Error in generateSampleData', {
+      userId,
       message: error?.message,
-      stack: error?.stack 
+      stack: error?.stack,
     });
     throw error;
   }

@@ -46,6 +46,27 @@ export function toStringList(value: unknown): string[] {
 }
 
 /**
+ * The read boundary: turns a raw `profiles` row into a `Profile`.
+ *
+ * The four jsonb columns arrive as `Json`, which is not `string[]`. Every
+ * reader in the app already assumes a list, so narrow once here rather than
+ * casting at each call site — a cast would restore exactly the drift this
+ * module exists to prevent. A malformed value degrades to `[]`.
+ */
+export function toProfile<T extends ProfileRow>(row: T): Profile;
+export function toProfile<T extends ProfileRow>(row: T | null | undefined): Profile | null;
+export function toProfile<T extends ProfileRow>(row: T | null | undefined): Profile | null {
+  if (!row) return null;
+  return {
+    ...row,
+    specialties: toStringList(row.specialties),
+    certifications: toStringList(row.certifications),
+    service_cities: toStringList(row.service_cities),
+    service_zip_codes: toStringList(row.service_zip_codes),
+  };
+}
+
+/**
  * The subset of the profile that a public profile page receives.
  *
  * usePublicProfile deliberately selects only these columns — the comment there

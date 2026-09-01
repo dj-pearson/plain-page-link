@@ -18,7 +18,8 @@ import { logger } from '@/lib/logger';
 
 interface QuickStatusUpdateProps {
   listingId: string;
-  currentStatus: string;
+  /** Nullable on the row; treated as 'active' when unset. */
+  currentStatus: string | null;
   onStatusChange?: (newStatus: string) => void;
 }
 
@@ -27,7 +28,7 @@ export function QuickStatusUpdate({
   currentStatus,
   onStatusChange,
 }: QuickStatusUpdateProps) {
-  const [status, setStatus] = useState(currentStatus);
+  const [status, setStatus] = useState(currentStatus ?? 'active');
   const [isUpdating, setIsUpdating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const { toast } = useToast();
@@ -70,7 +71,7 @@ export function QuickStatusUpdate({
     } catch (error) {
       logger.error('Failed to update status', error);
       // Revert status on error
-      setStatus(currentStatus);
+      setStatus(currentStatus ?? 'active');
       toast({
         title: 'Update Failed',
         description: 'Failed to update listing status. Please try again.',

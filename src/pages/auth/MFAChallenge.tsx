@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { MFAVerification } from '@/components/auth/mfa';
+import { NativeMFAVerification } from '@/components/auth/mfa/NativeMFAVerification';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const LAST_ROUTE_KEY = 'lastVisitedRoute';
@@ -7,10 +7,11 @@ const LAST_ROUTE_KEY = 'lastVisitedRoute';
 /**
  * MFA Challenge page (route: /auth/mfa).
  *
- * Shown during the login flow after a successful password authentication
- * when the account has MFA enabled. SecureRoute redirects here when an
- * MFA-protected route is accessed without a verified second factor.
- * On success the user is returned to the route they were heading to.
+ * Shown during the login flow when the session is aal1 and a second factor is
+ * outstanding. SecureRoute redirects here when an MFA-protected route is
+ * reached without one. On success the user is returned to where they were
+ * heading — and, more importantly, their token is now aal2, which is what RLS
+ * will check (US-085).
  */
 export const MFAChallenge = () => {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export const MFAChallenge = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
       <div className="w-full max-w-md bg-white rounded-xl shadow-sm border p-8">
-        <MFAVerification onSuccess={handleSuccess} onCancel={handleCancel} />
+        <NativeMFAVerification onSuccess={handleSuccess} onCancel={handleCancel} />
       </div>
     </div>
   );

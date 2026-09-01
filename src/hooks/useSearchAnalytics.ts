@@ -20,11 +20,52 @@ import type {
 } from '@/types/searchAnalytics';
 
 // Hook to get connected platforms status
+const SEARCH_PLATFORMS: readonly string[] = [
+  'google_search_console',
+  'google_analytics',
+  'bing_webmaster',
+  'yandex_webmaster',
+];
+
+const CREDENTIAL_STATUSES: readonly string[] = ['active', 'expired', 'not_connected'];
+
+/**
+ * Narrows get_connected_search_platforms' rows.
+ *
+ * The function is RETURNS TABLE(platform text, is_connected boolean,
+ * last_sync timestamptz, credential_status text) — see the squashed baseline —
+ * but the type generator cannot express a TABLE return and emits
+ * Record<string, unknown>[]. A straight cast was rejected as insufficiently
+ * overlapping, and would have been a lie anyway: `platform` and
+ * `credential_status` are plain text with no constraint behind them. Rows that
+ * do not match a known platform are dropped rather than passed on as one.
+ */
+function toConnectedPlatforms(rows: Record<string, unknown>[] | null): ConnectedPlatform[] {
+  return (rows ?? []).flatMap((row): ConnectedPlatform[] => {
+    const platform = row.platform;
+    if (typeof platform !== 'string' || !SEARCH_PLATFORMS.includes(platform)) return [];
+    const status = row.credential_status;
+    return [
+      {
+        platform: platform as ConnectedPlatform['platform'],
+        is_connected: row.is_connected === true,
+        last_sync: typeof row.last_sync === 'string' ? row.last_sync : null,
+        credential_status:
+          typeof status === 'string' && CREDENTIAL_STATUSES.includes(status)
+            ? (status as ConnectedPlatform['credential_status'])
+            : 'not_connected',
+      },
+    ];
+  });
+}
+
 export function useConnectedPlatforms() {
   return useQuery({
     queryKey: ['connected-platforms'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase.rpc('get_connected_search_platforms', {
@@ -32,7 +73,7 @@ export function useConnectedPlatforms() {
       });
 
       if (error) throw error;
-      return data as ConnectedPlatform[];
+      return toConnectedPlatforms(data);
     },
   });
 }
@@ -64,17 +105,18 @@ export function useOAuthInit() {
         client_id: platform.includes('google')
           ? import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
           : platform === 'bing_webmaster'
-          ? import.meta.env.VITE_MICROSOFT_CLIENT_ID || ''
-          : import.meta.env.VITE_YANDEX_CLIENT_ID || '',
+            ? import.meta.env.VITE_MICROSOFT_CLIENT_ID || ''
+            : import.meta.env.VITE_YANDEX_CLIENT_ID || '',
         redirect_uri: redirectUris[platform],
         response_type: 'code',
-        scope: platform === 'google_analytics'
-          ? 'https://www.googleapis.com/auth/analytics.readonly'
-          : platform === 'google_search_console'
-          ? 'https://www.googleapis.com/auth/webmasters.readonly'
-          : platform === 'bing_webmaster'
-          ? 'https://api.bing.microsoft.com/webmaster.read offline_access'
-          : 'webmaster:read',
+        scope:
+          platform === 'google_analytics'
+            ? 'https://www.googleapis.com/auth/analytics.readonly'
+            : platform === 'google_search_console'
+              ? 'https://www.googleapis.com/auth/webmasters.readonly'
+              : platform === 'bing_webmaster'
+                ? 'https://api.bing.microsoft.com/webmaster.read offline_access'
+                : 'webmaster:read',
         access_type: 'offline',
         prompt: 'consent',
       });
@@ -101,17 +143,20 @@ export function useOAuthCallback() {
 
   return useMutation({
     mutationFn: async ({ platform, code, state }: OAuthCallbackRequest) => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       // Determine which Edge Function to call
-      const functionName = platform === 'google_analytics'
-        ? 'google-analytics-oauth-callback'
-        : platform === 'google_search_console'
-        ? 'google-search-console-oauth-callback' // Would need to create this
-        : platform === 'bing_webmaster'
-        ? 'bing-webmaster-oauth-callback'
-        : 'yandex-webmaster-oauth-callback';
+      const functionName =
+        platform === 'google_analytics'
+          ? 'google-analytics-oauth-callback'
+          : platform === 'google_search_console'
+            ? 'google-search-console-oauth-callback' // Would need to create this
+            : platform === 'bing_webmaster'
+              ? 'bing-webmaster-oauth-callback'
+              : 'yandex-webmaster-oauth-callback';
 
       const { data, error } = await edgeFunctions.invoke(functionName, {
         body: { code, state },
@@ -147,16 +192,19 @@ export function useSyncPlatform() {
 
   return useMutation({
     mutationFn: async ({ platform, property_id, site_id, start_date, end_date }: SyncRequest) => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const functionName = platform === 'google_analytics'
-        ? 'google-analytics-sync'
-        : platform === 'google_search_console'
-        ? 'google-search-console-sync' // Would need to create this or use existing
-        : platform === 'bing_webmaster'
-        ? 'bing-webmaster-sync'
-        : 'yandex-webmaster-sync';
+      const functionName =
+        platform === 'google_analytics'
+          ? 'google-analytics-sync'
+          : platform === 'google_search_console'
+            ? 'google-search-console-sync' // Would need to create this or use existing
+            : platform === 'bing_webmaster'
+              ? 'bing-webmaster-sync'
+              : 'yandex-webmaster-sync';
 
       const { data, error } = await edgeFunctions.invoke(functionName, {
         body: { property_id, site_id, start_date, end_date },
@@ -192,7 +240,9 @@ export function useAggregateAnalytics() {
 
   return useMutation({
     mutationFn: async ({ start_date, end_date, force_refresh }: AggregateRequest) => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const { data, error } = await edgeFunctions.invoke('aggregate-search-analytics', {
@@ -227,7 +277,9 @@ export function useGA4Properties() {
   return useQuery({
     queryKey: ['ga4-properties'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -247,7 +299,9 @@ export function useBingSites() {
   return useQuery({
     queryKey: ['bing-sites'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -267,7 +321,9 @@ export function useYandexSites() {
   return useQuery({
     queryKey: ['yandex-sites'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -291,7 +347,9 @@ export function useUnifiedAnalytics(filters: {
   return useQuery({
     queryKey: ['unified-analytics', filters],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       let query = supabase
@@ -329,15 +387,19 @@ export function useAggregatedMetrics(filters: {
     total_sessions: analyticsData.reduce((sum, row) => sum + (row.sessions || 0), 0),
     total_users: analyticsData.reduce((sum, row) => sum + (row.users || 0), 0),
     total_pageviews: analyticsData.reduce((sum, row) => sum + (row.pageviews || 0), 0),
-    average_ctr: analyticsData.length > 0
-      ? analyticsData.reduce((sum, row) => sum + (row.ctr || 0), 0) / analyticsData.length
-      : 0,
-    average_position: analyticsData.length > 0
-      ? analyticsData.reduce((sum, row) => sum + (row.average_position || 0), 0) / analyticsData.length
-      : 0,
-    average_bounce_rate: analyticsData.length > 0
-      ? analyticsData.reduce((sum, row) => sum + (row.bounce_rate || 0), 0) / analyticsData.length
-      : 0,
+    average_ctr:
+      analyticsData.length > 0
+        ? analyticsData.reduce((sum, row) => sum + (row.ctr || 0), 0) / analyticsData.length
+        : 0,
+    average_position:
+      analyticsData.length > 0
+        ? analyticsData.reduce((sum, row) => sum + (row.average_position || 0), 0) /
+          analyticsData.length
+        : 0,
+    average_bounce_rate:
+      analyticsData.length > 0
+        ? analyticsData.reduce((sum, row) => sum + (row.bounce_rate || 0), 0) / analyticsData.length
+        : 0,
     clicks_change: 0, // Would need comparison period data
     impressions_change: 0,
     sessions_change: 0,
@@ -357,34 +419,37 @@ export function useTimeSeriesData(filters: {
   if (!analyticsData) return null;
 
   // Group by date
-  const grouped = analyticsData.reduce((acc, row) => {
-    const date = row.date;
-    if (!acc[date]) {
-      acc[date] = {
-        date,
-        clicks: 0,
-        impressions: 0,
-        sessions: 0,
-        users: 0,
-        ctr: 0,
-        position: 0,
-        count: 0,
-      };
-    }
+  const grouped = analyticsData.reduce(
+    (acc, row) => {
+      const date = row.date;
+      if (!acc[date]) {
+        acc[date] = {
+          date,
+          clicks: 0,
+          impressions: 0,
+          sessions: 0,
+          users: 0,
+          ctr: 0,
+          position: 0,
+          count: 0,
+        };
+      }
 
-    acc[date].clicks += row.clicks || 0;
-    acc[date].impressions += row.impressions || 0;
-    acc[date].sessions += row.sessions || 0;
-    acc[date].users += row.users || 0;
-    acc[date].ctr += row.ctr || 0;
-    acc[date].position += row.average_position || 0;
-    acc[date].count += 1;
+      acc[date].clicks += row.clicks || 0;
+      acc[date].impressions += row.impressions || 0;
+      acc[date].sessions += row.sessions || 0;
+      acc[date].users += row.users || 0;
+      acc[date].ctr += row.ctr || 0;
+      acc[date].position += row.average_position || 0;
+      acc[date].count += 1;
 
-    return acc;
-  }, {} as Record<string, any>);
+      return acc;
+    },
+    {} as Record<string, any>
+  );
 
   // Calculate averages and format
-  return Object.values(grouped).map(item => ({
+  return Object.values(grouped).map((item) => ({
     date: item.date,
     clicks: item.clicks,
     impressions: item.impressions,
@@ -407,35 +472,38 @@ export function useTopQueries(filters: {
   if (!analyticsData) return null;
 
   // Filter only rows with queries
-  const withQueries = analyticsData.filter(row => row.query);
+  const withQueries = analyticsData.filter((row) => row.query);
 
   // Group by query
-  const grouped = withQueries.reduce((acc, row) => {
-    const query = row.query!;
-    if (!acc[query]) {
-      acc[query] = {
-        query,
-        clicks: 0,
-        impressions: 0,
-        ctr: 0,
-        position: 0,
-        count: 0,
-        change: 0,
-      };
-    }
+  const grouped = withQueries.reduce(
+    (acc, row) => {
+      const query = row.query!;
+      if (!acc[query]) {
+        acc[query] = {
+          query,
+          clicks: 0,
+          impressions: 0,
+          ctr: 0,
+          position: 0,
+          count: 0,
+          change: 0,
+        };
+      }
 
-    acc[query].clicks += row.clicks || 0;
-    acc[query].impressions += row.impressions || 0;
-    acc[query].ctr += row.ctr || 0;
-    acc[query].position += row.average_position || 0;
-    acc[query].count += 1;
+      acc[query].clicks += row.clicks || 0;
+      acc[query].impressions += row.impressions || 0;
+      acc[query].ctr += row.ctr || 0;
+      acc[query].position += row.average_position || 0;
+      acc[query].count += 1;
 
-    return acc;
-  }, {} as Record<string, any>);
+      return acc;
+    },
+    {} as Record<string, any>
+  );
 
   // Calculate averages, sort by clicks, and limit
   const topQueries = Object.values(grouped)
-    .map(item => ({
+    .map((item) => ({
       query: item.query,
       clicks: item.clicks,
       impressions: item.impressions,
@@ -461,38 +529,41 @@ export function useTopPages(filters: {
   if (!analyticsData) return null;
 
   // Filter only rows with page URLs
-  const withPages = analyticsData.filter(row => row.page_url);
+  const withPages = analyticsData.filter((row) => row.page_url);
 
   // Group by page URL
-  const grouped = withPages.reduce((acc, row) => {
-    const url = row.page_url!;
-    if (!acc[url]) {
-      acc[url] = {
-        url,
-        title: row.page_title,
-        clicks: 0,
-        impressions: 0,
-        sessions: 0,
-        ctr: 0,
-        position: 0,
-        count: 0,
-        change: 0,
-      };
-    }
+  const grouped = withPages.reduce(
+    (acc, row) => {
+      const url = row.page_url!;
+      if (!acc[url]) {
+        acc[url] = {
+          url,
+          title: row.page_title,
+          clicks: 0,
+          impressions: 0,
+          sessions: 0,
+          ctr: 0,
+          position: 0,
+          count: 0,
+          change: 0,
+        };
+      }
 
-    acc[url].clicks += row.clicks || 0;
-    acc[url].impressions += row.impressions || 0;
-    acc[url].sessions += row.sessions || 0;
-    acc[url].ctr += row.ctr || 0;
-    acc[url].position += row.average_position || 0;
-    acc[url].count += 1;
+      acc[url].clicks += row.clicks || 0;
+      acc[url].impressions += row.impressions || 0;
+      acc[url].sessions += row.sessions || 0;
+      acc[url].ctr += row.ctr || 0;
+      acc[url].position += row.average_position || 0;
+      acc[url].count += 1;
 
-    return acc;
-  }, {} as Record<string, any>);
+      return acc;
+    },
+    {} as Record<string, any>
+  );
 
   // Calculate averages, sort by clicks, and limit
   const topPages = Object.values(grouped)
-    .map(item => ({
+    .map((item) => ({
       url: item.url,
       title: item.title,
       clicks: item.clicks,
@@ -513,7 +584,9 @@ export function useDashboardConfig() {
   return useQuery({
     queryKey: ['dashboard-config'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase

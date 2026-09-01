@@ -43,9 +43,15 @@ import type { Lead } from '@/types/lead';
 import { useLeadScore } from '@/hooks/useMLLeadScoring';
 import { logger } from '@/lib/logger';
 
-// Extended Lead type for modal with additional fields that may be present
+/**
+ * Lead plus the one field the modal shows that is not a column.
+ *
+ * `property_address` used to be redeclared here as an "extra"; it is a real
+ * column on `leads` and is inherited, so restating it only risked disagreeing
+ * with the schema. `budget` genuinely is not a column — it is read out of
+ * form_data — so it stays.
+ */
 interface LeadWithExtras extends Lead {
-  property_address?: string | null;
   budget?: string | null;
 }
 

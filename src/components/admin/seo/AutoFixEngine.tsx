@@ -28,33 +28,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Wand2, Plus, CheckCircle2, XCircle, Clock, Trash2, Play, Pause } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { logger } from '@/lib/logger';
+import type { Database } from '@/integrations/supabase/types';
 
-interface AutoFixRule {
-  id: string;
-  name: string;
-  description: string;
-  issue_type: string;
-  conditions: any;
-  fix_action: any;
-  requires_approval: boolean;
-  auto_apply: boolean;
-  priority: number;
-  applied_count: number;
-  success_count: number;
-  failure_count: number;
-  active: boolean;
-  created_at: string;
-}
+/** A row from `seo_autofix_rules`, exactly as stored. */
+type AutoFixRule = Database['public']['Tables']['seo_autofix_rules']['Row'];
 
-interface AutoFixHistory {
-  id: string;
-  rule_id: string;
-  issue_type: string;
-  fix_applied: any;
-  result: string;
-  error_message?: string;
-  applied_at: string;
-}
+/** A row from `seo_autofix_history`, exactly as stored. */
+type AutoFixHistory = Database['public']['Tables']['seo_autofix_history']['Row'];
 
 const ISSUE_TYPES = [
   { value: 'missing_meta_description', label: 'Missing Meta Description' },
@@ -486,7 +466,7 @@ export const AutoFixEngine = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-600">
-              {rules.reduce((sum, r) => sum + r.applied_count, 0)}
+              {rules.reduce((sum, r) => sum + (r.applied_count ?? 0), 0)}
             </div>
           </CardContent>
         </Card>
@@ -497,10 +477,10 @@ export const AutoFixEngine = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">
-              {rules.reduce((sum, r) => sum + r.applied_count, 0) > 0
+              {rules.reduce((sum, r) => sum + (r.applied_count ?? 0), 0) > 0
                 ? Math.round(
-                    (rules.reduce((sum, r) => sum + r.success_count, 0) /
-                      rules.reduce((sum, r) => sum + r.applied_count, 0)) *
+                    (rules.reduce((sum, r) => sum + (r.success_count ?? 0), 0) /
+                      rules.reduce((sum, r) => sum + (r.applied_count ?? 0), 0)) *
                       100
                   )
                 : 0}
@@ -555,7 +535,7 @@ export const AutoFixEngine = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => toggleRuleActive(rule.id, rule.active)}
+                        onClick={() => toggleRuleActive(rule.id, rule.active ?? false)}
                       >
                         {rule.active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
@@ -617,9 +597,11 @@ export const AutoFixEngine = () => {
                         Pending Fix Approval
                       </CardTitle>
                       <CardDescription>
-                        {formatDistanceToNow(new Date(approval.applied_at), {
-                          addSuffix: true,
-                        })}
+                        {approval.applied_at
+                          ? formatDistanceToNow(new Date(approval.applied_at), {
+                              addSuffix: true,
+                            })
+                          : 'not yet applied'}
                       </CardDescription>
                     </div>
                     <div className="flex gap-2">
@@ -679,9 +661,11 @@ export const AutoFixEngine = () => {
                         {item.issue_type}
                       </CardTitle>
                       <CardDescription>
-                        {formatDistanceToNow(new Date(item.applied_at), {
-                          addSuffix: true,
-                        })}
+                        {item.applied_at
+                          ? formatDistanceToNow(new Date(item.applied_at), {
+                              addSuffix: true,
+                            })
+                          : 'not yet applied'}
                       </CardDescription>
                     </div>
                     <Badge

@@ -1,8 +1,82 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import type { Database } from '@/integrations/supabase/types';
+import { decryptPIIBatch } from '@/lib/pii';
 
 export type TimeRange = '7d' | '30d' | '90d';
+
+/** One day's bucket while grouping; `visitors` is a Set until it is counted. */
+interface ViewsByDate {
+  name: string;
+  views: number;
+  visitors: Set<string>;
+}
+
+/**
+ * A point on the views-over-time chart.
+ *
+ * A type alias rather than an interface on purpose: AnalyticsChart's DataPoint
+ * carries an index signature, and only aliases get an implicit one.
+ */
+export type ViewsDatum = {
+  name: string;
+  views: number;
+  visitors: number;
+};
+
+/** A slice of the leads-by-type breakdown. */
+export type LeadsDatum = {
+  name: string;
+  value: number;
+};
+
+/**
+ * Exactly the lead columns this hook exposes, and LeadsTable renders.
+ *
+ * `email` and `phone` are not columns any more — US-086 dropped the plaintext
+ * pair — so they are produced by decrypting encrypted_email/encrypted_phone at
+ * the read boundary below, the same way useLeads does.
+ */
+export type RecentLead = Pick<
+  Database['public']['Tables']['leads']['Row'],
+  'id' | 'name' | 'created_at' | 'lead_type' | 'status' | 'first_responded_at'
+> & {
+  email: string | null;
+  phone: string | null;
+};
+
+type EncryptedLeadRow = Pick<
+  Database['public']['Tables']['leads']['Row'],
+  | 'id'
+  | 'name'
+  | 'created_at'
+  | 'lead_type'
+  | 'status'
+  | 'encrypted_email'
+  | 'encrypted_phone'
+  | 'first_responded_at'
+>;
+
+/**
+ * Decrypts a page of leads in one batched call.
+ *
+ * Batched for the same reason useLeads batches: since US-066 the crypto lives
+ * in the pii-crypto Edge Function, so a call per field would be two network
+ * round trips per row.
+ */
+async function decryptRecentLeads(rows: EncryptedLeadRow[]): Promise<RecentLead[]> {
+  const [emails, phones] = await Promise.all([
+    decryptPIIBatch(rows.map((row) => row.encrypted_email)),
+    decryptPIIBatch(rows.map((row) => row.encrypted_phone)),
+  ]);
+
+  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }, i) => ({
+    ...rest,
+    email: emails[i] ?? null,
+    phone: phones[i] ?? null,
+  }));
+}
 
 export function useAnalytics(timeRange: TimeRange = '30d') {
   const { user } = useAuthStore();
@@ -84,14 +158,20 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
 
       const { data, error } = await supabase
         .from('leads')
-        .select('created_at, lead_type, status, email, phone, first_responded_at')
+        // id and name are here because LeadsTable renders both — it keyed every
+        // row on an undefined id and printed an empty name cell without them.
+        // email/phone come from the encrypted columns (US-086 dropped the
+        // plaintext ones) and are decrypted below before any consumer sees them.
+        .select(
+          'id, name, created_at, lead_type, status, encrypted_email, encrypted_phone, first_responded_at'
+        )
         .eq('user_id', user.id)
         .gte('created_at', cutoffDate) // Filter by time range
         .order('created_at', { ascending: false })
         .limit(500); // Hard limit for safety
 
       if (error) throw error;
-      return data;
+      return decryptRecentLeads(data ?? []);
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds
@@ -162,19 +242,25 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     totalViews: views.length,
     uniqueVisitors: new Set(views.map((v) => v.visitor_id)).size,
     totalLeads: leads.length,
-    conversionRate: views.length > 0 ? ((leads.length / views.length) * 100).toFixed(2) : '0.00',
+    /** Percentage points, not a formatted string — callers format it. */
+    conversionRate: views.length > 0 ? (leads.length / views.length) * 100 : 0,
     /** null when no lead in the window has been responded to yet. */
     avgResponseMinutes,
   };
 
-  // Group views by date for chart
-  const viewsByDate = views.reduce((acc: any, view: any) => {
+  // Group views by date for chart. The accumulator used to be `any`, which
+  // propagated all the way out: Object.entries below then produced
+  // `value: unknown`, and Analytics.tsx divided by it and rendered it.
+  const viewsByDate = views.reduce<Record<string, ViewsByDate>>((acc, view) => {
+    // viewed_at is nullable; an undated view belongs in no bucket rather than
+    // in a "Jan 1" one (new Date(null) is the epoch).
+    if (!view.viewed_at) return acc;
     const date = new Date(view.viewed_at).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     });
     if (!acc[date]) {
-      acc[date] = { name: date, views: 0, visitors: new Set() };
+      acc[date] = { name: date, views: 0, visitors: new Set<string>() };
     }
     acc[date].views++;
     if (view.visitor_id) {
@@ -183,20 +269,20 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     return acc;
   }, {});
 
-  const viewsData = Object.values(viewsByDate).map((day: any) => ({
+  const viewsData: ViewsDatum[] = Object.values(viewsByDate).map((day) => ({
     name: day.name,
     views: day.views,
     visitors: day.visitors.size,
   }));
 
   // Group leads by type
-  const leadsByType = leads.reduce((acc: any, lead: any) => {
+  const leadsByType = leads.reduce<Record<string, number>>((acc, lead) => {
     const type = lead.lead_type || 'contact';
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {});
 
-  const leadsData = Object.entries(leadsByType).map(([name, value]) => ({
+  const leadsData: LeadsDatum[] = Object.entries(leadsByType).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value,
   }));

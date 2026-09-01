@@ -23,6 +23,7 @@ import {
 } from '@/lib/ml-lead-scoring';
 import type { Lead } from '@/types/lead';
 import { logger } from '@/lib/logger';
+import type { Json } from '@/integrations/supabase/types';
 
 // ============================================================================
 // Types
@@ -73,6 +74,29 @@ export interface UseMLLeadScoringOptions {
 // ============================================================================
 // Hook Implementation
 // ============================================================================
+
+/** `leads.form_data` is jsonb; only an object carries the behavioural fields. */
+function asRecord(value: Json | null | undefined): Record<string, Json | undefined> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function numberField(source: Record<string, Json | undefined>, key: string): number {
+  const value = source[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function stringField(source: Record<string, Json | undefined>, key: string): string | undefined {
+  const value = source[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+const DEVICE_TYPES = ['mobile', 'tablet', 'desktop'] as const;
+
+/** form_data.device is free text; LeadFeatures.deviceType is a closed union. */
+function deviceField(source: Record<string, Json | undefined>): (typeof DEVICE_TYPES)[number] {
+  const value = stringField(source, 'device');
+  return DEVICE_TYPES.find((device) => device === value) ?? 'desktop';
+}
 
 export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
   // `persistScores` is accepted by the options type but nothing consumes it —
@@ -143,7 +167,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
         .upsert(
           {
             user_id: user.id,
-            weights,
+            weights: weights as unknown as Json,
             updated_at: new Date().toISOString(),
           },
           {
@@ -183,7 +207,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
         return [];
       }
 
-      return data as Array<{
+      return data as unknown as Array<{
         id: string;
         user_id: string;
         test_id: string;
@@ -204,7 +228,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
         .insert({
           user_id: user.id,
           test_id: analysis.testId,
-          analysis,
+          analysis: analysis as unknown as Json,
         })
         .select()
         .single();
@@ -261,26 +285,31 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
    * Extract features from a Lead object
    */
   const extractFeaturesFromLead = useCallback((lead: Lead): LeadFeatures => {
-    const formData = lead.form_data || {};
+    // form_data is jsonb, so nothing guarantees it is an object at all; read
+    // through helpers rather than reaching into the Json union.
+    const formData = asRecord(lead.form_data);
+    // created_at is nullable; new Date(null) is the epoch, which would put
+    // every undated lead at hour 0 on a Thursday and skew the time features.
+    const createdAt = lead.created_at ? new Date(lead.created_at) : null;
 
     return {
       source: lead.source || 'unknown',
       hasPhone: !!lead.phone,
       hasEmail: !!lead.email,
       messageLength: (lead.message || '').length,
-      listingViews: formData.listingViews || 0,
-      pageViewCount: formData.pageViewCount || 0,
-      timeOnSite: formData.timeOnSite || 0,
-      scrollDepth: formData.scrollDepth || 0,
-      hasViewedMultipleListings: formData.hasViewedMultipleListings || false,
-      timeOfDay: new Date(lead.created_at).getHours(),
-      dayOfWeek: new Date(lead.created_at).getDay(),
+      listingViews: numberField(formData, 'listingViews'),
+      pageViewCount: numberField(formData, 'pageViewCount'),
+      timeOnSite: numberField(formData, 'timeOnSite'),
+      scrollDepth: numberField(formData, 'scrollDepth'),
+      hasViewedMultipleListings: formData.hasViewedMultipleListings === true,
+      timeOfDay: createdAt ? createdAt.getHours() : 0,
+      dayOfWeek: createdAt ? createdAt.getDay() : 0,
       leadType: lead.lead_type || 'general_contact',
       isPreapproved: formData.preapproval_status === 'approved',
       hasTimeline: !!formData.timeline,
-      deviceType: formData.device || 'desktop',
-      utmSource: formData.utm_source,
-      utmMedium: formData.utm_medium,
+      deviceType: deviceField(formData),
+      utmSource: stringField(formData, 'utm_source'),
+      utmMedium: stringField(formData, 'utm_medium'),
     };
   }, []);
 

@@ -32,21 +32,10 @@ import {
   FileText,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import type { Database } from '@/integrations/supabase/types';
 
-interface ErrorLog {
-  id: string;
-  user_id: string;
-  error_type: string;
-  error_message: string;
-  stack_trace: string;
-  user_context: any;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  resolved: boolean;
-  resolved_by: string;
-  resolved_at: string;
-  resolution_notes: string;
-  created_at: string;
-}
+/** A row from `error_logs`, exactly as stored. */
+type ErrorLog = Database['public']['Tables']['error_logs']['Row'];
 
 export const ErrorLogViewer = () => {
   const { toast } = useToast();
@@ -356,9 +345,11 @@ export const ErrorLogViewer = () => {
                     <p className="text-sm text-muted-foreground truncate">{error.error_message}</p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span>
-                        {formatDistanceToNow(new Date(error.created_at), {
-                          addSuffix: true,
-                        })}
+                        {error.created_at
+                          ? formatDistanceToNow(new Date(error.created_at), {
+                              addSuffix: true,
+                            })
+                          : 'unknown time'}
                       </span>
                       {error.user_id && (
                         <span className="truncate">User: {error.user_id.substring(0, 8)}...</span>
@@ -400,7 +391,11 @@ export const ErrorLogViewer = () => {
                 </div>
                 <div>
                   <Label className="text-sm font-semibold">Occurred</Label>
-                  <p className="text-sm">{new Date(selectedError.created_at).toLocaleString()}</p>
+                  <p className="text-sm">
+                    {selectedError.created_at
+                      ? new Date(selectedError.created_at).toLocaleString()
+                      : 'Unknown'}
+                  </p>
                 </div>
                 <div>
                   <Label className="text-sm font-semibold">User ID</Label>
@@ -462,9 +457,11 @@ export const ErrorLogViewer = () => {
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <span className="text-sm font-semibold text-green-600">
                         Resolved{' '}
-                        {formatDistanceToNow(new Date(selectedError.resolved_at), {
-                          addSuffix: true,
-                        })}
+                        {selectedError.resolved_at
+                          ? formatDistanceToNow(new Date(selectedError.resolved_at), {
+                              addSuffix: true,
+                            })
+                          : ''}
                       </span>
                     </div>
                     {selectedError.resolution_notes && (

@@ -25,8 +25,14 @@ class ErrorHandler {
 
   captureException(error: Error, context?: ErrorContext) {
     // Use secure logger instead of direct console.error
-    const sanitizedContext = context ? sanitizeObject(context) : undefined;
-    logger.error('Error captured', error, sanitizedContext as Record<string, unknown>);
+    const sanitized = context ? sanitizeObject(context) : undefined;
+    // sanitizeObject is declared `unknown` because it accepts anything; for a
+    // record input it returns a record, and the spread below needs that.
+    const sanitizedContext =
+      sanitized !== null && typeof sanitized === 'object' && !Array.isArray(sanitized)
+        ? (sanitized as Record<string, unknown>)
+        : undefined;
+    logger.error('Error captured', error, sanitizedContext);
 
     // Send to Sentry in production
     if (this.enabled) {
@@ -53,8 +59,18 @@ class ErrorHandler {
     this.storeError(error, context);
   }
 
-  captureMessage(message: string, level: 'info' | 'warning' | 'error' = 'info', context?: ErrorContext) {
-    const sanitizedContext = context ? sanitizeObject(context) : undefined;
+  captureMessage(
+    message: string,
+    level: 'info' | 'warning' | 'error' = 'info',
+    context?: ErrorContext
+  ) {
+    const sanitized = context ? sanitizeObject(context) : undefined;
+    // sanitizeObject is declared `unknown` because it accepts anything; for a
+    // record input it returns a record, and the spread below needs that.
+    const sanitizedContext =
+      sanitized !== null && typeof sanitized === 'object' && !Array.isArray(sanitized)
+        ? (sanitized as Record<string, unknown>)
+        : undefined;
 
     switch (level) {
       case 'error':
@@ -82,12 +98,14 @@ class ErrorHandler {
         // Only include stack in development
         stack: this.isDevelopment ? error.stack : undefined,
         // Sanitize context to remove sensitive data
-        context: context ? {
-          action: context.action,
-          component: context.component,
-          // Truncate user ID for privacy
-          userId: context.user?.id ? truncateId(context.user.id) : undefined,
-        } : undefined,
+        context: context
+          ? {
+              action: context.action,
+              component: context.component,
+              // Truncate user ID for privacy
+              userId: context.user?.id ? truncateId(context.user.id) : undefined,
+            }
+          : undefined,
         timestamp: new Date().toISOString(),
       };
 
@@ -189,10 +207,7 @@ export function handleApiError(error: unknown, context?: ErrorContext): string {
     message = error;
   }
 
-  errorHandler.captureException(
-    error instanceof Error ? error : new Error(message),
-    context
-  );
+  errorHandler.captureException(error instanceof Error ? error : new Error(message), context);
 
   return message;
 }

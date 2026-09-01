@@ -3,245 +3,238 @@
  * Handles offline data storage for listings, leads, and sync queue
  */
 
-import { openDB, DBSchema, IDBPDatabase } from "idb";
+import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import type { Database } from '@/integrations/supabase/types';
+
+/** Fields the offline layer adds on top of a stored row. */
+interface SyncMetadata {
+  lastSync: number;
+  localChanges: boolean;
+}
+
+export type OfflineListing = Database['public']['Tables']['listings']['Row'] & SyncMetadata;
 
 interface OfflineDB extends DBSchema {
-    listings: {
-        key: string;
-        value: {
-            id: string;
-            title: string;
-            description: string;
-            price: number;
-            status: "active" | "pending" | "sold" | "draft";
-            images: string[];
-            lastSync: number;
-            localChanges: boolean;
-            createdAt: string;
-            updatedAt: string;
-        };
-        indexes: { "by-status": string; "by-lastSync": number };
-    };
+  listings: {
+    key: string;
+    /**
+     * A `listings` row plus the two sync fields.
+     *
+     * This used to describe a shape the table has never had — `title`,
+     * `images`, `createdAt`, `updatedAt` and `price: number`. sync-manager
+     * caches rows straight off the wire, which carry `address`, `photos`,
+     * `created_at`, `updated_at` and a text `price`, so every listing
+     * written to IndexedDB was missing all four declared fields and had a
+     * string where a number was promised. Mirroring the row keeps the
+     * cache and the source in step by construction.
+     */
+    value: OfflineListing;
+    indexes: { 'by-status': string; 'by-lastSync': number };
+  };
 
-    leads: {
-        key: string;
-        value: {
-            id: string;
-            name: string;
-            email: string;
-            phone?: string;
-            message: string;
-            listingId?: string;
-            source: string;
-            timestamp: number;
-            read: boolean;
-        };
-        indexes: { "by-read": number; "by-timestamp": number };
+  leads: {
+    key: string;
+    value: {
+      id: string;
+      name: string;
+      email: string;
+      phone?: string;
+      message: string;
+      listingId?: string;
+      source: string;
+      timestamp: number;
+      read: boolean;
     };
+    indexes: { 'by-read': number; 'by-timestamp': number };
+  };
 
-    syncQueue: {
-        key: string;
-        value: {
-            id: string;
-            type:
-                | "listing_create"
-                | "listing_update"
-                | "listing_delete"
-                | "lead_response";
-            action: "create" | "update" | "delete";
-            data: unknown;
-            timestamp: number;
-            attempts: number;
-            lastAttempt?: number;
-            error?: string;
-        };
-        indexes: { "by-timestamp": number; "by-attempts": number };
+  syncQueue: {
+    key: string;
+    value: {
+      id: string;
+      type: 'listing_create' | 'listing_update' | 'listing_delete' | 'lead_response';
+      action: 'create' | 'update' | 'delete';
+      data: unknown;
+      timestamp: number;
+      attempts: number;
+      lastAttempt?: number;
+      error?: string;
     };
+    indexes: { 'by-timestamp': number; 'by-attempts': number };
+  };
 
-    userPreferences: {
-        key: string;
-        value: {
-            key: string;
-            value: unknown;
-            lastSync: number;
-        };
+  userPreferences: {
+    key: string;
+    value: {
+      key: string;
+      value: unknown;
+      lastSync: number;
     };
+  };
 }
 
 export class OfflineStorageManager {
-    private static instance: OfflineStorageManager;
-    private db?: IDBPDatabase<OfflineDB>;
-    private readonly dbName = "agentbio_offline";
-    private readonly dbVersion = 1;
+  private static instance: OfflineStorageManager;
+  private db?: IDBPDatabase<OfflineDB>;
+  private readonly dbName = 'agentbio_offline';
+  private readonly dbVersion = 1;
 
-    private constructor() {}
+  private constructor() {}
 
-    static getInstance(): OfflineStorageManager {
-        if (!OfflineStorageManager.instance) {
-            OfflineStorageManager.instance = new OfflineStorageManager();
-        }
-        return OfflineStorageManager.instance;
+  static getInstance(): OfflineStorageManager {
+    if (!OfflineStorageManager.instance) {
+      OfflineStorageManager.instance = new OfflineStorageManager();
     }
+    return OfflineStorageManager.instance;
+  }
 
-    async init(): Promise<void> {
-        try {
-            this.db = await openDB<OfflineDB>(this.dbName, this.dbVersion, {
-                upgrade(db) {
-                    // Listings store
-                    if (!db.objectStoreNames.contains("listings")) {
-                        const listingsStore = db.createObjectStore("listings", {
-                            keyPath: "id",
-                        });
-                        listingsStore.createIndex("by-status", "status");
-                        listingsStore.createIndex("by-lastSync", "lastSync");
-                    }
-
-                    // Leads store
-                    if (!db.objectStoreNames.contains("leads")) {
-                        const leadsStore = db.createObjectStore("leads", {
-                            keyPath: "id",
-                        });
-                        leadsStore.createIndex("by-read", "read");
-                        leadsStore.createIndex("by-timestamp", "timestamp");
-                    }
-
-                    // Sync queue store
-                    if (!db.objectStoreNames.contains("syncQueue")) {
-                        const syncQueueStore = db.createObjectStore(
-                            "syncQueue",
-                            { keyPath: "id" }
-                        );
-                        syncQueueStore.createIndex("by-timestamp", "timestamp");
-                        syncQueueStore.createIndex("by-attempts", "attempts");
-                    }
-
-                    // User preferences store
-                    if (!db.objectStoreNames.contains("userPreferences")) {
-                        db.createObjectStore("userPreferences", {
-                            keyPath: "key",
-                        });
-                    }
-                },
+  async init(): Promise<void> {
+    try {
+      this.db = await openDB<OfflineDB>(this.dbName, this.dbVersion, {
+        upgrade(db) {
+          // Listings store
+          if (!db.objectStoreNames.contains('listings')) {
+            const listingsStore = db.createObjectStore('listings', {
+              keyPath: 'id',
             });
+            listingsStore.createIndex('by-status', 'status');
+            listingsStore.createIndex('by-lastSync', 'lastSync');
+          }
 
-            if (import.meta.env.DEV) {
-                console.log("[OfflineStorage] Database initialized");
-            }
-        } catch (error) {
-            console.error(
-                "[OfflineStorage] Failed to initialize database:",
-                error
-            );
-            throw error;
-        }
-    }
+          // Leads store
+          if (!db.objectStoreNames.contains('leads')) {
+            const leadsStore = db.createObjectStore('leads', {
+              keyPath: 'id',
+            });
+            leadsStore.createIndex('by-read', 'read');
+            leadsStore.createIndex('by-timestamp', 'timestamp');
+          }
 
-    // Listings operations
-    async saveListing(listing: OfflineDB["listings"]["value"]): Promise<void> {
-        if (!this.db) await this.init();
-        await this.db!.put("listings", listing);
-    }
+          // Sync queue store
+          if (!db.objectStoreNames.contains('syncQueue')) {
+            const syncQueueStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
+            syncQueueStore.createIndex('by-timestamp', 'timestamp');
+            syncQueueStore.createIndex('by-attempts', 'attempts');
+          }
 
-    async getListing(
-        id: string
-    ): Promise<OfflineDB["listings"]["value"] | undefined> {
-        if (!this.db) await this.init();
-        return await this.db!.get("listings", id);
-    }
+          // User preferences store
+          if (!db.objectStoreNames.contains('userPreferences')) {
+            db.createObjectStore('userPreferences', {
+              keyPath: 'key',
+            });
+          }
+        },
+      });
 
-    async getAllListings(): Promise<OfflineDB["listings"]["value"][]> {
-        if (!this.db) await this.init();
-        return await this.db!.getAll("listings");
+      if (import.meta.env.DEV) {
+        console.log('[OfflineStorage] Database initialized');
+      }
+    } catch (error) {
+      console.error('[OfflineStorage] Failed to initialize database:', error);
+      throw error;
     }
+  }
 
-    async getListingsByStatus(
-        status: string
-    ): Promise<OfflineDB["listings"]["value"][]> {
-        if (!this.db) await this.init();
-        return await this.db!.getAllFromIndex("listings", "by-status", status);
-    }
+  // Listings operations
+  async saveListing(listing: OfflineDB['listings']['value']): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.put('listings', listing);
+  }
 
-    async deleteListing(id: string): Promise<void> {
-        if (!this.db) await this.init();
-        await this.db!.delete("listings", id);
-    }
+  async getListing(id: string): Promise<OfflineDB['listings']['value'] | undefined> {
+    if (!this.db) await this.init();
+    return await this.db!.get('listings', id);
+  }
 
-    // Leads operations
-    async saveLead(lead: OfflineDB["leads"]["value"]): Promise<void> {
-        if (!this.db) await this.init();
-        await this.db!.put("leads", lead);
-    }
+  async getAllListings(): Promise<OfflineDB['listings']['value'][]> {
+    if (!this.db) await this.init();
+    return await this.db!.getAll('listings');
+  }
 
-    async getLead(
-        id: string
-    ): Promise<OfflineDB["leads"]["value"] | undefined> {
-        if (!this.db) await this.init();
-        return await this.db!.get("leads", id);
-    }
+  async getListingsByStatus(status: string): Promise<OfflineDB['listings']['value'][]> {
+    if (!this.db) await this.init();
+    return await this.db!.getAllFromIndex('listings', 'by-status', status);
+  }
 
-    async getAllLeads(): Promise<OfflineDB["leads"]["value"][]> {
-        if (!this.db) await this.init();
-        return await this.db!.getAll("leads");
-    }
+  async deleteListing(id: string): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.delete('listings', id);
+  }
 
-    async getUnreadLeads(): Promise<OfflineDB["leads"]["value"][]> {
-        if (!this.db) await this.init();
-        return await this.db!.getAllFromIndex("leads", "by-read", 0);
-    }
+  // Leads operations
+  async saveLead(lead: OfflineDB['leads']['value']): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.put('leads', lead);
+  }
 
-    // Sync queue operations
-    async addToSyncQueue(item: OfflineDB["syncQueue"]["value"]): Promise<void> {
-        if (!this.db) await this.init();
-        await this.db!.put("syncQueue", item);
-    }
+  async getLead(id: string): Promise<OfflineDB['leads']['value'] | undefined> {
+    if (!this.db) await this.init();
+    return await this.db!.get('leads', id);
+  }
 
-    async getSyncQueue(): Promise<OfflineDB["syncQueue"]["value"][]> {
-        if (!this.db) await this.init();
-        return await this.db!.getAll("syncQueue");
-    }
+  async getAllLeads(): Promise<OfflineDB['leads']['value'][]> {
+    if (!this.db) await this.init();
+    return await this.db!.getAll('leads');
+  }
 
-    async removeFromSyncQueue(id: string): Promise<void> {
-        if (!this.db) await this.init();
-        await this.db!.delete("syncQueue", id);
-    }
+  async getUnreadLeads(): Promise<OfflineDB['leads']['value'][]> {
+    if (!this.db) await this.init();
+    return await this.db!.getAllFromIndex('leads', 'by-read', 0);
+  }
 
-    async incrementSyncAttempts(id: string): Promise<void> {
-        if (!this.db) await this.init();
-        const item = await this.db!.get("syncQueue", id);
-        if (item) {
-            item.attempts += 1;
-            item.lastAttempt = Date.now();
-            await this.db!.put("syncQueue", item);
-        }
-    }
+  // Sync queue operations
+  async addToSyncQueue(item: OfflineDB['syncQueue']['value']): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.put('syncQueue', item);
+  }
 
-    // Preferences operations
-    async savePreference(key: string, value: unknown): Promise<void> {
-        if (!this.db) await this.init();
-        await this.db!.put("userPreferences", {
-            key,
-            value,
-            lastSync: Date.now(),
-        });
-    }
+  async getSyncQueue(): Promise<OfflineDB['syncQueue']['value'][]> {
+    if (!this.db) await this.init();
+    return await this.db!.getAll('syncQueue');
+  }
 
-    async getPreference(key: string): Promise<unknown> {
-        if (!this.db) await this.init();
-        const pref = await this.db!.get("userPreferences", key);
-        return pref?.value;
-    }
+  async removeFromSyncQueue(id: string): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.delete('syncQueue', id);
+  }
 
-    // Clear all data (for logout)
-    async clearAllData(): Promise<void> {
-        if (!this.db) await this.init();
-        await this.db!.clear("listings");
-        await this.db!.clear("leads");
-        await this.db!.clear("syncQueue");
-        await this.db!.clear("userPreferences");
-        if (import.meta.env.DEV) {
-            console.log("[OfflineStorage] All data cleared");
-        }
+  async incrementSyncAttempts(id: string): Promise<void> {
+    if (!this.db) await this.init();
+    const item = await this.db!.get('syncQueue', id);
+    if (item) {
+      item.attempts += 1;
+      item.lastAttempt = Date.now();
+      await this.db!.put('syncQueue', item);
     }
+  }
+
+  // Preferences operations
+  async savePreference(key: string, value: unknown): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.put('userPreferences', {
+      key,
+      value,
+      lastSync: Date.now(),
+    });
+  }
+
+  async getPreference(key: string): Promise<unknown> {
+    if (!this.db) await this.init();
+    const pref = await this.db!.get('userPreferences', key);
+    return pref?.value;
+  }
+
+  // Clear all data (for logout)
+  async clearAllData(): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.clear('listings');
+    await this.db!.clear('leads');
+    await this.db!.clear('syncQueue');
+    await this.db!.clear('userPreferences');
+    if (import.meta.env.DEV) {
+      console.log('[OfflineStorage] All data cleared');
+    }
+  }
 }
 
 // Export singleton instance

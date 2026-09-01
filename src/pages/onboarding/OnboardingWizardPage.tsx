@@ -227,5 +227,5 @@ export default function OnboardingWizardPage() {
     );
   }
 
-  return <OnboardingWizard onComplete={handleComplete} userProfile={profile || user} />;
+  return <OnboardingWizard onComplete={handleComplete} userProfile={profile} />;
 }

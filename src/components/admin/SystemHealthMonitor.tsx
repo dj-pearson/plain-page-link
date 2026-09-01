@@ -17,17 +17,21 @@ import {
   Clock,
 } from 'lucide-react';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { Database as Schema } from '@/integrations/supabase/types';
 
-interface SystemMetric {
-  id: string;
-  metric_type: string;
-  metric_name: string;
-  value: number;
-  unit: string;
-  metadata: any;
-  recorded_at: string;
-}
+/** A row from `system_metrics`, exactly as stored — `unit` and `recorded_at`
+ *  are nullable, which the hand-written version claimed they were not. */
+type SystemMetric = Schema['public']['Tables']['system_metrics']['Row'];
 
+/**
+ * The shape `get_system_health_summary()` returns.
+ *
+ * The function is `RETURNS TABLE(metric_type text, avg_value numeric,
+ * min_value numeric, max_value numeric, count bigint)` (squashed baseline,
+ * line 1522), but the type generator cannot express a TABLE return and emits
+ * `Record<string, unknown>[]`. Narrowed here at the one call site, per row, so
+ * a shape change surfaces as missing data rather than as a render-time throw.
+ */
 interface HealthSummary {
   metric_type: string;
   avg_value: number;
@@ -35,6 +39,20 @@ interface HealthSummary {
   max_value: number;
   count: number;
 }
+
+const toNumber = (value: unknown): number => {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const toHealthSummary = (rows: Record<string, unknown>[] | null): HealthSummary[] =>
+  (rows ?? []).map((row) => ({
+    metric_type: typeof row.metric_type === 'string' ? row.metric_type : 'unknown',
+    avg_value: toNumber(row.avg_value),
+    min_value: toNumber(row.min_value),
+    max_value: toNumber(row.max_value),
+    count: toNumber(row.count),
+  }));
 
 export const SystemHealthMonitor = () => {
   const { toast } = useToast();
@@ -62,7 +80,7 @@ export const SystemHealthMonitor = () => {
       );
 
       if (summaryError) throw summaryError;
-      setHealthSummary(summary || []);
+      setHealthSummary(toHealthSummary(summary));
 
       // Get recent metrics
       const { data: metrics, error: metricsError } = await supabase
@@ -117,7 +135,10 @@ export const SystemHealthMonitor = () => {
     return { status: 'unknown', color: 'text-gray-600', icon: Activity };
   };
 
-  const formatValue = (value: number, unit: string) => {
+  const formatTime = (recordedAt: string | null) =>
+    recordedAt ? new Date(recordedAt).toLocaleTimeString() : '—';
+
+  const formatValue = (value: number, unit: string | null) => {
     if (unit === 'ms') {
       return `${value.toFixed(0)}ms`;
     }
@@ -141,7 +162,7 @@ export const SystemHealthMonitor = () => {
     .slice(0, 24)
     .reverse()
     .map((m) => ({
-      time: new Date(m.recorded_at).toLocaleTimeString(),
+      time: formatTime(m.recorded_at),
       value: m.value,
       name: m.metric_name,
     }));
@@ -303,7 +324,7 @@ export const SystemHealthMonitor = () => {
                     <div className="flex-1">
                       <div className="font-medium text-sm">{metric.metric_name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(metric.recorded_at).toLocaleTimeString()}
+                        {formatTime(metric.recorded_at)}
                       </div>
                     </div>
                     <div className="text-right">
@@ -348,7 +369,7 @@ export const SystemHealthMonitor = () => {
                   <div className="flex-1">
                     <div className="font-medium text-sm">{metric.metric_name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(metric.recorded_at).toLocaleTimeString()}
+                      {formatTime(metric.recorded_at)}
                     </div>
                   </div>
                   <div className="text-right">
@@ -392,7 +413,7 @@ export const SystemHealthMonitor = () => {
                   <div className="flex-1">
                     <div className="font-medium text-sm">{metric.metric_name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(metric.recorded_at).toLocaleTimeString()}
+                      {formatTime(metric.recorded_at)}
                     </div>
                   </div>
                   <div className="text-right">

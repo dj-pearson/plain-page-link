@@ -3,17 +3,19 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Lead } from '@/types/lead';
+import { makeLead } from '@/test/fixtures/lead';
 
 // Mock Supabase
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: vi.fn((table: string) => {
       // Return different mock based on table
-      const limitResult = table === 'ab_test_results'
-        ? Promise.resolve({ data: [], error: null }) // Array for ab_test_results
-        : {
-            maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
-          };
+      const limitResult =
+        table === 'ab_test_results'
+          ? Promise.resolve({ data: [], error: null }) // Array for ab_test_results
+          : {
+              maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+            };
 
       return {
         select: vi.fn(() => ({
@@ -91,27 +93,28 @@ const createMockFeatures = (overrides: Partial<LeadFeatures> = {}): LeadFeatures
   ...overrides,
 });
 
-const createMockLead = (overrides: Partial<Lead> = {}): Lead => ({
-  id: 'lead-123',
-  user_id: 'user-456',
-  lead_type: 'buyer_inquiry',
-  name: 'John Doe',
-  email: 'john@example.com',
-  phone: '555-1234',
-  message: 'I am interested in properties in the area.',
-  status: 'new',
-  source: 'website',
-  form_data: {
-    listingViews: 3,
-    pageViewCount: 5,
-    timeOnSite: 180,
-    scrollDepth: 75,
-    hasViewedMultipleListings: true,
-  },
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  ...overrides,
-});
+// Built on the shared fixture so it carries every field on Lead; only the
+// behavioural form_data this suite exercises is overridden.
+const createMockLead = (overrides: Partial<Lead> = {}): Lead =>
+  makeLead({
+    id: 'lead-123',
+    user_id: 'user-456',
+    name: 'John Doe',
+    email: 'john@example.com',
+    phone: '555-1234',
+    message: 'I am interested in properties in the area.',
+    source: 'website',
+    form_data: {
+      listingViews: 3,
+      pageViewCount: 5,
+      timeOnSite: 180,
+      scrollDepth: 75,
+      hasViewedMultipleListings: true,
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  });
 
 // ============================================================================
 // useMLLeadScoring Tests
@@ -558,11 +561,14 @@ describe('Integration Tests', () => {
     // 1. Score a lead
     let score: LeadScore;
     act(() => {
-      score = result.current.scoreLead('workflow-lead', createMockFeatures({
-        source: 'referral',
-        hasPhone: true,
-        messageLength: 200,
-      }));
+      score = result.current.scoreLead(
+        'workflow-lead',
+        createMockFeatures({
+          source: 'referral',
+          hasPhone: true,
+          messageLength: 200,
+        })
+      );
     });
 
     expect(score!.score).toBeGreaterThan(0);
@@ -591,12 +597,12 @@ describe('Integration Tests', () => {
     const scores: LeadScore[] = [];
 
     act(() => {
-      leads.forEach(lead => {
+      leads.forEach((lead) => {
         scores.push(result.current.scoreLeadObject(lead));
       });
     });
 
     expect(scores.length).toBe(3);
-    expect(scores.every(s => s.score >= 0 && s.score <= 100)).toBe(true);
+    expect(scores.every((s) => s.score >= 0 && s.score <= 100)).toBe(true);
   });
 });
