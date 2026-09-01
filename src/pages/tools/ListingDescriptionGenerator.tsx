@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, ArrowLeft, FileText, TrendingUp, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { PropertyDetails, GeneratedDescription, EmailCaptureData } from '@/lib/listing-description-generator/types';
 import { logger } from '@/lib/logger';
@@ -73,7 +74,7 @@ export default function ListingDescriptionGenerator() {
       const newListingId = crypto.randomUUID();
       const { error: saveError } = await supabase.from('listing_descriptions').insert({
         id: newListingId,
-        property_details: details,
+        property_details: details as unknown as Json,
         descriptions: data.descriptions,
         session_id: sessionId,
       });
@@ -379,10 +380,15 @@ export default function ListingDescriptionGenerator() {
       </Card>
 
       {/* Description Display */}
+      {/* The props were isUnlocked/onUnlockClick; the component takes
+          isLocked/onUnlock. Neither name matched, so isLocked fell back to its
+          `false` default and every visitor saw all four descriptions in full
+          without ever giving an email — and the Unlock CTA, guarded on
+          `isLocked && onUnlock`, could never render. */}
       <DescriptionDisplay
         descriptions={descriptions}
-        isUnlocked={isUnlocked}
-        onUnlockClick={() => setShowEmailModal(true)}
+        isLocked={!isUnlocked}
+        onUnlock={() => setShowEmailModal(true)}
         onCopy={handleDescriptionCopy}
       />
 
@@ -550,6 +556,7 @@ export default function ListingDescriptionGenerator() {
           isOpen={showEmailModal}
           onClose={() => setShowEmailModal(false)}
           onSubmit={handleEmailCapture}
+          listingId={listingId}
         />
       </main>
     </>

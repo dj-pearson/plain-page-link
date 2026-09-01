@@ -9,63 +9,18 @@ export type PropertyType =
   | 'land'
   | 'commercial';
 
-export interface Listing {
-  id: number;
-  profile_id: number;
-
-  // Property Details
-  address_street: string;
-  address_city: string;
-  address_state: string;
-  address_zip: string;
-  address_full: string;
-
-  // Location
-  latitude: number | null;
-  longitude: number | null;
-
-  // Property Info
-  price: number;
-  original_price: number | null;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  square_feet: number | null;
-  lot_size_acres: number | null;
-  property_type: PropertyType;
-  year_built: number | null;
-
-  // Description
-  title: string | null;
-  description: string | null;
-  highlights: string[];
-
-  // Status
-  status: ListingStatus;
-  listed_date: string | null;
-  sold_date: string | null;
-  days_on_market: number | null;
-
-  // MLS Info
-  mls_number: string | null;
-  mls_source: string | null;
-
-  // Media
-  primary_photo: string | null;
-  photos: string[];
-  virtual_tour_url: string | null;
-  video_url: string | null;
-
-  // Open House
-  open_house_date: string | null;
-  open_house_end_date: string | null;
-
-  // Sorting & Display
-  sort_order: number;
-  is_featured: boolean;
-
-  created_at: string;
-  updated_at: string;
-}
+/**
+ * The invented `Listing` interface that stood here is gone.
+ *
+ * It described a schema that has never existed — `id: number` (it is a uuid),
+ * `profile_id`, `address_street`/`address_city`/`address_state`/`address_zip`/
+ * `address_full`, `price: number` (the column is text), `title`, `mls_source`,
+ * `primary_photo`, `video_url`, `year_built`, `latitude`/`longitude` and
+ * `open_house_end_date`, none of which are columns on `listings`. Nothing
+ * imported it but the test fixtures, which is exactly how it survived: the
+ * only consumer was itself fictional. Use PublicListing below, or
+ * `Listing` from @/hooks/useListings for the dashboard's own shape.
+ */
 
 /**
  * PublicListing matches the shape returned by usePublicProfile's DB query
@@ -88,9 +43,6 @@ export interface Listing {
  *   - `highlights` is still collected by the add-listing form and discarded on
  *     save, because no column receives it. Removing it here does not change
  *     that; the form field needs either a column or removal — a product call.
- *
- * `id` is widened to `number | string` only because the test fixtures use
- * numbers; the column is a uuid.
  */
 export type PublicListing = Omit<
   Database['public']['Tables']['listings']['Row'],
