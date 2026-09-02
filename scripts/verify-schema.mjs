@@ -780,6 +780,104 @@ check('zip routing rules match against the property address', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 6e. An anonymous visitor must be able to read an agent's visibility toggles,
+//     and nothing else from that table.
+//
+//     usePublicProfile reads user_settings with the ANON client, and the only
+//     SELECT policy was `auth.uid() = user_id`. maybeSingle() therefore
+//     returned null for every real visitor and the hook fell back to all-true,
+//     so an agent who switched "Show sold properties" off saw it work — because
+//     they are logged in — while every visitor went on seeing them (US-110).
+//
+//     The same table holds the agent's private notification choices, so this
+//     also asserts the column grant: the row being visible must not make
+//     email_leads readable.
+// ---------------------------------------------------------------------------
+check('anon reads visibility toggles but not notification settings', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-00000000af01';
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'visibility@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name, is_published)
+        VALUES ('${uid}', 'visibilitycheck', 'Visibility Check', true)
+        ON CONFLICT (id) DO UPDATE SET username = 'visibilitycheck', is_published = true;
+      INSERT INTO public.user_settings (user_id, show_sold_properties)
+        VALUES ('${uid}', false)
+        ON CONFLICT (user_id) DO UPDATE SET show_sold_properties = false;
+    `);
+
+    const [visible] = q(`
+      SET ROLE anon;
+      SELECT count(*) FROM public.user_settings WHERE user_id = '${uid}';
+    `);
+    if (visible !== '1') {
+      out.push(`anon sees ${visible} settings row(s) for a published profile, expected 1`);
+    } else {
+      const [flag] = q(`
+        SET ROLE anon;
+        SELECT show_sold_properties::text FROM public.user_settings WHERE user_id = '${uid}';
+      `);
+      if (flag !== 'false') {
+        out.push(`anon read show_sold_properties as "${flag}", expected the stored false`);
+      }
+    }
+
+    // The private columns must stay private even though the row is visible.
+    // This probe is EXPECTED to fail, so its stderr is swallowed — otherwise a
+    // passing check prints "ERROR: permission denied" and reads like a defect.
+    let leaked = false;
+    try {
+      execFileSync(
+        'psql',
+        [
+          DB_URL,
+          '-tAq',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-c',
+          `SET ROLE anon; SELECT email_leads FROM public.user_settings WHERE user_id = '${uid}';`,
+        ],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+      );
+      leaked = true;
+    } catch {
+      /* expected: permission denied for table user_settings */
+    }
+    if (leaked) {
+      out.push('anon can read user_settings.email_leads — the column grant is too wide');
+    }
+
+    // An unpublished profile's settings must not be readable at all.
+    q(`UPDATE public.profiles SET is_published = false WHERE id = '${uid}';`);
+    const [hidden] = q(`
+      SET ROLE anon;
+      SELECT count(*) FROM public.user_settings WHERE user_id = '${uid}';
+    `);
+    if (hidden !== '0') {
+      out.push(`anon sees ${hidden} settings row(s) for an UNPUBLISHED profile, expected 0`);
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'visibility settings check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.user_settings WHERE user_id = '${uid}';
+         DELETE FROM public.profiles WHERE id = '${uid}';
+         DELETE FROM auth.users WHERE id = '${uid}';`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 7. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the

@@ -23,6 +23,7 @@ import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { SEOHead } from '@/components/SEOHead';
 import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
+import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
 import { parsePrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 import { logger } from '@/lib/logger';
@@ -195,8 +196,12 @@ export default function FullProfilePage() {
 
   const { profile, listings, testimonials, links, settings } = data;
 
-  const activeListings = listings.filter((l: PublicProfileListing) => l.status === 'active');
-  const soldListings = listings.filter((l: PublicProfileListing) => l.status === 'sold');
+  // Active, pending and under_contract — active first. This filtered on
+  // status === 'active' alone, so marking a listing Pending made it vanish
+  // from the agent's public page (US-110). The rules live in
+  // lib/publicListingVisibility so they can be tested.
+  const activeListings = selectAvailableListings(listings as PublicProfileListing[]);
+  const soldListings = selectSoldListings(listings as PublicProfileListing[]);
 
   // Calculate social proof stats
   const totalVolume = soldListings.reduce(
