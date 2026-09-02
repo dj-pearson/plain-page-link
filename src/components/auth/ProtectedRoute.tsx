@@ -34,6 +34,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
   const requiresMFA = useAuthStore((s) => s.requiresMFA);
   const mfaVerified = useAuthStore((s) => s.mfaVerified);
+  const profile = useAuthStore((s) => s.profile);
 
   useEffect(() => {
     // Check existing session on mount
@@ -98,6 +99,21 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (requiresMFA && !mfaVerified && !location.pathname.startsWith('/auth/')) {
     localStorage.setItem(LAST_ROUTE_KEY, getFullPath(location));
     return <Navigate to="/auth/mfa" replace />;
+  }
+
+  // First run: send the agent through the wizard once.
+  //
+  // This check lived only in Login.tsx's password path, so anyone who signed up
+  // with Google or Apple went straight to /dashboard and never saw onboarding
+  // at all (AuthCallback routed on isNewUser, which a returning OAuth user is
+  // not). Here it covers every authenticated route and therefore every auth
+  // path (US-108).
+  //
+  // Gated on `profile` being loaded, so a slow profile fetch does not bounce an
+  // established user into the wizard; and it never redirects away from the
+  // wizard itself.
+  if (profile && !profile.onboarding_completed_at && !location.pathname.startsWith('/onboarding')) {
+    return <Navigate to="/onboarding/wizard" replace />;
   }
 
   return <>{children}</>;

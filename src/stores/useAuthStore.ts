@@ -355,8 +355,27 @@ export const useAuthStore = create<AuthState>()(
           // the `aal` claim is what actually refuses the pre-challenge token.
           // The flags below drive routing only — setting mfaVerified from a
           // console no longer buys access to anything.
-          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          const needsNativeChallenge = aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1';
+          // Isolated: getAuthenticatorAssuranceLevel decodes the access token,
+          // so anything that is not a well-formed JWT makes it throw. Left
+          // unguarded it took the whole sign-in into the catch below and the
+          // user simply stayed on the login page with an error — which is what
+          // has been happening to tests/e2e/auth.spec.ts since US-085, unnoticed
+          // because nothing runs that suite (US-090).
+          //
+          // Defaulting to "no native challenge" is safe HERE and only here:
+          // these flags drive routing, and the actual protection is the `aal`
+          // claim in the token, which RLS checks. A user who genuinely needs a
+          // second factor still holds an aal1 token and still cannot read
+          // anything the aal2 policies guard.
+          let needsNativeChallenge = false;
+          try {
+            const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            needsNativeChallenge = aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1';
+          } catch (aalError) {
+            logger.warn('Could not read the session assurance level', {
+              error: aalError instanceof Error ? aalError.message : String(aalError),
+            });
+          }
 
           // A user still enrolled under the pre-US-085 system has no native
           // factor yet, so the token cannot ask for one. They are routed to

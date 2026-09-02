@@ -22,7 +22,7 @@ import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { SEOHead } from '@/components/SEOHead';
-import { applyTheme, type ThemeConfig } from '@/lib/themes';
+import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
 import { parsePrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 import { logger } from '@/lib/logger';
@@ -103,8 +103,15 @@ export default function FullProfilePage() {
             setActiveTheme(parsedTheme);
             applyTheme(data.profile.theme);
           } else {
-            // It's just a theme name like "default", skip applying
-            logger.debug('Using theme preset', { theme: data.profile.theme });
+            // A preset NAME, which is what the onboarding wizard stores. This
+            // used to log "skip applying" and do nothing, so the wizard's
+            // mandatory template step changed nothing on the public page
+            // whichever card the agent chose (US-108). getCurrentTheme falls
+            // back to 'modern' for an unknown name rather than leaving the
+            // page unstyled.
+            const preset = getCurrentTheme(data.profile.theme);
+            setActiveTheme(preset);
+            applyTheme(JSON.stringify(preset));
           }
         } else {
           // It's already an object, stringify it

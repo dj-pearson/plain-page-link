@@ -27,6 +27,41 @@ interface OnboardingTemplate {
 }
 
 /** Step 2's fields. */
+// Every id here must be a real DEFAULT_THEMES id, because it is stored
+// verbatim in profiles.theme and looked up by getCurrentTheme.
+//
+// 'luxury' and 'coastal' were not themes — the ids are 'luxe' and 'ocean' —
+// so two of the four choices in a MANDATORY step resolved to nothing. The
+// public page skipped preset names entirely on top of that, so the step
+// changed nothing whichever card the agent picked (US-108). The friendly
+// labels are kept; only the ids are corrected.
+export const ONBOARDING_TEMPLATES = [
+  {
+    id: 'luxe',
+    name: 'Luxury',
+    description: 'High-end properties',
+    colors: ['#1e3a8a', '#d4af37'],
+  },
+  {
+    id: 'modern',
+    name: 'Modern Clean',
+    description: 'Minimalist & professional',
+    colors: ['#2563eb', '#10b981'],
+  },
+  {
+    id: 'ocean',
+    name: 'Coastal',
+    description: 'Beach & waterfront',
+    colors: ['#0891b2', '#06b6d4'],
+  },
+  {
+    id: 'classic',
+    name: 'Classic',
+    description: 'Traditional & timeless',
+    colors: ['#7c3aed', '#a855f7'],
+  },
+];
+
 interface ProfileBasics {
   photo: File | null;
   photoPreview: string | null;
@@ -98,32 +133,7 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
     { number: 5, title: 'Share', icon: LinkIcon },
   ];
 
-  const templates = [
-    {
-      id: 'luxury',
-      name: 'Luxury',
-      description: 'High-end properties',
-      colors: ['#1e3a8a', '#d4af37'],
-    },
-    {
-      id: 'modern',
-      name: 'Modern Clean',
-      description: 'Minimalist & professional',
-      colors: ['#2563eb', '#10b981'],
-    },
-    {
-      id: 'coastal',
-      name: 'Coastal',
-      description: 'Beach & waterfront',
-      colors: ['#0891b2', '#06b6d4'],
-    },
-    {
-      id: 'classic',
-      name: 'Classic',
-      description: 'Traditional & timeless',
-      colors: ['#7c3aed', '#a855f7'],
-    },
-  ];
+  const templates = ONBOARDING_TEMPLATES;
 
   const handleNext = () => {
     if (currentStep < totalSteps) {

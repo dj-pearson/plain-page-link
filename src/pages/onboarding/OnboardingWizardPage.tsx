@@ -4,6 +4,7 @@ import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
 import type { TablesInsert } from '@/integrations/supabase/types';
+import { buildOnboardingProfileUpdate } from '@/lib/onboardingProfile';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
@@ -33,29 +34,13 @@ export default function OnboardingWizardPage() {
     setIsSaving(true);
 
     try {
-      // 1. Update profile with basic info
-      const profileUpdates: any = {};
-
-      if (wizardData.profileBasics.fullName) {
-        profileUpdates.full_name = wizardData.profileBasics.fullName;
-      }
-      if (wizardData.profileBasics.title) {
-        profileUpdates.title = wizardData.profileBasics.title;
-      }
-      if (wizardData.profileBasics.bio) {
-        profileUpdates.bio = wizardData.profileBasics.bio;
-      }
-      if (wizardData.profileBasics.phone) {
-        profileUpdates.phone = wizardData.profileBasics.phone;
-      }
-      if (wizardData.profileBasics.location) {
-        // Parse location into city/state if possible
-        const parts = wizardData.profileBasics.location.split(',').map((s: string) => s.trim());
-        if (parts.length >= 2) {
-          profileUpdates.city = parts[0];
-          profileUpdates.license_state = parts[1];
-        }
-      }
+      // 1. Update profile with basic info.
+      //
+      // Built by lib/onboardingProfile, which is typed against the generated
+      // Update shape and unit-tested. The mapping used to be inline and typed
+      // `any`, which is how a nonexistent `city` column reached PostgREST and
+      // took every other field down with it (US-108).
+      let avatarUrl: string | null = null;
 
       // Upload profile photo if provided
       if (wizardData.profileBasics.photo) {
@@ -77,7 +62,7 @@ export default function OnboardingWizardPage() {
             data: { publicUrl },
           } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
-          profileUpdates.avatar_url = publicUrl;
+          avatarUrl = publicUrl;
         } catch (error) {
           // US-075: still non-fatal — onboarding should not be blocked by a
           // photo — but no longer silent.
@@ -90,13 +75,15 @@ export default function OnboardingWizardPage() {
         }
       }
 
-      // Apply selected theme
-      if (wizardData.templateChoice) {
-        profileUpdates.theme = wizardData.templateChoice;
-      }
-
-      // Mark onboarding complete so the user isn't routed back into the wizard.
-      profileUpdates.onboarding_completed_at = new Date().toISOString();
+      const profileUpdates = buildOnboardingProfileUpdate({
+        fullName: wizardData.profileBasics.fullName,
+        title: wizardData.profileBasics.title,
+        bio: wizardData.profileBasics.bio,
+        phone: wizardData.profileBasics.phone,
+        location: wizardData.profileBasics.location,
+        templateChoice: wizardData.templateChoice,
+        avatarUrl,
+      });
 
       // Update profile
       const { error: profileError } = await supabase
@@ -180,13 +167,19 @@ export default function OnboardingWizardPage() {
 
           const { error: listingError } = await supabase.from('listings').insert(listingData);
 
-          if (listingError) {
-            logger.error('Error creating listing', listingError as Error);
-            // Don't throw - listing is optional
-          }
+          if (listingError) throw listingError;
         } catch (error) {
+          // Still non-fatal — the profile is saved and onboarding should not be
+          // blocked by an optional listing — but no longer silent. The agent
+          // typed an address and a price and was told nothing when it vanished
+          // (US-108).
           logger.error('Error with first listing', error as Error);
-          // Continue even if listing creation fails
+          toast({
+            title: 'Your first listing was not saved',
+            description:
+              'Everything else is saved. You can add the listing from the Listings page.',
+            variant: 'destructive',
+          });
         }
       }
 
@@ -197,7 +190,12 @@ export default function OnboardingWizardPage() {
             user_id: user.id,
             email: user.email,
             full_name: wizardData.profileBasics.fullName || user.user_metadata?.full_name,
-            username: user.user_metadata?.username || 'agent',
+            // From the store, which holds the profile row. user_metadata's
+            // username is what was REQUESTED at signup; derive_available_username
+            // may have assigned a different one when it was taken, so the
+            // welcome email could send an agent to a URL that is not theirs —
+            // or to /agent (US-108).
+            username: profile?.username ?? user.user_metadata?.username ?? 'agent',
           },
         });
       } catch (emailError) {
