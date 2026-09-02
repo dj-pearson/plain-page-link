@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, MessageSquare, Mail, Calendar, Home, X, ChevronUp } from 'lucide-react';
 import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
+import { trackContactTap } from '@/lib/analyticsEvents';
 
 interface StickyActionBarProps {
   profile: PublicProfile;
@@ -20,6 +21,12 @@ export function StickyActionBar({
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleAction = (method: string, value?: string) => {
+    // The sticky bar is the main contact surface on a phone, and it reported
+    // nothing at all — not even to the console, as ContactButtons did. Recorded
+    // before the navigation, because `tel:` and `mailto:` leave the page
+    // (US-115). Fire-and-forget: the call must not wait on the insert.
+    void trackContactTap(profile.id, method);
+
     if (method === 'phone' && value) {
       window.location.href = `tel:${value}`;
     } else if (method === 'email' && value) {

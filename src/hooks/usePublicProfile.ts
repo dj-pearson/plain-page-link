@@ -55,17 +55,15 @@ export const usePublicProfile = (username: string) => {
       if (profileError) throw profileError;
       if (!profile) throw new Error('Profile not found');
 
-      // Increment view count (non-blocking - fire and forget)
-      supabase
-        .rpc('increment_profile_views', {
-          _profile_id: profile.id,
-          // Fire and forget; a view-count failure must not fail the page.
-          // (No .catch(): PostgrestBuilder's .then() returns a PromiseLike.)
-        })
-        .then(
-          () => {},
-          () => {}
-        );
+      // No view increment here any more (US-115).
+      //
+      // This called increment_profile_views, a SECURITY DEFINER RPC with no
+      // throttle, from the anon client — so profiles.view_count and the
+      // analytics_views rows counted different things, and anyone holding the
+      // anon key (it ships in the bundle) could loop it. The counter is now a
+      // trigger on the throttled analytics_views insert, which useProfileTracking
+      // makes once per mounted page. Fetching a profile is not a view: this ran
+      // even for an agent whose page immediately redirects to a custom page.
 
       // Fetch all related data in parallel instead of sequential
       const [

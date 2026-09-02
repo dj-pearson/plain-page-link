@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useProfileTracking } from '@/hooks/useProfileTracking';
 import { PageConfig, BlockStyle } from '@/types/pageBuilder';
 import { BlockRenderer } from '@/components/pageBuilder/BlockRenderer';
 import { Helmet } from 'react-helmet-async';
@@ -141,6 +142,13 @@ export default function PublicPage() {
 
     fetchPage();
   }, [slug]);
+
+  // A page-builder page recorded nothing at all (US-115). An agent who built
+  // one got the redirect from /:username — which counted a view on the profile
+  // they were being sent away from — and then a page with no analytics of any
+  // kind. Same hook, same throttled insert, same counter as the default
+  // profile, so the two kinds of public page are measured identically.
+  useProfileTracking(page?.userId, slug || '');
 
   // Preload theme fonts when page loads
   useEffect(() => {

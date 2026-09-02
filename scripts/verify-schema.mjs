@@ -878,6 +878,112 @@ check('anon reads visibility toggles but not notification settings', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 6f. The public counters must be throttled, and must agree with each other.
+//
+//     profiles.view_count came from increment_profile_views, an unthrottled
+//     SECURITY DEFINER RPC callable by anon, while the analytics_views rows had
+//     a per-visitor ceiling — so the headline number and the chart measured
+//     different things, and anyone holding the anon key could inflate the
+//     headline without limit. increment_link_clicks had no bound either
+//     (US-115).
+//
+//     The counter is now a trigger on the throttled insert, so this asserts the
+//     property that matters: 60 inserts produce the same bounded number in both
+//     places, and the old unthrottled entry point is closed to anon.
+// ---------------------------------------------------------------------------
+check('view and click counters are throttled, and match the rows they count', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-00000000af02';
+  const lid = '00000000-dead-beef-0000-00000000af03';
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'counters@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name, is_published, view_count)
+        VALUES ('${uid}', 'counterscheck', 'Counters Check', true, 0)
+        ON CONFLICT (id) DO UPDATE SET username = 'counterscheck', is_published = true, view_count = 0;
+      INSERT INTO public.links (id, user_id, title, url, position, click_count)
+        VALUES ('${lid}', '${uid}', 'Site', 'https://example.com', 1, 0)
+        ON CONFLICT (id) DO UPDATE SET click_count = 0;
+      -- The rate-limit buckets outlive the rows this check creates, so without
+      -- this a second run inside the same minute starts already over the
+      -- ceiling and the check fails on its own leftovers. The table is
+      -- rate_limit_entries, keyed on (identifier, limit_type). There is a
+      -- separate rate_limits table that check_rate_limit does not touch.
+      DELETE FROM public.rate_limit_entries WHERE identifier LIKE 'verify-visitor%';
+    `);
+
+    // Well past the 30/minute ceiling.
+    const [counts] = q(`
+      INSERT INTO public.analytics_views (user_id, visitor_id, device, source)
+        SELECT '${uid}', 'verify-visitor', 'desktop', 'direct' FROM generate_series(1, 60);
+      SELECT (SELECT count(*) FROM public.analytics_views WHERE user_id = '${uid}')
+             || ',' || (SELECT view_count FROM public.profiles WHERE id = '${uid}');
+    `);
+    const [rows, counter] = String(counts).split(',');
+    if (rows !== counter) {
+      out.push(`analytics_views has ${rows} rows but profiles.view_count is ${counter}`);
+    }
+    if (Number(rows) > 30) {
+      out.push(`${rows} views recorded from one visitor in a minute; the throttle is not applied`);
+    }
+
+    const [clicks] = q(`
+      SELECT public.increment_link_clicks('${lid}', 'verify-visitor') FROM generate_series(1, 60);
+      SELECT click_count::text FROM public.links WHERE id = '${lid}';
+    `);
+    if (Number(clicks) > 30) {
+      out.push(`${clicks} link clicks from one visitor in a minute; the throttle is not applied`);
+    }
+    if (Number(clicks) === 0) {
+      out.push('increment_link_clicks recorded nothing at all');
+    }
+
+    // The unthrottled path must be closed. Expected to fail, so stderr is
+    // swallowed — otherwise a passing check prints "ERROR: permission denied".
+    let reachable = false;
+    try {
+      execFileSync(
+        'psql',
+        [
+          DB_URL,
+          '-tAq',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-c',
+          `SET ROLE anon; SELECT public.increment_profile_views('${uid}');`,
+        ],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+      );
+      reachable = true;
+    } catch {
+      /* expected: permission denied for function increment_profile_views */
+    }
+    if (reachable) {
+      out.push('anon can still call increment_profile_views — the unthrottled counter is open');
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'counter throttle check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.rate_limit_entries WHERE identifier LIKE 'verify-visitor%';
+         DELETE FROM public.analytics_views WHERE user_id = '${uid}';
+         DELETE FROM public.links WHERE id = '${lid}';
+         DELETE FROM public.profiles WHERE id = '${uid}';
+         DELETE FROM auth.users WHERE id = '${uid}';`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 7. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the

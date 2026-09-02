@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
+import { trackContactTap } from '@/lib/analyticsEvents';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { SEOHead } from '@/components/SEOHead';
@@ -140,9 +141,16 @@ export default function FullProfilePage() {
     }
   }, [slug, data, isLoading]);
 
-  // Track profile view analytics - must be called before any conditional returns
-  // We pass the profile.id only when data is available
-  useProfileTracking(data?.profile?.id, slug || '');
+  // Track the view — but only for a page that is actually being shown.
+  //
+  // An agent with a page-builder page got the full profile fetch and a view
+  // recorded here, and was then redirected to /p/<slug>, which tracked nothing
+  // at all. So a page-builder agent's own visits were counted against their
+  // profile while the page their visitors actually saw had no analytics
+  // whatever. PublicPage now records through this same hook, and this one waits
+  // until the custom-page check has settled so one visit is one view (US-115).
+  const shouldTrackProfileView = !checkingCustomPage && !customPageSlug;
+  useProfileTracking(shouldTrackProfileView ? data?.profile?.id : undefined, slug || '');
 
   // Apply theme when profile loads - IMPORTANT: All hooks must be before conditional returns
   useEffect(() => {
@@ -527,7 +535,10 @@ export default function FullProfilePage() {
             {settings?.show_contact_buttons !== false && (
               <ContactButtons
                 profile={profile}
-                onContactClick={(method) => logger.info('Contact clicked', { method })}
+                // logger.info wrote this to the visitor's own console and
+                // nowhere else, so an agent never learned that thirty people
+                // tapped Call this week (US-115).
+                onContactClick={(method) => void trackContactTap(profile.id, method)}
               />
             )}
 
@@ -609,7 +620,7 @@ export default function FullProfilePage() {
                 onLinkClick={async (link) => {
                   // trackLinkClick already calls increment_link_clicks;
                   // calling it again here counted every click twice.
-                  await trackLinkClick(link.id.toString());
+                  await trackLinkClick(link.id.toString(), profile.id, link.title);
                 }}
               />
             )}

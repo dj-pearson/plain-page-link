@@ -32,6 +32,26 @@ export type LeadsDatum = {
 };
 
 /**
+ * One row of the interactions breakdown: a contact method, or a single link.
+ *
+ * `analytics_events` is where Call/Email/Text taps and dated link clicks live
+ * (US-115). Before it, taps were logger.info'd on the visitor's own console,
+ * and link clicks existed only as `links.click_count` — a lifetime total that
+ * cannot be shown over a period or compared with anything.
+ */
+export type InteractionDatum = {
+  name: string;
+  value: number;
+};
+
+/** Human labels for the event types the CHECK constraint allows. */
+const CONTACT_LABELS: Record<string, string> = {
+  contact_call: 'Call',
+  contact_email: 'Email',
+  contact_text: 'Text',
+};
+
+/**
  * Exactly the lead columns this hook exposes, and LeadsTable renders.
  *
  * `email` and `phone` are not columns any more — US-086 dropped the plaintext
@@ -178,6 +198,45 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
 
+  // Public interactions in the window: Call/Email/Text taps and link clicks.
+  const {
+    data: events = [],
+    isLoading: eventsLoading,
+    refetch: refetchEvents,
+  } = useQuery({
+    queryKey: ['analytics-events', user?.id, timeRange],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data, error } = await supabase
+        .from('analytics_events')
+        .select('event_type, target_label, occurred_at')
+        .eq('user_id', user.id)
+        .gte('occurred_at', cutoffDate)
+        .order('occurred_at', { ascending: false })
+        .limit(1000);
+
+      // The table arrived in 20260902000012. An environment that has not run
+      // the migration reports empty rather than breaking the whole page —
+      // the same tolerance analytics_views already has above.
+      if (error) {
+        if (
+          error.code === '42P01' ||
+          error.message?.includes('does not exist') ||
+          error.code === 'PGRST204'
+        ) {
+          return [];
+        }
+        throw error;
+      }
+      return data;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+  });
+
   // Previous-window counts. Deliberately head-only counts rather than rows:
   // the comparison needs totals, and pulling another 1,500 rows to length them
   // would double the payload for no benefit.
@@ -287,6 +346,28 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     value,
   }));
 
+  // Contact taps, by method — the number an agent actually wants ("thirty
+  // people tapped Call this week"). Every allowed method is listed even at
+  // zero, so a week with no email taps reads as zero rather than as absence.
+  const contactTaps: InteractionDatum[] = Object.entries(CONTACT_LABELS).map(([type, name]) => ({
+    name,
+    value: events.filter((e) => e.event_type === type).length,
+  }));
+
+  const totalContactTaps = contactTaps.reduce((sum, row) => sum + row.value, 0);
+
+  // Link clicks in the same window, per link. `links.click_count` is a lifetime
+  // total and cannot answer "this month", which is what the page is asking.
+  const linkClickEvents = events.filter((e) => e.event_type === 'link_click');
+  const linkClicksByLabel = linkClickEvents.reduce<Record<string, number>>((acc, event) => {
+    const name = event.target_label || 'Untitled link';
+    acc[name] = (acc[name] || 0) + 1;
+    return acc;
+  }, {});
+  const linkClicks: InteractionDatum[] = Object.entries(linkClicksByLabel)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+
   const previousStats = previousCounts ?? { views: 0, visitors: 0, leads: 0, conversions: 0 };
 
   return {
@@ -299,13 +380,18 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     hasPreviousPeriod: (previousCounts?.views ?? 0) + (previousCounts?.leads ?? 0) > 0,
     viewsData,
     leadsData,
+    contactTaps,
+    totalContactTaps,
+    linkClicks,
+    totalLinkClicks: linkClickEvents.length,
     recentLeads: leads.slice(0, 10),
-    isLoading: viewsLoading || leadsLoading,
+    isLoading: viewsLoading || leadsLoading || eventsLoading,
     isError: viewsError || leadsError,
     error: viewsErrorObj || leadsErrorObj,
     refetch: () => {
       refetchViews();
       refetchLeads();
+      refetchEvents();
     },
     timeRange,
   };

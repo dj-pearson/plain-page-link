@@ -26,19 +26,38 @@ import {
   Search as SearchIcon,
   AlertCircle,
   RefreshCw,
+  MousePointerClick,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { useAnalytics, type TimeRange } from '@/hooks/useAnalytics';
 import { logger } from '@/lib/logger';
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState<TimeRange>('30d');
-  const { stats, viewsData, leadsData, recentLeads, isLoading, isError, error, refetch } =
-    useAnalytics(dateRange);
+  const {
+    stats,
+    viewsData,
+    leadsData,
+    contactTaps,
+    totalContactTaps,
+    linkClicks,
+    totalLinkClicks,
+    recentLeads,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useAnalytics(dateRange);
   const { toast } = useToast();
 
   const handleExportAnalytics = () => {
     // Check if there's data to export
-    if (stats.totalViews === 0 && stats.totalLeads === 0) {
+    if (
+      stats.totalViews === 0 &&
+      stats.totalLeads === 0 &&
+      totalContactTaps === 0 &&
+      totalLinkClicks === 0
+    ) {
       toast({
         title: 'No data to export',
         description: "There's no analytics data for the selected time period.",
@@ -66,6 +85,21 @@ export default function Analytics() {
     lines.push(`Unique Visitors,${stats.uniqueVisitors}`);
     lines.push(`Total Leads,${stats.totalLeads}`);
     lines.push(`Conversion Rate,${stats.conversionRate.toFixed(2)}%`);
+    lines.push('');
+
+    // The export used to omit taps and clicks entirely, because nothing
+    // recorded them (US-115).
+    lines.push('Taps and Clicks');
+    lines.push('Interaction,Count');
+    for (const tap of contactTaps) {
+      lines.push(`${tap.name} taps,${tap.value}`);
+    }
+    lines.push(`Link clicks,${totalLinkClicks}`);
+    for (const link of linkClicks) {
+      lines.push(`  ${link.name.replace(/,/g, ' ')},${link.value}`);
+    }
+    lines.push('');
+    lines.push('Note,Counts are indicative; visitors are identified by a browser-stored id.');
     lines.push('');
 
     // Views over time
@@ -297,21 +331,79 @@ export default function Analytics() {
               </CardContent>
             </Card>
 
-            {/* Recent Activity */}
+            {/* Taps and clicks.
+                This card used to be "Recent Activity" and printed the total
+                view count again, under a different heading. The interactions
+                an agent actually wants — who tapped Call, which link people
+                follow — were recorded nowhere at all until US-115. */}
             <Card>
               <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-base sm:text-lg">Recent Activity</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Taps &amp; Clicks</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">
-                  Latest profile interactions
+                  What visitors did on your page
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-xs sm:text-sm text-muted-foreground text-center py-6 sm:py-8">
-                  {stats.totalViews > 0 ? `${stats.totalViews} profile views` : 'No activity yet'}
+                <div className="space-y-2 sm:space-y-3">
+                  {contactTaps.map((item) => (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between py-2 min-h-[44px]"
+                    >
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <MousePointerClick className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-medium">{item.name}</span>
+                      </div>
+                      <span className="text-xs sm:text-sm font-semibold">
+                        {item.value.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="pt-3 border-t">
+                    <div className="flex items-center justify-between py-2 min-h-[44px]">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-medium">Link clicks</span>
+                      </div>
+                      <span className="text-xs sm:text-sm font-semibold">
+                        {totalLinkClicks.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {linkClicks.slice(0, 5).map((item) => (
+                      <div
+                        key={item.name}
+                        className="flex items-center justify-between py-1.5 pl-7 text-muted-foreground"
+                      >
+                        <span className="text-xs truncate pr-3">{item.name}</span>
+                        <span className="text-xs tabular-nums">{item.value.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {totalContactTaps === 0 && totalLinkClicks === 0 && (
+                    <p className="text-xs sm:text-sm text-muted-foreground text-center pt-3">
+                      No taps or clicks in this period yet.
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Criterion 4: say what these numbers are. Visitors are identified by
+              an id this app generates in their browser and stores in
+              localStorage — cleared or rotated, the same person counts twice;
+              shared or scripted, one person can count many times. The rate
+              limits bound that, they do not eliminate it. Presenting these as
+              measurement would be the same overclaim the trend arrows made
+              before US-087. */}
+          <p className="text-xs text-muted-foreground">
+            These counts are indicative, not exact. Visitors are recognised by an identifier stored
+            in their own browser, so clearing it counts one person twice and automated traffic can
+            inflate a total. Use them for direction, not for reporting.
+          </p>
 
           {/* Recent Leads Table */}
           <LeadsTable

@@ -305,6 +305,47 @@ export type Database = {
         };
         Relationships: [];
       };
+      analytics_events: {
+        Row: {
+          device: string | null;
+          event_type: string;
+          id: string;
+          occurred_at: string;
+          target_id: string | null;
+          target_label: string | null;
+          user_id: string;
+          visitor_id: string | null;
+        };
+        Insert: {
+          device?: string | null;
+          event_type: string;
+          id?: string;
+          occurred_at?: string;
+          target_id?: string | null;
+          target_label?: string | null;
+          user_id: string;
+          visitor_id?: string | null;
+        };
+        Update: {
+          device?: string | null;
+          event_type?: string;
+          id?: string;
+          occurred_at?: string;
+          target_id?: string | null;
+          target_label?: string | null;
+          user_id?: string;
+          visitor_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'analytics_events_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       analytics_views: {
         Row: {
           device: string | null;
@@ -8815,7 +8856,10 @@ export type Database = {
         Args: { _role: Database['public']['Enums']['app_role']; _user_id: string };
         Returns: boolean;
       };
-      increment_link_clicks: { Args: { link_id: string }; Returns: undefined };
+      increment_link_clicks: {
+        Args: { link_id: string; visitor_id?: string };
+        Returns: undefined;
+      };
       increment_mfa_failed_attempts: {
         Args: { p_user_id: string };
         Returns: number;
