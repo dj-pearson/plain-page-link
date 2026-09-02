@@ -1,24 +1,27 @@
-import { useState, useEffect } from "react";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
+import { parseSquareFeet } from '@/lib/format';
 
 export interface EditListingFormData {
   address: string;
   city: string;
   price: string;
-  beds: number;
-  baths: number;
-  sqft?: number;
+  /** Canonical column. `beds` is GENERATED from it since US-106. */
+  bedrooms: number;
+  /** Canonical column, numeric — 2.5 is a real value here. */
+  bathrooms: number;
+  square_feet?: number;
   status: string;
   image?: string;
   description?: string;
@@ -33,7 +36,12 @@ interface EditListingModalProps {
   initialData: EditListingFormData;
 }
 
-export function EditListingModal({ isOpen, onClose, onSubmit, initialData }: EditListingModalProps) {
+export function EditListingModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData,
+}: EditListingModalProps) {
   const [formData, setFormData] = useState<EditListingFormData>(initialData);
 
   useEffect(() => {
@@ -52,10 +60,7 @@ export function EditListingModal({ isOpen, onClose, onSubmit, initialData }: Edi
       <div className="bg-card border border-border rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Edit Property Listing</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-accent rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-accent rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -94,34 +99,50 @@ export function EditListingModal({ isOpen, onClose, onSubmit, initialData }: Edi
             </div>
 
             <div>
-              <Label htmlFor="beds">Bedrooms *</Label>
+              <Label htmlFor="bedrooms">Bedrooms *</Label>
               <Input
-                id="beds"
+                id="bedrooms"
                 type="number"
-                value={formData.beds}
-                onChange={(e) => setFormData({ ...formData, beds: parseInt(e.target.value) })}
+                min={0}
+                value={formData.bedrooms}
+                onChange={(e) =>
+                  setFormData({ ...formData, bedrooms: Number(e.target.value) || 0 })
+                }
                 required
               />
             </div>
 
             <div>
-              <Label htmlFor="baths">Bathrooms *</Label>
+              <Label htmlFor="bathrooms">Bathrooms *</Label>
               <Input
-                id="baths"
+                id="bathrooms"
                 type="number"
-                value={formData.baths}
-                onChange={(e) => setFormData({ ...formData, baths: parseInt(e.target.value) })}
+                // step 0.5 to match the Add form, which has always offered
+                // half-baths — into an integer column that rejected them
+                // (US-106). parseInt also truncated 2.5 to 2 here.
+                step={0.5}
+                min={0}
+                value={formData.bathrooms}
+                onChange={(e) =>
+                  setFormData({ ...formData, bathrooms: Number(e.target.value) || 0 })
+                }
                 required
               />
             </div>
 
             <div>
-              <Label htmlFor="sqft">Square Feet</Label>
+              <Label htmlFor="square_feet">Square Feet</Label>
               <Input
-                id="sqft"
+                id="square_feet"
                 type="number"
-                value={formData.sqft || ''}
-                onChange={(e) => setFormData({ ...formData, sqft: parseInt(e.target.value) || undefined })}
+                min={0}
+                value={formData.square_feet ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    square_feet: parseSquareFeet(e.target.value) ?? undefined,
+                  })
+                }
               />
             </div>
 

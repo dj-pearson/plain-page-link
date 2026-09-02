@@ -21,6 +21,24 @@ export function parsePrice(value: unknown): number {
 }
 
 /**
+ * Parse a square-footage value a person typed.
+ *
+ * US-106: the form's own placeholder is "2,400" and the writer used parseInt,
+ * which stops at the comma — so "2,400" stored 2 and the listing card rendered
+ * "$625,000/sqft". Separators are stripped before parsing, and anything with no
+ * digits at all returns null rather than 0, since an unknown size and a
+ * zero-square-foot property are different claims.
+ */
+export function parseSquareFeet(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : null;
+  if (value == null) return null;
+  const digits = String(value).replace(/[^0-9.]/g, '');
+  if (digits === '' || digits === '.') return null;
+  const numeric = Number(digits);
+  return Number.isFinite(numeric) ? Math.round(numeric) : null;
+}
+
+/**
  * Format number with commas
  */
 export function formatNumber(num: number): string {

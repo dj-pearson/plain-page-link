@@ -85,11 +85,8 @@ export const usePublicProfile = (username: string) => {
             address,
             city,
             price,
-            beds,
-            baths,
             bedrooms,
             bathrooms,
-            sqft,
             square_feet,
             status,
             sort_order,
@@ -177,13 +174,16 @@ export const usePublicProfile = (username: string) => {
         date: t.date || t.created_at, // date is nullable; fall back to created_at
       }));
 
-      // The listings table carries both naming conventions (beds/bedrooms,
-      // sqft/square_feet) from an earlier reconciliation; normalise to one.
+      // One naming convention. beds/baths/sqft are GENERATED from these
+      // columns since US-106 and are not selected at all: the normalisation
+      // that stood here was `bedrooms ?? beds`, which meant the STALE value won
+      // whenever an edit wrote only the integers — an agent changed 3 beds to 4
+      // and their clients kept seeing 3.
       const transformedListings: PublicProfileListing[] = (listings || []).map((l) => ({
         ...l,
-        bedrooms: l.bedrooms ?? l.beds,
-        bathrooms: l.bathrooms ?? l.baths,
-        square_feet: l.square_feet ?? l.sqft,
+        bedrooms: l.bedrooms,
+        bathrooms: l.bathrooms,
+        square_feet: l.square_feet,
         // photos is jsonb; every consumer treats it as a URL list.
         photos: toStringList(l.photos),
       }));

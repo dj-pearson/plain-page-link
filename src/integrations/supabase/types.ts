@@ -2732,14 +2732,15 @@ export type Database = {
       listings: {
         Row: {
           address: string;
-          bathrooms: number | null;
-          baths: number;
-          bedrooms: number | null;
-          beds: number;
+          bathrooms: number;
+          baths: number | null;
+          bedrooms: number;
+          beds: number | null;
           city: string;
           created_at: string | null;
           days_on_market: number | null;
           description: string | null;
+          garage_spaces: number | null;
           highlights: string[] | null;
           id: string;
           image: string | null;
@@ -2748,6 +2749,7 @@ export type Database = {
           lot_size_acres: number | null;
           mls_number: string | null;
           open_house_date: string | null;
+          open_house_end_date: string | null;
           photos: Json | null;
           price: string;
           property_type: string | null;
@@ -2757,21 +2759,24 @@ export type Database = {
           square_feet: number | null;
           state: string | null;
           status: string | null;
+          stories: number | null;
           updated_at: string | null;
           user_id: string;
           virtual_tour_url: string | null;
+          year_built: number | null;
           zip_code: string | null;
         };
         Insert: {
           address: string;
-          bathrooms?: number | null;
-          baths: number;
-          bedrooms?: number | null;
-          beds: number;
+          bathrooms?: number;
+          baths?: number | null;
+          bedrooms?: number;
+          beds?: number | null;
           city: string;
           created_at?: string | null;
           days_on_market?: number | null;
           description?: string | null;
+          garage_spaces?: number | null;
           highlights?: string[] | null;
           id?: string;
           image?: string | null;
@@ -2780,6 +2785,7 @@ export type Database = {
           lot_size_acres?: number | null;
           mls_number?: string | null;
           open_house_date?: string | null;
+          open_house_end_date?: string | null;
           photos?: Json | null;
           price: string;
           property_type?: string | null;
@@ -2789,21 +2795,24 @@ export type Database = {
           square_feet?: number | null;
           state?: string | null;
           status?: string | null;
+          stories?: number | null;
           updated_at?: string | null;
           user_id: string;
           virtual_tour_url?: string | null;
+          year_built?: number | null;
           zip_code?: string | null;
         };
         Update: {
           address?: string;
-          bathrooms?: number | null;
-          baths?: number;
-          bedrooms?: number | null;
-          beds?: number;
+          bathrooms?: number;
+          baths?: number | null;
+          bedrooms?: number;
+          beds?: number | null;
           city?: string;
           created_at?: string | null;
           days_on_market?: number | null;
           description?: string | null;
+          garage_spaces?: number | null;
           highlights?: string[] | null;
           id?: string;
           image?: string | null;
@@ -2812,6 +2821,7 @@ export type Database = {
           lot_size_acres?: number | null;
           mls_number?: string | null;
           open_house_date?: string | null;
+          open_house_end_date?: string | null;
           photos?: Json | null;
           price?: string;
           property_type?: string | null;
@@ -2821,9 +2831,11 @@ export type Database = {
           square_feet?: number | null;
           state?: string | null;
           status?: string | null;
+          stories?: number | null;
           updated_at?: string | null;
           user_id?: string;
           virtual_tour_url?: string | null;
+          year_built?: number | null;
           zip_code?: string | null;
         };
         Relationships: [

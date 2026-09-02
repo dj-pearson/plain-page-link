@@ -89,9 +89,9 @@ export default function ListingDetailModal({
   const state = listing.state || '';
   const zipCode = listing.zip_code || '';
   const price = parsePrice(listing.price);
-  const beds = listing.bedrooms ?? listing.beds ?? 0;
-  const baths = listing.bathrooms ?? listing.baths ?? 0;
-  const sqft = listing.square_feet ?? listing.sqft ?? 0;
+  const beds = listing.bedrooms ?? 0;
+  const baths = listing.bathrooms ?? 0;
+  const sqft = listing.square_feet ?? 0;
   const description = listing.description || '';
   const propertyType = listing.property_type || '';
   const mlsNumber = listing.mls_number || '';

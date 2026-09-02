@@ -29,8 +29,13 @@ const listingRow = {
   address: '1 Main St',
   city: 'Town',
   price: '100000',
+  bedrooms: 3,
+  bathrooms: 2,
+  square_feet: 1800,
+  // Derived from the three above since US-106; present on a row, never written.
   beds: 3,
   baths: 2,
+  sqft: 1800,
   status: 'active',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
@@ -86,5 +91,67 @@ describe('useListings', () => {
       });
     });
     expect(returned).toEqual(listingRow);
+  });
+
+  /**
+   * US-106: create wrote beds/baths/sqft AND bedrooms/bathrooms/square_feet,
+   * while edit wrote only the integers. The public read normalised with
+   * `bedrooms ?? beds`, so the STALE value won — an agent changed 3 beds to 4,
+   * saved, and their clients went on seeing 3.
+   *
+   * beds/baths/sqft are GENERATED columns now, so naming them in a write is a
+   * database error rather than a silent divergence. These assert the payload.
+   */
+  describe('the beds/bedrooms round trip', () => {
+    const writesFrom = (call: unknown[]) => call[0] as Record<string, unknown>;
+
+    it('edits the canonical columns and never the derived ones', async () => {
+      const builder = createQueryBuilder({ data: [listingRow], error: null });
+      fromMock.mockImplementation(() => builder);
+
+      const { result } = renderHook(() => useListings(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.updateListing.mutateAsync({
+          id: 'l1',
+          bedrooms: 4,
+          bathrooms: 2.5,
+          square_feet: 2400,
+        });
+      });
+
+      const update = writesFrom((builder.update as ReturnType<typeof vi.fn>).mock.calls[0]);
+      expect(update).toMatchObject({ bedrooms: 4, bathrooms: 2.5, square_feet: 2400 });
+      // Writing these would raise: they can only be updated to DEFAULT.
+      expect(update).not.toHaveProperty('beds');
+      expect(update).not.toHaveProperty('baths');
+      expect(update).not.toHaveProperty('sqft');
+    });
+
+    it('creates with the canonical columns only', async () => {
+      const builder = createQueryBuilder({ data: listingRow, error: null });
+      fromMock.mockImplementation(() => builder);
+
+      const { result } = renderHook(() => useListings(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.addListing.mutateAsync({
+          address: '2 Oak St',
+          city: 'Town',
+          price: '200000',
+          bedrooms: 4,
+          bathrooms: 2.5,
+          square_feet: 2400,
+        });
+      });
+
+      const insert = writesFrom((builder.insert as ReturnType<typeof vi.fn>).mock.calls[0]);
+      expect(insert).toMatchObject({ bedrooms: 4, bathrooms: 2.5 });
+      expect(insert).not.toHaveProperty('beds');
+      expect(insert).not.toHaveProperty('baths');
+      expect(insert).not.toHaveProperty('sqft');
+    });
   });
 });

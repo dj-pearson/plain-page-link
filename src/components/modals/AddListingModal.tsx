@@ -46,8 +46,19 @@ const listingSchema = z.object({
   price: z.string().min(1, 'Price is required'),
   propertyType: z.string().min(1, 'Property type is required'),
   beds: z.number().min(0, 'Must be 0 or more'),
-  baths: z.number().min(0, 'Must be 0 or more'),
-  sqft: z.string().min(1, 'Square footage is required'),
+  // Half-baths are real, and the input has always rendered step 0.5. What was
+  // missing was a numeric column to put 2.5 in; there is one now (US-106).
+  baths: z
+    .number()
+    .min(0, 'Must be 0 or more')
+    .refine((v) => Number.isInteger(v * 2), 'Use whole or half bathrooms, e.g. 2 or 2.5'),
+  // The placeholder is "2,400", so separators must be accepted — but a value
+  // with no digits at all must be rejected rather than silently stored as 2,
+  // which is what parseInt('2,400') produced (US-106).
+  sqft: z
+    .string()
+    .min(1, 'Square footage is required')
+    .refine((v) => /\d/.test(v.replace(/[^0-9.,]/g, '')), 'Enter a number, e.g. 2,400'),
   lotSize: z.string().optional(),
   yearBuilt: z.string().optional(),
   stories: z.string().optional(),
@@ -57,8 +68,10 @@ const listingSchema = z.object({
   description: z.string().optional(),
   highlights: z.string().optional(),
   images: z.array(z.instanceof(File)).max(25, 'Maximum 25 images'),
+  // `videoUrl` stood here beside virtualTourUrl. Both meant "a video of the
+  // property", only one had a column, and the form dropped whatever went in
+  // this one. Removed rather than given a second column (US-106).
   virtualTourUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  videoUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
   openHouseDate: z.string().optional(),
   openHouseEndDate: z.string().optional(),
   isFeatured: z.boolean().optional(),
@@ -117,7 +130,6 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
       garage: '',
       images: [],
       virtualTourUrl: '',
-      videoUrl: '',
       openHouseDate: '',
       openHouseEndDate: '',
       isFeatured: false,
@@ -605,20 +617,6 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                     />
                     {errors.virtualTourUrl && (
                       <p className="text-sm text-red-600 mt-1">{errors.virtualTourUrl.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="videoUrl" className="flex items-center gap-2">
-                      <Video className="h-4 w-4" /> Video URL
-                    </Label>
-                    <Input
-                      id="videoUrl"
-                      {...register('videoUrl')}
-                      placeholder="https://youtube.com/watch?v=..."
-                      className="mt-1"
-                    />
-                    {errors.videoUrl && (
-                      <p className="text-sm text-red-600 mt-1">{errors.videoUrl.message}</p>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">

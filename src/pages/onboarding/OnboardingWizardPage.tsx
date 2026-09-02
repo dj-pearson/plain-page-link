@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesInsert } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
@@ -152,19 +153,28 @@ export default function OnboardingWizardPage() {
           const state = stateParts[0] || '';
           const zip = stateParts[1] || '';
 
-          const listingData: any = {
+          // Typed, not `any`. Three things were wrong here and the cast hid all
+          // of them (US-106):
+          //   - `beds`/`baths` were NOT NULL integers with no default and this
+          //     insert never named them, so the wizard's first listing could
+          //     never save at all. They are GENERATED now, so omitting them is
+          //     correct.
+          //   - parseInt truncated 2.5 baths to 2; bathrooms is numeric.
+          //   - `featured` is not a column. The column is `is_featured`, so
+          //     "make the first listing featured" never happened.
+          const listingData: TablesInsert<'listings'> = {
             user_id: user.id,
             address: address,
             city: city,
             state: state,
             zip_code: zip,
             price: wizardData.firstListing.price || '0',
-            bedrooms: wizardData.firstListing.beds ? parseInt(wizardData.firstListing.beds) : null,
-            bathrooms: wizardData.firstListing.baths
-              ? parseInt(wizardData.firstListing.baths)
-              : null,
+            // bedrooms/bathrooms are NOT NULL with a 0 default; an empty field
+            // means "not stated", which is 0 rather than a failed insert.
+            bedrooms: Number(wizardData.firstListing.beds) || 0,
+            bathrooms: Number(wizardData.firstListing.baths) || 0,
             status: wizardData.firstListing.status || 'active',
-            featured: true, // Make first listing featured
+            is_featured: true,
             photos: photoUrl ? [photoUrl] : [],
           };
 

@@ -37,9 +37,11 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   const city = listing.city || '';
   const state = listing.state || '';
   const price = parsePrice(listing.price);
-  const beds = listing.bedrooms ?? listing.beds ?? 0;
-  const baths = listing.bathrooms ?? listing.baths ?? 0;
-  const sqft = listing.square_feet ?? listing.sqft ?? 0;
+  // Canonical columns only — beds/baths/sqft are derived and no longer read
+  // (US-106).
+  const beds = listing.bedrooms ?? 0;
+  const baths = listing.bathrooms ?? 0;
+  const sqft = listing.square_feet ?? 0;
   const isFeatured = listing.is_featured;
   const photoCount = listing.photos?.length || 1;
 

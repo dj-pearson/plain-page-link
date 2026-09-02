@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { parseSquareFeet } from '@/lib/format';
 import { AddListingModal } from '@/components/modals/AddListingModal';
 import { EditListingModal, EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
@@ -146,12 +147,14 @@ export default function Listings() {
         state: data.state,
         zip_code: data.zipCode,
         price: data.price,
-        beds: data.beds,
-        baths: data.baths,
+        // Canonical columns only. beds/baths/sqft are GENERATED from these
+        // since 20260902000007 — writing them now raises rather than silently
+        // diverging, which is the bug this fixes: create wrote both pairs while
+        // edit wrote only the integers, and the public read's `bedrooms ?? beds`
+        // then showed the stale value (US-106).
         bedrooms: data.beds,
         bathrooms: data.baths,
-        sqft: parseInt(data.sqft) || null,
-        square_feet: parseInt(data.sqft) || null,
+        square_feet: parseSquareFeet(data.sqft),
         status: data.status,
         image: imageUrls[0] || null,
         photos: imageUrls.length > 0 ? imageUrls : null,
@@ -162,6 +165,12 @@ export default function Listings() {
         virtual_tour_url: data.virtualTourUrl || null,
         is_featured: data.isFeatured || false,
         open_house_date: data.openHouseDate || null,
+        // Collected by the form since it was written, and discarded until
+        // 20260902000007 added the columns (US-106).
+        open_house_end_date: data.openHouseEndDate || null,
+        year_built: data.yearBuilt ? Number(data.yearBuilt) : null,
+        stories: data.stories ? Number(data.stories) : null,
+        garage_spaces: data.garage ? Number(data.garage) : null,
         // Collected by the form's "Property Highlights" textarea and rendered by
         // ListingDetailModal, but never persisted until US-056 added the column.
         highlights: data.highlights
@@ -211,11 +220,8 @@ export default function Listings() {
           state: listing.state as string,
           zip_code: listing.zip_code as string,
           price: String(listing.price),
-          beds: listing.bedrooms as number,
-          baths: listing.bathrooms as number,
           bedrooms: listing.bedrooms as number,
           bathrooms: listing.bathrooms as number,
-          sqft: listing.square_feet as number,
           square_feet: listing.square_feet as number,
           status: listing.status as string,
           description: listing.description as string,
@@ -224,6 +230,8 @@ export default function Listings() {
           lot_size_acres: listing.lot_size_acres as number,
           is_featured: listing.is_featured as boolean,
           virtual_tour_url: listing.virtual_tour_url as string,
+          // The template has advertised year_built all along (US-106).
+          year_built: (listing.year_built as number | null) ?? null,
         });
         successCount++;
       } catch {
@@ -295,9 +303,9 @@ export default function Listings() {
         address: data.address,
         city: data.city,
         price: data.price,
-        beds: data.beds,
-        baths: data.baths,
-        sqft: data.sqft,
+        bedrooms: data.bedrooms,
+        bathrooms: data.bathrooms,
+        square_feet: data.square_feet ?? null,
         status: data.status,
         image: data.image,
         description: data.description,
@@ -829,9 +837,9 @@ export default function Listings() {
             address: editingListing.address,
             city: editingListing.city,
             price: editingListing.price,
-            beds: editingListing.beds,
-            baths: editingListing.baths,
-            sqft: editingListing.sqft ?? undefined,
+            bedrooms: editingListing.bedrooms,
+            bathrooms: editingListing.bathrooms,
+            square_feet: editingListing.square_feet ?? undefined,
             status: editingListing.status ?? 'active',
             image: editingListing.image ?? undefined,
             description: editingListing.description ?? undefined,
