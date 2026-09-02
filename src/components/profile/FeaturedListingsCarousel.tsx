@@ -274,7 +274,9 @@ export function FeaturedListingsCarousel({
                 transition={{ delay: 0.4 }}
                 className="flex flex-wrap gap-4 md:gap-6 text-white"
               >
-                {currentListing.bedrooms && (
+                {/* Same falsy-guard bug as ProfileHeader: 0 beds renders a
+                    literal "0" rather than nothing (US-112). */}
+                {(currentListing.bedrooms ?? 0) > 0 && (
                   <div className="flex items-center gap-2">
                     <Bed className="h-5 w-5 md:h-6 md:w-6" />
                     <span className="text-base md:text-lg font-medium">
@@ -282,7 +284,7 @@ export function FeaturedListingsCarousel({
                     </span>
                   </div>
                 )}
-                {currentListing.bathrooms && (
+                {(currentListing.bathrooms ?? 0) > 0 && (
                   <div className="flex items-center gap-2">
                     <Bath className="h-5 w-5 md:h-6 md:w-6" />
                     <span className="text-base md:text-lg font-medium">
@@ -290,11 +292,11 @@ export function FeaturedListingsCarousel({
                     </span>
                   </div>
                 )}
-                {currentListing.square_feet && (
+                {(currentListing.square_feet ?? 0) > 0 && (
                   <div className="flex items-center gap-2">
                     <Maximize className="h-5 w-5 md:h-6 md:w-6" />
                     <span className="text-base md:text-lg font-medium">
-                      {currentListing.square_feet.toLocaleString()} sqft
+                      {currentListing.square_feet?.toLocaleString()} sqft
                     </span>
                   </div>
                 )}

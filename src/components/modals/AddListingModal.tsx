@@ -318,7 +318,10 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
           {error && (
-            <div className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+            <div
+              role="alert"
+              className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm"
+            >
               {error}
             </div>
           )}

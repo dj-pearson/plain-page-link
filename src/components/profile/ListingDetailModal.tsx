@@ -79,8 +79,15 @@ export default function ListingDetailModal({
   const [isSaved, setIsSaved] = useState(false);
   const [showShareTooltip, setShowShareTooltip] = useState(false);
 
+  // `photos?.length ? … : …`, not `photos || …`.
+  //
+  // usePublicProfile normalises photos with toStringList, which returns [] for
+  // null — and [] is truthy, so the fallback to `image` never ran. A legacy
+  // single-image listing therefore showed the grey placeholder in the modal
+  // while ListingCard, which checks `listing.image || listing.photos?.[0]`,
+  // showed the photo. Same listing, two answers (US-112).
   const photos = getImageUrls(
-    listing.photos || (listing.image ? [listing.image] : null),
+    listing.photos?.length ? listing.photos : listing.image ? [listing.image] : null,
     'listings'
   );
 

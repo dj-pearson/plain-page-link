@@ -15,7 +15,7 @@ import ListingDetailModal from '@/components/profile/ListingDetailModal';
 import { LeadFormModal } from '@/components/profile/LeadFormModal';
 import { CalendlyModal } from '@/components/integrations/CalendlyModal';
 import { HomeValuationForm } from '@/components/forms/HomeValuationForm';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
@@ -25,6 +25,7 @@ import { SEOHead } from '@/components/SEOHead';
 import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
 import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
 import { formatResponseTime } from '@/lib/responseTime';
+import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { parsePrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 import { logger } from '@/lib/logger';
@@ -49,7 +50,7 @@ export default function FullProfilePage() {
   const [isHomeValuationModalOpen, setIsHomeValuationModalOpen] = useState(false);
 
   // Fetch profile and related data
-  const { data, isLoading, error } = usePublicProfile(slug || '');
+  const { data, isLoading, error, refetch } = usePublicProfile(slug || '');
 
   // Check if user has an active custom page
   useEffect(() => {
@@ -60,13 +61,23 @@ export default function FullProfilePage() {
       }
 
       try {
+        // maybeSingle + limit(1), not single().
+        //
+        // .single() errors with PGRST116 when there is no row AND when there is
+        // more than one. The catch treated both as "no custom page", so an
+        // agent with two active published pages silently kept the default
+        // profile with no indication why (US-112). maybeSingle returns null for
+        // none, and limit(1) makes several a defined outcome rather than an
+        // error.
         const { data: customPage, error } = await supabase
           .from('custom_pages')
           .select('slug')
           .eq('user_id', data.profile.id)
           .eq('is_active', true)
           .eq('published', true)
-          .single();
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         if (!error && customPage) {
           setCustomPageSlug(customPage.slug);
@@ -191,7 +202,24 @@ export default function FullProfilePage() {
     return <ProfileSkeleton />;
   }
 
-  if (error || !data) {
+  // A missing profile is a 404. A network failure is not.
+  //
+  // This rendered NotFound for ANY error, so a visitor who hit a transient
+  // fetch failure was told the agent does not exist — and had no way to retry
+  // short of guessing that reloading might help (US-112). PGRST116 from the
+  // profile query is the real "no such username"; everything else is a fault
+  // worth offering a retry for.
+  if (error) {
+    const code = (error as { code?: string }).code;
+    const message = error instanceof Error ? error.message : String(error);
+    const isMissing = code === 'PGRST116' || /Profile not found/i.test(message);
+    if (!isMissing) {
+      return <ProfileLoadError onRetry={() => refetch()} />;
+    }
+    return <NotFound />;
+  }
+
+  if (!data) {
     return <NotFound />;
   }
 
@@ -678,6 +706,9 @@ export default function FullProfilePage() {
         {/* Home Valuation Modal */}
         <Dialog open={isHomeValuationModalOpen} onOpenChange={setIsHomeValuationModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            {/* Hidden: HomeValuationForm renders its own visible heading, but a
+                dialog without a title is announced unnamed (US-112). */}
+            <DialogTitle className="sr-only">Home valuation request</DialogTitle>
             <HomeValuationForm
               agentId={profile.id}
               agentName={profile.full_name || profile.username}

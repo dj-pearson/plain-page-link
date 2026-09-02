@@ -429,7 +429,10 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+                <div
+                  role="alert"
+                  className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm"
+                >
                   {error}
                 </div>
               )}

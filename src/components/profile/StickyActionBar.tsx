@@ -95,7 +95,9 @@ export function StickyActionBar({
   return (
     <>
       {/* Mobile - Bottom Action Bar */}
-      <div className="md:hidden">
+      {/* xl:hidden, paired with the desktop panel's hidden xl:block below —
+          one of the two at every width, neither on top of the content. */}
+      <div className="xl:hidden">
         <AnimatePresence>
           {isExpanded && (
             <motion.div
@@ -170,8 +172,13 @@ export function StickyActionBar({
         </motion.button>
       </div>
 
-      {/* Desktop - Floating Side Panel */}
-      <div className="hidden md:block">
+      {/* Desktop - Floating Side Panel.
+          Shown from xl (1280px), not md (768px). At md the content column
+          reaches the full width, so a 200px panel pinned to right-6 sat on top
+          of it from 768px to about 1150px (US-112). The mobile bar below is
+          xl:hidden to match, so exactly one of the two is present at every
+          width — the pair used to leave no gap only by overlapping. */}
+      <div className="hidden xl:block">
         <motion.div
           initial={{ x: 100, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}

@@ -128,21 +128,25 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
 
             {/* Trust Badges */}
             <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
-              {stats?.propertiesSold && stats.propertiesSold > 0 && (
+              {/* `stats?.propertiesSold && …` rendered a literal "0" for a new
+                  agent: 0 is falsy, so && short-circuits to 0, and React prints
+                  it. Two of these side by side gave the badge row "00"
+                  (US-112). Leading with the comparison returns a boolean. */}
+              {(stats?.propertiesSold ?? 0) > 0 && (
                 <TrustBadge
                   icon={CheckCircle2}
-                  label={`${stats.propertiesSold} Homes Sold`}
+                  label={`${stats?.propertiesSold} Homes Sold`}
                   variant="success"
                 />
               )}
-              {stats?.averageRating && stats.averageRating >= 4.5 && (
+              {(stats?.averageRating ?? 0) >= 4.5 && (
                 <TrustBadge
                   icon={Star}
-                  label={`${stats.averageRating.toFixed(1)} Rating`}
+                  label={`${stats?.averageRating?.toFixed(1)} Rating`}
                   variant="warning"
                 />
               )}
-              {profile.years_experience && profile.years_experience >= 5 && (
+              {(profile.years_experience ?? 0) >= 5 && (
                 <TrustBadge
                   icon={Award}
                   label={`${profile.years_experience} Years Experience`}

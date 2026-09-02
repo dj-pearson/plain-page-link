@@ -207,7 +207,9 @@ export function BuyerInquiryForm({
                 </span>
                 <span className="sr-only">(required)</span>
               </Label>
-              <Select onValueChange={(value) => setValue('propertyType', value)}>
+              <Select
+                onValueChange={(value) => setValue('propertyType', value, { shouldValidate: true })}
+              >
                 <SelectTrigger
                   id="propertyType"
                   aria-required="true"
@@ -243,7 +245,9 @@ export function BuyerInquiryForm({
                 </span>
                 <span className="sr-only">(required)</span>
               </Label>
-              <Select onValueChange={(value) => setValue('priceRange', value)}>
+              <Select
+                onValueChange={(value) => setValue('priceRange', value, { shouldValidate: true })}
+              >
                 <SelectTrigger
                   id="priceRange"
                   aria-required="true"
@@ -278,7 +282,9 @@ export function BuyerInquiryForm({
                 </span>
                 <span className="sr-only">(required)</span>
               </Label>
-              <Select onValueChange={(value) => setValue('bedrooms', value)}>
+              <Select
+                onValueChange={(value) => setValue('bedrooms', value, { shouldValidate: true })}
+              >
                 <SelectTrigger
                   id="bedrooms"
                   aria-required="true"
@@ -310,7 +316,9 @@ export function BuyerInquiryForm({
                 </span>
                 <span className="sr-only">(required)</span>
               </Label>
-              <Select onValueChange={(value) => setValue('timeline', value)}>
+              <Select
+                onValueChange={(value) => setValue('timeline', value, { shouldValidate: true })}
+              >
                 <SelectTrigger
                   id="timeline"
                   aria-required="true"
@@ -343,7 +351,9 @@ export function BuyerInquiryForm({
               </span>
               <span className="sr-only">(required)</span>
             </Label>
-            <Select onValueChange={(value) => setValue('preApproved', value)}>
+            <Select
+              onValueChange={(value) => setValue('preApproved', value, { shouldValidate: true })}
+            >
               <SelectTrigger
                 id="preApproved"
                 aria-required="true"
