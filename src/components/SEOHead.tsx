@@ -1,4 +1,5 @@
-import { Helmet } from "react-helmet-async";
+import { Helmet } from 'react-helmet-async';
+import { getSafeOrigin } from '@/lib/utils';
 
 interface SEOHeadProps {
   title: string;
@@ -63,35 +64,38 @@ export const SEOHead = ({
   citationTitle,
   citationAuthor,
   citationDate,
-  aiSearchOptimized = false
+  aiSearchOptimized = false,
 }: SEOHeadProps) => {
   // Truncate title and description to optimal lengths
   const fullTitle = title.length > 60 ? title.substring(0, 57) + '...' : title;
-  const metaDescription = description.length > 160 ? description.substring(0, 157) + '...' : description;
+  const metaDescription =
+    description.length > 160 ? description.substring(0, 157) + '...' : description;
 
   // Safe origin detection for SSR/crawlers
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
+  const origin = getSafeOrigin();
 
   // Default OG image if not provided
   const defaultOgImage = `${origin}/Cover.png`;
   const imageUrl = ogImage || defaultOgImage;
 
   // Generate robots meta tag
-  const robotsContent = [
-    noindex ? 'noindex' : 'index',
-    nofollow ? 'nofollow' : 'follow'
-  ].join(', ');
+  const robotsContent = [noindex ? 'noindex' : 'index', nofollow ? 'nofollow' : 'follow'].join(
+    ', '
+  );
 
   // Generate speakable schema for voice search if selectors provided
-  const speakableSchema = speakableSelectors.length > 0 && canonicalUrl ? {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "speakable": {
-      "@type": "SpeakableSpecification",
-      "cssSelector": speakableSelectors
-    },
-    "url": canonicalUrl
-  } : null;
+  const speakableSchema =
+    speakableSelectors.length > 0 && canonicalUrl
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          speakable: {
+            '@type': 'SpeakableSpecification',
+            cssSelector: speakableSelectors,
+          },
+          url: canonicalUrl,
+        }
+      : null;
 
   // Combine schemas if multiple exist
   const combinedSchema = (() => {
@@ -104,11 +108,11 @@ export const SEOHead = ({
 
     // Use @graph for multiple schemas
     return {
-      "@context": "https://schema.org",
-      "@graph": schemas.map(s => {
-        const { "@context": _, ...rest } = s as Record<string, unknown>;
+      '@context': 'https://schema.org',
+      '@graph': schemas.map((s) => {
+        const { '@context': _, ...rest } = s as Record<string, unknown>;
         return rest;
-      })
+      }),
     };
   })();
 
@@ -126,7 +130,10 @@ export const SEOHead = ({
       {aiSearchOptimized && (
         <>
           {/* Enable AI crawlers to index and cite this content */}
-          <meta name="robots" content={`${robotsContent}, max-image-preview:large, max-snippet:-1`} />
+          <meta
+            name="robots"
+            content={`${robotsContent}, max-image-preview:large, max-snippet:-1`}
+          />
         </>
       )}
       {citationTitle && <meta name="citation_title" content={citationTitle} />}
@@ -187,9 +194,7 @@ export const SEOHead = ({
 
       {/* Structured Data (combines page schema with speakable if provided) */}
       {combinedSchema && (
-        <script type="application/ld+json">
-          {JSON.stringify(combinedSchema)}
-        </script>
+        <script type="application/ld+json">{JSON.stringify(combinedSchema)}</script>
       )}
     </Helmet>
   );

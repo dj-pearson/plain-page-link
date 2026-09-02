@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAdmin } from '../_shared/auth.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { getPagespeedApiKey } from '../_shared/env.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -23,7 +24,7 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const PAGESPEED_API_KEY = Deno.env.get("PAGESPEED_API_KEY");
+    const PAGESPEED_API_KEY = getPagespeedApiKey();
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     // US-078: this builds a SERVICE-ROLE client and acted on the request body

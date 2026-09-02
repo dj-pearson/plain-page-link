@@ -10,10 +10,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { getSiteUrl, getFunctionsUrl } from '../_shared/env.ts';
 
 // Configuration from environment variables
-const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://agentbio.net';
-const FUNCTIONS_URL = Deno.env.get('FUNCTIONS_URL') || 'https://functions.agentbio.net';
+const SITE_URL = getSiteUrl();
+const FUNCTIONS_URL = getFunctionsUrl();
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://api.agentbio.net';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || '';
@@ -88,7 +89,7 @@ export default async function handler(req: Request): Promise<Response> {
       const error = url.searchParams.get('error');
 
       if (error) {
-        const errorUrl = new URL(`${FRONTEND_URL}/auth/login`);
+        const errorUrl = new URL(`${SITE_URL}/auth/login`);
         errorUrl.searchParams.set('error', error);
         errorUrl.searchParams.set('error_description', url.searchParams.get('error_description') || '');
         return new Response(null, { status: 302, headers: { 'Location': errorUrl.toString() } });
@@ -146,7 +147,7 @@ export default async function handler(req: Request): Promise<Response> {
 
       if (tokenData.error) {
         console.error('Token exchange error:', tokenData);
-        const errorUrl = new URL(`${FRONTEND_URL}/auth/login`);
+        const errorUrl = new URL(`${SITE_URL}/auth/login`);
         errorUrl.searchParams.set('error', tokenData.error);
         return new Response(null, { status: 302, headers: { 'Location': errorUrl.toString() } });
       }
@@ -180,7 +181,7 @@ export default async function handler(req: Request): Promise<Response> {
         });
         if (createError) {
           console.error('Create user error:', createError);
-          const errorUrl = new URL(`${FRONTEND_URL}/auth/login`);
+          const errorUrl = new URL(`${SITE_URL}/auth/login`);
           errorUrl.searchParams.set('error', 'create_user_failed');
           return new Response(null, { status: 302, headers: { 'Location': errorUrl.toString() } });
         }
@@ -190,12 +191,12 @@ export default async function handler(req: Request): Promise<Response> {
       const { data, error: linkError } = await supabase.auth.admin.generateLink({
         type: 'magiclink',
         email: payload.email,
-        options: { redirectTo: `${FRONTEND_URL}${finalRedirect}` },
+        options: { redirectTo: `${SITE_URL}${finalRedirect}` },
       });
 
       if (linkError) {
         console.error('Generate link error:', linkError);
-        const errorUrl = new URL(`${FRONTEND_URL}/auth/login`);
+        const errorUrl = new URL(`${SITE_URL}/auth/login`);
         errorUrl.searchParams.set('error', 'generate_link_failed');
         return new Response(null, { status: 302, headers: { 'Location': errorUrl.toString() } });
       }
@@ -205,7 +206,7 @@ export default async function handler(req: Request): Promise<Response> {
       const token = magicLinkUrl.searchParams.get('token');
       const type = magicLinkUrl.searchParams.get('type');
 
-      const successUrl = new URL(`${FRONTEND_URL}/auth/callback`);
+      const successUrl = new URL(`${SITE_URL}/auth/callback`);
       successUrl.searchParams.set('token', token || '');
       successUrl.searchParams.set('type', type || 'magiclink');
       successUrl.searchParams.set('redirect_to', finalRedirect);

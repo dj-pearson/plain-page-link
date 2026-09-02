@@ -7,10 +7,11 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'noreply@agentbio.net';
-const SITE_URL = Deno.env.get('SITE_URL') || 'https://agentbio.net';
+const SITE_URL = getSiteUrl();
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 

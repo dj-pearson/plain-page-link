@@ -6,6 +6,7 @@ import { sendEmail, createLeadNotificationEmail } from '../_shared/email.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
 import { decryptSecret } from '../_shared/encryption.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 
 /**
  * Notify Lead
@@ -115,7 +116,7 @@ serve(async (req) => {
       return successResponse({ notified: false, reason: 'preference_off' }, req);
     }
 
-    const siteUrl = Deno.env.get('SITE_URL') || 'https://agentbio.net';
+    const siteUrl = getSiteUrl();
     const listingLabel =
       lead.lead_type === 'valuation'
         ? 'a home valuation'

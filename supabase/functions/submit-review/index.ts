@@ -13,6 +13,7 @@ import {
   methodNotAllowedResponse,
   handleUnexpectedError,
 } from '../_shared/response.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 
 /**
  * Submit Review (US-113)
@@ -140,7 +141,7 @@ serve(async (req) => {
     if (!contact?.email) {
       console.error(`[submit-review] no account email for agent ${profile.id}; review ${inserted.id} stored unnotified`);
     } else {
-      const siteUrl = Deno.env.get('SITE_URL') || 'https://agentbio.net';
+      const siteUrl = getSiteUrl();
       const sent = await sendEmail(
         createTestimonialNotificationEmail({
           agentEmail: contact.email,

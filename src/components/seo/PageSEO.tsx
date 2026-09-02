@@ -1,4 +1,5 @@
-import { Helmet } from "react-helmet-async";
+import { Helmet } from 'react-helmet-async';
+import { getSafeOrigin } from '@/lib/utils';
 
 interface FAQItem {
   question: string;
@@ -10,7 +11,7 @@ interface PageSEOProps {
   description: string;
   url?: string;
   imageUrl?: string;
-  type?: "website" | "article" | "product";
+  type?: 'website' | 'article' | 'product';
   keywords?: string[];
   author?: string;
   faqs?: FAQItem[];
@@ -23,150 +24,160 @@ export function PageSEO({
   description,
   url,
   imageUrl,
-  type = "website",
+  type = 'website',
   keywords = [],
   author,
   faqs,
   noIndex = false,
   structuredData,
 }: PageSEOProps) {
-  const siteName = "AgentBio";
-  const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
-  const fullUrl = url ? (url.startsWith('http') ? url : `${siteUrl}${url}`) : (typeof window !== 'undefined' ? window.location.href : siteUrl);
+  const siteName = 'AgentBio';
+  const siteUrl = getSafeOrigin();
+  const fullUrl = url
+    ? url.startsWith('http')
+      ? url
+      : `${siteUrl}${url}`
+    : typeof window !== 'undefined'
+      ? window.location.href
+      : siteUrl;
   const socialImage = imageUrl || `${siteUrl}/Cover.png`;
 
   // Organization Schema with Social Signals
   const organizationSchema = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "@id": `${siteUrl}#organization`,
-    "name": "AgentBio",
-    "legalName": "AgentBio Intelligence",
-    "url": siteUrl,
-    "logo": {
-      "@type": "ImageObject",
-      "url": `${siteUrl}/logo.png`,
-      "width": "512",
-      "height": "512"
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${siteUrl}#organization`,
+    name: 'AgentBio',
+    legalName: 'AgentBio Intelligence',
+    url: siteUrl,
+    logo: {
+      '@type': 'ImageObject',
+      url: `${siteUrl}/logo.png`,
+      width: '512',
+      height: '512',
     },
-    "image": `${siteUrl}/Cover.png`,
-    "description": "AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.",
-    "foundingDate": "2024",
-    "slogan": "Transform Instagram followers into qualified leads",
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "contactType": "Customer Service",
-      "email": "support@agentbio.net",
-      "url": `${siteUrl}/contact`,
-      "availableLanguage": ["English"]
+    image: `${siteUrl}/Cover.png`,
+    description:
+      'AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.',
+    foundingDate: '2024',
+    slogan: 'Transform Instagram followers into qualified leads',
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'Customer Service',
+      email: 'support@agentbio.net',
+      url: `${siteUrl}/contact`,
+      availableLanguage: ['English'],
     },
-    "sameAs": [
-      "https://twitter.com/agentbio",
-      "https://www.facebook.com/agentbio",
-      "https://www.linkedin.com/company/agentbio",
-      "https://www.instagram.com/agentbio",
-      "https://www.youtube.com/@agentbio"
+    sameAs: [
+      'https://twitter.com/agentbio',
+      'https://www.facebook.com/agentbio',
+      'https://www.linkedin.com/company/agentbio',
+      'https://www.instagram.com/agentbio',
+      'https://www.youtube.com/@agentbio',
     ],
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.8",
-      "reviewCount": "523",
-      "bestRating": "5",
-      "worstRating": "1"
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      reviewCount: '523',
+      bestRating: '5',
+      worstRating: '1',
     },
-    "areaServed": {
-      "@type": "Country",
-      "name": "United States"
-    }
+    areaServed: {
+      '@type': 'Country',
+      name: 'United States',
+    },
   };
 
   // WebPage Schema
   const webPageSchema = {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "@id": fullUrl,
-    "url": fullUrl,
-    "name": title,
-    "description": description,
-    "publisher": {
-      "@id": `${siteUrl}#organization`
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': fullUrl,
+    url: fullUrl,
+    name: title,
+    description: description,
+    publisher: {
+      '@id': `${siteUrl}#organization`,
     },
-    "isPartOf": {
-      "@type": "WebSite",
-      "@id": `${siteUrl}#website`,
-      "name": siteName,
-      "url": siteUrl
+    isPartOf: {
+      '@type': 'WebSite',
+      '@id': `${siteUrl}#website`,
+      name: siteName,
+      url: siteUrl,
     },
-    "primaryImageOfPage": {
-      "@type": "ImageObject",
-      "url": socialImage,
-      "width": 1200,
-      "height": 630
+    primaryImageOfPage: {
+      '@type': 'ImageObject',
+      url: socialImage,
+      width: 1200,
+      height: 630,
     },
-    "inLanguage": "en-US",
-    "potentialAction": {
-      "@type": "ReadAction",
-      "target": [fullUrl]
-    }
+    inLanguage: 'en-US',
+    potentialAction: {
+      '@type': 'ReadAction',
+      target: [fullUrl],
+    },
   };
 
   // WebSite Schema with SearchAction
   const webSiteSchema = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "@id": `${siteUrl}#website`,
-    "url": siteUrl,
-    "name": siteName,
-    "description": "Link-in-bio platform for real estate agents",
-    "publisher": {
-      "@id": `${siteUrl}#organization`
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${siteUrl}#website`,
+    url: siteUrl,
+    name: siteName,
+    description: 'Link-in-bio platform for real estate agents',
+    publisher: {
+      '@id': `${siteUrl}#organization`,
     },
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": {
-        "@type": "EntryPoint",
-        "urlTemplate": `${siteUrl}/search?q={search_term_string}`
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${siteUrl}/search?q={search_term_string}`,
       },
-      "query-input": "required name=search_term_string"
-    }
+      'query-input': 'required name=search_term_string',
+    },
   };
 
   // FAQ Schema (if FAQs provided)
-  const faqSchema = faqs && faqs.length > 0 ? {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": faqs.map(faq => ({
-      "@type": "Question",
-      "name": faq.question,
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": faq.answer
-      }
-    }))
-  } : null;
+  const faqSchema =
+    faqs && faqs.length > 0
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: faqs.map((faq) => ({
+            '@type': 'Question',
+            name: faq.question,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: faq.answer,
+            },
+          })),
+        }
+      : null;
 
   // Combined Schema using @graph
   const combinedSchema = {
-    "@context": "https://schema.org",
-    "@graph": [
+    '@context': 'https://schema.org',
+    '@graph': [
       organizationSchema,
       webSiteSchema,
       webPageSchema,
       ...(faqSchema ? [faqSchema] : []),
-      ...(structuredData ? [structuredData] : [])
-    ]
+      ...(structuredData ? [structuredData] : []),
+    ],
   };
 
   const robotsContent = noIndex
-    ? "noindex, nofollow"
-    : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1";
+    ? 'noindex, nofollow'
+    : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
 
   return (
     <Helmet>
       {/* Basic Meta Tags */}
       <title>{title}</title>
       <meta name="description" content={description} />
-      {keywords.length > 0 && <meta name="keywords" content={keywords.join(", ")} />}
+      {keywords.length > 0 && <meta name="keywords" content={keywords.join(', ')} />}
       {author && <meta name="author" content={author} />}
       <link rel="canonical" href={fullUrl} />
 

@@ -3,6 +3,8 @@
  * 7-day email sequence for Instagram Bio Analyzer leads
  */
 
+import { getConfiguredAppUrl } from '@/lib/utils';
+
 export interface EmailTemplate {
   subject: string;
   preheader: string;
@@ -16,11 +18,17 @@ export const getEmailTemplate = (
   score: number,
   bioRewrites: string[]
 ): EmailTemplate => {
+  // Every call-to-action link in this sequence used to interpolate
+  // `process.env.NEXT_PUBLIC_APP_URL` — a Next.js variable name in a Vite
+  // app, so all nine rendered as the literal text "undefined/auth/register"
+  // (US-123). getConfiguredAppUrl, not getSafeOrigin: an emailed link must
+  // point at the deployment, not at whichever origin happened to render it.
+  const appUrl = getConfiguredAppUrl();
   const templates: Record<number, EmailTemplate> = {
     // Email 1: Immediate - Deliver the goods
     1: {
       subject: `${firstName}, Your 3 Optimized Instagram Bios + Action Plan Inside`,
-      preheader: "Here are your personalized bio rewrites and implementation checklist",
+      preheader: 'Here are your personalized bio rewrites and implementation checklist',
       body: `
 Hi ${firstName},
 
@@ -56,7 +64,7 @@ AgentBio gives you a professional link-in-bio built specifically for real estate
 → Analytics to track what's working
 → QR codes for your business cards and flyers
 
-[Start Your Free 14-Day Trial](${process.env.NEXT_PUBLIC_APP_URL}/auth/register)
+[Start Your Free 14-Day Trial](${appUrl}/auth/register)
 
 To your Instagram success,
 The AgentBio Team
@@ -67,7 +75,7 @@ P.S. Reply to this email if you have questions about implementing your new bio!
 
     // Email 2: Day 1 - Common mistakes
     2: {
-      subject: "The Instagram bio mistake 73% of agents make",
+      subject: 'The Instagram bio mistake 73% of agents make',
       preheader: `Don't let this kill your lead generation, ${firstName}`,
       body: `
 Hey ${firstName},
@@ -101,7 +109,7 @@ Your link-in-bio can show dynamic proof:
 → Recent sales: "Just sold 3 homes in [neighborhood]"
 → Client testimonials that update automatically
 
-[See How AgentBio Works](${process.env.NEXT_PUBLIC_APP_URL}/pricing)
+[See How AgentBio Works](${appUrl}/pricing)
 
 Talk soon,
 The AgentBio Team
@@ -112,8 +120,8 @@ P.S. Your competitors in ${market} are already optimizing. Don't get left behind
 
     // Email 3: Day 2 - Instagram as lead gen machine
     3: {
-      subject: "Your Instagram profile as a 24/7 showing scheduler",
-      preheader: "How top agents turn followers into qualified leads",
+      subject: 'Your Instagram profile as a 24/7 showing scheduler',
+      preheader: 'How top agents turn followers into qualified leads',
       body: `
 ${firstName},
 
@@ -149,7 +157,7 @@ Her secret? A strategic link-in-bio that converts.
 
 **Your Instagram bio is the gateway.** But your link-in-bio is where the conversion happens.
 
-[Build Your High-Converting Profile on AgentBio](${process.env.NEXT_PUBLIC_APP_URL}/auth/register)
+[Build Your High-Converting Profile on AgentBio](${appUrl}/auth/register)
 
 Best,
 The AgentBio Team
@@ -161,7 +169,7 @@ P.S. We have templates specifically designed for ${market} agents. Set up in 10 
     // Email 4: Day 3 - Content calendar
     4: {
       subject: `${firstName}, here's your 30-day Instagram content calendar`,
-      preheader: "Never run out of post ideas again + track what converts",
+      preheader: 'Never run out of post ideas again + track what converts',
       body: `
 Hi ${firstName},
 
@@ -170,7 +178,7 @@ Hi ${firstName},
 So I'm sending you a ready-to-use content calendar with 30 days of proven post ideas.
 
 **Download Your Content Calendar:**
-[Download PDF](${process.env.NEXT_PUBLIC_APP_URL}/resources/instagram-content-calendar.pdf)
+[Download PDF](${appUrl}/resources/instagram-content-calendar.pdf)
 
 **What's inside:**
 → 10 market update posts
@@ -198,7 +206,7 @@ Friday: Client testimonial → Links to free home valuation
 
 Stop guessing. Start knowing what works.
 
-[Try AgentBio Free for 14 Days](${process.env.NEXT_PUBLIC_APP_URL}/auth/register)
+[Try AgentBio Free for 14 Days](${appUrl}/auth/register)
 
 To your success,
 The AgentBio Team
@@ -209,8 +217,8 @@ P.S. The calendar includes caption templates. Just fill in your market-specific 
 
     // Email 5: Day 5 - Data and benchmarks
     5: {
-      subject: "Real data: What converts Instagram followers to clients",
-      preheader: "Anonymous performance data from 2,847 real estate agents",
+      subject: 'Real data: What converts Instagram followers to clients',
+      preheader: 'Anonymous performance data from 2,847 real estate agents',
       body: `
 ${firstName},
 
@@ -263,7 +271,7 @@ If you're below 70, you're likely losing 40-60% of potential leads at step #1.
 → Agent A: 3 leads/month → 18 leads/month (6X increase)
 → Agent B: 8 leads/month → 31 leads/month (4X increase)
 
-[See How AgentBio Works](${process.env.NEXT_PUBLIC_APP_URL}/pricing)
+[See How AgentBio Works](${appUrl}/pricing)
 
 Data-driven success,
 The AgentBio Team
@@ -274,7 +282,7 @@ P.S. We track all these metrics for you automatically. No spreadsheets needed.
 
     // Email 6: Day 6 - Honest comparison
     6: {
-      subject: "Linktree vs AgentBio for real estate (honest comparison)",
+      subject: 'Linktree vs AgentBio for real estate (honest comparison)',
       preheader: `${firstName}, here's what you need to know`,
       body: `
 ${firstName},
@@ -344,7 +352,7 @@ AgentBio cost per year: $348
 
 Most agents close 2-5 extra deals per year from better Instagram conversion.
 
-[Try AgentBio Free for 14 Days](${process.env.NEXT_PUBLIC_APP_URL}/auth/register)
+[Try AgentBio Free for 14 Days](${appUrl}/auth/register)
 
 No credit card required. See the difference yourself.
 
@@ -358,7 +366,7 @@ P.S. We have a "switch from Linktree" import tool. Transfer your existing setup 
     // Email 7: Day 7 - Final offer
     7: {
       subject: `${firstName}, final call: 20% off + free setup (expires tonight)`,
-      preheader: "Your exclusive offer for Instagram Bio Analyzer users",
+      preheader: 'Your exclusive offer for Instagram Bio Analyzer users',
       body: `
 ${firstName},
 
@@ -412,7 +420,7 @@ If this helps you close ONE extra deal this year, it pays for itself 390X over.
 
 Most agents close 3-5 extra deals per year with better Instagram conversion.
 
-[Claim Your 20% Discount Now](${process.env.NEXT_PUBLIC_APP_URL}/auth/register?coupon=BIO20)
+[Claim Your 20% Discount Now](${appUrl}/auth/register?coupon=BIO20)
 
 This offer expires tonight at midnight. After that, it's regular pricing.
 
@@ -425,7 +433,7 @@ P.S. Still have questions? Reply to this email. I'm here to help.
 
 P.P.S. Your competitors in ${market} are already optimizing their Instagram presence. Every day you wait is a day of lost leads.
 
-[Start Your Free Trial Now →](${process.env.NEXT_PUBLIC_APP_URL}/auth/register?coupon=BIO20)
+[Start Your Free Trial Now →](${appUrl}/auth/register?coupon=BIO20)
 
 ---
 

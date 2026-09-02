@@ -22,17 +22,6 @@ const ALLOWED_ORIGINS = [
     : [])
 ];
 
-/**
- * Default CORS headers for simple responses
- * Use getCorsHeaders() for dynamic origin handling
- */
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Credentials': 'true',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-};
-
 export interface CorsHeaders {
   'Access-Control-Allow-Origin': string;
   'Access-Control-Allow-Headers': string;
@@ -51,19 +40,22 @@ export function getCorsHeaders(
   requestOrigin: string | null,
   allowMethods?: string
 ): Record<string, string> {
-  // For webhook/server-to-server requests (no Origin header), use wildcard
-  // For browser requests, validate against whitelist
-  const origin = requestOrigin 
-    ? (ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0])
-    : '*'; // Allow webhooks without Origin header
-
   const headers: Record<string, string> = {
-    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   };
 
-  // Only set credentials for browser requests with specific origin
-  if (origin !== '*') {
+  // No Origin header means a server-to-server caller — a webhook, a cron
+  // invocation, curl. Those do not read ACAO, so omit the header entirely
+  // rather than answering '*'. Sending '*' told every browser on the internet
+  // that these endpoints were fair game the moment a request reached them
+  // without an Origin, which is exactly the shape of a request an attacker
+  // controls (US-123).
+  if (requestOrigin) {
+    // An origin outside the whitelist gets the canonical origin back, which
+    // its browser will reject — the request is refused, not silently allowed.
+    headers['Access-Control-Allow-Origin'] = ALLOWED_ORIGINS.includes(requestOrigin)
+      ? requestOrigin
+      : ALLOWED_ORIGINS[0];
     headers['Access-Control-Allow-Credentials'] = 'true';
   }
 

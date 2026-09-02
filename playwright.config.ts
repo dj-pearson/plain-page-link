@@ -67,17 +67,28 @@ export default defineConfig({
       name: 'security-chrome',
       use: {
         ...devices['Desktop Chrome'],
-        ...(process.env.PW_CHROMIUM_PATH
-          ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } }
-          : {}),
-        // Disable security features to test vulnerabilities
+        // One launchOptions object, not two. The executablePath used to be
+        // spread in above this key and was then overwritten wholesale by the
+        // args literal, so PW_CHROMIUM_PATH had no effect on this project and
+        // every spec in it failed at browserType.launch on a runner whose
+        // bundled Chromium build does not match the pinned one. e2e and a11y
+        // set the path the same way and ran fine, which is what made the
+        // failures look like the app rather than the harness.
         launchOptions: {
+          // Disable security features to test vulnerabilities
           args: ['--disable-web-security', '--allow-running-insecure-content'],
+          ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
         },
       },
     },
 
-    // Mobile Safari - iOS security testing
+    // Mobile Safari - iOS security testing.
+    //
+    // devices['iPhone 13'] defaults to WebKit, so PW_CHROMIUM_PATH does not
+    // help here and this project cannot run on a machine with only the
+    // Chromium bundle installed. Left as-is deliberately: pointing a WebKit
+    // launch at a Chromium binary makes every spec fail instantly, which reads
+    // as an application defect rather than a missing browser.
     {
       name: 'security-mobile',
       use: { ...devices['iPhone 13'] },

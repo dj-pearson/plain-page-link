@@ -3,6 +3,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { isServiceRoleRequest, getAuthenticatedUser } from '../_shared/service-auth.ts';
 import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { isValidWebhookUrl } from '../_shared/validation.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 
 export default async (req: Request) => {
   console.log('[publish-article-to-social] Function invoked');
@@ -99,7 +100,7 @@ export default async (req: Request) => {
 
     console.log('Generating social media content...');
 
-    const siteUrl = Deno.env.get('SITE_URL') || Deno.env.get('APP_URL') || 'https://agentbio.net';
+    const siteUrl = getSiteUrl();
     const articleUrl = `${siteUrl}/blog/${article.slug}`;
     
     const prompt = `Create social media posts to promote this article:

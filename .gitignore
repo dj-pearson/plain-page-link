@@ -43,3 +43,6 @@ db-backup/
 
 # Local scratch
 *.local
+
+# TypeScript incremental build cache
+*.tsbuildinfo

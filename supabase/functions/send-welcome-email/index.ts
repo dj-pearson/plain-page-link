@@ -5,6 +5,7 @@ import { getCorsHeaders } from '../_shared/cors.ts'
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { isServiceRoleRequest } from '../_shared/service-auth.ts'
+import { getSiteUrl } from '../_shared/env.ts';
 
 /**
  * The welcome email, sent to the agent who just finished onboarding.
@@ -80,7 +81,7 @@ serve(async (req) => {
     }
 
     const userName = profile.full_name || profile.username
-    const profileUrl = `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/${profile.username}`
+    const profileUrl = `${getSiteUrl()}/${profile.username}`
 
     // Send welcome email
     await sendEmail({
@@ -116,7 +117,7 @@ Need Help?
 - Contact support: support@agentbio.net
 
 Ready to start? Visit your dashboard:
-${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard
+${getSiteUrl()}/dashboard
 
 Best regards,
 The AgentBio Team
@@ -199,7 +200,7 @@ P.S. Share your first listing today and see how AgentBio helps you convert Insta
       </div>
 
       <div style="text-align: center;">
-        <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard" class="button">
+        <a href="${getSiteUrl()}/dashboard" class="button">
           Go to Your Dashboard →
         </a>
       </div>
@@ -207,7 +208,7 @@ P.S. Share your first listing today and see how AgentBio helps you convert Insta
       <div class="help-section">
         <p style="margin: 0 0 10px 0; font-weight: 600; color: #1f2937;">Need Help?</p>
         <p style="margin: 0; font-size: 14px; color: #6b7280;">
-          • Check out our <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/blog" style="color: #667eea;">video tutorials</a><br>
+          • Check out our <a href="${getSiteUrl()}/blog" style="color: #667eea;">video tutorials</a><br>
           • Join our agent community<br>
           • Email us: <a href="mailto:support@agentbio.net" style="color: #667eea;">support@agentbio.net</a>
         </p>
@@ -224,8 +225,8 @@ P.S. Share your first listing today and see how AgentBio helps you convert Insta
       <p><strong>AgentBio</strong> - Link-in-Bio for Real Estate Agents</p>
       <p style="margin: 10px 0 0 0;">
         <a href="${profileUrl}">View Your Profile</a> •
-        <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard">Dashboard</a> •
-        <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/blog">Blog</a>
+        <a href="${getSiteUrl()}/dashboard">Dashboard</a> •
+        <a href="${getSiteUrl()}/blog">Blog</a>
       </p>
       <p style="margin: 15px 0 0 0; font-size: 12px;">
         This email was sent because you created an account at AgentBio.net

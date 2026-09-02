@@ -14,9 +14,9 @@
  * fields are omitted so the output validates cleanly.
  */
 
+import { getSafeOrigin } from '@/lib/utils';
+
 const SITE_NAME = 'AgentBio';
-const DEFAULT_SITE_URL =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APP_URL) || 'https://agentbio.net';
 
 type JsonLd = Record<string, unknown>;
 
@@ -30,7 +30,7 @@ function compact<T extends JsonLd>(obj: T): T {
   return out as T;
 }
 
-export function organizationSchema(siteUrl: string = DEFAULT_SITE_URL): JsonLd {
+export function organizationSchema(siteUrl: string = getSafeOrigin()): JsonLd {
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
@@ -57,7 +57,7 @@ export interface AgentProfileInput {
 }
 
 export function realEstateAgentSchema(profile: AgentProfileInput): JsonLd {
-  const siteUrl = profile.siteUrl || DEFAULT_SITE_URL;
+  const siteUrl = profile.siteUrl || getSafeOrigin();
   const profileUrl = `${siteUrl}/${profile.username}`;
   return compact({
     '@context': 'https://schema.org',
@@ -148,7 +148,7 @@ export interface ArticleInput {
 }
 
 export function articleSchema(article: ArticleInput): JsonLd {
-  const siteUrl = article.siteUrl || DEFAULT_SITE_URL;
+  const siteUrl = article.siteUrl || getSafeOrigin();
   const url = `${siteUrl}/blog/${article.slug}`;
   return compact({
     '@context': 'https://schema.org',

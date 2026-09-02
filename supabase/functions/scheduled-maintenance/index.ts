@@ -5,6 +5,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail } from '../_shared/email.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 
 /**
  * Scheduled maintenance.
@@ -149,7 +150,7 @@ serve(async (req) => {
             }
 
             if (contact?.email) {
-              const siteUrl = Deno.env.get('SITE_URL') || 'https://agentbio.net';
+              const siteUrl = getSiteUrl();
               await sendEmail({
                 to: contact.email,
                 subject: `${lead.name} has been waiting ${hours}h`,

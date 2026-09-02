@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { getPagespeedApiKey } from '../_shared/env.ts';
 
 /**
  * Fetch Core Web Vitals from Google Search Console
@@ -102,13 +103,13 @@ serve(async (req) => {
     // We need to use the CrUX API instead, which requires a different API key
     // For now, we'll fetch from the CrUX API using the Chrome UX Report API
 
-    const CHROME_UX_API_KEY = Deno.env.get("CHROME_UX_API_KEY") || Deno.env.get("PAGESPEED_INSIGHTS_API_KEY");
+    const CHROME_UX_API_KEY = Deno.env.get("CHROME_UX_API_KEY") || getPagespeedApiKey();
 
     if (!CHROME_UX_API_KEY) {
       return new Response(
         JSON.stringify({
           error: 'Chrome UX Report API key not configured',
-          message: 'Please set CHROME_UX_API_KEY or use the existing PAGESPEED_INSIGHTS_API_KEY'
+          message: 'Please set CHROME_UX_API_KEY, or PAGESPEED_API_KEY to reuse the PageSpeed key'
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

@@ -5,7 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 
 interface AuditLogRequest {
@@ -45,9 +45,13 @@ const CRITICAL_RISK_ACTIONS = [
 ];
 
 serve(async (req: Request) => {
+  // Per request, from the Origin header. This was the module-level static
+  // `corsHeaders`, pinned to https://agentbio.net, so every visitor who
+  // reached the site as www.agentbio.net failed CORS here (US-123).
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'), 'GET, POST, PUT, DELETE, OPTIONS');
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return handleCorsPreFlight(req.headers.get('origin'));
   }
 
   try {

@@ -1,6 +1,8 @@
 // Shared email utility for Supabase Edge Functions
 // Uses Resend API - you can swap for SendGrid or another provider
 
+import { getSiteUrl } from './env.ts';
+
 interface EmailOptions {
   to: string
   subject: string
@@ -93,31 +95,6 @@ export async function sendEmail(options: EmailOptions): Promise<SendEmailResult>
   }
 }
 
-// Template for agent notification email
-export function createAgentNotificationEmail(data: {
-  name: string
-  email: string
-  phone?: string
-  message?: string
-  type: string
-}): EmailOptions {
-  return {
-    to: Deno.env.get('AGENT_EMAIL') ?? '',
-    subject: `New ${data.type} from ${data.name}`,
-    body: `
-You have received a new ${data.type} submission:
-
-Name: ${data.name}
-Email: ${data.email}
-${data.phone ? `Phone: ${data.phone}` : ''}
-${data.message ? `\nMessage:\n${data.message}` : ''}
-
----
-Sent from AgentBio.net
-    `.trim(),
-  }
-}
-
 // Branded, responsive HTML template for the agent lead notification.
 // Subject: "New Lead: {name} is interested in {listing}"
 export function createLeadNotificationEmail(data: {
@@ -134,7 +111,7 @@ export function createLeadNotificationEmail(data: {
   const listing = data.listing || 'your services'
   const dashboardUrl =
     data.dashboardUrl ||
-    `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/leads`
+    `${getSiteUrl()}/dashboard/leads`
   const scoreBadge =
     typeof data.leadScore === 'number'
       ? `<span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:600;">Lead score: ${data.leadScore}</span>`
@@ -240,7 +217,7 @@ export function createTestimonialNotificationEmail(data: {
 }): EmailOptions {
   const dashboardUrl =
     data.dashboardUrl ||
-    `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/testimonials`
+    `${getSiteUrl()}/dashboard/testimonials`
 
   const transaction =
     data.transactionType === 'both'

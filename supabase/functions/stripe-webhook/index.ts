@@ -22,6 +22,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { sendEmail } from '../_shared/email.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
 import { statusToStore } from '../_shared/subscription-entitlement.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   apiVersion: '2023-10-16',
@@ -476,7 +477,7 @@ serve(async (req) => {
             }
 
             if (profile?.email) {
-              const portalUrl = `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/subscription`;
+              const portalUrl = `${getSiteUrl()}/dashboard/subscription`;
               await sendEmail({
                 to: profile.email,
                 subject: 'Action needed: your AgentBio payment failed',

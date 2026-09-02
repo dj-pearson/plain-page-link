@@ -37,6 +37,7 @@ import NotFound from './NotFound';
 import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
+import { getSafeOrigin } from '@/lib/utils';
 
 export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -233,7 +234,7 @@ export default function FullProfilePage() {
       : 0;
 
   // Generate SEO data with safe origin detection for SSR/crawlers
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
+  const origin = getSafeOrigin();
   const seoTitle =
     profile.seo_title || `${profile.full_name || profile.username} - Real Estate Agent`;
   const seoDescription =

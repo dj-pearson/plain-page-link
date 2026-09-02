@@ -4,6 +4,7 @@ import { assertFetchableUrl } from '../_shared/ssrf-guard.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
+import { getPagespeedApiKey } from '../_shared/env.ts';
 
 interface CWVRequest {
   url: string;
@@ -31,9 +32,9 @@ serve(async (req) => {
     const startTime = Date.now();
 
     // Get PageSpeed Insights API Key
-    const PAGESPEED_API_KEY = Deno.env.get("PAGESPEED_INSIGHTS_API_KEY");
+    const PAGESPEED_API_KEY = getPagespeedApiKey();
     if (!PAGESPEED_API_KEY) {
-      throw new Error("PAGESPEED_INSIGHTS_API_KEY environment variable not set");
+      throw new Error("PAGESPEED_API_KEY environment variable not set");
     }
 
     // Initialize Supabase client
