@@ -24,12 +24,16 @@ export interface LeadFeatures {
   // Message quality
   messageLength: number;
 
-  // Behavioral features
-  listingViews: number;
-  pageViewCount: number;
-  timeOnSite: number; // seconds
-  scrollDepth: number; // 0-100
-  hasViewedMultipleListings: boolean;
+  // Behavioural features are ABSENT on purpose.
+  //
+  // listingViews, pageViewCount, timeOnSite, scrollDepth and
+  // hasViewedMultipleListings were read from lead.form_data and nothing has
+  // ever written them — no code in src/ or supabase/functions/ records a
+  // listing view against a lead. They arrived as 0/false for every lead, and
+  // carried 4.8 of the weight vector's mass between them, so the model's
+  // remaining signal was source, phone, message length and the hour of the
+  // day: a Hot badge meant "included a phone number and wrote at 10am"
+  // (US-105). Add them back with the capture that measures them, not before.
 
   // Timing features
   timeOfDay: number; // 0-23
@@ -78,8 +82,15 @@ export interface ModelWeights {
   version: string;
   trainedAt: Date;
   trainingExamples: number;
-  accuracy: number;
-  auc: number;
+  /**
+   * Measured accuracy and AUC. Optional because they have never been measured:
+   * the shipped weights carry trainingExamples: 0 and recordConversion has no
+   * caller, so nothing has ever trained or evaluated this model. They were
+   * literals (0.75 / 0.82) rendered to agents as if they meant something
+   * (US-105).
+   */
+  accuracy?: number;
+  auc?: number;
 }
 
 export interface ABTestConfig {
@@ -146,13 +157,6 @@ export class FeatureExtractor {
       // Message quality (normalized)
       this.normalizeMessageLength(features.messageLength),
 
-      // Behavioral engagement (normalized)
-      this.normalizeListingViews(features.listingViews),
-      this.normalizePageViews(features.pageViewCount),
-      this.normalizeTimeOnSite(features.timeOnSite),
-      features.scrollDepth / 100,
-      features.hasViewedMultipleListings ? 1 : 0,
-
       // Timing signals
       this.encodeTimeOfDay(features.timeOfDay),
       this.encodeDayOfWeek(features.dayOfWeek),
@@ -180,11 +184,6 @@ export class FeatureExtractor {
       'has_phone',
       'has_email',
       'message_quality',
-      'listing_views',
-      'page_views',
-      'time_on_site',
-      'scroll_depth',
-      'multiple_listings',
       'time_of_day',
       'day_of_week',
       'lead_type',
@@ -214,21 +213,6 @@ export class FeatureExtractor {
   private static normalizeMessageLength(length: number): number {
     // Sigmoid-like normalization: 200 chars = ~0.9
     return 1 - Math.exp(-length / 100);
-  }
-
-  private static normalizeListingViews(views: number): number {
-    // 5+ views = full score
-    return Math.min(views / 5, 1);
-  }
-
-  private static normalizePageViews(views: number): number {
-    // 10+ views = full score
-    return Math.min(views / 10, 1);
-  }
-
-  private static normalizeTimeOnSite(seconds: number): number {
-    // 5+ minutes = full score
-    return Math.min(seconds / 300, 1);
   }
 
   private static encodeTimeOfDay(hour: number): number {
@@ -383,11 +367,6 @@ export class MLLeadScoringSystem {
       has_phone: 1.8,
       has_email: 0.5,
       message_quality: 1.2,
-      listing_views: 1.5,
-      page_views: 0.8,
-      time_on_site: 1.0,
-      scroll_depth: 0.6,
-      multiple_listings: 0.9,
       time_of_day: 0.4,
       day_of_week: 0.3,
       lead_type: 1.4,
@@ -401,8 +380,12 @@ export class MLLeadScoringSystem {
     version: '1.0.0',
     trainedAt: new Date('2025-01-01'),
     trainingExamples: 0,
-    accuracy: 0.75,
-    auc: 0.82,
+    // Not measured. These were 0.75 and 0.82 as literals against a model with
+    // trainingExamples: 0 and no caller for recordConversion — nothing has ever
+    // been trained or evaluated, so any figure here is an invention. Left
+    // undefined so the UI has nothing to render rather than a fiction (US-105).
+    accuracy: undefined,
+    auc: undefined,
   };
 
   constructor() {
@@ -902,15 +885,14 @@ export class UnifiedLeadScorer {
       };
     } else {
       // Use rule-based system
+      // The behavioural fields LeadData still accepts are omitted: nothing
+      // measures them, so passing 0 through would only re-add the dead weight
+      // this change removed (US-105).
       const ruleBasedScore = LeadScoringSystem.calculateScore({
         source: features.source,
         hasPhone: features.hasPhone,
         hasEmail: features.hasEmail,
         messageLength: features.messageLength,
-        listingViews: features.listingViews,
-        pageViewCount: features.pageViewCount,
-        timeOnSite: features.timeOnSite,
-        hasViewedMultipleListings: features.hasViewedMultipleListings,
         timeOfDay: features.timeOfDay,
         dayOfWeek: features.dayOfWeek,
       });

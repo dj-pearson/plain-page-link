@@ -75,26 +75,16 @@ export interface UseMLLeadScoringOptions {
 // Hook Implementation
 // ============================================================================
 
-/** `leads.form_data` is jsonb; only an object carries the behavioural fields. */
-function asRecord(value: Json | null | undefined): Record<string, Json | undefined> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
-}
-
-function numberField(source: Record<string, Json | undefined>, key: string): number {
-  const value = source[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
-
-function stringField(source: Record<string, Json | undefined>, key: string): string | undefined {
-  const value = source[key];
-  return typeof value === 'string' ? value : undefined;
-}
-
 const DEVICE_TYPES = ['mobile', 'tablet', 'desktop'] as const;
 
-/** form_data.device is free text; LeadFeatures.deviceType is a closed union. */
-function deviceField(source: Record<string, Json | undefined>): (typeof DEVICE_TYPES)[number] {
-  const value = stringField(source, 'device');
+/**
+ * `leads.device` is free text; LeadFeatures.deviceType is a closed union.
+ *
+ * The jsonb readers that stood here (asRecord/numberField/stringField/
+ * deviceField) are gone with the form_data reads they served: every feature
+ * now comes from a real column (US-105).
+ */
+function normaliseDevice(value: string | null | undefined): (typeof DEVICE_TYPES)[number] {
   return DEVICE_TYPES.find((device) => device === value) ?? 'desktop';
 }
 
@@ -285,31 +275,32 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
    * Extract features from a Lead object
    */
   const extractFeaturesFromLead = useCallback((lead: Lead): LeadFeatures => {
-    // form_data is jsonb, so nothing guarantees it is an object at all; read
-    // through helpers rather than reaching into the Json union.
-    const formData = asRecord(lead.form_data);
     // created_at is nullable; new Date(null) is the epoch, which would put
     // every undated lead at hour 0 on a Thursday and skew the time features.
     const createdAt = lead.created_at ? new Date(lead.created_at) : null;
 
+    // Everything here comes from a real column.
+    //
+    // This read timeline, preapproval_status, utm_source, utm_medium and device
+    // out of lead.form_data. None of them are there: leadSubmission lifts
+    // timeline and preApproved into their own columns (so form_data.timeline is
+    // always absent), utm_source/utm_medium/device ARE columns, and the raw
+    // pre-approval answer is stored as form_data.preApprovalStatus — never
+    // preapproval_status, so isPreapproved was false for every lead including
+    // the approved ones (US-105).
     return {
       source: lead.source || 'unknown',
       hasPhone: !!lead.phone,
       hasEmail: !!lead.email,
       messageLength: (lead.message || '').length,
-      listingViews: numberField(formData, 'listingViews'),
-      pageViewCount: numberField(formData, 'pageViewCount'),
-      timeOnSite: numberField(formData, 'timeOnSite'),
-      scrollDepth: numberField(formData, 'scrollDepth'),
-      hasViewedMultipleListings: formData.hasViewedMultipleListings === true,
       timeOfDay: createdAt ? createdAt.getHours() : 0,
       dayOfWeek: createdAt ? createdAt.getDay() : 0,
       leadType: lead.lead_type || 'general_contact',
-      isPreapproved: formData.preapproval_status === 'approved',
-      hasTimeline: !!formData.timeline,
-      deviceType: deviceField(formData),
-      utmSource: stringField(formData, 'utm_source'),
-      utmMedium: stringField(formData, 'utm_medium'),
+      isPreapproved: lead.preapproved === true,
+      hasTimeline: !!lead.timeline,
+      deviceType: normaliseDevice(lead.device),
+      utmSource: lead.utm_source ?? undefined,
+      utmMedium: lead.utm_medium ?? undefined,
     };
   }, []);
 

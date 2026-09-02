@@ -697,6 +697,89 @@ check('log_lead_activity / _call / _email run against a real lead', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 6d. Zip routing rules must actually match.
+//
+//     auto_assign_lead compared criteria->>'zip' to NEW.property_address — a
+//     full street address — so equality against a five-digit zip was never
+//     true. Every zip rule fell through to the round-robin fallback, which is
+//     the worst shape of failure: the lead IS assigned, so routing looks like
+//     it works, just to the wrong person (US-105). A trigger like this can only
+//     be checked by running it.
+// ---------------------------------------------------------------------------
+check('zip routing rules match against the property address', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-00000000ad01';
+  const zipTarget = '00000000-dead-beef-0000-00000000ad02';
+  const roundRobin = '00000000-dead-beef-0000-00000000ad03';
+  const team = '00000000-dead-beef-0000-00000000ad04';
+  const leadOf = (n) => `00000000-dead-beef-0000-00000000ae0${n}`;
+
+  const assignee = (id) =>
+    q(`SELECT coalesce(assigned_to::text, '') FROM public.leads WHERE id = '${id}';`)[0] ?? '';
+
+  try {
+    for (const [id, email] of [
+      [owner, 'zipowner@example.test'],
+      [zipTarget, 'ziptarget@example.test'],
+      [roundRobin, 'zipfallback@example.test'],
+    ]) {
+      q(`INSERT INTO auth.users (id, email) VALUES ('${id}', '${email}')
+         ON CONFLICT (id) DO NOTHING;`);
+    }
+    q(`
+      INSERT INTO public.teams (id, owner_id, name)
+      VALUES ('${team}', '${owner}', 'Schema Check Team') ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.team_members (team_id, user_id, accepted_at, invited_at)
+      VALUES ('${team}', '${roundRobin}', now(), now()) ON CONFLICT DO NOTHING;
+      INSERT INTO public.lead_routing_rules (team_id, name, criteria, assigned_to, priority, is_active)
+      VALUES ('${team}', 'Schema check zip', '{"zip":"84604"}'::jsonb, '${zipTarget}', 1, true);
+    `);
+
+    const cases = [
+      [1, '1234 N Canyon Rd, Provo, UT 84604', true, 'a zip inside a street address'],
+      [2, '9 Elm St, Provo, UT 84604-1234', true, 'ZIP+4'],
+      [3, '846040 Long Rd, Nowhere, UT 99999', false, 'a longer number containing the zip'],
+      [4, '12 Other St, Elsewhere, UT 99999', false, 'an unrelated address'],
+    ];
+
+    for (const [n, address, shouldMatch, label] of cases) {
+      q(`
+        INSERT INTO public.leads (id, user_id, name, encrypted_email, lead_type, property_address)
+        VALUES ('${leadOf(n)}', '${owner}', 'Zip Check', 'enc:v1:zipcheck', 'buyer',
+                ${address === null ? 'NULL' : `'${address}'`});
+      `);
+      const got = assignee(leadOf(n)) === zipTarget;
+      if (got !== shouldMatch) {
+        out.push(
+          `${label}: expected ${shouldMatch ? '' : 'no '}match on the zip rule, got ${got ? 'a match' : 'the round-robin fallback'}`
+        );
+      }
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'zip routing check raised an error');
+  } finally {
+    try {
+      q(`
+        DELETE FROM public.leads WHERE user_id = '${owner}';
+        DELETE FROM public.lead_routing_rules WHERE team_id = '${team}';
+        DELETE FROM public.team_round_robin WHERE team_id = '${team}';
+        DELETE FROM public.team_members WHERE team_id = '${team}';
+        DELETE FROM public.teams WHERE id = '${team}';
+        DELETE FROM public.profiles WHERE id IN ('${owner}', '${zipTarget}', '${roundRobin}');
+        DELETE FROM auth.users WHERE id IN ('${owner}', '${zipTarget}', '${roundRobin}');
+      `);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 7. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the

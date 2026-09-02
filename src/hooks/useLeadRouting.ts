@@ -11,12 +11,21 @@ import type { Database, Json } from '@/integrations/supabase/types';
 
 type RoutingRuleRow = Database['public']['Tables']['lead_routing_rules']['Row'];
 
+/**
+ * Exactly what auto_assign_lead evaluates, and nothing more.
+ *
+ * price_min / price_max were here and are gone: the trigger matches them
+ * against `price_range`, a free-text column ("400000-450000", "under 500k",
+ * "$1.2M"), by stripping non-digits — so a rule on them fired according to how
+ * the visitor phrased their budget rather than what it was. The UI never
+ * exposed them, which is the only reason nobody was bitten. Bring them back
+ * with a numeric column, not before (US-105).
+ */
 export interface RoutingCriteria {
   lead_type?: string;
   source?: string;
+  /** Matched with a word-boundary regex inside leads.property_address. */
   zip?: string;
-  price_min?: number;
-  price_max?: number;
 }
 
 export interface LeadRoutingRule {

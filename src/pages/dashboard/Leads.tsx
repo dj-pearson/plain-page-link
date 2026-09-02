@@ -413,6 +413,7 @@ export default function Leads() {
     return (
       <span
         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.className}`}
+        title={`Priority ${config.label.toLowerCase()} (${score.score}/100) — from the lead's source, contact details, type and timing. Rules-based; no model has been trained.`}
       >
         {config.icon}
         {config.label}
@@ -600,10 +601,18 @@ export default function Leads() {
             variant={sortBy === 'score' ? 'default' : 'outline'}
             onClick={() => setSortBy(sortBy === 'date' ? 'score' : 'date')}
             className="min-h-[44px] gap-2 flex-shrink-0"
-            title={sortBy === 'score' ? 'Sorted by AI score' : 'Sort by AI score'}
+            title={
+              sortBy === 'score'
+                ? 'Sorted by priority — a rules-based score over source, contact details, lead type and timing'
+                : 'Sort by priority'
+            }
           >
             <ArrowUpDown className="h-4 w-4" />
-            <span className="hidden sm:inline">{sortBy === 'score' ? 'AI Score' : 'Recent'}</span>
+            {/* Not "AI Score". Nothing has ever trained this model —
+                trainingExamples is 0 and recordConversion has no caller — and
+                the five behavioural features it leaned on were never measured
+                (US-105). It is a rules-based priority, and it says so. */}
+            <span className="hidden sm:inline">{sortBy === 'score' ? 'Priority' : 'Recent'}</span>
           </Button>
           <Button
             variant={needsAttentionOnly ? 'default' : 'outline'}
