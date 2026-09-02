@@ -434,6 +434,87 @@ check("every rpc() call's named arguments exist on the function", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5c. Plain (non-trigger) plpgsql functions must also name real columns.
+//
+//     Check 1 only sees functions attached to a trigger, which is how US-100
+//     survived it: log_lead_activity, log_lead_call and log_lead_email each end
+//     with `UPDATE public.leads SET last_contacted_at = NOW()` and `leads` has
+//     contacted_at, not last_contacted_at. plpgsql resolves the name when the
+//     statement first executes, so CREATE FUNCTION succeeded, every structural
+//     lint passed, and the first real call raised — after inserting the
+//     activity row, so the exception rolled back both.
+//
+//     This parses the UPDATE ... SET and INSERT INTO ... (cols) targets out of
+//     every plpgsql body in `public` and checks them against the catalog. It is
+//     deliberately conservative: only statements naming a table this schema
+//     knows are checked, and only simple column lists. A body that defeats the
+//     parse is skipped rather than guessed at — the alternative to a partial
+//     check here is no check at all, which is what let this through.
+// ---------------------------------------------------------------------------
+check('plpgsql function bodies reference only real columns', () => {
+  const out = [];
+  const rows = q(`
+    SELECT p.proname || E'\\x01' || replace(p.prosrc, E'\\n', E'\\x02')
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    JOIN pg_language l ON l.oid = p.prolang
+    WHERE n.nspname = 'public' AND l.lanname = 'plpgsql';
+  `);
+
+  const columnsOf = (table) =>
+    new Set(
+      q(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = '${table}';
+      `)
+    );
+  const colCache = new Map();
+  const cols = (t) => {
+    if (!colCache.has(t)) colCache.set(t, columnsOf(t));
+    return colCache.get(t);
+  };
+
+  for (const row of rows) {
+    const sep = row.indexOf('\x01');
+    if (sep === -1) continue;
+    const fn = row.slice(0, sep);
+    const src = row.slice(sep + 1).replace(/\x02/g, '\n');
+    // Comments in a function body are prose, not statements.
+    const body = src.replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    // UPDATE [public.]<table> SET a = ..., b = ...
+    for (const m of body.matchAll(
+      /\bUPDATE\s+(?:public\.)?([a-z0-9_]+)\s+SET\s+([\s\S]*?)(?=\bWHERE\b|\bRETURNING\b|;)/gi
+    )) {
+      const table = m[1].toLowerCase();
+      const known = relations.has(table) ? cols(table) : null;
+      if (!known || known.size === 0) continue;
+      for (const a of m[2].matchAll(/(?:^|,)\s*([a-z0-9_]+)\s*=/gi)) {
+        const col = a[1].toLowerCase();
+        if (!known.has(col)) out.push(`${fn}: UPDATE ${table} SET ${col} — no such column`);
+      }
+    }
+
+    // INSERT INTO [public.]<table> ( a, b, c )
+    for (const m of body.matchAll(
+      /\bINSERT\s+INTO\s+(?:public\.)?([a-z0-9_]+)\s*\(([^)]*)\)/gi
+    )) {
+      const table = m[1].toLowerCase();
+      const known = relations.has(table) ? cols(table) : null;
+      if (!known || known.size === 0) continue;
+      const list = m[2].split(',').map((c) => c.trim().toLowerCase());
+      // A column list is names only; anything else means this matched a
+      // function call or a subquery, not an insert target.
+      if (!list.every((c) => /^[a-z0-9_]+$/.test(c))) continue;
+      for (const col of list) {
+        if (!known.has(col)) out.push(`${fn}: INSERT INTO ${table} (${col}) — no such column`);
+      }
+    }
+  }
+  return [...new Set(out)].sort();
+});
+
+// ---------------------------------------------------------------------------
 // 6. The ownership map in src/lib/security/ownership.ts must name real columns.
 //    These helpers fail closed, so a wrong column name does not open a hole —
 //    it silently denies every operation on that table, which is just as broken
@@ -532,6 +613,82 @@ check('check_rate_limit refuses the 11th call in a window', () => {
   } finally {
     try {
       q(`DELETE FROM public.rate_limit_entries WHERE identifier = '${id}';`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// 6c. The three lead-activity RPCs must actually run.
+//
+//     Check 5c reads their bodies for unknown column names, which is what
+//     caught US-100. This executes them, because a plpgsql body has more ways
+//     to fail than a bad column: an ownership guard that never passes, a CHECK
+//     constraint on activity_type, a NOT NULL nobody fills. US-102 puts these
+//     on the UI's critical path, so "it parses" is not the bar.
+// ---------------------------------------------------------------------------
+check('log_lead_activity / _call / _email run against a real lead', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-00000000ac01';
+  const lid = '00000000-dead-beef-0000-00000000ac02';
+  const asOwner = (sql) =>
+    q(`SET ROLE authenticated;
+       SET request.jwt.claim.sub = '${uid}';
+       ${sql}`);
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'rpccheck@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name)
+        VALUES ('${uid}', 'rpccheck', 'RPC Check')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.leads (id, user_id, name, encrypted_email, lead_type)
+        VALUES ('${lid}', '${uid}', 'RPC Check', 'enc:v1:rpccheck', 'buyer');
+    `);
+
+    asOwner(`SELECT public.log_lead_call('${lid}', 'connected', 120, 'notes');`);
+    asOwner(`SELECT public.log_lead_email('${lid}', 'Subject', 'lead@example.test', 'body');`);
+    asOwner(`SELECT public.log_lead_activity('${lid}', 'meeting', 'content', 'title');`);
+
+    const types = q(
+      `SELECT string_agg(DISTINCT activity_type, ',' ORDER BY activity_type)
+       FROM public.lead_activities WHERE lead_id = '${lid}';`
+    );
+    for (const t of ['call', 'email', 'meeting']) {
+      if (!(types[0] ?? '').includes(t)) out.push(`log_lead_* left no '${t}' activity`);
+    }
+
+    // Every one of the three sets contacted_at. It records FIRST contact — the
+    // Leads page measures response time from it — so it must be set, and a
+    // later call must not move it.
+    const [firstContact] = q(
+      `SELECT coalesce(contacted_at::text, '') FROM public.leads WHERE id = '${lid}';`
+    );
+    if (!firstContact) {
+      out.push('log_lead_* did not set leads.contacted_at');
+    } else {
+      asOwner(`SELECT public.log_lead_call('${lid}', 'connected', 60, 'later');`);
+      const [afterSecond] = q(
+        `SELECT coalesce(contacted_at::text, '') FROM public.leads WHERE id = '${lid}';`
+      );
+      if (afterSecond !== firstContact) {
+        out.push('a later call moved leads.contacted_at; it records first contact');
+      }
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'a lead-activity RPC raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.leads WHERE id = '${lid}';
+         DELETE FROM public.profiles WHERE id = '${uid}';
+         DELETE FROM auth.users WHERE id = '${uid}';`);
     } catch {
       /* cleanup is best effort */
     }

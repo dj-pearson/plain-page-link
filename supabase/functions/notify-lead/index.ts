@@ -40,8 +40,6 @@ interface LeadRecord {
   message?: string | null;
   lead_type?: string | null;
   listing_id?: string | null;
-  score?: number | null;
-  lead_score?: number | null;
   referrer_url?: string | null;
 }
 
@@ -136,6 +134,17 @@ serve(async (req) => {
       decryptSecret(lead.encrypted_phone),
     ]);
 
+    // The score badge read lead.score ?? lead.lead_score. `leads` has neither
+    // column — scores live in lead_scores, one row per lead — so the badge
+    // never rendered (US-100). A missing row is normal (scoring may not have
+    // run yet) and renders no badge, which is why this does not fail on it.
+    const { data: scoreRow } = await supabase
+      .from('lead_scores')
+      .select('score')
+      .eq('lead_id', lead.id)
+      .maybeSingle();
+    const leadScore = (scoreRow as { score?: number } | null)?.score ?? null;
+
     const email = createLeadNotificationEmail({
       agentEmail,
       name: lead.name,
@@ -144,7 +153,7 @@ serve(async (req) => {
       message: lead.message ?? undefined,
       listing: listingLabel,
       sourcePage: lead.referrer_url ?? undefined,
-      leadScore: lead.score ?? lead.lead_score ?? null,
+      leadScore: leadScore,
       dashboardUrl: `${siteUrl}/dashboard/leads`,
     });
 

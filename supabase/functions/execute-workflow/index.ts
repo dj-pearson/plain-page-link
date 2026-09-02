@@ -70,21 +70,59 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
     const { leadId, status, score, notes } = node.config;
     const resolvedLeadId = resolveVariables(leadId || '{{lead.id}}', context);
 
+    // `score` is NOT a column on leads — scores live in lead_scores, one row
+    // per lead (UNIQUE (lead_id)). Writing updates.score here made PostgREST
+    // reject the whole statement, so a workflow that set a score also failed to
+    // apply the status and notes beside it (US-100).
     const updates: Record<string, any> = {};
     if (status) updates.status = status;
-    if (score) updates.score = score;
     if (notes) updates.notes = notes;
 
-    if (resolvedLeadId && Object.keys(updates).length > 0) {
-      const { error } = await supabase
-        .from('leads')
-        .update(updates)
-        .eq('id', resolvedLeadId);
+    if (!resolvedLeadId) {
+      return { success: true, leadId: resolvedLeadId, updates };
+    }
 
+    if (Object.keys(updates).length > 0) {
+      const { error } = await supabase.from('leads').update(updates).eq('id', resolvedLeadId);
       if (error) throw error;
     }
 
-    return { success: true, leadId: resolvedLeadId, updates };
+    let scored: { score: number; priority: string } | undefined;
+    if (score !== undefined && score !== null && score !== '') {
+      // lead_scores.user_id is NOT NULL, and the score belongs to whoever owns
+      // the lead — read it rather than trusting the workflow's context.
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .select('user_id')
+        .eq('id', resolvedLeadId)
+        .single();
+      if (leadError) throw leadError;
+
+      const numericScore = Math.max(0, Math.min(100, Number(score)));
+      if (!Number.isFinite(numericScore)) {
+        throw new Error(`update_lead: score "${score}" is not a number`);
+      }
+      // lead_scores_priority_check allows only these three.
+      const priority = numericScore >= 70 ? 'hot' : numericScore >= 40 ? 'warm' : 'cold';
+
+      const { error: scoreError } = await supabase.from('lead_scores').upsert(
+        {
+          lead_id: resolvedLeadId,
+          user_id: lead.user_id,
+          score: numericScore,
+          priority,
+          // lead_scores_variant_check allows 'ml' | 'rules'; a workflow-set
+          // score is a rule, not a model prediction.
+          variant: 'rules',
+          scored_at: new Date().toISOString(),
+        },
+        { onConflict: 'lead_id' }
+      );
+      if (scoreError) throw scoreError;
+      scored = { score: numericScore, priority };
+    }
+
+    return { success: true, leadId: resolvedLeadId, updates, scored };
   },
 
   create_task: async (node, context, supabase) => {
