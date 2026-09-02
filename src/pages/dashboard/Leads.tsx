@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Download,
   Search,
@@ -28,6 +29,7 @@ import { useLeads } from '@/hooks/useLeads';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { useLeadContactAction } from '@/hooks/useLeadContactAction';
 import { useLeadsActivitySummaries } from '@/hooks/useLeadActivities';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
@@ -60,7 +62,11 @@ export default function Leads() {
   const { subscription } = useSubscriptionLimits();
   const { scoreLeadObject } = useMLLeadScoring();
 
-  const [slaHours, setSlaHours] = useState(2);
+  // Persisted on the profile, not in component state: it has to survive a
+  // reload and be readable by the overdue-leads job (US-103).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { slaHours, update: updatePreferences } = useNotificationPreferences();
+  const setSlaHours = (hours: number) => updatePreferences.mutate({ sla_hours: hours });
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
 
   // The one reader of `leads`. useLeads owns the query, the cache key and the
@@ -169,6 +175,22 @@ export default function Leads() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leads, leadScores, slaMs]);
+
+  // Deep link from a notification: /dashboard/leads?lead=<id> opens that lead.
+  // The trigger has always written data.lead_id and nothing ever read it, so
+  // an agent told about a lead was left to go find it (US-103). The param is
+  // cleared once consumed so a later close does not reopen the modal.
+  useEffect(() => {
+    const wanted = searchParams.get('lead');
+    if (!wanted || !leads.length) return;
+    const match = leads.find((l) => l.id === wanted);
+    if (!match) return;
+    setSelectedLead(match);
+    setShowLeadDetail(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('lead');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, leads, setSearchParams]);
 
   const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead);

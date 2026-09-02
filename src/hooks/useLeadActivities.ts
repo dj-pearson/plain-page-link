@@ -35,6 +35,15 @@ export interface LeadActivity {
   updated_at: string;
 }
 
+export interface CreateTaskParams {
+  leadId: string;
+  title: string;
+  /** ISO date. */
+  dueDate: string;
+  priority?: TaskPriority;
+  notes?: string;
+}
+
 export type ActivityType =
   | 'note'
   | 'email'
@@ -277,6 +286,70 @@ export function useLeadActivities(leadId?: string) {
     },
   });
 
+  /**
+   * A follow-up task on a lead.
+   *
+   * lead_activities has carried task_due_date, task_priority and
+   * task_completed_at since it was created, and nothing ever inserted a task
+   * or listed the due ones (US-103). This is what makes "nothing pulls them
+   * back to an unanswered lead" untrue.
+   */
+  const createTaskMutation = useMutation({
+    mutationFn: async (params: CreateTaskParams) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user?.id) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('lead_activities')
+        .insert({
+          lead_id: params.leadId,
+          user_id: userData.user.id,
+          activity_type: 'task',
+          title: params.title,
+          content: params.notes,
+          task_due_date: params.dueDate,
+          task_priority: params.priority ?? 'medium',
+          is_internal: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-tasks'] });
+      toast.success('Follow-up added');
+    },
+    onError: (error) => {
+      logger.error('Failed to create task', error as Error);
+      toast.error('Failed to add the follow-up');
+    },
+  });
+
+  const completeTaskMutation = useMutation({
+    mutationFn: async (activityId: string) => {
+      const { error } = await supabase
+        .from('lead_activities')
+        .update({ task_completed_at: new Date().toISOString() })
+        .eq('id', activityId)
+        .eq('activity_type', 'task');
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      queryClient.invalidateQueries({ queryKey: ['lead-tasks'] });
+      toast.success('Follow-up completed');
+    },
+    onError: (error) => {
+      logger.error('Failed to complete task', error as Error);
+      toast.error('Failed to complete the follow-up');
+    },
+  });
+
   // Delete an activity
   const deleteActivityMutation = useMutation({
     mutationFn: async (activityId: string) => {
@@ -308,6 +381,8 @@ export function useLeadActivities(leadId?: string) {
     logEmail: logEmailMutation.mutate,
     logCall: logCallMutation.mutate,
     logMeeting: logMeetingMutation.mutate,
+    createTask: createTaskMutation.mutate,
+    completeTask: completeTaskMutation.mutate,
     deleteActivity: deleteActivityMutation.mutate,
 
     // Loading states
@@ -316,6 +391,8 @@ export function useLeadActivities(leadId?: string) {
     isLoggingEmail: logEmailMutation.isPending,
     isLoggingCall: logCallMutation.isPending,
     isLoggingMeeting: logMeetingMutation.isPending,
+    isCreatingTask: createTaskMutation.isPending,
+    isCompletingTask: completeTaskMutation.isPending,
     isDeletingActivity: deleteActivityMutation.isPending,
 
     // Refetch
@@ -341,4 +418,49 @@ export function useLeadsActivitySummaries(leadIds: string[]) {
     },
     enabled: leadIds.length > 0,
   });
+}
+
+/**
+ * Open follow-up tasks across every lead, for the Overview "Due today" block.
+ *
+ * Overdue tasks are included deliberately: a reminder that has already slipped
+ * is the one the agent most needs to see, and hiding it once its date passes is
+ * how a follow-up gets lost (US-103).
+ */
+export function useDueLeadTasks(dueBefore?: Date) {
+  const cutoff = (dueBefore ?? endOfToday()).toISOString();
+
+  return useQuery({
+    queryKey: ['lead-tasks', 'due', cutoff.slice(0, 10)],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lead_activities')
+        .select('id, lead_id, title, content, task_due_date, task_priority, leads(name)')
+        .eq('activity_type', 'task')
+        .is('task_completed_at', null)
+        .lte('task_due_date', cutoff)
+        .order('task_due_date', { ascending: true })
+        .limit(50);
+
+      if (error) throw error;
+      return (data ?? []) as unknown as DueLeadTask[];
+    },
+  });
+}
+
+export interface DueLeadTask {
+  id: string;
+  lead_id: string;
+  title: string | null;
+  content: string | null;
+  task_due_date: string | null;
+  task_priority: TaskPriority | null;
+  leads: { name: string } | null;
+}
+
+/** End of the current day, local time. */
+function endOfToday(): Date {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d;
 }

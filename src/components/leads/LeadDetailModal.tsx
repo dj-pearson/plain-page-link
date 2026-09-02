@@ -48,6 +48,7 @@ import type { Lead } from '@/types/lead';
 import { useLeadScore } from '@/hooks/useMLLeadScoring';
 import { useLeadContactAction, type ContactChannel } from '@/hooks/useLeadContactAction';
 import { useLeadActivities, type LeadActivity } from '@/hooks/useLeadActivities';
+import { getLeadNextStep } from '@/lib/leadNextStep';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
 
@@ -157,7 +158,19 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     isLoading: loadingActivities,
     logNote,
     isLoggingNote,
+    createTask,
+    completeTask,
+    isCreatingTask,
   } = useLeadActivities(lead?.id);
+
+  // The next step. getRecommendedActions() has produced advice like "Send
+  // personalized message within 5 minutes" since it was written and no
+  // component ever rendered it — a paragraph an agent has to interpret is not
+  // guidance (US-103). This narrows it to one action with a button behind it.
+  const nextStep = lead ? getLeadNextStep(lead, leadScore?.score ?? null) : null;
+
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDue, setTaskDue] = useState('');
 
   // Re-initialise per-lead state whenever the lead changes.
   //
@@ -172,6 +185,8 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     setStatus(lead?.status || 'new');
     setNote('');
     setSelectedResponse('');
+    setTaskTitle('');
+    setTaskDue('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead?.id]);
 
@@ -219,6 +234,39 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     if (!lead) return;
     await recordContact(lead, channel);
     onLeadUpdated?.();
+  };
+
+  /** Performs the recommended next step, and records it. */
+  const handleNextStep = async () => {
+    if (!lead || !nextStep) return;
+    if (nextStep.action === 'task') {
+      // Prefill the follow-up form rather than inventing a due date.
+      setTaskTitle(nextStep.label);
+      const inAWeek = new Date();
+      inAWeek.setDate(inAWeek.getDate() + (nextStep.urgency === 'today' ? 0 : 7));
+      setTaskDue(inAWeek.toISOString().slice(0, 10));
+      return;
+    }
+    // call / email / sms all open the relevant app and record the response.
+    const target =
+      nextStep.action === 'call'
+        ? `tel:${lead.phone}`
+        : nextStep.action === 'sms'
+          ? `sms:${lead.phone}`
+          : `mailto:${lead.email}`;
+    window.location.href = target;
+    await handleContactAction(nextStep.action);
+  };
+
+  const handleAddTask = () => {
+    if (!lead || !taskTitle.trim() || !taskDue) return;
+    createTask({
+      leadId: lead.id,
+      title: taskTitle.trim(),
+      dueDate: new Date(taskDue).toISOString(),
+    });
+    setTaskTitle('');
+    setTaskDue('');
   };
 
   const handleAddNote = () => {
@@ -281,6 +329,21 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               </div>
             </div>
           </div>
+
+          {nextStep && (
+            <div className="mt-3 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-primary">
+                  Next step
+                </p>
+                <p className="text-sm font-medium text-foreground">{nextStep.label}</p>
+                <p className="text-xs text-muted-foreground">{nextStep.rationale}</p>
+              </div>
+              <Button size="sm" onClick={() => void handleNextStep()} className="flex-shrink-0">
+                {nextStep.label}
+              </Button>
+            </div>
+          )}
         </DialogHeader>
 
         <div className="space-y-6">
@@ -472,6 +535,36 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               Notes & Activity
             </h3>
 
+            {/* Follow-up task */}
+            <div className="space-y-2 rounded-lg border p-3">
+              <Label htmlFor="task-title" className="text-xs uppercase tracking-wide">
+                Add a follow-up
+              </Label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="task-title"
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="Call back about the Maple listing"
+                  className="flex-1 rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <input
+                  type="date"
+                  aria-label="Follow-up due date"
+                  value={taskDue}
+                  onChange={(e) => setTaskDue(e.target.value)}
+                  className="rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <Button
+                  onClick={handleAddTask}
+                  disabled={!taskTitle.trim() || !taskDue || isCreatingTask}
+                  size="sm"
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+
             {/* Add Note */}
             <div className="space-y-2">
               <Textarea
@@ -520,10 +613,25 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatDistanceToNow(new Date(a.activity_at ?? a.created_at), {
-                            addSuffix: true,
-                          })}
+                          {a.activity_type === 'task' && a.task_due_date
+                            ? `${a.task_completed_at ? 'Completed' : 'Due'} ${formatDistanceToNow(
+                                new Date(a.task_completed_at ?? a.task_due_date),
+                                { addSuffix: true }
+                              )}`
+                            : formatDistanceToNow(new Date(a.activity_at ?? a.created_at), {
+                                addSuffix: true,
+                              })}
                         </p>
+                        {a.activity_type === 'task' && !a.task_completed_at && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 h-7 gap-1 text-xs"
+                            onClick={() => completeTask(a.id)}
+                          >
+                            <CheckSquare className="h-3 w-3" /> Mark done
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );

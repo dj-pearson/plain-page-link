@@ -4,7 +4,6 @@ import type { WorkflowNode as WorkflowNodeType } from '@/types/workflow';
 import {
   Play,
   Mail,
-  MessageSquare,
   Clock,
   GitBranch,
   Repeat,
@@ -40,7 +39,7 @@ const NODE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   listing_created: Home,
   listing_updated: Home,
   send_email: Mail,
-  send_sms: MessageSquare,
+  // send_sms removed with the node — no SMS provider exists (US-103).
   update_lead: User,
   create_task: CheckSquare,
   webhook_call: Globe,

@@ -1,0 +1,66 @@
+name: Scheduled Maintenance
+
+# US-103: the repo had no scheduler of any kind — no pg_cron, no workflow
+# schedule:, no wrangler.toml — so everything meant to run on a clock never
+# ran. The SLA on unanswered leads was a useState evaluated only while the
+# Leads page was open, process-account-deletions had no caller, and the five
+# cleanup_* SQL functions had never been executed.
+#
+# A GitHub schedule was chosen over pg_cron because the self-hosted Supabase
+# this deploys to does not have the extension, and this needs no new
+# infrastructure to stand up.
+#
+# GitHub's scheduler is best-effort and can be delayed by several minutes under
+# load, and it disables schedules on repositories with no activity for 60 days.
+# Neither matters for hourly maintenance, but both are reasons this must not be
+# the only place a hard deadline lives.
+
+on:
+  schedule:
+    # Hourly at :17 rather than :00 — the top of the hour is when every
+    # scheduled workflow on GitHub fires at once and queueing is worst.
+    - cron: '17 * * * *'
+  workflow_dispatch: # so it can be run by hand when something is stuck
+
+concurrency:
+  group: scheduled-maintenance
+  cancel-in-progress: false
+
+jobs:
+  maintenance:
+    name: Run scheduled maintenance
+    runs-on: ubuntu-latest
+    # Without the secrets this would be a job that goes green having done
+    # nothing, which is the failure mode US-090 warns about.
+    if: github.repository_owner != ''
+    steps:
+      - name: Call scheduled-maintenance
+        env:
+          FUNCTIONS_URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${FUNCTIONS_URL:-}" ] || [ -z "${SERVICE_ROLE_KEY:-}" ]; then
+            echo "::error::SUPABASE_FUNCTIONS_URL and SUPABASE_SERVICE_ROLE_KEY must be set as repository secrets."
+            echo "::error::Without them this job cannot reach the function, and a green run would mean nothing."
+            exit 1
+          fi
+
+          # -sS shows errors without a progress bar; the body is captured so a
+          # partial failure (HTTP 207) can be surfaced in the log.
+          http_status=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST "${FUNCTIONS_URL}/scheduled-maintenance" \
+            -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+            -H 'Content-Type: application/json' \
+            --max-time 300 \
+            -d '{}')
+
+          echo "HTTP ${http_status}"
+          cat response.json
+
+          case "${http_status}" in
+            200) echo "All maintenance tasks succeeded." ;;
+            207) echo "::warning::Some maintenance tasks failed; see the response above." ;;
+            *)   echo "::error::scheduled-maintenance returned ${http_status}"; exit 1 ;;
+          esac

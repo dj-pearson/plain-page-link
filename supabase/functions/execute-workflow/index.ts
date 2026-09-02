@@ -52,19 +52,13 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
     };
   },
 
-  send_sms: async (node, context) => {
-    const { to, message } = node.config;
-    const resolvedTo = resolveVariables(to, context);
-    const resolvedMessage = resolveVariables(message, context);
-
-    console.log(`Sending SMS to ${resolvedTo}: ${resolvedMessage}`);
-
-    return {
-      success: true,
-      to: resolvedTo,
-      sentAt: new Date().toISOString(),
-    };
-  },
+  // send_sms is deliberately absent. There is no SMS provider anywhere in this
+  // repo — no Twilio credentials, no gateway, nothing in .env.example — so the
+  // node logged its message and returned { success: true, sentAt }. A workflow
+  // step that reports a delivery time for a message nobody sent is worse than
+  // one that is missing, because the agent believes the lead was texted.
+  // Removed from the palette in src/types/workflow.ts too; add it back with a
+  // provider behind it (US-103).
 
   update_lead: async (node, context, supabase) => {
     const { leadId, status, score, notes } = node.config;
@@ -126,14 +120,46 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
   },
 
   create_task: async (node, context, supabase) => {
-    const { title, dueDate, assignee } = node.config;
+    const { title, dueDate, assignee, priority, notes } = node.config;
     const resolvedTitle = resolveVariables(title, context);
+    const resolvedLeadId = resolveVariables(node.config.leadId || '{{lead.id}}', context);
 
-    console.log(`Creating task: ${resolvedTitle}`);
+    // This used to log the title and return a crypto.randomUUID() as `taskId`,
+    // storing nothing. A step that reports success with an id referencing no
+    // row is worse than one that fails: the workflow looks like it created a
+    // follow-up, and the agent is never reminded of anything (US-103).
+    if (!resolvedLeadId) {
+      throw new Error('create_task: no lead to attach the task to');
+    }
+
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('user_id')
+      .eq('id', resolvedLeadId)
+      .single();
+    if (leadError) throw leadError;
+
+    const { data, error } = await supabase
+      .from('lead_activities')
+      .insert({
+        lead_id: resolvedLeadId,
+        // assignee is honoured when the workflow names one; otherwise the task
+        // belongs to whoever owns the lead. lead_activities.user_id is NOT NULL.
+        user_id: resolveVariables(assignee, context) || lead.user_id,
+        activity_type: 'task',
+        title: resolvedTitle,
+        content: notes ? resolveVariables(notes, context) : null,
+        task_due_date: dueDate ? new Date(resolveVariables(dueDate, context)).toISOString() : null,
+        task_priority: priority ?? 'medium',
+        is_internal: true,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
 
     return {
       success: true,
-      taskId: crypto.randomUUID(),
+      taskId: data.id,
       title: resolvedTitle,
       dueDate,
       assignee,
