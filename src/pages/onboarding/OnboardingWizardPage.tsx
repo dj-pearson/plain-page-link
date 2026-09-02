@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesInsert } from '@/integrations/supabase/types';
+import { buildOnboardingProfileUpdate } from '@/lib/onboardingProfile';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
@@ -14,7 +16,7 @@ import { edgeFunctions } from '@/lib/edgeFunctions';
  */
 export default function OnboardingWizardPage() {
   const navigate = useNavigate();
-  const { user, profile } = useAuthStore();
+  const { user, profile, updateProfile } = useAuthStore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -32,29 +34,13 @@ export default function OnboardingWizardPage() {
     setIsSaving(true);
 
     try {
-      // 1. Update profile with basic info
-      const profileUpdates: any = {};
-
-      if (wizardData.profileBasics.fullName) {
-        profileUpdates.full_name = wizardData.profileBasics.fullName;
-      }
-      if (wizardData.profileBasics.title) {
-        profileUpdates.title = wizardData.profileBasics.title;
-      }
-      if (wizardData.profileBasics.bio) {
-        profileUpdates.bio = wizardData.profileBasics.bio;
-      }
-      if (wizardData.profileBasics.phone) {
-        profileUpdates.phone = wizardData.profileBasics.phone;
-      }
-      if (wizardData.profileBasics.location) {
-        // Parse location into city/state if possible
-        const parts = wizardData.profileBasics.location.split(',').map((s: string) => s.trim());
-        if (parts.length >= 2) {
-          profileUpdates.city = parts[0];
-          profileUpdates.license_state = parts[1];
-        }
-      }
+      // 1. Update profile with basic info.
+      //
+      // Built by lib/onboardingProfile, which is typed against the generated
+      // Update shape and unit-tested. The mapping used to be inline and typed
+      // `any`, which is how a nonexistent `city` column reached PostgREST and
+      // took every other field down with it (US-108).
+      let avatarUrl: string | null = null;
 
       // Upload profile photo if provided
       if (wizardData.profileBasics.photo) {
@@ -76,7 +62,7 @@ export default function OnboardingWizardPage() {
             data: { publicUrl },
           } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
-          profileUpdates.avatar_url = publicUrl;
+          avatarUrl = publicUrl;
         } catch (error) {
           // US-075: still non-fatal — onboarding should not be blocked by a
           // photo — but no longer silent.
@@ -89,23 +75,22 @@ export default function OnboardingWizardPage() {
         }
       }
 
-      // Apply selected theme
-      if (wizardData.templateChoice) {
-        profileUpdates.theme = wizardData.templateChoice;
-      }
+      const profileUpdates = buildOnboardingProfileUpdate({
+        fullName: wizardData.profileBasics.fullName,
+        title: wizardData.profileBasics.title,
+        bio: wizardData.profileBasics.bio,
+        phone: wizardData.profileBasics.phone,
+        location: wizardData.profileBasics.location,
+        templateChoice: wizardData.templateChoice,
+        avatarUrl,
+      });
 
-      // Mark onboarding complete so the user isn't routed back into the wizard.
-      profileUpdates.onboarding_completed_at = new Date().toISOString();
-
-      // Update profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update(profileUpdates)
-        .eq('id', user.id)
-        .select('id')
-        .single();
-
-      if (profileError) throw profileError;
+      // Through the store, not a direct supabase.update: it is the only writer
+      // that leaves useAuthStore holding the saved row. A bare update saved the
+      // profile and left `profile.onboarding_completed_at` null in memory, so
+      // ProtectedRoute's first-run gate immediately sent the agent who had just
+      // finished the wizard straight back into it (US-108).
+      await updateProfile(profileUpdates);
 
       // 2. Create first listing if provided
       if (wizardData.firstListing.address || wizardData.firstListing.price) {
@@ -152,44 +137,56 @@ export default function OnboardingWizardPage() {
           const state = stateParts[0] || '';
           const zip = stateParts[1] || '';
 
-          const listingData: any = {
+          // Typed, not `any`. Three things were wrong here and the cast hid all
+          // of them (US-106):
+          //   - `beds`/`baths` were NOT NULL integers with no default and this
+          //     insert never named them, so the wizard's first listing could
+          //     never save at all. They are GENERATED now, so omitting them is
+          //     correct.
+          //   - parseInt truncated 2.5 baths to 2; bathrooms is numeric.
+          //   - `featured` is not a column. The column is `is_featured`, so
+          //     "make the first listing featured" never happened.
+          const listingData: TablesInsert<'listings'> = {
             user_id: user.id,
             address: address,
             city: city,
             state: state,
             zip_code: zip,
             price: wizardData.firstListing.price || '0',
-            bedrooms: wizardData.firstListing.beds ? parseInt(wizardData.firstListing.beds) : null,
-            bathrooms: wizardData.firstListing.baths
-              ? parseInt(wizardData.firstListing.baths)
-              : null,
+            // bedrooms/bathrooms are NOT NULL with a 0 default; an empty field
+            // means "not stated", which is 0 rather than a failed insert.
+            bedrooms: Number(wizardData.firstListing.beds) || 0,
+            bathrooms: Number(wizardData.firstListing.baths) || 0,
             status: wizardData.firstListing.status || 'active',
-            featured: true, // Make first listing featured
+            is_featured: true,
             photos: photoUrl ? [photoUrl] : [],
           };
 
           const { error: listingError } = await supabase.from('listings').insert(listingData);
 
-          if (listingError) {
-            logger.error('Error creating listing', listingError as Error);
-            // Don't throw - listing is optional
-          }
+          if (listingError) throw listingError;
         } catch (error) {
+          // Still non-fatal — the profile is saved and onboarding should not be
+          // blocked by an optional listing — but no longer silent. The agent
+          // typed an address and a price and was told nothing when it vanished
+          // (US-108).
           logger.error('Error with first listing', error as Error);
-          // Continue even if listing creation fails
+          toast({
+            title: 'Your first listing was not saved',
+            description:
+              'Everything else is saved. You can add the listing from the Listings page.',
+            variant: 'destructive',
+          });
         }
       }
 
       // Send welcome email (non-blocking)
       try {
-        await edgeFunctions.invoke('send-welcome-email', {
-          body: {
-            user_id: user.id,
-            email: user.email,
-            full_name: wizardData.profileBasics.fullName || user.user_metadata?.full_name,
-            username: user.user_metadata?.username || 'agent',
-          },
-        });
+        // No body. The function reads the address from the caller's JWT and
+        // the name and username from that user's own profile row — it used to
+        // take all three from here, unauthenticated, which made it a branded
+        // relay to any address (US-119).
+        await edgeFunctions.invoke('send-welcome-email', {});
       } catch (emailError) {
         logger.error('Welcome email failed (non-critical)', emailError as Error);
         // Don't block navigation if email fails

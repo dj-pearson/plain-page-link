@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
@@ -131,7 +132,7 @@ function getEmailTemplate(
   market: string,
   score: number
 ): { to: string; subject: string; body: string; html: string } {
-  const siteUrl = Deno.env.get('SITE_URL') || 'https://agentbio.net'
+  const siteUrl = getSiteUrl()
 
   const templates: Record<number, any> = {
     2: {

@@ -5,6 +5,7 @@ import { getCorsHeaders } from '../_shared/cors.ts'
 import { validateEmail, sanitizeString } from '../_shared/validation.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { getErrorMessage } from '../_shared/errorHelpers.ts'
+import { getSiteUrl } from '../_shared/env.ts';
 
 interface BioAnalyzerEmailData {
   analysisId: string
@@ -171,7 +172,7 @@ async function scheduleEmailSequence(
 }
 
 function getEmail1PlainText(data: BioAnalyzerEmailData): string {
-  const siteUrl = Deno.env.get('SITE_URL') || 'https://agentbio.net'
+  const siteUrl = getSiteUrl()
 
   return `
 Hi ${data.firstName},
@@ -218,7 +219,7 @@ P.S. Reply to this email if you have questions about implementing your new bio!
 }
 
 function getEmail1HTML(data: BioAnalyzerEmailData): string {
-  const siteUrl = Deno.env.get('SITE_URL') || 'https://agentbio.net'
+  const siteUrl = getSiteUrl()
 
   return `
 <!DOCTYPE html>

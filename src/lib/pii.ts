@@ -38,7 +38,7 @@ export function isEncryptedPII(value: Nullable<string>): boolean {
  * One round trip to pii-crypto. Callers are expected to have filtered out
  * values needing no work — see the batch helpers below.
  */
-async function callPiiCrypto(op: 'encrypt' | 'decrypt', values: (string | null)[]) {
+async function callPiiCrypto(op: 'encrypt', values: (string | null)[]) {
   const { data, error } = await supabase.functions.invoke<{ values: (string | null)[] }>(
     'pii-crypto',
     { body: { op, values } }
@@ -77,37 +77,69 @@ export async function encryptPIIBatch(values: Nullable<string>[]): Promise<(stri
   return out;
 }
 
-/**
- * Decrypts a batch, preserving positions. Values that are empty or lack the
- * `enc:v1:` prefix (legacy plaintext) are passed through locally, so a page of
- * not-yet-backfilled rows makes no request at all.
- *
- * Never throws: if the call fails, the input is returned unchanged, matching
- * the old behaviour where an undecryptable value fell through rather than
- * breaking the list render.
- */
-export async function decryptPIIBatch(values: Nullable<string>[]): Promise<(string | null)[]> {
-  const out: (string | null)[] = values.map((v) => v ?? null);
-  const idx: number[] = [];
-  const payload: string[] = [];
+/** A lead's contact details, as pii-crypto returns them. */
+export interface DecryptedLeadContact {
+  id: string;
+  email: string | null;
+  phone: string | null;
+}
 
-  values.forEach((v, i) => {
-    if (isEncryptedPII(v)) {
-      idx.push(i);
-      payload.push(v as string);
-    }
-  });
-  if (payload.length === 0) return out;
+/**
+ * Decrypts the contact details of leads the caller owns, addressed by id.
+ *
+ * US-119: this used to be `decryptPIIBatch(values)` — it posted raw ciphertext
+ * and got plaintext back, for any valid JWT, with no check that the caller
+ * could ever have read those rows. audit_table_change stores to_jsonb(NEW) for
+ * `leads`, so audit_logs holds a copy of every ciphertext ever written; a
+ * caller who obtained one could bring it here to be opened. Naming rows instead
+ * of values removes the primitive: the function reads the rows itself and
+ * filters them to the caller.
+ *
+ * Ids the caller does not own are absent from the result rather than being an
+ * error — the caller zips by id, and an absent row reads as "no contact
+ * details".
+ *
+ * Never throws: an unreachable function returns an empty map, and the callers
+ * fall back to showing the row without contact details rather than failing the
+ * whole list.
+ */
+export async function decryptLeadContacts(
+  leadIds: string[]
+): Promise<Map<string, DecryptedLeadContact>> {
+  const out = new Map<string, DecryptedLeadContact>();
+  const ids = Array.from(new Set(leadIds.filter((id): id is string => !!id)));
+  if (ids.length === 0) return out;
 
   try {
-    const decrypted = await callPiiCrypto('decrypt', payload);
-    idx.forEach((target, k) => {
-      out[target] = decrypted[k];
-    });
+    const { data, error } = await supabase.functions.invoke<{ leads: DecryptedLeadContact[] }>(
+      'pii-crypto',
+      { body: { op: 'decrypt_leads', leadIds: ids } }
+    );
+    if (error || !data?.leads) return out;
+    for (const lead of data.leads) out.set(lead.id, lead);
   } catch {
-    // Leave the ciphertext in place rather than blanking the field.
+    // Leave the map empty rather than failing the list render.
   }
   return out;
+}
+
+/**
+ * Decrypts the caller's own profile phone number.
+ *
+ * Takes no argument on purpose: the row is chosen by the JWT, not by the
+ * caller, so there is nothing to point at somebody else's data.
+ */
+export async function decryptOwnProfilePhone(): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke<{ phone: string | null }>(
+      'pii-crypto',
+      { body: { op: 'decrypt_profile' } }
+    );
+    if (error) return null;
+    return data?.phone ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -121,18 +153,4 @@ export async function encryptPII<T extends Nullable<string>>(plaintext: T): Prom
   if (isEmpty(plaintext)) return plaintext;
   const [result] = await encryptPIIBatch([plaintext]);
   return result as string;
-}
-
-/**
- * Decrypts a value produced by encryptPII. Inputs that are null/undefined/empty,
- * or that lack the encryption prefix (legacy plaintext), are returned unchanged
- * so the same code path works during migration.
- *
- * Prefer decryptPIIBatch when handling more than one value.
- */
-export async function decryptPII<T extends Nullable<string>>(ciphertext: T): Promise<T | string> {
-  if (isEmpty(ciphertext)) return ciphertext;
-  if (!isEncryptedPII(ciphertext)) return ciphertext;
-  const [result] = await decryptPIIBatch([ciphertext]);
-  return (result ?? ciphertext) as string;
 }

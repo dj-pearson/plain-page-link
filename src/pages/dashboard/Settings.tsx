@@ -1,10 +1,25 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { validateUsername } from '@/lib/usernameValidation';
+import { SETTINGS_TOOLS } from '@/config/dashboard-nav';
 import { Bell, CreditCard, User, Lock, Save, Eye, KeyRound } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSettings } from '@/hooks/useSettings';
+import { useProfile } from '@/hooks/useProfile';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UsernameInput } from '@/components/UsernameInput';
 import { ProfileURLCard } from '@/components/settings/ProfileURLCard';
 import { Input } from '@/components/ui/input';
@@ -46,23 +61,39 @@ export default function Settings() {
     confirm: '',
   });
 
-  // Profile state
-  const { data: profile, isLoading: _profileLoading } = useQuery({
-    queryKey: ['profile', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
+  // Profile state — through useProfile, not a second query under the same key.
+  //
+  // This declared its own useQuery on ['profile', user.id] returning the raw
+  // row, while useProfile returns toProfile(data) with the phone decrypted.
+  // Two queryFns under one key is the cache collision US-094 fixed on
+  // ['leads']: whichever mounted first decided the shape the other saw, so
+  // Profile.tsx could render ciphertext in the phone field after a visit to
+  // Settings (US-117).
+  const { profile } = useProfile();
+  const { subscription, isLoading: subscriptionLoading } = useSubscription();
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+  // plan_name is stored lowercase ('professional', 'team'); this is the only
+  // place it is turned into something to show an agent, and it is derived from
+  // the row rather than assumed.
+  const [confirmRename, setConfirmRename] = useState(false);
 
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
+  /**
+   * Save, asking first when the username has changed.
+   *
+   * Everything else on this card is an edit; the username is an address.
+   */
+  const handleSaveProfile = () => {
+    const next = formData.username.trim().toLowerCase();
+    if (profile?.username && next && next !== profile.username) {
+      setConfirmRename(true);
+      return;
+    }
+    updateProfileMutation.mutate(formData);
+  };
+
+  const planLabel = subscription?.plan_name
+    ? subscription.plan_name.charAt(0).toUpperCase() + subscription.plan_name.slice(1)
+    : 'Free';
 
   const [formData, setFormData] = useState({
     username: '',
@@ -84,10 +115,34 @@ export default function Settings() {
     mutationFn: async (data: typeof formData) => {
       if (!user?.id) throw new Error('Not authenticated');
 
+      // Normalised here as well as in the input. The public lookup
+      // (usePublicProfile) matches on the column exactly, so a stray capital
+      // saved from anywhere makes the profile reachable at one casing only —
+      // which is what the second, raw editor on the Profile page used to do
+      // (US-117).
+      const username = data.username.trim().toLowerCase();
+
+      const validation = validateUsername(username);
+      if (!validation.valid) {
+        throw new Error(validation.error || 'That username is not valid');
+      }
+
+      // The unique index is case-sensitive, so a collision surfaced as a bare
+      // "Failed to update profile". Asking first means the agent is told which
+      // field is the problem.
+      const { data: isFree, error: checkError } = await supabase.rpc('check_username_available', {
+        _username: username,
+        _current_user_id: user.id,
+      });
+      if (checkError) throw checkError;
+      if (isFree !== true) {
+        throw new Error(`The username "${username}" is already taken`);
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
-          username: data.username,
+          username,
           full_name: data.full_name,
           bio: data.bio,
           updated_at: new Date().toISOString(),
@@ -273,6 +328,7 @@ export default function Settings() {
             value={formData.username}
             onChange={(value) => setFormData({ ...formData, username: value })}
             currentUsername={profile?.username}
+            currentUserId={user?.id}
           />
 
           <div className="space-y-2">
@@ -301,13 +357,55 @@ export default function Settings() {
           </div>
 
           <button
-            onClick={() => updateProfileMutation.mutate(formData)}
+            onClick={handleSaveProfile}
             disabled={updateProfileMutation.isPending}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             {updateProfileMutation.isPending ? 'Saving...' : 'Save Profile Changes'}
           </button>
+
+          {/* Changing a username is not an edit like the others: it moves the
+              agent's public address. Every business card, every Instagram bio
+              and every link already shared points at the old one, and nothing
+              warned about that (US-117). */}
+          <AlertDialog open={confirmRename} onOpenChange={setConfirmRename}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Change your public address?</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2">
+                    <p>
+                      Your profile moves from{' '}
+                      <strong className="whitespace-nowrap">
+                        agentbio.net/{profile?.username}
+                      </strong>{' '}
+                      to{' '}
+                      <strong className="whitespace-nowrap">
+                        agentbio.net/{formData.username}
+                      </strong>
+                      .
+                    </p>
+                    <p>
+                      Every link you have already shared — printed cards, your Instagram bio, past
+                      emails — will stop working. The old address is not kept.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep {profile?.username}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setConfirmRename(false);
+                    updateProfileMutation.mutate(formData);
+                  }}
+                >
+                  Change it
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </CardContent>
       </Card>
 
@@ -576,34 +674,55 @@ export default function Settings() {
           <CreditCard className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">Billing & Subscription</h2>
         </div>
+        {/* The real subscription, or nothing.
+            This block used to render "Professional - $49/month", a card ending
+            4242 and "February 15, 2024" as literals, with Manage / Update /
+            View Invoices buttons that had no handlers at all. An agent on the
+            free plan read that they were paying $49 a month with a card on
+            file, and pressing the buttons did nothing to correct them
+            (US-117). */}
         <div className="space-y-4">
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <div className="font-medium text-foreground">Current Plan</div>
-              <div className="text-sm text-muted-foreground">Professional - $49/month</div>
+              <div className="text-sm text-muted-foreground">
+                {subscriptionLoading
+                  ? 'Loading…'
+                  : subscription
+                    ? `${planLabel}${subscription.status && subscription.status !== 'active' ? ` · ${subscription.status}` : ''}`
+                    : 'Free'}
+              </div>
             </div>
-            <button className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium">
-              Manage Plan
-            </button>
+            <Link
+              to="/dashboard/subscription"
+              className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium"
+            >
+              {subscription ? 'Manage Plan' : 'View Plans'}
+            </Link>
           </div>
-          <div className="flex items-center justify-between py-3 border-b border-border">
-            <div>
-              <div className="font-medium text-foreground">Payment Method</div>
-              <div className="text-sm text-muted-foreground">•••• •••• •••• 4242</div>
+
+          {subscription?.current_period_end && (
+            <div className="flex items-center justify-between py-3 border-b border-border">
+              <div>
+                <div className="font-medium text-foreground">Renews</div>
+                <div className="text-sm text-muted-foreground">
+                  {new Date(subscription.current_period_end).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </div>
+              </div>
             </div>
-            <button className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium">
-              Update
-            </button>
-          </div>
-          <div className="flex items-center justify-between py-3">
-            <div>
-              <div className="font-medium text-foreground">Next Billing Date</div>
-              <div className="text-sm text-muted-foreground">February 15, 2024</div>
-            </div>
-            <button className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium">
-              View Invoices
-            </button>
-          </div>
+          )}
+
+          {/* Payment method and invoices live in Stripe's own billing portal,
+              which /dashboard/subscription opens. Restating them here would
+              mean inventing them again. */}
+          <p className="text-sm text-muted-foreground pt-1">
+            Payment method and invoices are managed in the billing portal, from the subscription
+            page.
+          </p>
         </div>
       </div>
 
@@ -632,6 +751,43 @@ export default function Settings() {
 
       {/* GDPR Settings (Data Export & Account Deletion) */}
       <GDPRSettings />
+
+      {/* Everything the sidebar no longer carries.
+          The dashboard nav had fifteen entries for a product aimed at people
+          who are not technical; it is seven now, and these are the rest — in
+          one place an agent can find rather than competing with the things
+          they do every day. /dashboard/settings/delete-account in particular
+          had no link anywhere in the app at all (US-120). */}
+      <Card>
+        <CardHeader>
+          <CardTitle>More tools</CardTitle>
+          <CardDescription>Everything else on your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="divide-y divide-border">
+            {SETTINGS_TOOLS.map((tool) => (
+              <li key={tool.href}>
+                <Link
+                  to={tool.href}
+                  className="flex items-center gap-4 py-3 min-h-[44px] group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                >
+                  <tool.icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-foreground group-hover:underline">
+                      {tool.label}
+                    </span>
+                    {tool.description && (
+                      <span className="block text-sm text-muted-foreground">
+                        {tool.description}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }

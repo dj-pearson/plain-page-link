@@ -36,7 +36,7 @@ if (!rootEl) {
   throw new Error('Root element #root not found');
 }
 if (import.meta.env.DEV) {
-  logger.debug('[Lovable] Mounting React app', { mode: import.meta?.env?.MODE });
+  logger.debug('Mounting React app', { mode: import.meta?.env?.MODE });
 }
 
 // SECURITY: Lazy load DevTools only in development to prevent info disclosure in production
@@ -66,7 +66,7 @@ ReactDOM.createRoot(rootEl).render(
 );
 
 if (import.meta.env.DEV) {
-  logger.debug('[Lovable] React render invoked');
+  logger.debug('React render invoked');
 }
 
 // Initialize Web Vitals monitoring (LCP, FID, CLS, TTFB, INP)

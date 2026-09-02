@@ -3,6 +3,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { getAuthenticatedUser, isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
+import { getFunctionsUrl } from '../_shared/env.ts';
 
 // Timeout constants
 const AI_API_TIMEOUT_MS = 120000; // 2 minutes for AI generation
@@ -120,6 +121,10 @@ export default async (req: Request) => {
       const rateLimit = await checkRateLimitDb(supabase, `user:${userId}`, 'generate-article', {
         maxRequests: 10,
         windowSeconds: 60,
+        // Fail closed: if the limiter is unavailable there is nothing between
+        // one account and an unbounded model bill, which is the cost this
+        // limit exists to cap (US-098).
+        failClosed: true,
       });
       if (!rateLimit.allowed) {
         return errorResponse(
@@ -448,8 +453,7 @@ mobile real estate marketing`;
       console.log('[generate-article] Triggering social media post generation...');
       
       // Call edge functions server directly (not through Kong/API)
-      const EDGE_FUNCTIONS_URL = Deno.env.get('EDGE_FUNCTIONS_URL') || 'https://functions.agentbio.net';
-      const functionsUrl = `${EDGE_FUNCTIONS_URL}/publish-article-to-social`;
+      const functionsUrl = `${getFunctionsUrl()}/publish-article-to-social`;
       console.log('[generate-article] Calling:', functionsUrl);
       
       const socialResponse = await fetchWithTimeout(

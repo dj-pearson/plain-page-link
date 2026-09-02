@@ -3,13 +3,7 @@
  * Type definitions for the visual workflow builder
  */
 
-export type WorkflowNodeType =
-  | 'trigger'
-  | 'action'
-  | 'condition'
-  | 'delay'
-  | 'loop'
-  | 'transform';
+export type WorkflowNodeType = 'trigger' | 'action' | 'condition' | 'delay' | 'loop' | 'transform';
 
 export type WorkflowTriggerSubtype =
   | 'manual'
@@ -29,7 +23,9 @@ export type WorkflowTriggerSubtype =
 
 export type WorkflowActionSubtype =
   | 'send_email'
-  | 'send_sms'
+  // 'send_sms' was here. No SMS provider exists in this repo, so the node
+  // logged the message and returned a sentAt timestamp for a text nobody sent
+  // (US-103). Add it back together with a provider, not before.
   | 'update_lead'
   | 'create_task'
   | 'webhook_call'
@@ -38,21 +34,13 @@ export type WorkflowActionSubtype =
   | 'assign_lead'
   | 'update_listing';
 
-export type WorkflowConditionSubtype =
-  | 'if_else'
-  | 'switch'
-  | 'filter';
+export type WorkflowConditionSubtype = 'if_else' | 'switch' | 'filter';
 
-export type WorkflowDelaySubtype =
-  | 'wait'
-  | 'wait_until';
+export type WorkflowDelaySubtype = 'wait' | 'wait_until';
 
-export type WorkflowLoopSubtype =
-  | 'for_each';
+export type WorkflowLoopSubtype = 'for_each';
 
-export type WorkflowTransformSubtype =
-  | 'set_variable'
-  | 'format_data';
+export type WorkflowTransformSubtype = 'set_variable' | 'format_data';
 
 export interface WorkflowNodePosition {
   x: number;
@@ -240,22 +228,31 @@ export const NODE_CONFIG_SCHEMAS: Record<string, Record<string, any>> = {
     body: { type: 'textarea', label: 'Body', required: true },
     template: { type: 'select', label: 'Template', options: [] },
   },
-  send_sms: {
-    to: { type: 'string', label: 'To', required: true, placeholder: '{{lead.phone}}' },
-    message: { type: 'textarea', label: 'Message', required: true, maxLength: 160 },
-  },
   update_lead: {
-    status: { type: 'select', label: 'Status', options: ['new', 'contacted', 'qualified', 'converted', 'lost'] },
+    status: {
+      type: 'select',
+      label: 'Status',
+      options: ['new', 'contacted', 'qualified', 'converted', 'lost'],
+    },
     score: { type: 'number', label: 'Score Adjustment' },
     notes: { type: 'textarea', label: 'Add Note' },
   },
   wait: {
     duration: { type: 'number', label: 'Duration', required: true, min: 1 },
-    unit: { type: 'select', label: 'Unit', options: ['minutes', 'hours', 'days'], default: 'hours' },
+    unit: {
+      type: 'select',
+      label: 'Unit',
+      options: ['minutes', 'hours', 'days'],
+      default: 'hours',
+    },
   },
   if_else: {
     field: { type: 'string', label: 'Field', required: true, placeholder: '{{lead.score}}' },
-    operator: { type: 'select', label: 'Operator', options: ['equals', 'not_equals', 'greater_than', 'less_than', 'contains', 'not_contains'] },
+    operator: {
+      type: 'select',
+      label: 'Operator',
+      options: ['equals', 'not_equals', 'greater_than', 'less_than', 'contains', 'not_contains'],
+    },
     value: { type: 'string', label: 'Value', required: true },
   },
   schedule: {
@@ -264,7 +261,12 @@ export const NODE_CONFIG_SCHEMAS: Record<string, Record<string, any>> = {
   },
   webhook_call: {
     url: { type: 'string', label: 'URL', required: true },
-    method: { type: 'select', label: 'Method', options: ['GET', 'POST', 'PUT', 'DELETE'], default: 'POST' },
+    method: {
+      type: 'select',
+      label: 'Method',
+      options: ['GET', 'POST', 'PUT', 'DELETE'],
+      default: 'POST',
+    },
     headers: { type: 'json', label: 'Headers' },
     body: { type: 'json', label: 'Body' },
   },

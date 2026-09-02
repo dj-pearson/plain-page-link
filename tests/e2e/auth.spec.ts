@@ -71,6 +71,11 @@ async function setupSupabaseMocks(page: Page) {
   );
 
   // Profile lookup uses .single() → return a single object.
+  //
+  // onboarding_completed_at is set because these specs sign in as an
+  // established user. US-108 moved the first-run redirect into ProtectedRoute
+  // so it covers OAuth as well as password login; a profile without this
+  // column is, correctly, a first-run account and goes to /onboarding/wizard.
   await page.route('**/rest/v1/profiles**', (route) =>
     route.fulfill({
       contentType: 'application/json',
@@ -78,6 +83,7 @@ async function setupSupabaseMocks(page: Page) {
         id: TEST_USER.id,
         username: TEST_USER.username,
         full_name: TEST_USER.fullName,
+        onboarding_completed_at: '2026-01-15T09:00:00.000Z',
       }),
     })
   );

@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { LISTING_STATUSES } from '@/lib/listingStatus';
 
 interface QuickStatusUpdateProps {
   listingId: string;
@@ -33,13 +34,10 @@ export function QuickStatusUpdate({
   const [showSuccess, setShowSuccess] = useState(false);
   const { toast } = useToast();
 
-  const statusOptions = [
-    { value: 'active', label: 'Active', color: 'text-green-600' },
-    { value: 'pending', label: 'Pending', color: 'text-yellow-600' },
-    { value: 'sold', label: 'Sold', color: 'text-blue-600' },
-    { value: 'under_contract', label: 'Under Contract', color: 'text-purple-600' },
-    { value: 'off_market', label: 'Off Market', color: 'text-gray-600' },
-  ];
+  // One list, shared with the Add/Edit forms and the Listings filter chips.
+  // This one offered off_market and omitted draft, so a listing set here could
+  // land in a state no filter knew about (US-107).
+  const statusOptions = LISTING_STATUSES;
 
   const handleStatusChange = async (newStatus: string) => {
     setIsUpdating(true);

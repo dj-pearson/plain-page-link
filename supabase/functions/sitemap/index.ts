@@ -1,9 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 
 // Use environment variable for BASE_URL with fallback
-const BASE_URL = Deno.env.get('SITE_URL') || Deno.env.get('APP_URL') || 'https://agentbio.net';
+const BASE_URL = getSiteUrl();
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));

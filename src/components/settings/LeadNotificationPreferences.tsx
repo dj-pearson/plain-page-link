@@ -3,13 +3,15 @@
  *
  * Lets an agent choose how they're notified of new leads:
  * instant email, a daily digest, or off. Persisted to
- * profiles.notification_preferences.leads.
+ * profiles.notification_preferences.leads and read by the notify-lead edge
+ * function, which is the single sender.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/stores/useAuthStore';
+import {
+  useNotificationPreferences,
+  type LeadNotificationMode,
+} from '@/hooks/useNotificationPreferences';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -20,62 +22,42 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-type LeadNotificationMode = 'instant' | 'daily_digest' | 'off';
+const SLA_OPTIONS = [1, 2, 4, 8, 24];
 
 const OPTIONS: { value: LeadNotificationMode; label: string; description: string }[] = [
   { value: 'instant', label: 'Instant', description: 'Email me the moment a lead comes in' },
-  { value: 'daily_digest', label: 'Daily digest', description: 'One summary email per day' },
+  {
+    value: 'daily_digest',
+    label: 'Daily digest',
+    // Honest label. The digest job does not exist; notify-lead used to skip
+    // these agents entirely, so choosing "daily digest" meant never being
+    // emailed about a lead at all (US-099). Until the job is built the setting
+    // behaves as Instant, and saying so beats a promise nothing keeps.
+    description: 'Not available yet — currently sends instantly, like Instant',
+  },
   { value: 'off', label: 'Off', description: 'Do not email me about new leads' },
 ];
 
 export function LeadNotificationPreferences() {
-  const { user } = useAuthStore();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  // One reader and writer for this column — see useNotificationPreferences for
+  // why the Leads page and this card must not each hold their own query.
+  const { leadMode: mode, slaHours, isLoading, update } = useNotificationPreferences();
 
-  const { data: mode = 'instant', isLoading } = useQuery({
-    queryKey: ['notification-preferences', user?.id],
-    enabled: !!user?.id,
-    queryFn: async (): Promise<LeadNotificationMode> => {
-      // notification_preferences is not yet in the generated Supabase types
-      // (types.ts is out of sync); cast is isolated to this read.
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('notification_preferences')
-        .eq('id', user!.id)
-        .single();
-      if (error) throw error;
-      const prefs = (data as { notification_preferences?: { leads?: LeadNotificationMode } } | null)
-        ?.notification_preferences;
-      return prefs?.leads ?? 'instant';
-    },
-  });
-
-  const updateMode = useMutation({
-    mutationFn: async (next: LeadNotificationMode) => {
-      const { error } = await supabase
-        .from('profiles')
-        // Cast: out-of-sync generated types don't include this jsonb column.
-        .update({ notification_preferences: { leads: next } } as never)
-        .eq('id', user!.id);
-      if (error) throw error;
-      return next;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification-preferences', user?.id] });
-      toast({
-        title: 'Preferences saved',
-        description: 'Your lead notification setting has been updated.',
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update preferences.',
-        variant: 'destructive',
-      });
-    },
-  });
+  const save = (next: Parameters<typeof update.mutate>[0]) =>
+    update.mutate(next, {
+      onSuccess: () =>
+        toast({
+          title: 'Preferences saved',
+          description: 'Your lead notification setting has been updated.',
+        }),
+      onError: (error: unknown) =>
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to update preferences.',
+          variant: 'destructive',
+        }),
+    });
 
   return (
     <Card>
@@ -91,8 +73,8 @@ export function LeadNotificationPreferences() {
       <CardContent>
         <Select
           value={mode}
-          onValueChange={(value) => updateMode.mutate(value as LeadNotificationMode)}
-          disabled={isLoading || updateMode.isPending}
+          onValueChange={(value) => save({ leads: value as LeadNotificationMode })}
+          disabled={isLoading || update.isPending}
         >
           <SelectTrigger className="w-full sm:w-72">
             <SelectValue placeholder="Select notification frequency" />
@@ -106,6 +88,30 @@ export function LeadNotificationPreferences() {
             ))}
           </SelectContent>
         </Select>
+
+        <div className="mt-6 space-y-2">
+          <p className="text-sm font-medium">Chase me about unanswered leads after</p>
+          <p className="text-xs text-muted-foreground">
+            A new lead with no response by this point is flagged on your Leads page, and the
+            overdue-lead check emails you about it.
+          </p>
+          <Select
+            value={String(slaHours)}
+            onValueChange={(value) => save({ sla_hours: Number(value) })}
+            disabled={isLoading || update.isPending}
+          >
+            <SelectTrigger className="w-full sm:w-72">
+              <SelectValue placeholder="Select a response window" />
+            </SelectTrigger>
+            <SelectContent>
+              {SLA_OPTIONS.map((h) => (
+                <SelectItem key={h} value={String(h)}>
+                  {h === 1 ? '1 hour' : h === 24 ? '1 day' : `${h} hours`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </CardContent>
     </Card>
   );

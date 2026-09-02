@@ -7,7 +7,7 @@ import { FormPrivacyNotice } from './FormPrivacyNotice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { EdgeFunctions } from '@/lib/edgeFunctions';
+import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
 import { logger } from '@/lib/logger';
 
 const contactSchema = z.object({
@@ -22,10 +22,17 @@ type ContactFormData = z.infer<typeof contactSchema>;
 interface ContactFormProps {
   agentId: string;
   agentName: string;
+  /**
+   * The property the visitor is asking about, when the form was opened from
+   * one. Its id reaches leads.listing_id and its address leads.property_address,
+   * so the lead arrives in the CRM attached to the listing rather than as an
+   * anonymous enquiry (US-096).
+   */
+  listing?: { id: string; address: string };
   onSuccess?: () => void;
 }
 
-export function ContactForm({ agentName, onSuccess }: ContactFormProps) {
+export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,15 +50,30 @@ export function ContactForm({ agentName, onSuccess }: ContactFormProps) {
     setIsSubmitting(true);
     setError(null);
     try {
-      // Submit lead via edge function (includes auto-response email)
-      await EdgeFunctions.submitLead({
+      // Goes through submitLead like the other three public forms. The direct
+      // EdgeFunctions.submitLead call this replaced sent no user_id and no
+      // lead_type, both of which submit-lead's validateLeadData() requires, so
+      // every "Send Message" was a 400 the visitor saw as a generic failure
+      // (US-095).
+      const result = await submitLead({
+        agentId,
+        leadType: 'contact',
         name: data.name,
         email: data.email,
         phone: data.phone,
-        message: data.message,
-        source: 'contact_form',
+        listingId: listing?.id,
+        data: {
+          message: data.message,
+          ...(listing ? { address: listing.address } : {}),
+        },
+        source: listing ? 'listing_inquiry' : 'contact_form',
       });
 
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send message');
+      }
+
+      trackFormSubmission('contact_form', true);
       setIsSuccess(true);
       reset();
 
@@ -61,7 +83,8 @@ export function ContactForm({ agentName, onSuccess }: ContactFormProps) {
       }, 3000);
     } catch (err) {
       logger.error('Error submitting contact form', err as Error);
-      setError('Failed to send message. Please try again.');
+      trackFormSubmission('contact_form', false);
+      setError(err instanceof Error ? err.message : 'Failed to send message. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -95,11 +118,18 @@ export function ContactForm({ agentName, onSuccess }: ContactFormProps) {
           <Mail className="w-5 h-5" />
           Send a Message
         </CardTitle>
-        <CardDescription>Get in touch with {agentName} directly</CardDescription>
+        <CardDescription>
+          {listing
+            ? `Ask ${agentName} about ${listing.address}`
+            : `Get in touch with ${agentName} directly`}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <div
+            role="alert"
+            className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2"
+          >
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-800">{error}</p>
           </div>
@@ -137,7 +167,11 @@ export function ContactForm({ agentName, onSuccess }: ContactFormProps) {
           <TextareaField
             label="Message"
             id="message"
-            placeholder="Tell me about your real estate needs..."
+            placeholder={
+              listing
+                ? `I'd like to see ${listing.address}. When are you available?`
+                : 'Tell me about your real estate needs...'
+            }
             rows={4}
             error={errors.message?.message}
             required

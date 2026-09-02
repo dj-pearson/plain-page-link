@@ -20,11 +20,6 @@ const createMockFeatures = (overrides: Partial<LeadFeatures> = {}): LeadFeatures
   hasPhone: true,
   hasEmail: true,
   messageLength: 100,
-  listingViews: 3,
-  pageViewCount: 5,
-  timeOnSite: 180,
-  scrollDepth: 75,
-  hasViewedMultipleListings: true,
   timeOfDay: 14,
   dayOfWeek: 2,
   leadType: 'buyer_inquiry',
@@ -106,8 +101,11 @@ describe('FeatureExtractor', () => {
       const businessVector = FeatureExtractor.extractFeatureVector(businessHours);
       const nightVector = FeatureExtractor.extractFeatureVector(nightTime);
 
-      // Time of day is 10th feature (index 9)
-      expect(businessVector[9]).toBeGreaterThan(nightVector[9]);
+      // Looked up by name rather than hardcoded: this said "index 9" and
+      // silently pointed at a different feature once US-105 removed the five
+      // unmeasured behavioural ones from the vector.
+      const i = FeatureExtractor.getFeatureNames().indexOf('time_of_day');
+      expect(businessVector[i]).toBeGreaterThan(nightVector[i]);
     });
 
     it('should handle unknown source gracefully', () => {
@@ -332,11 +330,6 @@ describe('MLLeadScoringSystem', () => {
         hasPhone: true,
         hasEmail: true,
         messageLength: 200,
-        listingViews: 10,
-        pageViewCount: 15,
-        timeOnSite: 600,
-        scrollDepth: 100,
-        hasViewedMultipleListings: true,
         isPreapproved: true,
         hasTimeline: true,
       });
@@ -351,11 +344,6 @@ describe('MLLeadScoringSystem', () => {
         hasPhone: true,
         hasEmail: true,
         messageLength: 200,
-        listingViews: 10,
-        pageViewCount: 15,
-        timeOnSite: 600,
-        scrollDepth: 100,
-        hasViewedMultipleListings: true,
         isPreapproved: true,
         hasTimeline: true,
       });
@@ -365,11 +353,6 @@ describe('MLLeadScoringSystem', () => {
         hasPhone: false,
         hasEmail: true,
         messageLength: 5,
-        listingViews: 0,
-        pageViewCount: 1,
-        timeOnSite: 10,
-        scrollDepth: 10,
-        hasViewedMultipleListings: false,
         isPreapproved: false,
         hasTimeline: false,
       });
@@ -843,33 +826,38 @@ describe('Integration Tests', () => {
     it('should improve after retraining with labeled data', () => {
       const scorer = new UnifiedLeadScorer();
 
-      // Create clear pattern: high engagement = conversion
-      const highEngagement = createMockFeatures({
-        listingViews: 10,
-        pageViewCount: 15,
-        timeOnSite: 600,
-        hasViewedMultipleListings: true,
+      // A clear pattern built from signals that are actually MEASURED. This
+      // used to contrast listingViews/pageViewCount/timeOnSite, which nothing
+      // has ever written — so the test asserted the model could learn from
+      // features that are zero for every real lead (US-105).
+      const strong = createMockFeatures({
+        hasPhone: true,
+        messageLength: 400,
+        isPreapproved: true,
+        hasTimeline: true,
+        source: 'direct',
       });
 
-      const lowEngagement = createMockFeatures({
-        listingViews: 0,
-        pageViewCount: 1,
-        timeOnSite: 10,
-        hasViewedMultipleListings: false,
+      const weak = createMockFeatures({
+        hasPhone: false,
+        messageLength: 5,
+        isPreapproved: false,
+        hasTimeline: false,
+        source: 'unknown',
       });
 
       // Add training data
       for (let i = 0; i < 15; i++) {
-        scorer.recordConversion(`high_${i}`, highEngagement, true);
-        scorer.recordConversion(`low_${i}`, lowEngagement, false);
+        scorer.recordConversion(`high_${i}`, strong, true);
+        scorer.recordConversion(`low_${i}`, weak, false);
       }
 
       // Retrain
       scorer.retrainModel();
 
       // High engagement should score higher than low engagement
-      const highScore = scorer.scoreLead('test_high', highEngagement).score;
-      const lowScore = scorer.scoreLead('test_low', lowEngagement).score;
+      const highScore = scorer.scoreLead('test_high', strong).score;
+      const lowScore = scorer.scoreLead('test_low', weak).score;
 
       expect(highScore).toBeGreaterThan(lowScore);
     });

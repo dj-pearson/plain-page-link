@@ -3,13 +3,23 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts'
+import { requireAuth } from '../_shared/auth.ts'
+import { isServiceRoleRequest } from '../_shared/service-auth.ts'
+import { getSiteUrl } from '../_shared/env.ts';
 
-interface WelcomeEmailData {
-  user_id: string
-  email: string
-  full_name?: string
-  username: string
-}
+/**
+ * The welcome email, sent to the agent who just finished onboarding.
+ *
+ * US-119: this took `to`, `full_name` and `username` from the request body with
+ * no authentication and no limit — an AgentBio-branded relay from
+ * noreply@agentbio.net to any address, carrying any name and a link to any
+ * path on the site. That is a phishing tool with the product's own domain and
+ * reputation behind it.
+ *
+ * Nothing about the message is caller-supplied now: the address comes from the
+ * verified JWT, and the display name and username come from that user's own
+ * profile row. The body is a fixed template.
+ */
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -20,19 +30,62 @@ serve(async (req) => {
   }
 
   try {
-    const data: WelcomeEmailData = await req.json()
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
 
-    // Validate required fields
-    if (!data.email || !data.username) {
-      return errorResponse('Missing required fields: email and username', 'REQUEST_VALIDATION_FAILED', req)
+    // The caller must be who the email is for. A service-role caller (the
+    // signup path) is allowed to name a user_id, because there is no session
+    // yet at that point — but even then the address is read from auth.users,
+    // never from the body.
+    let userId: string | null = null
+
+    if (isServiceRoleRequest(req)) {
+      const body = await req.json().catch(() => ({}))
+      userId = typeof body?.user_id === 'string' ? body.user_id : null
+      if (!userId) {
+        return errorResponse('A user_id is required', 'REQUEST_VALIDATION_FAILED', req)
+      }
+    } else {
+      try {
+        const user = await requireAuth(req, supabase)
+        userId = user.id
+      } catch {
+        return errorResponse('Unauthorized', 'UNAUTHORIZED', req, 401)
+      }
     }
 
-    const userName = data.full_name || data.username
-    const profileUrl = `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/${data.username}`
+    // The address: from auth.users, not from the request.
+    const { data: authUser, error: authLookupError } = await supabase.auth.admin.getUserById(userId)
+    const recipient = authUser?.user?.email
+
+    if (authLookupError || !recipient) {
+      console.error(`[send-welcome-email] no account email for ${userId}`)
+      return errorResponse(
+        'Could not resolve the account address',
+        'AGENT_EMAIL_UNRESOLVED',
+        req
+      )
+    }
+
+    // The name and the profile URL: from the agent's own profile row.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, full_name')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!profile?.username) {
+      return errorResponse('That account has no profile yet', 'PROFILE_NOT_FOUND', req, 404)
+    }
+
+    const userName = profile.full_name || profile.username
+    const profileUrl = `${getSiteUrl()}/${profile.username}`
 
     // Send welcome email
     await sendEmail({
-      to: data.email,
+      to: recipient,
       subject: '🎉 Welcome to AgentBio! Your Profile is Ready',
       body: `Hi ${userName},
 
@@ -64,7 +117,7 @@ Need Help?
 - Contact support: support@agentbio.net
 
 Ready to start? Visit your dashboard:
-${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard
+${getSiteUrl()}/dashboard
 
 Best regards,
 The AgentBio Team
@@ -147,7 +200,7 @@ P.S. Share your first listing today and see how AgentBio helps you convert Insta
       </div>
 
       <div style="text-align: center;">
-        <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard" class="button">
+        <a href="${getSiteUrl()}/dashboard" class="button">
           Go to Your Dashboard →
         </a>
       </div>
@@ -155,7 +208,7 @@ P.S. Share your first listing today and see how AgentBio helps you convert Insta
       <div class="help-section">
         <p style="margin: 0 0 10px 0; font-weight: 600; color: #1f2937;">Need Help?</p>
         <p style="margin: 0; font-size: 14px; color: #6b7280;">
-          • Check out our <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/blog" style="color: #667eea;">video tutorials</a><br>
+          • Check out our <a href="${getSiteUrl()}/blog" style="color: #667eea;">video tutorials</a><br>
           • Join our agent community<br>
           • Email us: <a href="mailto:support@agentbio.net" style="color: #667eea;">support@agentbio.net</a>
         </p>
@@ -172,8 +225,8 @@ P.S. Share your first listing today and see how AgentBio helps you convert Insta
       <p><strong>AgentBio</strong> - Link-in-Bio for Real Estate Agents</p>
       <p style="margin: 10px 0 0 0;">
         <a href="${profileUrl}">View Your Profile</a> •
-        <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard">Dashboard</a> •
-        <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/blog">Blog</a>
+        <a href="${getSiteUrl()}/dashboard">Dashboard</a> •
+        <a href="${getSiteUrl()}/blog">Blog</a>
       </p>
       <p style="margin: 15px 0 0 0; font-size: 12px;">
         This email was sent because you created an account at AgentBio.net

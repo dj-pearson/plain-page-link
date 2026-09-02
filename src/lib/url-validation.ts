@@ -3,7 +3,8 @@
  * Prevents open redirect vulnerabilities by validating redirect URLs
  */
 
-import { logger } from "@/lib/logger";
+import { logger } from '@/lib/logger';
+import { getConfiguredAppUrl } from '@/lib/utils';
 
 /**
  * Validate that a redirect URL is safe (same origin or whitelisted)
@@ -11,12 +12,13 @@ import { logger } from "@/lib/logger";
  * @param allowedDomains - Additional allowed domains (optional)
  * @returns boolean - true if URL is safe, false otherwise
  */
-export function isValidRedirectUrl(
-  redirectUrl: string,
-  allowedDomains: string[] = []
-): boolean {
+export function isValidRedirectUrl(redirectUrl: string, allowedDomains: string[] = []): boolean {
   try {
-    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    // getConfiguredAppUrl, not getSafeOrigin: the allowlist has to keep
+    // admitting the deployment's own address even when the visitor arrived on
+    // an agent's custom domain. window.location.origin is checked separately
+    // below (US-123).
+    const appUrl = getConfiguredAppUrl();
 
     // Parse both URLs
     const redirect = new URL(redirectUrl, window.location.origin);
@@ -37,10 +39,10 @@ export function isValidRedirectUrl(
     const allowedHosts = [
       app.hostname.toLowerCase(),
       window.location.hostname.toLowerCase(),
-      ...allowedDomains.map(d => d.toLowerCase()),
+      ...allowedDomains.map((d) => d.toLowerCase()),
     ];
 
-    return allowedHosts.some(allowed => {
+    return allowedHosts.some((allowed) => {
       // Exact match
       if (redirectHost === allowed) return true;
 

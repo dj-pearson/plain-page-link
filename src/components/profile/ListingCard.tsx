@@ -5,6 +5,7 @@ import { getImageUrl } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
+import { currentListingShareUrl } from '@/lib/listingShare';
 
 interface ListingCardProps {
   listing: PublicProfileListing;
@@ -37,9 +38,11 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   const city = listing.city || '';
   const state = listing.state || '';
   const price = parsePrice(listing.price);
-  const beds = listing.bedrooms ?? listing.beds ?? 0;
-  const baths = listing.bathrooms ?? listing.baths ?? 0;
-  const sqft = listing.square_feet ?? listing.sqft ?? 0;
+  // Canonical columns only — beds/baths/sqft are derived and no longer read
+  // (US-106).
+  const beds = listing.bedrooms ?? 0;
+  const baths = listing.bathrooms ?? 0;
+  const sqft = listing.square_feet ?? 0;
   const isFeatured = listing.is_featured;
   const photoCount = listing.photos?.length || 1;
 
@@ -77,16 +80,18 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const shareText = `${address}${city ? `, ${city}` : ''} - ${formatPrice(price)}`;
+    // The listing, not the profile it sits on (US-114).
+    const shareUrl = currentListingShareUrl(listing.id) ?? window.location.href;
     if (navigator.share) {
       try {
-        await navigator.share({ title: shareText, url: window.location.href });
+        await navigator.share({ title: shareText, url: shareUrl });
         return;
       } catch {
         /* ignore */
       }
     }
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareUrl);
       toast.success('Link copied!');
     } catch {
       /* ignore */
@@ -94,13 +99,17 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   };
 
   return (
+    // A plain container, NOT role="button".
+    //
+    // It was a role=button with two real <button>s nested inside it — invalid,
+    // and a screen reader announces the inner controls as part of a button
+    // whose own label describes the listing. The card's own click target is now
+    // the address link below, so the interactive elements are siblings rather
+    // than nested. The div keeps the click for pointer users (a large target is
+    // genuinely useful) but no longer claims to be a control (US-113).
     <div
       onClick={onClick}
       className="group bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
-      role="button"
-      tabIndex={0}
-      aria-label={`View ${address} - ${formatPrice(price)}`}
-      onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
     >
       {/* Image Container */}
       <div className="relative h-52 sm:h-56 overflow-hidden">
@@ -148,8 +157,12 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
           </div>
         )}
 
-        {/* Action buttons - visible on hover */}
-        <div className="absolute bottom-3 right-3 flex gap-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+        {/* Always visible below md, hover-revealed above it.
+            opacity-0 group-hover alone meant save and share simply did not
+            exist on a touch device — there is no hover to trigger them — and a
+            keyboard user could focus an invisible control. focus-within keeps
+            them visible while either is focused (US-113). */}
+        <div className="absolute bottom-3 right-3 flex gap-2 transition-all duration-300 md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:focus-within:translate-y-0 md:focus-within:opacity-100">
           <button
             onClick={handleSave}
             className={cn(
@@ -183,8 +196,22 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
         <div className="flex items-start gap-1.5 mb-3">
           <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
           <div className="min-w-0">
+            {/* The card's real control: one button, keyboard-operable by
+                default — so Space works, which the hand-rolled onKeyDown on the
+                container never handled (it checked Enter only). Nothing is
+                nested inside it (US-113). */}
             <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate group-hover:text-blue-600 transition-colors">
-              {address}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick?.();
+                }}
+                className="text-left w-full truncate focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+              >
+                <span className="sr-only">View listing: </span>
+                {address}
+              </button>
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
               {city}

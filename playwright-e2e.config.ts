@@ -8,6 +8,8 @@
 
 import { defineConfig, devices } from '@playwright/test';
 
+const E2E_ORIGIN = process.env.TEST_BASE_URL || 'http://127.0.0.1:8080';
+
 export default defineConfig({
   testDir: './tests/e2e',
 
@@ -28,7 +30,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: process.env.TEST_BASE_URL || 'http://127.0.0.1:8080',
+    baseURL: E2E_ORIGIN,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -54,8 +56,21 @@ export default defineConfig({
   // own config defaults host to '::', which fails where IPv6 is absent).
   webServer: {
     command: 'npm run dev -- --host 127.0.0.1',
-    url: 'http://127.0.0.1:8080',
+    url: E2E_ORIGIN,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    // src/integrations/supabase/client.ts throws at import when these are
+    // unset, so without them the SPA never mounts and every spec runs against
+    // a blank <body>. CI sets no env for this job. Same fix, and same reason
+    // for the origin, as playwright-a11y.config.ts: index.html's CSP
+    // connect-src is 'self' plus the agentbio.net hosts, so a request to any
+    // other localhost port is refused before Playwright's router sees it.
+    // The specs intercept every /rest/v1, /auth/v1 and /functions/v1 call, so
+    // nothing is ever sent to this origin.
+    env: {
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || E2E_ORIGIN,
+      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || 'e2e-placeholder-anon-key',
+      VITE_FUNCTIONS_URL: process.env.VITE_FUNCTIONS_URL || `${E2E_ORIGIN}/functions/v1`,
+    },
   },
 });

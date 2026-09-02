@@ -23,7 +23,6 @@ export default function SubmitReview() {
   const [hoveredRating, setHoveredRating] = useState(0);
   const [formData, setFormData] = useState({
     client_name: '',
-    client_email: '',
     client_title: '',
     review: '',
     property_type: '',
@@ -75,18 +74,28 @@ export default function SubmitReview() {
     setSubmitting(true);
 
     try {
-      const { error } = await supabase.from('testimonials').insert({
-        user_id: profile.id,
-        client_name: formData.client_name,
-        client_title: formData.client_title || '',
-        rating: rating,
-        review: formData.review,
-        property_type: formData.property_type || '',
-        transaction_type: formData.transaction_type,
-        date: new Date().toISOString(),
+      // Through the edge function, not a direct insert: it is what actually
+      // notifies the agent, which is what the success screen has always
+      // promised (US-113). The anon INSERT policy remains as the backstop, but
+      // a review nobody is told about stays unpublished forever.
+      const { data, error } = await supabase.functions.invoke('submit-review', {
+        body: {
+          user_id: profile.id,
+          client_name: formData.client_name,
+          client_title: formData.client_title || null,
+          rating,
+          review: formData.review,
+          property_type: formData.property_type || null,
+          transaction_type: formData.transaction_type,
+        },
       });
 
       if (error) throw error;
+      // invoke() only rejects on transport failures; a 4xx comes back as a
+      // body with success:false, which used to read as a successful submit.
+      if (data && data.success === false) {
+        throw new Error(data.error?.message ?? 'The review could not be submitted');
+      }
 
       setSubmitted(true);
       toast({
@@ -144,8 +153,8 @@ export default function SubmitReview() {
             </div>
             <CardTitle className="text-2xl">Thank You!</CardTitle>
             <CardDescription className="text-base mt-2">
-              Your review has been submitted successfully. {profile.full_name} will be notified and
-              may feature your testimonial on their profile.
+              Your review has been sent to {profile.full_name}. They review each one before it
+              appears on their profile, so it may not show up right away.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -196,6 +205,8 @@ export default function SubmitReview() {
                       onMouseEnter={() => setHoveredRating(star)}
                       onMouseLeave={() => setHoveredRating(0)}
                       className="transition-transform hover:scale-110"
+                      aria-label={`${star} ${star === 1 ? 'star' : 'stars'}`}
+                      aria-pressed={rating === star}
                     >
                       <Star
                         className={`w-10 h-10 ${
@@ -234,22 +245,6 @@ export default function SubmitReview() {
                   placeholder="John Doe"
                   required
                 />
-              </div>
-
-              {/* Email */}
-              <div>
-                <Label htmlFor="client_email">Your Email *</Label>
-                <Input
-                  id="client_email"
-                  type="email"
-                  value={formData.client_email}
-                  onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
-                  placeholder="john@example.com"
-                  required
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your email won't be published, it's for verification only.
-                </p>
               </div>
 
               {/* Title/Occupation (optional) */}

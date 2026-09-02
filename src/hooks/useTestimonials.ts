@@ -41,7 +41,13 @@ export function useTestimonials() {
 
   const addTestimonial = useMutation({
     mutationFn: async (
-      testimonialData: Omit<Testimonial, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+      // `is_sample` is excluded alongside the generated columns: it defaults
+      // to false and only the admin sample-data tool sets it, so an ordinary
+      // caller must not have to name it (US-109).
+      testimonialData: Omit<
+        Testimonial,
+        'id' | 'user_id' | 'created_at' | 'updated_at' | 'is_sample'
+      >
     ) => {
       if (!user?.id) throw new Error('User not authenticated');
 

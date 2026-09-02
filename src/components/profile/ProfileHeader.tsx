@@ -78,18 +78,25 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
                   </span>
                 </div>
               )}
-              {/* Available Status Indicator */}
-              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1.5 border-2 border-white">
-                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                Available Now
-              </div>
+              {/* "Available Now", with a pulsing dot, was rendered for every
+                  agent unconditionally — nothing tracks availability, so it
+                  told a visitor something nobody knew (US-111). Removed rather
+                  than made conditional: there is no signal to condition it on. */}
             </div>
 
-            {/* Verified Badge */}
-            <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full text-sm font-medium border border-blue-200">
-              <ShieldCheck className="h-4 w-4 fill-current" />
-              <span>Verified Agent</span>
-            </div>
+            {/* Licensed, not "Verified".
+                A "Verified Agent" badge was shown to every visitor although no
+                verification process exists anywhere in this product. What the
+                agent actually supplied is a licence number and state, so that
+                is what this says — and only when both are present. It states a
+                fact the agent asserted rather than an endorsement the platform
+                never made (US-111). */}
+            {profile.license_number && profile.license_state && (
+              <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full text-sm font-medium border border-blue-200">
+                <ShieldCheck className="h-4 w-4" />
+                <span>Licensed in {profile.license_state}</span>
+              </div>
+            )}
           </div>
 
           {/* Right Column - Info */}
@@ -121,21 +128,25 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
 
             {/* Trust Badges */}
             <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
-              {stats?.propertiesSold && stats.propertiesSold > 0 && (
+              {/* `stats?.propertiesSold && …` rendered a literal "0" for a new
+                  agent: 0 is falsy, so && short-circuits to 0, and React prints
+                  it. Two of these side by side gave the badge row "00"
+                  (US-112). Leading with the comparison returns a boolean. */}
+              {(stats?.propertiesSold ?? 0) > 0 && (
                 <TrustBadge
                   icon={CheckCircle2}
-                  label={`${stats.propertiesSold} Homes Sold`}
+                  label={`${stats?.propertiesSold} Homes Sold`}
                   variant="success"
                 />
               )}
-              {stats?.averageRating && stats.averageRating >= 4.5 && (
+              {(stats?.averageRating ?? 0) >= 4.5 && (
                 <TrustBadge
                   icon={Star}
-                  label={`${stats.averageRating.toFixed(1)} Rating`}
+                  label={`${stats?.averageRating?.toFixed(1)} Rating`}
                   variant="warning"
                 />
               )}
-              {profile.years_experience && profile.years_experience >= 5 && (
+              {(profile.years_experience ?? 0) >= 5 && (
                 <TrustBadge
                   icon={Award}
                   label={`${profile.years_experience} Years Experience`}

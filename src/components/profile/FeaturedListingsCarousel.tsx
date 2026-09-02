@@ -16,6 +16,7 @@ import { getImageUrl } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
+import { currentListingShareUrl } from '@/lib/listingShare';
 
 interface FeaturedListingsCarouselProps {
   listings: PublicProfileListing[];
@@ -89,7 +90,17 @@ export function FeaturedListingsCarousel({
   // Auto-advance carousel. Declared before the early return so this hook is
   // always called in the same order (rules of hooks).
   useEffect(() => {
-    if (!autoRotate || isPaused || featuredListings.length <= 1) return;
+    // prefers-reduced-motion is a request not to be shown unrequested motion,
+    // and a panel that replaces itself every four seconds is exactly that. It
+    // was ignored entirely; a visitor who had asked their OS for stillness got
+    // an auto-rotating carousel anyway (US-113). Honouring it here leaves the
+    // arrows and dots, so nothing becomes unreachable — it only stops moving
+    // on its own.
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    if (!autoRotate || isPaused || reduceMotion || featuredListings.length <= 1) return;
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % featuredListings.length);
@@ -128,7 +139,8 @@ export function FeaturedListingsCarousel({
 
     const shareTitle = `Check out this property: ${address}`;
     const shareText = `${address}${city ? `, ${city}` : ''} - ${price}`;
-    const shareUrl = window.location.href;
+    // The listing, not the profile it is featured on (US-114).
+    const shareUrl = currentListingShareUrl(currentListing.id) ?? window.location.href;
 
     // Try native share API first (mobile)
     if (navigator.share) {
@@ -179,6 +191,13 @@ export function FeaturedListingsCarousel({
       className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden rounded-xl shadow-2xl bg-gray-900"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
+      // Touch and focus pause it too. Hover-only meant a phone user — who has
+      // no hover — could not stop the panel changing under their thumb, and a
+      // keyboard user tabbing through the controls kept losing the slide they
+      // were on (US-113).
+      onTouchStart={() => setIsPaused(true)}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={() => setIsPaused(false)}
     >
       <AnimatePresence mode="wait">
         <motion.div
@@ -274,7 +293,9 @@ export function FeaturedListingsCarousel({
                 transition={{ delay: 0.4 }}
                 className="flex flex-wrap gap-4 md:gap-6 text-white"
               >
-                {currentListing.bedrooms && (
+                {/* Same falsy-guard bug as ProfileHeader: 0 beds renders a
+                    literal "0" rather than nothing (US-112). */}
+                {(currentListing.bedrooms ?? 0) > 0 && (
                   <div className="flex items-center gap-2">
                     <Bed className="h-5 w-5 md:h-6 md:w-6" />
                     <span className="text-base md:text-lg font-medium">
@@ -282,7 +303,7 @@ export function FeaturedListingsCarousel({
                     </span>
                   </div>
                 )}
-                {currentListing.bathrooms && (
+                {(currentListing.bathrooms ?? 0) > 0 && (
                   <div className="flex items-center gap-2">
                     <Bath className="h-5 w-5 md:h-6 md:w-6" />
                     <span className="text-base md:text-lg font-medium">
@@ -290,11 +311,11 @@ export function FeaturedListingsCarousel({
                     </span>
                   </div>
                 )}
-                {currentListing.square_feet && (
+                {(currentListing.square_feet ?? 0) > 0 && (
                   <div className="flex items-center gap-2">
                     <Maximize className="h-5 w-5 md:h-6 md:w-6" />
                     <span className="text-base md:text-lg font-medium">
-                      {currentListing.square_feet.toLocaleString()} sqft
+                      {currentListing.square_feet?.toLocaleString()} sqft
                     </span>
                   </div>
                 )}

@@ -1,7 +1,6 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
-import { componentTagger } from 'lovable-tagger';
 import { visualizer } from 'rollup-plugin-visualizer';
 // Cache bust: 2026-01-02 - Performance optimization
 
@@ -19,94 +18,117 @@ import { visualizer } from 'rollup-plugin-visualizer';
 // ANALYZE=true `vite build` writes dist/stats.html and opens it.
 const ANALYZE = process.env.ANALYZE === 'true';
 
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: '::',
-    port: 8080,
-  },
-  plugins: [
-    react(),
-    mode === 'development' && componentTagger(),
-    // Security headers plugin for development
-    {
-      name: 'security-headers',
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-          res.setHeader('X-Content-Type-Options', 'nosniff');
-          res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-          res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-          next();
-        });
-      },
+export default defineConfig(({ mode }) => {
+  // '' as the prefix so .env files are read whole; only VITE_GA_MEASUREMENT_ID
+  // is used below, and Vite still applies its own VITE_ prefix rule to what the
+  // client bundle can see.
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+    server: {
+      host: '::',
+      port: 8080,
     },
-    // Bundle visualizer — only when ANALYZE=true (off in CI/normal builds)
-    ANALYZE &&
-      visualizer({
-        filename: 'dist/stats.html',
-        open: true,
-        gzipSize: true,
-        brotliSize: true,
-      }),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  build: {
-    // Enable source maps for production (needed for Sentry error tracking)
-    // These are hidden source maps that won't expose source code to users
-    sourcemap: 'hidden',
-    rollupOptions: {
-      output: {
-        format: 'es',
-        // Manual chunk splitting for better caching and smaller initial bundle
-        manualChunks: {
-          // React core - rarely changes, cache well
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          // Supabase client - used everywhere
-          supabase: ['@supabase/supabase-js'],
-          // UI framework - Radix components
-          'ui-vendor': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-select',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-switch',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-label',
-            '@radix-ui/react-progress',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-alert-dialog',
-          ],
-          // Heavy 3D libraries - lazy loaded
-          'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-          // Charts - only needed in dashboard
-          'charts-vendor': ['recharts'],
-          // Animation libraries
-          'animation-vendor': ['framer-motion', 'gsap', '@gsap/react'],
-          // PDF/Export - only needed for exports
-          'export-vendor': ['jspdf', 'jspdf-autotable', 'html2canvas'],
-          // Markdown rendering - only needed for blog
-          'markdown-vendor': ['react-markdown', 'remark-gfm'],
-          // Firebase - only needed for push notifications
-          // Form handling
-          'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          // State management
-          'state-vendor': ['zustand', '@tanstack/react-query'],
-          // Date utilities
-          'date-vendor': ['date-fns'],
+    plugins: [
+      react(),
+      // Fills the GA measurement id into index.html's <meta name="ga-measurement-id">.
+      //
+      // Not Vite's own `%VITE_GA_MEASUREMENT_ID%` substitution: that warns on
+      // every dev start and every CI build when the variable is unset, which is
+      // the normal case outside production. public/scripts/analytics.js reads the
+      // meta tag because it is a static asset with no import.meta.env, and the
+      // page's CSP is `script-src 'self'` with no 'unsafe-inline', so an inline
+      // script could not carry the value either (US-123).
+      {
+        name: 'ga-measurement-id',
+        transformIndexHtml: {
+          order: 'pre' as const,
+          handler(html: string) {
+            const id = (env.VITE_GA_MEASUREMENT_ID ?? '').trim();
+            return html.replace(/(<meta name="ga-measurement-id" content=")[^"]*(")/, `$1${id}$2`);
+          },
         },
       },
+      // Security headers plugin for development
+      {
+        name: 'security-headers',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+            res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+            next();
+          });
+        },
+      },
+      // Bundle visualizer — only when ANALYZE=true (off in CI/normal builds)
+      ANALYZE &&
+        visualizer({
+          filename: 'dist/stats.html',
+          open: true,
+          gzipSize: true,
+          brotliSize: true,
+        }),
+    ].filter(Boolean),
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
     },
-    minify: 'esbuild',
-    target: 'esnext',
-    // Increase chunk size warning limit since we're intentionally creating vendor chunks
-    chunkSizeWarningLimit: 600,
-  },
-}));
+    build: {
+      // Enable source maps for production (needed for Sentry error tracking)
+      // These are hidden source maps that won't expose source code to users
+      sourcemap: 'hidden',
+      rollupOptions: {
+        output: {
+          format: 'es',
+          // Manual chunk splitting for better caching and smaller initial bundle
+          manualChunks: {
+            // React core - rarely changes, cache well
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            // Supabase client - used everywhere
+            supabase: ['@supabase/supabase-js'],
+            // UI framework - Radix components
+            'ui-vendor': [
+              '@radix-ui/react-dialog',
+              '@radix-ui/react-dropdown-menu',
+              '@radix-ui/react-tabs',
+              '@radix-ui/react-select',
+              '@radix-ui/react-popover',
+              '@radix-ui/react-accordion',
+              '@radix-ui/react-checkbox',
+              '@radix-ui/react-switch',
+              '@radix-ui/react-toast',
+              '@radix-ui/react-label',
+              '@radix-ui/react-progress',
+              '@radix-ui/react-separator',
+              '@radix-ui/react-slot',
+              '@radix-ui/react-alert-dialog',
+            ],
+            // Heavy 3D libraries - lazy loaded
+            'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
+            // Charts - only needed in dashboard
+            'charts-vendor': ['recharts'],
+            // Animation libraries
+            'animation-vendor': ['framer-motion', 'gsap', '@gsap/react'],
+            // PDF/Export - only needed for exports
+            'export-vendor': ['jspdf', 'jspdf-autotable', 'html2canvas'],
+            // Markdown rendering - only needed for blog
+            'markdown-vendor': ['react-markdown', 'remark-gfm'],
+            // Firebase - only needed for push notifications
+            // Form handling
+            'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
+            // State management
+            'state-vendor': ['zustand', '@tanstack/react-query'],
+            // Date utilities
+            'date-vendor': ['date-fns'],
+          },
+        },
+      },
+      minify: 'esbuild',
+      target: 'esnext',
+      // Increase chunk size warning limit since we're intentionally creating vendor chunks
+      chunkSizeWarningLimit: 600,
+    },
+  };
+});

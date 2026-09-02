@@ -46,8 +46,19 @@ const listingSchema = z.object({
   price: z.string().min(1, 'Price is required'),
   propertyType: z.string().min(1, 'Property type is required'),
   beds: z.number().min(0, 'Must be 0 or more'),
-  baths: z.number().min(0, 'Must be 0 or more'),
-  sqft: z.string().min(1, 'Square footage is required'),
+  // Half-baths are real, and the input has always rendered step 0.5. What was
+  // missing was a numeric column to put 2.5 in; there is one now (US-106).
+  baths: z
+    .number()
+    .min(0, 'Must be 0 or more')
+    .refine((v) => Number.isInteger(v * 2), 'Use whole or half bathrooms, e.g. 2 or 2.5'),
+  // The placeholder is "2,400", so separators must be accepted — but a value
+  // with no digits at all must be rejected rather than silently stored as 2,
+  // which is what parseInt('2,400') produced (US-106).
+  sqft: z
+    .string()
+    .min(1, 'Square footage is required')
+    .refine((v) => /\d/.test(v.replace(/[^0-9.,]/g, '')), 'Enter a number, e.g. 2,400'),
   lotSize: z.string().optional(),
   yearBuilt: z.string().optional(),
   stories: z.string().optional(),
@@ -57,14 +68,22 @@ const listingSchema = z.object({
   description: z.string().optional(),
   highlights: z.string().optional(),
   images: z.array(z.instanceof(File)).max(25, 'Maximum 25 images'),
+  // `videoUrl` stood here beside virtualTourUrl. Both meant "a video of the
+  // property", only one had a column, and the form dropped whatever went in
+  // this one. Removed rather than given a second column (US-106).
   virtualTourUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  videoUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
   openHouseDate: z.string().optional(),
   openHouseEndDate: z.string().optional(),
   isFeatured: z.boolean().optional(),
 });
 
 export type ListingFormData = z.infer<typeof listingSchema>;
+
+// Mirrors useListingImageUpload's limits so selection can reject a file before
+// the agent fills in five more steps (US-107).
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGES = 25;
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
 interface AddListingModalProps {
   open: boolean;
@@ -84,6 +103,7 @@ const STEPS = [
 export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
 
   const {
@@ -117,7 +137,6 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
       garage: '',
       images: [],
       virtualTourUrl: '',
-      videoUrl: '',
       openHouseDate: '',
       openHouseEndDate: '',
       isFeatured: false,
@@ -127,22 +146,58 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
   const images = watch('images');
   const isFeatured = watch('isFeatured');
 
-  const handleImageUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
+  /**
+   * Accepts the files that can actually be uploaded, and says why the rest
+   * were not.
+   *
+   * Size and type were only checked at upload time, five steps later — so an
+   * agent added a 6 MB photo, filled in everything else, pressed Save and only
+   * then learned the file was too big (US-107). Rejecting at selection means
+   * the answer arrives while the file picker is still in mind.
+   */
+  const acceptFiles = useCallback(
+    (files: File[]) => {
+      const accepted: File[] = [];
+      const rejected: string[] = [];
+
+      for (const file of files) {
+        if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+          rejected.push(`${file.name} is not a JPEG, PNG or WEBP`);
+        } else if (file.size > MAX_IMAGE_BYTES) {
+          rejected.push(`${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB (limit 5 MB)`);
+        } else {
+          accepted.push(file);
+        }
+      }
+
       const currentImages = images || [];
-      const newImages = [...currentImages, ...files].slice(0, 25);
-      setValue('images', newImages);
-      files.forEach((file) => {
+      const room = MAX_IMAGES - currentImages.length;
+      if (accepted.length > room) {
+        rejected.push(`Only ${MAX_IMAGES} photos per listing; the rest were not added`);
+      }
+      const kept = accepted.slice(0, Math.max(0, room));
+
+      setImageError(rejected.length ? rejected.join('. ') : null);
+      if (kept.length === 0) return;
+
+      setValue('images', [...currentImages, ...kept]);
+      kept.forEach((file) => {
         const reader = new FileReader();
         reader.onloadend = () => {
-          setImagePreviews((prev) => [...prev, reader.result as string].slice(0, 25));
+          setImagePreviews((prev) => [...prev, reader.result as string].slice(0, MAX_IMAGES));
         };
         reader.readAsDataURL(file);
       });
-      e.target.value = '';
     },
     [images, setValue]
+  );
+
+  const handleImageUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      acceptFiles(Array.from(e.target.files || []));
+      e.target.value = '';
+    },
+    [acceptFiles]
   );
 
   const removeImage = useCallback(
@@ -160,19 +215,9 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'));
-      const currentImages = images || [];
-      const newImages = [...currentImages, ...files].slice(0, 25);
-      setValue('images', newImages);
-      files.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreviews((prev) => [...prev, reader.result as string].slice(0, 25));
-        };
-        reader.readAsDataURL(file);
-      });
+      acceptFiles(Array.from(e.dataTransfer.files));
     },
-    [images, setValue]
+    [acceptFiles]
   );
 
   const validateCurrentStep = async (): Promise<boolean> => {
@@ -207,8 +252,14 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
       setImagePreviews([]);
       setCurrentStep(0);
     } catch (err) {
+      // Deliberately does NOT close or reset: the six steps of typing stay on
+      // screen so the agent can fix whatever failed and submit again (US-107).
       logger.error('Failed to add listing', err);
-      setError('Failed to add listing. Please try again.');
+      setError(
+        err instanceof Error && err.message
+          ? `${err.message} Your listing details are still here — fix that and try again.`
+          : 'Failed to add listing. Your details are still here; please try again.'
+      );
     }
   };
 
@@ -267,7 +318,10 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
           {error && (
-            <div className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+            <div
+              role="alert"
+              className="mx-6 mt-3 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm"
+            >
               {error}
             </div>
           )}
@@ -552,6 +606,11 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                     </p>
                   </label>
                 </div>
+                {imageError && (
+                  <p role="alert" className="text-sm text-red-600">
+                    {imageError}
+                  </p>
+                )}
                 {imagePreviews.length > 0 && (
                   <div>
                     <p className="text-sm font-medium mb-2">
@@ -605,20 +664,6 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                     />
                     {errors.virtualTourUrl && (
                       <p className="text-sm text-red-600 mt-1">{errors.virtualTourUrl.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="videoUrl" className="flex items-center gap-2">
-                      <Video className="h-4 w-4" /> Video URL
-                    </Label>
-                    <Input
-                      id="videoUrl"
-                      {...register('videoUrl')}
-                      placeholder="https://youtube.com/watch?v=..."
-                      className="mt-1"
-                    />
-                    {errors.videoUrl && (
-                      <p className="text-sm text-red-600 mt-1">{errors.videoUrl.message}</p>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">

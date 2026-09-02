@@ -21,6 +21,8 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { sendEmail } from '../_shared/email.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
+import { statusToStore } from '../_shared/subscription-entitlement.ts';
+import { getSiteUrl } from '../_shared/env.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   apiVersion: '2023-10-16',
@@ -63,48 +65,69 @@ async function claimEvent(
 }
 
 /**
- * Get plan name from price ID
+ * Resolve a Stripe price id to the plan row it belongs to (US-118).
+ *
+ * This used to be a hard-coded map from 'price_starter_monthly' and friends —
+ * literals that also appeared in src/config/pricing-plans.ts, and which are not
+ * price ids that exist in any Stripe account. `subscription_plans` holds the
+ * real ones (per environment, in three columns), so the table answers.
+ *
+ * The STRIPE_PRICE_* environment fallback is kept for an environment whose
+ * plan rows have not been filled in yet.
+ *
+ * US-084: an unrecognised price fails closed to 'free'. It used to fall back to
+ * 'professional', so a new tier, an add-on or a typo silently granted the paid
+ * entitlements.
  */
-function getPlanNameFromPriceId(priceId: string): string {
-  // Map price IDs to plan names
-  const priceMap: Record<string, string> = {
-    'price_starter_monthly': 'starter',
-    'price_starter_yearly': 'starter',
-    'price_professional_monthly': 'professional',
-    'price_professional_yearly': 'professional',
-    'price_team_monthly': 'team',
-    'price_team_yearly': 'team',
-    'price_enterprise_monthly': 'enterprise',
-    'price_enterprise_yearly': 'enterprise',
-  };
+async function resolvePlanFromPriceId(
+  supabase: ReturnType<typeof createClient>,
+  priceId: string | undefined
+): Promise<{ name: string; id: string | null }> {
+  if (!priceId) {
+    console.error('[stripe-webhook] subscription item carried no price id');
+    return { name: 'free', id: null };
+  }
 
-  // Check environment variables for production price IDs
-  const envPriceId = Object.entries(Deno.env.toObject())
-    .find(([key, value]) => value === priceId && key.startsWith('STRIPE_PRICE_'));
+  const { data, error } = await supabase
+    .from('subscription_plans')
+    .select('id, name')
+    .or(
+      `stripe_price_id.eq.${priceId},stripe_price_id_monthly.eq.${priceId},stripe_price_id_yearly.eq.${priceId}`
+    )
+    .maybeSingle();
+
+  if (!error && data?.name) {
+    return { name: data.name as string, id: data.id as string };
+  }
+
+  const envPriceId = Object.entries(Deno.env.toObject()).find(
+    ([key, value]) => value === priceId && key.startsWith('STRIPE_PRICE_')
+  );
 
   if (envPriceId) {
-    const planName = envPriceId[0]
+    const name = envPriceId[0]
       .replace('STRIPE_PRICE_', '')
       .replace('_MONTHLY', '')
       .replace('_YEARLY', '')
       .toLowerCase();
-    return planName;
+
+    const { data: byName } = await supabase
+      .from('subscription_plans')
+      .select('id')
+      .eq('name', name)
+      .maybeSingle();
+
+    return { name, id: (byName?.id as string) ?? null };
   }
 
-  // US-084: this used to fall back to 'professional'. Any price id not in the
-  // map or the STRIPE_PRICE_* env vars — a new tier, an add-on, a typo —
-  // silently granted professional entitlements. Entitlement defaults fail
-  // closed, and an unrecognised price is a configuration error worth shouting
-  // about.
-  if (priceMap[priceId]) return priceMap[priceId];
-  console.error(`Unrecognised Stripe price id ${priceId}; defaulting to the free plan`);
-  return 'free';
+  console.error(
+    `[stripe-webhook] unrecognised Stripe price id ${priceId}; defaulting to the free plan`
+  );
+  return { name: 'free', id: null };
 }
 
-/**
- * Get plan limits based on plan name
- */
-function getPlanLimits(planName: string): {
+/** The flat limit columns on `subscriptions`, as this webhook writes them. */
+interface FlatPlanLimits {
   max_listings: number;
   max_links: number;
   max_testimonials: number;
@@ -112,56 +135,69 @@ function getPlanLimits(planName: string): {
   custom_domain_enabled: boolean;
   remove_branding: boolean;
   priority_support: boolean;
-} {
-  const limits: Record<string, any> = {
-    free: {
-      max_listings: 3,
-      max_links: 5,
-      max_testimonials: 3,
-      analytics_history_days: 7,
-      custom_domain_enabled: false,
-      remove_branding: false,
-      priority_support: false,
-    },
-    starter: {
-      max_listings: 10,
-      max_links: 15,
-      max_testimonials: 10,
-      analytics_history_days: 90,
-      custom_domain_enabled: false,
-      remove_branding: false,
-      priority_support: false,
-    },
-    professional: {
-      max_listings: 25,
-      max_links: -1, // unlimited
-      max_testimonials: 25,
-      analytics_history_days: 365,
-      custom_domain_enabled: true,
-      remove_branding: true,
-      priority_support: false,
-    },
-    team: {
-      max_listings: -1,
-      max_links: -1,
-      max_testimonials: -1,
-      analytics_history_days: 730,
-      custom_domain_enabled: true,
-      remove_branding: true,
-      priority_support: true,
-    },
-    enterprise: {
-      max_listings: -1,
-      max_links: -1,
-      max_testimonials: -1,
-      analytics_history_days: -1,
-      custom_domain_enabled: true,
-      remove_branding: true,
-      priority_support: true,
-    },
-  };
+}
 
-  return limits[planName] || limits.professional;
+/**
+ * The most restrictive answer, used only when the plan row cannot be read.
+ *
+ * Deliberately the free plan and not `professional`, which is what the old
+ * hard-coded table returned for an unknown name — a lookup miss handed out the
+ * paid tier.
+ */
+const FALLBACK_LIMITS: FlatPlanLimits = {
+  max_listings: 3,
+  max_links: 5,
+  max_testimonials: 3,
+  analytics_history_days: 30,
+  custom_domain_enabled: false,
+  remove_branding: false,
+  priority_support: false,
+};
+
+/**
+ * The plan's limits, read from `subscription_plans` (US-118).
+ *
+ * This used to be a fourth hard-coded copy of the plan matrix, living here in
+ * the webhook. It disagreed with src/config/pricing-plans.ts (analytics 7 days
+ * on free, against 30 in the config) and with the pricing page, and nothing
+ * could tell which was right. The table is the source of truth now; this maps
+ * its jsonb onto the flat columns `subscriptions` actually has.
+ */
+async function loadPlanLimits(
+  supabase: ReturnType<typeof createClient>,
+  planName: string
+): Promise<FlatPlanLimits> {
+  const { data, error } = await supabase
+    .from('subscription_plans')
+    .select('limits, features')
+    .eq('name', planName)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error(
+      `[stripe-webhook] no subscription_plans row for "${planName}"; falling back to free limits`,
+      error?.message ?? ''
+    );
+    return FALLBACK_LIMITS;
+  }
+
+  const limits = (data.limits ?? {}) as Record<string, number>;
+  const features = (data.features ?? {}) as Record<string, boolean>;
+
+  // A missing key is not "unlimited": fall back to the free number, so a plan
+  // row that is incomplete cannot grant more than it names.
+  const num = (key: string, fallback: number) =>
+    typeof limits[key] === 'number' ? limits[key] : fallback;
+
+  return {
+    max_listings: num('listings', FALLBACK_LIMITS.max_listings),
+    max_links: num('links', FALLBACK_LIMITS.max_links),
+    max_testimonials: num('testimonials', FALLBACK_LIMITS.max_testimonials),
+    analytics_history_days: num('analytics_days', FALLBACK_LIMITS.analytics_history_days),
+    custom_domain_enabled: features.customDomain === true,
+    remove_branding: features.removeBranding === true,
+    priority_support: features.prioritySupport === true,
+  };
 }
 
 serve(async (req) => {
@@ -229,22 +265,28 @@ serve(async (req) => {
           // Get subscription details
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           const priceId = subscription.items.data[0]?.price.id;
-          const planName = getPlanNameFromPriceId(priceId);
-          const planLimits = getPlanLimits(planName);
+          // One lookup for both the name and the id. The id used to come from a
+          // separate query matching `stripe_price_id` alone — the pre-interval
+          // column, which is NULL on every seeded row — so plan_id came back
+          // undefined, user_subscriptions stored NULL, and get_user_plan's JOIN
+          // found nothing. A paying agent was on the free plan from the moment
+          // checkout completed (US-118).
+          const plan = await resolvePlanFromPriceId(supabase, priceId);
+          const planName = plan.name;
+          const planLimits = await loadPlanLimits(supabase, planName);
 
-          // Get plan from database
-          const { data: plan } = await supabase
-            .from('subscription_plans')
-            .select('id')
-            .eq('stripe_price_id', priceId)
-            .single();
+          if (!plan.id) {
+            console.error(
+              `[stripe-webhook] no subscription_plans row matches price ${priceId}; the subscription will have no plan_id`
+            );
+          }
 
           // Update user_subscriptions table (relational model)
           await supabase
             .from('user_subscriptions')
             .upsert({
               user_id: userId,
-              plan_id: plan?.id,
+              plan_id: plan.id,
               stripe_customer_id: customerId,
               stripe_subscription_id: subscriptionId,
               status: 'active',
@@ -298,20 +340,30 @@ serve(async (req) => {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const priceId = subscription.items.data[0]?.price.id;
-        const planName = getPlanNameFromPriceId(priceId);
-        const planLimits = getPlanLimits(planName);
+        const plan = await resolvePlanFromPriceId(supabase, priceId);
+        const planName = plan.name;
+        const planLimits = await loadPlanLimits(supabase, planName);
 
-        // Map Stripe status to our status
-        let status = subscription.status;
-        if (subscription.cancel_at_period_end) {
-          status = 'canceled'; // Will cancel at end of period
-        }
+        // Stripe's own status, unchanged.
+        //
+        // This used to do `if (cancel_at_period_end) status = 'canceled'`, and
+        // get_user_plan joins on the status — so the moment an agent scheduled
+        // a cancellation they dropped to the free plan, losing weeks of the
+        // plan they had already paid for. cancel_at_period_end is a separate
+        // boolean, stored in its own column below; the status stays 'active'
+        // until Stripe says otherwise (US-118).
+        const status = statusToStore(subscription);
 
         // Update user_subscriptions table
         await supabase
           .from('user_subscriptions')
           .update({
             status: status,
+            // Kept in step with the price. A plan change through the billing
+            // portal arrives as customer.subscription.updated, and plan_id was
+            // never updated here — so an agent who upgraded kept the entitlements
+            // of the plan they left.
+            ...(plan.id ? { plan_id: plan.id } : {}),
             current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
             current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
             cancel_at_period_end: subscription.cancel_at_period_end,
@@ -343,7 +395,7 @@ serve(async (req) => {
       // ========================================
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
-        const freeLimits = getPlanLimits('free');
+        const freeLimits = await loadPlanLimits(supabase, 'free');
 
         // Update user_subscriptions table
         await supabase
@@ -425,7 +477,7 @@ serve(async (req) => {
             }
 
             if (profile?.email) {
-              const portalUrl = `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/subscription`;
+              const portalUrl = `${getSiteUrl()}/dashboard/subscription`;
               await sendEmail({
                 to: profile.email,
                 subject: 'Action needed: your AgentBio payment failed',

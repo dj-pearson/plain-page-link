@@ -78,11 +78,10 @@ export type PublicListingFields =
   | 'address'
   | 'city'
   | 'price'
-  | 'beds'
-  | 'baths'
+  // beds/baths/sqft are GENERATED from these since US-106 and are no longer
+  // selected: reading both let a stale integer win over the canonical value.
   | 'bedrooms'
   | 'bathrooms'
-  | 'sqft'
   | 'square_feet'
   | 'status'
   | 'sort_order'

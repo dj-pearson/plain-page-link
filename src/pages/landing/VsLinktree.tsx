@@ -302,7 +302,7 @@ export default function VsLinktree() {
               <ReasonCard
                 icon={<DollarSign />}
                 title="Better ROI on Pricing"
-                description="AgentBio costs $39/month vs Linktree Pro at $24/month. But one extra lead per month from AgentBio's specialized features pays for the difference 50x over."
+                description="AgentBio's professional plan is $49/month vs Linktree Pro at $24/month. But one extra lead per month from AgentBio's specialized features pays for the difference 50x over."
               />
             </div>
           </div>

@@ -55,17 +55,15 @@ export const usePublicProfile = (username: string) => {
       if (profileError) throw profileError;
       if (!profile) throw new Error('Profile not found');
 
-      // Increment view count (non-blocking - fire and forget)
-      supabase
-        .rpc('increment_profile_views', {
-          _profile_id: profile.id,
-          // Fire and forget; a view-count failure must not fail the page.
-          // (No .catch(): PostgrestBuilder's .then() returns a PromiseLike.)
-        })
-        .then(
-          () => {},
-          () => {}
-        );
+      // No view increment here any more (US-115).
+      //
+      // This called increment_profile_views, a SECURITY DEFINER RPC with no
+      // throttle, from the anon client — so profiles.view_count and the
+      // analytics_views rows counted different things, and anyone holding the
+      // anon key (it ships in the bundle) could loop it. The counter is now a
+      // trigger on the throttled analytics_views insert, which useProfileTracking
+      // makes once per mounted page. Fetching a profile is not a view: this ran
+      // even for an agent whose page immediately redirects to a custom page.
 
       // Fetch all related data in parallel instead of sequential
       const [
@@ -73,6 +71,8 @@ export const usePublicProfile = (username: string) => {
         { data: testimonials, error: testimonialsError },
         { data: links, error: linksError },
         { data: settings, error: settingsError },
+        { data: responseHours },
+        { data: customPage },
       ] = await Promise.all([
         // Fetch listings with only needed columns
         supabase
@@ -85,11 +85,8 @@ export const usePublicProfile = (username: string) => {
             address,
             city,
             price,
-            beds,
-            baths,
             bedrooms,
             bathrooms,
-            sqft,
             square_feet,
             status,
             sort_order,
@@ -159,6 +156,33 @@ export const usePublicProfile = (username: string) => {
           )
           .eq('user_id', profile.id)
           .maybeSingle(),
+
+        // Median hours to first response over the last 90 days, or null below
+        // 5 responded leads. An aggregate from a SECURITY DEFINER function —
+        // `leads` itself stays unreadable to a visitor (US-111). The page used
+        // to hard-code "< 1 hour" for every agent.
+        supabase.rpc('public_agent_response_hours', { _user_id: profile.id }),
+
+        // The agent's active page-builder page, if they have one.
+        //
+        // This used to be fetched by FullProfilePage in its own effect, purely
+        // to decide whether to <Navigate> away to /p/<slug> — so building a
+        // page in the page builder silently replaced the entire listings and
+        // lead-capture profile with it. The blocks are a SECTION of the profile
+        // now (US-116), so they are fetched with everything else.
+        //
+        // maybeSingle + limit(1): .single() raises PGRST116 for none AND for
+        // several, and an agent with two active pages used to end up with
+        // neither.
+        supabase
+          .from('custom_pages')
+          .select('id, slug, title, blocks, theme')
+          .eq('user_id', profile.id)
+          .eq('is_active', true)
+          .eq('published', true)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
 
       // Handle errors from parallel queries
@@ -177,13 +201,16 @@ export const usePublicProfile = (username: string) => {
         date: t.date || t.created_at, // date is nullable; fall back to created_at
       }));
 
-      // The listings table carries both naming conventions (beds/bedrooms,
-      // sqft/square_feet) from an earlier reconciliation; normalise to one.
+      // One naming convention. beds/baths/sqft are GENERATED from these
+      // columns since US-106 and are not selected at all: the normalisation
+      // that stood here was `bedrooms ?? beds`, which meant the STALE value won
+      // whenever an edit wrote only the integers — an agent changed 3 beds to 4
+      // and their clients kept seeing 3.
       const transformedListings: PublicProfileListing[] = (listings || []).map((l) => ({
         ...l,
-        bedrooms: l.bedrooms ?? l.beds,
-        bathrooms: l.bathrooms ?? l.baths,
-        square_feet: l.square_feet ?? l.sqft,
+        bedrooms: l.bedrooms,
+        bathrooms: l.bathrooms,
+        square_feet: l.square_feet,
         // photos is jsonb; every consumer treats it as a URL list.
         photos: toStringList(l.photos),
       }));
@@ -204,6 +231,8 @@ export const usePublicProfile = (username: string) => {
         listings: transformedListings,
         testimonials: transformedTestimonials,
         links: links || [],
+        responseHours: typeof responseHours === 'number' ? responseHours : null,
+        customPage: customPage ?? null,
         settings: settings || {
           show_listings: true,
           show_sold_properties: true,

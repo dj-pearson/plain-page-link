@@ -1,29 +1,44 @@
-import { useState, useEffect } from "react";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
+import { parseSquareFeet } from '@/lib/format';
+import { LISTING_STATUSES } from '@/lib/listingStatus';
+import { ListingPhotoManager } from '@/components/listings/ListingPhotoManager';
 
 export interface EditListingFormData {
   address: string;
   city: string;
   price: string;
-  beds: number;
-  baths: number;
-  sqft?: number;
+  /** Canonical column. `beds` is GENERATED from it since US-106. */
+  bedrooms: number;
+  /** Canonical column, numeric — 2.5 is a real value here. */
+  bathrooms: number;
+  square_feet?: number;
   status: string;
-  image?: string;
+  /** The gallery. `image` is derived from photos[0] by the caller. */
+  photos: string[];
   description?: string;
   mls_number?: string;
   property_type?: string;
+  /** Columns the edit form never exposed, so an agent could only set them at
+   *  creation and never correct them (US-107). */
+  state?: string;
+  zip_code?: string;
+  lot_size_acres?: number;
+  virtual_tour_url?: string;
+  open_house_date?: string;
+  highlights?: string;
+  is_featured?: boolean;
 }
 
 interface EditListingModalProps {
@@ -31,9 +46,17 @@ interface EditListingModalProps {
   onClose: () => void;
   onSubmit: (data: EditListingFormData) => void;
   initialData: EditListingFormData;
+  /** Used to group newly uploaded photos under the listing's own folder. */
+  listingId?: string;
 }
 
-export function EditListingModal({ isOpen, onClose, onSubmit, initialData }: EditListingModalProps) {
+export function EditListingModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData,
+  listingId,
+}: EditListingModalProps) {
   const [formData, setFormData] = useState<EditListingFormData>(initialData);
 
   useEffect(() => {
@@ -52,10 +75,7 @@ export function EditListingModal({ isOpen, onClose, onSubmit, initialData }: Edi
       <div className="bg-card border border-border rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Edit Property Listing</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-accent rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-accent rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -94,34 +114,50 @@ export function EditListingModal({ isOpen, onClose, onSubmit, initialData }: Edi
             </div>
 
             <div>
-              <Label htmlFor="beds">Bedrooms *</Label>
+              <Label htmlFor="bedrooms">Bedrooms *</Label>
               <Input
-                id="beds"
+                id="bedrooms"
                 type="number"
-                value={formData.beds}
-                onChange={(e) => setFormData({ ...formData, beds: parseInt(e.target.value) })}
+                min={0}
+                value={formData.bedrooms}
+                onChange={(e) =>
+                  setFormData({ ...formData, bedrooms: Number(e.target.value) || 0 })
+                }
                 required
               />
             </div>
 
             <div>
-              <Label htmlFor="baths">Bathrooms *</Label>
+              <Label htmlFor="bathrooms">Bathrooms *</Label>
               <Input
-                id="baths"
+                id="bathrooms"
                 type="number"
-                value={formData.baths}
-                onChange={(e) => setFormData({ ...formData, baths: parseInt(e.target.value) })}
+                // step 0.5 to match the Add form, which has always offered
+                // half-baths — into an integer column that rejected them
+                // (US-106). parseInt also truncated 2.5 to 2 here.
+                step={0.5}
+                min={0}
+                value={formData.bathrooms}
+                onChange={(e) =>
+                  setFormData({ ...formData, bathrooms: Number(e.target.value) || 0 })
+                }
                 required
               />
             </div>
 
             <div>
-              <Label htmlFor="sqft">Square Feet</Label>
+              <Label htmlFor="square_feet">Square Feet</Label>
               <Input
-                id="sqft"
+                id="square_feet"
                 type="number"
-                value={formData.sqft || ''}
-                onChange={(e) => setFormData({ ...formData, sqft: parseInt(e.target.value) || undefined })}
+                min={0}
+                value={formData.square_feet ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    square_feet: parseSquareFeet(e.target.value) ?? undefined,
+                  })
+                }
               />
             </div>
 
@@ -135,10 +171,11 @@ export function EditListingModal({ isOpen, onClose, onSubmit, initialData }: Edi
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="under_contract">Under Contract</SelectItem>
-                  <SelectItem value="sold">Sold</SelectItem>
+                  {LISTING_STATUSES.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -183,13 +220,107 @@ export function EditListingModal({ isOpen, onClose, onSubmit, initialData }: Edi
             </div>
 
             <div className="col-span-2">
-              <Label htmlFor="image">Image URL</Label>
+              {/* Was a single raw "Image URL" text box: no add, no remove, no
+                  reorder, so photos could not be managed at all (US-107). */}
+              <ListingPhotoManager
+                photos={formData.photos}
+                onChange={(photos) => setFormData({ ...formData, photos })}
+                listingId={listingId}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="state">State</Label>
               <Input
-                id="image"
+                id="state"
+                maxLength={2}
+                value={formData.state || ''}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase() })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="zip_code">ZIP Code</Label>
+              <Input
+                id="zip_code"
+                inputMode="numeric"
+                value={formData.zip_code || ''}
+                onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="lot_size_acres">Lot Size (acres)</Label>
+              <Input
+                id="lot_size_acres"
+                type="number"
+                step={0.01}
+                min={0}
+                value={formData.lot_size_acres ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    lot_size_acres: e.target.value ? Number(e.target.value) : undefined,
+                  })
+                }
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="open_house_date">Open House</Label>
+              <Input
+                id="open_house_date"
+                type="date"
+                value={formData.open_house_date || ''}
+                onChange={(e) => setFormData({ ...formData, open_house_date: e.target.value })}
+              />
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="virtual_tour_url">Virtual Tour URL</Label>
+              <Input
+                id="virtual_tour_url"
                 type="url"
-                value={formData.image || ''}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder="https://example.com/image.jpg"
+                placeholder="https://..."
+                value={formData.virtual_tour_url || ''}
+                onChange={(e) => setFormData({ ...formData, virtual_tour_url: e.target.value })}
+              />
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="highlights">Property Highlights</Label>
+              <Input
+                id="highlights"
+                placeholder="Updated kitchen, corner lot, new roof"
+                value={formData.highlights || ''}
+                onChange={(e) => setFormData({ ...formData, highlights: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Comma-separated list of standout features.
+              </p>
+            </div>
+
+            <div className="col-span-2 flex items-center gap-2">
+              <input
+                id="is_featured"
+                type="checkbox"
+                checked={!!formData.is_featured}
+                onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="is_featured" className="mb-0">
+                Feature this listing on my profile
+              </Label>
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={4}
+                placeholder="Describe the property features..."
               />
             </div>
           </div>

@@ -3,14 +3,14 @@ import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './stores/useAuthStore';
 import { errorHandler } from './lib/errorHandler';
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import SecureRoute from './components/auth/SecureRoute';
 import { offlineStorage } from './lib/offline-storage';
 import { cleanupServiceWorkers } from './lib/sw-cleanup';
 import { OfflineIndicator } from './components/mobile/OfflineIndicator';
 import { FullPageLoader } from './components/LoadingSpinner';
 import LazyLoadErrorBoundary from './components/LazyLoadErrorBoundary';
 import { RouteErrorBoundary } from './components/RouteErrorBoundary';
+import RequireAuth from './components/auth/RequireAuth';
+import PublicBoundary from './components/PublicBoundary';
 import { SkipNavLink } from './components/ui/skip-nav';
 import { AnnouncerProvider } from './components/ui/live-region';
 import { RouteAnnouncer } from './components/ui/route-announcer';
@@ -19,7 +19,6 @@ import { CookieConsent } from './components/ui/cookie-consent';
 
 // Public pages (eager load for better UX on landing)
 import Landing from './pages/public/Landing';
-import ProfilePage from './pages/public/FullProfilePage';
 import NotFound from './pages/public/NotFound';
 
 // Lazy load public review page
@@ -91,7 +90,6 @@ const ApiKeysPage = lazy(() => import('./pages/dashboard/ApiKeysPage'));
 const TeamPage = lazy(() => import('./pages/dashboard/TeamPage'));
 const DeleteAccount = lazy(() => import('./pages/dashboard/DeleteAccount'));
 const QuickActionsDashboard = lazy(() => import('./pages/QuickActionsDashboard'));
-const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
 const PageBuilderEditor = lazy(() => import('./pages/PageBuilder'));
 
 // Lazy load workflow pages
@@ -108,6 +106,17 @@ const AdminDashboard = lazy(() =>
 const SEODashboard = lazy(() => import('./pages/SEODashboard'));
 const AuditLogPage = lazy(() => import('./pages/admin/AuditLogPage'));
 const HealthDashboard = lazy(() => import('./pages/admin/HealthDashboard'));
+const SearchAnalyticsPage = lazy(() => import('./pages/admin/SearchAnalyticsPage'));
+
+/**
+ * Lazy, like every other page (US-120).
+ *
+ * FullProfilePage was a static import, so its twenty imports — the listing
+ * modal, the carousel, the testimonials section, the theme engine — were pulled
+ * into the entry chunk and downloaded by everyone who loaded the marketing
+ * site, whether or not they ever opened a profile.
+ */
+const ProfilePage = lazy(() => import('./pages/public/FullProfilePage'));
 
 function App() {
   const { initialize, user } = useAuthStore();
@@ -157,92 +166,75 @@ function App() {
       <LazyLoadErrorBoundary>
         <Suspense fallback={<FullPageLoader text="Loading page..." />}>
           <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Landing />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<TermsOfService />} />
-            <Route path="/dmca" element={<DMCAPolicy />} />
-            <Route path="/acceptable-use" element={<AcceptableUse />} />
-            <Route path="/accessibility" element={<AccessibilityStatement />} />
-            <Route path="/cookies" element={<CookiePolicy />} />
-            <Route path="/privacy-choices" element={<PrivacyChoices />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/blog/category/:category" element={<BlogCategory />} />
-            <Route path="/blog/:slug" element={<BlogArticle />} />
-            <Route path="/p/:slug" element={<PublicPage />} />
+            {/* Public routes.
+                Wrapped in one RouteErrorBoundary layout route rather than
+                bare: the boundary used to sit on the dashboard, admin and a
+                handful of individual pages, leaving the 13 public/legal/blog
+                routes, 5 landings, 5 feature pages and 7 auth routes with none
+                at all — a render error on any of them was a white screen
+                (US-120). */}
+            <Route element={<PublicBoundary />}>
+              <Route path="/" element={<Landing />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/dmca" element={<DMCAPolicy />} />
+              <Route path="/acceptable-use" element={<AcceptableUse />} />
+              <Route path="/accessibility" element={<AccessibilityStatement />} />
+              <Route path="/cookies" element={<CookiePolicy />} />
+              <Route path="/privacy-choices" element={<PrivacyChoices />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/category/:category" element={<BlogCategory />} />
+              <Route path="/blog/:slug" element={<BlogArticle />} />
+              <Route path="/p/:slug" element={<PublicPage />} />
 
-            {/* Landing pages */}
-            <Route path="/for-real-estate-agents" element={<ForRealEstateAgents />} />
-            <Route path="/instagram-bio-for-realtors" element={<InstagramBioForRealtors />} />
-            <Route path="/vs/linktree" element={<VsLinktree />} />
-            <Route path="/vs/beacons" element={<VsBeacons />} />
-            <Route path="/vs/later" element={<VsLater />} />
+              {/* Landing pages */}
+              <Route path="/for-real-estate-agents" element={<ForRealEstateAgents />} />
+              <Route path="/instagram-bio-for-realtors" element={<InstagramBioForRealtors />} />
+              <Route path="/vs/linktree" element={<VsLinktree />} />
+              <Route path="/vs/beacons" element={<VsBeacons />} />
+              <Route path="/vs/later" element={<VsLater />} />
 
-            {/* Location pages - Dynamic route for all 22+ cities (programmatic SEO) */}
-            <Route path="/for/:slug" element={<DynamicLocationPage />} />
+              {/* Location pages - Dynamic route for all 22+ cities (programmatic SEO) */}
+              <Route path="/for/:slug" element={<DynamicLocationPage />} />
 
-            {/* Feature pages */}
-            <Route path="/features/property-listings" element={<PropertyListings />} />
-            <Route path="/features/lead-capture" element={<LeadCapture />} />
-            <Route path="/features/calendar-booking" element={<CalendarBooking />} />
-            <Route path="/features/testimonials" element={<TestimonialsFeature />} />
-            <Route path="/features/analytics" element={<AnalyticsFeature />} />
+              {/* Feature pages */}
+              <Route path="/features/property-listings" element={<PropertyListings />} />
+              <Route path="/features/lead-capture" element={<LeadCapture />} />
+              <Route path="/features/calendar-booking" element={<CalendarBooking />} />
+              <Route path="/features/testimonials" element={<TestimonialsFeature />} />
+              <Route path="/features/analytics" element={<AnalyticsFeature />} />
 
-            {/* Tools — isolated error boundary */}
-            <Route
-              path="/tools/instagram-bio-analyzer"
-              element={
-                <RouteErrorBoundary section="Instagram Bio Analyzer" backPath="/" backLabel="Home">
-                  <InstagramBioAnalyzer />
-                </RouteErrorBoundary>
-              }
-            />
-            <Route
-              path="/tools/listing-description-generator"
-              element={
-                <RouteErrorBoundary
-                  section="Listing Description Generator"
-                  backPath="/"
-                  backLabel="Home"
-                >
-                  <ListingDescriptionGenerator />
-                </RouteErrorBoundary>
-              }
-            />
+              {/* Tools */}
+              <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
+              <Route
+                path="/tools/listing-description-generator"
+                element={<ListingDescriptionGenerator />}
+              />
 
-            {/* User profiles — isolated error boundary */}
-            <Route
-              path="/:username/review"
-              element={
-                <RouteErrorBoundary section="Review">
-                  <SubmitReview />
-                </RouteErrorBoundary>
-              }
-            />
-            <Route
-              path="/:slug"
-              element={
-                <RouteErrorBoundary section="Profile">
-                  <ProfilePage />
-                </RouteErrorBoundary>
-              }
-            />
+              {/* Auth */}
+              <Route path="/auth/login" element={<Login />} />
+              <Route path="/auth/register" element={<Register />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+              <Route path="/auth/mfa" element={<MFAChallenge />} />
+              <Route path="/auth/reset-password" element={<ResetPassword />} />
+              <Route path="/auth/sso/callback" element={<SSOCallback />} />
 
-            {/* Auth routes */}
-            <Route path="/auth/login" element={<Login />} />
-            <Route path="/auth/register" element={<Register />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-            <Route path="/auth/mfa" element={<MFAChallenge />} />
-            <Route path="/auth/reset-password" element={<ResetPassword />} />
-            <Route path="/auth/sso/callback" element={<SSOCallback />} />
+              {/* User profiles. Last, so a real route always wins over the
+                  username catch-all. */}
+              <Route path="/:username/review" element={<SubmitReview />} />
+              <Route path="/:slug" element={<ProfilePage />} />
+            </Route>
 
-            {/* Onboarding (protected) — isolated error boundary */}
-            <Route
-              path="/onboarding/wizard"
-              element={
-                <ProtectedRoute>
+            {/* Everything that needs a session. One guard (US-120): this was
+                ProtectedRoute here and SecureRoute on /admin, two components
+                with different state machines writing the same
+                lastVisitedRoute key. */}
+            <Route element={<RequireAuth />}>
+              <Route
+                path="/onboarding/wizard"
+                element={
                   <RouteErrorBoundary
                     section="Onboarding"
                     backPath="/dashboard"
@@ -250,45 +242,39 @@ function App() {
                   >
                     <OnboardingWizardPage />
                   </RouteErrorBoundary>
-                </ProtectedRoute>
-              }
-            />
+                }
+              />
 
-            {/* Dashboard routes (protected) — isolated error boundary */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
+              <Route
+                path="/dashboard"
+                element={
                   <RouteErrorBoundary section="Dashboard" backPath="/" backLabel="Home">
                     <DashboardLayout />
                   </RouteErrorBoundary>
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Overview />} />
-              <Route path="listings" element={<Listings />} />
-              <Route path="quick-actions" element={<QuickActionsDashboard />} />
-              <Route path="leads" element={<Leads />} />
-              <Route path="analytics-advanced" element={<AnalyticsDashboard />} />
-              <Route path="page-builder" element={<PageBuilderEditor />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="theme" element={<Theme />} />
-              <Route path="links" element={<Links />} />
-              <Route path="testimonials" element={<Testimonials />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="subscription" element={<SubscriptionPage />} />
-              <Route path="api-keys" element={<ApiKeysPage />} />
-              <Route path="team" element={<TeamPage />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="settings/delete-account" element={<DeleteAccount />} />
-              <Route path="workflows" element={<WorkflowsListPage />} />
-            </Route>
+                }
+              >
+                <Route index element={<Overview />} />
+                <Route path="listings" element={<Listings />} />
+                <Route path="quick-actions" element={<QuickActionsDashboard />} />
+                <Route path="leads" element={<Leads />} />
+                <Route path="page-builder" element={<PageBuilderEditor />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="theme" element={<Theme />} />
+                <Route path="links" element={<Links />} />
+                <Route path="testimonials" element={<Testimonials />} />
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="subscription" element={<SubscriptionPage />} />
+                <Route path="api-keys" element={<ApiKeysPage />} />
+                <Route path="team" element={<TeamPage />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="settings/delete-account" element={<DeleteAccount />} />
+                <Route path="workflows" element={<WorkflowsListPage />} />
+              </Route>
 
-            {/* Workflow Builder (full screen, outside dashboard layout) */}
-            <Route
-              path="/dashboard/workflows/:workflowId"
-              element={
-                <ProtectedRoute>
+              {/* Workflow Builder (full screen, outside dashboard layout) */}
+              <Route
+                path="/dashboard/workflows/:workflowId"
+                element={
                   <RouteErrorBoundary
                     section="Workflow Builder"
                     backPath="/dashboard/workflows"
@@ -296,15 +282,15 @@ function App() {
                   >
                     <WorkflowBuilderPage />
                   </RouteErrorBoundary>
-                </ProtectedRoute>
-              }
-            />
+                }
+              />
+            </Route>
 
-            {/* Admin routes — isolated error boundary */}
-            <Route
-              path="/admin"
-              element={
-                <SecureRoute requireAdmin>
+            {/* Admin — the platform's own tooling, not the agent's. */}
+            <Route element={<RequireAuth requireAdmin />}>
+              <Route
+                path="/admin"
+                element={
                   <RouteErrorBoundary
                     section="Admin"
                     backPath="/dashboard"
@@ -312,13 +298,11 @@ function App() {
                   >
                     <AdminDashboard />
                   </RouteErrorBoundary>
-                </SecureRoute>
-              }
-            />
-            <Route
-              path="/admin/seo"
-              element={
-                <SecureRoute requireAdmin>
+                }
+              />
+              <Route
+                path="/admin/seo"
+                element={
                   <RouteErrorBoundary
                     section="SEO Dashboard"
                     backPath="/admin"
@@ -326,13 +310,11 @@ function App() {
                   >
                     <SEODashboard />
                   </RouteErrorBoundary>
-                </SecureRoute>
-              }
-            />
-            <Route
-              path="/admin/audit-log"
-              element={
-                <SecureRoute requireAdmin>
+                }
+              />
+              <Route
+                path="/admin/audit-log"
+                element={
                   <RouteErrorBoundary
                     section="Audit Log"
                     backPath="/admin"
@@ -340,13 +322,11 @@ function App() {
                   >
                     <AuditLogPage />
                   </RouteErrorBoundary>
-                </SecureRoute>
-              }
-            />
-            <Route
-              path="/admin/health"
-              element={
-                <SecureRoute requireAdmin>
+                }
+              />
+              <Route
+                path="/admin/health"
+                element={
                   <RouteErrorBoundary
                     section="Platform Health"
                     backPath="/admin"
@@ -354,9 +334,21 @@ function App() {
                   >
                     <HealthDashboard />
                   </RouteErrorBoundary>
-                </SecureRoute>
-              }
-            />
+                }
+              />
+              <Route
+                path="/admin/search-analytics"
+                element={
+                  <RouteErrorBoundary
+                    section="Search Analytics"
+                    backPath="/admin"
+                    backLabel="Back to Admin"
+                  >
+                    <SearchAnalyticsPage />
+                  </RouteErrorBoundary>
+                }
+              />
+            </Route>
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

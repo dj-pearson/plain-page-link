@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileCompletionWidget } from '@/components/dashboard/ProfileCompletionWidget';
 import { QuickActionsWidget } from '@/components/dashboard/QuickActionsWidget';
 import { ConversionFunnel } from '@/components/dashboard/ConversionFunnel';
+import { DueFollowUps } from '@/components/dashboard/DueFollowUps';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getPlanById } from '@/config/pricing-plans';
 import {
@@ -131,7 +132,10 @@ export default function Overview() {
         />
         <StatCard
           icon={<Users className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />}
-          label="New Leads"
+          // Not "New Leads": this is every lead in the window, whatever its
+          // status, so the label contradicted the Leads page's New count
+          // (US-104).
+          label="Leads (30d)"
           value={stats.totalLeads.toString()}
         />
         <StatCard
@@ -145,6 +149,9 @@ export default function Overview() {
           value={`${stats.conversionRate.toFixed(2)}%`}
         />
       </div>
+
+      {/* What needs doing today, before anything that only reports numbers. */}
+      <DueFollowUps />
 
       {/* Conversion Funnel */}
       <ConversionFunnel />
@@ -160,9 +167,12 @@ export default function Overview() {
             {recentLeads.length > 0 ? (
               <div className="space-y-2 sm:space-y-3">
                 {recentLeads.slice(0, 5).map((lead) => (
-                  <div
+                  // US-103: these rows were not links, so the one place an
+                  // agent sees a new lead on the dashboard was a dead end.
+                  <Link
                     key={lead.id}
-                    className="flex items-center justify-between py-2 sm:py-2.5 border-b border-border last:border-0 gap-2 min-h-[44px]"
+                    to={`/dashboard/leads?lead=${lead.id}`}
+                    className="flex items-center justify-between py-2 sm:py-2.5 border-b border-border last:border-0 gap-2 min-h-[44px] hover:bg-accent/40 rounded-md px-1 -mx-1 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm sm:text-base truncate">{lead.name}</p>
@@ -181,7 +191,7 @@ export default function Overview() {
                     >
                       {lead.status}
                     </span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (

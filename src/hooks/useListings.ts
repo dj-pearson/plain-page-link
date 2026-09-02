@@ -52,6 +52,12 @@ export function useListings() {
         .from('listings')
         .select('*')
         .eq('user_id', user.id)
+        // Same order the public gallery uses, so a reorder on the dashboard
+        // shows the agent exactly what a visitor will see. It ordered by
+        // created_at, which meant the dashboard and the public page disagreed
+        // as soon as sort_order was written (US-107). created_at breaks ties,
+        // since every listing starts at sort_order 0.
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
 
       if (error) throw error;

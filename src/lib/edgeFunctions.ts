@@ -29,12 +29,7 @@ export async function callEdgeFunction<T = any>(
   functionName: string,
   options: EdgeFunctionOptions = {}
 ): Promise<T> {
-  const {
-    method = 'POST',
-    body,
-    headers = {},
-    auth = false,
-  } = options;
+  const { method = 'POST', body, headers = {}, auth = false } = options;
 
   const url = `${EDGE_FUNCTIONS_URL}/${functionName}`;
 
@@ -46,7 +41,9 @@ export async function callEdgeFunction<T = any>(
 
   // Add authorization if requested
   if (auth) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (session?.access_token) {
       requestHeaders['Authorization'] = `Bearer ${session.access_token}`;
     }
@@ -63,7 +60,7 @@ export async function callEdgeFunction<T = any>(
   if (!response.ok) {
     const errorText = await response.text();
     let errorMessage = `Edge function '${functionName}' failed: ${response.status} ${response.statusText}`;
-    
+
     try {
       const errorJson = JSON.parse(errorText);
       errorMessage = errorJson.error || errorJson.message || errorMessage;
@@ -79,7 +76,12 @@ export async function callEdgeFunction<T = any>(
   const responseData = await response.json();
 
   // Unwrap standardized response format { success, data } if present
-  if (responseData && typeof responseData === 'object' && 'success' in responseData && 'data' in responseData) {
+  if (
+    responseData &&
+    typeof responseData === 'object' &&
+    'success' in responseData &&
+    'data' in responseData
+  ) {
     return responseData.data as T;
   }
 
@@ -91,7 +93,10 @@ export async function callEdgeFunction<T = any>(
  * Use this to quickly migrate existing code
  */
 export const edgeFunctions = {
-  invoke: async <T = any>(functionName: string, options?: { body?: any; headers?: Record<string, string> }) => {
+  invoke: async <T = any>(
+    functionName: string,
+    options?: { body?: any; headers?: Record<string, string> }
+  ) => {
     try {
       const data = await callEdgeFunction<T>(functionName, {
         method: 'POST',
@@ -121,31 +126,6 @@ export const EdgeFunctions = {
       auth: false,
     }),
 
-  // Lead submission
-  submitLead: (lead: {
-    name: string;
-    email: string;
-    phone?: string;
-    message?: string;
-    source?: string;
-  }) =>
-    callEdgeFunction<{ success: boolean; leadId?: string }>('submit-lead', {
-      body: lead,
-      auth: false,
-    }),
-
-  // Contact form submission
-  submitContact: (contact: {
-    name: string;
-    email: string;
-    message: string;
-    subject?: string;
-  }) =>
-    callEdgeFunction<{ success: boolean }>('submit-contact', {
-      body: contact,
-      auth: false,
-    }),
-
   // Generate listing description
   generateListingDescription: (listing: {
     address: string;
@@ -162,21 +142,14 @@ export const EdgeFunctions = {
     }),
 
   // Send listing generator email
-  sendListingGeneratorEmail: (data: {
-    email: string;
-    description: string;
-    listingData: any;
-  }) =>
+  sendListingGeneratorEmail: (data: { email: string; description: string; listingData: any }) =>
     callEdgeFunction<{ success: boolean }>('send-listing-generator-email', {
       body: data,
       auth: false,
     }),
 
   // Send bio analyzer email
-  sendBioAnalyzerEmail: (data: {
-    email: string;
-    analysis: any;
-  }) =>
+  sendBioAnalyzerEmail: (data: { email: string; analysis: any }) =>
     callEdgeFunction<{ success: boolean }>('send-bio-analyzer-email', {
       body: data,
       auth: false,
@@ -229,15 +202,14 @@ export const EdgeFunctions = {
     }),
 
   // Generate article
-  generateArticle: (data: {
-    topic: string;
-    keywords?: string[];
-    tone?: string;
-  }) =>
-    callEdgeFunction<{ title: string; content: string; meta_description: string }>('generate-article', {
-      body: data,
-      auth: true,
-    }),
+  generateArticle: (data: { topic: string; keywords?: string[]; tone?: string }) =>
+    callEdgeFunction<{ title: string; content: string; meta_description: string }>(
+      'generate-article',
+      {
+        body: data,
+        auth: true,
+      }
+    ),
 
   // Generate social post
   generateSocialPost: (data: {
@@ -251,10 +223,7 @@ export const EdgeFunctions = {
     }),
 
   // Google Indexing API - submit URLs for indexing/removal
-  submitGoogleIndexing: (data: {
-    urls: string[];
-    action?: 'URL_UPDATED' | 'URL_DELETED';
-  }) =>
+  submitGoogleIndexing: (data: { urls: string[]; action?: 'URL_UPDATED' | 'URL_DELETED' }) =>
     callEdgeFunction<{
       success: boolean;
       total: number;
@@ -269,4 +238,3 @@ export const EdgeFunctions = {
 };
 
 export default EdgeFunctions;
-

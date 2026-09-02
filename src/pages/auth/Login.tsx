@@ -35,7 +35,6 @@ export default function Login() {
     error,
     clearError,
     user,
-    profile,
     requiresMFA,
     mfaVerified,
   } = useAuthStore();
@@ -70,16 +69,14 @@ export default function Login() {
     }
 
     localStorage.removeItem('lastVisitedRoute');
-    // Route brand-new users (no onboarding completion) into the wizard.
-    // onboarding_completed_at isn't in the generated types yet — isolated read.
-    const onboardingDone = (profile as { onboarding_completed_at?: string | null } | null)
-      ?.onboarding_completed_at;
-    if (profile && !onboardingDone && redirectTo === '/dashboard') {
-      navigate('/onboarding/wizard', { replace: true });
-    } else {
-      navigate(redirectTo, { replace: true });
-    }
-  }, [user, profile, navigate, redirectTo, requiresMFA, mfaVerified]);
+    // The onboarding redirect used to live here, which meant it only ever fired
+    // on the password path — a Google or Apple signup went straight to the
+    // dashboard and never saw the wizard. It is in ProtectedRoute now, so every
+    // auth path reaches it exactly once (US-108). (The isolated
+    // `onboarding_completed_at isn't in the generated types` cast went with it;
+    // the column has always been there.)
+    navigate(redirectTo, { replace: true });
+  }, [user, navigate, redirectTo, requiresMFA, mfaVerified]);
 
   useEffect(() => {
     return () => {
@@ -237,22 +234,13 @@ export default function Login() {
               ))}
             </div>
 
-            {/* Testimonial */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-              <p className="text-blue-100/80 text-sm leading-relaxed italic">
-                "AgentBio completely changed how I manage leads. The AI scoring alone saved me hours
-                every week and my conversion rate doubled in the first month."
-              </p>
-              <div className="mt-4 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
-                  SM
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-white">Sarah Mitchell</div>
-                  <div className="text-xs text-blue-200/50">Top Producer, Miami</div>
-                </div>
-              </div>
-            </div>
+            {/* The testimonial that stood here — a named quote attributed
+                to "Sarah Mitchell, Top Producer, Miami" — is removed (US-111).
+                There is no testimonial record behind it and no way for a reader
+                to check it. A fabricated endorsement from a named person is a
+                different thing from optimistic copy, and this product sells to
+                licensed professionals who are themselves regulated on exactly
+                that point. Reinstate it from a real, attributable review. */}
           </div>
 
           {/* Footer */}

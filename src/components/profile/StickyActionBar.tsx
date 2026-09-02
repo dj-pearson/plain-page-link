@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, MessageSquare, Mail, Calendar, Home, X, ChevronUp } from 'lucide-react';
 import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
+import { trackContactTap } from '@/lib/analyticsEvents';
 
 interface StickyActionBarProps {
   profile: PublicProfile;
@@ -20,6 +21,12 @@ export function StickyActionBar({
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleAction = (method: string, value?: string) => {
+    // The sticky bar is the main contact surface on a phone, and it reported
+    // nothing at all — not even to the console, as ContactButtons did. Recorded
+    // before the navigation, because `tel:` and `mailto:` leave the page
+    // (US-115). Fire-and-forget: the call must not wait on the insert.
+    void trackContactTap(profile.id, method);
+
     if (method === 'phone' && value) {
       window.location.href = `tel:${value}`;
     } else if (method === 'email' && value) {
@@ -95,7 +102,9 @@ export function StickyActionBar({
   return (
     <>
       {/* Mobile - Bottom Action Bar */}
-      <div className="md:hidden">
+      {/* xl:hidden, paired with the desktop panel's hidden xl:block below —
+          one of the two at every width, neither on top of the content. */}
+      <div className="xl:hidden">
         <AnimatePresence>
           {isExpanded && (
             <motion.div
@@ -170,8 +179,13 @@ export function StickyActionBar({
         </motion.button>
       </div>
 
-      {/* Desktop - Floating Side Panel */}
-      <div className="hidden md:block">
+      {/* Desktop - Floating Side Panel.
+          Shown from xl (1280px), not md (768px). At md the content column
+          reaches the full width, so a 200px panel pinned to right-6 sat on top
+          of it from 768px to about 1150px (US-112). The mobile bar below is
+          xl:hidden to match, so exactly one of the two is present at every
+          width — the pair used to leave no gap only by overlapping. */}
+      <div className="hidden xl:block">
         <motion.div
           initial={{ x: 100, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
@@ -222,7 +236,10 @@ export function StickyActionBar({
               <p className="text-xs font-medium text-gray-900">
                 {profile.full_name || profile.username}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">Responds in &lt; 1 hour</p>
+              {/* "Responds in < 1 hour" stood here as literal text for every
+                  agent, with nothing behind it (US-111). The profile header
+                  shows a response time when one can be computed from real
+                  first-response data; there is nothing honest to say here. */}
             </div>
           </div>
         </motion.div>

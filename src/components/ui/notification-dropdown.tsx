@@ -4,6 +4,7 @@
  */
 
 import { CheckCheck, Inbox } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { AppNotification } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +14,20 @@ interface NotificationDropdownProps {
   isLoading: boolean;
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
+}
+
+/**
+ * Where a notification takes you.
+ *
+ * US-103: tapping a New Lead notification marked it read and did nothing else —
+ * `data.lead_id` was written by the trigger and read by nobody, so the agent
+ * was told about a lead and then left to go find it.
+ */
+function notificationTarget(n: AppNotification): string | null {
+  const leadId = (n.data as { lead_id?: string } | null)?.lead_id;
+  if (leadId) return `/dashboard/leads?lead=${leadId}`;
+  if (n.type === 'new_lead' || n.type === 'lead_overdue') return '/dashboard/leads';
+  return null;
 }
 
 function relativeTime(iso: string): string {
@@ -32,6 +47,8 @@ export function NotificationDropdown({
   onMarkAsRead,
   onMarkAllAsRead,
 }: NotificationDropdownProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="flex max-h-[420px] flex-col">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -59,7 +76,11 @@ export function NotificationDropdown({
             {notifications.map((n) => (
               <li key={n.id}>
                 <button
-                  onClick={() => !n.read_at && onMarkAsRead(n.id)}
+                  onClick={() => {
+                    if (!n.read_at) onMarkAsRead(n.id);
+                    const target = notificationTarget(n);
+                    if (target) navigate(target);
+                  }}
                   className={cn(
                     'flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors hover:bg-accent/50',
                     !n.read_at && 'bg-primary/5'

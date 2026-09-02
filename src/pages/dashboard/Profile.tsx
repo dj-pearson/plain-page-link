@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { Camera, Save, Plus, X } from "lucide-react";
-import { useProfile } from "@/hooks/useProfile";
-import { useAvatarUpload } from "@/hooks/useAvatarUpload";
-import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SkeletonProfile } from "@/components/ui/skeleton";
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { Camera, Save, Plus, X } from 'lucide-react';
+import { useProfile } from '@/hooks/useProfile';
+import { useAvatarUpload } from '@/hooks/useAvatarUpload';
+import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SkeletonProfile } from '@/components/ui/skeleton';
 
 export default function Profile() {
   const { profile, isLoading, updateProfile } = useProfile();
@@ -12,91 +13,91 @@ export default function Profile() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
-    full_name: "",
-    username: "",
-    bio: "",
-    avatar_url: "",
+    full_name: '',
+    username: '',
+    bio: '',
+    avatar_url: '',
 
     // Professional Information
-    title: "",
-    license_number: "",
-    license_state: "",
-    brokerage_name: "",
-    brokerage_logo: "",
+    title: '',
+    license_number: '',
+    license_state: '',
+    brokerage_name: '',
+    brokerage_logo: '',
     years_experience: 0,
     specialties: [] as string[],
     certifications: [] as string[],
 
     // Contact Information
-    phone: "",
-    email_display: "",
-    website_url: "",
-    calendly_url: "",
+    phone: '',
+    email_display: '',
+    website_url: '',
+    calendly_url: '',
 
     // Service Areas
     service_cities: [] as string[],
     service_zip_codes: [] as string[],
 
     // Social Media
-    facebook_url: "",
-    instagram_url: "",
-    linkedin_url: "",
-    tiktok_url: "",
-    youtube_url: "",
-    zillow_url: "",
-    realtor_com_url: "",
+    facebook_url: '',
+    instagram_url: '',
+    linkedin_url: '',
+    tiktok_url: '',
+    youtube_url: '',
+    zillow_url: '',
+    realtor_com_url: '',
 
     // SEO
-    seo_title: "",
-    seo_description: "",
+    seo_title: '',
+    seo_description: '',
   });
 
   // States for managing array inputs
-  const [specialtyInput, setSpecialtyInput] = useState("");
-  const [certificationInput, setCertificationInput] = useState("");
-  const [cityInput, setCityInput] = useState("");
-  const [zipInput, setZipInput] = useState("");
+  const [specialtyInput, setSpecialtyInput] = useState('');
+  const [certificationInput, setCertificationInput] = useState('');
+  const [cityInput, setCityInput] = useState('');
+  const [zipInput, setZipInput] = useState('');
 
   useEffect(() => {
     if (profile) {
       setFormData({
-        full_name: profile.full_name || "",
-        username: profile.username || "",
-        bio: profile.bio || "",
-        avatar_url: profile.avatar_url || "",
+        full_name: profile.full_name || '',
+        username: profile.username || '',
+        bio: profile.bio || '',
+        avatar_url: profile.avatar_url || '',
 
         // Professional Information
-        title: profile.title || "",
-        license_number: profile.license_number || "",
-        license_state: profile.license_state || "",
-        brokerage_name: profile.brokerage_name || "",
-        brokerage_logo: profile.brokerage_logo || "",
+        title: profile.title || '',
+        license_number: profile.license_number || '',
+        license_state: profile.license_state || '',
+        brokerage_name: profile.brokerage_name || '',
+        brokerage_logo: profile.brokerage_logo || '',
         years_experience: profile.years_experience || 0,
         specialties: profile.specialties || [],
         certifications: profile.certifications || [],
 
         // Contact Information
-        phone: profile.phone || "",
-        email_display: profile.email_display || "",
-        website_url: profile.website_url || "",
-        calendly_url: profile.calendly_url || "",
+        phone: profile.phone || '',
+        email_display: profile.email_display || '',
+        website_url: profile.website_url || '',
+        calendly_url: profile.calendly_url || '',
 
         // Service Areas
         service_cities: profile.service_cities || [],
         service_zip_codes: profile.service_zip_codes || [],
 
         // Social Media
-        facebook_url: profile.facebook_url || "",
-        instagram_url: profile.instagram_url || "",
-        linkedin_url: profile.linkedin_url || "",
-        tiktok_url: profile.tiktok_url || "",
-        youtube_url: profile.youtube_url || "",
-        zillow_url: profile.zillow_url || "",
-        realtor_com_url: profile.realtor_com_url || "",
+        facebook_url: profile.facebook_url || '',
+        instagram_url: profile.instagram_url || '',
+        linkedin_url: profile.linkedin_url || '',
+        tiktok_url: profile.tiktok_url || '',
+        youtube_url: profile.youtube_url || '',
+        zillow_url: profile.zillow_url || '',
+        realtor_com_url: profile.realtor_com_url || '',
 
         // SEO
-        seo_title: profile.seo_title || "",
-        seo_description: profile.seo_description || "",
+        seo_title: profile.seo_title || '',
+        seo_description: profile.seo_description || '',
       });
     }
   }, [profile]);
@@ -107,13 +108,13 @@ export default function Profile() {
     const { name, value, type } = e.target;
     setFormData({
       ...formData,
-      [name]: type === "number" ? Number(value) : value,
+      [name]: type === 'number' ? Number(value) : value,
     });
   };
 
   // Phone number formatting
   const formatPhone = (value: string) => {
-    const cleaned = value.replace(/\D/g, "");
+    const cleaned = value.replace(/\D/g, '');
     if (cleaned.length <= 3) return cleaned;
     if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
     return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
@@ -128,7 +129,7 @@ export default function Profile() {
   const addSpecialty = () => {
     if (specialtyInput.trim() && !formData.specialties.includes(specialtyInput.trim())) {
       setFormData({ ...formData, specialties: [...formData.specialties, specialtyInput.trim()] });
-      setSpecialtyInput("");
+      setSpecialtyInput('');
     }
   };
 
@@ -138,35 +139,50 @@ export default function Profile() {
 
   const addCertification = () => {
     if (certificationInput.trim() && !formData.certifications.includes(certificationInput.trim())) {
-      setFormData({ ...formData, certifications: [...formData.certifications, certificationInput.trim()] });
-      setCertificationInput("");
+      setFormData({
+        ...formData,
+        certifications: [...formData.certifications, certificationInput.trim()],
+      });
+      setCertificationInput('');
     }
   };
 
   const removeCertification = (index: number) => {
-    setFormData({ ...formData, certifications: formData.certifications.filter((_, i) => i !== index) });
+    setFormData({
+      ...formData,
+      certifications: formData.certifications.filter((_, i) => i !== index),
+    });
   };
 
   const addCity = () => {
     if (cityInput.trim() && !formData.service_cities.includes(cityInput.trim())) {
       setFormData({ ...formData, service_cities: [...formData.service_cities, cityInput.trim()] });
-      setCityInput("");
+      setCityInput('');
     }
   };
 
   const removeCity = (index: number) => {
-    setFormData({ ...formData, service_cities: formData.service_cities.filter((_, i) => i !== index) });
+    setFormData({
+      ...formData,
+      service_cities: formData.service_cities.filter((_, i) => i !== index),
+    });
   };
 
   const addZip = () => {
     if (zipInput.trim() && !formData.service_zip_codes.includes(zipInput.trim())) {
-      setFormData({ ...formData, service_zip_codes: [...formData.service_zip_codes, zipInput.trim()] });
-      setZipInput("");
+      setFormData({
+        ...formData,
+        service_zip_codes: [...formData.service_zip_codes, zipInput.trim()],
+      });
+      setZipInput('');
     }
   };
 
   const removeZip = (index: number) => {
-    setFormData({ ...formData, service_zip_codes: formData.service_zip_codes.filter((_, i) => i !== index) });
+    setFormData({
+      ...formData,
+      service_zip_codes: formData.service_zip_codes.filter((_, i) => i !== index),
+    });
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,16 +198,20 @@ export default function Profile() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateProfile.mutateAsync(formData);
+      // The username is not editable here any more, so it must not be sent:
+      // this form used to submit whatever was in the field, raw and
+      // un-normalised, competing with Settings' validated editor (US-117).
+      const { username: _username, ...editableFields } = formData;
+      await updateProfile.mutateAsync(editableFields);
       toast({
-        title: "Profile updated!",
-        description: "Your profile has been saved successfully.",
+        title: 'Profile updated!',
+        description: 'Your profile has been saved successfully.',
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update profile. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update profile. Please try again.',
+        variant: 'destructive',
       });
     }
   };
@@ -216,15 +236,13 @@ export default function Profile() {
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
-          {updateProfile.isPending ? "Saving..." : "Save Changes"}
+          {updateProfile.isPending ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
       {/* Profile Photo */}
       <div className="bg-card border border-border rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">
-          Profile Photo
-        </h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Profile Photo</h2>
         <div className="flex items-center gap-6">
           <div className="relative">
             {formData.avatar_url ? (
@@ -235,7 +253,12 @@ export default function Profile() {
               />
             ) : (
               <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-3xl font-bold text-primary">
-                {formData.full_name?.split(' ').map(n => n[0]).join('') || formData.username?.[0]?.toUpperCase() || "?"}
+                {formData.full_name
+                  ?.split(' ')
+                  .map((n) => n[0])
+                  .join('') ||
+                  formData.username?.[0]?.toUpperCase() ||
+                  '?'}
               </div>
             )}
             <button
@@ -249,16 +272,14 @@ export default function Profile() {
           </div>
           <div>
             <h3 className="font-medium text-foreground mb-1">Upload Photo</h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              JPG, PNG or WEBP. Max size 5MB.
-            </p>
+            <p className="text-sm text-muted-foreground mb-3">JPG, PNG or WEBP. Max size 5MB.</p>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium disabled:opacity-50"
             >
-              {uploading ? "Uploading..." : "Choose File"}
+              {uploading ? 'Uploading...' : 'Choose File'}
             </button>
             <input
               ref={fileInputRef}
@@ -285,14 +306,10 @@ export default function Profile() {
         {/* Basic Information Tab */}
         <TabsContent value="basic" className="space-y-6 mt-6">
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Basic Information
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Basic Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Full Name
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">Full Name</label>
                 <input
                   type="text"
                   name="full_name"
@@ -301,20 +318,35 @@ export default function Profile() {
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
+              {/* Read-only. There were two username editors: this one, a plain
+                  required <input> whose value handleSubmit sent raw, and
+                  Settings' UsernameInput, which lowercases, validates and
+                  checks availability. The public lookup matches the column
+                  exactly, so a "JohnSmith" saved here was reachable only at
+                  /JohnSmith; a collision surfaced as "Failed to update
+                  profile"; and nothing warned that every card already printed
+                  would stop working. One editor, and it is the safe one
+                  (US-117). */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Username *
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-username"
+                >
+                  Username
                 </label>
                 <input
+                  id="profile-username"
                   type="text"
-                  name="username"
                   value={formData.username}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  readOnly
+                  aria-describedby="profile-username-hint"
+                  className="w-full px-4 py-2 bg-muted text-muted-foreground border border-border rounded-lg cursor-not-allowed"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your profile URL: agentbio.net/{formData.username}
+                <p id="profile-username-hint" className="text-xs text-muted-foreground mt-1">
+                  Your profile URL: agentbio.net/{formData.username} —{' '}
+                  <Link to="/dashboard/settings" className="underline underline-offset-2">
+                    change it in Settings
+                  </Link>
                 </p>
               </div>
               <div className="md:col-span-2">
@@ -334,9 +366,7 @@ export default function Profile() {
           </div>
 
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Professional Bio
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Professional Bio</h2>
             <textarea
               name="bio"
               value={formData.bio}
@@ -355,9 +385,7 @@ export default function Profile() {
         {/* Professional Details Tab */}
         <TabsContent value="professional" className="space-y-6 mt-6">
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              License & Brokerage
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">License & Brokerage</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -406,7 +434,7 @@ export default function Profile() {
                 <input
                   type="number"
                   name="years_experience"
-                  value={formData.years_experience || ""}
+                  value={formData.years_experience || ''}
                   onChange={handleChange}
                   min="0"
                   placeholder="0"
@@ -430,16 +458,14 @@ export default function Profile() {
           </div>
 
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Specialties
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Specialties</h2>
             <div className="space-y-3">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={specialtyInput}
                   onChange={(e) => setSpecialtyInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addSpecialty())}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialty())}
                   placeholder="e.g., First-Time Buyers, Luxury Homes"
                   className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -472,16 +498,14 @@ export default function Profile() {
           </div>
 
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Certifications
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Certifications</h2>
             <div className="space-y-3">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={certificationInput}
                   onChange={(e) => setCertificationInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addCertification())}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCertification())}
                   placeholder="e.g., ABR, CRS, GRI"
                   className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -517,9 +541,7 @@ export default function Profile() {
         {/* Contact Information Tab */}
         <TabsContent value="contact" className="space-y-6 mt-6">
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Contact Information
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Contact Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -586,16 +608,14 @@ export default function Profile() {
         {/* Service Areas Tab */}
         <TabsContent value="service" className="space-y-6 mt-6">
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Service Cities
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Service Cities</h2>
             <div className="space-y-3">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={cityInput}
                   onChange={(e) => setCityInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addCity())}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCity())}
                   placeholder="e.g., Los Angeles, Beverly Hills"
                   className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -628,16 +648,14 @@ export default function Profile() {
           </div>
 
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Service ZIP Codes
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Service ZIP Codes</h2>
             <div className="space-y-3">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={zipInput}
                   onChange={(e) => setZipInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addZip())}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addZip())}
                   placeholder="e.g., 90210, 90211"
                   className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -673,9 +691,7 @@ export default function Profile() {
         {/* Social Media Tab */}
         <TabsContent value="social" className="space-y-6 mt-6">
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Social Media Links
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Social Media Links</h2>
             <div className="grid grid-cols-1 gap-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -717,9 +733,7 @@ export default function Profile() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  TikTok URL
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">TikTok URL</label>
                 <input
                   type="url"
                   name="tiktok_url"
@@ -785,9 +799,7 @@ export default function Profile() {
             <div className="space-y-6">
               {/* SEO Title */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  SEO Title
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">SEO Title</label>
                 <input
                   type="text"
                   name="seo_title"
@@ -801,9 +813,11 @@ export default function Profile() {
                   <p className="text-xs text-muted-foreground">
                     The title that appears in Google search results
                   </p>
-                  <span className={`text-xs font-medium ${
-                    formData.seo_title.length > 60 ? 'text-red-600' : 'text-muted-foreground'
-                  }`}>
+                  <span
+                    className={`text-xs font-medium ${
+                      formData.seo_title.length > 60 ? 'text-red-600' : 'text-muted-foreground'
+                    }`}
+                  >
                     {formData.seo_title.length}/60
                   </span>
                 </div>
@@ -827,9 +841,13 @@ export default function Profile() {
                   <p className="text-xs text-muted-foreground">
                     The description that appears in Google search results
                   </p>
-                  <span className={`text-xs font-medium ${
-                    formData.seo_description.length > 160 ? 'text-red-600' : 'text-muted-foreground'
-                  }`}>
+                  <span
+                    className={`text-xs font-medium ${
+                      formData.seo_description.length > 160
+                        ? 'text-red-600'
+                        : 'text-muted-foreground'
+                    }`}
+                  >
                     {formData.seo_description.length}/160
                   </span>
                 </div>
@@ -846,10 +864,12 @@ export default function Profile() {
                       {window.location.origin}/{formData.username || 'username'}
                     </div>
                     <div className="text-lg text-blue-600 hover:underline cursor-pointer font-medium line-clamp-1">
-                      {formData.seo_title || `${formData.full_name || 'Your Name'} - Real Estate Agent`}
+                      {formData.seo_title ||
+                        `${formData.full_name || 'Your Name'} - Real Estate Agent`}
                     </div>
                     <div className="text-sm text-muted-foreground line-clamp-2">
-                      {formData.seo_description || `Professional real estate services by ${formData.full_name || 'Your Name'}. Contact me today for all your real estate needs.`}
+                      {formData.seo_description ||
+                        `Professional real estate services by ${formData.full_name || 'Your Name'}. Contact me today for all your real estate needs.`}
                     </div>
                   </div>
                 </div>
@@ -858,28 +878,46 @@ export default function Profile() {
               {/* SEO Tips */}
               <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4 mt-6">
                 <h4 className="font-semibold text-sm mb-3 text-blue-900 dark:text-blue-100">
-                  <span role="img" aria-label="Tip">💡</span> SEO Best Practices
+                  <span role="img" aria-label="Tip">
+                    💡
+                  </span>{' '}
+                  SEO Best Practices
                 </h4>
                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                    <span><strong>Title:</strong> Keep under 60 characters, include your name and location</span>
+                    <span>
+                      <strong>Title:</strong> Keep under 60 characters, include your name and
+                      location
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                    <span><strong>Description:</strong> Keep under 160 characters, mention your services and areas</span>
+                    <span>
+                      <strong>Description:</strong> Keep under 160 characters, mention your services
+                      and areas
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                    <span><strong>Keywords:</strong> Include terms clients search for (e.g., "real estate agent [city]")</span>
+                    <span>
+                      <strong>Keywords:</strong> Include terms clients search for (e.g., "real
+                      estate agent [city]")
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                    <span><strong>Be Specific:</strong> Mention specialties, certifications, or unique services</span>
+                    <span>
+                      <strong>Be Specific:</strong> Mention specialties, certifications, or unique
+                      services
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                    <span><strong>Call to Action:</strong> Encourage clicks with phrases like "Contact me today"</span>
+                    <span>
+                      <strong>Call to Action:</strong> Encourage clicks with phrases like "Contact
+                      me today"
+                    </span>
                   </li>
                 </ul>
               </div>

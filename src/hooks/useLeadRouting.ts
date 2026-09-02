@@ -7,13 +7,25 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database, Json } from '@/integrations/supabase/types';
 
+type RoutingRuleRow = Database['public']['Tables']['lead_routing_rules']['Row'];
+
+/**
+ * Exactly what auto_assign_lead evaluates, and nothing more.
+ *
+ * price_min / price_max were here and are gone: the trigger matches them
+ * against `price_range`, a free-text column ("400000-450000", "under 500k",
+ * "$1.2M"), by stripping non-digits — so a rule on them fired according to how
+ * the visitor phrased their budget rather than what it was. The UI never
+ * exposed them, which is the only reason nobody was bitten. Bring them back
+ * with a numeric column, not before (US-105).
+ */
 export interface RoutingCriteria {
   lead_type?: string;
   source?: string;
+  /** Matched with a word-boundary regex inside leads.property_address. */
   zip?: string;
-  price_min?: number;
-  price_max?: number;
 }
 
 export interface LeadRoutingRule {
@@ -34,27 +46,18 @@ export interface NewRoutingRule {
   priority: number;
 }
 
-// lead_routing_rules isn't in the generated types — isolated cast.
-const routingDb = supabase as unknown as {
-  from: (t: string) => {
-    select: (c: string) => {
-      eq: (
-        c: string,
-        v: string
-      ) => {
-        order: (
-          c: string,
-          o: { ascending: boolean }
-        ) => Promise<{ data: LeadRoutingRule[] | null; error: unknown }>;
-      };
-    };
-    insert: (v: Record<string, unknown>) => Promise<{ error: unknown }>;
-    update: (v: Record<string, unknown>) => {
-      eq: (c: string, v: string) => Promise<{ error: unknown }>;
-    };
-    delete: () => { eq: (c: string, v: string) => Promise<{ error: unknown }> };
-  };
-};
+/**
+ * `criteria` is stored as jsonb, so the generated type is `Json`. Narrow it
+ * here, at the one place rows enter the app, rather than casting the client:
+ * lead_routing_rules is in the generated types, so the old
+ * `supabase as unknown as {...}` shim was asserting a shape over a table
+ * TypeScript could already describe — and silently disabling every check on
+ * these queries (US-094).
+ */
+const toRule = (row: RoutingRuleRow): LeadRoutingRule => ({
+  ...row,
+  criteria: (row.criteria ?? {}) as RoutingCriteria,
+});
 
 export function useLeadRouting(teamId: string | undefined) {
   const queryClient = useQueryClient();
@@ -63,13 +66,13 @@ export function useLeadRouting(teamId: string | undefined) {
     queryKey: ['lead-routing-rules', teamId],
     enabled: !!teamId,
     queryFn: async (): Promise<LeadRoutingRule[]> => {
-      const { data, error } = await routingDb
+      const { data, error } = await supabase
         .from('lead_routing_rules')
         .select('*')
         .eq('team_id', teamId!)
         .order('priority', { ascending: true });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).map(toRule);
     },
   });
 
@@ -78,9 +81,10 @@ export function useLeadRouting(teamId: string | undefined) {
 
   const createRule = useMutation({
     mutationFn: async (rule: NewRoutingRule) => {
-      const { error } = await routingDb
+      if (!teamId) throw new Error('No team selected');
+      const { error } = await supabase
         .from('lead_routing_rules')
-        .insert({ ...rule, team_id: teamId });
+        .insert({ ...rule, team_id: teamId, criteria: rule.criteria as Json });
       if (error) throw error;
     },
     onSuccess: invalidate,
@@ -88,7 +92,7 @@ export function useLeadRouting(teamId: string | undefined) {
 
   const toggleRule = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      const { error } = await routingDb
+      const { error } = await supabase
         .from('lead_routing_rules')
         .update({ is_active })
         .eq('id', id);
@@ -99,7 +103,7 @@ export function useLeadRouting(teamId: string | undefined) {
 
   const deleteRule = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await routingDb.from('lead_routing_rules').delete().eq('id', id);
+      const { error } = await supabase.from('lead_routing_rules').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: invalidate,

@@ -9,6 +9,9 @@ import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import type { Database } from '@/integrations/supabase/types';
+
+type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 
 export type NotificationType = 'new_lead' | 'lead_scored' | 'subscription_event' | 'system_alert';
 
@@ -23,33 +26,17 @@ export interface AppNotification {
   created_at: string;
 }
 
-// notifications isn't in the generated types yet — isolated cast.
-const notifClient = supabase as unknown as {
-  from: (t: string) => {
-    select: (c: string) => {
-      eq: (
-        c: string,
-        v: string
-      ) => {
-        order: (
-          c: string,
-          o: { ascending: boolean }
-        ) => {
-          limit: (n: number) => Promise<{ data: AppNotification[] | null; error: unknown }>;
-        };
-      };
-    };
-    update: (v: Record<string, unknown>) => {
-      eq: (
-        c: string,
-        v: string
-      ) => {
-        is: (c: string, v: null) => Promise<{ error: unknown }>;
-        select: (c: string) => Promise<{ error: unknown }>;
-      };
-    };
-  };
-};
+/**
+ * `data` is jsonb, so the generated type is `Json`. Narrow it here, at the one
+ * place rows enter the app. The hook used to reach the table through a
+ * `supabase as unknown as {...}` shim justified by "notifications isn't in the
+ * generated types yet" — it is (types.ts), and the shim was disabling every
+ * check on these queries rather than working around a gap (US-094).
+ */
+const toNotification = (row: NotificationRow): AppNotification => ({
+  ...row,
+  data: (row.data ?? null) as Record<string, unknown> | null,
+});
 
 export function useNotifications() {
   const { user } = useAuthStore();
@@ -60,14 +47,14 @@ export function useNotifications() {
     queryKey: ['notifications', userId],
     enabled: !!userId,
     queryFn: async (): Promise<AppNotification[]> => {
-      const { data, error } = await notifClient
+      const { data, error } = await supabase
         .from('notifications')
         .select('id, user_id, type, title, message, data, read_at, created_at')
         .eq('user_id', userId!)
         .order('created_at', { ascending: false })
         .limit(30);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).map(toNotification);
     },
   });
 
@@ -97,7 +84,7 @@ export function useNotifications() {
 
   const markAsRead = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await notifClient
+      const { error } = await supabase
         .from('notifications')
         .update({ read_at: new Date().toISOString() })
         .eq('id', id)
@@ -110,7 +97,7 @@ export function useNotifications() {
   const markAllAsRead = useMutation({
     mutationFn: async () => {
       if (!userId) return;
-      const { error } = await notifClient
+      const { error } = await supabase
         .from('notifications')
         .update({ read_at: new Date().toISOString() })
         .eq('user_id', userId)

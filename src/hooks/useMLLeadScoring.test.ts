@@ -79,11 +79,6 @@ const createMockFeatures = (overrides: Partial<LeadFeatures> = {}): LeadFeatures
   hasPhone: true,
   hasEmail: true,
   messageLength: 100,
-  listingViews: 3,
-  pageViewCount: 5,
-  timeOnSite: 180,
-  scrollDepth: 75,
-  hasViewedMultipleListings: true,
   timeOfDay: 14,
   dayOfWeek: 2,
   leadType: 'buyer_inquiry',
@@ -104,13 +99,7 @@ const createMockLead = (overrides: Partial<Lead> = {}): Lead =>
     phone: '555-1234',
     message: 'I am interested in properties in the area.',
     source: 'website',
-    form_data: {
-      listingViews: 3,
-      pageViewCount: 5,
-      timeOnSite: 180,
-      scrollDepth: 75,
-      hasViewedMultipleListings: true,
-    },
+    form_data: {},
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,
@@ -225,7 +214,9 @@ describe('useMLLeadScoring', () => {
       expect(features.leadType).toBe('buyer_inquiry');
     });
 
-    it('should handle missing form_data', () => {
+    // US-105: extraction no longer touches form_data at all — every feature
+    // comes from a real column. A lead with no form_data must still score.
+    it('is unaffected by missing form_data', () => {
       const { result } = renderHook(() => useMLLeadScoring(), {
         wrapper: createWrapper(),
       });
@@ -233,9 +224,49 @@ describe('useMLLeadScoring', () => {
       const lead = createMockLead({ form_data: null });
       const features = result.current.extractFeaturesFromLead(lead);
 
-      expect(features.listingViews).toBe(0);
-      expect(features.pageViewCount).toBe(0);
-      expect(features.timeOnSite).toBe(0);
+      expect(features.source).toBeTruthy();
+      expect(features.leadType).toBeTruthy();
+    });
+
+    it('reads the signals from their real columns, not from form_data', () => {
+      const { result } = renderHook(() => useMLLeadScoring(), {
+        wrapper: createWrapper(),
+      });
+
+      // The old code looked for these under form_data, where nothing writes
+      // them: timeline and preApproved are lifted into columns by
+      // leadSubmission, utm_source/device ARE columns, and the raw
+      // pre-approval answer is stored as preApprovalStatus — never
+      // preapproval_status — so isPreapproved was false for every lead.
+      const lead = createMockLead({
+        form_data: { preapproval_status: 'approved', timeline: '3_months', device: 'mobile' },
+        preapproved: true,
+        timeline: '3_months',
+        device: 'mobile',
+        utm_source: 'google',
+      });
+      const features = result.current.extractFeaturesFromLead(lead);
+
+      expect(features.isPreapproved).toBe(true);
+      expect(features.hasTimeline).toBe(true);
+      expect(features.deviceType).toBe('mobile');
+      expect(features.utmSource).toBe('google');
+    });
+
+    it('does not credit a lead whose columns are empty, whatever form_data says', () => {
+      const { result } = renderHook(() => useMLLeadScoring(), {
+        wrapper: createWrapper(),
+      });
+
+      const lead = createMockLead({
+        form_data: { preapproval_status: 'approved', timeline: '3_months' },
+        preapproved: false,
+        timeline: null,
+      });
+      const features = result.current.extractFeaturesFromLead(lead);
+
+      expect(features.isPreapproved).toBe(false);
+      expect(features.hasTimeline).toBe(false);
     });
   });
 

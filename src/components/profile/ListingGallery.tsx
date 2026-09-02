@@ -9,7 +9,6 @@ interface ListingGalleryProps {
   listings: PublicProfileListing[];
   title?: string;
   onListingClick?: (listing: PublicProfileListing) => void;
-  calendlyUrl?: string;
 }
 
 type SortOption = 'newest' | 'price-low' | 'price-high' | 'beds-high';
@@ -75,7 +74,7 @@ export default function ListingGallery({ listings, title, onListingClick }: List
 
     if (bedroomFilter > 0) {
       result = result.filter((l) => {
-        const beds = l.bedrooms ?? l.beds ?? 0;
+        const beds = l.bedrooms ?? 0;
         return beds >= bedroomFilter;
       });
     }
@@ -87,7 +86,7 @@ export default function ListingGallery({ listings, title, onListingClick }: List
         case 'price-high':
           return parsePrice(b.price) - parsePrice(a.price);
         case 'beds-high':
-          return (b.bedrooms ?? b.beds ?? 0) - (a.bedrooms ?? a.beds ?? 0);
+          return (b.bedrooms ?? 0) - (a.bedrooms ?? 0);
         default:
           return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       }

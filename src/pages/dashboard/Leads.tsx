@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Download,
   Search,
@@ -19,11 +20,17 @@ import {
   ArrowUpDown,
   Clock,
   AlertTriangle,
+  Home,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { useLeads } from '@/hooks/useLeads';
+import { buildLeadStatusPatch } from '@/lib/leadStatus';
+import { exportToCSV } from '@/lib/exportUtils';
+import { cn } from '@/lib/utils';
+import { useLeadContactAction } from '@/hooks/useLeadContactAction';
+import { useLeadsActivitySummaries } from '@/hooks/useLeadActivities';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
@@ -44,6 +51,9 @@ import type { LeadScore } from '@/hooks/useMLLeadScoring';
 import { logger } from '@/lib/logger';
 
 export default function Leads() {
+  // Search is local (it debounces into the query below); status and type live
+  // in the URL so a filtered view is linkable and a notification deep link can
+  // preselect one (US-104).
   const [searchQuery, setSearchQuery] = useState('');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
@@ -52,53 +62,66 @@ export default function Leads() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [isBulkActing, setIsBulkActing] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date');
-  const { user } = useAuthStore();
   const { toast } = useToast();
   const { subscription } = useSubscriptionLimits();
   const { scoreLeadObject } = useMLLeadScoring();
 
-  const [slaHours, setSlaHours] = useState(2);
+  // Persisted on the profile, not in component state: it has to survive a
+  // reload and be readable by the overdue-leads job (US-103).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusFilter = searchParams.get('status') ?? 'all';
+  const typeFilter = searchParams.get('type') ?? 'all';
+
+  const setFilter = (key: 'status' | 'type', value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === 'all') next.delete(key);
+    else next.set(key, value);
+    setSearchParams(next, { replace: true });
+    setSelectedLeadIds(new Set());
+  };
+
+  const { slaHours, update: updatePreferences } = useNotificationPreferences();
+  const setSlaHours = (hours: number) => updatePreferences.mutate({ sla_hours: hours });
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
 
+  // The one reader of `leads`. useLeads owns the query, the cache key and the
+  // decryption of encrypted_email / encrypted_phone — the page used to run its
+  // own query beside it, selecting the plaintext columns US-086 dropped, under
+  // the same ['leads', userId] key. That select was rejected by PostgREST (the
+  // page never loaded) and the duplicate key meant whichever of this page and
+  // AnalyticsDashboard mounted first decided the row shape for both (US-094).
   const {
-    data: leads,
+    leads,
     isLoading,
     isError,
     error,
     refetch,
-  } = useQuery({
-    queryKey: ['leads', user?.id],
-    queryFn: async (): Promise<Lead[]> => {
-      if (!user?.id) return [];
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    bulkUpdateStatus,
+    bulkDelete,
+  } = useLeads({ status: statusFilter, leadType: typeFilter, search: searchQuery });
 
-      // first_responded_at isn't in the (out-of-sync) generated types yet —
-      // isolated cast keeps the query typed to our Lead shape.
-      const leadsTable = supabase.from('leads') as unknown as {
-        select: (c: string) => {
-          eq: (
-            c: string,
-            v: string
-          ) => {
-            order: (
-              c: string,
-              o: { ascending: boolean }
-            ) => Promise<{ data: Lead[] | null; error: { message: string } | null }>;
-          };
-        };
-      };
+  // Tapping a lead's email or phone number on the card records the response,
+  // the same way the detail modal does (US-101).
+  const recordContact = useLeadContactAction();
 
-      const { data, error } = await leadsTable
-        .select(
-          'id, user_id, lead_type, name, email, phone, message, status, source, form_data, created_at, updated_at, first_responded_at'
-        )
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!user?.id,
-  });
+  // Last-contacted per lead, from the lead_activity_summary view. The hook that
+  // reads it had no importer at all, so the list showed nothing about whether
+  // an agent had actually reached out — only whether the status had been
+  // changed by hand (US-102).
+  const leadIds = useMemo(() => leads.map((l) => l.id), [leads]);
+  const { data: activitySummaries } = useLeadsActivitySummaries(leadIds);
+  const lastContactByLead = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of activitySummaries ?? []) {
+      // The most recent outbound touch, whichever channel it was.
+      const latest = [s.last_call_at, s.last_email_at].filter(Boolean).sort().pop();
+      if (latest) map.set(s.lead_id, latest);
+    }
+    return map;
+  }, [activitySummaries]);
 
   // Score all leads and cache results
   const leadScores = useMemo(() => {
@@ -179,6 +202,22 @@ export default function Leads() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leads, leadScores, slaMs]);
 
+  // Deep link from a notification: /dashboard/leads?lead=<id> opens that lead.
+  // The trigger has always written data.lead_id and nothing ever read it, so
+  // an agent told about a lead was left to go find it (US-103). The param is
+  // cleared once consumed so a later close does not reopen the modal.
+  useEffect(() => {
+    const wanted = searchParams.get('lead');
+    if (!wanted || !leads.length) return;
+    const match = leads.find((l) => l.id === wanted);
+    if (!match) return;
+    setSelectedLead(match);
+    setShowLeadDetail(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('lead');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, leads, setSearchParams]);
+
   const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead);
     setShowLeadDetail(true);
@@ -211,21 +250,20 @@ export default function Leads() {
 
     setIsBulkActing(true);
     try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ status: newStatus })
-        .in('id', Array.from(selectedLeadIds))
-        .select('id');
-
-      if (error) throw error;
+      // Through useLeads, which invalidates ['leads'], ['analytics-leads'] and
+      // ['conversion-funnel'] by prefix. This used to hit supabase directly and
+      // refetch only ['leads'], so Overview kept contradicting this page for up
+      // to five minutes (US-104).
+      await bulkUpdateStatus.mutateAsync({
+        ids: Array.from(selectedLeadIds),
+        patch: { ...buildLeadStatusPatch(newStatus) },
+      });
 
       toast({
         title: 'Status updated',
         description: `Updated ${selectedLeadIds.size} lead(s) to ${newStatus}`,
       });
-
       setSelectedLeadIds(new Set());
-      refetch();
     } catch (error) {
       logger.error('Bulk status update failed', error as Error);
       toast({
@@ -251,17 +289,13 @@ export default function Leads() {
 
     setIsBulkActing(true);
     try {
-      const { error } = await supabase.from('leads').delete().in('id', Array.from(selectedLeadIds));
-
-      if (error) throw error;
+      await bulkDelete.mutateAsync(Array.from(selectedLeadIds));
 
       toast({
         title: 'Leads deleted',
         description: `Deleted ${selectedLeadIds.size} lead(s)`,
       });
-
       setSelectedLeadIds(new Set());
-      refetch();
     } catch (error) {
       logger.error('Bulk delete failed', error as Error);
       toast({
@@ -281,46 +315,49 @@ export default function Leads() {
       return;
     }
 
-    if (!leads || leads.length === 0) {
+    if (filteredLeads.length === 0) {
       toast({
         title: 'No leads to export',
-        description: "You don't have any leads yet.",
+        description: 'Nothing matches the current filters.',
         variant: 'destructive',
       });
       return;
     }
 
-    // Create CSV
-    const headers = ['Name', 'Email', 'Phone', 'Type', 'Message', 'Status', 'Created At'];
-    const csvContent = [
-      headers.join(','),
-      ...leads.map((lead) =>
-        [
-          lead.name,
-          lead.email,
-          lead.phone || '',
-          lead.lead_type,
-          `"${(lead.message || '').replace(/"/g, '""')}"`,
-          lead.status,
-          lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '',
-        ].join(',')
-      ),
-    ].join('\n');
-
-    // Download
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // exportToCSV quotes any cell containing a comma, quote or newline. The
+    // hand-rolled version this replaced quoted only `message`, so a lead named
+    // "Smith, John" split into two columns in Excel and shifted every field
+    // after it. It also exported every lead rather than the filtered set
+    // (US-104).
+    exportToCSV({
+      title: 'Leads',
+      headers: [
+        'Name',
+        'Email',
+        'Phone',
+        'Type',
+        'Status',
+        'Source',
+        'Message',
+        'Created At',
+        'First Responded At',
+      ],
+      rows: filteredLeads.map((lead) => [
+        lead.name,
+        lead.email ?? '',
+        lead.phone ?? '',
+        lead.lead_type ?? '',
+        lead.status ?? '',
+        lead.source ?? '',
+        lead.message ?? '',
+        lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '',
+        lead.first_responded_at ? new Date(lead.first_responded_at).toLocaleString() : '',
+      ]),
+    });
 
     toast({
       title: 'Leads exported',
-      description: `Successfully exported ${leads.length} leads to CSV`,
+      description: `Successfully exported ${filteredLeads.length} leads to CSV`,
     });
   };
 
@@ -376,6 +413,7 @@ export default function Leads() {
     return (
       <span
         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.className}`}
+        title={`Priority ${config.label.toLowerCase()} (${score.score}/100) — from the lead's source, contact details, type and timing. Rules-based; no model has been trained.`}
       >
         {config.icon}
         {config.label}
@@ -459,24 +497,64 @@ export default function Leads() {
             <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Hot Leads</div>
           </CardContent>
         </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-            <div className="text-xl sm:text-2xl font-bold text-green-600">{leadStats.new}</div>
-            <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">New</div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-            <div className="text-xl sm:text-2xl font-bold text-blue-600">{leadStats.contacted}</div>
-            <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Contacted</div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
-            <div className="text-xl sm:text-2xl font-bold text-primary">{leadStats.converted}</div>
-            <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Converted</div>
-          </CardContent>
-        </Card>
+        <button
+          type="button"
+          onClick={() => setFilter('status', statusFilter === 'new' ? 'all' : 'new')}
+          aria-pressed={statusFilter === 'new'}
+          className="text-left"
+        >
+          <Card
+            className={cn(
+              'hover:shadow-md transition-shadow h-full',
+              statusFilter === 'new' && 'ring-2 ring-primary'
+            )}
+          >
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold text-green-600">{leadStats.new}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">New</div>
+            </CardContent>
+          </Card>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('status', statusFilter === 'contacted' ? 'all' : 'contacted')}
+          aria-pressed={statusFilter === 'contacted'}
+          className="text-left"
+        >
+          <Card
+            className={cn(
+              'hover:shadow-md transition-shadow h-full',
+              statusFilter === 'contacted' && 'ring-2 ring-primary'
+            )}
+          >
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold text-blue-600">
+                {leadStats.contacted}
+              </div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Contacted</div>
+            </CardContent>
+          </Card>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('status', statusFilter === 'converted' ? 'all' : 'converted')}
+          aria-pressed={statusFilter === 'converted'}
+          className="text-left"
+        >
+          <Card
+            className={cn(
+              'hover:shadow-md transition-shadow h-full',
+              statusFilter === 'converted' && 'ring-2 ring-primary'
+            )}
+          >
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold text-primary">
+                {leadStats.converted}
+              </div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-0.5">Converted</div>
+            </CardContent>
+          </Card>
+        </button>
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6">
             <div className="flex items-center gap-1.5">
@@ -503,14 +581,38 @@ export default function Leads() {
               className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base min-h-[44px]"
             />
           </div>
+          {/* Type filter — pushed into the query, not applied client-side. */}
+          <Select value={typeFilter} onValueChange={(v) => setFilter('type', v)}>
+            <SelectTrigger
+              className="w-[130px] min-h-[44px] flex-shrink-0"
+              aria-label="Filter by lead type"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="buyer">Buyer</SelectItem>
+              <SelectItem value="seller">Seller</SelectItem>
+              <SelectItem value="valuation">Valuation</SelectItem>
+              <SelectItem value="contact">Contact</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant={sortBy === 'score' ? 'default' : 'outline'}
             onClick={() => setSortBy(sortBy === 'date' ? 'score' : 'date')}
             className="min-h-[44px] gap-2 flex-shrink-0"
-            title={sortBy === 'score' ? 'Sorted by AI score' : 'Sort by AI score'}
+            title={
+              sortBy === 'score'
+                ? 'Sorted by priority — a rules-based score over source, contact details, lead type and timing'
+                : 'Sort by priority'
+            }
           >
             <ArrowUpDown className="h-4 w-4" />
-            <span className="hidden sm:inline">{sortBy === 'score' ? 'AI Score' : 'Recent'}</span>
+            {/* Not "AI Score". Nothing has ever trained this model —
+                trainingExamples is 0 and recordConversion has no caller — and
+                the five behavioural features it leaned on were never measured
+                (US-105). It is a rules-based priority, and it says so. */}
+            <span className="hidden sm:inline">{sortBy === 'score' ? 'Priority' : 'Recent'}</span>
           </Button>
           <Button
             variant={needsAttentionOnly ? 'default' : 'outline'}
@@ -694,6 +796,13 @@ export default function Leads() {
                           <Mail className="h-3 w-3 flex-shrink-0" />
                           <a
                             href={`mailto:${lead.email}`}
+                            onClick={(e) => {
+                              // Without this the click also bubbles to the
+                              // card and opens the detail modal behind the
+                              // mail client.
+                              e.stopPropagation();
+                              void recordContact(lead, 'email').then(() => refetch());
+                            }}
                             className="hover:text-primary active:text-primary-dark break-all"
                           >
                             {lead.email}
@@ -704,10 +813,31 @@ export default function Leads() {
                             <Phone className="h-3 w-3 flex-shrink-0" />
                             <a
                               href={`tel:${lead.phone}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void recordContact(lead, 'call').then(() => refetch());
+                              }}
                               className="hover:text-primary active:text-primary-dark"
                             >
                               {lead.phone}
                             </a>
+                          </div>
+                        )}
+                        {lastContactByLead.has(lead.id) && (
+                          <div className="flex items-center gap-2 min-h-[32px]">
+                            <MessageSquare className="h-3 w-3 flex-shrink-0" />
+                            <span>
+                              Last contacted{' '}
+                              {formatDistanceToNow(new Date(lastContactByLead.get(lead.id)!), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          </div>
+                        )}
+                        {lead.property_address && (
+                          <div className="flex items-center gap-2 min-h-[32px]">
+                            <Home className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{lead.property_address}</span>
                           </div>
                         )}
                         {lead.message && (
@@ -773,6 +903,22 @@ export default function Leads() {
           </Card>
         )}
       </div>
+
+      {/* Pagination. The page used to select every lead the agent had ever
+          received in one query — and decrypt every one of them through
+          pii-crypto on each visit (US-104). */}
+      {hasNextPage && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            onClick={() => void fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="min-h-[44px]"
+          >
+            {isFetchingNextPage ? 'Loading…' : 'Load more leads'}
+          </Button>
+        </div>
+      )}
 
       {/* Upgrade Modal */}
       <UpgradeModal

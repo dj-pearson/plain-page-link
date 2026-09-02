@@ -305,6 +305,47 @@ export type Database = {
         };
         Relationships: [];
       };
+      analytics_events: {
+        Row: {
+          device: string | null;
+          event_type: string;
+          id: string;
+          occurred_at: string;
+          target_id: string | null;
+          target_label: string | null;
+          user_id: string;
+          visitor_id: string | null;
+        };
+        Insert: {
+          device?: string | null;
+          event_type: string;
+          id?: string;
+          occurred_at?: string;
+          target_id?: string | null;
+          target_label?: string | null;
+          user_id: string;
+          visitor_id?: string | null;
+        };
+        Update: {
+          device?: string | null;
+          event_type?: string;
+          id?: string;
+          occurred_at?: string;
+          target_id?: string | null;
+          target_label?: string | null;
+          user_id?: string;
+          visitor_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'analytics_events_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       analytics_views: {
         Row: {
           device: string | null;
@@ -2263,48 +2304,6 @@ export type Database = {
           },
         ];
       };
-      lead_notes: {
-        Row: {
-          created_at: string;
-          created_by: string | null;
-          id: string;
-          is_system: boolean;
-          lead_id: string;
-          note: string;
-        };
-        Insert: {
-          created_at?: string;
-          created_by?: string | null;
-          id?: string;
-          is_system?: boolean;
-          lead_id: string;
-          note: string;
-        };
-        Update: {
-          created_at?: string;
-          created_by?: string | null;
-          id?: string;
-          is_system?: boolean;
-          lead_id?: string;
-          note?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'lead_notes_created_by_fkey';
-            columns: ['created_by'];
-            isOneToOne: false;
-            referencedRelation: 'users';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'lead_notes_lead_id_fkey';
-            columns: ['lead_id'];
-            isOneToOne: false;
-            referencedRelation: 'leads';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
       lead_routing_rules: {
         Row: {
           assigned_to: string | null;
@@ -2424,6 +2423,7 @@ export type Database = {
           first_responded_at: string | null;
           form_data: Json | null;
           id: string;
+          is_sample: boolean;
           lead_type: string;
           listing_id: string | null;
           message: string | null;
@@ -2453,6 +2453,7 @@ export type Database = {
           first_responded_at?: string | null;
           form_data?: Json | null;
           id?: string;
+          is_sample?: boolean;
           lead_type: string;
           listing_id?: string | null;
           message?: string | null;
@@ -2482,6 +2483,7 @@ export type Database = {
           first_responded_at?: string | null;
           form_data?: Json | null;
           id?: string;
+          is_sample?: boolean;
           lead_type?: string;
           listing_id?: string | null;
           message?: string | null;
@@ -2531,6 +2533,7 @@ export type Database = {
           icon: string | null;
           id: string;
           is_active: boolean | null;
+          is_sample: boolean;
           position: number;
           title: string;
           updated_at: string | null;
@@ -2543,6 +2546,7 @@ export type Database = {
           icon?: string | null;
           id?: string;
           is_active?: boolean | null;
+          is_sample?: boolean;
           position?: number;
           title: string;
           updated_at?: string | null;
@@ -2555,6 +2559,7 @@ export type Database = {
           icon?: string | null;
           id?: string;
           is_active?: boolean | null;
+          is_sample?: boolean;
           position?: number;
           title?: string;
           updated_at?: string | null;
@@ -2774,22 +2779,25 @@ export type Database = {
       listings: {
         Row: {
           address: string;
-          bathrooms: number | null;
-          baths: number;
-          bedrooms: number | null;
-          beds: number;
+          bathrooms: number;
+          baths: number | null;
+          bedrooms: number;
+          beds: number | null;
           city: string;
           created_at: string | null;
           days_on_market: number | null;
           description: string | null;
+          garage_spaces: number | null;
           highlights: string[] | null;
           id: string;
           image: string | null;
           is_featured: boolean | null;
+          is_sample: boolean;
           listed_date: string | null;
           lot_size_acres: number | null;
           mls_number: string | null;
           open_house_date: string | null;
+          open_house_end_date: string | null;
           photos: Json | null;
           price: string;
           property_type: string | null;
@@ -2799,29 +2807,34 @@ export type Database = {
           square_feet: number | null;
           state: string | null;
           status: string | null;
+          stories: number | null;
           updated_at: string | null;
           user_id: string;
           virtual_tour_url: string | null;
+          year_built: number | null;
           zip_code: string | null;
         };
         Insert: {
           address: string;
-          bathrooms?: number | null;
-          baths: number;
-          bedrooms?: number | null;
-          beds: number;
+          bathrooms?: number;
+          baths?: number | null;
+          bedrooms?: number;
+          beds?: number | null;
           city: string;
           created_at?: string | null;
           days_on_market?: number | null;
           description?: string | null;
+          garage_spaces?: number | null;
           highlights?: string[] | null;
           id?: string;
           image?: string | null;
           is_featured?: boolean | null;
+          is_sample?: boolean;
           listed_date?: string | null;
           lot_size_acres?: number | null;
           mls_number?: string | null;
           open_house_date?: string | null;
+          open_house_end_date?: string | null;
           photos?: Json | null;
           price: string;
           property_type?: string | null;
@@ -2831,29 +2844,34 @@ export type Database = {
           square_feet?: number | null;
           state?: string | null;
           status?: string | null;
+          stories?: number | null;
           updated_at?: string | null;
           user_id: string;
           virtual_tour_url?: string | null;
+          year_built?: number | null;
           zip_code?: string | null;
         };
         Update: {
           address?: string;
-          bathrooms?: number | null;
-          baths?: number;
-          bedrooms?: number | null;
-          beds?: number;
+          bathrooms?: number;
+          baths?: number | null;
+          bedrooms?: number;
+          beds?: number | null;
           city?: string;
           created_at?: string | null;
           days_on_market?: number | null;
           description?: string | null;
+          garage_spaces?: number | null;
           highlights?: string[] | null;
           id?: string;
           image?: string | null;
           is_featured?: boolean | null;
+          is_sample?: boolean;
           listed_date?: string | null;
           lot_size_acres?: number | null;
           mls_number?: string | null;
           open_house_date?: string | null;
+          open_house_end_date?: string | null;
           photos?: Json | null;
           price?: string;
           property_type?: string | null;
@@ -2863,9 +2881,11 @@ export type Database = {
           square_feet?: number | null;
           state?: string | null;
           status?: string | null;
+          stories?: number | null;
           updated_at?: string | null;
           user_id?: string;
           virtual_tour_url?: string | null;
+          year_built?: number | null;
           zip_code?: string | null;
         };
         Relationships: [
@@ -7270,6 +7290,7 @@ export type Database = {
           id: string;
           is_featured: boolean | null;
           is_published: boolean | null;
+          is_sample: boolean;
           listing_id: string | null;
           property_type: string | null;
           rating: number;
@@ -7288,6 +7309,7 @@ export type Database = {
           id?: string;
           is_featured?: boolean | null;
           is_published?: boolean | null;
+          is_sample?: boolean;
           listing_id?: string | null;
           property_type?: string | null;
           rating: number;
@@ -7306,6 +7328,7 @@ export type Database = {
           id?: string;
           is_featured?: boolean | null;
           is_published?: boolean | null;
+          is_sample?: boolean;
           listing_id?: string | null;
           property_type?: string | null;
           rating?: number;
@@ -8687,7 +8710,7 @@ export type Database = {
         Returns: boolean;
       };
       check_username_available: {
-        Args: { _current_user_id: string; _username: string };
+        Args: { _current_user_id?: string; _username: string };
         Returns: boolean;
       };
       cleanup_expired_mfa_codes: {
@@ -8718,6 +8741,10 @@ export type Database = {
           p_result?: Json;
           p_status: string;
         };
+        Returns: undefined;
+      };
+      decrement_profile_leads: {
+        Args: { _profile_id: string };
         Returns: undefined;
       };
       derive_available_username: {
@@ -8829,7 +8856,10 @@ export type Database = {
         Args: { _role: Database['public']['Enums']['app_role']; _user_id: string };
         Returns: boolean;
       };
-      increment_link_clicks: { Args: { link_id: string }; Returns: undefined };
+      increment_link_clicks: {
+        Args: { link_id: string; visitor_id?: string };
+        Returns: undefined;
+      };
       increment_mfa_failed_attempts: {
         Args: { p_user_id: string };
         Returns: number;
@@ -8972,6 +9002,10 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
+      public_agent_response_hours: {
+        Args: { _user_id: string };
+        Returns: number;
+      };
       queue_seo_notification: {
         Args: {
           p_channels: string[];
@@ -9010,6 +9044,7 @@ export type Database = {
         };
         Returns: string;
       };
+      redact_audit_row: { Args: { p_row: Json }; Returns: Json };
       refresh_unified_analytics: {
         Args: { p_end_date: string; p_start_date: string; p_user_id: string };
         Returns: number;

@@ -40,6 +40,13 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
 
   const [name, setName] = useState('');
   const [leadType, setLeadType] = useState('any');
+  // The trigger evaluates lead_type, source and zip. The form only ever wrote
+  // lead_type, so the other two were unreachable from the UI while RoutingCriteria
+  // advertised five fields (US-105). price_min/price_max are gone from the type:
+  // they matched against price_range, a free-text column an agent types by
+  // hand, so a rule on them fired according to how the visitor phrased a budget.
+  const [source, setSource] = useState('');
+  const [zip, setZip] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('round_robin');
   const [priority, setPriority] = useState(100);
 
@@ -50,7 +57,11 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
     createRule.mutate(
       {
         name: name.trim(),
-        criteria: leadType === 'any' ? {} : { lead_type: leadType },
+        criteria: {
+          ...(leadType === 'any' ? {} : { lead_type: leadType }),
+          ...(source.trim() ? { source: source.trim() } : {}),
+          ...(zip.trim() ? { zip: zip.trim() } : {}),
+        },
         assigned_to: assignedTo === 'round_robin' ? null : assignedTo,
         priority,
       },
@@ -58,6 +69,8 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
         onSuccess: () => {
           setName('');
           setLeadType('any');
+          setSource('');
+          setZip('');
           setAssignedTo('round_robin');
           setPriority(100);
           toast({ title: 'Routing rule created' });
@@ -91,7 +104,7 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Create form */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
           <Input
             placeholder="Rule name"
             value={name}
@@ -110,6 +123,19 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
               ))}
             </SelectContent>
           </Select>
+          <Input
+            placeholder="ZIP (optional)"
+            aria-label="ZIP code"
+            value={zip}
+            onChange={(e) => setZip(e.target.value)}
+            inputMode="numeric"
+          />
+          <Input
+            placeholder="Source (optional)"
+            aria-label="Lead source"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+          />
           <Select value={assignedTo} onValueChange={setAssignedTo}>
             <SelectTrigger>
               <SelectValue />

@@ -46,6 +46,11 @@
     <link rel="prefetch" href="/auth/register" as="document">
 
     <!-- Google Analytics - Deferred loading via external script (CSP compliant) -->
+    <!-- Filled in from VITE_GA_MEASUREMENT_ID at build time. Empty means no
+         analytics is loaded at all (US-123: the id was hard-coded in
+         analytics.js, so every fork, staging and preview build reported into
+         the production property). -->
+    <meta name="ga-measurement-id" content="" />
     <script src="/scripts/analytics.js" defer></script>
 
     <link rel="icon" type="image/png" href="/Icon.png" />

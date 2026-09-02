@@ -37,6 +37,7 @@ export const mockLead: Lead = {
   utm_medium: null,
   utm_campaign: null,
   device: 'desktop',
+  is_sample: false,
 
   created_at: '2026-03-01T12:00:00.000Z',
   updated_at: '2026-03-01T12:00:00.000Z',

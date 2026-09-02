@@ -5,8 +5,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { getClientIP } from '../_shared/auth.ts';
+import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 
 interface ThrottleCheckRequest {
   action: 'check_throttle';
@@ -35,9 +36,13 @@ interface RegisterSessionRequest {
 type RequestBody = ThrottleCheckRequest | RecordAttemptRequest | RegisterSessionRequest;
 
 serve(async (req: Request) => {
+  // Per request, from the Origin header. This was the module-level static
+  // `corsHeaders`, pinned to https://agentbio.net, so every visitor who
+  // reached the site as www.agentbio.net failed CORS here (US-123).
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'), 'GET, POST, PUT, DELETE, OPTIONS');
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return handleCorsPreFlight(req.headers.get('origin'));
   }
 
   if (req.method !== 'POST') {
@@ -58,6 +63,57 @@ serve(async (req: Request) => {
     const clientIP = getClientIP(req);
     const userAgent = req.headers.get('user-agent') || '';
 
+    /**
+     * The address as the database wants it.
+     *
+     * ip_address is `inet`, and getClientIP can return the string 'unknown'
+     * behind a proxy that sends no forwarded header — which is not a valid
+     * inet and makes the RPC raise. NULL is the honest value for "we do not
+     * know", and check_login_throttle falls back to its old email-wide count
+     * for it, which over-blocks rather than under-blocks.
+     */
+    const clientInet = clientIP && clientIP !== 'unknown' ? clientIP : null;
+
+    /**
+     * Every action here is unauthenticated by necessity — there is no session
+     * during a login — so the per-address limit is the only thing standing
+     * between this endpoint and a script (US-119). Applied before any branch,
+     * so it covers throttle probes as well as writes.
+     */
+    const rate = await checkRateLimitDb(
+      supabase,
+      clientIP,
+      `login-security:${body?.action ?? 'unknown'}`,
+      RATE_LIMITS.auth
+    );
+    if (!rate.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests', retryAfter: rate.retryAfterSeconds }),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': String(rate.retryAfterSeconds),
+          },
+          status: 429,
+        }
+      );
+    }
+
+    /**
+     * The user id from the caller's own JWT, or null.
+     *
+     * register_session used to take `userId` from the request body and insert a
+     * user_sessions row for it — so anyone could write session rows against any
+     * account, which is both a spoofed audit trail and a way to fill another
+     * person's active-sessions list with entries they did not create.
+     */
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
+    const callerId = bearer
+      ? ((await supabase.auth.getUser(bearer)).data.user?.id ?? null)
+      : null;
+
     switch (body.action) {
       case 'check_throttle': {
         const { email } = body as ThrottleCheckRequest;
@@ -73,7 +129,7 @@ serve(async (req: Request) => {
         const { data, error } = await supabase
           .rpc('check_login_throttle', {
             p_email: email.toLowerCase().trim(),
-            p_ip_address: clientIP,
+            p_ip_address: clientInet,
             p_window_minutes: 15,
             p_max_attempts: 5,
           });
@@ -126,12 +182,23 @@ serve(async (req: Request) => {
           );
         }
 
-        // Record the login attempt
+        // Record the login attempt.
+        //
+        // This stays callable without a session, because a FAILED login has no
+        // session to authenticate with and recording failures is the entire
+        // point of the control. What made it dangerous was not that it was
+        // open, but that check_login_throttle counted an email's failures
+        // across every source address — so five posts locked any account out.
+        // 20260902000016 scopes that counter to the caller's own address, so
+        // this endpoint can now only lock out the machine using it (US-119).
+        //
+        // The user id is never taken from the body: an unauthenticated caller
+        // must not be able to attribute an attempt to someone else's account.
         const { data, error } = await supabase
           .rpc('record_login_attempt', {
             p_email: email.toLowerCase().trim(),
-            p_ip_address: clientIP,
-            p_user_id: userId || null,
+            p_ip_address: clientInet,
+            p_user_id: callerId,
             p_success: success,
             p_failure_reason: failureReason || null,
             p_user_agent: userAgent,
@@ -155,11 +222,23 @@ serve(async (req: Request) => {
       }
 
       case 'register_session': {
-        const { userId, sessionTokenHash, expiresAt, deviceType, browser, os } = body as RegisterSessionRequest;
+        const { sessionTokenHash, expiresAt, deviceType, browser, os } = body as RegisterSessionRequest;
 
-        if (!userId || !sessionTokenHash || !expiresAt) {
+        // The session being registered belongs to the caller, full stop. The
+        // body's `userId` is ignored — it used to be trusted, so anyone could
+        // insert user_sessions rows against any account (US-119). A session has
+        // just been created at this point, so there is always a JWT to read.
+        if (!callerId) {
           return new Response(
-            JSON.stringify({ error: 'userId, sessionTokenHash, and expiresAt are required' }),
+            JSON.stringify({ error: 'Unauthorized' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+          );
+        }
+        const userId = callerId;
+
+        if (!sessionTokenHash || !expiresAt) {
+          return new Response(
+            JSON.stringify({ error: 'sessionTokenHash and expiresAt are required' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
           );
         }
@@ -175,7 +254,7 @@ serve(async (req: Request) => {
           .insert({
             user_id: userId,
             session_token_hash: sessionTokenHash,
-            ip_address: clientIP,
+            ip_address: clientInet,
             user_agent: userAgent,
             device_type: parsedDeviceType,
             browser: parsedBrowser,
@@ -197,7 +276,7 @@ serve(async (req: Request) => {
           p_status: 'success',
           p_resource_type: 'session',
           p_resource_id: data.id,
-          p_ip_address: clientIP,
+          p_ip_address: clientInet,
           p_user_agent: userAgent,
           p_details: JSON.stringify({
             device_type: parsedDeviceType,

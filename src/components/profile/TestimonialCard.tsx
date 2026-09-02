@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import type { PublicTestimonial } from '@/types/testimonial';
 import { formatRelativeTime } from '@/lib/format';
+import { transactionTypeLabel } from '@/lib/testimonialLabels';
 
 interface TestimonialCardProps {
   testimonial: PublicTestimonial;
@@ -17,6 +18,8 @@ export function TestimonialCard({ testimonial, variant = 'default' }: Testimonia
     .join('')
     .toUpperCase()
     .slice(0, 2);
+
+  const transactionLabel = transactionTypeLabel(testimonial.transaction_type);
 
   const renderStars = () => {
     return (
@@ -99,9 +102,9 @@ export function TestimonialCard({ testimonial, variant = 'default' }: Testimonia
 
             {/* Badges */}
             <div className="flex gap-2 mt-2 flex-wrap">
-              {testimonial.transaction_type && (
+              {transactionLabel && (
                 <Badge variant="secondary" className="text-xs">
-                  {testimonial.transaction_type === 'buyer' ? 'Buyer' : 'Seller'}
+                  {transactionLabel}
                 </Badge>
               )}
               {testimonial.property_type && (

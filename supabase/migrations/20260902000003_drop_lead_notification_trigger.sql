@@ -1,0 +1,32 @@
+-- US-099: drop the lead-notification trigger that has never fired, and the
+-- idea of keeping the service-role key in a database GUC.
+--
+-- trg_notify_lead_on_insert called notify_lead_on_insert(), which reads
+-- app.settings.functions_url and app.settings.service_role_key and returns
+-- early when either is unset. No live migration sets them — the instruction
+-- lives only in supabase/migrations/archive/20260525000001_lead_notifications.sql
+-- — so in practice the trigger has never posted anything. Confirmed against
+-- this schema: current_setting('app.settings.functions_url', true) is NULL
+-- after applying every migration.
+--
+-- It is not being repaired, for two reasons.
+--
+-- First, setting it up as documented would store the service-role key as a
+-- plaintext GUC readable by anyone who can run current_setting() — including
+-- through any SECURITY DEFINER function that leaks it — which is a worse
+-- outcome than the notification being broken.
+--
+-- Second, it was never the only sender. submit-lead composed and sent its own
+-- agent email as well, so on any deployment where the GUCs were set, every
+-- lead produced two emails, and neither path honoured the agent's
+-- notification_preferences.leads setting consistently. submit-lead now calls
+-- notify-lead over HTTP with the service-role key it already holds in its
+-- environment, and useLeads does the same for a lead added by hand. One path,
+-- one preference check, one timeline entry.
+--
+-- trg_notify_new_lead / notify_new_lead() are a DIFFERENT trigger and are
+-- deliberately untouched: they insert the in-app notifications row, take no
+-- GUCs, and work.
+
+DROP TRIGGER IF EXISTS trg_notify_lead_on_insert ON public.leads;
+DROP FUNCTION IF EXISTS public.notify_lead_on_insert();

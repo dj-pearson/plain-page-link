@@ -171,14 +171,23 @@ export class AnalyticsEngine {
   /**
    * Calculate funnel stages
    */
+  /**
+   * The funnel stages, from real counts.
+   *
+   * The second stage used to be "Viewed Listing", and its only caller passed
+   * `Math.round(uniqueVisitors * 0.7)` — a number nothing measured, presented
+   * to the agent as measurement (US-120). It is "Engaged" now: visitors who
+   * tapped Call, Email or Text, or followed a link, which analytics_events
+   * records since US-115.
+   */
   static calculateFunnel(stages: {
     visitors: number;
-    viewed: number;
+    engaged: number;
     contacted: number;
     qualified: number;
     converted: number;
   }): FunnelStage[] {
-    const { visitors, viewed, contacted, qualified, converted } = stages;
+    const { visitors, engaged, contacted, qualified, converted } = stages;
 
     return [
       {
@@ -187,16 +196,16 @@ export class AnalyticsEngine {
         percentage: 100,
       },
       {
-        name: 'Viewed Listing',
-        count: viewed,
-        percentage: this.calculateConversionRate(visitors, viewed),
-        dropoff: visitors - viewed,
+        name: 'Engaged',
+        count: engaged,
+        percentage: this.calculateConversionRate(visitors, engaged),
+        dropoff: visitors - engaged,
       },
       {
         name: 'Contacted',
         count: contacted,
         percentage: this.calculateConversionRate(visitors, contacted),
-        dropoff: viewed - contacted,
+        dropoff: engaged - contacted,
       },
       {
         name: 'Qualified',

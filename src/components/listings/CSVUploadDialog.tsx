@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { parseSquareFeet } from '@/lib/format';
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ interface ParsedListing {
   lot_size_acres: number | null;
   is_featured: boolean;
   virtual_tour_url: string | null;
+  year_built: number | null;
   errors: string[];
 }
 
@@ -114,8 +116,16 @@ function validateRow(row: CSVRow, _index: number): ParsedListing {
 
   const bedrooms = Number(row.bedrooms) || 0;
   const bathrooms = Number(row.bathrooms) || 0;
-  const sqft = row.square_feet ? Number(row.square_feet.replace(/[^0-9]/g, '')) : null;
+  const sqft = parseSquareFeet(row.square_feet);
   const lotSize = row.lot_size ? Number(row.lot_size) : null;
+  // The template has advertised year_built since it was written and the mapper
+  // dropped it — there was no column until 20260902000007 (US-106). A year
+  // outside the CHECK range is rejected here so the whole row does not fail on
+  // the insert.
+  const yearBuilt = row.year_built ? Number(row.year_built.replace(/[^0-9]/g, '')) : null;
+  if (yearBuilt !== null && (!Number.isFinite(yearBuilt) || yearBuilt < 1600 || yearBuilt > 2200)) {
+    errors.push('year_built must be a four-digit year');
+  }
 
   const validStatuses = ['active', 'pending', 'under_contract', 'sold', 'draft'];
   const status = validStatuses.includes(row.status?.toLowerCase())
@@ -143,6 +153,7 @@ function validateRow(row: CSVRow, _index: number): ParsedListing {
     lot_size_acres: lotSize,
     is_featured: row.is_featured?.toLowerCase() === 'true',
     virtual_tour_url: row.virtual_tour_url || null,
+    year_built: yearBuilt,
     errors,
   };
 }

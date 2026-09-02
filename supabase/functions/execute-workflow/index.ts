@@ -52,50 +52,114 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
     };
   },
 
-  send_sms: async (node, context) => {
-    const { to, message } = node.config;
-    const resolvedTo = resolveVariables(to, context);
-    const resolvedMessage = resolveVariables(message, context);
-
-    console.log(`Sending SMS to ${resolvedTo}: ${resolvedMessage}`);
-
-    return {
-      success: true,
-      to: resolvedTo,
-      sentAt: new Date().toISOString(),
-    };
-  },
+  // send_sms is deliberately absent. There is no SMS provider anywhere in this
+  // repo — no Twilio credentials, no gateway, nothing in .env.example — so the
+  // node logged its message and returned { success: true, sentAt }. A workflow
+  // step that reports a delivery time for a message nobody sent is worse than
+  // one that is missing, because the agent believes the lead was texted.
+  // Removed from the palette in src/types/workflow.ts too; add it back with a
+  // provider behind it (US-103).
 
   update_lead: async (node, context, supabase) => {
     const { leadId, status, score, notes } = node.config;
     const resolvedLeadId = resolveVariables(leadId || '{{lead.id}}', context);
 
+    // `score` is NOT a column on leads — scores live in lead_scores, one row
+    // per lead (UNIQUE (lead_id)). Writing updates.score here made PostgREST
+    // reject the whole statement, so a workflow that set a score also failed to
+    // apply the status and notes beside it (US-100).
     const updates: Record<string, any> = {};
     if (status) updates.status = status;
-    if (score) updates.score = score;
     if (notes) updates.notes = notes;
 
-    if (resolvedLeadId && Object.keys(updates).length > 0) {
-      const { error } = await supabase
-        .from('leads')
-        .update(updates)
-        .eq('id', resolvedLeadId);
+    if (!resolvedLeadId) {
+      return { success: true, leadId: resolvedLeadId, updates };
+    }
 
+    if (Object.keys(updates).length > 0) {
+      const { error } = await supabase.from('leads').update(updates).eq('id', resolvedLeadId);
       if (error) throw error;
     }
 
-    return { success: true, leadId: resolvedLeadId, updates };
+    let scored: { score: number; priority: string } | undefined;
+    if (score !== undefined && score !== null && score !== '') {
+      // lead_scores.user_id is NOT NULL, and the score belongs to whoever owns
+      // the lead — read it rather than trusting the workflow's context.
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .select('user_id')
+        .eq('id', resolvedLeadId)
+        .single();
+      if (leadError) throw leadError;
+
+      const numericScore = Math.max(0, Math.min(100, Number(score)));
+      if (!Number.isFinite(numericScore)) {
+        throw new Error(`update_lead: score "${score}" is not a number`);
+      }
+      // lead_scores_priority_check allows only these three.
+      const priority = numericScore >= 70 ? 'hot' : numericScore >= 40 ? 'warm' : 'cold';
+
+      const { error: scoreError } = await supabase.from('lead_scores').upsert(
+        {
+          lead_id: resolvedLeadId,
+          user_id: lead.user_id,
+          score: numericScore,
+          priority,
+          // lead_scores_variant_check allows 'ml' | 'rules'; a workflow-set
+          // score is a rule, not a model prediction.
+          variant: 'rules',
+          scored_at: new Date().toISOString(),
+        },
+        { onConflict: 'lead_id' }
+      );
+      if (scoreError) throw scoreError;
+      scored = { score: numericScore, priority };
+    }
+
+    return { success: true, leadId: resolvedLeadId, updates, scored };
   },
 
   create_task: async (node, context, supabase) => {
-    const { title, dueDate, assignee } = node.config;
+    const { title, dueDate, assignee, priority, notes } = node.config;
     const resolvedTitle = resolveVariables(title, context);
+    const resolvedLeadId = resolveVariables(node.config.leadId || '{{lead.id}}', context);
 
-    console.log(`Creating task: ${resolvedTitle}`);
+    // This used to log the title and return a crypto.randomUUID() as `taskId`,
+    // storing nothing. A step that reports success with an id referencing no
+    // row is worse than one that fails: the workflow looks like it created a
+    // follow-up, and the agent is never reminded of anything (US-103).
+    if (!resolvedLeadId) {
+      throw new Error('create_task: no lead to attach the task to');
+    }
+
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('user_id')
+      .eq('id', resolvedLeadId)
+      .single();
+    if (leadError) throw leadError;
+
+    const { data, error } = await supabase
+      .from('lead_activities')
+      .insert({
+        lead_id: resolvedLeadId,
+        // assignee is honoured when the workflow names one; otherwise the task
+        // belongs to whoever owns the lead. lead_activities.user_id is NOT NULL.
+        user_id: resolveVariables(assignee, context) || lead.user_id,
+        activity_type: 'task',
+        title: resolvedTitle,
+        content: notes ? resolveVariables(notes, context) : null,
+        task_due_date: dueDate ? new Date(resolveVariables(dueDate, context)).toISOString() : null,
+        task_priority: priority ?? 'medium',
+        is_internal: true,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
 
     return {
       success: true,
-      taskId: crypto.randomUUID(),
+      taskId: data.id,
       title: resolvedTitle,
       dueDate,
       assignee,
@@ -293,6 +357,23 @@ serve(async (req) => {
     }
 
     const workflow = execution.workflows;
+
+    // The caller must own the workflow.
+    //
+    // The lookup above uses the SERVICE-ROLE client, so RLS does not apply to
+    // it — an authenticated user could pass any executionId and this would run
+    // someone else's workflow with their variables and their integrations, and
+    // write the results back onto their execution record. Being logged in was
+    // the only requirement (US-119).
+    //
+    // Answered as "not found" rather than "forbidden": whether an execution id
+    // exists is not something a stranger should be able to learn.
+    if (!workflow || workflow.user_id !== user.id) {
+      console.warn(
+        `[execute-workflow] ${user.id} tried to run execution ${executionId}, owned by ${workflow?.user_id ?? 'nobody'}`
+      );
+      throw new Error('Execution not found');
+    }
     const nodes: WorkflowNode[] = workflow.nodes || [];
     const edges: WorkflowEdge[] = workflow.edges || [];
 

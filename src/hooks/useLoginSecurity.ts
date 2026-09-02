@@ -99,7 +99,8 @@ export async function recordLoginAttempt(
  * Register a new session after successful login
  */
 export async function registerSession(
-  userId: string,
+  /** Unused: the session's owner comes from the JWT, not from the caller. */
+  _userId: string,
   expiresAt: string,
   deviceType?: string,
   browser?: string,
@@ -111,8 +112,10 @@ export async function registerSession(
 
     const { data, error } = await edgeFunctions.invoke('login-security', {
       body: {
+        // No userId. The function reads it from the caller's JWT — it used to
+        // trust this field, so anyone could insert user_sessions rows against
+        // any account (US-119).
         action: 'register_session',
-        userId,
         sessionTokenHash,
         expiresAt,
         deviceType,
@@ -142,7 +145,7 @@ async function generateSessionTokenHash(): Promise<string> {
 
   const hashBuffer = await crypto.subtle.digest('SHA-256', randomBytes);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**

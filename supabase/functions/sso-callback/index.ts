@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { getClientIP } from '../_shared/auth.ts';
 import { sanitizeRedirectUrl } from '../_shared/url-validation.ts';
 import { decode as base64Decode, encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { getSiteUrl } from '../_shared/env.ts';
 
 /**
  * SSO Callback - Handle SAML Response or OIDC Callback
@@ -100,7 +101,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
-    const appUrl = Deno.env.get('APP_URL') || 'https://agentbio.net';
+    const appUrl = getSiteUrl();
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const clientIP = getClientIP(req);

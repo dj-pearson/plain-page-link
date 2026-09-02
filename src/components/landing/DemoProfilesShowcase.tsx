@@ -104,7 +104,10 @@ export function DemoProfilesShowcase() {
           className={`grid gap-8 max-w-6xl mx-auto ${profiles.length >= 3 ? 'md:grid-cols-3' : profiles.length === 2 ? 'md:grid-cols-2 max-w-4xl' : 'max-w-md'}`}
         >
           {profiles.slice(0, 3).map((profile) => (
-            <Link key={profile.id} to={`/p/${profile.username}`} className="group block">
+            // /:username, the profile. This linked /p/${username}, which is a
+            // page-builder slug — it 404'd for every agent whose page slug was
+            // not exactly their username, which was most of them (US-116).
+            <Link key={profile.id} to={`/${profile.username}`} className="group block">
               <div className="bg-glass-background backdrop-blur-md border border-glass-border rounded-xl p-6 hover:border-primary hover:shadow-lg hover:shadow-primary/10 transition-all">
                 {/* Avatar */}
                 <div className="relative mb-4">

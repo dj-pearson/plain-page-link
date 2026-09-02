@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
-import { FullPageLoader, ProfileSkeleton } from '@/components/LoadingSpinner';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import ContactButtons from '@/components/profile/ContactButtons';
 import SocialLinks from '@/components/profile/SocialLinks';
@@ -8,6 +8,8 @@ import ListingGallery from '@/components/profile/ListingGallery';
 import SoldProperties from '@/components/profile/SoldProperties';
 import { LeadCaptureCTA } from '@/components/profile/LeadCaptureCTA';
 import { TestimonialSection } from '@/components/profile/TestimonialSection';
+import { ReviewInvite } from '@/components/profile/ReviewInvite';
+import { CustomBlocksSection } from '@/components/profile/CustomBlocksSection';
 import { SocialProofBanner } from '@/components/profile/SocialProofBanner';
 import { FeaturedListingsCarousel } from '@/components/profile/FeaturedListingsCarousel';
 import { StickyActionBar } from '@/components/profile/StickyActionBar';
@@ -15,15 +17,19 @@ import ListingDetailModal from '@/components/profile/ListingDetailModal';
 import { LeadFormModal } from '@/components/profile/LeadFormModal';
 import { CalendlyModal } from '@/components/integrations/CalendlyModal';
 import { HomeValuationForm } from '@/components/forms/HomeValuationForm';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
+import { trackContactTap } from '@/lib/analyticsEvents';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
-import { supabase } from '@/integrations/supabase/client';
 import { SEOHead } from '@/components/SEOHead';
-import { applyTheme, type ThemeConfig } from '@/lib/themes';
+import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
+import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
+import { formatResponseTime } from '@/lib/responseTime';
+import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { parsePrice } from '@/lib/format';
+import { LISTING_PARAM } from '@/lib/listingShare';
 import { getImageUrl } from '@/lib/images';
 import { logger } from '@/lib/logger';
 import type { PublicProfileListing } from '@/types';
@@ -31,57 +37,68 @@ import NotFound from './NotFound';
 import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
+import { getSafeOrigin } from '@/lib/utils';
 
 export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
-  const [selectedListing, setSelectedListing] = useState<PublicProfileListing | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
-  const [customPageSlug, setCustomPageSlug] = useState<string | null>(null);
-  const [checkingCustomPage, setCheckingCustomPage] = useState(true);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
+  // The property a showing was requested for, if any. Kept separate from
+  // selectedListing so closing the detail modal does not drop the context the
+  // lead form and the Calendly header need (US-096).
+  const [showingListing, setShowingListing] = useState<PublicProfileListing | null>(null);
   const [isHomeValuationModalOpen, setIsHomeValuationModalOpen] = useState(false);
 
   // Fetch profile and related data
-  const { data, isLoading, error } = usePublicProfile(slug || '');
+  const { data, isLoading, error, refetch } = usePublicProfile(slug || '');
 
-  // Check if user has an active custom page
-  useEffect(() => {
-    const checkForCustomPage = async () => {
-      if (!slug || !data?.profile?.id) {
-        setCheckingCustomPage(false);
-        return;
-      }
+  /**
+   * Which listing's detail modal is open, derived from ?listing=<id> rather
+   * than held in state (US-114).
+   *
+   * The modal used to be pure component state, so it had no URL: every share
+   * button sent the recipient to the top of the profile, and the JSON-LD the
+   * modal injects could never be indexed because there was nothing to index it
+   * against. Deriving it from the query parameter gives the modal an address,
+   * makes Back close it, and makes a pasted link open the right property.
+   *
+   * An id that matches nothing — a deleted listing, a mangled paste — resolves
+   * to null, which renders the profile rather than an error.
+   */
+  const selectedListingId = searchParams.get(LISTING_PARAM);
+  const selectedListing =
+    (selectedListingId && data?.listings?.find((l) => l.id === selectedListingId)) || null;
 
-      try {
-        const { data: customPage, error } = await supabase
-          .from('custom_pages')
-          .select('slug')
-          .eq('user_id', data.profile.id)
-          .eq('is_active', true)
-          .eq('published', true)
-          .single();
+  /**
+   * Open or close the detail modal by rewriting the query parameter.
+   *
+   * `replace` on close and push on open: a visitor who opened a property and
+   * pressed Back expects the profile, not the page before it.
+   */
+  const setSelectedListing = useCallback(
+    (listing: PublicProfileListing | null) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (listing) {
+            next.set(LISTING_PARAM, listing.id);
+          } else {
+            next.delete(LISTING_PARAM);
+          }
+          return next;
+        },
+        { replace: !listing }
+      );
+    },
+    [setSearchParams]
+  );
 
-        if (!error && customPage) {
-          setCustomPageSlug(customPage.slug);
-        }
-      } catch (err) {
-        logger.error('Error checking for custom page', err as Error);
-      } finally {
-        setCheckingCustomPage(false);
-      }
-    };
-
-    if (data) {
-      checkForCustomPage();
-    } else if (!isLoading) {
-      // Profile failed to load or doesn't exist — stop spinner
-      setCheckingCustomPage(false);
-    }
-  }, [slug, data, isLoading]);
-
-  // Track profile view analytics - must be called before any conditional returns
-  // We pass the profile.id only when data is available
+  // One page, one view (US-115). This used to run alongside a redirect to
+  // /p/<slug>, so an agent with a page-builder page had the view counted here
+  // and the page their visitors actually saw tracked nothing at all. There is
+  // no redirect any more (US-116): the blocks render below, on this page.
   useProfileTracking(data?.profile?.id, slug || '');
 
   // Apply theme when profile loads - IMPORTANT: All hooks must be before conditional returns
@@ -99,8 +116,15 @@ export default function FullProfilePage() {
             setActiveTheme(parsedTheme);
             applyTheme(data.profile.theme);
           } else {
-            // It's just a theme name like "default", skip applying
-            logger.debug('Using theme preset', { theme: data.profile.theme });
+            // A preset NAME, which is what the onboarding wizard stores. This
+            // used to log "skip applying" and do nothing, so the wizard's
+            // mandatory template step changed nothing on the public page
+            // whichever card the agent chose (US-108). getCurrentTheme falls
+            // back to 'modern' for an unknown name rather than leaving the
+            // page unstyled.
+            const preset = getCurrentTheme(data.profile.theme);
+            setActiveTheme(preset);
+            applyTheme(JSON.stringify(preset));
           }
         } else {
           // It's already an object, stringify it
@@ -149,27 +173,55 @@ export default function FullProfilePage() {
     };
   }, [data]);
 
-  // Redirect to custom page if active
-  if (checkingCustomPage) {
-    return <FullPageLoader text="Loading profile..." />;
-  }
-
-  if (customPageSlug) {
-    return <Navigate to={`/p/${customPageSlug}`} replace />;
-  }
+  /**
+   * A showing request on a specific property. Routes to the agent's Calendly
+   * when they have one and to the lead form otherwise, carrying the listing
+   * either way — so the Calendly header names the property and the lead lands
+   * in the CRM with listing_id and property_address set (US-096).
+   */
+  const handleRequestShowing = (listing: PublicProfileListing) => {
+    setShowingListing(listing);
+    setSelectedListing(null);
+    if (data?.profile?.calendly_url) {
+      setIsCalendlyModalOpen(true);
+    } else {
+      setIsLeadModalOpen(true);
+    }
+  };
 
   if (isLoading) {
     return <ProfileSkeleton />;
   }
 
-  if (error || !data) {
+  // A missing profile is a 404. A network failure is not.
+  //
+  // This rendered NotFound for ANY error, so a visitor who hit a transient
+  // fetch failure was told the agent does not exist — and had no way to retry
+  // short of guessing that reloading might help (US-112). PGRST116 from the
+  // profile query is the real "no such username"; everything else is a fault
+  // worth offering a retry for.
+  if (error) {
+    const code = (error as { code?: string }).code;
+    const message = error instanceof Error ? error.message : String(error);
+    const isMissing = code === 'PGRST116' || /Profile not found/i.test(message);
+    if (!isMissing) {
+      return <ProfileLoadError onRetry={() => refetch()} />;
+    }
     return <NotFound />;
   }
 
-  const { profile, listings, testimonials, links, settings } = data;
+  if (!data) {
+    return <NotFound />;
+  }
 
-  const activeListings = listings.filter((l: PublicProfileListing) => l.status === 'active');
-  const soldListings = listings.filter((l: PublicProfileListing) => l.status === 'sold');
+  const { profile, listings, testimonials, links, settings, customPage } = data;
+
+  // Active, pending and under_contract — active first. This filtered on
+  // status === 'active' alone, so marking a listing Pending made it vanish
+  // from the agent's public page (US-110). The rules live in
+  // lib/publicListingVisibility so they can be tested.
+  const activeListings = selectAvailableListings(listings as PublicProfileListing[]);
+  const soldListings = selectSoldListings(listings as PublicProfileListing[]);
 
   // Calculate social proof stats
   const totalVolume = soldListings.reduce(
@@ -182,7 +234,7 @@ export default function FullProfilePage() {
       : 0;
 
   // Generate SEO data with safe origin detection for SSR/crawlers
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://agentbio.net';
+  const origin = getSafeOrigin();
   const seoTitle =
     profile.seo_title || `${profile.full_name || profile.username} - Real Estate Agent`;
   const seoDescription =
@@ -413,7 +465,9 @@ export default function FullProfilePage() {
                   propertiesSold: soldListings.length,
                   averageRating: averageRating,
                   reviewCount: testimonials.length,
-                  responseTime: '< 1 hour',
+                  // Computed, or absent. This was the literal string
+                  // '< 1 hour' for every agent (US-111).
+                  responseTime: formatResponseTime(data.responseHours),
                 }}
               />
             </section>
@@ -421,7 +475,10 @@ export default function FullProfilePage() {
             {settings?.show_contact_buttons !== false && (
               <ContactButtons
                 profile={profile}
-                onContactClick={(method) => logger.info('Contact clicked', { method })}
+                // logger.info wrote this to the visitor's own console and
+                // nowhere else, so an agent never learned that thirty people
+                // tapped Call this week (US-115).
+                onContactClick={(method) => void trackContactTap(profile.id, method)}
               />
             )}
 
@@ -459,7 +516,6 @@ export default function FullProfilePage() {
                   listings={activeListings}
                   title="All Properties"
                   onListingClick={(listing) => setSelectedListing(listing)}
-                  calendlyUrl={data?.profile?.calendly_url ?? undefined}
                 />
               </section>
             )}
@@ -482,11 +538,32 @@ export default function FullProfilePage() {
               </div>
             )}
 
-            {/* Testimonials */}
-            {settings?.show_testimonials !== false && testimonials.length > 0 && (
+            {/* Testimonials.
+                Not gated on testimonials.length: the review invitation belongs
+                on a profile that has no reviews yet more than on one that has
+                plenty, and TestimonialSection already renders nothing when the
+                list is empty (US-113). */}
+            {settings?.show_testimonials !== false && (
               <section id="testimonials" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
                 <TestimonialSection testimonials={testimonials} />
+                <ReviewInvite
+                  username={profile.username}
+                  agentName={profile.full_name || profile.username}
+                />
               </section>
+            )}
+
+            {/* Anything the agent built in the page builder.
+                A section of this page, not a replacement for it: building a
+                page used to redirect /:username to /p/<slug> and take the
+                listings, testimonials, contact buttons and lead capture off
+                the public web entirely (US-116). */}
+            {customPage && (
+              <CustomBlocksSection
+                blocks={customPage.blocks}
+                userId={profile.id}
+                title={customPage.title}
+              />
             )}
 
             {/* Custom Links */}
@@ -496,7 +573,7 @@ export default function FullProfilePage() {
                 onLinkClick={async (link) => {
                   // trackLinkClick already calls increment_link_clicks;
                   // calling it again here counted every click twice.
-                  await trackLinkClick(link.id.toString());
+                  await trackLinkClick(link.id.toString(), profile.id, link.title);
                 }}
               />
             )}
@@ -607,32 +684,46 @@ export default function FullProfilePage() {
             isOpen={!!selectedListing}
             onClose={() => setSelectedListing(null)}
             calendlyUrl={data?.profile?.calendly_url ?? undefined}
+            onRequestShowing={handleRequestShowing}
           />
         )}
 
         {/* Lead Form Modal */}
         <LeadFormModal
           isOpen={isLeadModalOpen}
-          onClose={() => setIsLeadModalOpen(false)}
+          onClose={() => {
+            setIsLeadModalOpen(false);
+            setShowingListing(null);
+          }}
           formType="contact"
           agentId={profile.id}
           agentName={profile.full_name || profile.username}
+          listing={
+            showingListing ? { id: showingListing.id, address: showingListing.address } : undefined
+          }
         />
 
         {/* Calendly Modal */}
         {profile.calendly_url && (
           <CalendlyModal
             isOpen={isCalendlyModalOpen}
-            onClose={() => setIsCalendlyModalOpen(false)}
+            onClose={() => {
+              setIsCalendlyModalOpen(false);
+              setShowingListing(null);
+            }}
             calendlyUrl={profile.calendly_url}
             title="Schedule a Showing"
             subtitle="Choose a time that works best for you"
+            listingAddress={showingListing?.address}
           />
         )}
 
         {/* Home Valuation Modal */}
         <Dialog open={isHomeValuationModalOpen} onOpenChange={setIsHomeValuationModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            {/* Hidden: HomeValuationForm renders its own visible heading, but a
+                dialog without a title is announced unnamed (US-112). */}
+            <DialogTitle className="sr-only">Home valuation request</DialogTitle>
             <HomeValuationForm
               agentId={profile.id}
               agentName={profile.full_name || profile.username}

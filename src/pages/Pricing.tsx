@@ -27,6 +27,28 @@ export default function Pricing() {
   const { plans, subscription } = useSubscription();
   const { toast } = useToast();
 
+  /**
+   * The pricing sentence, built from the plan rows (US-118).
+   *
+   * The JSON-LD and the FAQ each carried their own copy of it, and both said
+   * "Starter ($19/month), Professional ($39/month), and Team ($29/agent/month
+   * with 5 agent minimum)" — while the cards beside them rendered 29 / 49 / 99
+   * flat from the same rows this page already reads, and checkout sends
+   * quantity 1. Three numbers, none of which agreed, one of which described a
+   * per-seat product that does not exist.
+   */
+  const pricingAnswer = (() => {
+    if (!plans?.length) {
+      return 'AgentBio has a free plan and paid plans; see the table above for current pricing.';
+    }
+    const parts = plans.map((plan) => {
+      const name = plan.name.charAt(0).toUpperCase() + plan.name.slice(1);
+      const monthly = Number(plan.price_monthly);
+      return monthly === 0 ? `${name} ($0)` : `${name} ($${monthly}/month)`;
+    });
+    return `AgentBio offers ${parts.length} pricing tiers: ${parts.join(', ')}. Annual plans are billed yearly at a discount.`;
+  })();
+
   // Generate comprehensive schema for pricing page
   const generatePricingSchema = () => {
     const baseUrl = window.location.origin;
@@ -118,7 +140,7 @@ export default function Pricing() {
               name: 'How much does AgentBio cost?',
               acceptedAnswer: {
                 '@type': 'Answer',
-                text: 'AgentBio offers four pricing tiers: Free ($0), Starter ($19/month), Professional ($39/month), and Team ($29/agent/month with 5 agent minimum). Annual plans save 17%.',
+                text: pricingAnswer,
               },
             },
             {
@@ -279,9 +301,12 @@ export default function Pricing() {
                         {plan.price_monthly > 0 && (
                           <span className="text-muted-foreground">{getPeriod()}</span>
                         )}
-                        {plan.name === 'team' && (
-                          <div className="text-sm mt-2">per agent (5 minimum)</div>
-                        )}
+                        {/* "per agent (5 minimum)" used to be here. Nothing
+                            implements seats: checkout sends quantity 1, the
+                            plan row is a flat price, and no part of the app
+                            counts agents. Claiming a per-seat product on the
+                            page an agent buys from is a billing promise the
+                            system cannot keep (US-118). */}
                       </CardDescription>
                     </CardHeader>
 
@@ -354,7 +379,7 @@ export default function Pricing() {
                         asChild={plan.name === 'free'}
                       >
                         {plan.name === 'free' ? (
-                          <Link to="/register">Get Started</Link>
+                          <Link to="/auth/register">Get Started</Link>
                         ) : isCurrentPlan(plan.name) ? (
                           'Current Plan'
                         ) : plan.name === 'enterprise' ? (
@@ -396,10 +421,7 @@ export default function Pricing() {
               <div className="mt-20">
                 <h2 className="text-3xl font-bold text-center mb-8">Pricing Questions</h2>
                 <div className="max-w-3xl mx-auto space-y-4">
-                  <FAQItem
-                    question="How much does AgentBio cost?"
-                    answer="AgentBio offers four pricing tiers: Free ($0), Starter ($19/month), Professional ($39/month), and Team ($29/agent/month with 5 agent minimum). Annual plans save 17%."
-                  />
+                  <FAQItem question="How much does AgentBio cost?" answer={pricingAnswer} />
                   <FAQItem
                     question="Can I start with the free plan?"
                     answer="Yes! AgentBio offers a free plan with 3 active listings, 5 custom links, basic analytics, and lead capture forms. No credit card required to get started."

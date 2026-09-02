@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { Database } from '@/integrations/supabase/types';
-import { decryptPIIBatch } from '@/lib/pii';
+import { decryptLeadContacts } from '@/lib/pii';
 
 export type TimeRange = '7d' | '30d' | '90d';
 
@@ -29,6 +29,26 @@ export type ViewsDatum = {
 export type LeadsDatum = {
   name: string;
   value: number;
+};
+
+/**
+ * One row of the interactions breakdown: a contact method, or a single link.
+ *
+ * `analytics_events` is where Call/Email/Text taps and dated link clicks live
+ * (US-115). Before it, taps were logger.info'd on the visitor's own console,
+ * and link clicks existed only as `links.click_count` — a lifetime total that
+ * cannot be shown over a period or compared with anything.
+ */
+export type InteractionDatum = {
+  name: string;
+  value: number;
+};
+
+/** Human labels for the event types the CHECK constraint allows. */
+const CONTACT_LABELS: Record<string, string> = {
+  contact_call: 'Call',
+  contact_email: 'Email',
+  contact_text: 'Text',
 };
 
 /**
@@ -61,20 +81,17 @@ type EncryptedLeadRow = Pick<
 /**
  * Decrypts a page of leads in one batched call.
  *
- * Batched for the same reason useLeads batches: since US-066 the crypto lives
- * in the pii-crypto Edge Function, so a call per field would be two network
- * round trips per row.
+ * By id, for the same reason useLeads is: pii-crypto no longer opens raw
+ * ciphertext for anyone holding a JWT (US-119). One call per page, since the
+ * crypto lives in an Edge Function.
  */
 async function decryptRecentLeads(rows: EncryptedLeadRow[]): Promise<RecentLead[]> {
-  const [emails, phones] = await Promise.all([
-    decryptPIIBatch(rows.map((row) => row.encrypted_email)),
-    decryptPIIBatch(rows.map((row) => row.encrypted_phone)),
-  ]);
+  const contacts = await decryptLeadContacts(rows.map((row) => row.id));
 
-  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }, i) => ({
+  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }) => ({
     ...rest,
-    email: emails[i] ?? null,
-    phone: phones[i] ?? null,
+    email: contacts.get(rest.id)?.email ?? null,
+    phone: contacts.get(rest.id)?.phone ?? null,
   }));
 }
 
@@ -176,6 +193,45 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds
     gcTime: 10 * 60 * 1000, // 10 minutes cache time
+  });
+
+  // Public interactions in the window: Call/Email/Text taps and link clicks.
+  const {
+    data: events = [],
+    isLoading: eventsLoading,
+    refetch: refetchEvents,
+  } = useQuery({
+    queryKey: ['analytics-events', user?.id, timeRange],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data, error } = await supabase
+        .from('analytics_events')
+        .select('event_type, target_label, occurred_at')
+        .eq('user_id', user.id)
+        .gte('occurred_at', cutoffDate)
+        .order('occurred_at', { ascending: false })
+        .limit(1000);
+
+      // The table arrived in 20260902000012. An environment that has not run
+      // the migration reports empty rather than breaking the whole page —
+      // the same tolerance analytics_views already has above.
+      if (error) {
+        if (
+          error.code === '42P01' ||
+          error.message?.includes('does not exist') ||
+          error.code === 'PGRST204'
+        ) {
+          return [];
+        }
+        throw error;
+      }
+      return data;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
   });
 
   // Previous-window counts. Deliberately head-only counts rather than rows:
@@ -287,6 +343,28 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     value,
   }));
 
+  // Contact taps, by method — the number an agent actually wants ("thirty
+  // people tapped Call this week"). Every allowed method is listed even at
+  // zero, so a week with no email taps reads as zero rather than as absence.
+  const contactTaps: InteractionDatum[] = Object.entries(CONTACT_LABELS).map(([type, name]) => ({
+    name,
+    value: events.filter((e) => e.event_type === type).length,
+  }));
+
+  const totalContactTaps = contactTaps.reduce((sum, row) => sum + row.value, 0);
+
+  // Link clicks in the same window, per link. `links.click_count` is a lifetime
+  // total and cannot answer "this month", which is what the page is asking.
+  const linkClickEvents = events.filter((e) => e.event_type === 'link_click');
+  const linkClicksByLabel = linkClickEvents.reduce<Record<string, number>>((acc, event) => {
+    const name = event.target_label || 'Untitled link';
+    acc[name] = (acc[name] || 0) + 1;
+    return acc;
+  }, {});
+  const linkClicks: InteractionDatum[] = Object.entries(linkClicksByLabel)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+
   const previousStats = previousCounts ?? { views: 0, visitors: 0, leads: 0, conversions: 0 };
 
   return {
@@ -299,13 +377,18 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     hasPreviousPeriod: (previousCounts?.views ?? 0) + (previousCounts?.leads ?? 0) > 0,
     viewsData,
     leadsData,
+    contactTaps,
+    totalContactTaps,
+    linkClicks,
+    totalLinkClicks: linkClickEvents.length,
     recentLeads: leads.slice(0, 10),
-    isLoading: viewsLoading || leadsLoading,
+    isLoading: viewsLoading || leadsLoading || eventsLoading,
     isError: viewsError || leadsError,
     error: viewsErrorObj || leadsErrorObj,
     refetch: () => {
       refetchViews();
       refetchLeads();
+      refetchEvents();
     },
     timeRange,
   };

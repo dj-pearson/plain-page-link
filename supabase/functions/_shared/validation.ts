@@ -34,6 +34,12 @@ export function validateUrl(url: string): boolean {
   }
 }
 
+// UUID validation — accepts any RFC 4122 version, which is what Postgres does.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function validateUuid(value: unknown): boolean {
+  return typeof value === 'string' && UUID_RE.test(value);
+}
+
 // Sanitize string (remove potentially dangerous characters and XSS vectors)
 export function sanitizeString(str: string): string {
   return str
@@ -125,15 +131,44 @@ export function isPublicFetchableUrl(url: string): boolean {
 }
 
 // Validate webhook URL against allowed domains (for SSRF prevention)
-export function isValidWebhookUrl(url: string, allowedDomains: string[] = ['hooks.zapier.com', 'hook.us1.make.com', 'hook.eu1.make.com']): boolean {
+/**
+ * Whether a URL is an accepted webhook destination.
+ *
+ * The allow-list is the control, not the SSRF guard: a guard proves a URL is
+ * not internal, this proves it is one of the two integrations the product
+ * actually supports. Both are applied (US-119).
+ *
+ * https only. A webhook carries lead PII to a third party, and every
+ * destination on this list serves https; permitting http meant that payload
+ * could be sent in clear text.
+ *
+ * `hook.*.make.com` rather than two named regions: Make assigns regional
+ * hostnames (us1, us2, eu1, eu2 …) and a hard-coded pair silently rejected
+ * agents in the others.
+ */
+export function isValidWebhookUrl(
+  url: string,
+  allowedDomains: string[] = ['hooks.zapier.com']
+): boolean {
   try {
     const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol.toLowerCase())) {
+    if (parsed.protocol.toLowerCase() !== 'https:') {
       return false;
     }
-    // Check if the hostname matches any allowed domain
-    return allowedDomains.some(domain =>
-      parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
+
+    const host = parsed.hostname.toLowerCase();
+
+    // Credentials in the URL are a redirect trick and never legitimate here.
+    if (parsed.username || parsed.password) {
+      return false;
+    }
+
+    if (/^hook\.[a-z0-9-]+\.make\.com$/.test(host)) {
+      return true;
+    }
+
+    return allowedDomains.some(
+      (domain) => host === domain.toLowerCase() || host.endsWith('.' + domain.toLowerCase())
     );
   } catch {
     return false;
@@ -186,6 +221,21 @@ export function validateLeadData(data: any): ValidationResult {
     errors.push('Invalid referrer URL');
   }
 
+  // `preapproved` is a boolean column. A string reached it for a year and
+  // Postgres coerced 'yes' while raising 22P02 on 'in-process', 'not-yet' and
+  // 'cash' — a database error surfaced to the visitor as "Submission Failed"
+  // rather than a validation message (US-096). Rejecting it here means the
+  // next caller that gets the type wrong is told so.
+  if (data.preapproved !== undefined && typeof data.preapproved !== 'boolean') {
+    errors.push('Pre-approval status must be a boolean');
+  }
+
+  // listing_id is a uuid FK to listings. Anything else is a 22P02 from the
+  // insert, for the same reason.
+  if (data.listing_id !== undefined && !validateUuid(data.listing_id)) {
+    errors.push('Invalid listing ID');
+  }
+
   return {
     valid: errors.length === 0,
     errors
@@ -223,4 +273,51 @@ export function getClientIP(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0] || 
          req.headers.get('x-real-ip') || 
          'unknown';
+}
+
+/**
+ * Public review submission (US-113).
+ *
+ * The RLS policy added in 20260808000004 carries the same bounds as a backstop
+ * for the direct anon insert; these are the messages a visitor can act on.
+ * `client_email` is deliberately absent — the review page used to require an
+ * address "for verification only" that no column stored and nothing verified.
+ */
+export function validateReviewData(data: any): ValidationResult {
+  const errors: string[] = [];
+
+  if (!validateUuid(data?.user_id)) {
+    errors.push('Invalid agent ID');
+  }
+
+  if (!data?.client_name || !validateStringLength(String(data.client_name), 1, 100)) {
+    errors.push('Name must be between 1 and 100 characters');
+  }
+
+  if (!data?.review || !validateStringLength(String(data.review), 1, 2000)) {
+    errors.push('Review must be between 1 and 2000 characters');
+  }
+
+  // Number, not numeric-string: `rating` is an integer column, and '5' reaches
+  // it as a 22P02 the visitor sees as a generic failure.
+  if (!Number.isInteger(data?.rating) || data.rating < 1 || data.rating > 5) {
+    errors.push('Rating must be a whole number between 1 and 5');
+  }
+
+  if (
+    data?.transaction_type !== undefined &&
+    !['buyer', 'seller', 'both'].includes(data.transaction_type)
+  ) {
+    errors.push('Invalid transaction type');
+  }
+
+  if (data?.client_title && !validateStringLength(String(data.client_title), 0, 100)) {
+    errors.push('Title must be less than 100 characters');
+  }
+
+  if (data?.property_type && !validateStringLength(String(data.property_type), 0, 100)) {
+    errors.push('Property type must be less than 100 characters');
+  }
+
+  return { valid: errors.length === 0, errors };
 }

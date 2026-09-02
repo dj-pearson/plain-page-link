@@ -1,5 +1,29 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAdmin } from '../_shared/auth.ts';
+import { safeFetch } from '../_shared/ssrf-guard.ts';
+import { isValidWebhookUrl } from '../_shared/validation.ts';
+
+/**
+ * Send a sample article payload to a webhook, to check it is wired up.
+ *
+ * US-119: this was an unauthenticated request proxy. It took a URL from the
+ * request body, POSTed to it, and returned the response status AND body to the
+ * caller. On self-hosted Supabase the edge runtime shares a Docker network with
+ * postgres-meta, Kong and GoTrue, so anyone who could reach this function could
+ * read those services — a full unauthenticated internal read, with the answer
+ * echoed back.
+ *
+ * Three things close it, and all three are needed:
+ *   - admin only. This is an operator tool; it was never meant to be public.
+ *   - the URL goes through the SSRF guard, which resolves the host and refuses
+ *     private and reserved ranges, and re-checks every redirect hop — a public
+ *     hostname that redirects to 127.0.0.1 defeats a single up-front check.
+ *   - the response body is NOT returned. Even for an admin, echoing an
+ *     arbitrary body turns the function back into a read primitive; the status
+ *     is what "did the webhook accept it?" actually needs.
+ */
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -8,11 +32,37 @@ serve(async (req) => {
   }
 
   try {
-    const { webhookUrl } = await req.json();
-    console.log('Testing webhook URL:', webhookUrl);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
-    if (!webhookUrl) {
+    try {
+      await requireAdmin(req, supabase);
+    } catch (authError) {
+      const message = authError instanceof Error ? authError.message : 'Unauthorized';
+      return new Response(JSON.stringify({ success: false, error: message }), {
+        status: message.startsWith('Forbidden') ? 403 : 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { webhookUrl } = await req.json();
+
+    if (!webhookUrl || typeof webhookUrl !== 'string') {
       throw new Error('Webhook URL is required');
+    }
+
+    // The allow-list first, so an obviously wrong target is refused without a
+    // DNS lookup; the guard below is what stops the clever ones.
+    if (!isValidWebhookUrl(webhookUrl)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'That URL is not an accepted webhook destination',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Create sample payload that matches exactly what will be sent
@@ -50,10 +100,9 @@ Read the full article here: https://agentbio.net/blog/sample-article-slug
       }
     };
 
-    console.log('Sending test payload to webhook...');
-
-    // Send the test payload to the webhook URL
-    const response = await fetch(webhookUrl, {
+    // safeFetch, not fetch: it refuses private and reserved targets and
+    // re-checks every redirect hop.
+    const response = await safeFetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -62,22 +111,20 @@ Read the full article here: https://agentbio.net/blog/sample-article-slug
       body: JSON.stringify(samplePayload),
     });
 
-    const responseText = await response.text();
-    
-    console.log('Webhook response status:', response.status);
-    console.log('Webhook response body:', responseText);
+    // The body is read and discarded. Returning it is what made this a read
+    // primitive; the status answers the question the operator is asking.
+    console.log(`[test-article-webhook] responded ${response.status}`);
 
     if (!response.ok) {
       return new Response(
         JSON.stringify({
           success: false,
           error: `Webhook returned status ${response.status}`,
-          responseBody: responseText,
           samplePayload,
         }),
-        { 
+        {
           status: 200, // Return 200 so frontend can display the error
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
@@ -86,10 +133,7 @@ Read the full article here: https://agentbio.net/blog/sample-article-slug
       JSON.stringify({
         success: true,
         message: 'Test payload sent successfully',
-        webhookResponse: {
-          status: response.status,
-          body: responseText,
-        },
+        webhookResponse: { status: response.status },
         samplePayload,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

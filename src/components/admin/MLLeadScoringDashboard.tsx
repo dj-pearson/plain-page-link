@@ -211,7 +211,12 @@ const ModelStats = () => {
       const metrics = await retrain();
       toast({
         title: 'Model Retrained',
-        description: `Accuracy: ${(metrics.accuracy * 100).toFixed(1)}%, AUC: ${(metrics.auc * 100).toFixed(1)}%`,
+        // Only reported when the retrain actually measured them. They used to
+        // be shipped as literals on an untrained model (US-105).
+        description:
+          metrics.accuracy !== undefined && metrics.auc !== undefined
+            ? `Accuracy: ${(metrics.accuracy * 100).toFixed(1)}%, AUC: ${(metrics.auc * 100).toFixed(1)}%`
+            : 'Retrained. No held-out evaluation was run, so no accuracy figure is available.',
       });
     } catch (err: any) {
       toast({

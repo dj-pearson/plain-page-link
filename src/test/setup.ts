@@ -22,12 +22,17 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+// ResizeObserver — a real class, not vi.fn().mockImplementation(...).
+// Radix primitives construct it with `new`, and a vi.fn whose implementation
+// has been cleared by a resetAllMocks in some earlier suite returns undefined
+// from `new`, which surfaces much later as "... is not a constructor" inside
+// whichever component happens to open a popover (US-102).
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({

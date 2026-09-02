@@ -1,18 +1,25 @@
-import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useUsernameCheck } from "@/hooks/useUsernameCheck";
-import { Check, X, Loader2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useEffect, useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useUsernameCheck } from '@/hooks/useUsernameCheck';
+import { Check, X, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface UsernameInputProps {
   value: string;
   onChange: (value: string) => void;
   currentUsername?: string;
+  /** The agent editing, so their own username is not reported as taken. */
+  currentUserId?: string;
 }
 
-export const UsernameInput = ({ value, onChange, currentUsername }: UsernameInputProps) => {
-  const { checkUsername, isChecking, error, isAvailable } = useUsernameCheck();
+export const UsernameInput = ({
+  value,
+  onChange,
+  currentUsername,
+  currentUserId,
+}: UsernameInputProps) => {
+  const { checkUsername, isChecking, error, isAvailable } = useUsernameCheck(currentUserId);
   const [touched, setTouched] = useState(false);
 
   useEffect(() => {
@@ -44,14 +51,10 @@ export const UsernameInput = ({ value, onChange, currentUsername }: UsernameInpu
           {showError && <X className="h-4 w-4 text-red-500" />}
         </div>
       </div>
-      
-      {showError && (
-        <p className="text-sm text-red-500">{error}</p>
-      )}
-      
-      {showSuccess && (
-        <p className="text-sm text-green-500">Username is available!</p>
-      )}
+
+      {showError && <p className="text-sm text-red-500">{error}</p>}
+
+      {showSuccess && <p className="text-sm text-green-500">Username is available!</p>}
 
       <Alert>
         <AlertDescription className="text-sm">

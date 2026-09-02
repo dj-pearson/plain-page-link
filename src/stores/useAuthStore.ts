@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 import { logAuditEvent } from '@/lib/audit';
-import { generateSampleData } from '@/lib/sample-data-service';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
 import { toProfile } from '@/types/profile';
@@ -287,14 +286,20 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
             });
 
-            // Generate sample data for new users (runs in background)
-            // This provides demo content to help users visualize their profile
-            if (profile) {
-              generateSampleData(data.user.id).catch((error) => {
-                logger.error('Failed to generate sample data for new user', error);
-                // Don't throw - sample data is non-critical
-              });
-            }
+            // No sample data on signup (US-109).
+            //
+            // It inserted 4 listings against a free limit of 3, so the agent's
+            // FIRST REAL listing was refused with "Upgrade required"; 4 fake
+            // testimonials with is_published: true — "Robert & Lisa Thompson…
+            // Highly recommend!" — on a real licensed agent's public page,
+            // which is a fabricated review attributed to them; and 5 fake
+            // leads in their CRM.
+            //
+            // It also only ran when signup returned a session, i.e. when email
+            // confirmation is off. Register.tsx uses the OTP flow, so in the
+            // current configuration this branch never executed at all — the
+            // damage was latent, not observed. Demo content is still available
+            // deliberately, from the admin SampleDataManager.
           } else {
             // Email confirmation required - no session yet
             set({
@@ -355,8 +360,27 @@ export const useAuthStore = create<AuthState>()(
           // the `aal` claim is what actually refuses the pre-challenge token.
           // The flags below drive routing only — setting mfaVerified from a
           // console no longer buys access to anything.
-          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          const needsNativeChallenge = aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1';
+          // Isolated: getAuthenticatorAssuranceLevel decodes the access token,
+          // so anything that is not a well-formed JWT makes it throw. Left
+          // unguarded it took the whole sign-in into the catch below and the
+          // user simply stayed on the login page with an error — which is what
+          // has been happening to tests/e2e/auth.spec.ts since US-085, unnoticed
+          // because nothing runs that suite (US-090).
+          //
+          // Defaulting to "no native challenge" is safe HERE and only here:
+          // these flags drive routing, and the actual protection is the `aal`
+          // claim in the token, which RLS checks. A user who genuinely needs a
+          // second factor still holds an aal1 token and still cannot read
+          // anything the aal2 policies guard.
+          let needsNativeChallenge = false;
+          try {
+            const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            needsNativeChallenge = aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1';
+          } catch (aalError) {
+            logger.warn('Could not read the session assurance level', {
+              error: aalError instanceof Error ? aalError.message : String(aalError),
+            });
+          }
 
           // A user still enrolled under the pre-US-085 system has no native
           // factor yet, so the token cannot ask for one. They are routed to

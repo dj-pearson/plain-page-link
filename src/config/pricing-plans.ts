@@ -11,8 +11,16 @@ export interface PricingTier {
   popular?: boolean;
   features: PlanFeatures;
   limits: PlanLimits;
-  stripe_price_id_monthly?: string;
-  stripe_price_id_yearly?: string;
+  /**
+   * Stripe price ids are NOT here (US-118).
+   *
+   * They used to be, as the literals 'price_starter_monthly' and friends —
+   * strings that pass create-checkout-session's /^price_/ check and are then
+   * rejected by Stripe with "No such price", which reached the agent as
+   * "Could not start checkout". They are environment-specific and belong to
+   * the Stripe account, so they live in subscription_plans, filled in per
+   * environment. This file is the feature-matrix copy only.
+   */
 }
 
 export interface PlanFeatures {
@@ -148,8 +156,6 @@ export const PRICING_PLANS: PricingTier[] = [
       analyticsRetentionDays: 90,
       leadsPerMonth: 100,
     },
-    stripe_price_id_monthly: 'price_starter_monthly',
-    stripe_price_id_yearly: 'price_starter_yearly',
   },
 
   {
@@ -193,8 +199,6 @@ export const PRICING_PLANS: PricingTier[] = [
       analyticsRetentionDays: 365,
       leadsPerMonth: -1, // unlimited
     },
-    stripe_price_id_monthly: 'price_professional_monthly',
-    stripe_price_id_yearly: 'price_professional_yearly',
   },
 
   {
@@ -237,8 +241,6 @@ export const PRICING_PLANS: PricingTier[] = [
       analyticsRetentionDays: 730, // 2 years
       leadsPerMonth: -1,
     },
-    stripe_price_id_monthly: 'price_team_monthly',
-    stripe_price_id_yearly: 'price_team_yearly',
   },
 
   {
@@ -281,8 +283,6 @@ export const PRICING_PLANS: PricingTier[] = [
       analyticsRetentionDays: -1, // forever
       leadsPerMonth: -1,
     },
-    stripe_price_id_monthly: 'price_enterprise_monthly',
-    stripe_price_id_yearly: 'price_enterprise_yearly',
   },
 ];
 
