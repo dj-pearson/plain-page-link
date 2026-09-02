@@ -7,7 +7,7 @@ import { FormPrivacyNotice } from './FormPrivacyNotice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { EdgeFunctions } from '@/lib/edgeFunctions';
+import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
 import { logger } from '@/lib/logger';
 
 const contactSchema = z.object({
@@ -25,7 +25,7 @@ interface ContactFormProps {
   onSuccess?: () => void;
 }
 
-export function ContactForm({ agentName, onSuccess }: ContactFormProps) {
+export function ContactForm({ agentId, agentName, onSuccess }: ContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,15 +43,26 @@ export function ContactForm({ agentName, onSuccess }: ContactFormProps) {
     setIsSubmitting(true);
     setError(null);
     try {
-      // Submit lead via edge function (includes auto-response email)
-      await EdgeFunctions.submitLead({
+      // Goes through submitLead like the other three public forms. The direct
+      // EdgeFunctions.submitLead call this replaced sent no user_id and no
+      // lead_type, both of which submit-lead's validateLeadData() requires, so
+      // every "Send Message" was a 400 the visitor saw as a generic failure
+      // (US-095).
+      const result = await submitLead({
+        agentId,
+        leadType: 'contact',
         name: data.name,
         email: data.email,
         phone: data.phone,
-        message: data.message,
+        data: { message: data.message },
         source: 'contact_form',
       });
 
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send message');
+      }
+
+      trackFormSubmission('contact_form', true);
       setIsSuccess(true);
       reset();
 
@@ -61,7 +72,8 @@ export function ContactForm({ agentName, onSuccess }: ContactFormProps) {
       }, 3000);
     } catch (err) {
       logger.error('Error submitting contact form', err as Error);
-      setError('Failed to send message. Please try again.');
+      trackFormSubmission('contact_form', false);
+      setError(err instanceof Error ? err.message : 'Failed to send message. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

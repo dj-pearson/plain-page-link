@@ -1540,8 +1540,8 @@
         "npx tsc --noEmit reports 0 errors"
       ],
       "priority": 95,
-      "passes": false,
-      "notes": "Depends on nothing. Pair with US-096 since both are in the public lead forms."
+      "passes": true,
+      "notes": "DONE 2026-09-01.\n\nContactForm now takes its agentId prop (it was destructured away) and submits through submitLead() in src/lib/leadSubmission.ts with leadType 'contact', so the payload carries the user_id and lead_type that submit-lead's validateLeadData() requires. The message goes in `data`, which splitFormData lifts into the `message` column. Failures now surface the edge function's own reason instead of a fixed \"Failed to send message\", and trackFormSubmission fires on both paths, matching the other three public forms.\n\nDEAD SIBLINGS REMOVED, so the same mistake has nothing to copy:\n- EdgeFunctions.submitLead and EdgeFunctions.submitContact deleted from src/lib/edgeFunctions.ts. submitLead's type was the bug in miniature — it accepted name/email/phone/message/source and nothing else, so calling it correctly was impossible.\n- supabase/functions/submit-contact deleted (no caller, and it emailed without ever saving a lead), and its entry removed from edge-functions-server.ts FUNCTIONS_MAP.\n\nTEST: src/components/forms/ContactForm.test.tsx fills and submits the form, then asserts the exact object handed to submitLead — agentId, leadType 'contact', name/email/phone, source, and data.message. Two more cover the success card and the rejected path, which must show the returned reason rather than swallowing it.\n\nVERIFICATION: npx tsc --noEmit 0 errors; npm run test:run 311 passed (29 files, up from 308); eslint clean on the changed files (the 8 remaining warnings in edgeFunctions.ts are pre-existing no-explicit-any).\n\nDocumentation still referencing submit-contact — EDGE_FUNCTIONS_MIGRATION.md, supabase/functions/README.md, CODE_REVIEW_*.md — is left to US-121, which owns the root markdown sweep."
     },
     {
       "id": "US-096",
