@@ -36,10 +36,21 @@ type BuyerFormData = z.infer<typeof buyerSchema>;
 interface BuyerInquiryFormProps {
   agentId: string;
   agentName: string;
+  /**
+   * The property this enquiry is about, when the form was opened from one.
+   * Its id reaches leads.listing_id and its address leads.property_address
+   * (US-096).
+   */
+  listing?: { id: string; address: string };
   onSuccess?: () => void;
 }
 
-export function BuyerInquiryForm({ agentId, agentName, onSuccess }: BuyerInquiryFormProps) {
+export function BuyerInquiryForm({
+  agentId,
+  agentName,
+  listing,
+  onSuccess,
+}: BuyerInquiryFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +77,9 @@ export function BuyerInquiryForm({ agentId, agentName, onSuccess }: BuyerInquiry
         name: data.name,
         email: data.email,
         phone: data.phone,
+        listingId: listing?.id,
         data: {
+          ...(listing ? { address: listing.address } : {}),
           propertyType: data.propertyType,
           priceRange: data.priceRange,
           bedrooms: data.bedrooms,

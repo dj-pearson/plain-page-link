@@ -9,7 +9,6 @@ interface ListingGalleryProps {
   listings: PublicProfileListing[];
   title?: string;
   onListingClick?: (listing: PublicProfileListing) => void;
-  calendlyUrl?: string;
 }
 
 type SortOption = 'newest' | 'price-low' | 'price-high' | 'beds-high';

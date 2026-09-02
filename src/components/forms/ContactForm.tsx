@@ -22,10 +22,17 @@ type ContactFormData = z.infer<typeof contactSchema>;
 interface ContactFormProps {
   agentId: string;
   agentName: string;
+  /**
+   * The property the visitor is asking about, when the form was opened from
+   * one. Its id reaches leads.listing_id and its address leads.property_address,
+   * so the lead arrives in the CRM attached to the listing rather than as an
+   * anonymous enquiry (US-096).
+   */
+  listing?: { id: string; address: string };
   onSuccess?: () => void;
 }
 
-export function ContactForm({ agentId, agentName, onSuccess }: ContactFormProps) {
+export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,8 +61,12 @@ export function ContactForm({ agentId, agentName, onSuccess }: ContactFormProps)
         name: data.name,
         email: data.email,
         phone: data.phone,
-        data: { message: data.message },
-        source: 'contact_form',
+        listingId: listing?.id,
+        data: {
+          message: data.message,
+          ...(listing ? { address: listing.address } : {}),
+        },
+        source: listing ? 'listing_inquiry' : 'contact_form',
       });
 
       if (!result.success) {
@@ -107,7 +118,11 @@ export function ContactForm({ agentId, agentName, onSuccess }: ContactFormProps)
           <Mail className="w-5 h-5" />
           Send a Message
         </CardTitle>
-        <CardDescription>Get in touch with {agentName} directly</CardDescription>
+        <CardDescription>
+          {listing
+            ? `Ask ${agentName} about ${listing.address}`
+            : `Get in touch with ${agentName} directly`}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {error && (
@@ -149,7 +164,11 @@ export function ContactForm({ agentId, agentName, onSuccess }: ContactFormProps)
           <TextareaField
             label="Message"
             id="message"
-            placeholder="Tell me about your real estate needs..."
+            placeholder={
+              listing
+                ? `I'd like to see ${listing.address}. When are you available?`
+                : 'Tell me about your real estate needs...'
+            }
             rows={4}
             error={errors.message?.message}
             required

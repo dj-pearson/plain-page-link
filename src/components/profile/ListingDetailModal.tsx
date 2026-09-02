@@ -31,6 +31,14 @@ interface ListingDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   calendlyUrl?: string;
+  /**
+   * Opens the agent's scheduling flow for THIS property. Both showing buttons
+   * used to be dead ends: "Request a Showing" had no onClick at all, and the
+   * Calendly path was a raw target=_blank link rather than the CalendlyModal
+   * the page already mounts — so an enquiry about a specific listing never
+   * reached the CRM with the listing attached (US-096).
+   */
+  onRequestShowing?: (listing: PublicProfileListing) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -65,6 +73,7 @@ export default function ListingDetailModal({
   isOpen,
   onClose,
   calendlyUrl,
+  onRequestShowing,
 }: ListingDetailModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
@@ -507,18 +516,13 @@ export default function ListingDetailModal({
 
                 {/* CTAs */}
                 <div className="space-y-2">
-                  {calendlyUrl ? (
-                    <a
-                      href={calendlyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  {onRequestShowing && (
+                    <button
+                      onClick={() => onRequestShowing(listing)}
                       className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md min-h-[44px]"
                     >
-                      <Calendar className="h-4 w-4" /> Schedule a Showing
-                    </a>
-                  ) : (
-                    <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md min-h-[44px]">
-                      <Calendar className="h-4 w-4" /> Request a Showing
+                      <Calendar className="h-4 w-4" />
+                      {calendlyUrl ? 'Schedule a Showing' : 'Request a Showing'}
                     </button>
                   )}
                   <button

@@ -40,6 +40,10 @@ export default function FullProfilePage() {
   const [checkingCustomPage, setCheckingCustomPage] = useState(true);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
+  // The property a showing was requested for, if any. Kept separate from
+  // selectedListing so closing the detail modal does not drop the context the
+  // lead form and the Calendly header need (US-096).
+  const [showingListing, setShowingListing] = useState<PublicProfileListing | null>(null);
   const [isHomeValuationModalOpen, setIsHomeValuationModalOpen] = useState(false);
 
   // Fetch profile and related data
@@ -148,6 +152,22 @@ export default function FullProfilePage() {
       document.querySelectorAll('link[rel="preload"][as="image"]').forEach((el) => el.remove());
     };
   }, [data]);
+
+  /**
+   * A showing request on a specific property. Routes to the agent's Calendly
+   * when they have one and to the lead form otherwise, carrying the listing
+   * either way — so the Calendly header names the property and the lead lands
+   * in the CRM with listing_id and property_address set (US-096).
+   */
+  const handleRequestShowing = (listing: PublicProfileListing) => {
+    setShowingListing(listing);
+    setSelectedListing(null);
+    if (data?.profile?.calendly_url) {
+      setIsCalendlyModalOpen(true);
+    } else {
+      setIsLeadModalOpen(true);
+    }
+  };
 
   // Redirect to custom page if active
   if (checkingCustomPage) {
@@ -459,7 +479,6 @@ export default function FullProfilePage() {
                   listings={activeListings}
                   title="All Properties"
                   onListingClick={(listing) => setSelectedListing(listing)}
-                  calendlyUrl={data?.profile?.calendly_url ?? undefined}
                 />
               </section>
             )}
@@ -607,26 +626,37 @@ export default function FullProfilePage() {
             isOpen={!!selectedListing}
             onClose={() => setSelectedListing(null)}
             calendlyUrl={data?.profile?.calendly_url ?? undefined}
+            onRequestShowing={handleRequestShowing}
           />
         )}
 
         {/* Lead Form Modal */}
         <LeadFormModal
           isOpen={isLeadModalOpen}
-          onClose={() => setIsLeadModalOpen(false)}
+          onClose={() => {
+            setIsLeadModalOpen(false);
+            setShowingListing(null);
+          }}
           formType="contact"
           agentId={profile.id}
           agentName={profile.full_name || profile.username}
+          listing={
+            showingListing ? { id: showingListing.id, address: showingListing.address } : undefined
+          }
         />
 
         {/* Calendly Modal */}
         {profile.calendly_url && (
           <CalendlyModal
             isOpen={isCalendlyModalOpen}
-            onClose={() => setIsCalendlyModalOpen(false)}
+            onClose={() => {
+              setIsCalendlyModalOpen(false);
+              setShowingListing(null);
+            }}
             calendlyUrl={profile.calendly_url}
             title="Schedule a Showing"
             subtitle="Choose a time that works best for you"
+            listingAddress={showingListing?.address}
           />
         )}
 

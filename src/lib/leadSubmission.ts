@@ -34,6 +34,8 @@ export interface LeadSubmissionData {
    * below; the rest are persisted to leads.form_data.
    */
   data: Record<string, unknown>;
+  /** The property the lead asked about, when the form was opened from one. */
+  listingId?: string;
   source?: string;
   referrer?: string;
 }
@@ -44,20 +46,56 @@ export interface LeadSubmissionResponse {
   error?: string;
 }
 
-/** Form answers that have a real column on `leads`, and the column they map to. */
-const DEDICATED_COLUMNS: Record<string, string> = {
-  priceRange: 'price_range',
-  timeline: 'timeline',
-  address: 'property_address',
-  preApproved: 'preapproved',
-  message: 'message',
+/**
+ * How one form answer maps onto `leads`.
+ *
+ * `transform` exists because the form's vocabulary and the column's type are
+ * not always the same. `raw` names a key in form_data to keep the original
+ * answer under, so narrowing a value for storage never loses what was asked.
+ */
+interface ColumnMapping {
+  column: string;
+  transform?: (value: unknown) => unknown;
+  raw?: string;
+}
+
+/**
+ * `preapproved` is a boolean column, but the buyer form asks a four-way
+ * question: yes / in-process / not-yet / cash. The raw string used to be sent
+ * straight through, so Postgres coerced 'yes' and raised 22P02 on the other
+ * three — submit-lead rethrew and the buyer saw "Submission Failed". The leads
+ * an agent most wants, the not-yet-approved ones, were exactly the ones lost
+ * (US-096).
+ *
+ * A cash buyer needs no approval, so both 'yes' and 'cash' mean financing is
+ * settled; anything else is false. The four-way answer itself is not thrown
+ * away — it is kept in form_data.preApprovalStatus, where the agent can read
+ * whether this is a cash offer or someone who needs a lender introduction.
+ */
+export const toPreapprovedBoolean = (value: unknown): boolean =>
+  value === true || value === 'yes' || value === 'cash';
+
+/** Form answers that have a real column on `leads`, and how they map to it. */
+const DEDICATED_COLUMNS: Record<string, ColumnMapping> = {
+  priceRange: { column: 'price_range' },
+  timeline: { column: 'timeline' },
+  address: { column: 'property_address' },
+  preApproved: {
+    column: 'preapproved',
+    transform: toPreapprovedBoolean,
+    raw: 'preApprovalStatus',
+  },
+  message: { column: 'message' },
 };
 
 /**
  * Split a form's answer bag into the columns `leads` actually has and the
  * remainder, which the edge function stores in leads.form_data.
+ *
+ * Exported for test: this is where a form's vocabulary meets the column types,
+ * and it is where US-096 went wrong.
  */
-function splitFormData(data: Record<string, unknown>): {
+export function splitFormData(data: Record<string, unknown>): {
   columns: Record<string, unknown>;
   formData: Record<string, unknown>;
 } {
@@ -66,9 +104,10 @@ function splitFormData(data: Record<string, unknown>): {
 
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined || value === null || value === '') continue;
-    const column = DEDICATED_COLUMNS[key];
-    if (column) {
-      columns[column] = value;
+    const mapping = DEDICATED_COLUMNS[key];
+    if (mapping) {
+      columns[mapping.column] = mapping.transform ? mapping.transform(value) : value;
+      if (mapping.raw) formData[mapping.raw] = value;
     } else {
       formData[key] = value;
     }
@@ -96,6 +135,7 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
         name: leadData.name,
         email: leadData.email,
         phone: leadData.phone,
+        listing_id: leadData.listingId,
         source: leadData.source ?? 'website',
         referrer_url:
           leadData.referrer ?? (typeof document !== 'undefined' ? document.referrer : undefined),

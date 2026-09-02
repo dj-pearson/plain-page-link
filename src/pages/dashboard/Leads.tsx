@@ -19,6 +19,7 @@ import {
   ArrowUpDown,
   Clock,
   AlertTriangle,
+  Home,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -674,6 +675,12 @@ export default function Leads() {
                             >
                               {lead.phone}
                             </a>
+                          </div>
+                        )}
+                        {lead.property_address && (
+                          <div className="flex items-center gap-2 min-h-[32px]">
+                            <Home className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{lead.property_address}</span>
                           </div>
                         )}
                         {lead.message && (

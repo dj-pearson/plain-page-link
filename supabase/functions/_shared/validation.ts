@@ -34,6 +34,12 @@ export function validateUrl(url: string): boolean {
   }
 }
 
+// UUID validation — accepts any RFC 4122 version, which is what Postgres does.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function validateUuid(value: unknown): boolean {
+  return typeof value === 'string' && UUID_RE.test(value);
+}
+
 // Sanitize string (remove potentially dangerous characters and XSS vectors)
 export function sanitizeString(str: string): string {
   return str
@@ -184,6 +190,21 @@ export function validateLeadData(data: any): ValidationResult {
   
   if (data.referrer_url && !validateUrl(data.referrer_url)) {
     errors.push('Invalid referrer URL');
+  }
+
+  // `preapproved` is a boolean column. A string reached it for a year and
+  // Postgres coerced 'yes' while raising 22P02 on 'in-process', 'not-yet' and
+  // 'cash' — a database error surfaced to the visitor as "Submission Failed"
+  // rather than a validation message (US-096). Rejecting it here means the
+  // next caller that gets the type wrong is told so.
+  if (data.preapproved !== undefined && typeof data.preapproved !== 'boolean') {
+    errors.push('Pre-approval status must be a boolean');
+  }
+
+  // listing_id is a uuid FK to listings. Anything else is a 22P02 from the
+  // insert, for the same reason.
+  if (data.listing_id !== undefined && !validateUuid(data.listing_id)) {
+    errors.push('Invalid listing ID');
   }
 
   return {
