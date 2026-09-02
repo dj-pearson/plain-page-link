@@ -132,7 +132,10 @@ export default function Overview() {
         />
         <StatCard
           icon={<Users className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />}
-          label="New Leads"
+          // Not "New Leads": this is every lead in the window, whatever its
+          // status, so the label contradicted the Leads page's New count
+          // (US-104).
+          label="Leads (30d)"
           value={stats.totalLeads.toString()}
         />
         <StatCard

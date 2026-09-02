@@ -5,6 +5,7 @@
  */
 
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { QuickStatusDashboard } from '@/components/dashboard/QuickStatusDashboard';
 import { StaleContentAlert, StaleContentBadge } from '@/components/dashboard/StaleContentAlert';
 import { BulkEditMode } from '@/components/dashboard/BulkEditMode';
@@ -16,6 +17,12 @@ import { useListings } from '@/hooks/useListings';
 import { parsePrice } from '@/lib/format';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { Loader2 } from 'lucide-react';
+
+/** Percentage change against the preceding window, rounded. */
+function percentChange(current: number, previous: number): number {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
 
 // Transform database listings to dashboard format
 interface DashboardListing {
@@ -30,7 +37,8 @@ interface DashboardListing {
 
 export default function QuickActionsDashboard() {
   const { listings: dbListings, isLoading, updateListing, deleteListing } = useListings();
-  const { stats } = useAnalytics('30d');
+  const navigate = useNavigate();
+  const { stats, previousStats, hasPreviousPeriod } = useAnalytics('30d');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Transform database listings to dashboard format
@@ -80,8 +88,17 @@ export default function QuickActionsDashboard() {
       totalViews: stats.totalViews,
       totalLeads: stats.totalLeads,
       avgPrice,
-      viewsChange: 0, // Would need historical data
-      leadsChange: 0, // Would need historical data
+      // Real deltas against the preceding window. These were hardcoded 0 with
+      // the comment "Would need historical data" — useAnalytics has exposed
+      // previousStats and hasPreviousPeriod the whole time (US-104). Null when
+      // there is no preceding window: "+100%" against a first-week account
+      // with zero history is worse than showing nothing.
+      viewsChange: hasPreviousPeriod
+        ? percentChange(stats.totalViews, previousStats.views)
+        : undefined,
+      leadsChange: hasPreviousPeriod
+        ? percentChange(stats.totalLeads, previousStats.leads)
+        : undefined,
     });
   }, [listings, stats]);
 
@@ -103,12 +120,10 @@ export default function QuickActionsDashboard() {
     toast.success('Listings refreshed');
   };
 
-  const handleRefreshStale = async (listingId: string) => {
-    const listing = listings.find((l) => l.id === listingId);
-    if (listing) {
-      toast.info(`Opening editor for "${listing.title}"`);
-      // Navigate to edit page in real implementation
-    }
+  const handleRefreshStale = (listingId: string) => {
+    // This toasted "Opening editor for ..." and navigated nowhere, so the
+    // stale-content alert's only action did nothing (US-104).
+    navigate(`/dashboard/listings?edit=${listingId}`);
   };
 
   const handleToggleSelect = (id: string) => {

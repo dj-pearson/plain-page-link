@@ -39,6 +39,9 @@ vi.mock('@/hooks/useSubscriptionLimits', () => ({
   useSubscriptionLimits: () => ({ subscription: { plan_name: 'pro' } }),
 }));
 
+const { exportToCSVMock } = vi.hoisted(() => ({ exportToCSVMock: vi.fn() }));
+vi.mock('@/lib/exportUtils', () => ({ exportToCSV: exportToCSVMock }));
+
 vi.mock('@/hooks/useMLLeadScoring', () => ({
   useMLLeadScoring: () => ({
     scoreLeadObject: () => ({ score: 50, priority: 'warm', factors: [], confidence: 0.5 }),
@@ -48,6 +51,8 @@ vi.mock('@/hooks/useMLLeadScoring', () => ({
 import Leads from './Leads';
 
 /** A `leads` select that resolves to the given rows, and records the columns asked for. */
+const eqCalls: [string, unknown][] = [];
+
 const stubLeadsQuery = (
   rows: LeadRow[],
   selected: string[],
@@ -62,7 +67,13 @@ const stubLeadsQuery = (
     updates.push(values);
     return builder;
   });
-  for (const m of ['eq', 'order', 'in', 'is', 'limit']) {
+  builder.eq = vi.fn((col: string, value: unknown) => {
+    eqCalls.push([col, value]);
+    return builder;
+  });
+  // `range` is what useLeads pages with since US-104; without it the chain
+  // returns undefined and the page renders its error card.
+  for (const m of ['order', 'in', 'is', 'limit', 'range', 'ilike']) {
     builder[m] = vi.fn(() => builder);
   }
   builder.then = (resolve: (v: unknown) => unknown) =>
@@ -77,8 +88,10 @@ describe('Leads page', () => {
   beforeEach(() => {
     selected = [];
     updates = [];
+    eqCalls.length = 0;
     fromMock.mockReset();
     rpcMock.mockReset();
+    exportToCSVMock.mockReset();
     rpcMock.mockResolvedValue({ data: 'activity-1', error: null });
     fromMock.mockImplementation(() => stubLeadsQuery([mockLeadRow], selected, updates));
   });
@@ -158,5 +171,42 @@ describe('Leads page', () => {
     // shows it clamped. A dialog role appearing means the click bubbled.
     await waitFor(() => expect(updates.length).toBeGreaterThan(0));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  // US-104: the page hand-rolled a CSV that quoted only `message`, so a lead
+  // named "Smith, John" split into two columns in Excel and shifted every
+  // field after it. It also exported every lead rather than the filtered set.
+  describe('CSV export', () => {
+    it('hands every cell to exportToCSV, which quotes what needs quoting', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+
+      await userEvent.click(screen.getByRole('button', { name: /export/i }));
+
+      expect(exportToCSVMock).toHaveBeenCalledTimes(1);
+      const payload = exportToCSVMock.mock.calls[0][0];
+      expect(payload.headers).toEqual(
+        expect.arrayContaining(['Phone', 'Source', 'First Responded At'])
+      );
+      expect(payload.rows).toHaveLength(1);
+      // The row is passed as an array of raw values — escaping is exportToCSV's
+      // job, and it quotes any cell containing a comma, quote or newline.
+      expect(payload.rows[0]).toEqual(expect.arrayContaining([mockLead.name, mockLead.email]));
+    });
+  });
+
+  // US-104: status was not a filter at all, and nothing about the view was
+  // reflected in the URL, so a filtered list could not be linked to.
+  describe('filters', () => {
+    it('pushes the status filter into the query rather than filtering in JS', async () => {
+      renderWithProviders(<Leads />);
+      await screen.findByText(mockLead.name);
+      fromMock.mockClear();
+      eqCalls.length = 0;
+
+      await userEvent.click(screen.getByRole('button', { name: /contacted/i }));
+
+      await waitFor(() => expect(eqCalls).toContainEqual(['status', 'contacted']));
+    });
   });
 });

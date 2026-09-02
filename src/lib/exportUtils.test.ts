@@ -54,4 +54,67 @@ describe('PDF export (jspdf v4 + jspdf-autotable v5)', () => {
     exportToCSV({ title: 'Leads', headers, rows });
     expect(clicks).toBeGreaterThan(0);
   });
+
+  /**
+   * US-104: the Leads page hand-rolled its own CSV beside this one, quoting
+   * only `message`. A lead named "Smith, John" therefore split into two
+   * columns in Excel and shifted every field after it. The page uses this
+   * function now, so the escaping is worth asserting rather than assuming.
+   */
+  describe('CSV escaping', () => {
+    // jsdom's Blob has no .text(), so the parts are captured at construction.
+    const csvFrom = (data: Parameters<typeof exportToCSV>[0]): string => {
+      let captured = '';
+      const RealBlob = globalThis.Blob;
+      class CapturingBlob extends RealBlob {
+        constructor(parts: BlobPart[], options?: BlobPropertyBag) {
+          super(parts, options);
+          captured = parts.map(String).join('');
+        }
+      }
+      globalThis.Blob = CapturingBlob as unknown as typeof Blob;
+      try {
+        exportToCSV(data);
+      } finally {
+        globalThis.Blob = RealBlob;
+      }
+      return captured;
+    };
+
+    it('quotes a value containing a comma, so it stays one column', () => {
+      const csv = csvFrom({
+        title: 'Leads',
+        headers: ['Name', 'Status'],
+        rows: [['Smith, John', 'new']],
+      });
+      expect(csv).toContain('"Smith, John",new');
+    });
+
+    it('doubles embedded quotes rather than terminating the field', () => {
+      const csv = csvFrom({
+        title: 'Leads',
+        headers: ['Name', 'Note'],
+        rows: [['Ada', 'She said \"call me back\"']],
+      });
+      expect(csv).toContain('"She said \"\"call me back\"\""');
+    });
+
+    it('quotes a value containing a newline', () => {
+      const csv = csvFrom({
+        title: 'Leads',
+        headers: ['Name', 'Message'],
+        rows: [['Ada', 'line one\nline two']],
+      });
+      expect(csv).toContain('"line one\nline two"');
+    });
+
+    it('leaves an ordinary value unquoted', () => {
+      const csv = csvFrom({
+        title: 'Leads',
+        headers: ['Name', 'Status'],
+        rows: [['Ada', 'new']],
+      });
+      expect(csv).toContain('Ada,new');
+    });
+  });
 });
