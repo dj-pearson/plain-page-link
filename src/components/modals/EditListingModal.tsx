@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { parseSquareFeet } from '@/lib/format';
+import { LISTING_STATUSES } from '@/lib/listingStatus';
+import { ListingPhotoManager } from '@/components/listings/ListingPhotoManager';
 
 export interface EditListingFormData {
   address: string;
@@ -23,10 +25,20 @@ export interface EditListingFormData {
   bathrooms: number;
   square_feet?: number;
   status: string;
-  image?: string;
+  /** The gallery. `image` is derived from photos[0] by the caller. */
+  photos: string[];
   description?: string;
   mls_number?: string;
   property_type?: string;
+  /** Columns the edit form never exposed, so an agent could only set them at
+   *  creation and never correct them (US-107). */
+  state?: string;
+  zip_code?: string;
+  lot_size_acres?: number;
+  virtual_tour_url?: string;
+  open_house_date?: string;
+  highlights?: string;
+  is_featured?: boolean;
 }
 
 interface EditListingModalProps {
@@ -34,6 +46,8 @@ interface EditListingModalProps {
   onClose: () => void;
   onSubmit: (data: EditListingFormData) => void;
   initialData: EditListingFormData;
+  /** Used to group newly uploaded photos under the listing's own folder. */
+  listingId?: string;
 }
 
 export function EditListingModal({
@@ -41,6 +55,7 @@ export function EditListingModal({
   onClose,
   onSubmit,
   initialData,
+  listingId,
 }: EditListingModalProps) {
   const [formData, setFormData] = useState<EditListingFormData>(initialData);
 
@@ -156,10 +171,11 @@ export function EditListingModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="under_contract">Under Contract</SelectItem>
-                  <SelectItem value="sold">Sold</SelectItem>
+                  {LISTING_STATUSES.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -204,13 +220,107 @@ export function EditListingModal({
             </div>
 
             <div className="col-span-2">
-              <Label htmlFor="image">Image URL</Label>
+              {/* Was a single raw "Image URL" text box: no add, no remove, no
+                  reorder, so photos could not be managed at all (US-107). */}
+              <ListingPhotoManager
+                photos={formData.photos}
+                onChange={(photos) => setFormData({ ...formData, photos })}
+                listingId={listingId}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="state">State</Label>
               <Input
-                id="image"
+                id="state"
+                maxLength={2}
+                value={formData.state || ''}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase() })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="zip_code">ZIP Code</Label>
+              <Input
+                id="zip_code"
+                inputMode="numeric"
+                value={formData.zip_code || ''}
+                onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="lot_size_acres">Lot Size (acres)</Label>
+              <Input
+                id="lot_size_acres"
+                type="number"
+                step={0.01}
+                min={0}
+                value={formData.lot_size_acres ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    lot_size_acres: e.target.value ? Number(e.target.value) : undefined,
+                  })
+                }
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="open_house_date">Open House</Label>
+              <Input
+                id="open_house_date"
+                type="date"
+                value={formData.open_house_date || ''}
+                onChange={(e) => setFormData({ ...formData, open_house_date: e.target.value })}
+              />
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="virtual_tour_url">Virtual Tour URL</Label>
+              <Input
+                id="virtual_tour_url"
                 type="url"
-                value={formData.image || ''}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder="https://example.com/image.jpg"
+                placeholder="https://..."
+                value={formData.virtual_tour_url || ''}
+                onChange={(e) => setFormData({ ...formData, virtual_tour_url: e.target.value })}
+              />
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="highlights">Property Highlights</Label>
+              <Input
+                id="highlights"
+                placeholder="Updated kitchen, corner lot, new roof"
+                value={formData.highlights || ''}
+                onChange={(e) => setFormData({ ...formData, highlights: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Comma-separated list of standout features.
+              </p>
+            </div>
+
+            <div className="col-span-2 flex items-center gap-2">
+              <input
+                id="is_featured"
+                type="checkbox"
+                checked={!!formData.is_featured}
+                onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="is_featured" className="mb-0">
+                Feature this listing on my profile
+              </Label>
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={4}
+                placeholder="Describe the property features..."
               />
             </div>
           </div>

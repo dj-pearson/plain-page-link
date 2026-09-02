@@ -26,14 +26,20 @@ export function useListingImageUpload() {
   const validateFile = (file: File): Promise<string | null> =>
     validateUpload(file, { accept: ACCEPTED_FILE_TYPES, maxBytes: MAX_FILE_SIZE });
 
+  /**
+   * Uploads listing photos and returns their public URLs.
+   *
+   * THROWS on failure. It used to return [] for every failure — logged in or
+   * not, file too large, storage error — which the caller could not tell apart
+   * from "no images were selected". Listings.tsx read that as a normal `return`
+   * and closed the six-step form, so a 6 MB photo against a 5 MB limit meant
+   * the agent re-entered the entire listing (US-107).
+   */
   const uploadListingImages = async (files: File[], listingId?: string): Promise<string[]> => {
     if (!user?.id) {
-      toast({
-        title: 'Error',
-        description: 'You must be logged in to upload images',
-        variant: 'destructive',
-      });
-      return [];
+      const message = 'You must be logged in to upload images';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
+      throw new Error(message);
     }
 
     if (files.length === 0) {
@@ -41,24 +47,17 @@ export function useListingImageUpload() {
     }
 
     if (files.length > MAX_IMAGES) {
-      toast({
-        title: 'Too many images',
-        description: `You can upload a maximum of ${MAX_IMAGES} images per listing`,
-        variant: 'destructive',
-      });
-      return [];
+      const message = `You can upload a maximum of ${MAX_IMAGES} images per listing`;
+      toast({ title: 'Too many images', description: message, variant: 'destructive' });
+      throw new Error(message);
     }
 
     // Validate all files
     for (const file of files) {
       const validationError = await validateFile(file);
       if (validationError) {
-        toast({
-          title: 'Invalid file',
-          description: validationError,
-          variant: 'destructive',
-        });
-        return [];
+        toast({ title: 'Invalid file', description: validationError, variant: 'destructive' });
+        throw new Error(validationError);
       }
     }
 
@@ -99,7 +98,11 @@ export function useListingImageUpload() {
         // Best-effort: the original is already usable and OptimizedImage falls
         // back to it, so a failure here must never break the upload.
         void edgeFunctions
-          .invoke('optimize-image', { body: { bucket: 'listings', path: fileName } })
+          // The bucket is 'listing-photos'. This said 'listings', which is not a
+          // bucket, so optimize-image 404'd on every upload — caught as a debug
+          // log — and every public listing served the untouched original, up to
+          // 5 MB per photo (US-107).
+          .invoke('optimize-image', { body: { bucket: 'listing-photos', path: fileName } })
           .catch((err) =>
             logger.debug('Image optimization failed (non-blocking)', {
               error: err instanceof Error ? err.message : String(err),
@@ -132,12 +135,13 @@ export function useListingImageUpload() {
         variant: 'destructive',
       });
 
-      // Clean up any successfully uploaded images
+      // Roll back whatever did upload, so a partial batch does not orphan
+      // objects in the bucket.
       if (uploadedUrls.length > 0) {
         await deleteListingImages(uploadedUrls);
       }
 
-      return [];
+      throw error instanceof Error ? error : new Error('Failed to upload images');
     } finally {
       setUploading(false);
       setProgress({ current: 0, total: 0, percentage: 0 });
@@ -150,13 +154,25 @@ export function useListingImageUpload() {
     }
 
     try {
-      // Extract file paths from public URLs
+      // Extract the storage path from each public URL. The pattern was
+      // /listings\/(.+)$/ — but a public URL reads
+      // .../object/public/listing-photos/<user>/<listing>/<file>, which
+      // contains no "listings/" segment. It never matched, so the rollback
+      // above always had nothing to delete and every partial upload orphaned
+      // its objects (US-107).
       const filePaths = imageUrls
         .map((url) => {
-          const match = url.match(/listings\/(.+)$/);
-          return match ? match[1] : null;
+          const match = url.match(/\/listing-photos\/(.+)$/);
+          return match ? decodeURIComponent(match[1]) : null;
         })
         .filter(Boolean) as string[];
+
+      if (filePaths.length !== imageUrls.length) {
+        logger.warn('Some image URLs did not look like listing-photos objects', {
+          given: imageUrls.length,
+          parsed: filePaths.length,
+        });
+      }
 
       if (filePaths.length === 0) {
         return false;

@@ -25,6 +25,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { parseSquareFeet } from '@/lib/format';
+import { logger } from '@/lib/logger';
+import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
 import { AddListingModal } from '@/components/modals/AddListingModal';
 import { EditListingModal, EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
@@ -50,11 +52,12 @@ import { parsePrice, formatPrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 
 type ViewMode = 'grid' | 'list';
-type StatusFilter = 'all' | 'active' | 'pending' | 'under_contract' | 'sold' | 'draft';
+type StatusFilter = 'all' | (typeof LISTING_STATUSES)[number]['value'];
 
 export default function Listings() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
@@ -135,10 +138,15 @@ export default function Listings() {
 
   const handleAddListing = async (data: ListingFormData) => {
     try {
+      // uploadListingImages throws now, so a failure lands in the catch below
+      // and is rethrown — the modal stays open with the form intact. This used
+      // to be `if (imageUrls.length === 0) return;`, a normal return that the
+      // modal treated as success: it closed and reset, so a 6 MB photo against
+      // a 5 MB limit made the agent re-enter the whole six-step listing
+      // (US-107).
       let imageUrls: string[] = [];
       if (data.images && data.images.length > 0) {
         imageUrls = await uploadListingImages(data.images);
-        if (imageUrls.length === 0) return;
       }
 
       const listingData: NewListing = {
@@ -156,6 +164,9 @@ export default function Listings() {
         bathrooms: data.baths,
         square_feet: parseSquareFeet(data.sqft),
         status: data.status,
+        // Nothing wrote either date. listed_date is what "days on market"
+        // counts from, and sold_date is set on the transition below (US-107).
+        listed_date: new Date().toISOString().slice(0, 10),
         image: imageUrls[0] || null,
         photos: imageUrls.length > 0 ? imageUrls : null,
         description: data.description || null,
@@ -189,7 +200,7 @@ export default function Listings() {
         price: data.price,
         beds: data.beds,
         baths: data.baths,
-        sqft: parseInt(data.sqft) || undefined,
+        sqft: parseSquareFeet(data.sqft) ?? undefined,
         property_type: data.propertyType,
         image: imageUrls[0] || undefined,
       });
@@ -200,12 +211,21 @@ export default function Listings() {
       });
       setIsAddModalOpen(false);
       setShowSocialShareDialog(true);
-    } catch {
+    } catch (error) {
+      // Rethrown, not swallowed. The modal's own submit handler keeps the
+      // dialog open and the fields populated when this rejects; swallowing it
+      // here is what let the form close on a failed upload and threw away six
+      // steps of typing (US-107). The specific reason has already been toasted
+      // by the upload hook, so this only reports what it can add.
       toast({
         title: 'Error',
-        description: 'Failed to add listing. Please try again.',
+        description:
+          error instanceof Error && error.message
+            ? error.message
+            : 'Failed to add listing. Please try again.',
         variant: 'destructive',
       });
+      throw error;
     }
   };
 
@@ -295,6 +315,41 @@ export default function Listings() {
     }
   };
 
+  /**
+   * Persist a new display order.
+   *
+   * The public gallery has always ordered by sort_order and nothing ever wrote
+   * it, so every listing sat at 0 and the order an agent saw on their own page
+   * was arbitrary (US-107). Positions are rewritten densely from the reordered
+   * list, so there are no gaps to reason about later.
+   */
+  const persistOrder = async (ordered: typeof listings) => {
+    try {
+      await Promise.all(
+        ordered.map((l, index) => updateListing.mutateAsync({ id: l.id, sort_order: index }))
+      );
+    } catch (error) {
+      logger.error('Failed to save the listing order', error as Error);
+      toast({
+        title: 'Error',
+        description: 'Could not save the new order. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDropOn = async (targetId: string) => {
+    if (!draggingId || draggingId === targetId) return;
+    const ordered = [...filteredListings];
+    const from = ordered.findIndex((l) => l.id === draggingId);
+    const to = ordered.findIndex((l) => l.id === targetId);
+    if (from === -1 || to === -1) return;
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(to, 0, moved);
+    setDraggingId(null);
+    await persistOrder(ordered);
+  };
+
   const handleEditListing = async (data: EditListingFormData) => {
     if (!editingListing) return;
     try {
@@ -307,10 +362,31 @@ export default function Listings() {
         bathrooms: data.bathrooms,
         square_feet: data.square_feet ?? null,
         status: data.status,
-        image: data.image,
+        // Moving a listing to sold records the date; moving it back out clears
+        // it. Nothing wrote sold_date at all, so a sold listing had no close
+        // date and days_on_market could never be computed (US-107).
+        sold_date: CLOSED_LISTING_STATUSES.has(data.status)
+          ? (editingListing.sold_date ?? new Date().toISOString().slice(0, 10))
+          : null,
+        // `photos` is the gallery and `image` is the card thumbnail; they must
+        // agree, so the cover is always photos[0] (US-107).
+        photos: data.photos,
+        image: data.photos[0] ?? null,
         description: data.description,
         mls_number: data.mls_number,
         property_type: data.property_type,
+        state: data.state || null,
+        zip_code: data.zip_code || null,
+        lot_size_acres: data.lot_size_acres ?? null,
+        virtual_tour_url: data.virtual_tour_url || null,
+        open_house_date: data.open_house_date || null,
+        is_featured: data.is_featured ?? false,
+        highlights: data.highlights
+          ? data.highlights
+              .split(',')
+              .map((h) => h.trim())
+              .filter(Boolean)
+          : null,
         updated_at: new Date().toISOString(),
       });
       toast({
@@ -327,13 +403,11 @@ export default function Listings() {
     }
   };
 
+  // From the shared list, so a status added there appears here rather than
+  // becoming a state no filter can reach (US-107).
   const statusFilterOptions: { value: StatusFilter; label: string }[] = [
     { value: 'all', label: 'All' },
-    { value: 'active', label: 'Active' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'under_contract', label: 'Under Contract' },
-    { value: 'sold', label: 'Sold' },
-    { value: 'draft', label: 'Draft' },
+    ...LISTING_STATUSES.map((s) => ({ value: s.value as StatusFilter, label: s.label })),
   ];
 
   return (
@@ -575,7 +649,18 @@ export default function Listings() {
           {filteredListings.map((listing) => (
             <div
               key={listing.id}
-              className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group"
+              // Native HTML5 drag, matching PageBuilder — no new dependency.
+              // Dropping one card onto another rewrites sort_order for the
+              // whole list, which the public gallery then follows (US-107).
+              draggable
+              onDragStart={() => setDraggingId(listing.id)}
+              onDragEnd={() => setDraggingId(null)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => void handleDropOn(listing.id)}
+              className={cn(
+                'bg-card border border-border rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group',
+                draggingId === listing.id && 'opacity-50 ring-2 ring-primary'
+              )}
             >
               <div className="relative h-48 sm:h-52 overflow-hidden">
                 <img
@@ -833,6 +918,7 @@ export default function Listings() {
           isOpen={!!editingListing}
           onClose={() => setEditingListing(null)}
           onSubmit={handleEditListing}
+          listingId={editingListing.id}
           initialData={{
             address: editingListing.address,
             city: editingListing.city,
@@ -841,7 +927,20 @@ export default function Listings() {
             bathrooms: editingListing.bathrooms,
             square_feet: editingListing.square_feet ?? undefined,
             status: editingListing.status ?? 'active',
-            image: editingListing.image ?? undefined,
+            photos: Array.isArray(editingListing.photos)
+              ? (editingListing.photos as string[])
+              : editingListing.image
+                ? [editingListing.image]
+                : [],
+            state: editingListing.state ?? undefined,
+            zip_code: editingListing.zip_code ?? undefined,
+            lot_size_acres: editingListing.lot_size_acres ?? undefined,
+            virtual_tour_url: editingListing.virtual_tour_url ?? undefined,
+            open_house_date: editingListing.open_house_date ?? undefined,
+            highlights: Array.isArray(editingListing.highlights)
+              ? (editingListing.highlights as string[]).join(', ')
+              : undefined,
+            is_featured: editingListing.is_featured ?? false,
             description: editingListing.description ?? undefined,
             mls_number: editingListing.mls_number ?? undefined,
             property_type: editingListing.property_type ?? undefined,

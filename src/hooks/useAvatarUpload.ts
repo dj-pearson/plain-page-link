@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +12,7 @@ const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp
 export function useAvatarUpload() {
   const { user } = useAuthStore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
 
   // US-076: file.type is inferred from the extension and a caller can set it to
@@ -40,8 +42,15 @@ export function useAvatarUpload() {
 
     setUploading(true);
     try {
+      // Timestamped, not a fixed `avatar.<ext>`.
+      //
+      // The old name was stable and the object is served with
+      // cacheControl: 3600, so replacing a headshot kept serving the previous
+      // one — from the CDN and from every browser that had it — for an hour.
+      // The agent uploaded a new photo, saw the old one, and uploaded again
+      // (US-107). A new path is a new URL, so the change is visible at once.
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/avatar.${fileExt}`;
+      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
 
       // Delete old avatar if exists
       const { data: existingFiles } = await supabase.storage.from('avatars').list(user.id);
@@ -74,6 +83,11 @@ export function useAvatarUpload() {
         .single();
 
       if (updateError) throw updateError;
+
+      // Without this the dashboard header and profile preview go on rendering
+      // the cached avatar_url until something else refetches.
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['public-profile'] });
 
       toast({
         title: 'Success',

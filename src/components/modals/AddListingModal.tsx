@@ -79,6 +79,12 @@ const listingSchema = z.object({
 
 export type ListingFormData = z.infer<typeof listingSchema>;
 
+// Mirrors useListingImageUpload's limits so selection can reject a file before
+// the agent fills in five more steps (US-107).
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGES = 25;
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
 interface AddListingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -97,6 +103,7 @@ const STEPS = [
 export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
 
   const {
@@ -139,22 +146,58 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
   const images = watch('images');
   const isFeatured = watch('isFeatured');
 
-  const handleImageUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
+  /**
+   * Accepts the files that can actually be uploaded, and says why the rest
+   * were not.
+   *
+   * Size and type were only checked at upload time, five steps later — so an
+   * agent added a 6 MB photo, filled in everything else, pressed Save and only
+   * then learned the file was too big (US-107). Rejecting at selection means
+   * the answer arrives while the file picker is still in mind.
+   */
+  const acceptFiles = useCallback(
+    (files: File[]) => {
+      const accepted: File[] = [];
+      const rejected: string[] = [];
+
+      for (const file of files) {
+        if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+          rejected.push(`${file.name} is not a JPEG, PNG or WEBP`);
+        } else if (file.size > MAX_IMAGE_BYTES) {
+          rejected.push(`${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB (limit 5 MB)`);
+        } else {
+          accepted.push(file);
+        }
+      }
+
       const currentImages = images || [];
-      const newImages = [...currentImages, ...files].slice(0, 25);
-      setValue('images', newImages);
-      files.forEach((file) => {
+      const room = MAX_IMAGES - currentImages.length;
+      if (accepted.length > room) {
+        rejected.push(`Only ${MAX_IMAGES} photos per listing; the rest were not added`);
+      }
+      const kept = accepted.slice(0, Math.max(0, room));
+
+      setImageError(rejected.length ? rejected.join('. ') : null);
+      if (kept.length === 0) return;
+
+      setValue('images', [...currentImages, ...kept]);
+      kept.forEach((file) => {
         const reader = new FileReader();
         reader.onloadend = () => {
-          setImagePreviews((prev) => [...prev, reader.result as string].slice(0, 25));
+          setImagePreviews((prev) => [...prev, reader.result as string].slice(0, MAX_IMAGES));
         };
         reader.readAsDataURL(file);
       });
-      e.target.value = '';
     },
     [images, setValue]
+  );
+
+  const handleImageUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      acceptFiles(Array.from(e.target.files || []));
+      e.target.value = '';
+    },
+    [acceptFiles]
   );
 
   const removeImage = useCallback(
@@ -172,19 +215,9 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'));
-      const currentImages = images || [];
-      const newImages = [...currentImages, ...files].slice(0, 25);
-      setValue('images', newImages);
-      files.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreviews((prev) => [...prev, reader.result as string].slice(0, 25));
-        };
-        reader.readAsDataURL(file);
-      });
+      acceptFiles(Array.from(e.dataTransfer.files));
     },
-    [images, setValue]
+    [acceptFiles]
   );
 
   const validateCurrentStep = async (): Promise<boolean> => {
@@ -219,8 +252,14 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
       setImagePreviews([]);
       setCurrentStep(0);
     } catch (err) {
+      // Deliberately does NOT close or reset: the six steps of typing stay on
+      // screen so the agent can fix whatever failed and submit again (US-107).
       logger.error('Failed to add listing', err);
-      setError('Failed to add listing. Please try again.');
+      setError(
+        err instanceof Error && err.message
+          ? `${err.message} Your listing details are still here — fix that and try again.`
+          : 'Failed to add listing. Your details are still here; please try again.'
+      );
     }
   };
 
@@ -564,6 +603,11 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                     </p>
                   </label>
                 </div>
+                {imageError && (
+                  <p role="alert" className="text-sm text-red-600">
+                    {imageError}
+                  </p>
+                )}
                 {imagePreviews.length > 0 && (
                   <div>
                     <p className="text-sm font-medium mb-2">
