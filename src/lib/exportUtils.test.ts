@@ -1,5 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { exportToPDF, generatePDFReport, exportToCSV } from './exportUtils';
+
+/**
+ * doc.save() writes a real file, and under jsdom jsPDF takes its Node path — so
+ * every `npm run test:run` wrote lead_report_<date>.pdf and
+ * performance_<date>.pdf into the repository ROOT, and four of them had been
+ * committed by accident (US-121).
+ *
+ * jsPDF assigns `save` as an OWN property of each instance, not on the
+ * prototype, so a prototype spy does not intercept it ("The property save is
+ * not defined on the object"). A subclass whose constructor overwrites the own
+ * property after super() does, and leaves the rest of the document real — the
+ * whole render still runs, only the write is caught.
+ */
+const { savedFilenames } = vi.hoisted(() => ({ savedFilenames: [] as string[] }));
+
+vi.mock('jspdf', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('jspdf')>();
+
+  class TestPdf extends actual.jsPDF {
+    constructor(...args: ConstructorParameters<typeof actual.jsPDF>) {
+      super(...args);
+      // After super(), because that is when the own property is assigned.
+      // The cast is because save() is overloaded — it returns a Promise when
+      // called with { returnPromise: true }, which nothing here does.
+      this.save = ((filename?: string) => {
+        savedFilenames.push(filename ?? '');
+        return this;
+      }) as unknown as typeof this.save;
+    }
+  }
+
+  return { ...actual, jsPDF: TestPdf, default: TestPdf };
+});
 
 /**
  * US-091 upgraded jspdf 2.x -> 4.x and jspdf-autotable 3.x -> 5.x — both major
@@ -12,6 +47,8 @@ describe('PDF export (jspdf v4 + jspdf-autotable v5)', () => {
 
   beforeEach(() => {
     clicks = 0;
+    savedFilenames.length = 0;
+
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
       clicks += 1;
     });
@@ -29,6 +66,20 @@ describe('PDF export (jspdf v4 + jspdf-autotable v5)', () => {
 
   it('renders a table to PDF without throwing', () => {
     expect(() => exportToPDF({ title: 'Lead Report', headers, rows })).not.toThrow();
+    // It still reaches the download step; only the write to disk is stubbed.
+    expect(savedFilenames).toHaveLength(1);
+    expect(savedFilenames[0]).toMatch(/^lead_report_\d{4}-\d{2}-\d{2}\.pdf$/);
+  });
+
+  it('writes nothing to disk', () => {
+    exportToPDF({ title: 'Lead Report', headers, rows });
+    generatePDFReport({ title: 'Performance', headers, rows });
+
+    // Both reached save(), and neither reached the filesystem. The real
+    // assertion is the one `git status` makes after a test run.
+    expect(savedFilenames).toHaveLength(2);
+    expect(existsSync(join(process.cwd(), savedFilenames[0]))).toBe(false);
+    expect(existsSync(join(process.cwd(), savedFilenames[1]))).toBe(false);
   });
 
   it('renders a full report — summary cards, autotable, footer', () => {

@@ -1,5 +1,22 @@
 # AgentBio — Full Codebase Review (2026-08-08)
 
+<!-- US-121: there were two files called CODE_REVIEW_2026-08.md — this one
+     (the review) and a 195-line docs/ copy that was a status header plus a
+     summary of the same pass. They had diverged by 771 lines. The status
+     block below is from that copy; the review itself is unchanged. -->
+
+> **Status.** This document is the review as found. Work against it is tracked in
+> `prd.json`, not here. Closed since: US-063 and US-064 (the two anon-exploitable
+> RLS holes), US-065 (the guard that stops them regressing), US-062 (`search_path`
+> pinning), US-051 (logger migration), US-061 (this document's schema section),
+> US-057/058/059 (three unfinished subsystems, deleted), and US-067 (the twelve
+> further exposures the US-065 guard surfaced on the `/tools/*` tables — which
+> also turned out to have broken anonymous email capture on both free tools).
+> Both allowlists in `verify-schema.mjs` are now empty and all eight checks are
+> blocking. Still open: US-056 (321 `tsc` errors), US-060 (squashed migration
+> baseline), US-066 (PII key off the client bundle).
+
+
 Two passes. Scope: signup/login, authorization, RLS, storage, all 87 edge
 functions, the dashboard modules, and the CI gates.
 

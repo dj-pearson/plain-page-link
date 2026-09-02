@@ -1,65 +1,45 @@
-/assets/favicon/icons
+# Dependencies and build output
 /node_modules
 /dist
 /coverage
-/public/hot
-/public/storage
-/storage/*.key
-/vendor
+
+# Environment
 .env
-.env.backup
-.phpunit.result.cache
-docker-compose.override.yml
-Homestead.json
-Homestead.yaml
-npm-debug.log
-yarn-error.log
-_ide_*
-frontend/node_modules/@esbuild/win32-x64/esbuild.exe
-frontend/node_modules/@rollup/rollup-win32-x64-msvc/rollup.win32-x64-msvc.node
-supabase/.temp/cli-latest
-supabase/.temp/gotrue-version
-supabase/.temp/pooler-url
-supabase/.temp/postgres-version
-supabase/.temp/project-ref
-supabase/.temp/rest-version
-supabase/.temp/storage-version
-generate-apple-secret.js
-migrate-to-coolify.ps1
-migrate-to-coolify.sh
-migrate-via-files.ps1
-SSH_MIGRATION_GUIDE.md
-test-db-connection.ps1
-deploy-migrations-ssh.ps1
-COOLIFY_MIGRATION_GUIDE.md
-migrate-from-container.sh
-db-backup/ai_models_rows.sql
-SSL_MIGRATION_COMPLETE.md
-SSL_MIGRATION_COMPLETE.md
-SUPABASE_URL_AUDIT_REPORT.md
-db-backup/db_cluster-15-12-2025@05-30-45.backup.gz
-VERIFY_SUPABASE_MIGRATION.md
-final-backup-2025-12-17.sql
-.gitignore
-MIGRATION_VERIFICATION_COMPLETE.md
-quick-verify.ps1
-READY_TO_DELETE_OLD_SUPABASE.md
 .env.local
-AUTH_BROKEN_SUMMARY.md
-AUTH_FIX_URGENT.md
-CRITICAL_AUTH_ISSUE_FOUND.md
-generate-supabase-keys.js
-Screenshot 2025-12-17 101035.png
-test-auth-endpoints.ps1
+.env.*.local
+.env.backup
 
-COMPLETE_FIX_SUMMARY.md
-CLOUDFLARE_PAGES_ENV_UPDATE.md
-SUPABASE_KEYS_GUIDE.md
-SUPABASE_KEYS_QUICK_ANSWER.md
+# Editor / OS
+_ide_*
+.DS_Store
+Thumbs.db
 
-# Playwright E2E artifacts
-playwright-report-e2e/
+# Local Claude Code settings — machine-specific, not shared
+.claude/settings.local.json
+
+# Supabase CLI scratch
+supabase/.temp/
+
+# Test artifacts.
+#
+# US-121: exportUtils.test.ts drove jsPDF's doc.save() under jsdom, which takes
+# the Node path and wrote lead_report_<date>.pdf and performance_<date>.pdf into
+# this directory on every `npm run test:run`. Four of them had been committed.
+# The test stubs save() now, so nothing should land here — this is the backstop.
+*.pdf
+test-reports/
 test-results/
-
-# a11y report
+playwright-report/
+playwright-report-e2e/
 playwright-report-a11y/
+
+# Database dumps and backups. db-backup/ was 9.9 MB of cluster backups and
+# article rows in git, with .gitignore covering 2 of its 14 files.
+db-backup/
+*.backup
+*.backup.*
+*.dump
+*.sql.gz
+
+# Local scratch
+*.local

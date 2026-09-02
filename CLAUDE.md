@@ -698,10 +698,13 @@ the free tools (`instagram_bio_*`, `listing_*`).
 - Enforced, with `ON DELETE CASCADE` where appropriate.
 
 **Migrations:**
-- Applying `supabase/migrations/` to an empty database in filename order
-  currently fails in ten places (duplicate timestamp prefixes, files indexing
-  columns a later migration adds). CI works around it with three passes. See
-  US-060.
+- `supabase/migrations/` applies to an empty database in filename order, in one
+  pass, with `ON_ERROR_STOP=1`. It used to fail in ten places (duplicate
+  timestamp prefixes, files indexing columns a later migration adds) and CI
+  worked around it with three passes; US-060 replaced the 89 non-order-independent
+  files with a squashed baseline. `.github/workflows/verify-backend.yml` now
+  fails rather than converging on a later pass, so a migration that is not
+  order-independent is caught immediately.
 
 ---
 
@@ -1073,16 +1076,25 @@ try {
 
 ### Internal Docs
 
-See the repository root for comprehensive documentation:
+Six files stay in the root — `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`,
+`SECURITY.md`, `CODE_OF_CONDUCT.md` and `LICENSE`. Everything else moved under
+`docs/` in US-121, when the root held 121 markdown files:
 
-- `README.md` - Project overview and setup
-- `CONTRIBUTING.md` - Contribution guidelines
-- `FEATURES_README.md` - Feature documentation
-- `FRONTEND_ARCHITECTURE.md` - Architecture details
-- `API_DOCUMENTATION.md` - API reference
-- `SECURITY.md` - Security guidelines
-- `PERFORMANCE_OPTIMIZATIONS.md` - Performance guide
-- Various implementation summaries and guides
+| Directory | Holds | Examples |
+| --- | --- | --- |
+| `docs/setup/` | Getting a working environment, and per-integration setup | `GETTING_STARTED.md`, `AUTH_SETUP_DOCUMENTATION.md`, `OAUTH_SELF_HOSTED_GUIDE.md` |
+| `docs/deploy/` | Shipping it — Cloudflare, Coolify, edge functions, monitoring | `CLOUDFLARE_DEPLOYMENT.md`, `EDGE_FUNCTIONS_DEPLOYMENT.md`, `MONITORING.md` |
+| `docs/architecture/` | How it is built | `FRONTEND_ARCHITECTURE.md`, `API_DOCUMENTATION.md`, `PERFORMANCE_OPTIMIZATIONS.md` |
+| `docs/product/` | What it is meant to do | `PRD.md`, `FEATURES_README.md`, `USER_JOURNEY_MAP.md` |
+| `docs/seo/` | The SEO programme | `SEO_SYSTEM_OVERVIEW.md`, `INTERNAL_LINKING_STRATEGY.md` |
+| `docs/reviews/` | Audits and code reviews, dated | `CODE_REVIEW_2026-08.md`, `SECURITY_AUDIT_COMPREHENSIVE.md` |
+| `docs/archive/` | Point-in-time status notes, migration write-ups and sprint summaries kept for history | `SPRINT_*_IMPLEMENTATION_SUMMARY.md`, `SESSION_SUMMARY.md` |
+
+`docs/archive/` is history, not guidance: it records what was true on a
+particular day. Do not treat anything in it as current.
+
+`prd.json` and `progress.txt` stay in the root, because the loop that drives the
+work reads them there.
 
 ---
 

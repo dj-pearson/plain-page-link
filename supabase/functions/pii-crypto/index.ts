@@ -13,7 +13,7 @@
  * iterations, same 16-byte salt prepended to the 12-byte IV, same
  * base64-of-JSON serialization — so every value written under the old scheme
  * decrypts here unchanged, provided PII_ENCRYPTION_KEY is set to what
- * VITE_PII_ENCRYPTION_KEY used to hold. See DEPLOYMENT.md.
+ * VITE_PII_ENCRYPTION_KEY used to hold. See docs/deploy/DEPLOYMENT.md.
  *
  * Batched deliberately: the leads list decrypts two fields per row, and a
  * request per field would make the dashboard unusable. The client also
