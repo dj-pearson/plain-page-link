@@ -73,6 +73,7 @@ export const usePublicProfile = (username: string) => {
         { data: testimonials, error: testimonialsError },
         { data: links, error: linksError },
         { data: settings, error: settingsError },
+        { data: responseHours },
       ] = await Promise.all([
         // Fetch listings with only needed columns
         supabase
@@ -156,6 +157,12 @@ export const usePublicProfile = (username: string) => {
           )
           .eq('user_id', profile.id)
           .maybeSingle(),
+
+        // Median hours to first response over the last 90 days, or null below
+        // 5 responded leads. An aggregate from a SECURITY DEFINER function —
+        // `leads` itself stays unreadable to a visitor (US-111). The page used
+        // to hard-code "< 1 hour" for every agent.
+        supabase.rpc('public_agent_response_hours', { _user_id: profile.id }),
       ]);
 
       // Handle errors from parallel queries
@@ -204,6 +211,7 @@ export const usePublicProfile = (username: string) => {
         listings: transformedListings,
         testimonials: transformedTestimonials,
         links: links || [],
+        responseHours: typeof responseHours === 'number' ? responseHours : null,
         settings: settings || {
           show_listings: true,
           show_sold_properties: true,

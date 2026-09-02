@@ -8958,6 +8958,10 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
+      public_agent_response_hours: {
+        Args: { _user_id: string };
+        Returns: number;
+      };
       queue_seo_notification: {
         Args: {
           p_channels: string[];

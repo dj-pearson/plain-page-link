@@ -100,10 +100,12 @@ async function autoPopulateBioBlock(
 
   if (!profile) return defaultConfig;
 
+  // The defaults are empty since US-111, so these fall back to nothing rather
+  // than to 'Your Name' / '[Your City]'.
   return {
     ...defaultConfig,
     title: profile.full_name || profile.username || defaultConfig.title,
-    subtitle: defaultConfig.subtitle,
+    subtitle: profile.title || defaultConfig.subtitle,
     description: profile.bio || defaultConfig.description,
     avatarUrl: profile.avatar_url || defaultConfig.avatarUrl,
   };

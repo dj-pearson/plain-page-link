@@ -222,7 +222,10 @@ export function StickyActionBar({
               <p className="text-xs font-medium text-gray-900">
                 {profile.full_name || profile.username}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">Responds in &lt; 1 hour</p>
+              {/* "Responds in < 1 hour" stood here as literal text for every
+                  agent, with nothing behind it (US-111). The profile header
+                  shows a response time when one can be computed from real
+                  first-response data; there is nothing honest to say here. */}
             </div>
           </div>
         </motion.div>

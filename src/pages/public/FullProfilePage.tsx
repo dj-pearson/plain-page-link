@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SEOHead } from '@/components/SEOHead';
 import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
 import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
+import { formatResponseTime } from '@/lib/responseTime';
 import { parsePrice } from '@/lib/format';
 import { getImageUrl } from '@/lib/images';
 import { logger } from '@/lib/logger';
@@ -445,7 +446,9 @@ export default function FullProfilePage() {
                   propertiesSold: soldListings.length,
                   averageRating: averageRating,
                   reviewCount: testimonials.length,
-                  responseTime: '< 1 hour',
+                  // Computed, or absent. This was the literal string
+                  // '< 1 hour' for every agent (US-111).
+                  responseTime: formatResponseTime(data.responseHours),
                 }}
               />
             </section>

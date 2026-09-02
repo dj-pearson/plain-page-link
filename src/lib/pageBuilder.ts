@@ -230,10 +230,17 @@ class PageBuilderEngine {
         category: 'content',
         defaultConfig: {
           type: 'bio',
-          title: 'Your Name',
+          // Blank, not a template.
+          //
+          // These read 'Your Name' and 'Helping clients find their dream homes
+          // in [Your City]. Licensed agent with [X] years of experience.' —
+          // bracketed placeholders that publish verbatim if the agent does not
+          // overwrite them (US-111). autoPopulateBioBlock fills both from the
+          // profile when it can; when it cannot, BioBlock renders nothing for
+          // the description rather than a fill-in-the-blank.
+          title: '',
           subtitle: 'Real Estate Professional',
-          description:
-            'Helping clients find their dream homes in [Your City]. Licensed agent with [X] years of experience.',
+          description: '',
           showSocialLinks: true,
           showContactButton: true,
         },
@@ -408,12 +415,15 @@ class PageBuilderEngine {
         defaultConfig: {
           type: 'stats',
           title: 'By The Numbers',
-          stats: [
-            { id: 's1', value: '150', label: 'Homes Sold', icon: 'home', suffix: '+' },
-            { id: 's2', value: '98', label: 'Client Satisfaction', icon: 'star', suffix: '%' },
-            { id: 's3', value: '15', label: 'Years Experience', icon: 'award', suffix: '+' },
-            { id: 's4', value: '50', label: 'M in Sales', icon: 'dollar', prefix: '$' },
-          ],
+          // Empty by design.
+          //
+          // These defaulted to 150 Homes Sold / 98% Client Satisfaction /
+          // 15 Years / $50M in Sales, and StatsBlock published them unchanged —
+          // so dropping the block onto a page put four invented figures on a
+          // licensed agent's public profile under their name (US-111).
+          // StatsBlock already renders "Add stats in the settings panel" when
+          // the list is empty, which is the correct prompt.
+          stats: [],
           layout: 'row',
         },
       },
