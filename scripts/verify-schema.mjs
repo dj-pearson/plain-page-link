@@ -1153,6 +1153,131 @@ check('subscription entitlement survives a scheduled cancellation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 6i. Secrets must not be copied into audit_logs, an account must not be
+//     lockable by a stranger, and the webhook column must be bounded.
+//
+//     audit_table_change serialises to_jsonb(NEW) and is attached to `leads`
+//     and `profiles`, so audit_logs held a copy of every encrypted_email and
+//     every zapier_webhook_url ever written — and pii-crypto would open a
+//     ciphertext for anyone with a JWT. check_login_throttle counted an email's
+//     failures across every source address, so five unauthenticated posts
+//     locked any account. zapier_webhook_url had no constraint at all, and
+//     submit-lead fetches it with the service role from a network that reaches
+//     postgres-meta, Kong and GoTrue (US-119).
+// ---------------------------------------------------------------------------
+check('audit logs redact secrets, lockout is per-address, webhooks are bounded', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-00000000af06';
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'authz@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name)
+        VALUES ('${uid}', 'authzcheck', 'Authz Check')
+        ON CONFLICT (id) DO UPDATE SET username = 'authzcheck';
+      DELETE FROM public.audit_logs WHERE user_id = '${uid}';
+      INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, encrypted_phone)
+        VALUES ('${uid}', 'buyer', 'Authz Lead', 'enc:v1:VERIFYCIPHERTEXT', 'enc:v1:VERIFYPHONE');
+      UPDATE public.profiles
+        SET zapier_webhook_url = 'https://hooks.zapier.com/hooks/catch/1/verify/'
+        WHERE id = '${uid}';
+    `);
+
+    const [leaked] = q(`
+      SELECT EXISTS (
+        SELECT 1 FROM public.audit_logs
+        WHERE user_id = '${uid}' AND details::text LIKE '%VERIFYCIPHERTEXT%'
+      )::text;
+    `);
+    if (leaked !== 'false') {
+      out.push('audit_logs holds lead ciphertext; audit_table_change is not redacting');
+    }
+
+    const [webhookLeaked] = q(`
+      SELECT EXISTS (
+        SELECT 1 FROM public.audit_logs
+        WHERE user_id = '${uid}' AND details::text LIKE '%hooks.zapier.com%'
+      )::text;
+    `);
+    if (webhookLeaked !== 'false') {
+      out.push('audit_logs holds a zapier_webhook_url');
+    }
+
+    // The audit entry must still be useful.
+    const [recorded] = q(`
+      SELECT EXISTS (
+        SELECT 1 FROM public.audit_logs
+        WHERE user_id = '${uid}' AND details::text LIKE '%Authz Lead%'
+      )::text;
+    `);
+    if (recorded !== 'true') {
+      out.push('the audit entry lost the non-secret fields too');
+    }
+
+    // An internal URL must be refused by the column itself.
+    let accepted = false;
+    try {
+      execFileSync(
+        'psql',
+        [
+          DB_URL,
+          '-tAq',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-c',
+          `UPDATE public.profiles SET zapier_webhook_url = 'http://postgres-meta:8080/tables' WHERE id = '${uid}';`,
+        ],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+      );
+      accepted = true;
+    } catch {
+      /* expected: violates check constraint profiles_zapier_webhook_url_check */
+    }
+    if (accepted) {
+      out.push('profiles.zapier_webhook_url accepted an internal address');
+    }
+
+    // Five failures from a stranger must not lock the owner out.
+    q(`
+      DELETE FROM public.login_attempts WHERE email = 'authz-victim@example.test';
+      INSERT INTO public.login_attempts (email, ip_address, success)
+        SELECT 'authz-victim@example.test', '10.0.0.1', false FROM generate_series(1, 5);
+    `);
+    const [victimBlocked] = q(
+      `SELECT is_blocked::text FROM public.check_login_throttle('authz-victim@example.test', '203.0.113.9');`
+    );
+    if (victimBlocked !== 'false') {
+      out.push('five failures from one address locked out a visitor from another — anyone can lock any account');
+    }
+
+    const [attackerBlocked] = q(
+      `SELECT is_blocked::text FROM public.check_login_throttle('authz-victim@example.test', '10.0.0.1');`
+    );
+    if (attackerBlocked !== 'true') {
+      out.push('a brute force from one address is no longer stopped');
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'authorization check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.login_attempts WHERE email = 'authz-victim@example.test';
+         DELETE FROM public.leads WHERE user_id = '${uid}';
+         DELETE FROM public.audit_logs WHERE user_id = '${uid}';
+         DELETE FROM public.profiles WHERE id = '${uid}';
+         DELETE FROM auth.users WHERE id = '${uid}';`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 7. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the

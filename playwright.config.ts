@@ -7,6 +7,8 @@
 
 import { defineConfig, devices } from '@playwright/test';
 
+const SECURITY_ORIGIN = process.env.TEST_BASE_URL || 'http://127.0.0.1:8080';
+
 export default defineConfig({
   // Test directory
   testDir: './tests/security',
@@ -41,7 +43,7 @@ export default defineConfig({
   // Shared settings for all projects
   use: {
     // Base URL for tests
-    baseURL: process.env.TEST_BASE_URL || 'http://localhost:8080',
+    baseURL: SECURITY_ORIGIN,
 
     // Collect trace when retrying the failed test
     trace: 'on-first-retry',
@@ -65,12 +67,12 @@ export default defineConfig({
       name: 'security-chrome',
       use: {
         ...devices['Desktop Chrome'],
+        ...(process.env.PW_CHROMIUM_PATH
+          ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } }
+          : {}),
         // Disable security features to test vulnerabilities
         launchOptions: {
-          args: [
-            '--disable-web-security',
-            '--allow-running-insecure-content',
-          ],
+          args: ['--disable-web-security', '--allow-running-insecure-content'],
         },
       },
     },
@@ -87,15 +89,36 @@ export default defineConfig({
       use: {
         // No browser - pure API testing
         ...devices['Desktop Chrome'],
+        ...(process.env.PW_CHROMIUM_PATH
+          ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } }
+          : {}),
       },
     },
   ],
 
   // Local dev server configuration
+  // Two things this needed before it would run at all (US-119):
+  //
+  //   - `--host 127.0.0.1`. vite's own config defaults host to '::', and in a
+  //     sandbox or runner without IPv6 the dev server dies with
+  //     "listen EAFNOSUPPORT: address family not supported :::8080", so the
+  //     whole suite errored before a single spec ran.
+  //   - the VITE_SUPABASE_* placeholders. src/integrations/supabase/client.ts
+  //     throws at import without them, so the SPA never mounted and every spec
+  //     ran against a blank <body> — the same defect found in the a11y and e2e
+  //     configs under US-114/US-116.
+  //
+  // The origin must be the dev server's own: index.html ships a CSP whose
+  // connect-src is 'self' plus the agentbio.net hosts.
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:8080',
+    command: 'npm run dev -- --host 127.0.0.1',
+    url: SECURITY_ORIGIN,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    env: {
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || SECURITY_ORIGIN,
+      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || 'security-placeholder-anon-key',
+      VITE_FUNCTIONS_URL: process.env.VITE_FUNCTIONS_URL || `${SECURITY_ORIGIN}/functions/v1`,
+    },
   },
 });

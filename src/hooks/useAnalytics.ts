@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { Database } from '@/integrations/supabase/types';
-import { decryptPIIBatch } from '@/lib/pii';
+import { decryptLeadContacts } from '@/lib/pii';
 
 export type TimeRange = '7d' | '30d' | '90d';
 
@@ -81,20 +81,17 @@ type EncryptedLeadRow = Pick<
 /**
  * Decrypts a page of leads in one batched call.
  *
- * Batched for the same reason useLeads batches: since US-066 the crypto lives
- * in the pii-crypto Edge Function, so a call per field would be two network
- * round trips per row.
+ * By id, for the same reason useLeads is: pii-crypto no longer opens raw
+ * ciphertext for anyone holding a JWT (US-119). One call per page, since the
+ * crypto lives in an Edge Function.
  */
 async function decryptRecentLeads(rows: EncryptedLeadRow[]): Promise<RecentLead[]> {
-  const [emails, phones] = await Promise.all([
-    decryptPIIBatch(rows.map((row) => row.encrypted_email)),
-    decryptPIIBatch(rows.map((row) => row.encrypted_phone)),
-  ]);
+  const contacts = await decryptLeadContacts(rows.map((row) => row.id));
 
-  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }, i) => ({
+  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }) => ({
     ...rest,
-    email: emails[i] ?? null,
-    phone: phones[i] ?? null,
+    email: contacts.get(rest.id)?.email ?? null,
+    phone: contacts.get(rest.id)?.phone ?? null,
   }));
 }
 

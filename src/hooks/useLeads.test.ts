@@ -20,6 +20,20 @@ vi.mock('@/stores/useAuthStore', () => ({
   useAuthStore: () => ({ user: authUser }),
 }));
 
+// Decryption is an Edge Function call, addressed by lead id since US-119. The
+// hook's job is to zip the result back onto the rows; the crypto has its own
+// tests in src/lib/pii.test.ts.
+vi.mock('@/lib/pii', async () => {
+  const { mockLead } = await import('@/test/fixtures/lead');
+  return {
+    encryptPIIBatch: vi.fn(async (values: (string | null)[]) => values),
+    decryptLeadContacts: vi.fn(
+      async (ids: string[]) =>
+        new Map(ids.map((id) => [id, { id, email: mockLead.email, phone: mockLead.phone }]))
+    ),
+  };
+});
+
 import { useLeads } from './useLeads';
 
 const wrapper = ({ children }: { children: ReactNode }) =>

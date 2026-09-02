@@ -182,19 +182,11 @@ export default function OnboardingWizardPage() {
 
       // Send welcome email (non-blocking)
       try {
-        await edgeFunctions.invoke('send-welcome-email', {
-          body: {
-            user_id: user.id,
-            email: user.email,
-            full_name: wizardData.profileBasics.fullName || user.user_metadata?.full_name,
-            // From the store, which holds the profile row. user_metadata's
-            // username is what was REQUESTED at signup; derive_available_username
-            // may have assigned a different one when it was taken, so the
-            // welcome email could send an agent to a URL that is not theirs —
-            // or to /agent (US-108).
-            username: profile?.username ?? user.user_metadata?.username ?? 'agent',
-          },
-        });
+        // No body. The function reads the address from the caller's JWT and
+        // the name and username from that user's own profile row — it used to
+        // take all three from here, unauthenticated, which made it a branded
+        // relay to any address (US-119).
+        await edgeFunctions.invoke('send-welcome-email', {});
       } catch (emailError) {
         logger.error('Welcome email failed (non-critical)', emailError as Error);
         // Don't block navigation if email fails

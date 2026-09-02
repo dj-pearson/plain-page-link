@@ -1,30 +1,29 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { encryptPIIBatch, decryptPIIBatch } from '@/lib/pii';
+import { encryptPIIBatch, decryptLeadContacts } from '@/lib/pii';
 import type { Lead, LeadRow } from '@/types/lead';
 
 /**
  * Turns stored lead rows into the app's Lead shape by decrypting the contact
  * details. Since US-086 dropped the plaintext columns, encrypted_email and
- * encrypted_phone are the only store; decryptPIIBatch passes through any value
- * that is not `enc:v1:` prefixed, so a row written before the backfill still
- * reads correctly.
+ * encrypted_phone are the only store.
  *
- * Batched across the whole page rather than per row: since US-066 the crypto
- * lives in the pii-crypto Edge Function, so a per-field call would be two
- * network round trips per lead.
+ * By id, not by value (US-119): pii-crypto used to accept raw ciphertext from
+ * anyone with a JWT, which made it an oracle for any ciphertext that leaked —
+ * and audit_logs held a copy of every one ever written. It now reads the rows
+ * itself and returns only those the caller owns.
+ *
+ * One call for the whole page rather than one per row: the crypto lives in an
+ * Edge Function since US-066, so per-row would be a round trip per lead.
  */
 async function decryptLeadRows(rows: LeadRow[]): Promise<Lead[]> {
-  const [decryptedEmails, decryptedPhones] = await Promise.all([
-    decryptPIIBatch(rows.map((row) => row.encrypted_email)),
-    decryptPIIBatch(rows.map((row) => row.encrypted_phone)),
-  ]);
+  const contacts = await decryptLeadContacts(rows.map((row) => row.id));
 
-  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }, i) => ({
+  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }) => ({
     ...rest,
-    email: decryptedEmails[i] ?? null,
-    phone: decryptedPhones[i] ?? null,
+    email: contacts.get(rest.id)?.email ?? null,
+    phone: contacts.get(rest.id)?.phone ?? null,
   }));
 }
 

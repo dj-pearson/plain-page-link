@@ -4,7 +4,8 @@ import { sendEmail } from '../_shared/email.ts'
 import { encryptSecret } from '../_shared/encryption.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
-import { validateLeadData, sanitizeString, getClientIP } from '../_shared/validation.ts'
+import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl } from '../_shared/validation.ts'
+import { safeFetch } from '../_shared/ssrf-guard.ts'
 import { getAgentContact } from '../_shared/agent-contact.ts'
 import { successResponse, validationError, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts'
 
@@ -180,7 +181,19 @@ serve(async (req) => {
           created_at: lead.created_at,
         }
 
-        const zapierResponse = await fetch(zapierWebhookUrl, {
+        // The agent controls this value, so it is caller-supplied input that
+        // happens to be stored. Without a check an agent could aim it at
+        // http://postgres-meta:8080 and have the edge runtime fetch it from
+        // inside the Docker network on every lead (US-119). The column now has
+        // a CHECK constraint too; this is the guard for rows written before it.
+        if (!isValidWebhookUrl(zapierWebhookUrl)) {
+          console.error(
+            `[submit-lead] refusing zapier_webhook_url for ${leadData.user_id}: not an accepted destination`
+          )
+          throw new Error('Zapier webhook destination is not allowed')
+        }
+
+        const zapierResponse = await safeFetch(zapierWebhookUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

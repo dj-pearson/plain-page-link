@@ -1,43 +1,58 @@
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useProfile } from "@/hooks/useProfile";
-import { Loader2, CheckCircle, XCircle, Zap, AlertCircle, ExternalLink } from "lucide-react";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useProfile } from '@/hooks/useProfile';
+import { Loader2, CheckCircle, XCircle, Zap, AlertCircle, ExternalLink } from 'lucide-react';
+import { validateWebhookUrl } from '@/lib/webhookUrl';
 
 interface ZapierIntegrationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function ZapierIntegrationModal({
-  open,
-  onOpenChange,
-}: ZapierIntegrationModalProps) {
+export function ZapierIntegrationModal({ open, onOpenChange }: ZapierIntegrationModalProps) {
   const { toast } = useToast();
   const { profile, refetch } = useProfile();
-  const [webhookUrl, setWebhookUrl] = useState(profile?.zapier_webhook_url || "");
+  const [webhookUrl, setWebhookUrl] = useState(profile?.zapier_webhook_url || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
+  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+
+  const urlCheck = validateWebhookUrl(webhookUrl);
 
   const handleSave = async () => {
+    // Checked before the write, so the agent is told what is wrong rather than
+    // meeting the column's CHECK constraint as "Failed to save webhook URL".
+    // The constraint and submit-lead's SSRF guard are the layers behind this
+    // one; this is the layer that explains itself (US-119).
+    if (!urlCheck.valid) {
+      toast({
+        title: 'That webhook cannot be used',
+        description: urlCheck.error,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase
         .from('profiles')
-        .update({ zapier_webhook_url: webhookUrl || null })
+        .update({ zapier_webhook_url: webhookUrl.trim() || null })
         .eq('id', user.id)
         .select('id')
         .single();
@@ -47,16 +62,16 @@ export function ZapierIntegrationModal({
       await refetch();
 
       toast({
-        title: "Saved!",
+        title: 'Saved!',
         description: webhookUrl
-          ? "Zapier webhook configured successfully"
-          : "Zapier webhook removed",
+          ? 'Zapier webhook configured successfully'
+          : 'Zapier webhook removed',
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to save webhook URL",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to save webhook URL',
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -66,9 +81,9 @@ export function ZapierIntegrationModal({
   const handleTest = async () => {
     if (!webhookUrl) {
       toast({
-        title: "Error",
-        description: "Please enter a webhook URL first",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Please enter a webhook URL first',
+        variant: 'destructive',
       });
       return;
     }
@@ -79,12 +94,12 @@ export function ZapierIntegrationModal({
     try {
       const testPayload = {
         test: true,
-        lead_id: "test-lead-id",
-        name: "Test Lead",
-        email: "test@example.com",
-        phone: "+1 555-123-4567",
-        message: "This is a test lead from AgentBio.net",
-        lead_type: "contact",
+        lead_id: 'test-lead-id',
+        name: 'Test Lead',
+        email: 'test@example.com',
+        phone: '+1 555-123-4567',
+        message: 'This is a test lead from AgentBio.net',
+        lead_type: 'contact',
         created_at: new Date().toISOString(),
       };
 
@@ -97,20 +112,20 @@ export function ZapierIntegrationModal({
       });
 
       if (response.ok) {
-        setTestResult("success");
+        setTestResult('success');
         toast({
-          title: "Test successful!",
-          description: "Your Zapier webhook is working correctly",
+          title: 'Test successful!',
+          description: 'Your Zapier webhook is working correctly',
         });
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      setTestResult("error");
+      setTestResult('error');
       toast({
-        title: "Test failed",
-        description: "Could not reach your webhook. Check the URL and try again.",
-        variant: "destructive",
+        title: 'Test failed',
+        description: 'Could not reach your webhook. Check the URL and try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsTesting(false);
@@ -125,26 +140,27 @@ export function ZapierIntegrationModal({
             <Zap className="h-6 w-6 text-orange-500" />
             Zapier Integration
           </DialogTitle>
-          <DialogDescription>
-            Automatically send new leads to your CRM via Zapier
-          </DialogDescription>
+          <DialogDescription>Automatically send new leads to your CRM via Zapier</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Webhook URL Input */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              Zapier Webhook URL
-            </label>
+            <label className="block text-sm font-semibold mb-2">Zapier Webhook URL</label>
             <Input
               type="url"
               placeholder="https://hooks.zapier.com/hooks/catch/..."
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
               className="font-mono text-sm"
+              aria-invalid={!urlCheck.valid}
+              aria-describedby="zapier-webhook-hint"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Paste your Zapier webhook URL here
+            <p
+              id="zapier-webhook-hint"
+              className={`text-xs mt-1 ${urlCheck.valid ? 'text-muted-foreground' : 'text-destructive'}`}
+            >
+              {urlCheck.valid ? 'Paste your Zapier or Make webhook URL here' : urlCheck.error}
             </p>
           </div>
 
@@ -152,20 +168,20 @@ export function ZapierIntegrationModal({
           {testResult && (
             <div
               className={`p-3 rounded-lg flex items-center gap-2 ${
-                testResult === "success"
-                  ? "bg-green-50 border border-green-200 text-green-800"
-                  : "bg-red-50 border border-red-200 text-red-800"
+                testResult === 'success'
+                  ? 'bg-green-50 border border-green-200 text-green-800'
+                  : 'bg-red-50 border border-red-200 text-red-800'
               }`}
             >
-              {testResult === "success" ? (
+              {testResult === 'success' ? (
                 <CheckCircle className="h-5 w-5" />
               ) : (
                 <XCircle className="h-5 w-5" />
               )}
               <span className="text-sm font-medium">
-                {testResult === "success"
-                  ? "Webhook test successful!"
-                  : "Webhook test failed. Check your URL."}
+                {testResult === 'success'
+                  ? 'Webhook test successful!'
+                  : 'Webhook test failed. Check your URL.'}
               </span>
             </div>
           )}
@@ -175,7 +191,7 @@ export function ZapierIntegrationModal({
             <Button
               onClick={handleTest}
               variant="outline"
-              disabled={isTesting || !webhookUrl}
+              disabled={isTesting || !webhookUrl || !urlCheck.valid}
               className="flex-1"
             >
               {isTesting ? (
@@ -190,18 +206,14 @@ export function ZapierIntegrationModal({
                 </>
               )}
             </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="flex-1"
-            >
+            <Button onClick={handleSave} disabled={isSaving || !urlCheck.valid} className="flex-1">
               {isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (
-                "Save Configuration"
+                'Save Configuration'
               )}
             </Button>
           </div>
@@ -216,7 +228,7 @@ export function ZapierIntegrationModal({
                 </p>
                 <ol className="text-blue-800 space-y-2 list-decimal list-inside">
                   <li>
-                    Go to{" "}
+                    Go to{' '}
                     <a
                       href="https://zapier.com"
                       target="_blank"
@@ -225,7 +237,7 @@ export function ZapierIntegrationModal({
                     >
                       Zapier.com
                       <ExternalLink className="h-3 w-3" />
-                    </a>{" "}
+                    </a>{' '}
                     and create a new Zap
                   </li>
                   <li>Choose "Webhooks by Zapier" as the trigger</li>
@@ -242,9 +254,7 @@ export function ZapierIntegrationModal({
 
           {/* Available Fields */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h4 className="font-semibold text-sm mb-2">
-              Available Fields in Webhook Payload:
-            </h4>
+            <h4 className="font-semibold text-sm mb-2">Available Fields in Webhook Payload:</h4>
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div className="text-gray-600">lead_id</div>
               <div className="text-gray-600">name</div>

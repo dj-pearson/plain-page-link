@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
-import { encryptPII, decryptPII } from '@/lib/pii';
+import { encryptPII, decryptOwnProfilePhone } from '@/lib/pii';
 import { toProfile } from '@/types/profile';
 import type { Profile } from '@/types/profile';
 
@@ -43,10 +43,14 @@ export function useProfile() {
 
       if (error) throw error;
       const profileData = toProfile(data);
-      // Decrypt PII (decryptPII passes legacy plaintext through unchanged).
+      // The function chooses the row from the JWT rather than being handed a
+      // ciphertext — pii-crypto used to decrypt whatever it was given, for
+      // anyone logged in (US-119). It returns null when it cannot decrypt, so
+      // the stored value stands in, which is what the old client did with a
+      // legacy plaintext number.
       return {
         ...profileData,
-        phone: (await decryptPII(profileData.phone)) ?? profileData.phone,
+        phone: (await decryptOwnProfilePhone()) ?? profileData.phone,
       };
     },
     enabled: !!user?.id,

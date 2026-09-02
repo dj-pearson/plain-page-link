@@ -357,6 +357,23 @@ serve(async (req) => {
     }
 
     const workflow = execution.workflows;
+
+    // The caller must own the workflow.
+    //
+    // The lookup above uses the SERVICE-ROLE client, so RLS does not apply to
+    // it — an authenticated user could pass any executionId and this would run
+    // someone else's workflow with their variables and their integrations, and
+    // write the results back onto their execution record. Being logged in was
+    // the only requirement (US-119).
+    //
+    // Answered as "not found" rather than "forbidden": whether an execution id
+    // exists is not something a stranger should be able to learn.
+    if (!workflow || workflow.user_id !== user.id) {
+      console.warn(
+        `[execute-workflow] ${user.id} tried to run execution ${executionId}, owned by ${workflow?.user_id ?? 'nobody'}`
+      );
+      throw new Error('Execution not found');
+    }
     const nodes: WorkflowNode[] = workflow.nodes || [];
     const edges: WorkflowEdge[] = workflow.edges || [];
 

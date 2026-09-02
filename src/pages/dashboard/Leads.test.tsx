@@ -42,6 +42,18 @@ vi.mock('@/hooks/useSubscriptionLimits', () => ({
 const { exportToCSVMock } = vi.hoisted(() => ({ exportToCSVMock: vi.fn() }));
 vi.mock('@/lib/exportUtils', () => ({ exportToCSV: exportToCSVMock }));
 
+// Decryption is an Edge Function call, addressed by lead id since US-119.
+vi.mock('@/lib/pii', async () => {
+  const { mockLead } = await import('@/test/fixtures/lead');
+  return {
+    encryptPIIBatch: vi.fn(async (values: (string | null)[]) => values),
+    decryptLeadContacts: vi.fn(
+      async (ids: string[]) =>
+        new Map(ids.map((id) => [id, { id, email: mockLead.email, phone: mockLead.phone }]))
+    ),
+  };
+});
+
 vi.mock('@/hooks/useMLLeadScoring', () => ({
   useMLLeadScoring: () => ({
     scoreLeadObject: () => ({ score: 50, priority: 'warm', factors: [], confidence: 0.5 }),

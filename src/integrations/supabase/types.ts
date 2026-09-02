@@ -9044,6 +9044,7 @@ export type Database = {
         };
         Returns: string;
       };
+      redact_audit_row: { Args: { p_row: Json }; Returns: Json };
       refresh_unified_analytics: {
         Args: { p_end_date: string; p_start_date: string; p_user_id: string };
         Returns: number;

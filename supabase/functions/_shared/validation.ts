@@ -131,15 +131,44 @@ export function isPublicFetchableUrl(url: string): boolean {
 }
 
 // Validate webhook URL against allowed domains (for SSRF prevention)
-export function isValidWebhookUrl(url: string, allowedDomains: string[] = ['hooks.zapier.com', 'hook.us1.make.com', 'hook.eu1.make.com']): boolean {
+/**
+ * Whether a URL is an accepted webhook destination.
+ *
+ * The allow-list is the control, not the SSRF guard: a guard proves a URL is
+ * not internal, this proves it is one of the two integrations the product
+ * actually supports. Both are applied (US-119).
+ *
+ * https only. A webhook carries lead PII to a third party, and every
+ * destination on this list serves https; permitting http meant that payload
+ * could be sent in clear text.
+ *
+ * `hook.*.make.com` rather than two named regions: Make assigns regional
+ * hostnames (us1, us2, eu1, eu2 …) and a hard-coded pair silently rejected
+ * agents in the others.
+ */
+export function isValidWebhookUrl(
+  url: string,
+  allowedDomains: string[] = ['hooks.zapier.com']
+): boolean {
   try {
     const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol.toLowerCase())) {
+    if (parsed.protocol.toLowerCase() !== 'https:') {
       return false;
     }
-    // Check if the hostname matches any allowed domain
-    return allowedDomains.some(domain =>
-      parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
+
+    const host = parsed.hostname.toLowerCase();
+
+    // Credentials in the URL are a redirect trick and never legitimate here.
+    if (parsed.username || parsed.password) {
+      return false;
+    }
+
+    if (/^hook\.[a-z0-9-]+\.make\.com$/.test(host)) {
+      return true;
+    }
+
+    return allowedDomains.some(
+      (domain) => host === domain.toLowerCase() || host.endsWith('.' + domain.toLowerCase())
     );
   } catch {
     return false;

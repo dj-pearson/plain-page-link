@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { isServiceRoleRequest, getAuthenticatedUser } from '../_shared/service-auth.ts';
+import { safeFetch } from '../_shared/ssrf-guard.ts';
+import { isValidWebhookUrl } from '../_shared/validation.ts';
 
 export default async (req: Request) => {
   console.log('[publish-article-to-social] Function invoked');
@@ -192,7 +194,18 @@ Return ONLY valid JSON with this exact structure:
 
         console.log(`Sending to webhook: ${webhook.name}`);
 
-        const response = await fetch(webhook.webhook_url, {
+        // The URL is stored, but stored is not the same as trusted: it was
+        // written by an operator through a form with no validation, and this
+        // runs with the service role on a network that reaches postgres-meta,
+        // Kong and GoTrue (US-119).
+        if (!isValidWebhookUrl(webhook.webhook_url)) {
+          console.error(
+            `[publish-article-to-social] refusing webhook "${webhook.name}": not an accepted destination`
+          );
+          return { webhook: webhook.name, success: false, error: 'Destination not allowed' };
+        }
+
+        const response = await safeFetch(webhook.webhook_url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
