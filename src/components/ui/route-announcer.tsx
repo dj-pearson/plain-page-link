@@ -1,49 +1,51 @@
-import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 /**
  * Maps route paths to human-readable page titles for screen reader announcements.
  * Falls back to document.title if no match is found.
  */
 const ROUTE_TITLES: Record<string, string> = {
-  "/": "Home",
-  "/pricing": "Pricing",
-  "/blog": "Blog",
-  "/privacy": "Privacy Policy",
-  "/terms": "Terms of Service",
-  "/dmca": "DMCA Policy",
-  "/acceptable-use": "Acceptable Use Policy",
-  "/accessibility": "Accessibility Statement",
-  "/auth/login": "Log In",
-  "/auth/register": "Create Account",
-  "/auth/forgot-password": "Forgot Password",
-  "/auth/reset-password": "Reset Password",
-  "/dashboard": "Dashboard",
-  "/dashboard/listings": "Listings",
-  "/dashboard/leads": "Leads",
-  "/dashboard/testimonials": "Testimonials",
-  "/dashboard/links": "Custom Links",
-  "/dashboard/analytics": "Analytics",
-  "/dashboard/profile": "Profile",
-  "/dashboard/theme": "Theme",
-  "/dashboard/settings": "Settings",
-  "/dashboard/quick-actions": "Quick Actions",
-  "/dashboard/page-builder": "Page Builder",
-  "/dashboard/workflows": "Workflows",
-  "/dashboard/lead-management": "Lead Management",
-  "/dashboard/analytics-advanced": "Advanced Analytics",
-  "/admin": "Admin Dashboard",
-  "/admin/seo": "SEO Dashboard",
-  "/for-real-estate-agents": "For Real Estate Agents",
-  "/instagram-bio-for-realtors": "Instagram Bio for Realtors",
-  "/features/property-listings": "Property Listings Feature",
-  "/features/lead-capture": "Lead Capture Feature",
-  "/features/calendar-booking": "Calendar Booking Feature",
-  "/features/testimonials": "Testimonials Feature",
-  "/features/analytics": "Analytics Feature",
-  "/tools/instagram-bio-analyzer": "Instagram Bio Analyzer",
-  "/tools/listing-description-generator": "Listing Description Generator",
-  "/onboarding/wizard": "Onboarding",
+  '/': 'Home',
+  '/pricing': 'Pricing',
+  '/blog': 'Blog',
+  '/privacy': 'Privacy Policy',
+  '/terms': 'Terms of Service',
+  '/dmca': 'DMCA Policy',
+  '/acceptable-use': 'Acceptable Use Policy',
+  '/accessibility': 'Accessibility Statement',
+  '/auth/login': 'Log In',
+  '/auth/register': 'Create Account',
+  '/auth/forgot-password': 'Forgot Password',
+  '/auth/reset-password': 'Reset Password',
+  '/dashboard': 'Dashboard',
+  '/dashboard/listings': 'Listings',
+  '/dashboard/leads': 'Leads',
+  '/dashboard/testimonials': 'Testimonials',
+  '/dashboard/links': 'Custom Links',
+  '/dashboard/analytics': 'Analytics',
+  '/dashboard/profile': 'Profile',
+  '/dashboard/theme': 'Theme',
+  '/dashboard/settings': 'Settings',
+  '/dashboard/quick-actions': 'Quick Actions',
+  '/dashboard/page-builder': 'Page Builder',
+  '/dashboard/workflows': 'Workflows',
+  '/dashboard/subscription': 'Subscription',
+  '/dashboard/team': 'Team',
+  '/dashboard/api-keys': 'API Keys',
+  '/dashboard/settings/delete-account': 'Delete Account',
+  '/admin': 'Admin Dashboard',
+  '/admin/seo': 'SEO Dashboard',
+  '/for-real-estate-agents': 'For Real Estate Agents',
+  '/instagram-bio-for-realtors': 'Instagram Bio for Realtors',
+  '/features/property-listings': 'Property Listings Feature',
+  '/features/lead-capture': 'Lead Capture Feature',
+  '/features/calendar-booking': 'Calendar Booking Feature',
+  '/features/testimonials': 'Testimonials Feature',
+  '/features/analytics': 'Analytics Feature',
+  '/tools/instagram-bio-analyzer': 'Instagram Bio Analyzer',
+  '/tools/listing-description-generator': 'Listing Description Generator',
+  '/onboarding/wizard': 'Onboarding',
 };
 
 function getPageTitle(pathname: string): string {
@@ -53,37 +55,37 @@ function getPageTitle(pathname: string): string {
   }
 
   // Dynamic route patterns
-  if (pathname.startsWith("/blog/category/")) {
-    return "Blog Category";
+  if (pathname.startsWith('/blog/category/')) {
+    return 'Blog Category';
   }
-  if (pathname.startsWith("/blog/")) {
-    return "Blog Article";
+  if (pathname.startsWith('/blog/')) {
+    return 'Blog Article';
   }
-  if (pathname.startsWith("/for/")) {
-    return "Real Estate Agents";
+  if (pathname.startsWith('/for/')) {
+    return 'Real Estate Agents';
   }
-  if (pathname.startsWith("/vs/")) {
-    return "Comparison";
+  if (pathname.startsWith('/vs/')) {
+    return 'Comparison';
   }
-  if (pathname.startsWith("/p/")) {
-    return "Page";
+  if (pathname.startsWith('/p/')) {
+    return 'Page';
   }
-  if (pathname.startsWith("/dashboard/workflows/")) {
-    return "Workflow Builder";
+  if (pathname.startsWith('/dashboard/workflows/')) {
+    return 'Workflow Builder';
   }
 
   // Fall back to document title
   const docTitle = document.title;
   if (docTitle) {
     // Strip the site name suffix if present
-    const pipeIndex = docTitle.indexOf(" | ");
-    const dashIndex = docTitle.indexOf(" – ");
+    const pipeIndex = docTitle.indexOf(' | ');
+    const dashIndex = docTitle.indexOf(' – ');
     if (pipeIndex > 0) return docTitle.substring(0, pipeIndex);
     if (dashIndex > 0) return docTitle.substring(0, dashIndex);
     return docTitle;
   }
 
-  return "Page";
+  return 'Page';
 }
 
 /**
@@ -102,7 +104,7 @@ function getPageTitle(pathname: string): string {
  */
 export function RouteAnnouncer() {
   const location = useLocation();
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, setAnnouncement] = useState('');
   const previousPathRef = useRef(location.pathname);
 
   useEffect(() => {
@@ -119,7 +121,7 @@ export function RouteAnnouncer() {
       setAnnouncement(`Navigated to ${title}`);
 
       // Move focus to main content for keyboard users (WCAG 2.4.3)
-      const mainContent = document.getElementById("main-content");
+      const mainContent = document.getElementById('main-content');
       if (mainContent) {
         mainContent.focus({ preventScroll: false });
       }
@@ -131,18 +133,13 @@ export function RouteAnnouncer() {
   // Clear announcement after it's been read
   useEffect(() => {
     if (announcement) {
-      const timer = setTimeout(() => setAnnouncement(""), 1500);
+      const timer = setTimeout(() => setAnnouncement(''), 1500);
       return () => clearTimeout(timer);
     }
   }, [announcement]);
 
   return (
-    <div
-      role="status"
-      aria-live="assertive"
-      aria-atomic="true"
-      className="sr-only"
-    >
+    <div role="status" aria-live="assertive" aria-atomic="true" className="sr-only">
       {announcement}
     </div>
   );

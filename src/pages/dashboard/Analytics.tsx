@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { subDays } from 'date-fns';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { AnalyticsChart } from '@/components/dashboard/AnalyticsChart';
 import { LeadsTable } from '@/components/dashboard/LeadsTable';
-import { SearchAnalyticsDashboard } from '@/components/admin/SearchAnalyticsDashboard';
 import { InsightsWidget } from '@/components/analytics/InsightsWidget';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,19 +23,33 @@ import {
   Calendar,
   Download,
   BarChart3,
-  Search as SearchIcon,
   AlertCircle,
   RefreshCw,
   MousePointerClick,
   Link as LinkIcon,
+  Filter,
+  FileText,
 } from 'lucide-react';
 import { useAnalytics, type TimeRange } from '@/hooks/useAnalytics';
+import { useLeads } from '@/hooks/useLeads';
+import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
+import { ConversionFunnel } from '@/components/analytics/ConversionFunnel';
+import { LeadSourceBreakdown } from '@/components/analytics/LeadSourceBreakdown';
+import { InsightsPanel } from '@/components/analytics/InsightsPanel';
+import { ReportBuilder, type ReportConfig } from '@/components/analytics/ReportBuilder';
+import {
+  calculateFunnel,
+  analyzeLeadSources,
+  generateInsights,
+  type AnalyticsData,
+} from '@/lib/analytics';
 import { logger } from '@/lib/logger';
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState<TimeRange>('30d');
   const {
     stats,
+    previousStats,
     viewsData,
     leadsData,
     contactTaps,
@@ -48,6 +62,126 @@ export default function Analytics() {
     error,
     refetch,
   } = useAnalytics(dateRange);
+  const { leads } = useLeads();
+  const { scoreLeadObject } = useMLLeadScoring();
+
+  /**
+   * The funnel, the source breakdown and the insights, moved here from
+   * src/pages/AnalyticsDashboard.tsx — a 417-line page reachable only by typing
+   * its URL, since nothing in the app linked to it (US-120).
+   *
+   * The second funnel stage is real now. It was `Math.round(uniqueVisitors *
+   * 0.7)` labelled "Viewed Listing" — a number nothing measured, shown to the
+   * agent as measurement. analytics_events records taps and link clicks since
+   * US-115, so "Engaged" is counted rather than assumed.
+   */
+  const funnel = useMemo(
+    () =>
+      calculateFunnel({
+        visitors: stats.uniqueVisitors,
+        engaged: totalContactTaps + totalLinkClicks,
+        contacted: stats.totalLeads,
+        qualified: leads.filter((l) => l.status === 'qualified' || l.status === 'converted').length,
+        converted: leads.filter((l) => l.status === 'converted').length,
+      }),
+    [stats, leads, totalContactTaps, totalLinkClicks]
+  );
+
+  const leadSources = useMemo(() => {
+    const bySource: Record<string, { leads: number; conversions: number }> = {};
+    for (const lead of leads) {
+      const source = lead.source || 'website';
+      bySource[source] ??= { leads: 0, conversions: 0 };
+      bySource[source].leads++;
+      if (lead.status === 'converted') bySource[source].conversions++;
+    }
+
+    const rows = Object.entries(bySource).map(([source, counts]) => ({
+      source,
+      leads: counts.leads,
+      conversions: counts.conversions,
+      // Neither is tracked anywhere in the product; they stay zero rather than
+      // being invented.
+      revenue: 0,
+      cost: 0,
+    }));
+
+    return analyzeLeadSources(
+      rows.length > 0
+        ? rows
+        : [{ source: 'website', leads: 0, conversions: 0, revenue: 0, cost: 0 }]
+    );
+  }, [leads]);
+
+  const insights = useMemo(() => {
+    const period: AnalyticsData['period'] =
+      dateRange === '7d' ? 'week' : dateRange === '30d' ? 'month' : 'quarter';
+    const days = { '7d': 7, '30d': 30, '90d': 90 }[dateRange];
+    const now = new Date();
+    const startDate = subDays(now, days);
+
+    const current: AnalyticsData = {
+      pageViews: stats.totalViews,
+      uniqueVisitors: stats.uniqueVisitors,
+      leads: stats.totalLeads,
+      conversions: leads.filter((l) => l.status === 'converted').length,
+      revenue: 0,
+      avgResponseTime: stats.avgResponseMinutes ?? 0,
+      period,
+      startDate,
+      endDate: now,
+    };
+
+    const previous: AnalyticsData = {
+      pageViews: previousStats.views,
+      uniqueVisitors: previousStats.visitors,
+      leads: previousStats.leads,
+      conversions: previousStats.conversions,
+      revenue: 0,
+      avgResponseTime: 0,
+      period,
+      startDate: subDays(startDate, days),
+      endDate: startDate,
+    };
+
+    return generateInsights(current, previous, leadSources);
+  }, [stats, previousStats, leads, leadSources, dateRange]);
+
+  /** Rows for the report the agent builds. Real lead data, not a sample. */
+  const handleGenerateReport = async (config: ReportConfig): Promise<Record<string, unknown>[]> => {
+    if (config.reportType !== 'leads') {
+      return [
+        {
+          metric: 'Total views',
+          value: stats.totalViews,
+        },
+        { metric: 'Unique visitors', value: stats.uniqueVisitors },
+        { metric: 'Leads', value: stats.totalLeads },
+        { metric: 'Contact taps', value: totalContactTaps },
+        { metric: 'Link clicks', value: totalLinkClicks },
+        { metric: 'Conversion rate', value: `${stats.conversionRate.toFixed(2)}%` },
+      ];
+    }
+
+    return leads.map((lead) => {
+      // There is no `score` column on `leads`; the ML score is computed.
+      let score = 0;
+      try {
+        score = scoreLeadObject(lead).score;
+      } catch {
+        // Scoring is best-effort here; an unscoreable lead exports as 0.
+      }
+      return {
+        id: lead.id,
+        name: lead.name || 'Unknown',
+        email: lead.email || '',
+        source: lead.source || 'website',
+        status: lead.status || 'new',
+        score,
+        created_at: lead.created_at,
+      };
+    });
+  };
   const { toast } = useToast();
 
   const handleExportAnalytics = () => {
@@ -220,18 +354,30 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Tabs for different analytics views */}
+      {/* Tabs for different analytics views.
+          There used to be a "Search Analytics" tab here mounting
+          @/components/admin/SearchAnalyticsDashboard — Google Search Console,
+          GA4, Bing and Yandex OAuth connections — on the agent-facing page with
+          no admin gate at all. That is the platform's own SEO tooling, not
+          something a real estate agent has any use for or any business
+          connecting. It lives under /admin now (US-120).
+
+          Funnel and Reports come from src/pages/AnalyticsDashboard.tsx, a
+          417-line page that nothing linked to. */}
       <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:w-auto">
+        <TabsList className="grid w-full grid-cols-3 sm:w-auto">
           <TabsTrigger value="overview" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Profile Analytics</span>
             <span className="sm:hidden">Overview</span>
           </TabsTrigger>
-          <TabsTrigger value="search" className="gap-2">
-            <SearchIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Search Analytics</span>
-            <span className="sm:hidden">Search</span>
+          <TabsTrigger value="funnel" className="gap-2">
+            <Filter className="h-4 w-4" />
+            <span>Funnel</span>
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="gap-2">
+            <FileText className="h-4 w-4" />
+            <span>Reports</span>
           </TabsTrigger>
         </TabsList>
 
@@ -412,8 +558,19 @@ export default function Analytics() {
           />
         </TabsContent>
 
-        <TabsContent value="search" className="space-y-4 sm:space-y-6">
-          <SearchAnalyticsDashboard />
+        <TabsContent value="funnel" className="space-y-4 sm:space-y-6">
+          <ConversionFunnel stages={funnel} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <LeadSourceBreakdown sources={leadSources} />
+            <InsightsPanel insights={insights} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4 sm:space-y-6">
+          {/* The orphan page also had a grid of four "Available Reports" cards
+              with cursor-pointer and no onClick at all. They are not carried
+              over; the builder below is the part that produces anything. */}
+          <ReportBuilder onGenerateReport={handleGenerateReport} />
         </TabsContent>
       </Tabs>
     </div>

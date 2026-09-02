@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { validateUsername } from '@/lib/usernameValidation';
+import { SETTINGS_TOOLS } from '@/config/dashboard-nav';
 import { Bell, CreditCard, User, Lock, Save, Eye, KeyRound } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSettings } from '@/hooks/useSettings';
@@ -750,6 +751,43 @@ export default function Settings() {
 
       {/* GDPR Settings (Data Export & Account Deletion) */}
       <GDPRSettings />
+
+      {/* Everything the sidebar no longer carries.
+          The dashboard nav had fifteen entries for a product aimed at people
+          who are not technical; it is seven now, and these are the rest — in
+          one place an agent can find rather than competing with the things
+          they do every day. /dashboard/settings/delete-account in particular
+          had no link anywhere in the app at all (US-120). */}
+      <Card>
+        <CardHeader>
+          <CardTitle>More tools</CardTitle>
+          <CardDescription>Everything else on your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="divide-y divide-border">
+            {SETTINGS_TOOLS.map((tool) => (
+              <li key={tool.href}>
+                <Link
+                  to={tool.href}
+                  className="flex items-center gap-4 py-3 min-h-[44px] group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                >
+                  <tool.icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-foreground group-hover:underline">
+                      {tool.label}
+                    </span>
+                    {tool.description && (
+                      <span className="block text-sm text-muted-foreground">
+                        {tool.description}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }

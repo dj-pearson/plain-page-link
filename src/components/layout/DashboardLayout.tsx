@@ -1,27 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
-import {
-  Home,
-  LayoutDashboard,
-  Building2,
-  Users,
-  Link as LinkIcon,
-  Star,
-  BarChart3,
-  User,
-  Palette,
-  Settings,
-  LogOut,
-  Shield,
-  Zap,
-  FileText,
-  Copy,
-  Check,
-  Share2,
-  Workflow,
-  CreditCard,
-  KeyRound,
-} from 'lucide-react';
+import { Home, LogOut, Shield, Copy, Check, Share2 } from 'lucide-react';
 import { MobileNav } from '@/components/mobile/MobileNav';
 import { NotificationBell } from '@/components/ui/notification-bell';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { logger } from '@/lib/logger';
+import { PRIMARY_NAV } from '@/config/dashboard-nav';
 
 export default function DashboardLayout() {
   const location = useLocation();
@@ -110,64 +90,23 @@ export default function DashboardLayout() {
           </Link>
         </div>
 
+        {/* Seven destinations, from src/config/dashboard-nav.ts.
+            There were fifteen here, and MobileNav listed a different set — so
+            an agent on a phone could not reach their own billing at all. Both
+            navs render from that file now (US-120). */}
         <nav className="px-3 space-y-1 flex-1 overflow-y-auto" aria-label="Main navigation">
-          <NavLink
-            to="/dashboard"
-            icon={<LayoutDashboard className="h-5 w-5" />}
-            label="Dashboard"
-            active={isActive('/dashboard')}
-          />
-          <NavLink
-            to="/dashboard/listings"
-            icon={<Building2 className="h-5 w-5" />}
-            label="Listings"
-            active={isActive('/dashboard/listings')}
-          />
-          <NavLink
-            to="/dashboard/leads"
-            icon={<Users className="h-5 w-5" />}
-            label="Leads"
-            active={isActive('/dashboard/leads')}
-          />
-          <NavLink
-            to="/dashboard/testimonials"
-            icon={<Star className="h-5 w-5" />}
-            label="Testimonials"
-            active={isActive('/dashboard/testimonials')}
-          />
-          <NavLink
-            to="/dashboard/links"
-            icon={<LinkIcon className="h-5 w-5" />}
-            label="Custom Links"
-            active={isActive('/dashboard/links')}
-          />
-          <NavLink
-            to="/dashboard/analytics"
-            icon={<BarChart3 className="h-5 w-5" />}
-            label="Analytics"
-            active={isActive('/dashboard/analytics')}
-          />
-          <NavLink
-            to="/dashboard/quick-actions"
-            icon={<Zap className="h-5 w-5" />}
-            label="Quick Actions"
-            active={isActive('/dashboard/quick-actions')}
-          />
-          <NavLink
-            to="/dashboard/page-builder"
-            icon={<FileText className="h-5 w-5" />}
-            label="Page Builder"
-            active={isActive('/dashboard/page-builder')}
-          />
-          <NavLink
-            to="/dashboard/workflows"
-            icon={<Workflow className="h-5 w-5" />}
-            label="Workflows"
-            active={isActive('/dashboard/workflows')}
-          />
+          {PRIMARY_NAV.map((item) => (
+            <NavLink
+              key={item.href}
+              to={item.href}
+              icon={<item.icon className="h-5 w-5" />}
+              label={item.label}
+              active={isActive(item.href)}
+            />
+          ))}
 
-          <div className="pt-4 mt-4 border-t border-gray-200">
-            {role === 'admin' && (
+          {role === 'admin' && (
+            <div className="pt-4 mt-4 border-t border-gray-200">
               <NavLink
                 to="/admin"
                 icon={<Shield className="h-5 w-5" />}
@@ -181,44 +120,8 @@ export default function DashboardLayout() {
                 }
                 active={isActive('/admin')}
               />
-            )}
-            <NavLink
-              to="/dashboard/profile"
-              icon={<User className="h-5 w-5" />}
-              label="Profile"
-              active={isActive('/dashboard/profile')}
-            />
-            <NavLink
-              to="/dashboard/theme"
-              icon={<Palette className="h-5 w-5" />}
-              label="Theme"
-              active={isActive('/dashboard/theme')}
-            />
-            <NavLink
-              to="/dashboard/subscription"
-              icon={<CreditCard className="h-5 w-5" />}
-              label="Subscription"
-              active={isActive('/dashboard/subscription')}
-            />
-            <NavLink
-              to="/dashboard/team"
-              icon={<Users className="h-5 w-5" />}
-              label="Team"
-              active={isActive('/dashboard/team')}
-            />
-            <NavLink
-              to="/dashboard/api-keys"
-              icon={<KeyRound className="h-5 w-5" />}
-              label="API Keys"
-              active={isActive('/dashboard/api-keys')}
-            />
-            <NavLink
-              to="/dashboard/settings"
-              icon={<Settings className="h-5 w-5" />}
-              label="Settings"
-              active={isActive('/dashboard/settings')}
-            />
-          </div>
+            </div>
+          )}
         </nav>
 
         <div className="flex-shrink-0 p-4 border-t border-gray-200">

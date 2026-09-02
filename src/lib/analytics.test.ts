@@ -130,7 +130,7 @@ describe('AnalyticsEngine', () => {
     it('should calculate funnel stages correctly', () => {
       const funnel = AnalyticsEngine.calculateFunnel({
         visitors: 1000,
-        viewed: 500,
+        engaged: 500,
         contacted: 100,
         qualified: 50,
         converted: 10,
@@ -147,7 +147,7 @@ describe('AnalyticsEngine', () => {
     it('should calculate dropoff correctly', () => {
       const funnel = AnalyticsEngine.calculateFunnel({
         visitors: 1000,
-        viewed: 800,
+        engaged: 800,
         contacted: 200,
         qualified: 100,
         converted: 50,
@@ -162,7 +162,7 @@ describe('AnalyticsEngine', () => {
     it('should handle zero visitors', () => {
       const funnel = AnalyticsEngine.calculateFunnel({
         visitors: 0,
-        viewed: 0,
+        engaged: 0,
         contacted: 0,
         qualified: 0,
         converted: 0,
