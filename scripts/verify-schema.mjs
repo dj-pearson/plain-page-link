@@ -732,8 +732,14 @@ check('lead insert pipeline works end to end', () => {
       out.push('lead created but auto_log_lead_creation logged no activity');
     }
 
-    // A note must be attachable to the lead (lead_notes must exist).
-    q(`INSERT INTO public.lead_notes (lead_id, note) VALUES ('${lid}', 'schema check');`);
+    // A note must be attachable to the lead. This used to insert into
+    // lead_notes — a second activity store the modal read while every trigger
+    // wrote lead_activities. US-102 migrated those rows across and dropped the
+    // table, so there is one timeline again.
+    q(`
+      INSERT INTO public.lead_activities (lead_id, user_id, activity_type, content)
+      VALUES ('${lid}', '${uid}', 'note', 'schema check');
+    `);
   } catch (e) {
     const msg = String(e.stderr || e.message)
       .split('\n')

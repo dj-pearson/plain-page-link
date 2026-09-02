@@ -35,6 +35,11 @@ import {
   Flame,
   TrendingUp,
   Brain,
+  StickyNote,
+  CalendarClock,
+  CheckSquare,
+  ArrowRightLeft,
+  Inbox,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +47,7 @@ import { formatDistanceToNow } from 'date-fns';
 import type { Lead } from '@/types/lead';
 import { useLeadScore } from '@/hooks/useMLLeadScoring';
 import { useLeadContactAction, type ContactChannel } from '@/hooks/useLeadContactAction';
+import { useLeadActivities, type LeadActivity } from '@/hooks/useLeadActivities';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
 
@@ -57,19 +63,45 @@ interface LeadWithExtras extends Lead {
   budget?: string | null;
 }
 
-interface LeadNote {
-  id: string;
-  lead_id: string;
-  note: string;
-  is_system: boolean;
-  created_at: string;
-}
-
 interface LeadDetailModalProps {
   lead: LeadWithExtras | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLeadUpdated?: () => void;
+}
+
+/**
+ * How each kind of timeline entry is drawn. The timeline mixes what the agent
+ * did (note, call, email, sms, meeting, task) with what the system recorded
+ * (status_change from the trigger, form_submission when the lead arrived), so
+ * the icon is what tells them apart at a glance.
+ */
+const ACTIVITY_ICONS: Record<string, typeof StickyNote> = {
+  note: StickyNote,
+  call: Phone,
+  email: Mail,
+  sms: MessageSquare,
+  meeting: CalendarClock,
+  task: CheckSquare,
+  status_change: ArrowRightLeft,
+  form_submission: Inbox,
+};
+
+/** The line an agent reads. Falls back to the stored title, then the type. */
+function activityHeadline(a: LeadActivity): string {
+  if (a.activity_type === 'status_change' && a.new_status) {
+    return a.previous_status
+      ? `Status: ${a.previous_status} → ${a.new_status}`
+      : `Status set to ${a.new_status}`;
+  }
+  if (a.activity_type === 'call' && a.call_outcome) {
+    const mins = a.call_duration_seconds ? ` · ${Math.round(a.call_duration_seconds / 60)}m` : '';
+    return `Call (${a.call_outcome.replace(/_/g, ' ')})${mins}`;
+  }
+  if (a.activity_type === 'email' && a.email_subject) {
+    return `Email: ${a.email_subject}`;
+  }
+  return a.title || a.activity_type.replace(/_/g, ' ');
 }
 
 const STATUS_OPTIONS = [
@@ -110,12 +142,22 @@ const QUICK_RESPONSES = [
 export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: LeadDetailModalProps) {
   const [status, setStatus] = useState(lead?.status || 'new');
   const [note, setNote] = useState('');
-  const [notes, setNotes] = useState<LeadNote[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [loadingNotes, setLoadingNotes] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<string>('');
   const leadScore = useLeadScore(lead);
   const recordContact = useLeadContactAction(setStatus);
+
+  // The timeline. This used to read public.lead_notes while every trigger
+  // wrote public.lead_activities, so the agent saw none of: the lead being
+  // created, a status change with its previous value, a logged call or email,
+  // or a notification send. Two stores, one displayed (US-102). lead_notes was
+  // migrated into lead_activities and dropped in 20260902000005.
+  const {
+    activities,
+    isLoading: loadingActivities,
+    logNote,
+    isLoggingNote,
+  } = useLeadActivities(lead?.id);
 
   // Re-initialise per-lead state whenever the lead changes.
   //
@@ -129,37 +171,9 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
   useEffect(() => {
     setStatus(lead?.status || 'new');
     setNote('');
-    setNotes([]);
     setSelectedResponse('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead?.id]);
-
-  // Load notes when modal opens
-  useEffect(() => {
-    if (lead && open) {
-      loadNotes();
-    }
-  }, [lead, open]);
-
-  const loadNotes = async () => {
-    if (!lead) return;
-
-    setLoadingNotes(true);
-    try {
-      const { data, error } = await supabase
-        .from('lead_notes')
-        .select('*')
-        .eq('lead_id', lead.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setNotes(data || []);
-    } catch (error) {
-      logger.error('Failed to load notes', error as Error);
-    } finally {
-      setLoadingNotes(false);
-    }
-  };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!lead) return;
@@ -184,9 +198,10 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
       setStatus(newStatus);
       toast.success('Lead status updated');
       onLeadUpdated?.();
-
-      // Auto-add a note about the status change
-      await addNote(`Status changed to: ${newStatus}`, true);
+      // No note is written here any more. auto_log_lead_status_change already
+      // records a 'status_change' activity for exactly this event, and carries
+      // the PREVIOUS status, which the hand-written note never did — so this
+      // was a worse duplicate of a row the database had already stored.
     } catch (error) {
       logger.error('Failed to update lead status', error as Error);
       toast.error('Failed to update status');
@@ -206,37 +221,10 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     onLeadUpdated?.();
   };
 
-  const addNote = async (noteText: string, isSystemNote: boolean = false) => {
-    if (!lead || !noteText.trim()) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('lead_notes')
-        .insert({
-          lead_id: lead.id,
-          note: noteText.trim(),
-          is_system: isSystemNote,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setNotes((prev) => [data, ...prev]);
-      if (!isSystemNote) {
-        setNote('');
-        toast.success('Note added');
-      }
-    } catch (error) {
-      logger.error('Failed to add note', error as Error);
-      if (!isSystemNote) {
-        toast.error('Failed to add note');
-      }
-    }
-  };
-
   const handleAddNote = () => {
-    addNote(note, false);
+    if (!lead || !note.trim()) return;
+    logNote({ leadId: lead.id, content: note.trim() });
+    setNote('');
   };
 
   const getLeadTypeIcon = () => {
@@ -492,36 +480,54 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                 placeholder="Add a note about this lead..."
                 rows={3}
               />
-              <Button onClick={handleAddNote} disabled={!note.trim()} size="sm" className="gap-2">
+              <Button
+                onClick={handleAddNote}
+                disabled={!note.trim() || isLoggingNote}
+                size="sm"
+                className="gap-2"
+              >
                 <Send className="h-4 w-4" />
                 Add Note
               </Button>
             </div>
 
-            {/* Notes Timeline */}
+            {/* Timeline: notes, calls, emails, status changes, the lot */}
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {loadingNotes ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Loading notes...</p>
-              ) : notes.length === 0 ? (
+              {loadingActivities ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  No notes yet. Add your first note above.
+                  Loading activity...
+                </p>
+              ) : activities.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nothing recorded yet. Add a note above, or call or email the lead.
                 </p>
               ) : (
-                notes.map((n) => (
-                  <div
-                    key={n.id}
-                    className={`p-3 rounded-lg border ${
-                      n.is_system ? 'bg-muted/30 border-muted' : 'bg-background'
-                    }`}
-                  >
-                    <p className="text-sm">{n.note}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(n.created_at), {
-                        addSuffix: true,
-                      })}
-                    </p>
-                  </div>
-                ))
+                activities.map((a) => {
+                  const Icon = ACTIVITY_ICONS[a.activity_type] ?? StickyNote;
+                  return (
+                    <div
+                      key={a.id}
+                      className={`flex gap-3 p-3 rounded-lg border ${
+                        a.is_internal ? 'bg-muted/30 border-muted' : 'bg-background'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{activityHeadline(a)}</p>
+                        {a.content && (
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-0.5">
+                            {a.content}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatDistanceToNow(new Date(a.activity_at ?? a.created_at), {
+                            addSuffix: true,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

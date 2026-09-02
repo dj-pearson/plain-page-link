@@ -2263,48 +2263,6 @@ export type Database = {
           },
         ];
       };
-      lead_notes: {
-        Row: {
-          created_at: string;
-          created_by: string | null;
-          id: string;
-          is_system: boolean;
-          lead_id: string;
-          note: string;
-        };
-        Insert: {
-          created_at?: string;
-          created_by?: string | null;
-          id?: string;
-          is_system?: boolean;
-          lead_id: string;
-          note: string;
-        };
-        Update: {
-          created_at?: string;
-          created_by?: string | null;
-          id?: string;
-          is_system?: boolean;
-          lead_id?: string;
-          note?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'lead_notes_created_by_fkey';
-            columns: ['created_by'];
-            isOneToOne: false;
-            referencedRelation: 'users';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'lead_notes_lead_id_fkey';
-            columns: ['lead_id'];
-            isOneToOne: false;
-            referencedRelation: 'leads';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
       lead_routing_rules: {
         Row: {
           assigned_to: string | null;

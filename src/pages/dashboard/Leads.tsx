@@ -21,11 +21,13 @@ import {
   AlertTriangle,
   Home,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeads } from '@/hooks/useLeads';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { useLeadContactAction } from '@/hooks/useLeadContactAction';
+import { useLeadsActivitySummaries } from '@/hooks/useLeadActivities';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
@@ -72,6 +74,22 @@ export default function Leads() {
   // Tapping a lead's email or phone number on the card records the response,
   // the same way the detail modal does (US-101).
   const recordContact = useLeadContactAction();
+
+  // Last-contacted per lead, from the lead_activity_summary view. The hook that
+  // reads it had no importer at all, so the list showed nothing about whether
+  // an agent had actually reached out — only whether the status had been
+  // changed by hand (US-102).
+  const leadIds = useMemo(() => leads.map((l) => l.id), [leads]);
+  const { data: activitySummaries } = useLeadsActivitySummaries(leadIds);
+  const lastContactByLead = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of activitySummaries ?? []) {
+      // The most recent outbound touch, whichever channel it was.
+      const latest = [s.last_call_at, s.last_email_at].filter(Boolean).sort().pop();
+      if (latest) map.set(s.lead_id, latest);
+    }
+    return map;
+  }, [activitySummaries]);
 
   // Score all leads and cache results
   const leadScores = useMemo(() => {
@@ -699,6 +717,17 @@ export default function Leads() {
                             >
                               {lead.phone}
                             </a>
+                          </div>
+                        )}
+                        {lastContactByLead.has(lead.id) && (
+                          <div className="flex items-center gap-2 min-h-[32px]">
+                            <MessageSquare className="h-3 w-3 flex-shrink-0" />
+                            <span>
+                              Last contacted{' '}
+                              {formatDistanceToNow(new Date(lastContactByLead.get(lead.id)!), {
+                                addSuffix: true,
+                              })}
+                            </span>
                           </div>
                         )}
                         {lead.property_address && (
