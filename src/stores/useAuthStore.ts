@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 import { logAuditEvent } from '@/lib/audit';
-import { generateSampleData } from '@/lib/sample-data-service';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
 import { toProfile } from '@/types/profile';
@@ -287,14 +286,20 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
             });
 
-            // Generate sample data for new users (runs in background)
-            // This provides demo content to help users visualize their profile
-            if (profile) {
-              generateSampleData(data.user.id).catch((error) => {
-                logger.error('Failed to generate sample data for new user', error);
-                // Don't throw - sample data is non-critical
-              });
-            }
+            // No sample data on signup (US-109).
+            //
+            // It inserted 4 listings against a free limit of 3, so the agent's
+            // FIRST REAL listing was refused with "Upgrade required"; 4 fake
+            // testimonials with is_published: true — "Robert & Lisa Thompson…
+            // Highly recommend!" — on a real licensed agent's public page,
+            // which is a fabricated review attributed to them; and 5 fake
+            // leads in their CRM.
+            //
+            // It also only ran when signup returned a session, i.e. when email
+            // confirmation is off. Register.tsx uses the OTP flow, so in the
+            // current configuration this branch never executed at all — the
+            // damage was latent, not observed. Demo content is still available
+            // deliberately, from the admin SampleDataManager.
           } else {
             // Email confirmation required - no session yet
             set({

@@ -1,6 +1,20 @@
 /**
  * Sample Data Service
- * Generates sample listings, leads, testimonials, links, and other boilerplate data
+ * Generates sample listings, leads, testimonials, links, and other boilerplate data.
+ *
+ * US-109: this ran on signup and is no longer called from there. It inserted 4
+ * listings against a free limit of 3 — so the agent's first REAL listing was
+ * refused with "Upgrade required" — and 4 testimonials with is_published: true,
+ * putting fabricated five-star reviews on a real licensed agent's public page
+ * under their name.
+ *
+ * Every row it writes now carries is_sample = true, which
+ * check_subscription_limit excludes from plan limits and deleteSampleData
+ * matches on. Sample testimonials are never published; the database refuses it
+ * (testimonials_sample_not_published) as well as the code.
+ *
+ * The only entry point is the admin SampleDataManager, which can also remove
+ * what it generated.
  * for new users to visualize their profile page
  */
 
@@ -187,7 +201,10 @@ async function generateSampleListings(userId: string): Promise<number> {
   ];
 
   try {
-    const { data, error } = await supabase.from('listings').insert(sampleListings).select();
+    const { data, error } = await supabase
+      .from('listings')
+      .insert(sampleListings.map((l) => ({ ...l, is_sample: true })))
+      .select();
 
     if (error) {
       logger.error('Error creating sample listings', {
@@ -290,7 +307,10 @@ async function generateSampleLeads(userId: string): Promise<number> {
       encrypted_phone: encryptedPhones[i],
     }));
 
-    const { data, error } = await supabase.from('leads').insert(encryptedLeads).select();
+    const { data, error } = await supabase
+      .from('leads')
+      .insert(encryptedLeads.map((l) => ({ ...l, is_sample: true })))
+      .select();
 
     if (error) {
       logger.error('Error creating sample leads', {
@@ -331,7 +351,7 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
       property_type: 'Single Family Home',
       date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       is_featured: true,
-      is_published: true,
+      is_published: false,
       sort_order: 1,
     },
     {
@@ -344,7 +364,7 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
       property_type: 'Condo',
       date: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       is_featured: true,
-      is_published: true,
+      is_published: false,
       sort_order: 2,
     },
     {
@@ -357,7 +377,7 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
       property_type: 'Townhouse',
       date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       is_featured: false,
-      is_published: true,
+      is_published: false,
       sort_order: 3,
     },
     {
@@ -370,13 +390,16 @@ async function generateSampleTestimonials(userId: string): Promise<number> {
       property_type: 'Single Family Home',
       date: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       is_featured: false,
-      is_published: true,
+      is_published: false,
       sort_order: 4,
     },
   ];
 
   try {
-    const { data, error } = await supabase.from('testimonials').insert(sampleTestimonials).select();
+    const { data, error } = await supabase
+      .from('testimonials')
+      .insert(sampleTestimonials.map((t) => ({ ...t, is_sample: true })))
+      .select();
 
     if (error) {
       logger.error('Error creating sample testimonials', {
@@ -464,7 +487,10 @@ async function generateSampleLinks(userId: string): Promise<number> {
   ];
 
   try {
-    const { data, error } = await supabase.from('links').insert(sampleLinks).select();
+    const { data, error } = await supabase
+      .from('links')
+      .insert(sampleLinks.map((l) => ({ ...l, is_sample: true })))
+      .select();
 
     if (error) {
       logger.error('Error creating sample links', {
@@ -644,11 +670,50 @@ export async function generateSampleData(
 /**
  * Delete all sample data for a user (useful for testing or cleanup)
  */
-export async function deleteSampleData(userId: string): Promise<void> {
-  await Promise.all([
-    supabase.from('listings').delete().eq('user_id', userId),
-    supabase.from('leads').delete().eq('user_id', userId),
-    supabase.from('testimonials').delete().eq('user_id', userId),
-    supabase.from('links').delete().eq('user_id', userId),
-  ]);
+/** What deleteSampleData removed, per table. */
+export interface DeletedSampleCounts {
+  listings: number;
+  leads: number;
+  testimonials: number;
+  links: number;
+}
+
+/**
+ * Removes the demo content, and ONLY the demo content.
+ *
+ * This used to delete every listing, lead, testimonial and link belonging to
+ * the user — real ones included. It had no caller, which is the only reason it
+ * never destroyed an agent's data; wiring it to a button as it stood would
+ * have. It matches on is_sample now (US-109).
+ *
+ * Returns what it removed, so the admin UI can report it rather than claiming
+ * success blindly.
+ */
+export async function deleteSampleData(userId: string): Promise<DeletedSampleCounts> {
+  const tables = ['listings', 'leads', 'testimonials', 'links'] as const;
+
+  const results = await Promise.all(
+    tables.map(async (table) => {
+      const { data, error } = await supabase
+        .from(table)
+        .delete()
+        .eq('user_id', userId)
+        .eq('is_sample', true)
+        .select('id');
+      if (error) {
+        logger.error(`Failed to delete sample ${table}`, { error });
+        throw error;
+      }
+      return data?.length ?? 0;
+    })
+  );
+
+  const counts: DeletedSampleCounts = {
+    listings: results[0],
+    leads: results[1],
+    testimonials: results[2],
+    links: results[3],
+  };
+  logger.info('Deleted sample data', { userId, ...counts });
+  return counts;
 }

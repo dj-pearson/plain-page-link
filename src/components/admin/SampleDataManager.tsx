@@ -1,36 +1,40 @@
-import { useState } from "react";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Database, 
-  Home, 
-  Users, 
-  Star, 
+import { useState } from 'react';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Database,
+  Home,
+  Users,
+  Star,
   Link as LinkIcon,
   Loader2,
   CheckCircle2,
   XCircle,
-  AlertCircle
-} from "lucide-react";
-import { generateSampleData, checkExistingData } from "@/lib/sample-data-service";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { logger } from "@/lib/logger";
+  AlertCircle,
+  Trash2,
+} from 'lucide-react';
+import { generateSampleData, checkExistingData, deleteSampleData } from '@/lib/sample-data-service';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export function SampleDataManager() {
   const { user } = useAuthStore();
-  const [emailOrUsername, setEmailOrUsername] = useState("");
-  const [resolvedUserId, setResolvedUserId] = useState("");
-  const [resolvedUserInfo, setResolvedUserInfo] = useState<{ email?: string; username?: string } | null>(null);
+  const [emailOrUsername, setEmailOrUsername] = useState('');
+  const [resolvedUserId, setResolvedUserId] = useState('');
+  const [resolvedUserInfo, setResolvedUserInfo] = useState<{
+    email?: string;
+    username?: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingUser, setIsCheckingUser] = useState(false);
   const [existingDataInfo, setExistingDataInfo] = useState<any>(null);
-  
+
   // Options for what to include
   const [includeListings, setIncludeListings] = useState(true);
   const [includeLeads, setIncludeLeads] = useState(true);
@@ -41,7 +45,9 @@ export function SampleDataManager() {
   /**
    * Lookup user by email or username and resolve to UUID
    */
-  const lookupUser = async (identifier: string): Promise<{ id: string; email?: string; username?: string } | null> => {
+  const lookupUser = async (
+    identifier: string
+  ): Promise<{ id: string; email?: string; username?: string } | null> => {
     logger.info('Looking up user', { identifier });
 
     try {
@@ -53,11 +59,14 @@ export function SampleDataManager() {
         .maybeSingle();
 
       if (profileByUsername) {
-        logger.info('Found user by username', { id: profileByUsername.id, username: profileByUsername.username });
+        logger.info('Found user by username', {
+          id: profileByUsername.id,
+          username: profileByUsername.username,
+        });
         return {
           id: profileByUsername.id,
           username: profileByUsername.username,
-          email: profileByUsername.email_display || undefined
+          email: profileByUsername.email_display || undefined,
         };
       }
 
@@ -69,11 +78,14 @@ export function SampleDataManager() {
         .maybeSingle();
 
       if (profileByEmail) {
-        logger.info('Found user by email_display', { id: profileByEmail.id, email: profileByEmail.email_display });
+        logger.info('Found user by email_display', {
+          id: profileByEmail.id,
+          email: profileByEmail.email_display,
+        });
         return {
           id: profileByEmail.id,
           username: profileByEmail.username,
-          email: profileByEmail.email_display || undefined
+          email: profileByEmail.email_display || undefined,
         };
       }
 
@@ -87,20 +99,20 @@ export function SampleDataManager() {
 
   const handleCheckUser = async () => {
     if (!emailOrUsername.trim()) {
-      toast.error("Please enter a user email or username");
+      toast.error('Please enter a user email or username');
       return;
     }
 
     setIsCheckingUser(true);
     setExistingDataInfo(null);
-    setResolvedUserId("");
+    setResolvedUserId('');
     setResolvedUserInfo(null);
 
     try {
       logger.info('Starting user lookup', { emailOrUsername });
 
       const userInfo = await lookupUser(emailOrUsername.trim());
-      
+
       if (!userInfo) {
         logger.warn('User not found', { emailOrUsername });
         toast.error(`User not found: ${emailOrUsername}`);
@@ -114,28 +126,33 @@ export function SampleDataManager() {
       // Check existing data
       const existingData = await checkExistingData(userInfo.id);
       setExistingDataInfo(existingData);
-      
+
       logger.info('User data checked successfully', { userId: userInfo.id, existingData });
       toast.success(`Found user: ${userInfo.username || userInfo.email}`);
     } catch (error: any) {
       logger.error('Error checking user', { emailOrUsername, error });
-      toast.error(error.message || "Failed to check user data");
+      toast.error(error.message || 'Failed to check user data');
     } finally {
       setIsCheckingUser(false);
     }
   };
 
-
   const handleGenerateSampleData = async () => {
     if (!resolvedUserId) {
-      toast.error("Please check a user first");
+      toast.error('Please check a user first');
       return;
     }
 
     setIsLoading(true);
-    logger.info('Starting sample data generation', { 
-      userId: resolvedUserId, 
-      options: { includeListings, includeLeads, includeTestimonials, includeLinks, skipDuplicateCheck }
+    logger.info('Starting sample data generation', {
+      userId: resolvedUserId,
+      options: {
+        includeListings,
+        includeLeads,
+        includeTestimonials,
+        includeLinks,
+        skipDuplicateCheck,
+      },
     });
 
     try {
@@ -158,20 +175,68 @@ export function SampleDataManager() {
         counts.addedLeads > 0 ? `${counts.addedLeads} leads` : null,
         counts.addedTestimonials > 0 ? `${counts.addedTestimonials} testimonials` : null,
         counts.addedLinks > 0 ? `${counts.addedLinks} links` : null,
-      ].filter(Boolean).join(', ');
+      ]
+        .filter(Boolean)
+        .join(', ');
 
       if (summary) {
         toast.success(`Successfully added: ${summary}`);
       } else {
-        toast.info("No new data was added (user may already have sample data)");
+        toast.info('No new data was added (user may already have sample data)');
       }
     } catch (error: any) {
-      logger.error('Error generating sample data', { 
-        userId: resolvedUserId, 
+      logger.error('Error generating sample data', {
+        userId: resolvedUserId,
         message: error?.message,
-        stack: error?.stack 
+        stack: error?.stack,
       });
-      toast.error(error.message || "Failed to generate sample data");
+      toast.error(error.message || 'Failed to generate sample data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Removes the demo content this tool generated.
+   *
+   * deleteSampleData was exported and called by nothing, so demo content could
+   * be created and never removed. It also used to delete EVERY row belonging
+   * to the user, real ones included — it matches on is_sample now, which is
+   * why it is safe to put behind a button at all (US-109).
+   */
+  const handleDeleteSampleData = async () => {
+    if (!resolvedUserId) {
+      toast.error('Please check a user first');
+      return;
+    }
+    if (
+      !confirm(
+        'Remove the sample listings, leads, testimonials and links for this user? Their real content is not touched.'
+      )
+    ) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const removed = await deleteSampleData(resolvedUserId);
+      const summary = [
+        removed.listings > 0 ? `${removed.listings} listings` : null,
+        removed.leads > 0 ? `${removed.leads} leads` : null,
+        removed.testimonials > 0 ? `${removed.testimonials} testimonials` : null,
+        removed.links > 0 ? `${removed.links} links` : null,
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      setExistingDataInfo(await checkExistingData(resolvedUserId));
+      toast.success(summary ? `Removed: ${summary}` : 'There was no sample data to remove');
+    } catch (error: any) {
+      logger.error('Error deleting sample data', {
+        userId: resolvedUserId,
+        message: error?.message,
+      });
+      toast.error(error?.message || 'Failed to remove sample data');
     } finally {
       setIsLoading(false);
     }
@@ -179,7 +244,7 @@ export function SampleDataManager() {
 
   const handleAddSampleDataToSelf = async () => {
     if (!user) {
-      toast.error("You must be logged in");
+      toast.error('You must be logged in');
       return;
     }
 
@@ -190,11 +255,11 @@ export function SampleDataManager() {
       // Set resolved info
       setResolvedUserId(user.id);
       setResolvedUserInfo({ email: user.email, username: user.user_metadata?.username });
-      
+
       // Check existing data first
       const existingData = await checkExistingData(user.id);
       setExistingDataInfo(existingData);
-      
+
       // Then generate
       const counts = await generateSampleData(user.id, {
         includeListings,
@@ -211,20 +276,22 @@ export function SampleDataManager() {
         counts.addedLeads > 0 ? `${counts.addedLeads} leads` : null,
         counts.addedTestimonials > 0 ? `${counts.addedTestimonials} testimonials` : null,
         counts.addedLinks > 0 ? `${counts.addedLinks} links` : null,
-      ].filter(Boolean).join(', ');
+      ]
+        .filter(Boolean)
+        .join(', ');
 
       if (summary) {
         toast.success(`Successfully added to your account: ${summary}`);
       } else {
-        toast.info("No new data was added (you may already have sample data)");
+        toast.info('No new data was added (you may already have sample data)');
       }
     } catch (error: any) {
-      logger.error('Error adding sample data to self', { 
-        userId: user?.id, 
+      logger.error('Error adding sample data to self', {
+        userId: user?.id,
         message: error?.message,
-        stack: error?.stack 
+        stack: error?.stack,
       });
-      toast.error(error.message || "Failed to add sample data");
+      toast.error(error.message || 'Failed to add sample data');
     } finally {
       setIsLoading(false);
     }
@@ -374,7 +441,7 @@ export function SampleDataManager() {
         {/* Options */}
         <div className="space-y-4 rounded-lg border p-4">
           <h3 className="font-semibold">Generation Options</h3>
-          
+
           <div className="space-y-3">
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -457,6 +524,18 @@ export function SampleDataManager() {
               Generate Sample Data
             </>
           )}
+        </Button>
+
+        {/* Removal lives next to generation, so demo content can always be
+            taken back off an account (US-109). */}
+        <Button
+          onClick={handleDeleteSampleData}
+          disabled={isLoading || isCheckingUser || !resolvedUserId}
+          variant="outline"
+          className="w-full"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Remove Sample Data
         </Button>
 
         {!resolvedUserId && (

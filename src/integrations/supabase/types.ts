@@ -2382,6 +2382,7 @@ export type Database = {
           first_responded_at: string | null;
           form_data: Json | null;
           id: string;
+          is_sample: boolean;
           lead_type: string;
           listing_id: string | null;
           message: string | null;
@@ -2411,6 +2412,7 @@ export type Database = {
           first_responded_at?: string | null;
           form_data?: Json | null;
           id?: string;
+          is_sample?: boolean;
           lead_type: string;
           listing_id?: string | null;
           message?: string | null;
@@ -2440,6 +2442,7 @@ export type Database = {
           first_responded_at?: string | null;
           form_data?: Json | null;
           id?: string;
+          is_sample?: boolean;
           lead_type?: string;
           listing_id?: string | null;
           message?: string | null;
@@ -2489,6 +2492,7 @@ export type Database = {
           icon: string | null;
           id: string;
           is_active: boolean | null;
+          is_sample: boolean;
           position: number;
           title: string;
           updated_at: string | null;
@@ -2501,6 +2505,7 @@ export type Database = {
           icon?: string | null;
           id?: string;
           is_active?: boolean | null;
+          is_sample?: boolean;
           position?: number;
           title: string;
           updated_at?: string | null;
@@ -2513,6 +2518,7 @@ export type Database = {
           icon?: string | null;
           id?: string;
           is_active?: boolean | null;
+          is_sample?: boolean;
           position?: number;
           title?: string;
           updated_at?: string | null;
@@ -2745,6 +2751,7 @@ export type Database = {
           id: string;
           image: string | null;
           is_featured: boolean | null;
+          is_sample: boolean;
           listed_date: string | null;
           lot_size_acres: number | null;
           mls_number: string | null;
@@ -2781,6 +2788,7 @@ export type Database = {
           id?: string;
           image?: string | null;
           is_featured?: boolean | null;
+          is_sample?: boolean;
           listed_date?: string | null;
           lot_size_acres?: number | null;
           mls_number?: string | null;
@@ -2817,6 +2825,7 @@ export type Database = {
           id?: string;
           image?: string | null;
           is_featured?: boolean | null;
+          is_sample?: boolean;
           listed_date?: string | null;
           lot_size_acres?: number | null;
           mls_number?: string | null;
@@ -7240,6 +7249,7 @@ export type Database = {
           id: string;
           is_featured: boolean | null;
           is_published: boolean | null;
+          is_sample: boolean;
           listing_id: string | null;
           property_type: string | null;
           rating: number;
@@ -7258,6 +7268,7 @@ export type Database = {
           id?: string;
           is_featured?: boolean | null;
           is_published?: boolean | null;
+          is_sample?: boolean;
           listing_id?: string | null;
           property_type?: string | null;
           rating: number;
@@ -7276,6 +7287,7 @@ export type Database = {
           id?: string;
           is_featured?: boolean | null;
           is_published?: boolean | null;
+          is_sample?: boolean;
           listing_id?: string | null;
           property_type?: string | null;
           rating?: number;

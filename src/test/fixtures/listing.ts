@@ -20,6 +20,7 @@ export const mockListing: PublicListing = {
   bathrooms: 3,
   square_feet: 2400,
   lot_size_acres: 0.25,
+  is_sample: false,
   // Derived columns (US-106). Present on a Row, never written; the fixture
   // carries them because PublicListing is the full row shape.
   beds: 4,
