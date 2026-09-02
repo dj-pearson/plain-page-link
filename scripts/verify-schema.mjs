@@ -1068,6 +1068,91 @@ check('check_username_available sees profiles the anon client cannot', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 6h. Entitlement must follow what the agent has paid for.
+//
+//     stripe-webhook wrote status 'canceled' the day cancel_at_period_end was
+//     set, and get_user_plan joined only status = 'active' — so a paid-up
+//     agent lost their plan the moment they scheduled a cancellation, weeks
+//     early. invoice.payment_failed wrote 'past_due' with the same effect and
+//     no grace at all (US-118).
+//
+//     Also asserts the plans table is seeded: nothing ever seeded it, so
+//     Pricing rendered an empty grid and get_user_plan fell through to its
+//     hard-coded fallback for every agent.
+// ---------------------------------------------------------------------------
+check('subscription entitlement survives a scheduled cancellation', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-00000000af05';
+  try {
+    const [planCount] = q(`SELECT count(*) FROM public.subscription_plans WHERE is_active;`);
+    if (Number(planCount) < 4) {
+      out.push(`subscription_plans holds ${planCount} active row(s); the seed did not run`);
+      return out;
+    }
+
+    const [freePrice] = q(`SELECT price_monthly::text FROM public.subscription_plans WHERE name = 'free';`);
+    if (freePrice !== '0.00' && freePrice !== '0') {
+      out.push(`the free plan costs ${freePrice}`);
+    }
+
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'entitlement@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name)
+        VALUES ('${uid}', 'entitlementcheck', 'Entitlement Check')
+        ON CONFLICT (id) DO UPDATE SET username = 'entitlementcheck';
+      DELETE FROM public.user_subscriptions WHERE user_id = '${uid}';
+      INSERT INTO public.user_subscriptions (user_id, plan_id, status, current_period_end, cancel_at_period_end)
+        SELECT '${uid}', id, 'canceled', now() + interval '20 days', true
+        FROM public.subscription_plans WHERE name = 'professional';
+    `);
+
+    const [cancelled] = q(
+      `SELECT public.get_user_plan('${uid}')->>'plan_name';`
+    );
+    if (cancelled !== 'professional') {
+      out.push(
+        `a cancellation scheduled for 20 days' time already reads as "${cancelled}", not professional`
+      );
+    }
+
+    q(`UPDATE public.user_subscriptions SET status = 'past_due', current_period_end = now() - interval '2 days' WHERE user_id = '${uid}';`);
+    const [pastDue] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
+    if (pastDue !== 'professional') {
+      out.push(`a payment that failed 2 days ago already reads as "${pastDue}"; there is no grace`);
+    }
+
+    q(`UPDATE public.user_subscriptions SET current_period_end = now() - interval '30 days' WHERE user_id = '${uid}';`);
+    const [expired] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
+    if (expired !== 'free') {
+      out.push(`a subscription 30 days past due still reads as "${expired}"; the grace never ends`);
+    }
+
+    q(`UPDATE public.user_subscriptions SET status = 'canceled', current_period_end = now() - interval '1 day' WHERE user_id = '${uid}';`);
+    const [over] = q(`SELECT public.get_user_plan('${uid}')->>'plan_name';`);
+    if (over !== 'free') {
+      out.push(`a cancelled subscription whose period ended still reads as "${over}"`);
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'entitlement check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.user_subscriptions WHERE user_id = '${uid}';
+         DELETE FROM public.profiles WHERE id = '${uid}';
+         DELETE FROM auth.users WHERE id = '${uid}';`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 7. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the

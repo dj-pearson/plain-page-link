@@ -273,7 +273,7 @@ export default function VsBeacons() {
                   />
                   <ComparisonRow
                     feature="Professional Plan"
-                    agentbio="$39/month"
+                    agentbio="$49/month"
                     beacons="$10/month"
                     description="Full-featured paid tier"
                   />
@@ -526,7 +526,7 @@ export default function VsBeacons() {
               />
               <FAQItem
                 question="Is AgentBio more expensive than Beacons?"
-                answer="AgentBio's professional plan is $39/month vs Beacons' $10/month. However, AgentBio pays for itself with a single extra lead per month. Real estate agents report 15-25 qualified leads per month from AgentBio, making the ROI significantly higher despite the higher price."
+                answer="AgentBio's professional plan is $49/month vs Beacons' $10/month. However, AgentBio pays for itself with a single extra lead per month. Real estate agents report 15-25 qualified leads per month from AgentBio, making the ROI significantly higher despite the higher price."
               />
               <FAQItem
                 question="What happens to my Beacons analytics when I switch?"

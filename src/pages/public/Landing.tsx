@@ -42,7 +42,7 @@ const LANDING_FAQS = [
   {
     question: 'How much does a real estate agent website cost?',
     answer:
-      'Traditional real estate agent websites cost $3,000-$15,000 upfront plus $100-$300 per month for hosting, maintenance, booking systems, and lead capture tools. AgentBio provides all these features for $39/month with $0 setup costs. You get property galleries, lead capture forms, appointment booking, analytics, and mobile optimization\u2014everything a traditional website offers, but optimized specifically for social media traffic and mobile users.',
+      'Traditional real estate agent websites cost $3,000-$15,000 upfront plus $100-$300 per month for hosting, maintenance, booking systems, and lead capture tools. AgentBio provides all these features from $29/month with $0 setup costs. You get property galleries, lead capture forms, appointment booking, analytics, and mobile optimization\u2014everything a traditional website offers, but optimized specifically for social media traffic and mobile users.',
   },
   {
     question: 'Can I showcase sold properties on my bio page?',
