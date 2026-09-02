@@ -1,150 +1,142 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Globe, Plus, ExternalLink, CheckCircle2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { toast } from "sonner";
-import { logger } from "@/lib/logger";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Globe, Plus, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export function ProfileDisplaySettings() {
-    const navigate = useNavigate();
-    const { user } = useAuthStore();
-    const [activePage, setActivePage] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { user, profile } = useAuthStore();
+  const [activePage, setActivePage] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadActivePage();
-    }, [user]);
+  useEffect(() => {
+    loadActivePage();
+  }, [user]);
 
-    const loadActivePage = async () => {
-        if (!user) return;
+  const loadActivePage = async () => {
+    if (!user) return;
 
-        try {
-            const { data, error } = await supabase
-                .from('custom_pages')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('is_active', true)
-                .single();
+    try {
+      const { data, error } = await supabase
+        .from('custom_pages')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-            if (!error && data) {
-                setActivePage(data);
-            }
-        } catch (error) {
-            logger.error('Error loading active page', error as Error);
-        } finally {
-            setLoading(false);
-        }
-    };
+      if (!error && data) {
+        setActivePage(data);
+      }
+    } catch (error) {
+      logger.error('Error loading active page', error as Error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleDeactivate = async () => {
-        if (!activePage) return;
+  const handleDeactivate = async () => {
+    if (!activePage) return;
 
-        try {
-            const { error } = await supabase
-                .from('custom_pages')
-                .update({ is_active: false })
-                .eq('id', activePage.id)
-                .select('id')
-                .single();
+    try {
+      const { error } = await supabase
+        .from('custom_pages')
+        .update({ is_active: false })
+        .eq('id', activePage.id)
+        .eq('user_id', user?.id ?? '')
+        .select('id')
+        .maybeSingle();
 
-            if (error) throw error;
+      if (error) throw error;
 
-            toast.success('Switched to default profile');
-            setActivePage(null);
-        } catch (error) {
-            logger.error('Error deactivating page', error as Error);
-            toast.error('Failed to deactivate custom page');
-        }
-    };
+      toast.success('Switched to default profile');
+      setActivePage(null);
+    } catch (error) {
+      logger.error('Error deactivating page', error as Error);
+      toast.error('Failed to deactivate custom page');
+    }
+  };
 
-    return (
-        <Card className="p-6">
-            <div className="space-y-4">
-                <div>
-                    <h3 className="text-lg font-semibold mb-1">Profile Display</h3>
-                    <p className="text-sm text-muted-foreground">
-                        Choose what visitors see when they visit your profile
-                    </p>
+  return (
+    <Card className="p-6">
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold mb-1">Profile Display</h3>
+          <p className="text-sm text-muted-foreground">
+            Extra sections to show on your public profile
+          </p>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : activePage ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Globe className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{activePage.title}</span>
+                  <Badge variant="default" className="gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Active
+                  </Badge>
                 </div>
-
-                {loading ? (
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                ) : activePage ? (
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Globe className="h-4 w-4 text-primary" />
-                                    <span className="font-medium">{activePage.title}</span>
-                                    <Badge variant="default" className="gap-1">
-                                        <CheckCircle2 className="h-3 w-3" />
-                                        Active
-                                    </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                    Custom page: /{activePage.slug}
-                                </p>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                asChild
-                            >
-                                <a
-                                    href={`/p/${activePage.slug}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="gap-2"
-                                >
-                                    View
-                                    <ExternalLink className="h-3 w-3" />
-                                </a>
-                            </Button>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => navigate('/dashboard/page-builder')}
-                                className="gap-2"
-                            >
-                                Edit Custom Page
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={handleDeactivate}
-                            >
-                                Use Default Profile
-                            </Button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="p-4 border rounded-lg">
-                            <div className="flex items-center gap-2 mb-1">
-                                <CheckCircle2 className="h-4 w-4 text-primary" />
-                                <span className="font-medium">Default Profile</span>
-                                <Badge variant="secondary">Active</Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Using the standard profile layout with listings, testimonials, and links
-                            </p>
-                        </div>
-
-                        <Button
-                            onClick={() => navigate('/dashboard/page-builder')}
-                            className="gap-2"
-                        >
-                            <Plus className="h-4 w-4" />
-                            Create Custom Page
-                        </Button>
-                    </div>
-                )}
+                <p className="text-sm text-muted-foreground">Shown as a section on your profile</p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <a
+                  href={`/${profile?.username ?? ''}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="gap-2"
+                >
+                  View
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </Button>
             </div>
-        </Card>
-    );
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/dashboard/page-builder')}
+                className="gap-2"
+              >
+                Edit Custom Page
+              </Button>
+              <Button variant="outline" onClick={handleDeactivate}>
+                Hide From Profile
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="p-4 border rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <span className="font-medium">Profile only</span>
+                <Badge variant="secondary">Active</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Your listings, testimonials and links. Build a page to add your own sections below
+                them.
+              </p>
+            </div>
+
+            <Button onClick={() => navigate('/dashboard/page-builder')} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Custom Page
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
 }

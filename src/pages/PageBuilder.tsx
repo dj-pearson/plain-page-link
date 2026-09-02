@@ -6,6 +6,8 @@
 
 import { useEffect, useState } from 'react';
 import { usePageBuilderStore } from '@/stores/pageBuilderStore';
+import { pageSnapshot } from '@/lib/pageSnapshot';
+import { slugify, validateSlug } from '@/lib/pageSlug';
 import { getBlockTemplates } from '@/lib/pageBuilder';
 import { PageList } from '@/components/pageBuilder/PageList';
 import { BlockRenderer } from '@/components/pageBuilder/BlockRenderer';
@@ -101,6 +103,7 @@ export default function PageBuilderEditor() {
     selectedBlockId,
     isPreviewMode,
     isSaving,
+    lastSavedSnapshot,
     canUndo,
     canRedo,
     setPage,
@@ -129,9 +132,25 @@ export default function PageBuilderEditor() {
     }
   }, [page?.theme]);
 
-  // Auto-save functionality
+  // Autosave, on an actual edit.
+  //
+  // This depended on `isSaving`, which savePage flips true and then false — so
+  // every save re-ran the effect, which scheduled another save. The editor
+  // wrote to the database and toasted "Page saved successfully" every three
+  // seconds for as long as it was open, whether or not anything had changed
+  // (US-116).
+  //
+  // The dependency is now the serialised page, and the guard is a comparison
+  // against what was last written, so a save cannot retrigger itself: after it
+  // completes, snapshot === lastSavedSnapshot and the effect does nothing.
+  const snapshot = pageSnapshot(page);
+  const slugCheck = validateSlug(page?.slug ?? '');
   useEffect(() => {
-    if (!page || isSaving) return;
+    if (!page || !snapshot || snapshot === lastSavedSnapshot) return;
+    // Mid-edit the slug is briefly empty or malformed; autosaving then would
+    // turn a keystroke into a "Failed to save page" toast.
+    if (!validateSlug(page.slug).valid) return;
+
     const autoSaveTimer = setTimeout(async () => {
       try {
         await savePage();
@@ -142,9 +161,17 @@ export default function PageBuilderEditor() {
       }
     }, 3000);
     return () => clearTimeout(autoSaveTimer);
-  }, [page, isSaving, savePage]);
+    // `page` is intentionally absent: it is a new object on every render, and
+    // depending on it is what made this loop in the first place. `snapshot` is
+    // its value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, lastSavedSnapshot, savePage]);
 
   const handleSave = async () => {
+    if (!slugCheck.valid) {
+      toast.error(slugCheck.error ?? 'Fix the page address before saving');
+      return;
+    }
     try {
       await savePage();
       setLastSaved(new Date());
@@ -155,6 +182,10 @@ export default function PageBuilderEditor() {
   };
 
   const handlePublish = async () => {
+    if (!slugCheck.valid) {
+      toast.error(slugCheck.error ?? 'Fix the page address before publishing');
+      return;
+    }
     try {
       await publishPage();
       toast.success('Page published successfully!');
@@ -358,7 +389,33 @@ export default function PageBuilderEditor() {
               onChange={(e) => updatePageMeta({ title: e.target.value })}
               className="w-52 h-8 text-sm"
               placeholder="Page Title"
+              aria-label="Page title"
             />
+
+            {/* The address. There was no slug field at all — the meta editor
+                exposed only the title — so an agent whose page collided on
+                custom_pages_user_id_slug_key could see "Failed to save page"
+                and had nothing they could change to fix it (US-116).
+
+                Normalised as it is typed, so what is shown is what is stored;
+                the message below is what the unique constraint would say. */}
+            <div className="flex flex-col">
+              <Input
+                type="text"
+                value={page.slug}
+                onChange={(e) => updatePageMeta({ slug: slugify(e.target.value) })}
+                className="w-44 h-8 text-sm font-mono"
+                placeholder="page-address"
+                aria-label="Page address"
+                aria-invalid={!slugCheck.valid}
+                aria-describedby={slugCheck.valid ? undefined : 'page-slug-error'}
+              />
+              {!slugCheck.valid && (
+                <span id="page-slug-error" className="text-[11px] text-destructive mt-0.5">
+                  {slugCheck.error}
+                </span>
+              )}
+            </div>
 
             <Badge variant={page.published ? 'default' : 'secondary'} className="text-xs">
               {page.published ? 'Published' : 'Draft'}

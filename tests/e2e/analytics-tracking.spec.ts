@@ -6,7 +6,9 @@
  *   - An agent with a page-builder page got the full profile fetch and a view
  *     recorded against their profile, and was then redirected to /p/<slug>,
  *     which tracked nothing at all. So the page their visitors actually saw had
- *     no analytics, and the page they never saw got the view.
+ *     no analytics, and the page they never saw got the view. US-116 then
+ *     removed the redirect entirely — the blocks are a section of the profile —
+ *     so there is one page and one view.
  *   - profiles.view_count was bumped by a separate unthrottled RPC, so the
  *     headline number and the chart counted different things.
  *   - Call, Email and Text taps were logger.info'd and nowhere else.
@@ -149,18 +151,19 @@ test.describe('Public page analytics', () => {
     expect(recorded.viewRpcs).toHaveLength(0);
   });
 
-  test('an agent with a page-builder page is counted on the page visitors see, once', async ({
-    page,
-  }) => {
+  test('an agent with a page-builder page is counted once, on their profile', async ({ page }) => {
     const recorded = fresh();
     await setupMocks(page, recorded, 'my-custom-page');
 
     await page.goto(`/${AGENT.username}`);
-    await expect(page).toHaveURL(/\/p\/my-custom-page/, { timeout: 20000 });
+    await expect(page.getByText(AGENT.fullName).first()).toBeVisible();
     await page.waitForTimeout(1500);
 
-    // Exactly one: the profile page must not count the view it is about to
-    // redirect away from, and the custom page must not be a blind spot.
+    // US-116 removed the redirect to /p/<slug>: the blocks are a section of the
+    // profile now, so there is one page and one view. Before US-115 the profile
+    // counted the view it was about to redirect away from, and the page the
+    // visitor actually saw counted nothing.
+    await expect(page).toHaveURL(new RegExp(`/${AGENT.username}$`));
     expect(recorded.views).toHaveLength(1);
     expect(recorded.viewRpcs).toHaveLength(0);
   });

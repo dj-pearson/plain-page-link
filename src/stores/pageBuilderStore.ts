@@ -9,6 +9,7 @@ import type { PageBlock, PageTheme, PageSEO } from '@/types/pageBuilder';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { pageSnapshot } from '@/lib/pageSnapshot';
 import type { Json } from '@/integrations/supabase/types';
 import {
   addBlock,
@@ -47,6 +48,11 @@ interface PageBuilderStore {
   canUndo: () => boolean;
   canRedo: () => boolean;
   togglePreviewMode: () => void;
+  /**
+   * The serialised page as it was last written. Autosave compares against this
+   * so it fires on an edit rather than on its own completion (US-116).
+   */
+  lastSavedSnapshot: string | null;
   savePage: () => Promise<void>;
   publishPage: () => Promise<void>;
   setAsActivePage: (pageId: string) => Promise<void>;
@@ -87,6 +93,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
   historyIndex: -1,
   isPreviewMode: false,
   isSaving: false,
+  lastSavedSnapshot: null,
 
   // Set the current page
   setPage: (page) => {
@@ -381,12 +388,19 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         published: page.published,
       };
 
-      // Check if page exists
-      const { data: existing } = await supabase
+      // maybeSingle, and scoped to the owner. .single() raises PGRST116 when
+      // there is no row, and the error was destructured away — so "does this
+      // page exist" was answered by a swallowed error. Scoping by user_id also
+      // means an id that belongs to someone else reads as absent rather than as
+      // an update this agent is not allowed to make (US-116).
+      const { data: existing, error: existingError } = await supabase
         .from('custom_pages')
         .select('id')
         .eq('id', page.id)
-        .single();
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
 
       if (existing) {
         // Update existing page
@@ -405,10 +419,13 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
         if (error) throw error;
       }
 
-      toast.success('Page saved successfully');
+      // No toast here. This is called by autosave as well as by the Save
+      // button, and it announced every three-second background write as though
+      // the agent had asked for it. Callers that the agent initiated do the
+      // toasting (US-116).
+      set({ lastSavedSnapshot: pageSnapshot(page) });
     } catch (error) {
       logger.error('Failed to save page', error as Error);
-      toast.error('Failed to save page');
       throw error;
     } finally {
       set({ isSaving: false });
@@ -422,7 +439,6 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
 
     updatePageMeta({ published: true });
     await savePage();
-    toast.success('Page published successfully!');
   },
 
   // Set as active page (will be shown on profile)
@@ -433,18 +449,29 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
       } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Set the page as active
-      const { error } = await supabase
+      // Deactivate the siblings first. This only ever set is_active on the
+      // chosen page and never cleared it anywhere else, so an agent who marked
+      // two pages active had two active rows — and the .single() lookups that
+      // ask "which page is active?" then failed with PGRST116, leaving them
+      // with neither (US-116).
+      const { error: clearError } = await supabase
+        .from('custom_pages')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+        .neq('id', pageId);
+
+      if (clearError) throw clearError;
+
+      const { data: activated, error } = await supabase
         .from('custom_pages')
         .update({ is_active: true })
         .eq('id', pageId)
         .eq('user_id', user.id)
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-
-      toast.success('This page is now your active profile');
+      if (!activated) throw new Error('That page could not be found on your account');
     } catch (error) {
       logger.error('Failed to set active page', error as Error);
       toast.error('Failed to set active page');
@@ -462,6 +489,7 @@ export const usePageBuilderStore = create<PageBuilderStore>((set, get) => ({
       historyIndex: -1,
       isPreviewMode: false,
       isSaving: false,
+      lastSavedSnapshot: null,
     });
   },
 }));

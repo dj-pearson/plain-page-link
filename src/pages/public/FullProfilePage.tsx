@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams, Navigate } from 'react-router-dom';
-import { FullPageLoader, ProfileSkeleton } from '@/components/LoadingSpinner';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import ContactButtons from '@/components/profile/ContactButtons';
 import SocialLinks from '@/components/profile/SocialLinks';
@@ -9,6 +9,7 @@ import SoldProperties from '@/components/profile/SoldProperties';
 import { LeadCaptureCTA } from '@/components/profile/LeadCaptureCTA';
 import { TestimonialSection } from '@/components/profile/TestimonialSection';
 import { ReviewInvite } from '@/components/profile/ReviewInvite';
+import { CustomBlocksSection } from '@/components/profile/CustomBlocksSection';
 import { SocialProofBanner } from '@/components/profile/SocialProofBanner';
 import { FeaturedListingsCarousel } from '@/components/profile/FeaturedListingsCarousel';
 import { StickyActionBar } from '@/components/profile/StickyActionBar';
@@ -22,7 +23,6 @@ import CustomLinks from '@/components/profile/CustomLinks';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
 import { trackContactTap } from '@/lib/analyticsEvents';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
-import { supabase } from '@/integrations/supabase/client';
 import { SEOHead } from '@/components/SEOHead';
 import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
 import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
@@ -42,8 +42,6 @@ export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
-  const [customPageSlug, setCustomPageSlug] = useState<string | null>(null);
-  const [checkingCustomPage, setCheckingCustomPage] = useState(true);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
   // The property a showing was requested for, if any. Kept separate from
@@ -96,61 +94,11 @@ export default function FullProfilePage() {
     [setSearchParams]
   );
 
-  // Check if user has an active custom page
-  useEffect(() => {
-    const checkForCustomPage = async () => {
-      if (!slug || !data?.profile?.id) {
-        setCheckingCustomPage(false);
-        return;
-      }
-
-      try {
-        // maybeSingle + limit(1), not single().
-        //
-        // .single() errors with PGRST116 when there is no row AND when there is
-        // more than one. The catch treated both as "no custom page", so an
-        // agent with two active published pages silently kept the default
-        // profile with no indication why (US-112). maybeSingle returns null for
-        // none, and limit(1) makes several a defined outcome rather than an
-        // error.
-        const { data: customPage, error } = await supabase
-          .from('custom_pages')
-          .select('slug')
-          .eq('user_id', data.profile.id)
-          .eq('is_active', true)
-          .eq('published', true)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (!error && customPage) {
-          setCustomPageSlug(customPage.slug);
-        }
-      } catch (err) {
-        logger.error('Error checking for custom page', err as Error);
-      } finally {
-        setCheckingCustomPage(false);
-      }
-    };
-
-    if (data) {
-      checkForCustomPage();
-    } else if (!isLoading) {
-      // Profile failed to load or doesn't exist — stop spinner
-      setCheckingCustomPage(false);
-    }
-  }, [slug, data, isLoading]);
-
-  // Track the view — but only for a page that is actually being shown.
-  //
-  // An agent with a page-builder page got the full profile fetch and a view
-  // recorded here, and was then redirected to /p/<slug>, which tracked nothing
-  // at all. So a page-builder agent's own visits were counted against their
-  // profile while the page their visitors actually saw had no analytics
-  // whatever. PublicPage now records through this same hook, and this one waits
-  // until the custom-page check has settled so one visit is one view (US-115).
-  const shouldTrackProfileView = !checkingCustomPage && !customPageSlug;
-  useProfileTracking(shouldTrackProfileView ? data?.profile?.id : undefined, slug || '');
+  // One page, one view (US-115). This used to run alongside a redirect to
+  // /p/<slug>, so an agent with a page-builder page had the view counted here
+  // and the page their visitors actually saw tracked nothing at all. There is
+  // no redirect any more (US-116): the blocks render below, on this page.
+  useProfileTracking(data?.profile?.id, slug || '');
 
   // Apply theme when profile loads - IMPORTANT: All hooks must be before conditional returns
   useEffect(() => {
@@ -240,15 +188,6 @@ export default function FullProfilePage() {
     }
   };
 
-  // Redirect to custom page if active
-  if (checkingCustomPage) {
-    return <FullPageLoader text="Loading profile..." />;
-  }
-
-  if (customPageSlug) {
-    return <Navigate to={`/p/${customPageSlug}`} replace />;
-  }
-
   if (isLoading) {
     return <ProfileSkeleton />;
   }
@@ -274,7 +213,7 @@ export default function FullProfilePage() {
     return <NotFound />;
   }
 
-  const { profile, listings, testimonials, links, settings } = data;
+  const { profile, listings, testimonials, links, settings, customPage } = data;
 
   // Active, pending and under_contract — active first. This filtered on
   // status === 'active' alone, so marking a listing Pending made it vanish
@@ -611,6 +550,19 @@ export default function FullProfilePage() {
                   agentName={profile.full_name || profile.username}
                 />
               </section>
+            )}
+
+            {/* Anything the agent built in the page builder.
+                A section of this page, not a replacement for it: building a
+                page used to redirect /:username to /p/<slug> and take the
+                listings, testimonials, contact buttons and lead capture off
+                the public web entirely (US-116). */}
+            {customPage && (
+              <CustomBlocksSection
+                blocks={customPage.blocks}
+                userId={profile.id}
+                title={customPage.title}
+              />
             )}
 
             {/* Custom Links */}

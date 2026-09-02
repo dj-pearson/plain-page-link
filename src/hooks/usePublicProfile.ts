@@ -72,6 +72,7 @@ export const usePublicProfile = (username: string) => {
         { data: links, error: linksError },
         { data: settings, error: settingsError },
         { data: responseHours },
+        { data: customPage },
       ] = await Promise.all([
         // Fetch listings with only needed columns
         supabase
@@ -161,6 +162,27 @@ export const usePublicProfile = (username: string) => {
         // `leads` itself stays unreadable to a visitor (US-111). The page used
         // to hard-code "< 1 hour" for every agent.
         supabase.rpc('public_agent_response_hours', { _user_id: profile.id }),
+
+        // The agent's active page-builder page, if they have one.
+        //
+        // This used to be fetched by FullProfilePage in its own effect, purely
+        // to decide whether to <Navigate> away to /p/<slug> — so building a
+        // page in the page builder silently replaced the entire listings and
+        // lead-capture profile with it. The blocks are a SECTION of the profile
+        // now (US-116), so they are fetched with everything else.
+        //
+        // maybeSingle + limit(1): .single() raises PGRST116 for none AND for
+        // several, and an agent with two active pages used to end up with
+        // neither.
+        supabase
+          .from('custom_pages')
+          .select('id, slug, title, blocks, theme')
+          .eq('user_id', profile.id)
+          .eq('is_active', true)
+          .eq('published', true)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
 
       // Handle errors from parallel queries
@@ -210,6 +232,7 @@ export const usePublicProfile = (username: string) => {
         testimonials: transformedTestimonials,
         links: links || [],
         responseHours: typeof responseHours === 'number' ? responseHours : null,
+        customPage: customPage ?? null,
         settings: settings || {
           show_listings: true,
           show_sold_properties: true,
