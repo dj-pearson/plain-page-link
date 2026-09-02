@@ -93,7 +93,15 @@ const KNOWN_UNDEFINED_TABLES = new Set([]);
 // The bar for this list: the data is already public, or the command is an
 // append-only submission from a page that has no session to authenticate with.
 const PUBLIC_BY_DESIGN = new Map([
-  ['leads:INSERT', 'public lead-capture forms on every profile — the core product'],
+  // leads:INSERT was here, described as "public lead-capture forms on every
+  // profile — the core product". No public form had used it since US-069:
+  // leadSubmission.ts and ContactBlock.tsx both go through the submit-lead
+  // edge function, which runs with the service role and is exempt from RLS.
+  // The policy it excused let anyone holding the anon key — which ships in the
+  // bundle — insert contact-less leads into any agent's CRM, firing nine
+  // triggers each. Dropped in 20260902000001 (US-097). Do not re-add it: an
+  // agent inserting into their own CRM is covered by "Users can insert their
+  // own leads", and the public path needs no policy at all.
   ['analytics_views:INSERT', 'profile view counter, fired by anonymous visitors'],
   ['mortgage_calculations:INSERT', 'anonymous mortgage calculator on public profiles'],
   ['feature_catalog:SELECT', 'plan/pricing catalog, rendered on the public pricing page'],

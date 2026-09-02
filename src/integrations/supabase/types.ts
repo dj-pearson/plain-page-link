@@ -8720,6 +8720,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      decrement_profile_leads: {
+        Args: { _profile_id: string };
+        Returns: undefined;
+      };
       derive_available_username: {
         Args: { p_email: string; p_requested: string; p_user_id: string };
         Returns: string;
