@@ -10,10 +10,14 @@
  * agent saw "Failed to save your information" and was routed back into the
  * wizard on every login afterwards.
  *
- * The return type is the generated Update shape, so an invented column is now
- * a compile error rather than a run-time rejection.
+ * The return type is derived from the generated row, so an invented column is
+ * now a compile error rather than a run-time rejection. It is `Partial<Profile>`
+ * rather than `TablesUpdate<'profiles'>` so the result can go straight to
+ * useAuthStore.updateProfile — the store has to end up holding the saved row,
+ * or ProtectedRoute's first-run gate sends the agent it just onboarded back
+ * into the wizard.
  */
-import type { TablesUpdate } from '@/integrations/supabase/types';
+import type { Profile } from '@/types/profile';
 
 export interface OnboardingProfileInput {
   fullName?: string;
@@ -45,10 +49,8 @@ export function parseOnboardingLocation(location: string): {
   return { city: parts[0], state: parts[1] };
 }
 
-export function buildOnboardingProfileUpdate(
-  input: OnboardingProfileInput
-): TablesUpdate<'profiles'> {
-  const updates: TablesUpdate<'profiles'> = {};
+export function buildOnboardingProfileUpdate(input: OnboardingProfileInput): Partial<Profile> {
+  const updates: Partial<Profile> = {};
 
   if (input.fullName) updates.full_name = input.fullName;
   if (input.title) updates.title = input.title;

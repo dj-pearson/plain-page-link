@@ -91,6 +91,44 @@ The PWA icons are referenced in `manifest.json` but need to be generated:
 - Prefix all variables with `VITE_` for Vite to expose them
 - Redeploy after adding environment variables
 
+## Pages Functions: social unfurls for `/:username`
+
+`functions/[username].ts` runs on Cloudflare's edge, ahead of the static asset
+server. It exists because `public/_redirects` is `/* /index.html 200` and
+nothing prerenders: every crawler that fetched `agentbio.net/jane` was served
+`index.html`'s marketing tags and `Cover.png`, because `SEOHead` sets the real
+ones in React and iMessage, Facebook, Slack and LinkedIn do not run JavaScript.
+
+Behaviour:
+
+- A **person** gets `next()` — the SPA, byte for byte, with no database call.
+- A **crawler** (matched on User-Agent) gets the same document with the head
+  replaced: the agent's name, bio, avatar and JSON-LD, or the property's
+  address, price and photo when the URL carries `?listing=<id>`.
+- Anything that fails — no binding, unreachable database, unknown username,
+  4 s timeout — falls through to `next()`. The card is never worth the page.
+
+**It needs the Supabase values at runtime, not only at build time.** Vite
+inlines `VITE_*` into the bundle during the build; a Pages Function reads them
+from `context.env` when the request arrives. In Settings > Environment
+variables, make sure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set
+for the Production (and Preview) environments — the same values the build uses.
+`SUPABASE_URL` / `SUPABASE_ANON_KEY` are accepted as aliases. Without them the
+function logs and falls through, so unfurls quietly revert to the generic card;
+`curl -sI -A facebookexternalhit https://agentbio.net/<username>` should show
+`x-agentbio-prerender: profile`.
+
+Only the anon key belongs here. The function reads published profiles and
+listings, which is exactly what the public page already reads.
+
+To inspect the output without deploying:
+
+```bash
+npx tsx scripts/preview-social-meta.mjs &
+curl -sA facebookexternalhit http://127.0.0.1:8791/jane | grep 'og:'
+curl -sA facebookexternalhit 'http://127.0.0.1:8791/jane?listing=abc-123' | grep 'og:'
+```
+
 ## Custom Domain
 
 To use custom domain (e.g., agentbio.net):
@@ -108,6 +146,8 @@ To use custom domain (e.g., agentbio.net):
 - [ ] Custom domain configured (if applicable)
 - [ ] SSL/TLS enabled (automatic with Cloudflare)
 - [ ] Test all routes work
+- [ ] `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` available to Pages Functions
+- [ ] `curl -sI -A facebookexternalhit https://<domain>/<username>` returns `x-agentbio-prerender`
 - [ ] Verify SEO meta tags
 - [ ] Check mobile responsiveness
 - [ ] Test PWA installation

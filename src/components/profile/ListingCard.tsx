@@ -5,6 +5,7 @@ import { getImageUrl } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
+import { currentListingShareUrl } from '@/lib/listingShare';
 
 interface ListingCardProps {
   listing: PublicProfileListing;
@@ -79,16 +80,18 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const shareText = `${address}${city ? `, ${city}` : ''} - ${formatPrice(price)}`;
+    // The listing, not the profile it sits on (US-114).
+    const shareUrl = currentListingShareUrl(listing.id) ?? window.location.href;
     if (navigator.share) {
       try {
-        await navigator.share({ title: shareText, url: window.location.href });
+        await navigator.share({ title: shareText, url: shareUrl });
         return;
       } catch {
         /* ignore */
       }
     }
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareUrl);
       toast.success('Link copied!');
     } catch {
       /* ignore */

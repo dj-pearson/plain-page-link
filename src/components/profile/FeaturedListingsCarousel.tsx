@@ -16,6 +16,7 @@ import { getImageUrl } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
+import { currentListingShareUrl } from '@/lib/listingShare';
 
 interface FeaturedListingsCarouselProps {
   listings: PublicProfileListing[];
@@ -138,7 +139,8 @@ export function FeaturedListingsCarousel({
 
     const shareTitle = `Check out this property: ${address}`;
     const shareText = `${address}${city ? `, ${city}` : ''} - ${price}`;
-    const shareUrl = window.location.href;
+    // The listing, not the profile it is featured on (US-114).
+    const shareUrl = currentListingShareUrl(currentListing.id) ?? window.location.href;
 
     // Try native share API first (mobile)
     if (navigator.share) {

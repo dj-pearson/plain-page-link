@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
 import { realEstateListingSchema } from '@/lib/structured-data';
+import { currentListingShareUrl } from '@/lib/listingShare';
 
 interface ListingDetailModalProps {
   listing: PublicProfileListing;
@@ -161,7 +162,10 @@ export default function ListingDetailModal({
 
   const handleShare = async () => {
     const shareText = `${address}${city ? `, ${city}` : ''} - ${formatPrice(price)}`;
-    const shareUrl = window.location.href;
+    // The listing, not the page it happens to be open on (US-114). Sharing
+    // window.location.href sent the recipient to the top of a profile that may
+    // list a dozen properties.
+    const shareUrl = currentListingShareUrl(listing.id) ?? window.location.href;
 
     if (navigator.share) {
       try {

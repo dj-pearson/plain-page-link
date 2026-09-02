@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useSearchParams, Navigate } from 'react-router-dom';
 import { FullPageLoader, ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import ContactButtons from '@/components/profile/ContactButtons';
@@ -28,6 +28,7 @@ import { selectAvailableListings, selectSoldListings } from '@/lib/publicListing
 import { formatResponseTime } from '@/lib/responseTime';
 import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { parsePrice } from '@/lib/format';
+import { LISTING_PARAM } from '@/lib/listingShare';
 import { getImageUrl } from '@/lib/images';
 import { logger } from '@/lib/logger';
 import type { PublicProfileListing } from '@/types';
@@ -38,7 +39,7 @@ import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
 
 export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
-  const [selectedListing, setSelectedListing] = useState<PublicProfileListing | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
   const [customPageSlug, setCustomPageSlug] = useState<string | null>(null);
   const [checkingCustomPage, setCheckingCustomPage] = useState(true);
@@ -52,6 +53,47 @@ export default function FullProfilePage() {
 
   // Fetch profile and related data
   const { data, isLoading, error, refetch } = usePublicProfile(slug || '');
+
+  /**
+   * Which listing's detail modal is open, derived from ?listing=<id> rather
+   * than held in state (US-114).
+   *
+   * The modal used to be pure component state, so it had no URL: every share
+   * button sent the recipient to the top of the profile, and the JSON-LD the
+   * modal injects could never be indexed because there was nothing to index it
+   * against. Deriving it from the query parameter gives the modal an address,
+   * makes Back close it, and makes a pasted link open the right property.
+   *
+   * An id that matches nothing — a deleted listing, a mangled paste — resolves
+   * to null, which renders the profile rather than an error.
+   */
+  const selectedListingId = searchParams.get(LISTING_PARAM);
+  const selectedListing =
+    (selectedListingId && data?.listings?.find((l) => l.id === selectedListingId)) || null;
+
+  /**
+   * Open or close the detail modal by rewriting the query parameter.
+   *
+   * `replace` on close and push on open: a visitor who opened a property and
+   * pressed Back expects the profile, not the page before it.
+   */
+  const setSelectedListing = useCallback(
+    (listing: PublicProfileListing | null) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (listing) {
+            next.set(LISTING_PARAM, listing.id);
+          } else {
+            next.delete(LISTING_PARAM);
+          }
+          return next;
+        },
+        { replace: !listing }
+      );
+    },
+    [setSearchParams]
+  );
 
   // Check if user has an active custom page
   useEffect(() => {

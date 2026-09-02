@@ -81,24 +81,29 @@ async function setupMocks(page: Page, profilePatches: Request[]) {
     route.fulfill({ contentType: 'application/json', body: '[]' })
   );
 
-  await page.route('**/rest/v1/profiles**', (route) => {
+  // The stored profile, as the mocked backend sees it. A completed wizard has
+  // to actually change it: ProtectedRoute sends anyone without
+  // onboarding_completed_at back to the wizard, so a mock that always answers
+  // null would bounce the agent forever and the spec would never reach
+  // /dashboard — which is precisely the loop US-108 was about.
+  const stored: Record<string, unknown> = {
+    id: TEST_USER.id,
+    username: TEST_USER.username,
+    full_name: TEST_USER.fullName,
+    onboarding_completed_at: null,
+  };
+
+  await page.route('**/rest/v1/profiles**', async (route) => {
     const request = route.request();
     if (request.method() === 'PATCH') {
       profilePatches.push(request);
+      Object.assign(stored, (request.postDataJSON() as Record<string, unknown>) ?? {});
       return route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({ id: TEST_USER.id }),
+        body: JSON.stringify(stored),
       });
     }
-    return route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: TEST_USER.id,
-        username: TEST_USER.username,
-        full_name: TEST_USER.fullName,
-        onboarding_completed_at: null,
-      }),
-    });
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(stored) });
   });
 
   await page.route('**/rest/v1/user_roles**', (route) =>
@@ -170,21 +175,52 @@ test.describe('Onboarding E2E', () => {
     await expect(page.getByText('Modern Clean').first()).toBeVisible({ timeout: 15000 });
   });
 
-  test('a profile update names only columns that exist', async ({ page }) => {
+  test('completing the wizard with a Location saves the profile and lands on the dashboard', async ({
+    page,
+  }) => {
     const patches: Request[] = [];
     await setupMocks(page, patches);
 
     await signIn(page);
     await expect(page).toHaveURL(/\/onboarding\/wizard/, { timeout: 20000 });
-    await expect(page.getByText('Modern Clean').first()).toBeVisible({ timeout: 15000 });
 
-    // Every PATCH this flow produces must name only real columns. `city` is
-    // what took the entire update down when a Location was filled in.
-    for (const request of patches) {
-      const body = request.postDataJSON() as Record<string, unknown>;
-      for (const key of Object.keys(body ?? {})) {
+    // Step 1 — template. Mandatory: Next is disabled until one is chosen.
+    await page.getByText('Modern Clean').first().click();
+    await page.getByRole('button', { name: /^Next/ }).click();
+
+    // Step 2 — the step that used to destroy the profile. The Location value
+    // is the placeholder's own example, which is what agents typed.
+    await page.getByPlaceholder('Sarah Johnson').fill('Dana Rivers');
+    await page.getByPlaceholder('Luxury Home Specialist').fill('Associate Broker');
+    await page.getByPlaceholder('Austin, TX').first().fill('Austin, TX');
+    await page.getByRole('button', { name: /^Next/ }).click();
+
+    // Steps 3 and 4 are optional; walk through them to the last step.
+    await page.getByRole('button', { name: /^Next/ }).click();
+    await page.getByRole('button', { name: /^Next/ }).click();
+
+    await page.getByRole('button', { name: /Go to Dashboard/ }).click();
+
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 20000 });
+
+    // The profile was saved, and saved with columns that exist. `city` is what
+    // took the whole update down — PostgREST rejects the statement, so name,
+    // title, bio, phone, avatar, theme and onboarding_completed_at went with it.
+    expect(patches.length).toBeGreaterThan(0);
+    const bodies = patches.map((r) => (r.postDataJSON() as Record<string, unknown>) ?? {});
+    for (const body of bodies) {
+      for (const key of Object.keys(body)) {
         expect(REAL_PROFILE_COLUMNS.has(key), `unexpected column "${key}"`).toBe(true);
       }
     }
+
+    const merged = Object.assign({}, ...bodies) as Record<string, unknown>;
+    expect(merged.full_name).toBe('Dana Rivers');
+    expect(merged.title).toBe('Associate Broker');
+    // The Location is split across the two columns that exist, not written to
+    // a `city` column that does not.
+    expect(merged.service_cities).toEqual(['Austin']);
+    expect(merged.license_state).toBe('TX');
+    expect(merged.onboarding_completed_at).toBeTruthy();
   });
 });

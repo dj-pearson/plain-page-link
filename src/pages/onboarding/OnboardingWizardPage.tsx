@@ -16,7 +16,7 @@ import { edgeFunctions } from '@/lib/edgeFunctions';
  */
 export default function OnboardingWizardPage() {
   const navigate = useNavigate();
-  const { user, profile } = useAuthStore();
+  const { user, profile, updateProfile } = useAuthStore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -85,15 +85,12 @@ export default function OnboardingWizardPage() {
         avatarUrl,
       });
 
-      // Update profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update(profileUpdates)
-        .eq('id', user.id)
-        .select('id')
-        .single();
-
-      if (profileError) throw profileError;
+      // Through the store, not a direct supabase.update: it is the only writer
+      // that leaves useAuthStore holding the saved row. A bare update saved the
+      // profile and left `profile.onboarding_completed_at` null in memory, so
+      // ProtectedRoute's first-run gate immediately sent the agent who had just
+      // finished the wizard straight back into it (US-108).
+      await updateProfile(profileUpdates);
 
       // 2. Create first listing if provided
       if (wizardData.firstListing.address || wizardData.firstListing.price) {

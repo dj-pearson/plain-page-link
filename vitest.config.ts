@@ -15,6 +15,11 @@ export default defineConfig({
       // logic like the SSRF guard's address-range matching had no test at all.
       // Only files that avoid Deno globals at module scope can be covered here.
       'supabase/functions/**/*.test.ts',
+      // Cloudflare Pages Functions. These have no Workers globals at module
+      // scope, so the crawler-detection and meta-injection logic (US-114) runs
+      // here rather than only in production, where nobody would notice it
+      // breaking until an unfurl came back blank.
+      'functions/**/*.test.ts',
     ],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
     // src/integrations/supabase/client.ts throws at module load when these are
