@@ -22,12 +22,15 @@ function announcedRoutes(): string[] {
     source.indexOf('ROUTE_TITLES'),
     source.indexOf('function getPageTitle')
   );
-  return Array.from(block.matchAll(/"(\/[^"]*)":/g)).map((m) => m[1]);
+  // Either quote style: prettier rewrites these files, and an assertion that
+  // depends on the quote character silently stops matching anything — which is
+  // exactly how this test first passed while finding nothing.
+  return Array.from(block.matchAll(/['"](\/[^'"]*)['"]\s*:/g)).map((m) => m[1]);
 }
 
 function declaredRoutes(): string[] {
   const source = readFileSync(join(SRC, 'App.tsx'), 'utf8');
-  const paths = Array.from(source.matchAll(/\bpath="([^"]*)"/g)).map((m) => m[1]);
+  const paths = Array.from(source.matchAll(/\bpath=['"]([^'"]*)['"]/g)).map((m) => m[1]);
   // Nested children are relative; join them onto the dashboard/admin prefixes
   // the file uses, which is enough to check membership.
   const absolute = paths.filter((p) => p.startsWith('/'));

@@ -79,12 +79,14 @@ describe('dashboard navigation', () => {
     const sidebar = read('components/layout/DashboardLayout.tsx');
     const mobile = read('components/mobile/MobileNav.tsx');
 
-    expect(sidebar).toContain("from '@/config/dashboard-nav'");
-    expect(mobile).toContain('from "@/config/dashboard-nav"');
+    // Quote-agnostic: prettier rewrites these files, and an assertion pinned to
+    // one quote character stops matching without failing loudly.
+    expect(sidebar).toMatch(/from ['"]@\/config\/dashboard-nav['"]/);
+    expect(mobile).toMatch(/from ['"]@\/config\/dashboard-nav['"]/);
     // A hard-coded /dashboard/… link in either file is a list starting to drift
     // again. The sidebar's /admin entry is not a dashboard destination.
-    expect(sidebar.match(/to="\/dashboard\/[^"]*"/g) ?? []).toEqual([]);
-    expect(mobile.match(/href: "\/dashboard\/[^"]*"/g) ?? []).toEqual([]);
+    expect(sidebar.match(/to=['"]\/dashboard\/[^'"]*['"]/g) ?? []).toEqual([]);
+    expect(mobile.match(/href: ['"]\/dashboard\/[^'"]*['"]/g) ?? []).toEqual([]);
   });
 
   it('the Settings page links the tools', () => {
