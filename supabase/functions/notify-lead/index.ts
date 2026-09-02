@@ -5,29 +5,38 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail, createLeadNotificationEmail } from '../_shared/email.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
+import { decryptSecret } from '../_shared/encryption.ts';
 
 /**
  * Notify Lead
  *
- * Sends the agent an email when a new lead is captured. Designed to be called
- * by the leads-INSERT database trigger (pg_net) with a `{ record }` payload,
- * but also accepts `{ lead_id }` for manual/testing invocation.
+ * Sends the agent an email when a new lead is captured. The only notification
+ * path: submit-lead calls it explicitly after inserting, and useLeads calls it
+ * for a lead an agent adds by hand. It used to be called by a leads-INSERT
+ * trigger as well, which is why submit-lead ALSO emailed the agent itself —
+ * two emails per lead whenever both worked. The trigger never fired in
+ * practice (it read GUCs no live migration sets) and is dropped in
+ * 20260902000003 along with the notion of putting the service-role key in a
+ * plaintext database GUC (US-099).
  *
  * Respects the agent's profiles.notification_preferences.leads setting:
  *   - 'instant'      → send the email now
- *   - 'daily_digest' → skip (a separate digest job handles these)
- *   - 'off'          → skip
+ *   - 'daily_digest' → send now, because no digest job exists. Skipping meant
+ *                      agents on this setting were never emailed at all. The
+ *                      settings UI says so.
+ *   - 'off'          → send nothing
  *
- * Authenticated via the service-role key (the trigger sends it as a Bearer
- * token); this is server-to-server, not a user session.
+ * Authenticated via the service-role key; this is server-to-server, not a user
+ * session.
  */
 
 interface LeadRecord {
   id: string;
   user_id: string;
   name: string;
-  email: string;
-  phone?: string | null;
+  /** Ciphertext. US-086 dropped the plaintext email/phone columns. */
+  encrypted_email?: string | null;
+  encrypted_phone?: string | null;
   message?: string | null;
   lead_type?: string | null;
   listing_id?: string | null;
@@ -98,9 +107,14 @@ serve(async (req) => {
       );
     }
 
+    // 'off' is the only setting that suppresses the email. 'daily_digest' used
+    // to skip here "because a separate digest job handles these" — no such job
+    // exists, so every agent who chose it silently received nothing at all.
+    // Until one is built, a digest subscriber gets instant mail, which is the
+    // failure mode that loses no leads.
     const leadPref = (contact?.notificationPreferences?.leads as string | undefined) ?? 'instant';
-    if (leadPref !== 'instant') {
-      return successResponse({ notified: false, reason: `preference_${leadPref}` }, req);
+    if (leadPref === 'off') {
+      return successResponse({ notified: false, reason: 'preference_off' }, req);
     }
 
     const siteUrl = Deno.env.get('SITE_URL') || 'https://agentbio.net';
@@ -113,11 +127,20 @@ serve(async (req) => {
             ? 'buying a home'
             : undefined;
 
+    // The contact details are the point of the email. They live only as
+    // ciphertext since US-086, and this function passed lead.email / lead.phone
+    // — columns that no longer exist — so the agent received a New Lead alert
+    // reading "Email: undefined" with no way to reply (US-099).
+    const [leadEmail, leadPhone] = await Promise.all([
+      decryptSecret(lead.encrypted_email),
+      decryptSecret(lead.encrypted_phone),
+    ]);
+
     const email = createLeadNotificationEmail({
       agentEmail,
       name: lead.name,
-      email: lead.email,
-      phone: lead.phone ?? undefined,
+      email: leadEmail ?? '',
+      phone: leadPhone ?? undefined,
       message: lead.message ?? undefined,
       listing: listingLabel,
       sourcePage: lead.referrer_url ?? undefined,
@@ -125,21 +148,51 @@ serve(async (req) => {
       dashboardUrl: `${siteUrl}/dashboard/leads`,
     });
 
-    // sendEmail never throws (logs + swallows), so capture happens regardless.
-    await sendEmail(email);
+    // sendEmail never throws, but it now reports what happened. This used to
+    // log status 'success' unconditionally, without knowing whether anything
+    // had been sent.
+    const sent = await sendEmail(email);
 
     await supabase
       .rpc('log_audit_event', {
         p_user_id: lead.user_id,
         p_action: 'lead_notification_sent',
-        p_status: 'success',
+        p_status: sent.ok ? 'success' : 'failure',
         p_resource_type: 'lead',
         p_resource_id: lead.id,
-        p_details: JSON.stringify({ channel: 'email' }),
+        p_details: JSON.stringify({
+          channel: 'email',
+          recipient: agentEmail,
+          provider_id: sent.providerId ?? null,
+          error: sent.error ?? null,
+        }),
       })
       .then(undefined, () => undefined);
 
-    return successResponse({ notified: true }, req);
+    // Record the send on the lead's own timeline. Without this the agent can
+    // see a lead and see nothing about whether they were told about it.
+    // Best-effort: a failure here must not turn a delivered email into a 500.
+    const { error: activityError } = await supabase.from('lead_activities').insert({
+      lead_id: lead.id,
+      user_id: lead.user_id,
+      activity_type: 'email',
+      title: sent.ok ? 'New lead notification sent' : 'New lead notification failed',
+      content: sent.ok ? null : sent.error ?? 'Unknown error',
+      email_subject: email.subject,
+      email_recipient: agentEmail,
+      is_internal: true,
+      metadata: { source: 'notify-lead', provider_id: sent.providerId ?? null },
+    });
+    if (activityError) {
+      console.error(`[notify-lead] could not log activity for ${lead.id}: ${activityError.message}`);
+    }
+
+    if (!sent.ok) {
+      console.error(`[notify-lead] email to ${agentEmail} for lead ${lead.id} failed: ${sent.error}`);
+      return errorResponse('The notification email could not be sent', 'EMAIL_SEND_FAILED', req, 502);
+    }
+
+    return successResponse({ notified: true, providerId: sent.providerId ?? null }, req);
   } catch (error) {
     console.error('Notify Lead Error:', error instanceof Error ? error.message : error);
     return handleUnexpectedError(error, req);

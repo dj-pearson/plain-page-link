@@ -3,7 +3,8 @@
  *
  * Lets an agent choose how they're notified of new leads:
  * instant email, a daily digest, or off. Persisted to
- * profiles.notification_preferences.leads.
+ * profiles.notification_preferences.leads and read by the notify-lead edge
+ * function, which is the single sender.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,7 +25,15 @@ type LeadNotificationMode = 'instant' | 'daily_digest' | 'off';
 
 const OPTIONS: { value: LeadNotificationMode; label: string; description: string }[] = [
   { value: 'instant', label: 'Instant', description: 'Email me the moment a lead comes in' },
-  { value: 'daily_digest', label: 'Daily digest', description: 'One summary email per day' },
+  {
+    value: 'daily_digest',
+    label: 'Daily digest',
+    // Honest label. The digest job does not exist; notify-lead used to skip
+    // these agents entirely, so choosing "daily digest" meant never being
+    // emailed about a lead at all (US-099). Until the job is built the setting
+    // behaves as Instant, and saying so beats a promise nothing keeps.
+    description: 'Not available yet — currently sends instantly, like Instant',
+  },
   { value: 'off', label: 'Off', description: 'Do not email me about new leads' },
 ];
 
@@ -37,16 +46,18 @@ export function LeadNotificationPreferences() {
     queryKey: ['notification-preferences', user?.id],
     enabled: !!user?.id,
     queryFn: async (): Promise<LeadNotificationMode> => {
-      // notification_preferences is not yet in the generated Supabase types
-      // (types.ts is out of sync); cast is isolated to this read.
+      // notification_preferences is jsonb, so the generated type is Json —
+      // narrowed here rather than by casting the client. The comment this
+      // replaced claimed the column was "not yet in the generated types"; it
+      // has been there throughout (types.ts:3414), and the cast was disabling
+      // the check rather than working around a gap (the US-094 pattern).
       const { data, error } = await supabase
         .from('profiles')
         .select('notification_preferences')
         .eq('id', user!.id)
         .single();
       if (error) throw error;
-      const prefs = (data as { notification_preferences?: { leads?: LeadNotificationMode } } | null)
-        ?.notification_preferences;
+      const prefs = data?.notification_preferences as { leads?: LeadNotificationMode } | null;
       return prefs?.leads ?? 'instant';
     },
   });
@@ -55,8 +66,7 @@ export function LeadNotificationPreferences() {
     mutationFn: async (next: LeadNotificationMode) => {
       const { error } = await supabase
         .from('profiles')
-        // Cast: out-of-sync generated types don't include this jsonb column.
-        .update({ notification_preferences: { leads: next } } as never)
+        .update({ notification_preferences: { leads: next } })
         .eq('id', user!.id);
       if (error) throw error;
       return next;

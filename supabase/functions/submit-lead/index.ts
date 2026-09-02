@@ -153,8 +153,9 @@ serve(async (req) => {
       console.error(`Could not resolve agent contact for ${leadData.user_id}; lead ${lead.id} saved without notification`)
     }
 
+    // agentEmail is no longer read here: the agent notification is notify-lead's
+    // job now. agentName still signs the visitor's auto-response below.
     const agentName = agentContact?.fullName || 'Your Real Estate Agent'
-    const agentEmail = agentContact?.email
     const zapierWebhookUrl = agentContact?.zapierWebhookUrl
 
     // Send lead to Zapier webhook if configured
@@ -259,66 +260,35 @@ ${agentName}`,
 </html>`
     })
 
-    // Send notification email to agent (if email is available)
-    if (agentEmail) {
-      await sendEmail({
-        to: agentEmail,
-        subject: `🔔 New ${leadTypeLabels[leadData.lead_type] || 'Lead'} from ${leadData.name}`,
-        body: `You have a new ${leadTypeLabels[leadData.lead_type] || 'lead'}!
-
-Name: ${leadData.name}
-Email: ${leadData.email}
-${leadData.phone ? `Phone: ${leadData.phone}` : ''}
-
-${leadData.message ? `Message:\n${leadData.message}` : ''}
-
-${leadData.price_range ? `Price Range: ${leadData.price_range}` : ''}
-${leadData.timeline ? `Timeline: ${leadData.timeline}` : ''}
-${leadData.property_address ? `Property Address: ${leadData.property_address}` : ''}
-
-View lead in your dashboard: ${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/leads
-
----
-Sent from AgentBio.net`,
-        html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: #10b981; color: white; padding: 20px; border-radius: 10px 10px 0 0; }
-    .content { background: #fff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 10px 10px; }
-    .info-row { padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
-    .label { font-weight: bold; color: #6b7280; }
-    .value { color: #111827; }
-    .button { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h2 style="margin: 0;">🔔 New ${leadTypeLabels[leadData.lead_type] || 'Lead'}!</h2>
-    </div>
-    <div class="content">
-      <div class="info-row">
-        <span class="label">Name:</span> <span class="value">${leadData.name}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Email:</span> <span class="value">${leadData.email}</span>
-      </div>
-      ${leadData.phone ? `<div class="info-row"><span class="label">Phone:</span> <span class="value">${leadData.phone}</span></div>` : ''}
-      ${leadData.message ? `<div class="info-row"><span class="label">Message:</span><br><span class="value">${leadData.message}</span></div>` : ''}
-      ${leadData.price_range ? `<div class="info-row"><span class="label">Price Range:</span> <span class="value">${leadData.price_range}</span></div>` : ''}
-      ${leadData.timeline ? `<div class="info-row"><span class="label">Timeline:</span> <span class="value">${leadData.timeline}</span></div>` : ''}
-      ${leadData.property_address ? `<div class="info-row"><span class="label">Property Address:</span> <span class="value">${leadData.property_address}</span></div>` : ''}
-
-      <a href="${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/leads" class="button">View in Dashboard</a>
-    </div>
-  </div>
-</body>
-</html>`
+    // Notify the agent through notify-lead, the one notification path.
+    //
+    // This block used to compose and send its own agent email, while
+    // trg_notify_lead_on_insert called notify-lead for the same row — two
+    // emails per lead whenever both worked, and neither honoured the agent's
+    // notification_preferences.leads setting from here. It also interpolated
+    // the visitor's name and message into HTML unescaped, which the shared
+    // template does not. The trigger is dropped in 20260902000003; this is the
+    // explicit call that replaces it, so the preference, the decryption and
+    // the timeline entry all happen in one place (US-099).
+    //
+    // Best effort: the lead is already stored, and a notification failure must
+    // not tell the visitor their enquiry did not go through.
+    try {
+      const notifyResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/notify-lead`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({ lead_id: lead.id }),
       })
+      if (!notifyResponse.ok) {
+        console.error(
+          `notify-lead returned ${notifyResponse.status} for lead ${lead.id}: ${await notifyResponse.text()}`
+        )
+      }
+    } catch (notifyError) {
+      console.error(`Could not reach notify-lead for lead ${lead.id}:`, notifyError)
     }
 
     return successResponse({ lead_id: lead.id }, req)

@@ -22,12 +22,40 @@ export function escapeHtml(value: string | number | null | undefined): string {
     .replace(/'/g, '&#39;')
 }
 
-export async function sendEmail(options: EmailOptions): Promise<void> {
+/**
+ * The outcome of a send. Callers used to get `void` from a function that
+ * swallowed every failure — a missing RESEND_API_KEY, a 4xx from Resend, a
+ * network error — so notify-lead logged 'lead_notification_sent' with status
+ * 'success' without knowing whether anything had been sent (US-099).
+ */
+export interface SendEmailResult {
+  ok: boolean
+  providerId?: string
+  error?: string
+}
+
+/**
+ * Sends one email through Resend.
+ *
+ * Never throws — a notification failure must not roll back the lead that
+ * triggered it — but it now reports what happened, so a caller can record the
+ * truth instead of assuming success.
+ *
+ * A missing RESEND_API_KEY is a configuration failure, not a quiet skip: in
+ * production it is logged at error level and returned as { ok: false }. Outside
+ * production it stays a warning, so local development does not need a key.
+ */
+export async function sendEmail(options: EmailOptions): Promise<SendEmailResult> {
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
 
   if (!resendApiKey) {
-    console.warn('RESEND_API_KEY not set, skipping email')
-    return
+    const message = 'RESEND_API_KEY is not set; no email was sent'
+    if ((Deno.env.get('ENVIRONMENT') ?? Deno.env.get('DENO_ENV')) === 'production') {
+      console.error(`[email] ${message}`)
+      return { ok: false, error: message }
+    }
+    console.warn(`[email] ${message} (non-production)`)
+    return { ok: false, error: message }
   }
 
   try {
@@ -49,15 +77,19 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     })
 
     if (!response.ok) {
-      const error = await response.text()
-      console.error('Failed to send email:', error)
-      throw new Error('Email sending failed')
+      const detail = await response.text()
+      const message = `Resend returned ${response.status}: ${detail}`
+      console.error(`[email] ${message}`)
+      return { ok: false, error: message }
     }
 
-    console.log('Email sent successfully to:', options.to)
+    const body = (await response.json().catch(() => null)) as { id?: string } | null
+    console.log(`[email] sent to ${options.to}${body?.id ? ` (${body.id})` : ''}`)
+    return { ok: true, providerId: body?.id }
   } catch (error) {
-    console.error('Error sending email:', error)
-    // Don't throw - email is nice to have but shouldn't break the main flow
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`[email] send failed: ${message}`)
+    return { ok: false, error: message }
   }
 }
 

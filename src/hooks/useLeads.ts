@@ -83,6 +83,16 @@ export function useLeads() {
       const { data, error } = await supabase.from('leads').insert(payload).select().single();
 
       if (error) throw error;
+
+      // Deliberately no notify-lead call here. US-099 consolidated lead
+      // notification onto that one function, and submit-lead calls it for
+      // every lead captured from a public form. This path is an agent typing a
+      // lead into their own CRM: the notification would email them about
+      // something they just entered, and reaching notify-lead from the browser
+      // would mean accepting a user session on a function US-078 restricted to
+      // the service role. Neither is worth it. If team assignment ever needs to
+      // notify a colleague, that belongs in the assignment trigger, addressed
+      // to leads.assigned_to rather than to leads.user_id.
       return data;
     },
     onSuccess: () => {
