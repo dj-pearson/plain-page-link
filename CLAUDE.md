@@ -834,6 +834,15 @@ the free tools (`instagram_bio_*`, `listing_*`).
    supabase functions deploy my-function
    ```
 
+   There is one deployment path and it is documented in
+   `docs/deploy/edge-functions.md`. Self-hosted Supabase's own edge runtime
+   serves everything under `supabase/functions/` at `/functions/v1/<name>`.
+   US-122 deleted four competing build configurations (`Dockerfile`,
+   `edge-functions.Dockerfile`, `Dockerfile.gitclone`,
+   `docker-compose.edge-functions.yml`, `nixpacks.toml`) that all shipped a
+   hand-written router listing 15 of the 86 functions — the app calls 34, and
+   25 of those were absent from it.
+
 ---
 
 ## Security Considerations

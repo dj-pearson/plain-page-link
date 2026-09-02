@@ -96,6 +96,52 @@ describe('.gitignore', () => {
   });
 });
 
+describe('one deployment path (US-122)', () => {
+  const entries = readdirSync(ROOT);
+
+  it('has no competing edge-function build configurations', () => {
+    // Five files shipped a hand-written Deno router listing 15 of the 86
+    // functions in supabase/functions/. The app calls 34, and 25 of those were
+    // not in its map — so it cannot have been what served production, and
+    // documenting it as the deploy path made the real one unfindable.
+    const banned = [
+      'Dockerfile',
+      'Dockerfile.gitclone',
+      'edge-functions.Dockerfile',
+      'docker-compose.edge-functions.yml',
+      'nixpacks.toml',
+      'edge-functions-server.ts',
+    ];
+    expect(banned.filter((name) => entries.includes(name))).toEqual([]);
+  });
+
+  it('documents the one path that is real', () => {
+    expect(existsSync(join(ROOT, 'docs/deploy/edge-functions.md'))).toBe(true);
+  });
+
+  it('has one migration tree and one CI directory', () => {
+    // supabase/ held all_migrations_combined.sql, all_migrations_safe.sql and
+    // migration_part_1..9.sql, referenced by nothing; database/ held an index
+    // script to paste into a console; github-actions/ held six workflows GitHub
+    // never runs, since only .github/workflows/ executes.
+    expect(existsSync(join(ROOT, 'github-actions'))).toBe(false);
+    expect(existsSync(join(ROOT, 'database'))).toBe(false);
+    expect(existsSync(join(ROOT, 'supabase/all_migrations_combined.sql'))).toBe(false);
+    expect(existsSync(join(ROOT, 'supabase/all_migrations_safe.sql'))).toBe(false);
+
+    const strays = readdirSync(join(ROOT, 'supabase')).filter((name) =>
+      /^(all_migrations|migration_part)/.test(name)
+    );
+    expect(strays).toEqual([]);
+  });
+
+  it('carries no unbuilt subprojects, and says where they went', () => {
+    expect(existsSync(join(ROOT, 'mobile-native-js'))).toBe(false);
+    expect(existsSync(join(ROOT, 'tools/automated-testing'))).toBe(false);
+    expect(existsSync(join(ROOT, 'docs/archive/REMOVED_SUBPROJECTS.md'))).toBe(true);
+  });
+});
+
 describe('earlier platforms', () => {
   it('has no LinkStack or Lovable remnants', () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
