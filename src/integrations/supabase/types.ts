@@ -8710,7 +8710,7 @@ export type Database = {
         Returns: boolean;
       };
       check_username_available: {
-        Args: { _current_user_id: string; _username: string };
+        Args: { _current_user_id?: string; _username: string };
         Returns: boolean;
       };
       cleanup_expired_mfa_codes: {

@@ -984,6 +984,90 @@ check('view and click counters are throttled, and match the rows they count', ()
 });
 
 // ---------------------------------------------------------------------------
+// 6g. "Is this username free?" must be answered by something that can see
+//     unpublished profiles.
+//
+//     useUsernameCheck asked PostgREST directly, and since 20260808000002 the
+//     public SELECT policy on `profiles` is scoped to published rows. So a
+//     username held by an unpublished profile — every account that has not
+//     published yet, which includes every account mid-signup — read as
+//     available, the insert then failed on the unique index, and the agent saw
+//     a generic error naming no field (US-117).
+// ---------------------------------------------------------------------------
+check('check_username_available sees profiles the anon client cannot', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-00000000af04';
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'username@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name, is_published)
+        VALUES ('${uid}', 'verifyhidden', 'Verify Hidden', false)
+        ON CONFLICT (id) DO UPDATE SET username = 'verifyhidden', is_published = false;
+    `);
+
+    // The premise: the direct query really cannot see it.
+    const [visible] = q(`
+      SET ROLE anon;
+      SELECT count(*) FROM public.profiles WHERE username = 'verifyhidden';
+    `);
+    if (visible !== '0') {
+      out.push(
+        `anon can see the unpublished profile (${visible} rows) — this check no longer tests what it says`
+      );
+    }
+
+    const [taken] = q(`
+      SET ROLE anon;
+      SELECT public.check_username_available('verifyhidden')::text;
+    `);
+    if (taken !== 'false') {
+      out.push('check_username_available says a taken username is free');
+    }
+
+    const [cased] = q(`
+      SET ROLE anon;
+      SELECT public.check_username_available('VerifyHidden')::text;
+    `);
+    if (cased !== 'false') {
+      out.push('check_username_available is case-sensitive; the unique index is not');
+    }
+
+    const [free] = q(`
+      SET ROLE anon;
+      SELECT public.check_username_available('verify-definitely-free')::text;
+    `);
+    if (free !== 'true') {
+      out.push('check_username_available says a free username is taken');
+    }
+
+    // The agent's own name must not read as taken when they are the holder.
+    const [own] = q(`
+      SET ROLE anon;
+      SELECT public.check_username_available('verifyhidden', '${uid}')::text;
+    `);
+    if (own !== 'true') {
+      out.push('check_username_available reports the holder their own username is taken');
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'username availability check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.profiles WHERE id = '${uid}';
+         DELETE FROM auth.users WHERE id = '${uid}';`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 7. Smoke test the lead pipeline. Lead capture is the platform's core value
 //    proposition and is guarded by seven triggers, several of which swallow
 //    their own errors, so "the insert succeeded" is not sufficient — assert the
