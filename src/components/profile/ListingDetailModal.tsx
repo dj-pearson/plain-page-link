@@ -19,6 +19,7 @@ import {
   Check,
   Layers,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getImageUrls } from '@/lib/images';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -116,25 +117,22 @@ export default function ListingDetailModal({
     }
   }, [listing.id]);
 
+  // Radix locks body scroll and restores it, so the manual overflow handling
+  // that stood here is gone with the hand-rolled overlay. Resetting the photo
+  // index on open is still ours.
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      setCurrentImageIndex(0);
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (isOpen) setCurrentImageIndex(0);
   }, [isOpen]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!isOpen) return;
-      if (e.key === 'Escape') onClose();
+      // Escape is Radix's job now; the arrows are the gallery's.
       if (e.key === 'ArrowLeft')
         setCurrentImageIndex((i) => (i - 1 + photos.length) % photos.length);
       if (e.key === 'ArrowRight') setCurrentImageIndex((i) => (i + 1) % photos.length);
     },
-    [isOpen, onClose, photos.length]
+    [isOpen, photos.length]
   );
 
   useEffect(() => {
@@ -208,354 +206,362 @@ export default function ListingDetailModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <script
-        type="application/ld+json"
-        // Escape "<" so a listing field containing "</script>" can't break out
-        // of the JSON-LD script tag.
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema).replace(/</g, '\\u003c') }}
-      />
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="relative w-full max-w-5xl max-h-[92vh] bg-white rounded-2xl overflow-hidden shadow-2xl mx-3 sm:mx-4 flex flex-col"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-white/95 backdrop-blur-sm sticky top-0 z-20">
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                'px-2.5 py-1 rounded-full text-xs font-semibold',
-                statusColors[listing.status ?? 'active'] || 'bg-gray-500 text-white'
-              )}
-            >
-              {statusLabels[listing.status ?? 'active'] || listing.status}
-            </span>
-            {mlsNumber && <span className="text-xs text-gray-500">MLS# {mlsNumber}</span>}
+    // Radix Dialog, not a hand-rolled overlay.
+    //
+    // The div this replaces had no role="dialog", no aria-modal, no focus trap
+    // and no focus restore: a screen reader announced nothing, Tab walked
+    // straight out of the modal into the page behind it, and closing left focus
+    // on <body>. The page already used this Dialog elsewhere, so nothing here
+    // needed inventing (US-113). DialogContent supplies Escape-to-close and the
+    // backdrop, so the motion.div backdrop below is gone with them.
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-5xl max-h-[92vh] p-0 gap-0 overflow-hidden">
+        <DialogTitle className="sr-only">
+          {address ? `${address}${city ? `, ${city}` : ''}` : 'Property details'}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          Photos, price and details for this listing.
+        </DialogDescription>
+        <script
+          type="application/ld+json"
+          // Escape "<" so a listing field containing "</script>" can't break out
+          // of the JSON-LD script tag.
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(listingSchema).replace(/</g, '\\u003c'),
+          }}
+        />
+        <div className="relative w-full max-h-[92vh] bg-white overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-white/95 backdrop-blur-sm sticky top-0 z-20">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'px-2.5 py-1 rounded-full text-xs font-semibold',
+                  statusColors[listing.status ?? 'active'] || 'bg-gray-500 text-white'
+                )}
+              >
+                {statusLabels[listing.status ?? 'active'] || listing.status}
+              </span>
+              {mlsNumber && <span className="text-xs text-gray-500">MLS# {mlsNumber}</span>}
+            </div>
+            <div className="flex items-center gap-1">
+              {/* These three were icon-only with no accessible name at all — a
+                screen reader announced "button" three times (US-113). */}
+              <button
+                onClick={toggleSave}
+                aria-label={isSaved ? 'Remove from saved' : 'Save property'}
+                aria-pressed={isSaved}
+                className={cn(
+                  'p-2 rounded-full transition-all min-h-[44px] min-w-[44px] flex items-center justify-center',
+                  isSaved ? 'bg-red-50 text-red-500' : 'hover:bg-gray-100 text-gray-600'
+                )}
+              >
+                <Heart className={cn('h-5 w-5', isSaved && 'fill-current')} />
+              </button>
+              <button
+                onClick={handleShare}
+                aria-label={showShareTooltip ? 'Link copied' : 'Share property'}
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                {showShareTooltip ? (
+                  <Check className="h-5 w-5 text-green-500" />
+                ) : (
+                  <Share2 className="h-5 w-5" />
+                )}
+              </button>
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={toggleSave}
-              className={cn(
-                'p-2 rounded-full transition-all min-h-[44px] min-w-[44px] flex items-center justify-center',
-                isSaved ? 'bg-red-50 text-red-500' : 'hover:bg-gray-100 text-gray-600'
-              )}
-            >
-              <Heart className={cn('h-5 w-5', isSaved && 'fill-current')} />
-            </button>
-            <button
-              onClick={handleShare}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-            >
-              {showShareTooltip ? (
-                <Check className="h-5 w-5 text-green-500" />
-              ) : (
-                <Share2 className="h-5 w-5" />
-              )}
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {/* Image Gallery */}
-          <div className="relative bg-gray-900 aspect-[16/9] sm:aspect-[2/1] max-h-[50vh]">
-            <AnimatePresence mode="wait">
-              <motion.img
-                key={currentImageIndex}
-                src={photos[currentImageIndex]}
-                alt={`${address} - Photo ${currentImageIndex + 1}`}
-                className="w-full h-full object-cover"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                onError={(e) => {
-                  e.currentTarget.src = '/placeholder-property.jpg';
-                }}
-              />
-            </AnimatePresence>
+          <div className="flex-1 overflow-y-auto">
+            {/* Image Gallery */}
+            <div className="relative bg-gray-900 aspect-[16/9] sm:aspect-[2/1] max-h-[50vh]">
+              <AnimatePresence mode="wait">
+                <motion.img
+                  key={currentImageIndex}
+                  src={photos[currentImageIndex]}
+                  alt={`${address} - Photo ${currentImageIndex + 1}`}
+                  className="w-full h-full object-cover"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder-property.jpg';
+                  }}
+                />
+              </AnimatePresence>
 
-            {photos.length > 1 && (
-              <>
-                <button
-                  onClick={() =>
-                    setCurrentImageIndex((i) => (i - 1 + photos.length) % photos.length)
-                  }
-                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-                >
-                  <ChevronLeft className="h-5 w-5 text-gray-800" />
-                </button>
-                <button
-                  onClick={() => setCurrentImageIndex((i) => (i + 1) % photos.length)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-                >
-                  <ChevronRight className="h-5 w-5 text-gray-800" />
-                </button>
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
-                  {currentImageIndex + 1} / {photos.length}
-                </div>
-              </>
-            )}
-
-            {photos.length > 1 && (
-              <div className="absolute bottom-3 right-3 flex gap-1 max-w-[40%]">
-                {photos.slice(0, 5).map((photo, idx) => (
+              {photos.length > 1 && (
+                <>
                   <button
-                    key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
-                    className={cn(
-                      'w-12 h-9 rounded-md overflow-hidden border-2 transition-all flex-shrink-0',
-                      idx === currentImageIndex
-                        ? 'border-white shadow-lg'
-                        : 'border-transparent opacity-70 hover:opacity-100'
-                    )}
+                    onClick={() =>
+                      setCurrentImageIndex((i) => (i - 1 + photos.length) % photos.length)
+                    }
+                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
-                    <img
-                      src={photo}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = '/placeholder-property.jpg';
-                      }}
-                    />
+                    <ChevronLeft className="h-5 w-5 text-gray-800" />
                   </button>
-                ))}
-                {photos.length > 5 && (
-                  <div className="w-12 h-9 rounded-md bg-black/60 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                    +{photos.length - 5}
+                  <button
+                    onClick={() => setCurrentImageIndex((i) => (i + 1) % photos.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  >
+                    <ChevronRight className="h-5 w-5 text-gray-800" />
+                  </button>
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
+                    {currentImageIndex + 1} / {photos.length}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                </>
+              )}
 
-          {/* Content */}
-          <div className="p-5 sm:p-6 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-              {/* Main Details */}
-              <div className="lg:col-span-2 space-y-6">
-                <div>
-                  <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-1">
-                    {formatPrice(price)}
-                  </h2>
-                  <div className="flex items-start gap-2 text-gray-600">
-                    <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span className="text-base">
-                      {address}
-                      {city && `, ${city}`}
-                      {state && `, ${state}`}
-                      {zipCode && ` ${zipCode}`}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Key Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {beds > 0 && (
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <Bed className="h-5 w-5 mx-auto mb-1 text-gray-500" />
-                      <div className="text-xl font-bold text-gray-900">{beds}</div>
-                      <div className="text-xs text-gray-500">Bedrooms</div>
-                    </div>
-                  )}
-                  {baths > 0 && (
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <Bath className="h-5 w-5 mx-auto mb-1 text-gray-500" />
-                      <div className="text-xl font-bold text-gray-900">{baths}</div>
-                      <div className="text-xs text-gray-500">Bathrooms</div>
-                    </div>
-                  )}
-                  {sqft > 0 && (
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <Maximize className="h-5 w-5 mx-auto mb-1 text-gray-500" />
-                      <div className="text-xl font-bold text-gray-900">{formatNumber(sqft)}</div>
-                      <div className="text-xs text-gray-500">Sq Ft</div>
-                    </div>
-                  )}
-                  {sqft > 0 && price > 0 && (
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <Tag className="h-5 w-5 mx-auto mb-1 text-gray-500" />
-                      <div className="text-xl font-bold text-gray-900">
-                        ${Math.round(price / sqft)}
-                      </div>
-                      <div className="text-xs text-gray-500">Per Sq Ft</div>
+              {photos.length > 1 && (
+                <div className="absolute bottom-3 right-3 flex gap-1 max-w-[40%]">
+                  {photos.slice(0, 5).map((photo, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentImageIndex(idx)}
+                      className={cn(
+                        'w-12 h-9 rounded-md overflow-hidden border-2 transition-all flex-shrink-0',
+                        idx === currentImageIndex
+                          ? 'border-white shadow-lg'
+                          : 'border-transparent opacity-70 hover:opacity-100'
+                      )}
+                    >
+                      <img
+                        src={photo}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = '/placeholder-property.jpg';
+                        }}
+                      />
+                    </button>
+                  ))}
+                  {photos.length > 5 && (
+                    <div className="w-12 h-9 rounded-md bg-black/60 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                      +{photos.length - 5}
                     </div>
                   )}
                 </div>
+              )}
+            </div>
 
-                {description && (
+            {/* Content */}
+            <div className="p-5 sm:p-6 lg:p-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+                {/* Main Details */}
+                <div className="lg:col-span-2 space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      About This Property
-                    </h3>
-                    <p className="text-gray-600 leading-relaxed whitespace-pre-line">
-                      {description}
-                    </p>
-                  </div>
-                )}
-
-                {highlightsList.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                      Property Highlights
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {highlightsList.map((highlight: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm font-medium"
-                        >
-                          {highlight}
-                        </span>
-                      ))}
+                    <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-1">
+                      {formatPrice(price)}
+                    </h2>
+                    <div className="flex items-start gap-2 text-gray-600">
+                      <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span className="text-base">
+                        {address}
+                        {city && `, ${city}`}
+                        {state && `, ${state}`}
+                        {zipCode && ` ${zipCode}`}
+                      </span>
                     </div>
                   </div>
-                )}
 
-                {virtualTourUrl && (
-                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-5 border border-purple-100">
-                    <div className="flex items-center justify-between flex-wrap gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-purple-100 rounded-lg">
-                          <Video className="h-5 w-5 text-purple-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-900">Virtual Tour Available</h4>
-                          <p className="text-sm text-gray-500">Experience this property in 3D</p>
-                        </div>
-                      </div>
-                      <a
-                        href={virtualTourUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm min-h-[44px]"
-                      >
-                        Take Tour <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Sidebar */}
-              <div className="space-y-4">
-                <div className="bg-gray-50 rounded-xl p-5">
-                  <h3 className="font-semibold text-gray-900 mb-3">Property Details</h3>
-                  <div className="space-y-3">
-                    {propertyType && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 flex items-center gap-2">
-                          <Home className="h-3.5 w-3.5" /> Type
-                        </span>
-                        <span className="font-medium text-gray-900">
-                          {propertyTypeLabels[propertyType] || propertyType}
-                        </span>
-                      </div>
-                    )}
+                  {/* Key Stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {beds > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 flex items-center gap-2">
-                          <Bed className="h-3.5 w-3.5" /> Bedrooms
-                        </span>
-                        <span className="font-medium text-gray-900">{beds}</span>
+                      <div className="bg-gray-50 rounded-xl p-4 text-center">
+                        <Bed className="h-5 w-5 mx-auto mb-1 text-gray-500" />
+                        <div className="text-xl font-bold text-gray-900">{beds}</div>
+                        <div className="text-xs text-gray-500">Bedrooms</div>
                       </div>
                     )}
                     {baths > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 flex items-center gap-2">
-                          <Bath className="h-3.5 w-3.5" /> Bathrooms
-                        </span>
-                        <span className="font-medium text-gray-900">{baths}</span>
+                      <div className="bg-gray-50 rounded-xl p-4 text-center">
+                        <Bath className="h-5 w-5 mx-auto mb-1 text-gray-500" />
+                        <div className="text-xl font-bold text-gray-900">{baths}</div>
+                        <div className="text-xs text-gray-500">Bathrooms</div>
                       </div>
                     )}
                     {sqft > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 flex items-center gap-2">
-                          <Maximize className="h-3.5 w-3.5" /> Square Feet
-                        </span>
-                        <span className="font-medium text-gray-900">{formatNumber(sqft)}</span>
+                      <div className="bg-gray-50 rounded-xl p-4 text-center">
+                        <Maximize className="h-5 w-5 mx-auto mb-1 text-gray-500" />
+                        <div className="text-xl font-bold text-gray-900">{formatNumber(sqft)}</div>
+                        <div className="text-xs text-gray-500">Sq Ft</div>
                       </div>
                     )}
-                    {lotSize && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 flex items-center gap-2">
-                          <Layers className="h-3.5 w-3.5" /> Lot Size
-                        </span>
-                        <span className="font-medium text-gray-900">{lotSize} acres</span>
-                      </div>
-                    )}
-                    {daysOnMarket != null && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 flex items-center gap-2">
-                          <Clock className="h-3.5 w-3.5" /> Days on Market
-                        </span>
-                        <span className="font-medium text-gray-900">{daysOnMarket}</span>
-                      </div>
-                    )}
-                    {mlsNumber && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 flex items-center gap-2">
-                          <Tag className="h-3.5 w-3.5" /> MLS#
-                        </span>
-                        <span className="font-medium text-gray-900">{mlsNumber}</span>
+                    {sqft > 0 && price > 0 && (
+                      <div className="bg-gray-50 rounded-xl p-4 text-center">
+                        <Tag className="h-5 w-5 mx-auto mb-1 text-gray-500" />
+                        <div className="text-xl font-bold text-gray-900">
+                          ${Math.round(price / sqft)}
+                        </div>
+                        <div className="text-xs text-gray-500">Per Sq Ft</div>
                       </div>
                     )}
                   </div>
+
+                  {description && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        About This Property
+                      </h3>
+                      <p className="text-gray-600 leading-relaxed whitespace-pre-line">
+                        {description}
+                      </p>
+                    </div>
+                  )}
+
+                  {highlightsList.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                        Property Highlights
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {highlightsList.map((highlight: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm font-medium"
+                          >
+                            {highlight}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {virtualTourUrl && (
+                    <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-5 border border-purple-100">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-purple-100 rounded-lg">
+                            <Video className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">Virtual Tour Available</h4>
+                            <p className="text-sm text-gray-500">Experience this property in 3D</p>
+                          </div>
+                        </div>
+                        <a
+                          href={virtualTourUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm min-h-[44px]"
+                        >
+                          Take Tour <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* CTAs */}
-                <div className="space-y-2">
-                  {onRequestShowing && (
-                    <button
-                      onClick={() => onRequestShowing(listing)}
-                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md min-h-[44px]"
-                    >
-                      <Calendar className="h-4 w-4" />
-                      {calendlyUrl ? 'Schedule a Showing' : 'Request a Showing'}
-                    </button>
-                  )}
-                  <button
-                    onClick={handleShare}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium min-h-[44px]"
-                  >
-                    <Share2 className="h-4 w-4" /> Share Property
-                  </button>
-                  <button
-                    onClick={toggleSave}
-                    className={cn(
-                      'w-full inline-flex items-center justify-center gap-2 px-4 py-3 border rounded-lg transition-colors font-medium min-h-[44px]',
-                      isSaved
-                        ? 'bg-red-50 border-red-200 text-red-600'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                {/* Sidebar */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 rounded-xl p-5">
+                    <h3 className="font-semibold text-gray-900 mb-3">Property Details</h3>
+                    <div className="space-y-3">
+                      {propertyType && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-2">
+                            <Home className="h-3.5 w-3.5" /> Type
+                          </span>
+                          <span className="font-medium text-gray-900">
+                            {propertyTypeLabels[propertyType] || propertyType}
+                          </span>
+                        </div>
+                      )}
+                      {beds > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-2">
+                            <Bed className="h-3.5 w-3.5" /> Bedrooms
+                          </span>
+                          <span className="font-medium text-gray-900">{beds}</span>
+                        </div>
+                      )}
+                      {baths > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-2">
+                            <Bath className="h-3.5 w-3.5" /> Bathrooms
+                          </span>
+                          <span className="font-medium text-gray-900">{baths}</span>
+                        </div>
+                      )}
+                      {sqft > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-2">
+                            <Maximize className="h-3.5 w-3.5" /> Square Feet
+                          </span>
+                          <span className="font-medium text-gray-900">{formatNumber(sqft)}</span>
+                        </div>
+                      )}
+                      {lotSize && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-2">
+                            <Layers className="h-3.5 w-3.5" /> Lot Size
+                          </span>
+                          <span className="font-medium text-gray-900">{lotSize} acres</span>
+                        </div>
+                      )}
+                      {daysOnMarket != null && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-2">
+                            <Clock className="h-3.5 w-3.5" /> Days on Market
+                          </span>
+                          <span className="font-medium text-gray-900">{daysOnMarket}</span>
+                        </div>
+                      )}
+                      {mlsNumber && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-2">
+                            <Tag className="h-3.5 w-3.5" /> MLS#
+                          </span>
+                          <span className="font-medium text-gray-900">{mlsNumber}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CTAs */}
+                  <div className="space-y-2">
+                    {onRequestShowing && (
+                      <button
+                        onClick={() => onRequestShowing(listing)}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md min-h-[44px]"
+                      >
+                        <Calendar className="h-4 w-4" />
+                        {calendlyUrl ? 'Schedule a Showing' : 'Request a Showing'}
+                      </button>
                     )}
-                  >
-                    <Heart className={cn('h-4 w-4', isSaved && 'fill-current')} />
-                    {isSaved ? 'Saved' : 'Save Property'}
-                  </button>
+                    <button
+                      onClick={handleShare}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium min-h-[44px]"
+                    >
+                      <Share2 className="h-4 w-4" /> Share Property
+                    </button>
+                    <button
+                      onClick={toggleSave}
+                      className={cn(
+                        'w-full inline-flex items-center justify-center gap-2 px-4 py-3 border rounded-lg transition-colors font-medium min-h-[44px]',
+                        isSaved
+                          ? 'bg-red-50 border-red-200 text-red-600'
+                          : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                      )}
+                    >
+                      <Heart className={cn('h-4 w-4', isSaved && 'fill-current')} />
+                      {isSaved ? 'Saved' : 'Save Property'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </motion.div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

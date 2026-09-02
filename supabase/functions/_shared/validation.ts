@@ -245,3 +245,50 @@ export function getClientIP(req: Request): string {
          req.headers.get('x-real-ip') || 
          'unknown';
 }
+
+/**
+ * Public review submission (US-113).
+ *
+ * The RLS policy added in 20260808000004 carries the same bounds as a backstop
+ * for the direct anon insert; these are the messages a visitor can act on.
+ * `client_email` is deliberately absent — the review page used to require an
+ * address "for verification only" that no column stored and nothing verified.
+ */
+export function validateReviewData(data: any): ValidationResult {
+  const errors: string[] = [];
+
+  if (!validateUuid(data?.user_id)) {
+    errors.push('Invalid agent ID');
+  }
+
+  if (!data?.client_name || !validateStringLength(String(data.client_name), 1, 100)) {
+    errors.push('Name must be between 1 and 100 characters');
+  }
+
+  if (!data?.review || !validateStringLength(String(data.review), 1, 2000)) {
+    errors.push('Review must be between 1 and 2000 characters');
+  }
+
+  // Number, not numeric-string: `rating` is an integer column, and '5' reaches
+  // it as a 22P02 the visitor sees as a generic failure.
+  if (!Number.isInteger(data?.rating) || data.rating < 1 || data.rating > 5) {
+    errors.push('Rating must be a whole number between 1 and 5');
+  }
+
+  if (
+    data?.transaction_type !== undefined &&
+    !['buyer', 'seller', 'both'].includes(data.transaction_type)
+  ) {
+    errors.push('Invalid transaction type');
+  }
+
+  if (data?.client_title && !validateStringLength(String(data.client_title), 0, 100)) {
+    errors.push('Title must be less than 100 characters');
+  }
+
+  if (data?.property_type && !validateStringLength(String(data.property_type), 0, 100)) {
+    errors.push('Property type must be less than 100 characters');
+  }
+
+  return { valid: errors.length === 0, errors };
+}

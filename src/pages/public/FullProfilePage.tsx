@@ -8,6 +8,7 @@ import ListingGallery from '@/components/profile/ListingGallery';
 import SoldProperties from '@/components/profile/SoldProperties';
 import { LeadCaptureCTA } from '@/components/profile/LeadCaptureCTA';
 import { TestimonialSection } from '@/components/profile/TestimonialSection';
+import { ReviewInvite } from '@/components/profile/ReviewInvite';
 import { SocialProofBanner } from '@/components/profile/SocialProofBanner';
 import { FeaturedListingsCarousel } from '@/components/profile/FeaturedListingsCarousel';
 import { StickyActionBar } from '@/components/profile/StickyActionBar';
@@ -544,10 +545,18 @@ export default function FullProfilePage() {
               </div>
             )}
 
-            {/* Testimonials */}
-            {settings?.show_testimonials !== false && testimonials.length > 0 && (
+            {/* Testimonials.
+                Not gated on testimonials.length: the review invitation belongs
+                on a profile that has no reviews yet more than on one that has
+                plenty, and TestimonialSection already renders nothing when the
+                list is empty (US-113). */}
+            {settings?.show_testimonials !== false && (
               <section id="testimonials" className="pt-4 sm:pt-8 scroll-mt-16 sm:scroll-mt-20">
                 <TestimonialSection testimonials={testimonials} />
+                <ReviewInvite
+                  username={profile.username}
+                  agentName={profile.full_name || profile.username}
+                />
               </section>
             )}
 

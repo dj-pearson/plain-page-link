@@ -89,7 +89,17 @@ export function FeaturedListingsCarousel({
   // Auto-advance carousel. Declared before the early return so this hook is
   // always called in the same order (rules of hooks).
   useEffect(() => {
-    if (!autoRotate || isPaused || featuredListings.length <= 1) return;
+    // prefers-reduced-motion is a request not to be shown unrequested motion,
+    // and a panel that replaces itself every four seconds is exactly that. It
+    // was ignored entirely; a visitor who had asked their OS for stillness got
+    // an auto-rotating carousel anyway (US-113). Honouring it here leaves the
+    // arrows and dots, so nothing becomes unreachable — it only stops moving
+    // on its own.
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    if (!autoRotate || isPaused || reduceMotion || featuredListings.length <= 1) return;
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % featuredListings.length);
@@ -179,6 +189,13 @@ export function FeaturedListingsCarousel({
       className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden rounded-xl shadow-2xl bg-gray-900"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
+      // Touch and focus pause it too. Hover-only meant a phone user — who has
+      // no hover — could not stop the panel changing under their thumb, and a
+      // keyboard user tabbing through the controls kept losing the slide they
+      // were on (US-113).
+      onTouchStart={() => setIsPaused(true)}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={() => setIsPaused(false)}
     >
       <AnimatePresence mode="wait">
         <motion.div

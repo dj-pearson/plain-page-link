@@ -216,3 +216,90 @@ The AgentBio Team
     `.trim(),
   }
 }
+
+/**
+ * Agent notification for a review submitted from /:username/review (US-113).
+ *
+ * The review page's success screen has always told the visitor "{agent} will be
+ * notified" — nothing sent anything. Reviews arrive unpublished by design
+ * (20260808000004 forces is_published = false), so an agent who is never told
+ * one exists never approves it, and the review is invisible forever.
+ *
+ * Every interpolated value is visitor-supplied, so all of it goes through
+ * escapeHtml.
+ */
+export function createTestimonialNotificationEmail(data: {
+  agentEmail: string
+  clientName: string
+  clientTitle?: string | null
+  rating: number
+  review: string
+  transactionType?: string | null
+  propertyType?: string | null
+  dashboardUrl?: string
+}): EmailOptions {
+  const dashboardUrl =
+    data.dashboardUrl ||
+    `${Deno.env.get('SITE_URL') || 'https://agentbio.net'}/dashboard/testimonials`
+
+  const transaction =
+    data.transactionType === 'both'
+      ? 'Buyer & Seller'
+      : data.transactionType === 'seller'
+        ? 'Seller'
+        : data.transactionType === 'buyer'
+          ? 'Buyer'
+          : undefined
+
+  const stars = `${'★'.repeat(data.rating)}${'☆'.repeat(5 - data.rating)}`
+
+  const rows: Array<[string, string | undefined]> = [
+    ['From', data.clientName],
+    ['Title', data.clientTitle ?? undefined],
+    ['Rating', `${data.rating} of 5`],
+    ['Transaction', transaction],
+    ['Property', data.propertyType ?? undefined],
+  ]
+  const rowsHtml = rows
+    .filter(([, v]) => v)
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:120px;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#1f2937;font-size:14px;font-weight:600;">${escapeHtml(value)}</td></tr>`
+    )
+    .join('')
+
+  return {
+    to: data.agentEmail,
+    subject: `New review from ${data.clientName} — awaiting your approval`,
+    body: `${data.clientName} left you a ${data.rating}-star review.
+
+${transaction ? `Transaction: ${transaction}\n` : ''}${data.propertyType ? `Property: ${data.propertyType}\n` : ''}
+"${data.review}"
+
+It is not visible on your profile yet. Approve or hide it here:
+${dashboardUrl}
+
+— AgentBio`,
+    html: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;">
+    <div style="background:#1f2937;color:#fff;padding:32px 30px;">
+      <h1 style="margin:0;font-size:22px;font-weight:600;">New review from ${escapeHtml(data.clientName)}</h1>
+      <p style="margin:8px 0 0;color:#fbbf24;font-size:18px;letter-spacing:2px;">${stars}</p>
+    </div>
+    <div style="background:#fff;padding:30px;">
+      <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
+      <blockquote style="margin:20px 0;padding:16px;background:#f9fafb;border-radius:12px;color:#1f2937;font-size:15px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(data.review)}</blockquote>
+      <p style="margin:0 0 20px;color:#4b5563;font-size:14px;">This review is waiting for you. It stays hidden from your public profile until you approve it.</p>
+      <a href="${dashboardUrl}" style="display:inline-block;background:#1f2937;color:#fff;padding:14px 32px;text-decoration:none;border-radius:10px;font-weight:600;">Review and publish →</a>
+    </div>
+    <div style="background:#f9fafb;padding:24px;text-align:center;color:#6b7280;font-size:13px;">
+      <p style="margin:0;"><strong>AgentBio</strong></p>
+    </div>
+  </div>
+</body>
+</html>`,
+  }
+}

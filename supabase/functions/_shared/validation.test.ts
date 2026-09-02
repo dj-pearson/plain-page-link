@@ -9,7 +9,7 @@
  * supabase/functions/**\/*.test.ts entry in vitest.config.ts).
  */
 import { describe, it, expect } from 'vitest';
-import { validateLeadData, validateUuid } from './validation.ts';
+import { validateLeadData, validateReviewData, validateUuid } from './validation.ts';
 
 const validLead = {
   name: 'Dana Rivers',
@@ -63,5 +63,45 @@ describe('validateLeadData', () => {
     );
     const noUser = validateLeadData({ ...validLead, user_id: undefined });
     expect(noUser.errors).toContain('Invalid user ID');
+  });
+});
+
+describe('validateReviewData', () => {
+  const validReview = {
+    user_id: '11111111-1111-1111-1111-111111111111',
+    client_name: 'Dana Rivers',
+    review: 'She found us three houses in a week and talked us out of the wrong one.',
+    rating: 5,
+  };
+
+  it('accepts a minimal review', () => {
+    expect(validateReviewData(validReview)).toEqual({ valid: true, errors: [] });
+  });
+
+  it('rejects a rating outside 1-5, and a numeric string', () => {
+    expect(validateReviewData({ ...validReview, rating: 0 }).valid).toBe(false);
+    expect(validateReviewData({ ...validReview, rating: 6 }).valid).toBe(false);
+    expect(validateReviewData({ ...validReview, rating: 4.5 }).valid).toBe(false);
+    // '5' would reach an integer column as a 22P02 the visitor reads as a
+    // generic failure — the same shape as US-096 on leads.preapproved.
+    expect(validateReviewData({ ...validReview, rating: '5' }).valid).toBe(false);
+  });
+
+  it('requires a uuid agent id', () => {
+    expect(validateReviewData({ ...validReview, user_id: 'jane' }).valid).toBe(false);
+    expect(validateReviewData({ ...validReview, user_id: undefined }).valid).toBe(false);
+  });
+
+  it('bounds the free text the RLS policy also bounds', () => {
+    expect(validateReviewData({ ...validReview, client_name: '' }).valid).toBe(false);
+    expect(validateReviewData({ ...validReview, client_name: 'x'.repeat(101) }).valid).toBe(false);
+    expect(validateReviewData({ ...validReview, review: 'x'.repeat(2001) }).valid).toBe(false);
+  });
+
+  it('accepts the three transaction types the review form offers and no others', () => {
+    for (const transaction_type of ['buyer', 'seller', 'both']) {
+      expect(validateReviewData({ ...validReview, transaction_type }).valid).toBe(true);
+    }
+    expect(validateReviewData({ ...validReview, transaction_type: 'renter' }).valid).toBe(false);
   });
 });

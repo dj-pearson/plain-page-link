@@ -16,6 +16,12 @@
  *   register       : 1  (color-contrast)
  *   dashboard      : 1  (color-contrast)
  *   public profile : 1  (color-contrast)
+ *
+ * US-113 added the listing-modal case. ListingDetailModal was a hand-rolled
+ * overlay — no role=dialog, no aria-modal, no focus trap, no focus restore,
+ * and unlabelled icon buttons — so the modal state was exactly the state the
+ * suite never looked at. It now uses the Radix Dialog the rest of the page
+ * uses, and this holds it there.
  */
 
 const BASELINE: Record<string, number> = {
@@ -24,6 +30,7 @@ const BASELINE: Record<string, number> = {
   register: 1,
   dashboard: 1,
   'public profile': 1,
+  'public profile with a listing modal open': 1,
 };
 
 import { test, expect, type Page } from '@playwright/test';
@@ -71,6 +78,40 @@ async function setupMocks(page: Page) {
   await page.route('**/rest/v1/**', (r) =>
     r.fulfill({ contentType: 'application/json', body: '[]' })
   );
+  // Registered after the '**/rest/v1/**' catch-all on purpose: Playwright
+  // matches the most recently added route first, so these win for their tables
+  // and everything else still resolves to an empty array.
+  await page.route('**/rest/v1/listings**', (r) =>
+    r.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: '00000000-0000-4000-8000-000000000010',
+          image: null,
+          photos: [],
+          address: '412 Maple Avenue',
+          city: 'Salt Lake City',
+          price: '525000',
+          bedrooms: 3,
+          bathrooms: 2,
+          square_feet: 1980,
+          status: 'active',
+          sort_order: 1,
+          is_featured: false,
+          days_on_market: 12,
+          description: 'A quiet street, a loud kitchen.',
+          property_type: 'Single Family',
+          state: 'UT',
+          zip_code: '84103',
+          mls_number: 'MLS-0001',
+          lot_size_acres: 0.19,
+          virtual_tour_url: null,
+          highlights: [],
+          created_at: '2026-03-01T12:00:00.000Z',
+        },
+      ]),
+    })
+  );
   await page.route('**/rest/v1/profiles**', (r) =>
     r.fulfill({
       contentType: 'application/json',
@@ -89,6 +130,23 @@ async function setupMocks(page: Page) {
   );
   await page.route('**/auth/v1/user**', (r) =>
     r.fulfill({ contentType: 'application/json', body: JSON.stringify(session().user) })
+  );
+}
+
+/**
+ * axe reports zero violations on an empty document, so a suite that never
+ * notices the app failed to mount passes every page and proves nothing. That
+ * is what this suite did until US-113 gave the dev server its VITE_SUPABASE_*
+ * placeholders. This is the tripwire for the next time.
+ */
+async function assertAppRendered(page: Page) {
+  const text = (await page.locator('body').innerText()).trim();
+  expect(
+    text.length,
+    'The page rendered no text at all — the SPA did not mount, so an axe run on it is meaningless.'
+  ).toBeGreaterThan(0);
+  expect(text, 'The app mounted straight into its error boundary.').not.toMatch(
+    /This page didn.t load/i
   );
 }
 
@@ -113,6 +171,7 @@ test.describe('Accessibility (axe-core)', () => {
       await page.goto(path, { waitUntil: 'domcontentloaded' });
       // Let the SPA render.
       await page.waitForTimeout(1500);
+      await assertAppRendered(page);
 
       const { blocking, total } = await analyze(page);
       if (blocking.length > 0) {
@@ -129,4 +188,36 @@ test.describe('Accessibility (axe-core)', () => {
       ).toBeLessThanOrEqual(baseline);
     });
   }
+
+  test('public profile with a listing modal open stays at/below baseline', async ({ page }) => {
+    const name = 'public profile with a listing modal open';
+    await setupMocks(page);
+    await page.goto('/demo', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await assertAppRendered(page);
+
+    // The card's address is the interactive element (US-113 unnested the two
+    // buttons that used to sit inside a role=button container).
+    await page
+      .getByRole('button', { name: /View listing:/ })
+      .first()
+      .click();
+    // The assertion that the overlay is a dialog at all — the hand-rolled one
+    // had no role, so this locator would never have resolved.
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    const { blocking, total } = await analyze(page);
+    if (blocking.length > 0) {
+      console.log(
+        `[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`,
+        blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+      );
+    }
+    const baseline = BASELINE[name] ?? 0;
+    expect(
+      blocking.length,
+      `New critical/serious a11y violations on ${name} (baseline ${baseline}): ` +
+        blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+    ).toBeLessThanOrEqual(baseline);
+  });
 });
