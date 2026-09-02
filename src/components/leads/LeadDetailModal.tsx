@@ -41,6 +41,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import type { Lead } from '@/types/lead';
 import { useLeadScore } from '@/hooks/useMLLeadScoring';
+import { useLeadContactAction, type ContactChannel } from '@/hooks/useLeadContactAction';
+import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
 
 /**
@@ -113,6 +115,24 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<string>('');
   const leadScore = useLeadScore(lead);
+  const recordContact = useLeadContactAction(setStatus);
+
+  // Re-initialise per-lead state whenever the lead changes.
+  //
+  // Leads.tsx keeps ONE instance of this modal mounted and swaps the `lead`
+  // prop, but useState only reads its initial value on mount. Opening a
+  // 'converted' lead and then a 'new' one showed the second lead as Converted,
+  // with the first lead's half-typed note still in the box — and saving from
+  // there wrote one lead's note onto another (US-101). Only loadNotes() ever
+  // re-ran. This is keyed on lead.id rather than on the object so a refetch
+  // that returns an equal-but-new row does not wipe what the agent is typing.
+  useEffect(() => {
+    setStatus(lead?.status || 'new');
+    setNote('');
+    setNotes([]);
+    setSelectedResponse('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead?.id]);
 
   // Load notes when modal opens
   useEffect(() => {
@@ -146,9 +166,15 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
 
     setIsSaving(true);
     try {
+      // A status change is more than the status: converted/lost record
+      // closed_at, the first move into contact records contacted_at, and a
+      // reset to 'new' clears both plus first_responded_at. This used to write
+      // `{ status }` alone, so none of those columns were ever maintained from
+      // the UI, and a lead put back to 'new' kept a first_responded_at the
+      // trigger could never set again (US-101).
       const { error } = await supabase
         .from('leads')
-        .update({ status: newStatus })
+        .update(buildLeadStatusPatch(newStatus, lead))
         .eq('id', lead.id)
         .select('id')
         .single();
@@ -167,6 +193,17 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     } finally {
       setIsSaving(false);
     }
+  };
+
+  /**
+   * The agent tapping call, email or text IS the response. Shared with the
+   * Leads page card through useLeadContactAction so both record it the same
+   * way; the href still fires and the dialer still opens (US-101).
+   */
+  const handleContactAction = async (channel: ContactChannel) => {
+    if (!lead) return;
+    await recordContact(lead, channel);
+    onLeadUpdated?.();
   };
 
   const addNote = async (noteText: string, isSystemNote: boolean = false) => {
@@ -348,6 +385,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
             <div className="space-y-2">
               <a
                 href={`mailto:${lead.email}`}
+                onClick={() => void handleContactAction('email')}
                 className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
               >
                 <Mail className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
@@ -357,6 +395,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               {lead.phone && (
                 <a
                   href={`tel:${lead.phone}`}
+                  onClick={() => void handleContactAction('call')}
                   className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
                 >
                   <Phone className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
@@ -367,6 +406,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               {lead.phone && (
                 <a
                   href={`sms:${lead.phone}`}
+                  onClick={() => void handleContactAction('sms')}
                   className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
                 >
                   <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-primary" />

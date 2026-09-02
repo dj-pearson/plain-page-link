@@ -12,14 +12,14 @@
  * for the contact details, so the regression cannot return silently.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderWithProviders, screen, waitFor } from '@/test/test-utils';
+import { renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
 import { mockLead, mockLeadRow } from '@/test/fixtures/lead';
 import type { LeadRow } from '@/types/lead';
 
-const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
+const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
 
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: fromMock },
+  supabase: { from: fromMock, rpc: rpcMock },
   supabaseConfig: {
     url: 'http://localhost:54321',
     anonKey: 'test-anon-key',
@@ -48,10 +48,18 @@ vi.mock('@/hooks/useMLLeadScoring', () => ({
 import Leads from './Leads';
 
 /** A `leads` select that resolves to the given rows, and records the columns asked for. */
-const stubLeadsQuery = (rows: LeadRow[], selected: string[]) => {
+const stubLeadsQuery = (
+  rows: LeadRow[],
+  selected: string[],
+  updates: Record<string, unknown>[] = []
+) => {
   const builder: Record<string, unknown> = {};
   builder.select = vi.fn((cols: string) => {
     selected.push(cols);
+    return builder;
+  });
+  builder.update = vi.fn((values: Record<string, unknown>) => {
+    updates.push(values);
     return builder;
   });
   for (const m of ['eq', 'order', 'in', 'is', 'limit']) {
@@ -64,11 +72,15 @@ const stubLeadsQuery = (rows: LeadRow[], selected: string[]) => {
 
 describe('Leads page', () => {
   let selected: string[];
+  let updates: Record<string, unknown>[];
 
   beforeEach(() => {
     selected = [];
+    updates = [];
     fromMock.mockReset();
-    fromMock.mockImplementation(() => stubLeadsQuery([mockLeadRow], selected));
+    rpcMock.mockReset();
+    rpcMock.mockResolvedValue({ data: 'activity-1', error: null });
+    fromMock.mockImplementation(() => stubLeadsQuery([mockLeadRow], selected, updates));
   });
 
   it('renders the agent’s leads with decrypted contact details', async () => {
@@ -118,5 +130,33 @@ describe('Leads page', () => {
 
     renderWithProviders(<Leads />);
     await waitFor(() => expect(screen.getByText(/failed to load leads/i)).toBeInTheDocument());
+  });
+
+  // US-101: the card's contact links were plain anchors, so an agent who
+  // phoned a lead from the list still showed as never having responded.
+  it('records the response when the agent taps a phone number on the card', async () => {
+    renderWithProviders(<Leads />);
+    await screen.findByText(mockLead.name);
+
+    await userEvent.click(screen.getByRole('link', { name: mockLead.phone! }));
+
+    await waitFor(() => expect(updates.length).toBeGreaterThan(0));
+    expect(updates[0]).toMatchObject({ status: 'contacted' });
+    expect(rpcMock).toHaveBeenCalledWith(
+      'log_lead_call',
+      expect.objectContaining({ _outcome: 'initiated' })
+    );
+  });
+
+  it('does not open the detail modal when a contact link is tapped', async () => {
+    renderWithProviders(<Leads />);
+    await screen.findByText(mockLead.name);
+
+    await userEvent.click(screen.getByRole('link', { name: mockLead.phone! }));
+
+    // The modal renders the lead's message in a Message section; the card
+    // shows it clamped. A dialog role appearing means the click bubbled.
+    await waitFor(() => expect(updates.length).toBeGreaterThan(0));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

@@ -24,6 +24,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeads } from '@/hooks/useLeads';
+import { buildLeadStatusPatch } from '@/lib/leadStatus';
+import { useLeadContactAction } from '@/hooks/useLeadContactAction';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
@@ -66,6 +68,10 @@ export default function Leads() {
   // page never loaded) and the duplicate key meant whichever of this page and
   // AnalyticsDashboard mounted first decided the row shape for both (US-094).
   const { leads, isLoading, isError, error, refetch } = useLeads();
+
+  // Tapping a lead's email or phone number on the card records the response,
+  // the same way the detail modal does (US-101).
+  const recordContact = useLeadContactAction();
 
   // Score all leads and cache results
   const leadScores = useMemo(() => {
@@ -178,9 +184,16 @@ export default function Leads() {
 
     setIsBulkActing(true);
     try {
+      // Same transition rules as the detail modal. This wrote `{ status }`
+      // alone, so bulk-setting leads back to 'new' left first_responded_at set
+      // — permanently, since the trigger only fires on the first move away
+      // from 'new' — and they went on counting as responded to (US-101).
+      // No lead row is passed: a bulk change does not hold each one, so the
+      // rules that depend on the previous value are skipped rather than
+      // guessed at. The clearing rules for 'new' apply to all of them.
       const { error } = await supabase
         .from('leads')
-        .update({ status: newStatus })
+        .update(buildLeadStatusPatch(newStatus))
         .in('id', Array.from(selectedLeadIds))
         .select('id');
 
@@ -661,6 +674,13 @@ export default function Leads() {
                           <Mail className="h-3 w-3 flex-shrink-0" />
                           <a
                             href={`mailto:${lead.email}`}
+                            onClick={(e) => {
+                              // Without this the click also bubbles to the
+                              // card and opens the detail modal behind the
+                              // mail client.
+                              e.stopPropagation();
+                              void recordContact(lead, 'email').then(() => refetch());
+                            }}
                             className="hover:text-primary active:text-primary-dark break-all"
                           >
                             {lead.email}
@@ -671,6 +691,10 @@ export default function Leads() {
                             <Phone className="h-3 w-3 flex-shrink-0" />
                             <a
                               href={`tel:${lead.phone}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void recordContact(lead, 'call').then(() => refetch());
+                              }}
                               className="hover:text-primary active:text-primary-dark"
                             >
                               {lead.phone}

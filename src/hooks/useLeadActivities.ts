@@ -45,7 +45,15 @@ export type ActivityType =
   | 'sms'
   | 'form_submission';
 
-export type CallOutcome = 'answered' | 'voicemail' | 'no_answer' | 'busy';
+/**
+ * 'initiated' covers the case the UI can actually observe: the agent tapped a
+ * tel: link and the dialer opened. Whether anyone picked up is not knowable
+ * from the browser, and recording 'answered' for it would put a fact in the
+ * timeline that nobody established (US-101). The other four are outcomes an
+ * agent reports afterwards. There is no CHECK constraint on
+ * lead_activities.call_outcome, so this stores as-is.
+ */
+export type CallOutcome = 'initiated' | 'answered' | 'voicemail' | 'no_answer' | 'busy';
 export type MeetingType = 'in_person' | 'video' | 'phone';
 export type TaskPriority = 'low' | 'medium' | 'high';
 
