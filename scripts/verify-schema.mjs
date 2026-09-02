@@ -295,6 +295,145 @@ check('every RPC referenced in code exists', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5b. Every rpc() call's NAMED ARGUMENTS must match the function's parameters.
+//
+//     Check 5 matches by name only, which is how US-098 survived it: the
+//     edge-function rate limiter called check_rate_limit with p_ip_address and
+//     p_endpoint — the column names of an orphaned `rate_limits` table — while
+//     the function takes p_identifier and p_limit_type. PostgREST resolves an
+//     overload by its named arguments, so the mismatch was a 404, the limiter's
+//     error branch failed open, and thirteen edge functions believed they were
+//     rate limited when no check had ever succeeded. Nothing in tsc, deno check
+//     or the unit tests can see this; only the applied schema can.
+//
+//     A call is checked only when its argument object is a literal this can
+//     read. Spreads, computed keys and variables are skipped rather than
+//     guessed at — reported as notes so they are visible without being fatal.
+// ---------------------------------------------------------------------------
+const rpcParams = new Map();
+for (const row of q(`
+  SELECT p.proname || E'\\t' || array_to_string(
+           ARRAY(
+             -- proargnames covers OUT columns too; for a TABLE-returning
+             -- function like check_rate_limit that would list allowed /
+             -- remaining / reset_at as if they were parameters, and the check
+             -- would accept a call passing them. proargmodes is NULL when
+             -- every argument is IN, and otherwise marks each one.
+             SELECT p.proargnames[i]
+             FROM generate_subscripts(p.proargnames, 1) AS i
+             WHERE p.proargmodes IS NULL
+                OR p.proargmodes[i] IN ('i', 'b', 'v')
+           ), ','
+         )
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public' AND p.proargnames IS NOT NULL;
+`)) {
+  const [name, args] = row.split('\t');
+  // An overloaded function contributes every parameter name it might accept;
+  // this check catches names no overload has, not a wrong choice among them.
+  const set = rpcParams.get(name) ?? new Set();
+  for (const a of (args ?? '').split(',').filter(Boolean)) set.add(a);
+  rpcParams.set(name, set);
+}
+
+/** The `{ ... }` argument object of a .rpc() call, if it is a readable literal. */
+function rpcArgObject(text, from) {
+  const open = text.indexOf('{', from);
+  if (open === -1) return null;
+  // Bail if a non-object argument (a variable, a spread) got there first.
+  const between = text.slice(from, open);
+  if (!/^[\s,]*$/.test(between)) return null;
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') {
+      depth--;
+      if (depth === 0) return text.slice(open + 1, i);
+    }
+  }
+  return null;
+}
+
+/**
+ * Top-level keys of an object literal's body.
+ *
+ * Two things make a naive scan wrong, and both produced false positives here:
+ *   - nesting: `log_audit_event({ p_details: { count: n } })` passes one
+ *     argument, not two;
+ *   - ternaries: in `p_action: cond ? 'mfa_enable' : 'mfa_verify'` the second
+ *     colon belongs to the conditional, not to a new key.
+ * So this tracks bracket depth and pending `?`s rather than matching a regex.
+ */
+function topLevelKeys(body) {
+  const keys = [];
+  let depth = 0;
+  let pendingTernary = 0;
+  let quote = null;
+  let token = '';
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (quote) {
+      if (c === quote && body[i - 1] !== '\\') quote = null;
+      else if (depth === 0) token += c;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      quote = c;
+      continue;
+    }
+    if (c === '{' || c === '[' || c === '(') {
+      depth++;
+    } else if (c === '}' || c === ']' || c === ')') {
+      depth--;
+    } else if (depth === 0 && c === '?') {
+      pendingTernary++;
+    } else if (depth === 0 && c === ':') {
+      if (pendingTernary > 0) {
+        pendingTernary--;
+      } else {
+        const k = token.trim();
+        if (/^[a-z0-9_]+$/i.test(k)) keys.push(k);
+      }
+      token = '';
+    } else if (depth === 0 && c === ',') {
+      token = '';
+      pendingTernary = 0;
+    } else if (depth === 0) {
+      token += c;
+    }
+  }
+  return keys;
+}
+
+check("every rpc() call's named arguments exist on the function", () => {
+  const out = [];
+  for (const file of sourceFiles(['src', 'supabase/functions'])) {
+    const text = stripComments(readFileSync(file, 'utf8'));
+    for (const m of text.matchAll(/\.rpc\(\s*['"]([a-z0-9_]+)['"]\s*,/g)) {
+      const fn = m[1];
+      const params = rpcParams.get(fn);
+      if (!params) continue; // check 5 already reports a function that does not exist
+      const body = rpcArgObject(text, m.index + m[0].length);
+      if (body === null) {
+        notes.push(`rpc('${fn}') in ${file.replace(ROOT + '/', '')} passes a non-literal argument object — not checked`);
+        continue;
+      }
+      if (/\.\.\./.test(body) || /\[/.test(body.split(':')[0] ?? '')) {
+        notes.push(`rpc('${fn}') in ${file.replace(ROOT + '/', '')} uses a spread or computed key — not checked`);
+        continue;
+      }
+      for (const key of topLevelKeys(body)) {
+        if (params.has(key)) continue;
+        out.push(
+          `${fn}({ ${key}: ... }) <- ${file.replace(ROOT + '/', '')}; accepts: ${[...params].sort().join(', ')}`
+        );
+      }
+    }
+  }
+  return [...new Set(out)].sort();
+});
+
+// ---------------------------------------------------------------------------
 // 6. The ownership map in src/lib/security/ownership.ts must name real columns.
 //    These helpers fail closed, so a wrong column name does not open a hole —
 //    it silently denies every operation on that table, which is just as broken
@@ -320,6 +459,82 @@ check('security ownership map names real columns', () => {
       WHERE table_schema='public' AND table_name='${table}' AND column_name='${column}';
     `);
     if (!hit.length) out.push(`OWNER_FIELD['${table}'] = '${column}' — no such column`);
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// 6b. The rate limiter must actually refuse. US-098's failure was not that the
+//     limit was wrong — it was that no check ever ran, because the RPC was
+//     called with argument names the function does not have and the error
+//     branch failed open. Check 5b stops the names drifting again; this
+//     exercises the function itself, so "the limiter works" is a demonstrated
+//     fact and not an inference from a signature.
+// ---------------------------------------------------------------------------
+check('check_rate_limit refuses the 11th call in a window', () => {
+  const out = [];
+  const id = 'schemacheck-198.51.100.7';
+  const type = 'submit-lead-schemacheck';
+  try {
+    q(`DELETE FROM public.rate_limit_entries WHERE identifier = '${id}';`);
+
+    // Ten calls with a limit of ten: every one allowed, remaining counting down.
+    for (let i = 1; i <= 10; i++) {
+      const [row] = q(
+        `SELECT allowed || ',' || remaining FROM public.check_rate_limit('${id}', '${type}', 10, 60);`
+      );
+      const [allowed, remaining] = row.split(',');
+      // `allowed || ','` casts the boolean to text, so it reads true/false
+      // rather than psql's t/f column display.
+      if (allowed !== 'true') {
+        out.push(`call ${i} of 10 was refused (remaining ${remaining})`);
+        break;
+      }
+      if (Number(remaining) !== 10 - i) {
+        out.push(`call ${i} reported remaining ${remaining}, expected ${10 - i}`);
+        break;
+      }
+    }
+
+    // The eleventh, inside the same window, must be refused.
+    const [eleventh] = q(
+      `SELECT allowed || ',' || remaining FROM public.check_rate_limit('${id}', '${type}', 10, 60);`
+    );
+    if (eleventh !== 'false,0') {
+      out.push(`the 11th call returned "${eleventh}", expected "false,0"`);
+    }
+
+    // cleanup_rate_limits() must be able to reach the row check_rate_limit
+    // wrote. It used to delete from `rate_limits`, a different and orphaned
+    // table, so nothing was ever collected (fixed in 20260902000002).
+    const before = q(
+      `SELECT count(*) FROM public.rate_limit_entries WHERE identifier = '${id}';`
+    );
+    if (before[0] === '0') {
+      out.push('check_rate_limit wrote no rate_limit_entries row');
+    }
+    q(
+      `UPDATE public.rate_limit_entries SET window_end = now() - INTERVAL '2 days' WHERE identifier = '${id}';`
+    );
+    q(`SELECT public.cleanup_rate_limits();`);
+    const after = q(
+      `SELECT count(*) FROM public.rate_limit_entries WHERE identifier = '${id}';`
+    );
+    if (after[0] !== '0') {
+      out.push('cleanup_rate_limits() left an expired rate_limit_entries row behind');
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'rate limit check raised an error');
+  } finally {
+    try {
+      q(`DELETE FROM public.rate_limit_entries WHERE identifier = '${id}';`);
+    } catch {
+      /* cleanup is best effort */
+    }
   }
   return out;
 });

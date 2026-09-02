@@ -120,6 +120,10 @@ export default async (req: Request) => {
       const rateLimit = await checkRateLimitDb(supabase, `user:${userId}`, 'generate-article', {
         maxRequests: 10,
         windowSeconds: 60,
+        // Fail closed: if the limiter is unavailable there is nothing between
+        // one account and an unbounded model bill, which is the cost this
+        // limit exists to cap (US-098).
+        failClosed: true,
       });
       if (!rateLimit.allowed) {
         return errorResponse(
