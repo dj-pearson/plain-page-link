@@ -705,3 +705,35 @@ lead_report_<date>.pdf and performance_<date>.pdf into the repo root on every
 test run (jsdom lets jsPDF's doc.save through). The two files dated today are
 tracked, so a test run shows them modified. Restore with git checkout until
 US-121 stubs the save.
+
+---
+
+## Product Deep-Dive — 2026-09-03 (stories US-128 to US-143 added)
+
+Three parallel read-only passes — CRM lifecycle, public page and open house,
+messaging and scheduling — against the ask: a cheaper-than-a-website showcase,
+full buyer/seller prospect management, and the things agents forget (open-house
+sign-in, past-client birthdays, home anniversaries, personal details). Index and
+verdict in docs/reviews/PRODUCT_REVIEW_2026-09-03.md.
+
+Headline: the inquiry inbox works and stops there. There is no person record
+(one form = one leads row, email is ciphertext so duplicates are unfindable), no
+past-client stage, no tags, no import, no dates, no reminder beyond the SLA
+chase, no deal/pipeline after 'converted', no open house (two orphan listing
+columns and a plan flag), no email in the agent's name and no unsubscribe, a
+workflow builder with no runtime (send_email logs; delay is a 5 s setTimeout),
+and a plan matrix selling SMS with no provider.
+
+16 stories, all passes:false, in dependency order: the person (128-130), the
+reminder engine on the existing hourly job (133), prospects (131, 132, 134),
+client email identity and consent (135), the workflow runtime (136), open house
+event and kiosk (137, 138), matching and appointments (139, 140), the listing
+page and publish controls (141, 142), and copy reconciled to the product (143).
+Refined: US-124 lists what the new stories claim so the dead-code sweep keeps
+it; US-126 absorbs the free-tool drips whose emails 2-7 never send; US-127
+shares its QR component with the open-house flyer.
+
+Constraints for whoever runs these: one clock (hourly GitHub cron into
+scheduled-maintenance, US-103) — add tasks, never a second scheduler; the PII
+key is edge-function only (US-066), so hashing and contact writes go through a
+function; subscription_plans is the enforced matrix, pricing-plans.ts is copy.

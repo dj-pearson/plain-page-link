@@ -1972,11 +1972,12 @@
         "Feature flags either gate at least the SSO and workflows entry points or the table, manager and hook are removed together; SSO login/config are either routed or removed with their functions",
         "One sitemap implementation remains and robots.txt points at it; one LoadingSpinner and one SkeletonCard",
         "The listed dependencies are uninstalled; three is removed if Hero3D/Hero3DPhone go",
-        "npm run build, test:run and tsc pass; bundle size does not rise"
+        "npm run build, test:run and tsc pass; bundle size does not rise",
+        "Items claimed by US-130, US-136, US-140, US-141, US-142 and US-143 (listed in the notes) are left in place or handled by those stories; everything else knip reports is deleted or wired"
       ],
       "priority": 124,
       "passes": false,
-      "notes": "Found by the 2026-09 review (architecture and content slices). Do after US-102 and US-116 so those decisions are not undone here."
+      "notes": "Found by the 2026-09 review (architecture and content slices). Do after US-102 and US-116 so those decisions are not undone here. REFINED 2026-09-03 by the product deep-dive: more dead code found, and several items are now CLAIMED by new stories, so the sweep must not delete them \u2014 exportUtils.formatLeadsForExport (zero callers; delete), src/lib/mortgageCalculator.ts (claimed by US-141), src/pages/Sitemap.tsx (unrouted; generate-sitemap is the live one; delete), the LegacyLead/LeadFormType/LeadStatus/LeadPriority/ContactMethod types in src/types/lead.ts (claimed by US-130), MLLeadScoringDashboard and useMLLeadScoring.recordLeadConversion (no route, no caller), useLeadActivities.logMeeting and deleteActivity (claimed by US-130 and US-140), _shared/email.ts createAutoResponseEmail (claimed by US-138 or delete), run-scheduled-audit and schedule-seo-audit (no caller anywhere; US-126), workflow_templates/workflow_node_templates with zero rows (claimed by US-136), check_feature_limit/feature_catalog/feature_usage/monthly_usage_summary (claimed by US-143), and profiles.custom_css (claimed by US-142). Run knip after those land and treat their claims as the allowlist."
     },
     {
       "id": "US-125",
@@ -1996,17 +1997,18 @@
     {
       "id": "US-126",
       "title": "Decide the fate of the SEO suite: 32 tables, 37 uncalled functions and 460 KB of admin UI that the agent never sees",
-      "description": "Of 135 public tables, 32 are seo_* plus gsc_*, yandex_*, ga4_* and pseo_*; src/ queries 8 of the 32. Of 89 edge functions, 33 are invoked from src/ and 37 are referenced by nothing (analyze-*, check-*, crawl-site, detect-*, gsc-*, apply-seo-*, optimize-page-content, validate-structured-data, run-scheduled-audit and more), and no migration or workflow schedules any of them. 24 tables are touched by neither src/ nor supabase/functions (seo_automation_logs, seo_page_scores, seo_report_history, seo_settings, workflow_execution_queue, workflow_templates, workflow_triggers, workflow_versions, lead_scores, ml_training_examples, team_round_robin, rate_limits, mortgage_calculations, ...). src/components/admin is 460 KB across 33 components and SEODashboard.tsx is an 11-line wrapper around the same SEOManager that AdminDashboard.tsx:23 mounts as a tab. This is the platform's own marketing tooling living inside the agent product; it doubles the schema, the deno check surface and the migration risk for a product whose users are agents.",
+      "description": "Of 135 public tables, 32 are seo_* plus gsc_*, yandex_*, ga4_* and pseo_*; src/ queries 8 of the 32. Of 89 edge functions, 33 are invoked from src/ and 37 are referenced by nothing (analyze-*, check-*, crawl-site, detect-*, gsc-*, apply-seo-*, optimize-page-content, validate-structured-data, run-scheduled-audit and more), and no migration or workflow schedules any of them. 24 tables are touched by neither src/ nor supabase/functions (seo_automation_logs, seo_page_scores, seo_report_history, seo_settings, workflow_execution_queue, workflow_templates, workflow_triggers, workflow_versions, lead_scores, ml_training_examples, team_round_robin, rate_limits, mortgage_calculations, ...). src/components/admin is 460 KB across 33 components and SEODashboard.tsx is an 11-line wrapper around the same SEOManager that AdminDashboard.tsx:23 mounts as a tab. This is the platform's own marketing tooling living inside the agent product; it doubles the schema, the deno check surface and the migration risk for a product whose users are agents. The 2026-09-03 deep-dive adds: run-scheduled-audit and schedule-seo-audit have no caller in src/, supabase/ or .github/ (the only scheduler is scheduled-maintenance, US-103); and the two lead-magnet drips for the free tools, send-scheduled-listing-emails and send-scheduled-bio-emails, are on no cron either, so email 1 of each sequence sends from the tool page and emails 2-7 have never sent (the listing_email_sequences and instagram_bio_email_sequences tables record schedules nothing executes).",
       "acceptanceCriteria": [
         "A written decision in docs/architecture: extract the SEO suite to its own repository, or keep it as an isolated src/admin-seo/ package with its own lazy entry and its own migration prefix",
         "The 37 uninvoked functions are each either scheduled (US-103's scheduler), invoked from the admin UI, or deleted with their tables in a migration",
         "The 24 orphan tables are dropped or claimed by a caller; verify:schema fails on a public table referenced by no code",
         "/admin/seo is removed as a duplicate of the AdminDashboard tab",
-        "CLAUDE.md's table count and cluster description are updated"
+        "CLAUDE.md's table count and cluster description are updated",
+        "The two free-tool email sequences are either driven from the scheduled-maintenance queue task (US-136) so emails 2-7 send, or the sequence functions and tables are removed and the tool pages send a single email; the decision is recorded here"
       ],
       "priority": 126,
       "passes": false,
-      "notes": "Found by the 2026-09 architecture review. A decision story like US-057; the work that follows is a separate batch."
+      "notes": "Found by the 2026-09 architecture review. A decision story like US-057; the work that follows is a separate batch. The free-tool drips are platform marketing, not an agent feature, so they belong to this decision rather than to US-136."
     },
     {
       "id": "US-127",
@@ -2020,7 +2022,270 @@
       ],
       "priority": 127,
       "passes": false,
-      "notes": "Found by the 2026-09 review (content and onboarding slices)."
+      "notes": "Found by the 2026-09 review (content and onboarding slices). REFINED 2026-09-03: the QR code component built here is shared with the open-house flyer and yard sign in US-137 \u2014 build it once (qrcode.react, a download-as-PNG helper, the profile URL or any URL passed in). The custom-domain removal stays here; the wider copy reconciliation is US-143, so this story removes only the Zillow import mode and the domain bullet. The setup checklist should also include \u201cImport your past clients\u201d once US-129 lands, because an imported list is what makes the reminders (US-133) useful in week one. New observation for the checklist: profiles.is_published has no UI at all (US-142), so \u201cpublish your page\u201d cannot be a checklist step until that lands."
+    },
+    {
+      "id": "US-128",
+      "title": "A person record: contacts that outlive a lead, deduplicated by email",
+      "description": "A lead is the only person record in the product, and it is one-shot: one form submission is one leads row (supabase/functions/submit-lead/index.ts:126-140 inserts unconditionally, no lookup, no unique constraint). The same buyer asking about three listings is three strangers, and because email is ciphertext (encrypted_email, US-086) a duplicate cannot even be found by query \u2014 the Leads page searches email client-side over loaded pages only (src/pages/dashboard/Leads.tsx:427-430). An exhaustive search of src/ and supabase/ finds no contacts, clients or households table and no column for tags, birthday, anniversary, closing date, household details, preferred channel or 'past client'; preferred_contact_method exists only in the dead LegacyLead interface (src/types/lead.ts:48). leads.notes is never read or written. The user's ask \u2014 a buyer who becomes a past client whose birthday, home anniversary and family details keep them top of mind \u2014 has nowhere to live. This story adds the record; the pages that use it follow (US-129 to US-134).",
+      "acceptanceCriteria": [
+        "Migration creates contacts (id, user_id NOT NULL, first_name, last_name, encrypted_email, encrypted_phone, email_hash, phone_hash, stage CHECK IN ('lead','active_buyer','active_seller','past_client','sphere','archived') DEFAULT 'lead', tags text[] DEFAULT '{}', source, referred_by_contact_id self-FK, preferred_channel CHECK IN ('call','sms','email'), birthday date, current_address, personal_details jsonb, email_opt_in bool, sms_opt_in bool, do_not_contact bool DEFAULT false, last_contacted_at, next_touch_at, created_at, updated_at) and contact_important_dates (id, contact_id, user_id, label, date, recurs_annually bool DEFAULT true, remind_days_before int DEFAULT 7); both with RLS for the owner and for team assignees on the pattern of 20260902000006, updated_at triggers, indexes on (user_id, stage), (user_id, email_hash) and (user_id, next_touch_at)",
+        "email_hash and phone_hash are an HMAC-SHA256 of the normalised value keyed with the PII key, computed only server-side in _shared/encryption.ts (the key left the client in US-066); a unique index on (user_id, email_hash) WHERE email_hash IS NOT NULL prevents duplicates",
+        "leads gains contact_id (FK, nullable) and email_hash; lead_activities gains contact_id (nullable) so a timeline can span every inquiry from the same person; the auto-log triggers populate it",
+        "submit-lead finds-or-creates the contact by (user_id, email_hash), falling back to phone_hash, sets leads.contact_id, and records the inquiry on the contact timeline; a returning person produces one contact with two leads, verified by a test that submits twice with the same email and different casing/whitespace",
+        "A service-role backfill function on the pattern of backfill-lead-pii decrypts existing leads, hashes, and creates one contact per (user_id, email) with stage derived from the best lead status (converted -> past_client, otherwise lead); it is idempotent and reports counts",
+        "personal_details is bounded like form_data (max keys, key and value length, no nested objects) in the edge function that writes it, and its allowed keys are documented (partner_name, children, pets, employer, interests, notes)",
+        "src/integrations/supabase/types.ts is regenerated; npm run verify:schema passes with the new tables (RLS on, no unconditional anon policy, SECURITY DEFINER functions pin search_path); npm run test:run and tsc pass"
+      ],
+      "priority": 128,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). This is the pivot the rest of the batch stands on: US-129 (People page and import), US-131 (deals), US-132 (closing), US-133 (dates and reminders), US-134 (cadence and referrals), US-138 (open-house sign-in) all write to contacts. Do it first and keep it to the schema, the edge-function upsert and the backfill; no UI here. Keep leads as the inquiry inbox \u2014 a lead is an event, a contact is a person. The hash must be computed where the key is (edge functions), never in the browser: the dashboard creates contacts through an edge function (US-129), not through a direct PostgREST insert."
+    },
+    {
+      "id": "US-129",
+      "title": "The People page: past clients and sphere, imported from a spreadsheet on day one",
+      "description": "There is no page for anyone who is not a fresh inquiry. The dashboard nav is Overview, Profile, Links, Listings, Leads, Analytics, Settings (src/config/dashboard-nav.ts:46-54); Leads is a list of form submissions with status/type filters, name search and a card list (src/pages/dashboard/Leads.tsx:573-642, 754-889). An agent's most valuable list \u2014 the people who already bought or sold with them, the ones who send referrals \u2014 has no way in: there is CSV export (Leads.tsx:311-362) and no CSV import anywhere. Without an import, every relationship feature in this batch starts from zero and an agent with a decade of clients sees an empty page.",
+      "acceptanceCriteria": [
+        "A People entry is added to PRIMARY_NAV at /dashboard/people; the nav-coverage test in dashboard-nav still passes and MobileNav's bar and sheet both reach it",
+        "The list shows contacts with stage tabs (All, Active buyers, Active sellers, Past clients, Sphere, Leads), a tag filter, name search (ilike server-side) and exact email/phone lookup (hashed through an edge function, so it works on ciphertext), sort by last contacted and next touch; 50 per page with load-more; a card list with 44px targets on phones and no horizontally overflowing filter row",
+        "A contact drawer shows: call/text/email buttons that open the native app AND log a touch (useLeadContactAction generalised to contacts), stage picker, tag editor, a Personal card (birthday, home anniversary, current address, partner, children, pets, employer, interests, free notes), an Important dates list with add/remove (writes contact_important_dates), the related inquiries (leads) and deals, and one timeline across all of them (lead_activities by contact_id)",
+        "Create contact and edit contact go through a contacts edge function that encrypts email/phone and computes the hashes; a direct PostgREST insert of encrypted_email is not possible for the authenticated role (no INSERT policy on those columns, or a trigger that rejects unhashed rows)",
+        "CSV import: upload, auto-map columns (name / first / last / email / phone / tags / birthday / closing date / address / notes) with a manual mapping step, preview the first 10 rows, dedupe against existing contacts by hash, then import server-side in batches with a progress indicator and a downloadable rejects file; 1,000 rows import in under a minute and re-importing the same file creates zero new rows",
+        "The empty state's primary action is 'Import your past clients' with a template CSV to download; the secondary is 'Add a person'",
+        "Export uses the quoting fixed in US-104 and includes stage, tags, birthday and the important dates",
+        "Component tests cover the drawer save, the import mapping and the dedupe; tsc, lint and test:run pass"
+      ],
+      "priority": 129,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-128. Leads stays as the inbox for new inquiries; a lead card gains a link to its contact. No plan limit on contacts in this story \u2014 the relationship features are the reason to pay, and an empty People page is the reason to leave. Reuse the encrypt/decrypt boundary from src/lib/pii.ts (decryptLeadContacts) rather than adding a second one."
+    },
+    {
+      "id": "US-130",
+      "title": "The lead detail hides most of what the form captured, and the CRM overflows on a phone",
+      "description": "The public forms capture more than the CRM shows. splitFormData lifts price_range, timeline, property_address, preapproved and message into columns (src/lib/leadSubmission.ts:79-117); everything else \u2014 buyer propertyType, bedrooms, preApprovalStatus; seller bathrooms, reason; valuation squareFeet, yearBuilt, condition \u2014 lands in form_data, and the only key ever read back is budget (src/components/leads/LeadDetailModal.tsx:63-65, 504-510). leads.listing_id is written at capture (leadSubmission.ts:138) and never rendered: the modal shows property_address text only (LeadDetailModal.tsx:497-503), so 'which listing did they ask about', the point of US-096, is invisible. The quick-response templates prefill the notes box and send nothing (LeadDetailModal.tsx:300-306). Tasks are always priority 'medium' with no picker (LeadDetailModal.tsx:261-270). logMeeting and deleteActivity exist with no UI (src/hooks/useLeadActivities.ts:253, 354). The status set disagrees with itself: the UI offers new/contacted/qualified/converted/lost (LeadDetailModal.tsx:108-114), leadStatus.ts:21-24 also honours 'closed' and 'nurturing', and there is no CHECK constraint. leads.notes is dead (never read or written). src/types/lead.ts:1-16, 39-120 declare an unused LegacyLead model with its own status and priority enums. On a phone the filter row (Leads.tsx:573-642) is a non-wrapping flex of two fixed-width selects and three buttons and overflows horizontally; there are no swipe actions.",
+      "acceptanceCriteria": [
+        "The modal renders every form_data key the four forms write, in a labelled 'What they told you' block, and the form_data schema per lead_type is documented in src/lib/leadSubmission.ts",
+        "When listing_id is set the modal shows the listing card (photo, address, price, status) with a link to it on the public page, and the Leads list card shows 'Asked about 123 Main St'",
+        "Quick responses send: choosing one opens a preview, sending goes through the client email path (US-135) or, before US-135 lands, opens the agent's mail client with the filled template via mailto and logs an email activity either way",
+        "Follow-up tasks have a priority picker (low/medium/high) and a Log meeting action that writes meeting_type, meeting_scheduled_at and meeting_location; activities the agent wrote can be deleted from the timeline",
+        "The status vocabulary is one list: a CHECK constraint on leads.status, the UI options, and leadStatus.ts agree (decide whether 'nurturing' and 'closed' are real; if not, remove them from leadStatus.ts and the tests)",
+        "leads.notes is dropped in a migration, and the LegacyLead, LeadFormType, LeadStatus, LeadPriority and ContactMethod types are deleted with any dead importers",
+        "The filter row wraps or collapses into a Filters sheet on screens under 640px, verified by a Playwright viewport test at 375px showing no horizontal scroll on /dashboard/leads",
+        "tsc, lint and test:run pass; the LeadDetailModal tests cover the new block and the listing card"
+      ],
+      "priority": 130,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Small, self-contained, and it makes the next stories visible: buyer criteria (US-139) are prefilled from exactly the form_data keys this story surfaces. Do it before or alongside US-128."
+    },
+    {
+      "id": "US-131",
+      "title": "Buyer and seller pipelines: a deal record with stages, not a lead with a status",
+      "description": "After a lead is marked converted the product has nothing more to say. buildLeadStatusPatch sets closed_at (src/lib/leadStatus.ts:21-77) and that is the end: no transaction record, no stage between 'qualified' and 'converted', no link to the property, no expected close date, no price, no side. A buyer touring homes for four months and a seller waiting on a listing appointment are both 'qualified'. The user asked for full management of prospects for buying and selling; that is a pipeline per side with stages an agent recognises, and it needs its own record because one person can be buying and selling at once.",
+      "acceptanceCriteria": [
+        "Migration creates deals (id, user_id, contact_id NOT NULL, lead_id nullable, side CHECK IN ('buy','sell'), stage text, status CHECK IN ('open','won','lost') DEFAULT 'open', listing_id nullable, price_min/price_max numeric (buy), list_price numeric (sell), expected_close_date date, closed_at, sale_price numeric, commission_amount numeric nullable, lost_reason, notes, created_at, updated_at) with RLS for owner and team assignees; a CHECK or trigger restricts stage to the side's list: buy = new, consultation, pre_approved, touring, offer, under_contract, closed; sell = new, listing_appointment, cma_sent, listed, under_contract, closed",
+        "/dashboard/pipeline shows Buyers and Sellers tabs; on screens 768px and up a board with drag between stage columns, on phones a stage-grouped list with a stage picker on each card; each card shows the person, property or price range, days in stage and next task",
+        "A 'Start a deal' action on a lead creates the contact if none exists (US-128), creates the deal with side derived from lead_type (buyer -> buy, seller and valuation -> sell, contact -> ask) and moves the lead to converted; a deal can also be started from a contact",
+        "Every stage change writes a lead_activities row (activity_type status_change, contact_id set) so the timeline shows the journey; won/lost are set only through the close flow (US-132) or a Mark lost dialog that requires a reason",
+        "Overview gains a pipeline strip: open deals per side, expected closings this month, and 'stuck' deals (no activity in 14 days) with a link to each",
+        "Lead scoring input hasViewedMultipleListings/timeline is untouched; the existing lead statuses keep their meaning for the inbox",
+        "Migration passes verify:schema; types regenerated; tests cover the stage-list guard and the start-a-deal derivation; tsc, lint and test:run pass"
+      ],
+      "priority": 131,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-128. Keep the stage lists short and recognisable to an agent; do not make them configurable in this story. Commission is optional and private to the agent \u2014 never rendered anywhere public and excluded from exports by default."
+    },
+    {
+      "id": "US-132",
+      "title": "Closing a deal turns a prospect into a past client, with the dates that matter already filled in",
+      "description": "Nothing happens when a deal closes. Today 'converted' sets closed_at and getLeadNextStep suggests a check-in whose button prefills a task seven days out (src/lib/leadNextStep.ts:68-75, LeadDetailModal.tsx:242-249). There is no record of what was bought or sold, at what price, on what date, or where the person now lives \u2014 which is exactly the data that drives the home-anniversary card, the annual equity check-in, and the referral ask. Sold listings are edited by hand on the Listings page (status 'sold', sold_date) with no link to the client. The review page has existed at /:username/review since US-074, but nothing asks a client to use it at the moment they are happiest.",
+      "acceptanceCriteria": [
+        "A 'Mark closed' flow on a deal collects closing date, sale price, the property (prefilled from listing_id or the lead's property_address) and, if blank on the contact, birthday and a one-line personal note ('You will want these later'); it sets deal status won, closed_at and sale_price",
+        "On a buy-side close: contact.stage becomes past_client, contact.current_address becomes the property, and a recurring 'Home anniversary' row is added to contact_important_dates on the closing date with remind_days_before 7",
+        "On a sell-side close: the linked listing is set to sold with sold_date and the sale price in the format the public page parses (price is text), so it appears in Recent Success Stories without a second edit; contact.stage becomes past_client unless they also have an open buy-side deal",
+        "A review request is scheduled for 7 days after close: an email with the /:username/review link through the client email path (US-135), or before US-135 a due task on the contact with a prefilled mailto; either way the timeline shows it",
+        "Overview shows 'Closed this year' (count and volume from deals) and the People page shows past clients sorted by closing date",
+        "A test covers each side of the close and the anniversary row; tsc, lint and test:run pass"
+      ],
+      "priority": 132,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-131. This is the bridge between the prospect half and the relationship half of the product. Do not create testimonials automatically \u2014 the client writes the review, the agent moderates it (US-074)."
+    },
+    {
+      "id": "US-133",
+      "title": "Birthdays, home anniversaries and due tasks reach the agent \u2014 by email, in a morning digest, not only if they open the dashboard",
+      "description": "The hourly job (supabase/functions/scheduled-maintenance/index.ts, .github/workflows/scheduled-maintenance.yml) chases only unanswered new leads past sla_hours (:74-169). Due follow-up tasks are visible solely in DueFollowUps on Overview (src/components/dashboard/DueFollowUps.tsx, useDueLeadTasks) \u2014 nothing server-side reads task_due_date, so an agent who does not log in that morning is never reminded. There are no date fields to remind about at all (US-128 adds them). notify-lead sends instantly for agents who chose daily_digest 'because no digest job exists' (supabase/functions/notify-lead/index.ts:109-114). profiles has no timezone column, so 'morning' cannot be computed. The reminder engine the user described \u2014 birthdays, closing anniversaries, important dates, with enough notice to send a card \u2014 can ship on the existing job, the notifications table and _shared/email.ts with no new infrastructure; the overdue_leads task is the pattern (per-agent preferences, at-most-once dedupe through notifications.data).",
+      "acceptanceCriteria": [
+        "profiles gains timezone (IANA name, default America/New_York, set from the browser on first dashboard load and editable in Settings) and notification_preferences gains dates (instant|digest|off), digest_hour (0-23, default 7) and reminder_days_before (default 7)",
+        "scheduled-maintenance gains an upcoming_dates task: for every contacts.birthday and contact_important_dates row whose next occurrence is exactly reminder_days_before days away or today (in the agent's timezone; 29 February observed on 28 February in non-leap years), insert a notifications row of type important_date with data {contact_id, date_id, occurrence: 'YYYY'} at most once per occurrence, and email the agent when dates is instant",
+        "scheduled-maintenance gains a daily_digest task that runs once per agent per day at digest_hour in their timezone and sends one email with: new leads since the last digest, tasks due today and overdue, dates in the next reminder window, and (after US-134) overdue touches; agents on leads=daily_digest stop receiving instant lead emails and the comment in notify-lead is removed; an agent with nothing to report gets no email",
+        "Overview gains a 'Coming up' block listing the next 14 days of dates with the person's name, the occasion and one-tap call / text / send-a-note actions that log a touch (send-a-note is a mailto with a prefilled message until US-135, then the client email path); the block renders nothing when empty like DueFollowUps",
+        "Tapping an important_date notification opens the contact drawer (notification-dropdown.tsx deep link, like lead_overdue)",
+        "Unit tests cover next-occurrence maths (year rollover, leap day, timezone day boundary) and the once-per-occurrence dedupe; the job SQL is exercised against a real Postgres like US-103; tsc, lint and test:run pass"
+      ],
+      "priority": 133,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-128 for the date rows; the digest and task-reminder halves do not and can ship first. GitHub Actions cron is hourly at :17; a digest_hour is therefore honoured to the hour, which is fine. This is the highest-value story in the batch per unit of work: it is what makes the imported past-client list (US-129) do something the week it is imported."
+    },
+    {
+      "id": "US-134",
+      "title": "Stay-in-touch cadence and referral tracking, so past clients are never quietly forgotten",
+      "description": "Nothing measures time since the agent last spoke to a person: contacted_at records first contact only (src/lib/leadStatus.ts:70-73), and after that a lead can sit untouched forever with no signal. Referrals \u2014 the reason to stay in touch \u2014 are untracked: source 'referral' is a scoring weight (src/lib/ml-lead-scoring.ts:119, lead-scoring.ts:249) that no code ever writes, the public forms never ask how the person found the agent, and there is no referred_by anywhere. The nav description for Workflows promises 'Automate follow-up when a lead arrives'; the follow-up that keeps a past client sending business is a call every quarter, and the product cannot tell an agent who is due one.",
+      "acceptanceCriteria": [
+        "contacts gains touch_cadence_days (nullable); Settings holds per-stage defaults (past_client 90, sphere 60, active_buyer 7, active_seller 7; leads use sla_hours instead); a trigger recomputes next_touch_at from last_contacted_at + effective cadence whenever either changes",
+        "A trigger on lead_activities sets contacts.last_contacted_at on any call, sms, email, meeting or note by the agent (is_internal notes count; automated emails do not), including activities on leads linked to the contact",
+        "The People page has an 'Overdue' filter (next_touch_at < now) and Overview shows a 'Reach out' block of the five most overdue people with call / text / email actions that log the touch and clear the overdue state; the daily digest (US-133) includes the count",
+        "The four public forms and the open-house sign-in gain an optional 'How did you hear about me?' select (Instagram, Facebook, Google, Zillow, Realtor.com, Referral, Open house, Yard sign, Other) that writes leads.source with the values scoring already knows (src/lib/ml-lead-scoring.ts:118-128) and, for Referral, a free-text referrer name into form_data.referrer_name",
+        "referred_by_contact_id is editable in the contact drawer with a contact picker; a contact shows how many people they referred and who; Analytics gains leads-by-source from real data",
+        "Tests cover the cadence trigger and the referral field; tsc, lint and test:run pass"
+      ],
+      "priority": 134,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-128 and US-129. Keep the cadence defaults editable but not the stage list."
+    },
+    {
+      "id": "US-135",
+      "title": "Email to clients in the agent\u2019s name, with consent, an unsubscribe link and a suppression list",
+      "description": "Every email the platform sends is from one global FROM_EMAIL, default noreply@agentbio.net (supabase/functions/_shared/email.ts:51-71); nothing reads a per-agent sender, and agent-contact.ts resolves the agent only as a recipient. That is fine for alerts to the agent and not fine for a birthday note, a listing match or an open-house thank-you to a client. There is no unsubscribe: one hardcoded ${SITE_URL}/unsubscribe link (send-listing-generator-email/index.ts:282) and an {{unsubscribe_url}} placeholder (src/lib/instagram-bio-analyzer/email-templates.ts:440) point at a route that does not exist; there is no suppression table, no List-Unsubscribe header, no bounce or complaint handling, and the privacy policy promises all of it (src/pages/legal/PrivacyPolicy.tsx:184-196). No public form records consent. createAutoResponseEmail (email.ts:177) has zero callers. Every client-facing story in this batch (US-130, 132, 133, 136, 138, 139, 140) needs this first, and CAN-SPAM requires the sender's postal address, which profiles does not hold.",
+      "acceptanceCriteria": [
+        "_shared/email.ts gains sendClientEmail({ agentUserId, contactId, to, subject, html, text, category: 'transactional'|'marketing' }): From is '<agent full_name> via AgentBio <agents@agentbio.net>' (or the configured client-sending domain), Reply-To is the agent's auth email, the footer carries agent name, brokerage, licence, the agent's postal address and an unsubscribe link, and List-Unsubscribe / List-Unsubscribe-Post headers are set",
+        "profiles gains office_address (required before the first marketing email; Settings explains why); sendClientEmail refuses marketing email while it is blank, and refuses any email to a contact with do_not_contact, an email_suppressions row, or (for marketing) email_opt_in false, returning {ok:false, reason}",
+        "Migration creates email_suppressions (user_id nullable for global, email_hash, reason CHECK IN (unsubscribe, bounce, complaint, manual), created_at) with RLS; a public /unsubscribe/:token route (token = HMAC of contact_id + user_id + purpose, verified in an edge function) confirms in one tap, writes the suppression, sets contacts.email_opt_in false and logs it on the timeline",
+        "A resend-webhook edge function verifies the Resend signature (pattern of _shared/webhook-auth.ts) and handles email.bounced and email.complained by writing a global suppression, and email.delivered/opened/clicked by updating the matching lead_activities metadata (which is what the email_opened and email_clicked workflow triggers will read)",
+        "Every sendClientEmail call writes a lead_activities row (activity_type email, is_internal false, metadata.provider_id) so the contact timeline is the audit trail",
+        "The four public forms and the open-house sign-in carry a consent line and checkbox that sets contacts.email_opt_in (transactional replies to the inquiry itself do not need it; sequences and notes do)",
+        "The privacy policy text matches what is built; email.test.ts covers the refusal paths and the header set; tsc, lint and test:run pass"
+      ],
+      "priority": 135,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-128 for email_hash and email_opt_in. Sending from the platform domain with the agent as Reply-To avoids per-agent domain verification entirely; note in docs/deploy which Resend domain and webhook secret the environment needs (names only, never values). Do the suppression list before any story sends its first marketing email."
+    },
+    {
+      "id": "US-136",
+      "title": "Follow-up sequences that actually run: a durable step queue, a send_email node that sends, and seeded templates",
+      "description": "The workflow builder is a complete UI with no runtime. execute-workflow has zero callers in src/ (the builder's run button calls start_workflow_execution, which only inserts a workflow_executions row \u2014 src/stores/useWorkflowBuilderStore.ts:684). Its send_email node console.logs and returns {success:true, sentAt} without importing _shared/email.ts (supabase/functions/execute-workflow/index.ts:37-53); its delay node is an in-process setTimeout capped at 5000 ms 'for testing' (:210-225), so a 'wait 2 days' step cannot exist. workflow_triggers accepts lead_created and thirteen other types that nothing dispatches; get_scheduled_workflows and workflow_execution_queue (with scheduled_for and locked_at indexes) exist with no caller. workflow_templates and workflow_node_templates have zero seed rows. pricing-plans.ts sells followUpSequences on every paid tier and Overview.tsx:94 lists 'Follow-up sequences' as a plan feature. Separately, the two lead-magnet drips (send-scheduled-listing-emails, send-scheduled-bio-emails) send email 1 from the tool pages and never emails 2-7, because no cron calls them.",
+      "acceptanceCriteria": [
+        "submit-lead (after the contact upsert), the deal stage-change path and the open-house sign-in enqueue a workflow_executions row plus the first workflow_execution_queue step for each of the agent\u2019s active, published workflows whose trigger matches (lead_created, lead_status_changed, deal_stage_changed, open_house_checkin); the dispatch is one shared helper in _shared",
+        "scheduled-maintenance gains a workflow_queue task that claims due steps (scheduled_for <= now, locked_at IS NULL) through a FOR UPDATE SKIP LOCKED RPC, runs each through execute-workflow, records the step in workflow_execution_steps, and on a delay node writes scheduled_for = now + delay and returns; a step that throws is retried up to three times then marks the execution failed; the claim is idempotent under two concurrent runs (tested)",
+        "send_email uses sendClientEmail (US-135) with {{first_name}}, {{agent_name}}, {{listing_address}} and {{open_house_address}} substitution and refuses without consent; create_task, update_lead and webhook_call keep working; a node type the executor does not implement cannot be published",
+        "workflow_templates is seeded with four real sequences \u2014 New buyer inquiry (5 touches over 14 days), New seller inquiry (4 touches), Open house follow-up (thank-you at +1 h, still-interested at +2 days, market update at +14 days), Past client annual check-in \u2014 and WorkflowsListPage offers 'Start from a template'",
+        "subscription_plans gains max_active_workflows (free 1, starter 3, professional 10, team/enterprise unlimited) enforced by enforce_plan_limit on publish; the Overview and Subscription feature rows read it",
+        "The two lead-magnet sequences are either driven from the same queue task (emails 2-7 send) or deleted with their tables \u2014 decision recorded in the notes",
+        "A workflow execution is visible on the contact timeline (one activity per sent email or created task, referencing the workflow); tsc, lint, test:run and verify:schema pass"
+      ],
+      "priority": 136,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-128 and US-135. Do not build a second scheduler: the hourly GitHub Actions cron and scheduled-maintenance are the clock (US-103), so step timing is honoured to the hour; anything that must be immediate (the open-house thank-you) is sent synchronously by the function that handles the event, not by a workflow. If hourly proves too coarse, tighten the cron, do not add pg_cron."
+    },
+    {
+      "id": "US-137",
+      "title": "Open houses as events: scheduled from a listing, shown on the public page, with a printable flyer and QR code",
+      "description": "Open house is a plan flag and marketing copy with no feature behind it: openHouseManagement and openHousesPerMonth exist only in src/config/pricing-plans.ts (:42, 363, 402), /features/property-listings promises 'Include open house dates' (src/pages/features/PropertyListings.tsx:151), and the Landing card says 'open house dates'. The listing forms write open_house_date and open_house_end_date (AddListingModal.tsx:671-688, Listings.tsx:178-181; edit drops the end date, Listings.tsx:382) into columns that are excluded from the public select (usePublicProfile.ts:80-105) and from PublicListingFields (src/types/listing.ts:74-98): nothing ever renders them. A listing has one open house at a time, no time of day, no sign-in link, no guest list. There is no QR code anywhere (qrcode.react installed, unused \u2014 US-127) and no flyer.",
+      "acceptanceCriteria": [
+        "Migration creates open_houses (id, user_id, listing_id, starts_at, ends_at timestamptz, code text unique (8 chars, unambiguous alphabet), status CHECK IN ('scheduled','live','ended','cancelled'), welcome_message, ask_working_with_agent bool, ask_preapproved bool, ask_timeframe bool, guest_count int DEFAULT 0, created_at, updated_at) with owner RLS; existing listings.open_house_date/open_house_end_date rows are migrated into it and the two columns dropped; a SECURITY DEFINER get_open_house_public(code) returns only what the sign-in page needs (address, first photo, price, agent name and avatar, starts_at, ends_at, the three ask_ flags, welcome_message)",
+        "Listings cards in the dashboard gain 'Schedule an open house'; /dashboard/open-houses lists upcoming and past events with edit/cancel, the sign-in link, the QR code and the flyer; the Add/Edit listing modals lose the two date fields",
+        "The public page shows upcoming open houses: a badge on the listing card ('Open house Sat, Sep 6 \u00b7 1\u20134 pm' in the agent's timezone), a section in the listing modal/page, an 'Upcoming open houses' strip on the profile when any exist, and an Event in the listing's JSON-LD; the crawler prerender includes it",
+        "A printable flyer (jspdf, already a dependency) with the first photo, price, beds/baths/sqft, date and time, agent name/phone/brokerage and a QR code to /:username/oh/:code, plus a yard-sign variant with a large QR and \u201cScan to sign in\u201d; the QR component is shared with the profile QR from US-127",
+        "subscription_plans gains max_open_houses_per_month enforced by enforce_plan_limit on insert, seeded so that every tier including free can run at least one per month; pricing copy reconciled in US-143",
+        "Tests cover the code generator, the badge date formatting and the plan guard; verify:schema, tsc, lint and test:run pass"
+      ],
+      "priority": 137,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Independent of the contacts work; the sign-in itself is US-138. The status field is derived (scheduled/live/ended) from the times except for cancelled."
+    },
+    {
+      "id": "US-138",
+      "title": "Open-house sign-in: a kiosk page guests use on the agent\u2019s tablet, a live guest list, and a thank-you that goes out before they reach the car",
+      "description": "There is no sign-in sheet, kiosk, guest registration or check-in of any kind in src/ (zero hits). docs/product/features.md:2017-2120 specced one in 2025 \u2014 kiosk mode, qualifying questions, consent, instant confirmation, automated follow-up \u2014 and none of it was built. The user named this as the first of the things people don't think about: a paper sheet loses the guest, and the guest who signed in and never heard back is the deal that went to the other agent. The pieces now exist to do it properly: submit-lead encrypts and rate-limits, US-128 turns a guest into a contact, US-135 can send in the agent's name, US-136 can follow up on a schedule, US-137 gives the event a code.",
+      "acceptanceCriteria": [
+        "Public route /:username/oh/:code renders a full-screen, tablet-first kiosk: a welcome screen with the listing photo and agent, 'Tap to sign in', a form (name required; email or phone required; the optional questions the event enabled: working with an agent?, pre-approved?, timeframe 0-3/3-6/6-12/12+ months; a consent checkbox with the copy from US-135), a thank-you screen that returns to welcome after 8 seconds; 44px targets, no dashboard chrome, no navigation away; the question set is fixed and contains nothing about a protected class (documented in the component)",
+        "Sign-ins are queued in IndexedDB (src/lib/offline-storage.ts) and flushed on reconnect, so a venue with bad signal loses nobody; a small 'N pending' indicator shows the agent the queue is draining",
+        "submit-lead accepts lead_type 'open_house' with open_house_id: it checks the code is live (starts_at \u2212 2 h to ends_at + 2 h), rate-limits per event through check_rate_limit, upserts the contact (US-128), inserts the lead with source 'open_house' and listing_id, inserts an open_house_signins row (open_house_id, contact_id, lead_id, answers jsonb, signed_in_at) and increments guest_count",
+        "Immediately after sign-in the guest receives a transactional thank-you through sendClientEmail with the listing link, three photos and the agent\u2019s contact details; if the agent has the seeded Open house follow-up workflow active, US-136 enqueues it",
+        "The agent's phone shows the live guest list for the event (Supabase realtime on open_house_signins) with tap-to-call and tap-to-text that log a touch; after the event a Follow up checklist marks each guest contacted, and the event page shows a report: guests, opt-ins, contacted %, deals started",
+        "The lead scoring source weights include open_house; the Leads inbox shows the event on the card; the kiosk page emits no analytics view against the agent\u2019s profile counters",
+        "Playwright covers the kiosk loop at a 768\u00d71024 viewport and the offline queue; unit tests cover code validity and the consent gate; tsc, lint and test:run pass"
+      ],
+      "priority": 138,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-128, US-135, US-137; the follow-up sequence needs US-136. The thank-you is sent synchronously by submit-lead, not by a workflow, because the hourly clock is too slow for it. Keep the kiosk a separate lazy route so its bundle is small and it loads fast on a tablet."
+    },
+    {
+      "id": "US-139",
+      "title": "Buyer criteria on the person, and \u201c3 buyers match this listing\u201d when a listing is added",
+      "description": "The buyer form captures price range, timeline, bedrooms, property type and pre-approval (src/components/forms/BuyerInquiryForm.tsx:77-86), and after US-130 the agent can at least read them. Nothing uses them: there is no place to keep a buyer's criteria as they sharpen over a few showings, and adding a listing does not tell the agent which of their own buyers it suits. The scoring inputs listingViews and hasViewedMultipleListings are never measured (src/lib/lead-scoring.ts:138-145). Matching an agent's active buyers to their new listing is the everyday win of a CRM that knows both sides, and it is a query, not a model.",
+      "acceptanceCriteria": [
+        "deals (buy side) gains buyer_criteria jsonb {price_min, price_max, beds_min, baths_min, property_types[], areas[] (cities or zips), must_haves text}, prefilled from the originating lead\u2019s price_range and form_data on Start a deal, and editable in the deal card and contact drawer",
+        "A SQL function match_buyers_for_listing(listing_id) returns the agent\u2019s open buy-side deals whose criteria the listing satisfies (price within range, beds/baths at least, property type in list, city or zip in areas; empty criteria fields match anything); the inverse match_listings_for_deal(deal_id) returns the agent\u2019s own active listings for a buyer",
+        "After Add or Edit listing the dashboard shows 'N buyers match' with a link; the Listings card carries the count; the deal card and contact drawer show 'Matches' from the agent's active listings",
+        "'Send to matching buyers' previews and sends one listing email per matching contact through sendClientEmail (marketing category, consent required), logs an activity per contact, and never sends the same listing to the same contact twice",
+        "Tests cover the matcher against a seeded set (price boundaries, empty criteria, area by zip); tsc, lint, test:run and verify:schema pass"
+      ],
+      "priority": 139,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-131 and US-135. A query, not ML: the match must be explainable in one line on the card (\u201c3 bd, under $450k, in Austin\u201d)."
+    },
+    {
+      "id": "US-140",
+      "title": "Appointments: showings and consultations on a calendar the agent and the client both receive",
+      "description": "A showing request is a lead with listing_id (src/pages/public/FullProfilePage.tsx:182-190) and nothing else: no time, no confirmation, no record that it happened. The only calendar is a single profiles.calendly_url text field rendered in CalendlyModal (src/pages/dashboard/Profile.tsx:594-597); /features/calendar-booking promises Google Calendar integration, availability windows, buffer times, per-property showing durations, same-day cutoffs, manual approval and two-way confirmations (src/pages/features/CalendarBooking.tsx:14, 40, 148, 188-213), none of which exist. logMeeting (useLeadActivities.ts:253) writes meeting_scheduled_at and has no UI. An agent working a buyer through five showings has nowhere to put them.",
+      "acceptanceCriteria": [
+        "Migration creates appointments (id, user_id, contact_id, deal_id nullable, listing_id nullable, kind CHECK IN ('showing','buyer_consultation','listing_appointment','closing','other'), starts_at, ends_at, location, notes, status CHECK IN ('scheduled','completed','cancelled','no_show') DEFAULT 'scheduled', created_at, updated_at) with owner and assignee RLS",
+        "Appointments are created from a lead (a showing-request lead prefills kind showing and the listing), a contact, a deal, or the Overview 'Today' agenda; each offers Download .ics and Add to Google Calendar (a calendar.google.com/render URL, no OAuth)",
+        "Creating or rescheduling sends the client a transactional confirmation through sendClientEmail with an .ics attachment; the agent gets a notifications row at the top of the hour before starts_at from scheduled-maintenance and the day\u2019s appointments in the digest (US-133)",
+        "Overview shows 'Today' (appointments in the agent's timezone) and completing one writes a meeting activity via logMeeting; the contact timeline shows scheduled, completed and no-show",
+        "/features/calendar-booking is rewritten to describe the Calendly link and appointments as built; every claim on the page exists in the dashboard",
+        "Tests cover the .ics output (timezone, DTSTAMP, UID stability on reschedule) and the reminder dedupe; tsc, lint, test:run and verify:schema pass"
+      ],
+      "priority": 140,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Depends on US-128 and US-135. Self-serve availability booking (windows, buffers) is deliberately out of scope; Calendly covers it today and the copy should say so."
+    },
+    {
+      "id": "US-141",
+      "title": "Every listing is a page: a per-listing URL, view counts per listing, and a monthly-payment line",
+      "description": "A listing is a modal over the profile addressed by ?listing=<id> (src/lib/listingShare.ts:10-31, FullProfilePage.tsx:70-96); the path form was avoided because /:username/:listingId would collide with /:username/review. The crawler prerender already swaps in listing OG tags for ?listing= (functions/[username].ts:105-118), so the unfurl is right and the page is wrong: on a phone the modal is a scroll inside a scroll, there is no 'more from this agent', and the URL looks like a query. 'listing_view' is in src/types/analytics.ts:4 but not an accepted analytics_events.event_type (src/lib/analyticsEvents.ts:19); nothing emits it, so per-listing views do not exist, the Landing card 'See which listings visitors view most' (src/pages/public/Landing.tsx) is untrue and /features/analytics 'Listing View Analytics' (:139) is unbuilt. src/lib/mortgageCalculator.ts has no importer since US-058 deleted the component; the plan matrix still lists mortgageCalculator as a free feature.",
+      "acceptanceCriteria": [
+        "Route /:username/listing/:id renders the listing as a full page (gallery, price, facts, description, highlights, virtual tour, upcoming open houses from US-137, Schedule a showing, Share, 'More from <agent>' with three other active listings, the compliance footer); ?listing= redirects to it; 'listing' and 'oh' are added to RESERVED_USERNAMES; the crawler prerender and generate-sitemap emit the new path",
+        "analytics_events accepts event_type 'listing_view' with target_id = listing id; the listing page and the card open emit it, throttled like profile views (US-115); the dashboard Listings cards show views (7 and 30 days) and Analytics gains 'Top listings'",
+        "leadSubmission sends the visitor_id and submit-lead stores it on the lead; the lead detail shows 'Viewed N listings before contacting you' with the list, and lead-scoring's listingViews / hasViewedMultipleListings are computed from it",
+        "The listing page shows 'Est. $X/mo' from src/lib/mortgageCalculator.ts with the assumptions (20% down, 30-year, rate from a config constant) in a tooltip; no full calculator",
+        "Playwright a11y run covers the new page; tests cover the redirect and the throttle; tsc, lint and test:run pass"
+      ],
+      "priority": 141,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Independent. The listing page is what makes the profile a website substitute: it is the URL an agent puts on a sign, in a story, in a text."
+    },
+    {
+      "id": "US-142",
+      "title": "Publish controls and branding the agent can actually set: publish toggle, logo upload, service areas, remove-branding, and the fake stats in page templates",
+      "description": "profiles.is_published gates the whole public page (src/hooks/usePublicProfile.ts:52) and no dashboard UI reads or writes it \u2014 an agent cannot unpublish or preview. The brokerage logo is a URL text input (src/pages/dashboard/Profile.tsx:450-451) with no uploader, though the storage buckets and useAvatarUpload exist. service_cities is collected as a list and only [0] is rendered (ProfileHeader). subscriptions.remove_branding exists and 'Powered by AgentBio.net' renders unconditionally (FullProfilePage.tsx compliance footer). profiles.custom_css and the theme type fields exist with no UI writing and no page reading them. Four of the six page-builder templates ship hardcoded stats and testimonials (src/lib/pageTemplates.ts:454-457, 511-528) \u2014 the same class of fabricated trust claim US-111 removed from the profile. manifest.json theme_color (#2563eb) disagrees with index.html (#0ea5e9).",
+      "acceptanceCriteria": [
+        "Settings gains Publish (toggle is_published, with a 'Preview as visitor' link that renders the page for the owner even when unpublished); an unpublished page shows a neutral 'This page is not live yet' with no agent data to anonymous visitors",
+        "Brokerage logo is uploaded to the avatars bucket through the useAvatarUpload path with magic-number validation (US-076); the URL field is removed",
+        "All service_cities render ('Serving Austin, Round Rock and Cedar Park') and the RealEstateAgent JSON-LD areaServed lists them",
+        "'Powered by AgentBio.net' is omitted when subscriptions.remove_branding is true; the Subscription page's Remove branding row reflects it",
+        "custom_css is dropped from profiles and src/types/theme.ts (decision: no unsanitised CSS injection path), or a sanitised UI is built \u2014 the decision is recorded in the notes",
+        "Page-builder templates contain no invented numbers or reviews: stats blocks read the agent\u2019s real counts and testimonial blocks read the testimonials table or render an empty state",
+        "manifest.json and index.html agree on theme colour; ProfileCompletionWidget counts logo, service areas and publish state; tsc, lint and test:run pass"
+      ],
+      "priority": 142,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Independent. Custom domains stay out (US-127 removes the claim until a hostname flow exists)."
+    },
+    {
+      "id": "US-143",
+      "title": "Say what ships: reconcile the pricing matrix, feature pages and Landing with the product",
+      "description": "The plan matrix in src/config/pricing-plans.ts advertises followUpSequences, emailsPerMonth, smsPerMonth, openHousesPerMonth, cmaGenerator, marketReports, virtualStaging, videoTours, predictiveAnalytics and mortgageCalculator; none of those keys is read by any component except the four that Overview.tsx:89-95 and SubscriptionPage.tsx:22-46 print as plan features, and the seeded subscription_plans (20260902000014) carries only listings, links, testimonials, sold_properties, leads_per_month, analytics_days and themes. There is no SMS provider at all (send_sms was removed from the workflow palette for faking a sentAt); smsPerMonth is still sold. USAGE_PRICING lists per-use prices for features that do not exist. /features/calendar-booking claims Google Calendar sync, availability and approvals; /features/testimonials claims video testimonials (:165); /features/analytics claims CSV export, PDF reports and email summaries (:279-287) and listing view analytics (:139); Landing claims 'See which listings visitors view most', 'Hot/Warm/Cold based on behavior' and 'Time zone detection'. docs/product/FEATURES_README.md says a features schema, src/types/features.ts, usageTracking and useFeatureUsage are implemented; US-057 deleted them. check_feature_limit reads a feature_catalog that is never seeded, so every key is denied (:519). An agent who buys Professional for follow-up sequences and SMS gets neither.",
+      "acceptanceCriteria": [
+        "pricing-plans.ts and subscription_plans describe the same plans: one test loads the seed migration and the config and fails on any key present in one and not the other; every remaining PlanFeatures/PlanLimits key has a consumer in src/ or is deleted; USAGE_PRICING is deleted with its comment",
+        "SMS is removed from every plan and page until a provider exists; open houses, follow-up sequences, appointments and listing views appear in the matrix only once US-137, US-136, US-140 and US-141 have landed (each of those stories adds its own row)",
+        "Each /features/* page and the Landing feature cards describe only what exists; a short table in docs/product/FEATURES_README.md maps each claim to the file that implements it, and the stale sections about deleted files are removed",
+        "feature_catalog, feature_usage, monthly_usage_summary and check_feature_limit are dropped in a migration (US-057 deleted their only consumers) or feature_catalog is seeded and the RPC is called; the decision is recorded here",
+        "Overview\u2019s plan-feature list and the Subscription page rows render from the reconciled config; tsc, lint and test:run pass"
+      ],
+      "priority": 143,
+      "passes": false,
+      "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Same spirit as US-111 and US-127. Do it after the feature stories in this batch so the copy is trimmed once, not twice; but the SMS and per-use pricing removals can go immediately."
     }
   ]
 }
