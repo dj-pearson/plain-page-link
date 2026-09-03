@@ -23,6 +23,11 @@
 -- rendering a number the agent cannot stand behind — which is the whole point
 -- of this story.
 
+-- Older databases may not have received the response-tracking column from the
+-- baseline. It is nullable until a lead receives its first response.
+ALTER TABLE public.leads
+  ADD COLUMN IF NOT EXISTS first_responded_at timestamp with time zone;
+
 CREATE OR REPLACE FUNCTION public.public_agent_response_hours(_user_id uuid)
 RETURNS numeric
 LANGUAGE sql

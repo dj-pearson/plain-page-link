@@ -29,11 +29,101 @@
 -- WHERE name = 'free', the webhook maps a Stripe price to a plan name — but
 -- the table had no unique constraint on it. Two rows with the same name make
 -- get_user_plan's SELECT ... INTO raise, so this is required before the seed
--- can be idempotent at all. It fails loudly if duplicates already exist, which
--- is a data problem for a person rather than something a migration should
--- silently resolve by deleting a row a subscription may point at.
-ALTER TABLE public.subscription_plans
-  ADD CONSTRAINT subscription_plans_name_key UNIQUE (name);
+-- can be idempotent at all. Older environments carry duplicate legacy rows,
+-- so consolidate each name before creating the constraint. The oldest row is
+-- retained, existing Stripe configuration is merged into it, and every
+-- user_subscriptions reference is repointed before redundant rows are removed.
+DO $$
+DECLARE
+  duplicate_name text;
+  canonical_plan_id uuid;
+BEGIN
+  FOR duplicate_name IN
+    SELECT name
+    FROM public.subscription_plans
+    GROUP BY name
+    HAVING count(*) > 1
+  LOOP
+    SELECT id INTO canonical_plan_id
+    FROM public.subscription_plans
+    WHERE name = duplicate_name
+    ORDER BY created_at ASC NULLS LAST, id ASC
+    LIMIT 1;
+
+    UPDATE public.subscription_plans canonical
+    SET
+      stripe_price_id = COALESCE(canonical.stripe_price_id, (
+        SELECT duplicate.stripe_price_id
+        FROM public.subscription_plans duplicate
+        WHERE duplicate.name = duplicate_name
+          AND duplicate.id <> canonical_plan_id
+          AND duplicate.stripe_price_id IS NOT NULL
+        ORDER BY duplicate.created_at ASC NULLS LAST, duplicate.id ASC
+        LIMIT 1
+      )),
+      stripe_price_id_monthly = COALESCE(canonical.stripe_price_id_monthly, (
+        SELECT duplicate.stripe_price_id_monthly
+        FROM public.subscription_plans duplicate
+        WHERE duplicate.name = duplicate_name
+          AND duplicate.id <> canonical_plan_id
+          AND duplicate.stripe_price_id_monthly IS NOT NULL
+        ORDER BY duplicate.created_at ASC NULLS LAST, duplicate.id ASC
+        LIMIT 1
+      )),
+      stripe_price_id_yearly = COALESCE(canonical.stripe_price_id_yearly, (
+        SELECT duplicate.stripe_price_id_yearly
+        FROM public.subscription_plans duplicate
+        WHERE duplicate.name = duplicate_name
+          AND duplicate.id <> canonical_plan_id
+          AND duplicate.stripe_price_id_yearly IS NOT NULL
+        ORDER BY duplicate.created_at ASC NULLS LAST, duplicate.id ASC
+        LIMIT 1
+      )),
+      payment_link_monthly = COALESCE(canonical.payment_link_monthly, (
+        SELECT duplicate.payment_link_monthly
+        FROM public.subscription_plans duplicate
+        WHERE duplicate.name = duplicate_name
+          AND duplicate.id <> canonical_plan_id
+          AND duplicate.payment_link_monthly IS NOT NULL
+        ORDER BY duplicate.created_at ASC NULLS LAST, duplicate.id ASC
+        LIMIT 1
+      )),
+      payment_link_yearly = COALESCE(canonical.payment_link_yearly, (
+        SELECT duplicate.payment_link_yearly
+        FROM public.subscription_plans duplicate
+        WHERE duplicate.name = duplicate_name
+          AND duplicate.id <> canonical_plan_id
+          AND duplicate.payment_link_yearly IS NOT NULL
+        ORDER BY duplicate.created_at ASC NULLS LAST, duplicate.id ASC
+        LIMIT 1
+      ))
+    WHERE canonical.id = canonical_plan_id;
+
+    UPDATE public.user_subscriptions
+    SET plan_id = canonical_plan_id
+    WHERE plan_id IN (
+      SELECT id
+      FROM public.subscription_plans
+      WHERE name = duplicate_name AND id <> canonical_plan_id
+    );
+
+    DELETE FROM public.subscription_plans
+    WHERE name = duplicate_name AND id <> canonical_plan_id;
+  END LOOP;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.subscription_plans'::regclass
+      AND conname = 'subscription_plans_name_key'
+  ) THEN
+    ALTER TABLE public.subscription_plans
+      ADD CONSTRAINT subscription_plans_name_key UNIQUE (name);
+  END IF;
+END $$;
 
 INSERT INTO public.subscription_plans (name, price_monthly, price_yearly, sort_order, is_active, features, limits)
 VALUES

@@ -2286,6 +2286,21 @@
       "priority": 143,
       "passes": false,
       "notes": "Found by the 2026-09-03 product deep-dive (docs/reviews/PRODUCT_REVIEW_2026-09-03.md). Same spirit as US-111 and US-127. Do it after the feature stories in this batch so the copy is trimmed once, not twice; but the SMS and per-use pricing removals can go immediately."
+    },
+    {
+      "id": "US-144",
+      "title": "Unbreak sign-in: the missing onboarding column and the auth-lock deadlock",
+      "description": "Both /auth/login and /auth/register dead-ended at /onboarding/wizard for anyone with a session, and the app hung for logged-in users. Two independent causes, confirmed against production on 2026-09-03. (1) public.profiles has no onboarding_completed_at column in production: ?select=onboarding_completed_at returns 42703 and the table is exactly one column short of the squashed baseline, because archive/20260525000006_onboarding_completed.sql was never applied there and CI only ever builds a database from supabase/migrations/*.sql, where the baseline supplies it. So select('*') returned a row with no such key, RequireAuth's `!profile.onboarding_completed_at` was true for EVERY user, and the wizard could not clear it either: buildOnboardingProfileUpdate always names the column, PostgREST rejects an update naming an unknown column, and the whole statement failed with 'Failed to save your information'. (2) useAuthStore.initialize passed an async callback to supabase.auth.onAuthStateChange that awaited supabase.from('profiles'). supabase-js runs those callbacks holding the origin-wide lock:sb-api-auth-token Web Lock, and any supabase call needs an access token, which takes the same lock. navigator.locks.query() on agentbio.net showed one held lock and a permanently pending waiter, the holder living in another tab: RequireAuth sat on 'Verifying session...' forever and Login's button sat on 'Signing in...' forever, in every tab, until the poisoned one was closed.",
+      "acceptanceCriteria": [
+        "profiles.onboarding_completed_at exists in production and is backfilled: `select id from profiles where onboarding_completed_at is null` returns only accounts that genuinely have not finished the wizard, and no established agent is routed to /onboarding/wizard on login",
+        "Completing or skipping the wizard writes onboarding_completed_at and lands on /dashboard without bouncing back",
+        "No onAuthStateChange callback anywhere calls supabase; a lint or test fails if one does. After a hard reload as a signed-in user, navigator.locks.query() shows no lock:sb-api-auth-token held once the page has settled",
+        "RequireAuth treats an ABSENT onboarding_completed_at key as unknown rather than as 'not onboarded', so a partial or rehydrated profile cannot trap a user (covered by a test)",
+        "The login form is interactive on arrival: its button reads 'Sign In', not 'Signing in...', before a submit"
+      ],
+      "priority": 144,
+      "passes": false,
+      "notes": "Code fix landed 2026-09-03: 20260903000001_profiles_onboarding_completed_at.sql (idempotent, so a no-op on a database built from the baseline), the setTimeout(..., 0) escape in useAuthStore.initialize, the key-presence guard in RequireAuth, Register.tsx handing off to /dashboard instead of naming the wizard, and a local isSubmitting in Login.tsx. STILL OPEN: the migration has to be applied to production by hand. Migrations are not deployed by CI - verify-backend only applies them to a throwaway Postgres - which is how the drift survived this long, and that gap deserves its own story. Anyone whose tab is currently holding the auth lock must close every agentbio.net tab once, since the deadlocked client outlives the deploy."
     }
   ]
 }

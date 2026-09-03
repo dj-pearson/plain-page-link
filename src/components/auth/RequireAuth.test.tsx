@@ -23,7 +23,10 @@ vi.mock('@/integrations/supabase/client', () => ({
 interface AuthState {
   requiresMFA: boolean;
   mfaVerified: boolean;
-  profile: { onboarding_completed_at: string | null } | null;
+  // Partial<> so a test can drop the key entirely, which is what a rehydrated
+  // partial profile and the pre-20260903000001 production schema both looked
+  // like.
+  profile: Partial<{ onboarding_completed_at: string | null }> | null;
   role: string | null;
 }
 let authState: AuthState = {
@@ -120,6 +123,19 @@ describe('RequireAuth', () => {
     getSession.mockResolvedValue({ data: { session: mockSession }, error: null });
     renderAt('/dashboard');
     await waitFor(() => expect(screen.getByText('Onboarding wizard')).toBeInTheDocument());
+  });
+
+  it('does not send an agent to the wizard when the profile has no onboarding key', async () => {
+    // Production ran for a window with no profiles.onboarding_completed_at
+    // column at all, so `select('*')` returned a row without the key and
+    // `!profile.onboarding_completed_at` was true for EVERY user: /auth/login
+    // and /auth/register both dead-ended in a wizard that could not save.
+    // An absent key is not evidence of a first run.
+    authState = { ...authState, profile: { username: 'agent' } as AuthState['profile'] };
+    getSession.mockResolvedValue({ data: { session: mockSession }, error: null });
+    renderAt('/dashboard');
+    await waitFor(() => expect(screen.getByText('Protected content')).toBeInTheDocument());
+    expect(screen.queryByText('Onboarding wizard')).not.toBeInTheDocument();
   });
 
   it('does not bounce an established agent while the profile is still loading', async () => {

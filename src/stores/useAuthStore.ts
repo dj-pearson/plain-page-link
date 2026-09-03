@@ -177,7 +177,24 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
-        supabase.auth.onAuthStateChange(async (event, session) => {
+        // NOTE: this callback is synchronous and calls nothing on `supabase`
+        // directly. It must stay that way.
+        //
+        // supabase-js runs every auth-state callback while it holds the
+        // `lock:sb-api-auth-token` Web Lock. Any supabase call inside the
+        // callback needs an access token, which takes the same lock, so an
+        // `await supabase.from(...)` here never resolves and the lock is never
+        // released. Web Locks are origin-wide, so one page that deadlocks this
+        // way starves every other agentbio.net tab for as long as it stays
+        // open: RequireAuth's getSession() hangs on "Verifying session...",
+        // Login's store never sets `user` and its button sits on "Signing
+        // in...", and nothing recovers short of closing the poisoned tab.
+        // Verified in production with navigator.locks.query(): one held lock,
+        // one permanently pending waiter, holder in another tab.
+        //
+        // setTimeout(..., 0) is the documented escape: it runs the fetches on a
+        // later task, after supabase-js has released the lock.
+        supabase.auth.onAuthStateChange((event, session) => {
           logger.authEvent(event, session?.user?.id);
 
           if (event === 'SIGNED_OUT') {
@@ -197,17 +214,27 @@ export const useAuthStore = create<AuthState>()(
 
           set({ session, user: session?.user ?? null });
 
-          if (session?.user) {
-            // Fetch user data for new sessions or sign-ins
+          if (!session?.user) {
+            set({ profile: null, role: null });
+            return;
+          }
+
+          const userId = session.user.id;
+          setTimeout(async () => {
             try {
               const [profileResult, rolesResult] = await Promise.all([
-                supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+                supabase.from('profiles').select('*').eq('id', userId).single(),
                 supabase
                   .from('user_roles')
                   .select('role')
-                  .eq('user_id', session.user.id)
+                  .eq('user_id', userId)
                   .order('role', { ascending: true }),
               ]);
+
+              // The session can have changed while this was queued (a fast
+              // sign-out, or a sign-in as someone else). Dropping a stale
+              // result beats writing another user's profile into the store.
+              if (get().user?.id !== userId) return;
 
               const role =
                 rolesResult.data?.find((r) => r.role === 'admin')?.role ||
@@ -217,9 +244,7 @@ export const useAuthStore = create<AuthState>()(
             } catch (error) {
               logger.error('Error fetching user data in auth state listener', error);
             }
-          } else {
-            set({ profile: null, role: null });
-          }
+          }, 0);
         });
       },
 

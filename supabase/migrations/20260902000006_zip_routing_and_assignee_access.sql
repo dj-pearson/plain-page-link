@@ -21,6 +21,13 @@
 -- inside the address is the honest fix for the data that exists; extracting a
 -- zip at capture time belongs with the form work.
 
+-- Some databases predate the baseline's assignee column. The trigger and RLS
+-- policies below both require it, so establish that schema prerequisite here.
+ALTER TABLE public.leads
+  ADD COLUMN IF NOT EXISTS assigned_to uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_leads_assigned_to ON public.leads (assigned_to);
+
 CREATE OR REPLACE FUNCTION public.auto_assign_lead()
 RETURNS trigger
 LANGUAGE plpgsql

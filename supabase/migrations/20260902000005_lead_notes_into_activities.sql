@@ -27,33 +27,38 @@
 --                  owner rather than dropping the row
 --   created_at  -> activity_at, preserving the timeline's ordering
 
-INSERT INTO public.lead_activities (
-  lead_id,
-  user_id,
-  activity_type,
-  title,
-  content,
-  is_internal,
-  metadata,
-  activity_at,
-  created_at
-)
-SELECT
-  n.lead_id,
-  COALESCE(n.created_by, l.user_id),
-  'note',
-  CASE WHEN n.is_system THEN 'System note' ELSE 'Note' END,
-  n.note,
-  n.is_system,
-  jsonb_build_object('migrated_from', 'lead_notes', 'lead_notes_id', n.id),
-  n.created_at,
-  n.created_at
-FROM public.lead_notes n
-JOIN public.leads l ON l.id = n.lead_id
--- Re-running must not duplicate the timeline.
-WHERE NOT EXISTS (
-  SELECT 1 FROM public.lead_activities a
-  WHERE a.metadata ->> 'lead_notes_id' = n.id::text
-);
+DO $$
+BEGIN
+  IF to_regclass('public.lead_notes') IS NOT NULL THEN
+    INSERT INTO public.lead_activities (
+      lead_id,
+      user_id,
+      activity_type,
+      title,
+      content,
+      is_internal,
+      metadata,
+      activity_at,
+      created_at
+    )
+    SELECT
+      n.lead_id,
+      COALESCE(n.created_by, l.user_id),
+      'note',
+      CASE WHEN n.is_system THEN 'System note' ELSE 'Note' END,
+      n.note,
+      n.is_system,
+      jsonb_build_object('migrated_from', 'lead_notes', 'lead_notes_id', n.id),
+      n.created_at,
+      n.created_at
+    FROM public.lead_notes n
+    JOIN public.leads l ON l.id = n.lead_id
+    -- Re-running must not duplicate the timeline.
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.lead_activities a
+      WHERE a.metadata ->> 'lead_notes_id' = n.id::text
+    );
+  END IF;
+END $$;
 
 DROP TABLE IF EXISTS public.lead_notes;

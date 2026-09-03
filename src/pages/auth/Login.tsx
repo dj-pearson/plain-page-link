@@ -31,7 +31,6 @@ export default function Login() {
     signIn,
     signInWithGoogle,
     signInWithApple,
-    isLoading,
     error,
     clearError,
     user,
@@ -39,6 +38,11 @@ export default function Login() {
     mfaVerified,
   } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
+  // Local, not the store's `isLoading`. That flag also means "auth is still
+  // bootstrapping", so the form arrived disabled and reading "Signing in..."
+  // before the visitor had typed anything, and it never cleared at all while
+  // the auth lock was deadlocked. Only a submit in flight belongs here.
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isThrottled, setIsThrottled] = useState(false);
   const [throttleMessage, setThrottleMessage] = useState<string | null>(null);
   const { toast } = useToast();
@@ -70,11 +74,15 @@ export default function Login() {
 
     localStorage.removeItem('lastVisitedRoute');
     // The onboarding redirect used to live here, which meant it only ever fired
-    // on the password path — a Google or Apple signup went straight to the
-    // dashboard and never saw the wizard. It is in ProtectedRoute now, so every
-    // auth path reaches it exactly once (US-108). (The isolated
-    // `onboarding_completed_at isn't in the generated types` cast went with it;
-    // the column has always been there.)
+    // on the password path: a Google or Apple signup went straight to the
+    // dashboard and never saw the wizard. It is in RequireAuth now, so every
+    // auth path reaches it exactly once (US-108).
+    //
+    // The note that used to sit here said the `onboarding_completed_at` cast
+    // was unnecessary because "the column has always been there". It was not
+    // there in production, which is exactly what made this redirect land every
+    // signed-in agent in the wizard. Added by
+    // 20260903000001_profiles_onboarding_completed_at.sql.
     navigate(redirectTo, { replace: true });
   }, [user, navigate, redirectTo, requiresMFA, mfaVerified]);
 
@@ -86,6 +94,7 @@ export default function Login() {
 
   const onSubmit = async (data: LoginFormData) => {
     const email = data.email.toLowerCase().trim();
+    setIsSubmitting(true);
 
     try {
       const throttleResult = await checkLoginThrottle(email);
@@ -95,6 +104,7 @@ export default function Login() {
           ? formatBlockedUntil(throttleResult.blockedUntil)
           : '15 minutes';
         setIsThrottled(true);
+        setIsSubmitting(false);
         setThrottleMessage(`Too many login attempts. Please try again in ${timeLeft}.`);
         toast({
           title: 'Account Temporarily Locked',
@@ -138,6 +148,8 @@ export default function Login() {
         isNetworkError ? 'network_error' : 'invalid_credentials',
         getDeviceFingerprint()
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -289,7 +301,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                disabled={isLoading}
+                disabled={isSubmitting}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -316,7 +328,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={handleAppleSignIn}
-                disabled={isLoading}
+                disabled={isSubmitting}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-black text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -430,10 +442,10 @@ export default function Login() {
 
               <button
                 type="submit"
-                disabled={isLoading || isThrottled}
+                disabled={isSubmitting || isThrottled}
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-xl text-sm font-semibold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
               >
-                {isLoading ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Signing in...

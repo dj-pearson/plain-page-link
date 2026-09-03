@@ -74,9 +74,13 @@ export default function Register() {
 
   const usernameValue = watch('username');
 
+  // Already signed in: there is nothing to register. Hand off to /dashboard and
+  // let RequireAuth decide, rather than naming the wizard here — this route
+  // fires for anyone with a session, so an established agent who clicked "Sign
+  // up" out of habit was dropped into first-run onboarding.
   useEffect(() => {
     if (user && session) {
-      navigate('/onboarding/wizard', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [user, session, navigate]);
 

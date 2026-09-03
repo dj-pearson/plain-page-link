@@ -99,7 +99,19 @@ export default function RequireAuth({ requireAdmin = false }: RequireAuthProps) 
   // at all (US-108). Gated on `profile` being loaded, so a slow profile fetch
   // does not bounce an established user into the wizard; and it never redirects
   // away from the wizard itself.
-  if (profile && !profile.onboarding_completed_at && !location.pathname.startsWith('/onboarding')) {
+  //
+  // "Not onboarded" means the column is present and null. An ABSENT key is not
+  // evidence of anything and must not redirect: `profile` can be a partial row
+  // rehydrated from the persisted store, and production spent the US-108 window
+  // with no onboarding_completed_at column at all, so `!profile.x` was true for
+  // every user and sent all of them into a wizard that could not save. Read the
+  // key, not its truthiness.
+  const onboardingStateKnown = profile !== null && 'onboarding_completed_at' in profile;
+  if (
+    onboardingStateKnown &&
+    !profile.onboarding_completed_at &&
+    !location.pathname.startsWith('/onboarding')
+  ) {
     return <Navigate to="/onboarding/wizard" replace />;
   }
 
