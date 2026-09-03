@@ -32,7 +32,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-import { deleteSampleData } from './sample-data-service';
+import { deleteSampleData, generateSampleData } from './sample-data-service';
 
 describe('deleteSampleData', () => {
   beforeEach(() => {
@@ -101,5 +101,49 @@ describe('deleteSampleData', () => {
     await expect(deleteSampleData('user-1')).rejects.toMatchObject({
       message: 'permission denied',
     });
+  });
+});
+
+/**
+ * The jsonb columns take a value, not a serialisation of one.
+ *
+ * `photos` was written as JSON.stringify([...]), so the column held a JSON
+ * string rather than a JSON array and toStringList - which every listing
+ * surface reads through - returned []. Four seeded listings in production had
+ * photos nobody could see, on the dashboard and on the public profile alike.
+ */
+describe('generateSampleData', () => {
+  it('writes listing photos as an array, not a JSON string', async () => {
+    const inserted: Record<string, unknown>[] = [];
+
+    fromMock.mockReset();
+    fromMock.mockImplementation((table: string) => {
+      const builder: Record<string, unknown> = {};
+      builder.select = vi.fn(() => builder);
+      builder.eq = vi.fn(() => Promise.resolve({ data: [], error: null, count: 0 }));
+      builder.insert = vi.fn((rows: Record<string, unknown>[]) => {
+        if (table === 'listings') inserted.push(...rows);
+        return {
+          select: vi.fn(() => Promise.resolve({ data: rows, error: null })),
+        };
+      });
+      return builder;
+    });
+
+    await generateSampleData('user-1', {
+      skipDuplicateCheck: true,
+      includeListings: true,
+      includeLeads: false,
+      includeTestimonials: false,
+      includeLinks: false,
+    });
+
+    expect(inserted.length).toBeGreaterThan(0);
+    for (const listing of inserted) {
+      expect(Array.isArray(listing.photos)).toBe(true);
+      for (const url of listing.photos as unknown[]) {
+        expect(typeof url).toBe('string');
+      }
+    }
   });
 });

@@ -124,11 +124,11 @@ async function generateSampleListings(userId: string): Promise<number> {
       status: 'active',
       is_featured: true,
       sort_order: 1,
-      photos: JSON.stringify([
+      photos: [
         'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800',
         'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800',
         'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800',
-      ]),
+      ],
     },
     {
       user_id: userId,
@@ -148,10 +148,10 @@ async function generateSampleListings(userId: string): Promise<number> {
       status: 'active',
       is_featured: true,
       sort_order: 2,
-      photos: JSON.stringify([
+      photos: [
         'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800',
         'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=800',
-      ]),
+      ],
     },
     {
       user_id: userId,
@@ -171,9 +171,7 @@ async function generateSampleListings(userId: string): Promise<number> {
       status: 'pending',
       is_featured: false,
       sort_order: 3,
-      photos: JSON.stringify([
-        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800',
-      ]),
+      photos: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800'],
     },
     {
       user_id: userId,
@@ -193,10 +191,10 @@ async function generateSampleListings(userId: string): Promise<number> {
       sold_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
       is_featured: false,
       sort_order: 4,
-      photos: JSON.stringify([
+      photos: [
         'https://images.unsplash.com/photo-1600607687644-c7171b42498b?w=800',
         'https://images.unsplash.com/photo-1600047509358-9dc75507daeb?w=800',
-      ]),
+      ],
     },
   ];
 

@@ -453,9 +453,19 @@ export default function Settings() {
         </div>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">New Password</label>
+            <label
+              htmlFor="new-password"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
+              New Password
+            </label>
             <input
+              id="new-password"
+              name="new-password"
               type="password"
+              // Without this a password manager offers the saved CURRENT
+              // password here and can save the half-typed value as an update.
+              autoComplete="new-password"
               value={password.new}
               onChange={(e) => setPassword({ ...password, new: e.target.value })}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -464,11 +474,17 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="confirm-new-password"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Confirm New Password
             </label>
             <input
+              id="confirm-new-password"
+              name="confirm-new-password"
               type="password"
+              autoComplete="new-password"
               value={password.confirm}
               onChange={(e) => setPassword({ ...password, confirm: e.target.value })}
               className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"

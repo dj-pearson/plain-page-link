@@ -49,7 +49,7 @@ import { QuickStatusUpdate } from '@/components/dashboard/QuickStatusUpdate';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { parsePrice, formatPrice } from '@/lib/format';
-import { getImageUrl } from '@/lib/images';
+import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 
 type ViewMode = 'grid' | 'list';
 type StatusFilter = 'all' | (typeof LISTING_STATUSES)[number]['value'];
@@ -664,12 +664,12 @@ export default function Listings() {
             >
               <div className="relative h-48 sm:h-52 overflow-hidden">
                 <img
-                  src={getImageUrl(listing.image || listing.photos?.[0], 'listings')}
+                  src={getImageUrl(listing.image || listing.photos?.[0])}
                   alt={listing.address}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   loading="lazy"
                   onError={(e) => {
-                    e.currentTarget.src = '/placeholder-property.jpg';
+                    e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -782,11 +782,11 @@ export default function Listings() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <img
-                        src={getImageUrl(listing.image || listing.photos?.[0], 'listings')}
+                        src={getImageUrl(listing.image || listing.photos?.[0])}
                         alt={listing.address}
                         className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                         onError={(e) => {
-                          e.currentTarget.src = '/placeholder-property.jpg';
+                          e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
                         }}
                       />
                       <div className="min-w-0">

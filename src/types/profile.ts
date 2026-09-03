@@ -40,9 +40,32 @@ export type Profile = Omit<
   service_zip_codes: string[] | null;
 };
 
-/** Narrows one of the jsonb list columns to the string[] the UI expects. */
+/**
+ * Narrows one of the jsonb list columns to the string[] the UI expects.
+ *
+ * A JSON-encoded array is accepted as well as a real one. A jsonb column holds
+ * whatever it was handed, and a writer that calls JSON.stringify before the
+ * insert stores the JSON *string* `"[\"https://...\"]"` rather than an array,
+ * which is exactly what sample-data-service did to `listings.photos`: every
+ * seeded listing came back as a string, failed the Array.isArray test, and
+ * rendered a gallery of nothing. Parsing it here means one bad writer cannot
+ * blank an agent's photos, and it hides nothing - a real array still takes the
+ * first branch, and 20260903000002 repairs the stored rows.
+ */
 export function toStringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+  if (Array.isArray(value)) {
+    return value.filter((v): v is string => typeof v === 'string');
+  }
+
+  if (typeof value === 'string' && value.startsWith('[')) {
+    try {
+      return toStringList(JSON.parse(value));
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
 }
 
 /**

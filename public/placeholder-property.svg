@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="No photo for this listing">
+  <rect width="640" height="480" fill="#eceae5"/>
+  <g fill="none" stroke="#b3aea3" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M180 250 L320 150 L460 250"/>
+    <path d="M214 232 L214 336 L426 336 L426 232"/>
+    <path d="M290 336 L290 280 L350 280 L350 336"/>
+  </g>
+  <text x="320" y="392" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="24" fill="#8a8479">No photo yet</text>
+</svg>

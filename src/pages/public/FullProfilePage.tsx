@@ -30,7 +30,7 @@ import { formatResponseTime } from '@/lib/responseTime';
 import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { parsePrice } from '@/lib/format';
 import { LISTING_PARAM } from '@/lib/listingShare';
-import { getImageUrl } from '@/lib/images';
+import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { logger } from '@/lib/logger';
 import type { PublicProfileListing } from '@/types';
 import NotFound from './NotFound';
@@ -152,8 +152,8 @@ export default function FullProfilePage() {
     // hand-written annotations disagreed with it (is_featured is nullable).
     const featured = data.listings?.filter((l) => l.is_featured) || [];
     featured.slice(0, 5).forEach((listing) => {
-      const imgSrc = getImageUrl(listing.image || listing.photos?.[0], 'listings');
-      if (imgSrc && imgSrc !== '/placeholder-property.jpg') {
+      const imgSrc = getImageUrl(listing.image || listing.photos?.[0]);
+      if (imgSrc && imgSrc !== PLACEHOLDER_PROPERTY_IMAGE) {
         imagesToPreload.push(imgSrc);
       }
     });

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bed, Bath, Maximize, MapPin, Heart, Eye, Share2, Star } from 'lucide-react';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
-import { getImageUrl } from '@/lib/images';
+import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
@@ -46,7 +46,7 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   const isFeatured = listing.is_featured;
   const photoCount = listing.photos?.length || 1;
 
-  const primaryImage = getImageUrl(listing.image || listing.photos?.[0], 'listings');
+  const primaryImage = getImageUrl(listing.image || listing.photos?.[0]);
 
   useEffect(() => {
     try {
@@ -125,7 +125,7 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
           loading="lazy"
           onLoad={() => setImageLoaded(true)}
           onError={(e) => {
-            e.currentTarget.src = '/placeholder-property.jpg';
+            e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
             setImageLoaded(true);
           }}
         />

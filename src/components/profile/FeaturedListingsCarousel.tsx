@@ -12,7 +12,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { formatPrice, parsePrice } from '@/lib/format';
-import { getImageUrl } from '@/lib/images';
+import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
@@ -184,7 +184,7 @@ export function FeaturedListingsCarousel({
     setCurrentIndex(index);
   };
 
-  const primaryPhoto = getImageUrl(currentListing.image || currentListing.photos?.[0], 'listings');
+  const primaryPhoto = getImageUrl(currentListing.image || currentListing.photos?.[0]);
 
   return (
     <div
@@ -214,7 +214,7 @@ export function FeaturedListingsCarousel({
             alt={currentListing.address || 'Featured Property'}
             className="w-full h-full object-cover"
             onError={(e) => {
-              e.currentTarget.src = '/placeholder-property.jpg';
+              e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
             }}
           />
 

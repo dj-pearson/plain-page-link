@@ -20,7 +20,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { getImageUrls } from '@/lib/images';
+import { getImageUrls, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -89,8 +89,7 @@ export default function ListingDetailModal({
   // while ListingCard, which checks `listing.image || listing.photos?.[0]`,
   // showed the photo. Same listing, two answers (US-112).
   const photos = getImageUrls(
-    listing.photos?.length ? listing.photos : listing.image ? [listing.image] : null,
-    'listings'
+    listing.photos?.length ? listing.photos : listing.image ? [listing.image] : null
   );
 
   const address = listing.address || '';
@@ -297,7 +296,7 @@ export default function ListingDetailModal({
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}
                   onError={(e) => {
-                    e.currentTarget.src = '/placeholder-property.jpg';
+                    e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
                   }}
                 />
               </AnimatePresence>
@@ -342,7 +341,7 @@ export default function ListingDetailModal({
                         alt=""
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          e.currentTarget.src = '/placeholder-property.jpg';
+                          e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
                         }}
                       />
                     </button>

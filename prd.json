@@ -2301,6 +2301,37 @@
       "priority": 144,
       "passes": false,
       "notes": "Code fix landed 2026-09-03: 20260903000001_profiles_onboarding_completed_at.sql (idempotent, so a no-op on a database built from the baseline), the setTimeout(..., 0) escape in useAuthStore.initialize, the key-presence guard in RequireAuth, Register.tsx handing off to /dashboard instead of naming the wizard, and a local isSubmitting in Login.tsx. STILL OPEN: the migration has to be applied to production by hand. Migrations are not deployed by CI - verify-backend only applies them to a throwaway Postgres - which is how the drift survived this long, and that gap deserves its own story. Anyone whose tab is currently holding the auth lock must close every agentbio.net tab once, since the deadlocked client outlives the deploy."
+    },
+    {
+      "id": "US-145",
+      "title": "Listing photos: a stringified jsonb column, a placeholder that is not a file, a bucket that is not a bucket",
+      "description": "The Listings dashboard and every public profile drew no photos. Three faults on one path, all confirmed against production on 2026-09-03. (1) sample-data-service wrote `photos: JSON.stringify([...])` into a jsonb column, so the column held the JSON *string* '\"[\\\"https://...\\\"]\"' and not an array. toStringList tests Array.isArray, a string fails it, and every seeded listing came back with zero photos; all four listings on the owner account had photos nobody could see. (2) getImageUrl's fallback was '/placeholder-property.jpg' and no such file has ever existed in public/. Cloudflare Pages answered it with the SPA's index.html under a JPEG content type, 5.8 KB of markup where an image should be, so the fallback drew a broken-image icon - including from the onError handlers whose only job was to replace a broken image. Nine call sites referenced it. (3) Every getImageUrl/getImageUrls call passed bucket 'listings', which is not a bucket in any environment; 20260808000005 standardised on 'listing-photos'. Latent only because uploads store an absolute URL that getImageUrl returns untouched.",
+      "acceptanceCriteria": [
+        "listings.photos is a jsonb array in every row: `select count(*) from listings where jsonb_typeof(photos) = 'string'` returns 0 in production, and the dashboard and public profile render the seeded photos",
+        "A write that stringifies the array is rejected by the listings_photos_is_array check rather than silently emptying the gallery at the reader",
+        "toStringList parses a JSON-encoded array as well as a real one, covered by a test that uses the exact shape production stored",
+        "The placeholder resolves to a real image: /placeholder-property.svg is in dist/ after a build and returns image/svg+xml, and no source file references placeholder-property.jpg",
+        "No caller names a storage bucket that does not exist; listing photo URLs are built against listing-photos"
+      ],
+      "priority": 145,
+      "passes": false,
+      "notes": "Fixed 2026-09-03: real arrays in sample-data-service, 20260903000002_repair_double_encoded_listing_photos.sql (per-row repair with exception handling plus a NOT VALID check constraint), the JSON-string branch in toStringList, public/placeholder-property.svg with PLACEHOLDER_PROPERTY_IMAGE and LISTING_PHOTO_BUCKET exported from lib/images, and both applied at all nine call sites. The repair was exercised against a real postgres:16 with all 32 migrations applied: one double-encoded row repaired, a correct array untouched, an unparseable string left alone without aborting, and a stringified insert afterwards rejected by the constraint. STILL OPEN: apply the migration to production. See US-146 for why it is not there already."
+    },
+    {
+      "id": "US-146",
+      "title": "Production is not the schema in this repo: 11 missing tables, no storage buckets, undeployed functions",
+      "description": "Reconciling production against supabase/migrations on 2026-09-03 found the drift is systemic, not the single column US-144 patched. PostgREST's own OpenAPI spec at api.agentbio.net/rest/v1/ lists 136 definitions, of which 12 are views; against the 136 tables the migrations create, production is missing account_deletion_log, invoices, lead_routing_rules, mortgage_calculations, notifications, query_metrics, rate_limits, stripe_processed_events, team_members, team_round_robin and teams. (lead_notes is also absent and should be: 20260902000005 folds it into lead_activities.) The dashboard 404s on notifications on every load, twice. Storage is worse: GET /storage/v1/bucket/listing-photos and /avatars both return 'Bucket not found', so NO bucket exists and every photo and avatar upload fails - 20260808000005 was never applied. Edge functions are behind too: functions.agentbio.net/get-sessions and /gdpr-deletion return 404 and /pii-crypto returns 500, though all three exist in supabase/functions. Ten of the eleven missing tables come from the squashed baseline (US-060), which is the tell: the baseline was written from the migration history rather than dumped from production, so everything the archived migrations added and never applied is missing there and present in CI. verify-backend applies migrations to a throwaway Postgres and asserts against that, so it is green on a database nobody uses.",
+      "acceptanceCriteria": [
+        "A documented reconciliation: for each of the 11 tables, the storage buckets and each undeployed function, either it is applied to production or there is a recorded decision that it is not wanted",
+        "Photo and avatar upload work end to end in production: a real upload lands in listing-photos and the returned public URL 200s",
+        "The dashboard makes no 404 request on load; notifications either exists or the client stops querying it",
+        "pii-crypto returns 200 for its own caller, or decryptOwnProfilePhone stops calling it",
+        "CI can tell that production has drifted: a job compares the applied production schema against the migrations and fails on a difference, rather than only verifying a database built from scratch",
+        "Migrations reach production by a defined route (a deploy step or a written runbook), not by hand with no record of what was applied"
+      ],
+      "priority": 146,
+      "passes": false,
+      "notes": "Evidence gathered read-only from the browser against production: the PostgREST OpenAPI spec for the table list, /storage/v1/bucket/<name> for the buckets, and the console log from the user's own dashboard session for the function 404s and the pii-crypto 500. US-144 and US-145 each patched one symptom of this; both are blocked on the same manual apply. Do this before either of them is called done."
     }
   ]
 }
