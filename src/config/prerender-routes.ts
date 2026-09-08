@@ -32,6 +32,12 @@ export interface PrerenderRoute {
    * next person can tell a marketing page from a legal obligation.
    */
   kind: 'marketing' | 'feature' | 'comparison' | 'tool' | 'location' | 'legal' | 'blog' | 'article';
+  /**
+   * Set false for a route that should be rendered and crawlable but kept out of
+   * sitemap.xml — a page carrying a noindex directive, for instance. Omitted
+   * means listed. US-151 and US-153 are the first users.
+   */
+  sitemap?: false;
 }
 
 /**

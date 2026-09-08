@@ -269,30 +269,18 @@ export const generateStructuredData = (page: PageConfig): Record<string, any> =>
   };
 };
 
-/**
- * Generate sitemap XML for all published pages
+/*
+ * generateSitemap() was here. It was exported, imported by nobody, and one of
+ * five separate sitemap implementations in this repository (US-149): this one,
+ * a React component at src/pages/Sitemap.tsx that had no route, two Supabase
+ * edge functions that duplicated each other and were never deployed to the
+ * served path, and the static public/sitemap.xml that was the only one Google
+ * ever read — hand-edited, listing no blog articles, and listing /features,
+ * which has no route and answered with the 404 page under a 200.
+ *
+ * There is now one, in scripts/lib/sitemap.mts, generated at build time from
+ * the pages the build actually rendered. The other four are deleted.
  */
-export const generateSitemap = (pages: PageConfig[]): string => {
-  const publishedPages = pages.filter((p) => p.published);
-  const baseUrl = getSafeOrigin();
-
-  const urlEntries = publishedPages
-    .map(
-      (page) => `
-  <url>
-    <loc>${baseUrl}/p/${page.slug}</loc>
-    <lastmod>${new Date(page.updatedAt).toISOString()}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`
-    )
-    .join('');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  ${urlEntries}
-</urlset>`;
-};
 
 /**
  * Generate robots.txt content

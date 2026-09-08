@@ -977,3 +977,73 @@ Note for US-149: blogRoutes() in src/config/prerender-routes.ts is the function
 that produced these files. Read article URLs for the sitemap from it rather than
 re-deriving them — a sitemap listing no articles is the bug that story exists to
 fix, and two sources of truth is how it happened.
+
+### US-149 — generate sitemap.xml at build time — 2026-09-08 — PASSES
+
+sitemap.xml is now emitted by scripts/prerender.mts from the routes that
+actually rendered, and public/sitemap.xml is deleted. 44 URLs without the blog,
+49 with it, verified well-formed by ElementTree, no duplicates, and every single
+loc resolving to a file on disk that is not the 404 page.
+
+The story said two duplicate sitemap generators. There were FIVE, four of them
+dead:
+  1. public/sitemap.xml — static, hand-edited, mtime 2026-07-14, every lastmod
+     reading 2026-02-08. The only one Google ever read.
+  2. supabase/functions/generate-sitemap/index.ts — 309 lines. Never deployed to
+     the served path, and docs/reviews/CODE_REVIEW_2026-08.md:405 had already
+     recorded that it selects articles.featured_image, a column that does not
+     exist (the real one is featured_image_url). It could not have worked.
+  3. supabase/functions/sitemap/index.ts — 187 lines, duplicating (2).
+  4. src/pages/Sitemap.tsx — a React component that generates XML into component
+     state. It has NO route in App.tsx and nothing imports it.
+  5. generateSitemap() in src/lib/seo.ts — exported, imported by nobody, and
+     emitting only /p/<slug> page-builder URLs.
+All four dead ones are deleted; (5) leaves a comment where it was saying why.
+Nothing in src/ or functions/ referenced any of them — checked before removing.
+
+The guarantee is structural rather than procedural. writeSitemap() takes the
+render results, not the route manifest, so the only thing that can enter the
+sitemap is a page that has just rendered and passed the gate — exists as a file,
+carries its own title/description/canonical, is not the 404. A dangling-entry
+assertion sits on top of that for the day someone changes the derivation.
+
+/features: removing it from the sitemap was not enough, because the URL still
+answered 200 with the SPA's 404 page and Google had already been shown it. Added
+`/features / 301` to public/_redirects, which also documents why the SPA splat
+at the bottom does not swallow the prerendered files. /llms.txt is gone from the
+sitemap too — it is served, it is not a page.
+
+lastmod is only emitted where there is a truthful source: articles use
+articles.updated_at falling back to published_at (verified — stub article one
+carries 2026-04-02 from updated_at, not its 2026-03-01 published_at). The static
+routes have no honest source, so the element is omitted rather than stamped with
+the build date. A sitemap where every lastmod is "today" is one Google learns to
+disregard, which is roughly what the old file achieved by freezing every date at
+2026-02-08.
+
+Priorities: homepage 1.0; marketing and comparison 0.9; tools and features 0.8;
+/blog 0.7; articles 0.6; the 23 city pages 0.5; legal 0.3. The legal weighting
+is deliberate and is the part of US-151 that belongs here — those pages stay
+indexable, they just stop competing for prominence with the pages that sell
+the product.
+
+Verification: build exits 0 in both modes (49 URLs against a stub PostgREST, 44
+with PRERENDER_ALLOW_NO_ARTICLES=1 and zero /blog entries). tsc --noEmit clean.
+robots.txt still points at https://agentbio.net/sitemap.xml, which is now the
+generated file.
+
+On the test suite: 627-628 passing, and the failure set is not stable between
+runs. Four fail every time and pre-date this branch — repo-hygiene.test.ts (2,
+from the loose root .md and .ps1/.sh files added in 908a2c10), analytics.test.ts
+and analyticsEvents.test.ts. Two more come and go under full-suite parallel
+load: LeadDetailModal.test.tsx and ContactForm.test.tsx. ContactForm was run
+three times in isolation and passed 3/3, so it is load-flakiness in the suite,
+not a regression here. Worth someone's attention, but it is not this batch's.
+
+Note for US-153: PrerenderRoute now carries an optional `sitemap: false`, for a
+route that should be rendered and crawlable but kept out of the sitemap — which
+is exactly what a noindexed city page needs. writeSitemap already honours it and
+reports how many routes were excluded.
+
+Note for US-124: the dead-code sweep should know that four sitemap
+implementations were removed here, so it does not go looking for them.

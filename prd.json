@@ -2382,8 +2382,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 149,
-      "passes": false,
-      "notes": "Depends on US-147 and US-148. US-124 (dead code sweep) should be told which of the two sitemap functions survives. Resubmitting in GSC is a human step - note it in progress.txt rather than claiming it."
+      "passes": true,
+      "notes": "Depends on US-147 and US-148. US-124 (dead code sweep) should be told which of the two sitemap functions survives. Resubmitting in GSC is a human step - note it in progress.txt rather than claiming it. Reality differed from the description: there were FIVE sitemap implementations, not two - public/sitemap.xml (the only one served), the two edge functions, an unrouted src/pages/Sitemap.tsx, and a dead generateSitemap() export in src/lib/seo.ts. All four dead ones deleted. /features needed a 301 in public/_redirects as well as removal from the sitemap, because the URL still answered 200 with the SPA 404 page."
     },
     {
       "id": "US-150",

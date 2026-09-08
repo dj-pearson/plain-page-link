@@ -38,6 +38,7 @@ import {
   type PrerenderRoute,
 } from '../src/config/prerender-routes';
 import { categorySlugs, loadArticles, type Article } from './lib/articles.mts';
+import { buildSitemapXml, weightFor, type SitemapEntry } from './lib/sitemap.mts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -252,8 +253,7 @@ async function interceptArticles(context: BrowserContext, articles: Article[]): 
     if (order?.startsWith('published_at.')) {
       const dir = order.endsWith('.asc') ? 1 : -1;
       rows = [...rows].sort(
-        (a, b) =>
-          dir * ((a.published_at || '').localeCompare(b.published_at || ''))
+        (a, b) => dir * (a.published_at || '').localeCompare(b.published_at || '')
       );
     }
 
@@ -415,6 +415,54 @@ async function verifyServedLayout(results: Rendered[]): Promise<void> {
   console.log('[prerender] layout check: every route resolves to its own file, nothing shadows it');
 }
 
+/**
+ * Emit dist/sitemap.xml from the routes that rendered successfully (US-149).
+ *
+ * Takes `results` rather than the route manifest on purpose. Everything in
+ * `results` has been through the render gate — it exists as a file, it is not
+ * the 404 page, and it carries its own title, description and canonical. That
+ * makes "every URL in the sitemap resolves to a real page" a property of how
+ * the file is built, rather than a check somebody has to remember to run. The
+ * /features soft 404 sat in the old hand-edited sitemap for months precisely
+ * because nothing connected the two.
+ */
+async function writeSitemap(results: Rendered[], articles: Article[]): Promise<void> {
+  const updatedBySlug = new Map(articles.map((a) => [a.slug, a.updated_at || a.published_at]));
+
+  const entries: SitemapEntry[] = results
+    .filter((r) => r.route.sitemap !== false)
+    .map((r) => {
+      const slug = r.route.kind === 'article' ? r.route.path.replace('/blog/', '') : null;
+      return {
+        path: r.route.path,
+        lastmod: slug ? (updatedBySlug.get(slug) ?? null) : null,
+        ...weightFor(r.route.kind, r.route.path),
+      };
+    })
+    .sort((a, b) => b.priority - a.priority || a.path.localeCompare(b.path));
+
+  // Structurally this cannot fail today, because `entries` is derived from
+  // routes that already rendered to a file. It is asserted anyway: the day
+  // somebody derives the sitemap from the manifest instead, or adds an entry by
+  // hand, this is what stops another /features reaching Google.
+  const dangling = entries.filter(
+    (e) => !existsSync(join(DIST, e.path === '/' ? 'index.html' : `${e.path.slice(1)}/index.html`))
+  );
+  if (dangling.length > 0) {
+    console.error('\n[prerender] sitemap would list URLs with no page behind them:');
+    for (const e of dangling) console.error(`  - ${e.path}`);
+    process.exit(1);
+  }
+
+  await writeFile(join(DIST, 'sitemap.xml'), buildSitemapXml(entries, SITE_ORIGIN), 'utf8');
+
+  const excluded = results.length - entries.length;
+  console.log(
+    `[prerender] sitemap.xml: ${entries.length} URLs` +
+      (excluded > 0 ? ` (${excluded} prerendered but deliberately not listed)` : '')
+  );
+}
+
 async function main() {
   if (!existsSync(join(DIST, 'index.html'))) {
     console.error('[prerender] dist/index.html not found. Run `vite build` first.');
@@ -491,6 +539,7 @@ async function main() {
   console.log(`\n[prerender] wrote ${results.length} HTML files into dist/`);
 
   await verifyServedLayout(results);
+  await writeSitemap(results, articles);
 }
 
 main().catch((error) => {
