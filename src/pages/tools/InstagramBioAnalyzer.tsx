@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { getCanonicalUrl } from '@/config/seo.config';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { BioAnalyzerForm } from '@/components/tools/instagram-bio-analyzer/BioAnalyzerForm';
 import { ScoreDisplay } from '@/components/tools/instagram-bio-analyzer/ScoreDisplay';
@@ -271,6 +272,7 @@ export default function InstagramBioAnalyzer() {
     <>
       <Helmet>
         <title>Free Instagram Bio Analyzer for Real Estate Agents | AgentBio</title>
+        <link rel="canonical" href={getCanonicalUrl('/tools/instagram-bio-analyzer')} />
         <meta
           name="description"
           content="Analyze your realtor Instagram bio in 60 seconds. Get your effectiveness score + 3 optimized bio rewrites. Free tool for agents. No signup required."

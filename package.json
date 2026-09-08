@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:check": "tsc --noEmit && vite build",
+    "build": "vite build && npm run prerender",
+    "build:check": "tsc --noEmit && npm run build",
     "build:dev": "vite build --mode development",
     "analyze": "ANALYZE=true vite build",
     "size-check": "node scripts/check-bundle-size.mjs",
@@ -29,7 +29,8 @@
     "lint:warn": "eslint src/ --max-warnings=-1",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "prerender": "tsx scripts/prerender.mts"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

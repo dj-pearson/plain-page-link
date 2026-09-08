@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { getCanonicalUrl } from '@/config/seo.config';
 import { PropertyDetailsForm } from '@/components/tools/listing-description-generator/PropertyDetailsForm';
 import { DescriptionDisplay } from '@/components/tools/listing-description-generator/DescriptionDisplay';
 import { EmailCaptureModal } from '@/components/tools/listing-description-generator/EmailCaptureModal';
@@ -527,6 +528,7 @@ export default function ListingDescriptionGenerator() {
     <>
       <Helmet>
         <title>Free AI Listing Description Generator for Real Estate | AgentBio</title>
+        <link rel="canonical" href={getCanonicalUrl('/tools/listing-description-generator')} />
         <meta
           name="description"
           content="Generate professional real estate listing descriptions in 3 styles using AI. Get MLS descriptions, social media posts, email copy, and SMS snippets in under 60 seconds. Free tool for agents."

@@ -808,3 +808,85 @@ Baseline to measure against, for the next runner: 33 clicks / 1,481 impressions
 US-152 — the ~180 bio-intent impressions are noise and shedding them is the
 point. Resubmitting the sitemap and reading the GSC indexing report are human
 steps; note them, do not claim them.
+
+### US-147 — prerender every public route — 2026-09-08 — PASSES
+
+44 routes now render to their own HTML file under dist/ with 44 distinct
+titles. Before this, all 44 answered with the same shell and the same single
+title from index.html:80.
+
+Built: src/config/prerender-routes.ts (the one route list — 21 static routes
+plus one per LOCATIONS entry, so the city pages cannot drift from the data that
+generates them) and scripts/prerender.mts, run by `npm run prerender` and wired
+into `npm run build` after `vite build`. It serves dist/ with Vite's own preview
+API, drives it with the Playwright already in devDependencies, and snapshots
+each route once React has painted and helmet has written the head. Every page is
+rendered before anything is written, so the script never serves its own output
+back to itself. Build cost: ~35 s on top of a ~95 s bundle, four pages at a time.
+
+Four things found on the way, all of which would have shipped silently:
+
+1. CI has been building a bundle that cannot boot. .github/workflows/ci.yml ran
+   `npm run build` with no VITE_SUPABASE_* at all, and
+   src/integrations/supabase/client.ts throws at import when they are absent.
+   Nothing noticed because nothing in CI ever loaded the result — the prerender
+   is the first thing that does. Both build jobs now pass placeholder values and
+   install Chromium. This is the same trap US-113 hit with the a11y suite, and
+   playwright-a11y/e2e.config.ts already solve it the same way. The real values
+   live on the Cloudflare Pages project, not in the workflow.
+
+2. Canonicals were being baked as http://127.0.0.1:4319/pricing. getCanonicalUrl
+   is built on getSafeOrigin(), which in a browser returns
+   window.location.origin — during prerendering, the preview server. Every page
+   would have told Google its real URL was a duplicate of an unreachable
+   machine. The script now rewrites the preview origin to VITE_APP_URL (default
+   https://agentbio.net, mirroring FALLBACK_APP_URL in src/lib/utils.ts) and
+   fails if any 127.0.0.1/localhost survives.
+
+3. /tools/instagram-bio-analyzer and /tools/listing-description-generator had no
+   canonical at all — raw <Helmet> with title and description only. The render
+   gate caught it; both now use getCanonicalUrl.
+
+4. index.html's own <meta name="description">/og tags and helmet's are both
+   present in the live DOM (helmet marks its own with data-rh rather than
+   replacing). Serialised naively every page carried two of each. The snapshot
+   drops the unmanaged duplicate — verified canonical=1, description=1,
+   og:title=1 per page.
+
+On hydration: src/main.tsx uses ReactDOM.createRoot, not hydrateRoot, so the
+browser discards the prerendered markup and re-renders. There is no hydration
+contract and no mismatch to warn about — confirmed by loading /pricing and
+watching the console: no hydration warnings, #root repopulates, title resolves
+to "Pricing - AgentBio Professional Plans".
+
+On Cloudflare serving these files: `vite preview` is NOT a valid check here and
+misled the first attempt — its SPA fallback fires before directory-index
+resolution, so it returns dist/index.html for /pricing even when
+dist/pricing/index.html exists. Pages resolves differently (asset, then
+<path>/index.html, then _redirects). The load-bearing claim is that assets
+outrank the `/* /index.html 200` splat, and that is not a guess: if the splat
+won, every Pages-hosted SPA would answer its own /assets/*.js with index.html
+and none would work. The build now asserts our half — a file exists exactly
+where the asset lookup lands, and no _redirects rule targets a prerendered path.
+wrangler is not a dependency and was not added for this.
+
+Not prerendered, deliberately: /blog and articles (body comes from `articles`,
+US-148), /auth/* (US-151 adds them with noindex), /dashboard, /admin,
+/onboarding (no anonymous render), and /:username, /p/:slug, /:username/review
+(one page per tenant — already served by functions/[username].ts from US-114).
+
+Verification: `npm run build` exits 0 and ends with the layout check; `tsc
+--noEmit` clean; eslint 0 errors on the changed files (17 pre-existing warnings
+in the two tool pages, none new). `npx vitest run` is 628 passed / 4 failed —
+all four failures pre-date this work and are unrelated: two in
+repo-hygiene.test.ts caused by the four loose *.md and six loose *.ps1/*.sh
+files added in 908a2c10, plus analytics.test.ts, analyticsEvents.test.ts and
+LeadDetailModal.test.tsx. Confirmed by stashing this branch's changes and
+re-running the same four files: identical failures.
+
+Note for the next runner: the render gate currently requires a title, a
+description and a canonical on every route, and treats index.html's default
+title on a non-root route as failure. US-151 will add noindex routes that still
+need to satisfy it, and US-150 turns the same assertions on the written files
+into the CI gate. Do not weaken these checks to make a new route pass — a route
+that cannot produce its own tags is the bug, not the check.

@@ -2348,7 +2348,7 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 147,
-      "passes": false,
+      "passes": true,
       "notes": "This is the unlock - US-148 through US-158 are largely wasted effort until it ships, so it goes first and nothing else in this batch should be started before it passes. Do not rewrite SEOHead/PageSEO/ArticleSEO; they already emit the right tags and the only defect is that a crawler never runs them. Watch build time: 44 routes through a headless browser is the slow part of CI - render them concurrently with a bounded pool. Keep the prerender script in scripts/ alongside the existing check-bundle-size.mjs / verify-schema.mjs and match their .mjs + node style."
     },
     {
