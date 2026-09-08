@@ -2332,6 +2332,213 @@
       "priority": 146,
       "passes": false,
       "notes": "Evidence gathered read-only from the browser against production: the PostgREST OpenAPI spec for the table list, /storage/v1/bucket/<name> for the buckets, and the console log from the user's own dashboard session for the function 404s and the pii-crypto 500. US-144 and US-145 each patched one symptom of this; both are blocked on the same manual apply. Do this before either of them is called done."
+    },
+    {
+      "id": "US-147",
+      "title": "Nothing public is prerendered: Googlebot gets an empty shell and one identical title for all 44 URLs",
+      "description": "The single root cause behind 33 clicks in 16 months. agentbio.net is a pure client-rendered Vite SPA with no SSG, SSR or prerender step anywhere - package.json and vite.config.ts contain no prerender/ssg/react-snap/puppeteer dependency, and public/_redirects is `/* /index.html 200`, so every one of the 44 sitemap URLs returns the identical shell. index.html:80 hardcodes ONE <title> ('Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads - AgentBio') for the whole site; the real per-page titles, descriptions, canonicals and JSON-LD are produced by react-helmet-async (SEOHead.tsx, seo/PageSEO.tsx, blog/ArticleSEO.tsx) and therefore only exist after hydration. Googlebot's first pass sees an empty div and a title shared with 43 other URLs, then has to queue the page for the render service. The GSC export of 2026-09-08 shows the consequence exactly: all 23 /for/{city} pages, all 5 /features/* pages and all 3 /vs/* pages - 31 pages, every one of them in the sitemap - have ZERO impressions across the full 16 months. Pages.csv lists every page with at least one impression (it reaches down to /accessibility with 1), and not one of the 31 appears. The second signature is high rank with no clicks, which is what a duplicated SERP title produces: /pricing sits at position 4.77 on 122 impressions with 1 click (0.82% CTR, where position 5 should return 6-9%), /blog/link-hub-for-leasing-agents at position 3.00 with 0 clicks, /blog/home-selling-link-hub at position 5.23 with 0 clicks. Fix the delivery, not the meta components - those are already correct and already carry canonical, og and schema.",
+      "acceptanceCriteria": [
+        "A postbuild prerender step renders every static public route to its own HTML file under dist/ (e.g. dist/pricing/index.html, dist/vs/linktree/index.html, dist/for/miami-real-estate-agents/index.html). Use the playwright already in devDependencies (^1.57.0) against a local `vite preview`; do NOT add puppeteer or a second browser dependency",
+        "The route list is derived from a single exported source of truth, not hand-maintained twice: static routes from a routes manifest and the 23 /for/{slug} pages from the existing LOCATIONS array in src/data/locations.ts (26 entries)",
+        "Each prerendered file contains the page's own post-hydration <title>, <meta name=\"description\">, <link rel=\"canonical\"> and JSON-LD in the served HTML, not the index.html defaults. Verify by asserting the title in dist/pricing/index.html differs from the title in dist/index.html",
+        "The prerendered HTML still hydrates without a React mismatch warning: loading a prerendered route in a browser logs no 'did not match' / hydration error in the console",
+        "Cloudflare Pages serves the static file rather than the SPA fallback for a prerendered route - confirm the `/* /index.html 200` rule in public/_redirects does not shadow the emitted files (static assets are matched before redirects; add a test or a documented check)",
+        "Routes behind auth (/dashboard/*, /admin/*, /onboarding/*) and the dynamic tenant routes (/:username, /p/:slug, /:username/review) are NOT prerendered",
+        "`npm run build` still succeeds and the prerender step fails the build loudly if a route renders an error page or an empty root",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 147,
+      "passes": false,
+      "notes": "This is the unlock - US-148 through US-158 are largely wasted effort until it ships, so it goes first and nothing else in this batch should be started before it passes. Do not rewrite SEOHead/PageSEO/ArticleSEO; they already emit the right tags and the only defect is that a crawler never runs them. Watch build time: 44 routes through a headless browser is the slow part of CI - render them concurrently with a bounded pool. Keep the prerender script in scripts/ alongside the existing check-bundle-size.mjs / verify-schema.mjs and match their .mjs + node style."
+    },
+    {
+      "id": "US-148",
+      "title": "Blog articles are fetched from Supabase in the browser, so the body of every post is invisible on first crawl",
+      "description": "src/pages/BlogArticle.tsx:26 queries `.from('articles')` at runtime, so a blog URL returns the same empty shell as everything else and the article text only exists after the bundle executes AND a Supabase round-trip resolves - the worst case for indexing. The GSC export shows what this costs: the 25 blog posts other than the single 2024 post earned 2 clicks combined across 16 months. The exception proves the mechanism is survivable but expensive - /blog/how-real-estate-agents-use-link-in-bio-to-generate-more-leads-in-2024 pulled 162 impressions and 6 clicks at position 11.09, which is 18% of the entire site's clicks from one post that has had long enough for the render queue to reach it. Extend the US-147 prerender to article routes by fetching published articles from Supabase at BUILD time and emitting real HTML per slug.",
+      "acceptanceCriteria": [
+        "The prerender step fetches published rows from the `articles` table at build time (id, title, slug, excerpt, content, featured_image_url, author_id, published_at, updated_at, seo_title, seo_description, tags) and emits dist/blog/<slug>/index.html for each",
+        "The article body text is present in the emitted HTML - grep for a distinctive sentence from an article's content in its prerendered file and find it",
+        "Each article file carries its own <title> (seo_title falling back to title), meta description (seo_description falling back to excerpt), canonical, og:type=article, og:image and Article JSON-LD, matching what blog/ArticleSEO.tsx produces client-side",
+        "dist/blog/index.html (the listing) and the /blog/category/:category routes are prerendered from the same fetched set",
+        "The build degrades safely when Supabase is unreachable or credentials are absent: it must NOT silently emit zero article pages - either fail the build or reuse a committed snapshot, and say which in the log",
+        "Publishing an article triggers a rebuild: a documented Cloudflare Pages deploy hook fired from the existing article publish path, so a new post reaches the index without a manual deploy",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 148,
+      "passes": false,
+      "notes": "Depends on US-147. Use the anon key and rely on RLS - do not put a service-role key into the build. `articles` is the table; `blog_posts` has never existed (see CLAUDE.md). The 'fail loudly on zero articles' criterion is the important one: a build that quietly ships an empty blog is exactly how the current sitemap ended up with no articles in it."
+    },
+    {
+      "id": "US-149",
+      "title": "The sitemap lists 44 URLs, none of which is a blog post, and one of which is a soft 404",
+      "description": "public/sitemap.xml is a static hand-edited file - 44 <loc> entries, every lastmod reading 2026-02-08, file last modified 2026-07-14 - and robots.txt points Google at it. Three defects. (1) Not one of the 25+ blog articles is listed; only /blog itself. (2) https://agentbio.net/features is listed but there is no `/features` route in App.tsx - only the five /features/* children at App.tsx:202-206 - so it falls through to `path=\"*\"` and returns the NotFound page under a 200, a soft 404 submitted to Google on purpose. /llms.txt is listed as a page and is not one. (3) Five real routes are missing: /cookies, /privacy-choices, /accessibility, /blog/category/:category and the article URLs. Meanwhile two Supabase edge functions that generate sitemaps - supabase/functions/generate-sitemap/index.ts (309 lines) and supabase/functions/sitemap/index.ts (187 lines) - both exist, duplicate each other, and neither is what agentbio.net/sitemap.xml serves. They are dead code.",
+      "acceptanceCriteria": [
+        "sitemap.xml is generated during the build from the same route source of truth as US-147 plus the articles fetched in US-148, with a real per-URL lastmod (articles use articles.updated_at)",
+        "Every URL in the generated sitemap resolves to a prerendered file that is not the NotFound page - assert this in the build, so a /features-style soft 404 can never be submitted again",
+        "/llms.txt is removed from the sitemap (it stays served, it is not a page); /features is removed or given a real route",
+        "All published article URLs appear in the sitemap",
+        "The two dead edge functions are resolved: either delete supabase/functions/generate-sitemap and supabase/functions/sitemap, or wire exactly one of them to the served path and delete the other. Two generators and a third static file is the state that produced this bug",
+        "robots.txt still points at the one sitemap that is actually served",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 149,
+      "passes": false,
+      "notes": "Depends on US-147 and US-148. US-124 (dead code sweep) should be told which of the two sitemap functions survives. Resubmitting in GSC is a human step - note it in progress.txt rather than claiming it."
+    },
+    {
+      "id": "US-150",
+      "title": "CI gate: fail the build when a prerendered page has a missing or duplicated title, description or canonical",
+      "description": "The reason 44 URLs shipped with one shared title for a year is that nothing checked. US-147 fixes today's HTML; this keeps it fixed. Add an automated assertion over the built dist/ that every prerendered page carries a unique, non-empty title and description and a self-referencing canonical, and run it in CI so the regression cannot return silently.",
+      "acceptanceCriteria": [
+        "A test (vitest or a scripts/*.mjs invoked by CI) walks every *.html under dist/ and asserts: <title> present, non-empty, and not equal to the index.html title unless the file IS index.html",
+        "Asserts <meta name=\"description\"> present, non-empty, and unique across pages (a small allowlist is acceptable for genuine near-duplicates, but it must be explicit and named)",
+        "Asserts <link rel=\"canonical\"> present and pointing at the page's own absolute URL, not at the homepage",
+        "Asserts the file is not the NotFound page and its <body> is not empty",
+        "The check runs in the existing GitHub Actions workflow and fails the build on violation",
+        "Running it against the current pre-US-147 output would fail - demonstrate that with a test fixture, so the gate is known to have teeth",
+        "An `npm run verify:seo` script exists, matching the style of the existing verify:schema / size-check scripts",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 150,
+      "passes": false,
+      "notes": "Depends on US-147. Keep it in the same spirit as the existing verify:schema / size-check scripts: a plain node script with a clear failure message naming the offending file."
+    },
+    {
+      "id": "US-151",
+      "title": "Auth and legal pages absorb 22% of impressions, and robots.txt is blocking the fix",
+      "description": "321 of 1,481 impressions (21.7%) went to pages with no commercial value: /auth/login 114, /dmca 72, /terms 56, /privacy 40, /acceptable-use 39. /dmca ranks for 'dmca copyright office ia' at position 70.88 and /auth/register has 42 impressions. The subtle part is that robots.txt already says `Disallow: /auth/` and the login page is indexed anyway - Disallow prevents crawling, not indexing, so Google indexes the URL from links alone and can never see a noindex directive because it is forbidden from fetching the page that would carry one. Blocking harder makes this worse, not better. Now that US-147 puts real meta in the served HTML, the correct fix is available: let Googlebot fetch these routes and tell it not to index them.",
+      "acceptanceCriteria": [
+        "Remove `Disallow: /auth/` from public/robots.txt so Googlebot can fetch the auth routes and read their directives (keep /api/ and /dashboard/ disallowed)",
+        "Every /auth/* route emits <meta name=\"robots\" content=\"noindex, follow\"> in its prerendered HTML - the SEOHead component already supports a noindex prop, so wire it rather than adding a mechanism",
+        "The auth routes are prerendered (so the directive is visible without JS) but excluded from sitemap.xml",
+        "Legal pages (/privacy, /terms, /dmca, /acceptable-use, /cookies, /privacy-choices, /accessibility) stay indexable but are given a low sitemap priority and are excluded from internal-link prominence",
+        "US-150's uniqueness gate accounts for the noindexed pages rather than failing on them",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 151,
+      "passes": false,
+      "notes": "Depends on US-147 and US-149. Do not add `noindex` to the legal pages - they are legitimate pages and removing them from the index does not redistribute their impressions to anything. The 22% figure is a symptom of a thin site, and the cure is US-155/156 having something better to rank; this story only stops the auth URLs from competing."
+    },
+    {
+      "id": "US-152",
+      "title": "The homepage title targets the one query the product cannot satisfy",
+      "description": "index.html:80 and the homepage SEOHead both read 'Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads - AgentBio', and the GSC query report shows exactly who that attracts. The largest impression cluster is informational and wrong-intent: 'real estate agent bio' 82 impressions at position 88.56, 'agent bio' 60 at 7.33, 'luxury real estate agent bio' 6 at 63.33, 'real estate bio new agent' 4 at 105.25, 'real estate agent bio for new agents' 3 at 37, 'professional real estate agent bio examples' 2 at 7.5, plus a long tail - roughly 180 impressions, one click, of people looking for bio COPY to write about themselves. They do not want a page builder. Meanwhile the query that actually describes the product, 'link in bio for real estate agents', gets 28 impressions at position 21.18, and 'link in bio for realtors' 4 at 28.25. The site is on page 3 for what it sells and page 9 for what it does not. Retarget the homepage at the commercial query; US-155 handles the informational cluster separately so it is captured rather than abandoned.",
+      "acceptanceCriteria": [
+        "The homepage <title>, meta description, og:title and H1 target the 'link in bio for real estate agents' / 'link in bio for realtors' intent and no longer lead with 'real estate agent bio'",
+        "index.html's hardcoded fallback title and description are updated to match, so the shell and the hydrated page agree",
+        "The change is made in one place - the homepage SEO source - and index.html's fallback derives from it or is documented as needing to be kept in step",
+        "H1 and title are consistent with each other and with the page's actual first screen of copy",
+        "og:image and twitter card still resolve to a real file",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 152,
+      "passes": false,
+      "notes": "Depends on US-147 (a title change is worthless while every URL shares one title). Expect impressions to FALL and clicks to rise - the 180 wrong-intent impressions are noise and losing them is the point. Record the pre-change baseline in progress.txt (33 clicks / 1,481 impressions / position 18.4 over the 16 months to 2026-09-08) so the next runner can tell improvement from drift. Do not also change the brand name; that is not this story."
+    },
+    {
+      "id": "US-153",
+      "title": "Gate the 23 thin /for/{city} pages behind noindex until they carry something a Miami agent could not get from the Austin page",
+      "description": "A risk that US-147 creates rather than removes. The 23 /for/{city}-real-estate-agents pages are generated from LOCATIONS in src/data/locations.ts by a single 715-line LocationTemplate.tsx; each differs only by city name, a median price, an agent count, a one-sentence marketDescription and a neighbourhood list. Today that is harmless because none of them has ever been crawled well enough to receive a single impression in 16 months. The moment prerendering makes them real, 23 near-identical pages enter the index at once on a domain with almost no authority, which is the classic doorway-page pattern and a site-wide quality risk. Ship them noindexed, and let a page earn its way in.",
+      "acceptanceCriteria": [
+        "/for/{slug} pages are prerendered (so they are crawlable and their directives visible) but emit noindex, follow by default",
+        "A per-location flag in src/data/locations.ts controls indexability, defaulting to off, so a city page can be switched on individually once it has real content",
+        "Documented criteria for switching one on - what 'real content' means here (genuinely local, verifiable, not template-substituted) - written into docs/seo/ and referenced from the data file",
+        "Noindexed city pages are excluded from sitemap.xml; a page switched on is included automatically",
+        "At most 2 city pages are switched on as worked examples, and only if they are given substantive unique content in this story",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 153,
+      "passes": false,
+      "notes": "Depends on US-147 and US-149. This is deliberately conservative and will feel like a step backwards - it is not. 23 templated pages ranking nowhere cost nothing; 23 templated pages indexed on a weak domain can cost the pages that matter. Do not delete the pages or the data; the template is fine and the approach becomes viable once the domain has authority."
+    },
+    {
+      "id": "US-154",
+      "title": "Consolidate 25 near-duplicate blog posts into four guides",
+      "description": "The blog is one topic written 25 times. From the GSC page report: 'the-ultimate-guide-to-link-ideas-for-real-estate-pages', 'the-smart-agent-s-guide-to-creating-a-link-for-home-tours', 'instagram-link-ideas-for-realtors', 'home-sales-link-ideas', 'agent-click-page-tips', 'agent-qr-code-setup-ideas', 'home-selling-link-hub', 'home-ads-link-hub', 'agent-core-link-setup', 'best-contact-link-buttons', 'the-complete-agent-link-hub-guide', 'link-hub-for-leasing-agents', 'agent-page-link-ideas', 'link-hub-for-listings', 'link-hub-for-top-agents', 'how-agents-send-links-online', 'agent-call-link-layout', 'the-landlord-agent-link-page', 'how-agents-get-leads-from-social-bio-links', 'how-to-link-your-active-listings', 'why-every-real-estate-agent-needs-an-online-resume-page', and more - all permutations of agent + link + hub/page/ideas. Together they earned 2 clicks in 16 months. This is the pattern Google's helpful-content signals demote site-wide, so it is plausibly suppressing the pages that matter. One post is genuinely working and must be preserved: how-real-estate-agents-use-link-in-bio-to-generate-more-leads-in-2024 at 162 impressions, 6 clicks, position 11.09 - 18% of all site clicks.",
+      "acceptanceCriteria": [
+        "The permutation posts are merged into at most four substantial guides, each answering a distinct question rather than a distinct keyword phrasing",
+        "how-real-estate-agents-use-link-in-bio-to-generate-more-leads-in-2024 is kept at its existing URL, expanded rather than merged away, and its '2024' framing refreshed without changing the slug",
+        "Every retired slug 301s to the guide that absorbed it - implemented in public/_redirects (Cloudflare Pages), not as a client-side redirect, so the signal actually passes",
+        "No retired URL returns the SPA NotFound page: assert every 301 source resolves to a 200 at its target",
+        "No redirect chains: every source points directly at its final target",
+        "Retired slugs are removed from sitemap.xml and the surviving guides are present with correct lastmod",
+        "The articles rows for retired posts are unpublished rather than deleted, so the content is recoverable",
+        "Internal links pointing at retired slugs are updated to the surviving guides",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 154,
+      "passes": false,
+      "notes": "Depends on US-148 and US-149. Pruning feels destructive and is the single most reliable site-wide quality move available here. Get the redirect map right in one pass - a chain of 301s or a redirect into a 404 is worse than leaving the post up. Write the full old-slug -> new-slug map into progress.txt before making any change."
+    },
+    {
+      "id": "US-155",
+      "title": "A real estate agent bio generator, to capture the 180-impression cluster the homepage currently fails",
+      "description": "Rather than abandon the wrong-intent traffic US-152 stops chasing, serve it. 'real estate agent bio' (82 impressions, position 88.56), 'professional real estate agent bio examples' (position 7.5), 'real estate bio for new agents', 'real estate agent bio for new agents', 'luxury real estate agent bio', 'realtor instagram bio', 'real estate bio generator' - roughly 180 impressions across 16 months with no page built for them at all, ranking on the homepage's title alone. The infrastructure already exists: src/lib/instagram-bio-analyzer/ and src/lib/listing-description-generator/ are shipped free tools with routes at /tools/instagram-bio-analyzer and /tools/listing-description-generator. This is the same shape, and it feeds the funnel honestly - here is your bio, now where does the link in it point?",
+      "acceptanceCriteria": [
+        "A free bio tool ships at a route under /tools/ following the pattern of the two existing tools (structure, layout and lead-capture behaviour consistent with them)",
+        "It produces a usable bio without an account, and covers the intents the query data actually shows: new agent, luxury, rental/leasing, team, and Instagram-length",
+        "Real worked examples are on the page as crawlable text, not generated only on interaction - the examples are what can rank",
+        "The page is prerendered with its own title, description, canonical and appropriate schema, and is in the sitemap",
+        "It converts: a clear, non-obnoxious path from finished bio to creating a page, measured with the existing analytics",
+        "No new heavyweight dependency; reuse the existing tool scaffolding and UI components",
+        "The page respects the UI craft floor in CLAUDE.md - run `npx impeccable detect` on the new files and address what it flags",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 155,
+      "passes": false,
+      "notes": "Depends on US-147. Read src/lib/instagram-bio-analyzer/ first and follow it rather than inventing a second pattern. If the tool needs an LLM call, route it through an edge function - no API key in the bundle. This story and US-152 are a pair: one stops the homepage chasing the query, the other builds the page that deserves it."
+    },
+    {
+      "id": "US-156",
+      "title": "/vs/linktree is the highest commercial intent page in the category and it has never had an impression",
+      "description": "The three comparison pages - /vs/linktree, /vs/beacons, /vs/later - are routed (App.tsx) and in the sitemap, and have zero impressions across the full 16 months. US-147 makes them visible; this story makes them worth finding. Comparison queries are where someone with a credit card out ends up, and 'linktree alternative for real estate agents' is the exact query this product should own. Currently the roundup articles owning those SERPs do not mention AgentBio at all.",
+      "acceptanceCriteria": [
+        "/vs/linktree is built out as a substantive, honest comparison: a real feature matrix, pricing reality, and a clear statement of who Linktree is genuinely better for - a comparison that only wins is not credible and does not convert",
+        "Claims about the competitor are accurate as of the build date and dated on the page, so they can be maintained",
+        "/vs/beacons and /vs/later are brought to the same standard or reduced to one page, rather than left as three thin variants (the US-153 lesson)",
+        "Each comparison page is prerendered with its own title, description, canonical and FAQ/Product schema where genuinely applicable, and appears in the sitemap",
+        "Comparison pages are reachable from the pricing page and the primary navigation, not orphaned",
+        "Comparison tables scroll horizontally on mobile rather than forcing the page to - 81% of the site's impressions are desktop but mobile CTR is already higher (3.32% vs 2.00%)",
+        "The pages respect the UI craft floor in CLAUDE.md - `npx impeccable detect` clean or justified",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 156,
+      "passes": false,
+      "notes": "Depends on US-147. Do not publish comparison claims you have not checked - a stale or wrong pricing table on a competitor is both a credibility and a legal problem. Put the check date in the page copy and in a constant, so the next runner knows when it went stale."
+    },
+    {
+      "id": "US-157",
+      "title": "Rich results: the whole site produced 3 Product-snippet impressions in 16 months",
+      "description": "Search appearance for the entire 16-month window: 'Product snippets, 0 clicks, 3 impressions'. That is the sum of the site's structured-data presence. The components exist - src/components/seo/SchemaMarkup.tsx, src/components/ReviewSchema.tsx, src/components/Breadcrumbs.tsx, src/components/seo/Breadcrumb.tsx and the schema prop on SEOHead - and like everything else they only run after hydration, so a crawler collecting rich-result eligibility never sees them. Once US-147 puts them in the served HTML, make the coverage deliberate.",
+      "acceptanceCriteria": [
+        "SoftwareApplication (or Product) schema with offers on the homepage and /pricing, matching the real plans in subscription_plans rather than the pricing-plans.ts copy",
+        "Article schema on every blog post with author, datePublished and dateModified taken from the articles row",
+        "BreadcrumbList on blog posts, /features/*, /vs/* and /for/* - the components already exist, wire them consistently",
+        "FAQPage only where a real FAQ is visible on the page, never as invisible markup",
+        "Organization/WebSite schema once, sitewide, with a single sameAs set",
+        "Every emitted block validates: the US-150 verify:seo check parses each JSON-LD block and fails on invalid or contradictory markup",
+        "No schema describes content that is not visible on the page - that is a manual-action risk, not a shortcut",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 157,
+      "passes": false,
+      "notes": "Depends on US-147 and US-150. subscription_plans is the enforced matrix and pricing-plans.ts is copy (see the constraints noted for US-128..US-143) - schema must follow the enforced source or it will advertise prices the app will not honour. Review schema needs real reviews; do not emit aggregateRating from seeded or sample testimonials."
+    },
+    {
+      "id": "US-158",
+      "title": "The uncomfortable one: position 18-20 on every page regardless of topic is a domain with no links",
+      "description": "Across 16 months the site averages position 18.39 on desktop and 20.40 on mobile, and the average barely moves by page or by topic - /pricing 4.77 and a handful of blog posts at 3-6 are the exceptions, and even those convert nothing. Uniform mid-page-two ranking irrespective of content quality is the signature of a domain with essentially no authority. US-147 through US-157 will move pages from roughly position 20 to roughly position 10; they cannot move them to 1-5. What does is being present in the 'best link in bio tools for realtors' roundups that currently own those SERPs, and in the directories real estate agents actually consult. That work is human outreach, but the assets it requires and the target list it needs are buildable, and their absence is what stalls it.",
+      "acceptanceCriteria": [
+        "A researched, prioritised link-acquisition target list committed to docs/seo/ - the roundup articles currently ranking for 'link in bio for real estate agents', 'linktree alternative for realtors' and neighbouring queries, plus the real estate tech directories, review platforms (G2, Capterra) and agent communities, each with the actual submission or contact route and an effort/likelihood note",
+        "The on-site assets a roundup author needs in order to include the product: a press/about page with accurate positioning, logo files in usable formats, a plain-language feature summary and screenshots, at a stable URL",
+        "Outreach templates that are specific enough to send - one for a roundup author, one for a directory submission, one for a partnership approach - with the honest pitch, not a generic mail merge",
+        "A single owner-facing checklist in docs/seo/ describing what is a code task and what is a human task here, so the next runner does not silently no-op the human half",
+        "Nothing in this story fabricates a placement, a review, or a directory listing, and no template asks anyone else to",
+        "Typecheck passes: tsc --noEmit succeeds"
+      ],
+      "priority": 158,
+      "passes": false,
+      "notes": "Last, and mostly not a coding task - it is here so it is not forgotten, and the story is scoped to the artifacts an agent can honestly produce. Do NOT attempt to acquire links, create accounts, post to communities or contact anyone; produce the list, the assets and the templates and stop. Say plainly in progress.txt that the outreach itself is outstanding and belongs to a person."
     }
   ]
 }

@@ -737,3 +737,74 @@ Constraints for whoever runs these: one clock (hourly GitHub cron into
 scheduled-maintenance, US-103) — add tasks, never a second scheduler; the PII
 key is edge-function only (US-066), so hashing and contact writes go through a
 function; subscription_plans is the enforced matrix, pricing-plans.ts is copy.
+
+---
+
+## Search Performance Diagnosis — 2026-09-08 (stories US-147 to US-158 added)
+
+Source: the Google Search Console export in keyword/, "Performance on Search",
+Web, last 16 months, pulled 2026-09-08. Whole-site totals for the window: 33
+clicks, 1,481 impressions, average position 18.39 desktop / 20.40 mobile. About
+three clicks a month. 81% of impressions are desktop; 63% are US (937/1,481),
+the rest largely South Korea, Philippines, India, Brazil, Turkey — noise for a
+US real-estate SaaS.
+
+Headline: this is not a content problem, it is a delivery problem. The site is a
+pure client-rendered SPA with no prerender step of any kind — no SSG/SSR/
+react-snap/puppeteer in package.json or vite.config.ts, public/_redirects is
+`/* /index.html 200`, and index.html:80 hardcodes ONE <title> for all 44 sitemap
+URLs. The per-page meta is correct but lives in react-helmet-async, so it only
+exists after hydration and a crawler's first pass never sees it. Blog bodies are
+worse: BlogArticle.tsx:26 fetches from `articles` at runtime, so the text needs
+the bundle AND a Supabase round-trip before it exists.
+
+Two fingerprints in the data confirm the mechanism rather than inferring it.
+(1) All 23 /for/{city} pages, all 5 /features/* pages and all 3 /vs/* pages —
+31 pages, every one in the sitemap — have ZERO impressions across the full 16
+months. Pages.csv lists every page with >=1 impression (down to /accessibility
+with 1); not one of the 31 appears. (2) High rank, no clicks, which is what a
+duplicated SERP title produces: /pricing at position 4.77 on 122 impressions
+with 1 click (0.82% CTR where position 5 returns 6-9%), link-hub-for-leasing-
+agents at 3.00 with 0 clicks, home-selling-link-hub at 5.23 with 0 clicks.
+
+Four further findings, all evidenced in the export or the tree:
+- public/sitemap.xml is static, hand-edited, 44 locs, every lastmod 2026-02-08,
+  file mtime 2026-07-14. Not one blog article is in it. /features is in it and
+  has no route (App.tsx has only the five /features/* children), so it is a soft
+  404 submitted on purpose. Two edge functions generate sitemaps
+  (generate-sitemap 309 lines, sitemap 187 lines); neither is what is served.
+- 321 impressions (21.7%) go to auth and legal pages: /auth/login 114, /dmca 72,
+  /terms 56, /privacy 40, /acceptable-use 39. robots.txt already Disallows
+  /auth/, which is why it cannot be fixed — Disallow stops the crawl, so Google
+  never sees a noindex. Blocking harder makes it worse.
+- The homepage title chases the wrong intent. 'real estate agent bio' 82 impr at
+  position 88.56, 'agent bio' 60 at 7.33, and a long tail of bio-examples
+  queries — roughly 180 impressions of people wanting bio COPY, not a builder.
+  The commercial query 'link in bio for real estate agents' sits at 28 impr,
+  position 21.18. Page 3 for what it sells, page 9 for what it does not.
+- The blog is one topic written 25 times (agent + link + hub/page/ideas
+  permutations). Those 25 earned 2 clicks combined in 16 months. The single
+  exception, how-real-estate-agents-use-link-in-bio-...-2024, took 162 impr and
+  6 clicks at position 11.09 — 18% of all site clicks from one post.
+
+12 stories, all passes:false, in dependency order: fix delivery (147, 148),
+fix discovery and keep it fixed (149, 150), stop the wrong pages competing
+(151, 152, 153), then earn something worth ranking (154, 155, 156, 157) and
+face the authority problem (158).
+
+Constraints for whoever runs these: US-147 is the unlock and everything else in
+the batch is largely wasted before it passes — do not reorder. Playwright
+^1.57.0 is already a devDependency; use it for prerendering and do not add a
+second headless browser. Do not rewrite SEOHead/PageSEO/ArticleSEO — they emit
+the right tags and the only defect is that a crawler never runs them. US-147
+CREATES the risk US-153 contains: 23 templated city pages that cost nothing
+while uncrawled become a doorway-page problem the moment they are indexed, so
+153 ships them noindexed by default. US-158 is mostly human outreach and is
+scoped to the artifacts an agent can honestly produce — the outreach itself
+stays outstanding and belongs to a person; do not fabricate placements.
+
+Baseline to measure against, for the next runner: 33 clicks / 1,481 impressions
+/ position 18.4, 16 months to 2026-09-08. Expect impressions to FALL after
+US-152 — the ~180 bio-intent impressions are noise and shedding them is the
+point. Resubmitting the sitemap and reading the GSC indexing report are human
+steps; note them, do not claim them.
