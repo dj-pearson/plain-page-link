@@ -28,14 +28,16 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Browser, type Page } from 'playwright';
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
 
 import {
   allPrerenderRoutes,
+  blogRoutes,
   outputPathForRoute,
   type PrerenderRoute,
 } from '../src/config/prerender-routes';
+import { categorySlugs, loadArticles, type Article } from './lib/articles.mts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -214,17 +216,92 @@ async function renderRoute(
   }
 }
 
+/**
+ * Answer the app's own `articles` queries with the rows fetched at build time.
+ *
+ * The alternative was to teach BlogArticle.tsx about a preloaded cache, which
+ * would mean changing the component to suit the build. This way the page runs
+ * exactly the code it runs in production — same query, same TanStack Query
+ * states, same ArticleSEO output — and only the transport is short-circuited.
+ *
+ * PostgREST's contract has to be honoured for supabase-js to be satisfied:
+ * `.single()` sets Accept: application/vnd.pgrst.object+json and expects a bare
+ * object plus a 406 when the row count is not exactly one, while an ordinary
+ * select expects an array.
+ */
+async function interceptArticles(context: BrowserContext, articles: Article[]): Promise<void> {
+  await context.route('**/rest/v1/articles*', async (route) => {
+    const request = route.request();
+
+    // BlogArticle increments view_count on mount. There is no view to count
+    // here, and the anon role cannot write anyway.
+    if (request.method() !== 'GET') {
+      return route.fulfill({ status: 204, body: '' });
+    }
+
+    const url = new URL(request.url());
+    let rows = articles.filter((a) => a.status === 'published');
+
+    const slug = url.searchParams.get('slug');
+    if (slug?.startsWith('eq.')) {
+      const wanted = decodeURIComponent(slug.slice(3));
+      rows = rows.filter((a) => a.slug === wanted);
+    }
+
+    const order = url.searchParams.get('order');
+    if (order?.startsWith('published_at.')) {
+      const dir = order.endsWith('.asc') ? 1 : -1;
+      rows = [...rows].sort(
+        (a, b) =>
+          dir * ((a.published_at || '').localeCompare(b.published_at || ''))
+      );
+    }
+
+    const wantsObject = (request.headers()['accept'] || '').includes('vnd.pgrst.object');
+    if (wantsObject) {
+      if (rows.length !== 1) {
+        return route.fulfill({
+          status: 406,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'PGRST116',
+            message: `JSON object requested, ${rows.length} rows returned`,
+          }),
+        });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.pgrst.object+json',
+        body: JSON.stringify(rows[0]),
+      });
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(rows),
+    });
+  });
+}
+
 /** Render `routes` with at most `CONCURRENCY` pages open at once. */
 async function renderAll(
   browser: Browser,
   routes: PrerenderRoute[],
-  defaultTitle: string
+  defaultTitle: string,
+  articles: Article[]
 ): Promise<Rendered[]> {
   const context = await browser.newContext({
     // A crawler is what this output is for; render as one so any UA-conditional
     // behaviour resolves the same way it will in production.
     userAgent:
       'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) AgentBio-Prerender',
+    // index.html's connect-src names the production API hosts. During a build
+    // VITE_SUPABASE_URL may be a placeholder or a stub, and the browser would
+    // block the article fetch before Playwright ever saw it — so the route
+    // handler below would never fire and every post would render empty. This
+    // affects the prerender context only; the shipped CSP is untouched.
+    bypassCSP: true,
   });
 
   // The SW would cache the pre-prerender shell and serve it to later routes in
@@ -233,6 +310,7 @@ async function renderAll(
   await context.route('**/scripts/analytics.js', (r) => r.abort());
   await context.route('https://www.googletagmanager.com/**', (r) => r.abort());
   await context.route('https://www.google-analytics.com/**', (r) => r.abort());
+  await interceptArticles(context, articles);
 
   const results: Rendered[] = new Array(routes.length);
   let cursor = 0;
@@ -343,7 +421,32 @@ async function main() {
     process.exit(1);
   }
 
-  const routes = allPrerenderRoutes();
+  // Throws rather than shipping an empty blog; see scripts/lib/articles.mts.
+  //
+  // ALLOW_NO_ARTICLES exists for builds that verify the bundle and do not ship
+  // it — CI's build and bundle-size jobs, which have no database credentials
+  // and no reason to. It omits the blog routes entirely rather than emitting
+  // empty ones, because an empty /blog/<slug> in the index is worse than none.
+  // A deploy must never set it: without articles the deploy would quietly drop
+  // every post from the site.
+  let articles: Article[] = [];
+  let blog: PrerenderRoute[] = [];
+  if (process.env.PRERENDER_ALLOW_NO_ARTICLES === '1') {
+    console.warn(
+      '[prerender] PRERENDER_ALLOW_NO_ARTICLES=1 — skipping the blog entirely.\n' +
+        '            Correct for a verification build, wrong for a deploy.'
+    );
+  } else {
+    const loaded = await loadArticles();
+    articles = loaded.articles;
+    blog = blogRoutes(
+      articles.map((a) => a.slug),
+      categorySlugs(articles)
+    );
+    console.log(`[prerender] ${articles.length} published articles (from ${loaded.source})`);
+  }
+
+  const routes = allPrerenderRoutes(blog);
   const defaultTitle = await indexDefaultTitle();
   console.log(`[prerender] ${routes.length} routes, ${CONCURRENCY} at a time`);
 
@@ -358,7 +461,7 @@ async function main() {
       logLevel: 'warn',
     });
     browser = await chromium.launch();
-    results = await renderAll(browser, routes, defaultTitle);
+    results = await renderAll(browser, routes, defaultTitle, articles);
   } finally {
     await browser?.close().catch(() => {});
     await server?.close().catch(() => {});

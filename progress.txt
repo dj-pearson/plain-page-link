@@ -890,3 +890,90 @@ title on a non-root route as failure. US-151 will add noindex routes that still
 need to satisfy it, and US-150 turns the same assertions on the written files
 into the CI gate. Do not weaken these checks to make a new route pass — a route
 that cannot produce its own tags is the bug, not the check.
+
+### US-148 — prerender blog articles from Supabase — 2026-09-08 — PASSES (two human steps outstanding)
+
+/blog, /blog/category/* and every /blog/<slug> now render at build time with the
+article body already in the HTML. Confirmed by grepping a distinctive sentence
+out of the emitted file, and confirmed not to leak: article one's file contains
+none of article two's body.
+
+The approach avoids touching the app. scripts/prerender.mts intercepts the
+page's own PostgREST call and fulfils it from rows fetched at build time, so
+BlogArticle.tsx runs exactly the code it runs in production — same query, same
+TanStack Query states, same ArticleSEO output. The alternative was to teach the
+component about a build-time cache, which would mean changing a component to
+suit the build. The interception honours PostgREST's contract: `.single()` sends
+Accept: application/vnd.pgrst.object+json and gets a bare object plus a 406 when
+the row count is not one; a plain select gets an array.
+
+Two things this needed that were not obvious:
+
+1. bypassCSP on the prerender browser context. index.html's connect-src names
+   the production API hosts, so with a placeholder or stub VITE_SUPABASE_URL the
+   browser blocked the article fetch before Playwright could see it — the route
+   handler never fired and every post rendered empty. Prerender context only;
+   the shipped CSP is untouched.
+
+2. Prettier reformatted an escaped \n inside the new console.warn into a literal
+   newline, producing "Unterminated string literal" at build time. Worth knowing
+   when hand-editing .mts through a script: run prettier, then build, then read
+   the build output rather than assuming.
+
+Where articles come from (scripts/lib/articles.mts), in order: the database when
+VITE_SUPABASE_URL/ANON_KEY are real (anon key only — the same RLS that governs a
+visitor governs the build); then the committed snapshot at
+scripts/data/articles.snapshot.json; then failure. There is no silent empty
+case. Verified all three: with credentials it reads live and logs "from
+supabase"; with only a snapshot it logs that it is using it and how many;
+with neither it exits 1 saying exactly what to run.
+
+PRERENDER_ALLOW_NO_ARTICLES=1 is set on CI's build and bundle-size jobs. Those
+verify the bundle and do not deploy, and they have no database credentials. It
+omits the blog routes entirely rather than emitting empty ones — an empty
+/blog/<slug> in the index is worse than no entry. A deploy must never set it.
+
+Deploy hook: supabase/functions/trigger-rebuild POSTs to
+CLOUDFLARE_DEPLOY_HOOK_URL, and useArticles.ts calls it after a successful
+publish. Deliberately not awaited and its failure is not shown to the author —
+the article IS published, and an unset hook must not look like a failed publish;
+it logs a warning. The function requires an authenticated caller, because an
+open endpoint that starts a paid build is a denial-of-wallet primitive, and it
+never echoes the hook URL, including in errors. Documented in
+docs/deploy/BLOG_PRERENDERING.md.
+
+src/env-example.test.ts caught the new Deno.env.get name immediately — the repo
+asserts every one is declared in supabase/functions/.env.example with a one-line
+trailing purpose. Added in the house format.
+
+VERIFIED AGAINST A STUB, NOT PRODUCTION. This machine has no database
+credentials, so the whole path was proven against a local PostgREST-shaped stub
+serving two known articles: same wire protocol, known content, assertions on the
+emitted HTML. The stub and its fixture snapshot were deleted afterwards and are
+not committed — fabricated posts must not sit in the repo looking like real
+content.
+
+TWO HUMAN STEPS REMAIN, both needing credentials no agent here has:
+  1. Run `npm run articles:snapshot` somewhere that can reach the database and
+     commit scripts/data/articles.snapshot.json. Until then a build with no
+     database access ships no blog, and CI stays on the opt-out flag.
+  2. Create the Cloudflare Pages deploy hook and set CLOUDFLARE_DEPLOY_HOOK_URL
+     in the Supabase edge function secrets. Steps are in
+     docs/deploy/BLOG_PRERENDERING.md. Until then trigger-rebuild returns
+     {triggered:false} and logs that it is unconfigured — nothing breaks, the
+     blog just waits for the next deploy, which is the pre-existing behaviour.
+
+Verification: `npm run build` exits 0 in both modes — 44 routes with
+PRERENDER_ALLOW_NO_ARTICLES=1, 49 routes (2 articles + 2 categories + /blog)
+against the stub. tsc --noEmit clean. vitest 628 passed / 4 failed, the same
+four that pre-date this branch. Article one's emitted head: title from seo_title
+with the "| AgentBio" suffix, description from seo_description, canonical
+https://agentbio.net/blog/stub-article-one, og:type=article, og:image from
+featured_image_url, BlogPosting JSON-LD with datePublished 2026-03-01 and
+dateModified 2026-04-02 from the row. Article two, which has neither seo_title
+nor seo_description, correctly fell back to title and excerpt.
+
+Note for US-149: blogRoutes() in src/config/prerender-routes.ts is the function
+that produced these files. Read article URLs for the sitemap from it rather than
+re-deriving them — a sitemap listing no articles is the bug that story exists to
+fix, and two sources of truth is how it happened.

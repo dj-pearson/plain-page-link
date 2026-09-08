@@ -31,7 +31,7 @@ export interface PrerenderRoute {
    * Why this route is in the list. Read by nobody at runtime; it exists so the
    * next person can tell a marketing page from a legal obligation.
    */
-  kind: 'marketing' | 'feature' | 'comparison' | 'tool' | 'location' | 'legal';
+  kind: 'marketing' | 'feature' | 'comparison' | 'tool' | 'location' | 'legal' | 'blog' | 'article';
 }
 
 /**
@@ -88,9 +88,24 @@ export function locationRoutes(): PrerenderRoute[] {
   }));
 }
 
+/**
+ * The blog, which only exists once the `articles` rows are in hand (US-148).
+ *
+ * Kept here rather than in the prerender script so the sitemap generator reads
+ * article URLs from the same function that produced the files — the hand-edited
+ * sitemap listing no articles at all is the failure this prevents.
+ */
+export function blogRoutes(slugs: string[], categorySlugs: string[]): PrerenderRoute[] {
+  return [
+    { path: '/blog', kind: 'blog' },
+    ...categorySlugs.map((c) => ({ path: `/blog/category/${c}`, kind: 'blog' as const })),
+    ...slugs.map((s) => ({ path: `/blog/${s}`, kind: 'article' as const })),
+  ];
+}
+
 /** Every route the build renders to HTML. */
-export function allPrerenderRoutes(): PrerenderRoute[] {
-  return [...STATIC_ROUTES, ...locationRoutes()];
+export function allPrerenderRoutes(blog: PrerenderRoute[] = []): PrerenderRoute[] {
+  return [...STATIC_ROUTES, ...locationRoutes(), ...blog];
 }
 
 /**

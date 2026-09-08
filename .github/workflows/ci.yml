@@ -111,6 +111,10 @@ jobs:
           VITE_SUPABASE_URL: https://placeholder.supabase.co
           VITE_SUPABASE_ANON_KEY: placeholder-anon-key-ci-build-only
           VITE_APP_URL: https://agentbio.net
+          # This job verifies the bundle, it does not deploy it, and it has no
+          # database credentials. Skip the blog rather than prerender empty posts.
+          # The Cloudflare Pages deploy must NOT set this (US-148).
+          PRERENDER_ALLOW_NO_ARTICLES: '1'
 
   bundle-size:
     name: Bundle Size
@@ -150,6 +154,10 @@ jobs:
           VITE_SUPABASE_URL: https://placeholder.supabase.co
           VITE_SUPABASE_ANON_KEY: placeholder-anon-key-ci-build-only
           VITE_APP_URL: https://agentbio.net
+          # This job verifies the bundle, it does not deploy it, and it has no
+          # database credentials. Skip the blog rather than prerender empty posts.
+          # The Cloudflare Pages deploy must NOT set this (US-148).
+          PRERENDER_ALLOW_NO_ARTICLES: '1'
 
       - name: Check bundle size budgets
         run: npm run size-check

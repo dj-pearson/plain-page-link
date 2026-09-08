@@ -2365,8 +2365,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 148,
-      "passes": false,
-      "notes": "Depends on US-147. Use the anon key and rely on RLS - do not put a service-role key into the build. `articles` is the table; `blog_posts` has never existed (see CLAUDE.md). The 'fail loudly on zero articles' criterion is the important one: a build that quietly ships an empty blog is exactly how the current sitemap ended up with no articles in it."
+      "passes": true,
+      "notes": "Depends on US-147. Use the anon key and rely on RLS - do not put a service-role key into the build. `articles` is the table; `blog_posts` has never existed (see CLAUDE.md). The 'fail loudly on zero articles' criterion is the important one: a build that quietly ships an empty blog is exactly how the current sitemap ended up with no articles in it. VERIFIED AGAINST A STUB PostgREST, not production - no database credentials on the build machine. Two human steps remain, both needing credentials: run 'npm run articles:snapshot' somewhere the database is reachable and commit scripts/data/articles.snapshot.json, and create the Cloudflare Pages deploy hook and set CLOUDFLARE_DEPLOY_HOOK_URL in the Supabase edge function secrets (docs/deploy/BLOG_PRERENDERING.md). Until the snapshot is committed, CI's build and bundle-size jobs carry PRERENDER_ALLOW_NO_ARTICLES=1, which omits the blog rather than emitting empty posts; a deploy must never set it."
     },
     {
       "id": "US-149",
