@@ -98,6 +98,17 @@ export function PublicFooter() {
                   Blog
                 </Link>
               </li>
+              <li>
+                {/* The comparison pages were reachable only by typing the URL,
+                    which is part of why they took zero impressions in 16 months
+                    (US-156). */}
+                <Link
+                  to="/vs/linktree"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Compare to Linktree
+                </Link>
+              </li>
             </ul>
           </div>
 

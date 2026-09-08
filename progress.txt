@@ -1447,3 +1447,99 @@ Note for whoever measures this: the point is not traffic to the tool, it is
 whether the tool feeds the funnel. bio_cta_clicked over bio_generated is the
 number to watch. If people generate bios and never click through, the page is
 serving an intent that does not convert and should be judged on that.
+
+### US-156 — comparison pages — 2026-09-08 — PASSES
+
+The story framed this as "make /vs/linktree substantive". What the pages
+actually needed first was to stop asserting things that are not true.
+
+FIVE FABRICATED TESTIMONIALS WERE LIVE ON THESE PAGES. Two on /vs/linktree
+("Sarah M., Luxury Agent, Austin TX" claiming a jump from 1-2 leads a month to
+8-10 qualified inquiries; "Mike R., Team Leader, Miami FL") and three on
+/vs/beacons ("Marcus T.", "Jessica R.", "David K.", carrying the metrics "18
+leads/month from Instagram", "3x more bio link clicks" and "$2.4M closed from
+Instagram"). All hardcoded JSX, none from the `testimonials` table that the rest
+of the product reads through useTestimonials — so nothing records who said them,
+whether they said them, or whether they consented. A named endorsement with an
+unverifiable revenue figure is exactly what the FTC endorsement guides cover.
+Removed, with a comment at each site explaining what was there and why it went,
+and how to reinstate them properly if these are real agents who agreed.
+
+THREE PRICING CLAIMS WERE WRONG ABOUT OUR OWN PRODUCT.
+  - /vs/linktree said "$39" in the comparison table and "$49/month" in the prose
+    on the same page. $39 is not one of our plans; pricing-plans.ts has 0, 29,
+    49, 99, 299.
+  - /vs/later said "$19" in the table and "$29/mo" lower down. $19 is not a plan
+    either, and a "$54/month total" figure was built on top of it.
+Both now derive from PRICING_PLANS rather than being typed in.
+
+COMPETITOR PRICES ARE GONE, AND THAT IS THE RIGHT ANSWER, not a shortfall. The
+pages asserted "$24 (Pro)" for Linktree, "$10/month" for Beacons and "$25-$80"
+for Later, all unsourced. Checking linktr.ee/s/pricing on 2026-09-08 returned
+the tier names but no figures: Linktree shows pricing in local currency, it
+varies by region, and their own page warns that tiers and boundaries change
+frequently. A single USD number on our site would be wrong for most readers on
+most days, and being wrong about a competitor's price is both a credibility and
+a legal problem. The pages now compare tiers and capabilities, link to the
+vendor so a reader can check in one click, and say plainly that we do not quote
+their prices and why.
+
+src/config/competitors.ts is the single source: tier names, what each product is
+genuinely built for, and — the part that makes a comparison page credible —
+`betterWhen`, an honest list of when to pick them over us. COMPETITORS_VERIFIED_ON
+is dated 2026-09-08 and rendered on /vs/linktree, so a stale date is visible to
+the reader rather than only to us. Update the date in the same commit as the
+facts.
+
+Also removed: "Why 2,000+ Agents Switched from Linktree to AgentBio" — an
+unverifiable customer count in the hero subtitle.
+
+THE PAGES WERE ORPHANED, which is a large part of why all three took zero
+impressions in 16 months even before the prerender problem. Nothing on the site
+linked to them — not the header, not the footer, not /pricing. Added a "Compare
+to Linktree" link to the footer's Product column (sitewide) and a line at the
+end of the pricing FAQ pointing at all three, worded to include that they say
+where the competitor is the better choice. Someone on the pricing page comparing
+us to something else is precisely the audience.
+
+Fixed src/lib/geo.ts's targetUrl '/compare', which has never been a route, to
+'/vs/linktree'. The other dead link there,
+'/blog/instagram-marketing-for-real-estate', is left for US-124 — it belongs to
+the blog, not to this story.
+
+Craft floor: `npx impeccable detect` is now clean on all three pages. It flagged
+gradient text in two places — the AgentBio column header in /vs/beacons and the
+H1 on /vs/later — and unlike the hero (which restyles six pages and is Dj's
+call), these are a single table header and a single heading inside pages this
+story explicitly covers, so they were fixed rather than deferred. Emphasis now
+comes from weight and the brand colour. All three comparison tables already had
+overflow-x-auto wrappers, so the mobile criterion needed nothing.
+
+Verification: build exits 0 (51 routes), verify:seo passes all 51, tsc --noEmit
+clean, eslint 0 errors (46 pre-existing warnings). All three /vs/ pages are in
+the sitemap; the footer link appears on every prerendered page. Confirmed in the
+built HTML that "Marcus T.", "Jessica R.", "$2.4M" and "2,000+ Agents" no longer
+appear anywhere in dist/.
+
+Full suite 634 passed / 11 failed at 90s, which is the load-flaky pattern
+(failures track duration). routes.test.ts was worth checking because Pricing.tsx
+changed: 3/3 in isolation, LeadDetailModal 7/7, and the three stable files give
+exactly the four known pre-existing failures.
+
+>>> SITE-WIDE FINDING, BEYOND THIS STORY'S SCOPE, FOR DJ TO DECIDE ON <<<
+The fabricated testimonials are not confined to the comparison pages. Still live
+elsewhere, hardcoded, none from the testimonials table:
+  src/pages/tools/ListingDescriptionGenerator.tsx:250  "Sarah M., Beverly Hills"
+  src/pages/tools/ListingDescriptionGenerator.tsx:257  "Mike T., Austin"
+  src/pages/tools/ListingDescriptionGenerator.tsx:264  "Jennifer L., Denver"
+  src/components/tools/listing-description-generator/EmailCaptureModal.tsx:161
+                                          "Sarah M., Top Producer in Austin, TX"
+  src/components/tools/instagram-bio-analyzer/EmailCaptureModal.tsx:162
+                                          "Jennifer K., Miami Real Estate Agent"
+  plus "Mike R." on /instagram-bio-for-realtors and "David K." on
+  /features/analytics.
+The clincher: "Sarah M." is simultaneously a Luxury Agent in Austin TX, a Top
+Producer in Austin TX, and from Beverly Hills. Same initials, three different
+biographies. These were not left in place out of doubt about what they are —
+they sit outside US-156's scope and removing marketing copy across six more
+pages is a decision for Dj, not a side effect of a comparison-page story.

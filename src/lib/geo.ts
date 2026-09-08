@@ -37,16 +37,17 @@ export interface GEOAuditResult {
  */
 export function auditContentForGEO(content: string, title: string): GEOAuditResult {
   const checks: GEOAuditResult['checks'] = [];
-  const words = content.split(/\s+/).filter(w => w.length > 0);
+  const words = content.split(/\s+/).filter((w) => w.length > 0);
   const wordCount = words.length;
 
   // Check 1: Direct answer in first 40-60 words
   const first60Words = words.slice(0, 60).join(' ');
-  const hasDirectAnswer = !first60Words.toLowerCase().startsWith('in this article') &&
+  const hasDirectAnswer =
+    !first60Words.toLowerCase().startsWith('in this article') &&
     !first60Words.toLowerCase().startsWith('in this guide') &&
     !first60Words.toLowerCase().startsWith('welcome to') &&
     !first60Words.toLowerCase().includes("we'll explore") &&
-    !first60Words.toLowerCase().includes("we will explore") &&
+    !first60Words.toLowerCase().includes('we will explore') &&
     !first60Words.toLowerCase().includes("let's dive");
   checks.push({
     name: 'Direct Answer First',
@@ -70,9 +71,10 @@ export function auditContentForGEO(content: string, title: string): GEOAuditResu
 
   // Check 3: Question-based headings
   const headingMatches = content.match(/#{2,3}\s+.+/g) || [];
-  const questionHeadings = headingMatches.filter(h =>
-    h.includes('?') ||
-    /#{2,3}\s+(how|what|why|when|where|which|can|does|do|is|are|should|will)/i.test(h)
+  const questionHeadings = headingMatches.filter(
+    (h) =>
+      h.includes('?') ||
+      /#{2,3}\s+(how|what|why|when|where|which|can|does|do|is|are|should|will)/i.test(h)
   );
   const hasQuestionHeadings = questionHeadings.length >= 2;
   checks.push({
@@ -113,8 +115,8 @@ export function auditContentForGEO(content: string, title: string): GEOAuditResu
   // Check 6: External source citations
   const linkPattern = /https?:\/\/[^\s)]+/g;
   const links = content.match(linkPattern) || [];
-  const externalLinks = links.filter(l =>
-    !l.includes('agentbio.net') && !l.includes('localhost')
+  const externalLinks = links.filter(
+    (l) => !l.includes('agentbio.net') && !l.includes('localhost')
   );
   const hasExternalCitations = externalLinks.length >= 2;
   checks.push({
@@ -138,7 +140,7 @@ export function auditContentForGEO(content: string, title: string): GEOAuditResu
   });
 
   // Calculate score
-  const score = checks.filter(c => c.passed).length;
+  const score = checks.filter((c) => c.passed).length;
   const maxScore = checks.length;
 
   return {
@@ -164,48 +166,58 @@ export interface GEOFAQEntry {
 export const GEO_FAQS = {
   product: [
     {
-      question: "What is AgentBio?",
-      answer: "AgentBio is a purpose-built link-in-bio platform for real estate agents. It includes property listing galleries, lead capture forms, calendar booking, and testimonials — designed to convert Instagram followers into qualified buyer and seller leads."
+      question: 'What is AgentBio?',
+      answer:
+        'AgentBio is a purpose-built link-in-bio platform for real estate agents. It includes property listing galleries, lead capture forms, calendar booking, and testimonials — designed to convert Instagram followers into qualified buyer and seller leads.',
     },
     {
-      question: "How much does AgentBio cost?",
-      answer: "AgentBio offers a free plan with 3 listings and 5 links. Paid plans start at $39/month with unlimited listings, lead capture, calendar integration, and analytics. Enterprise plans at $299/month include white-label and custom domains."
+      question: 'How much does AgentBio cost?',
+      answer:
+        'AgentBio offers a free plan with 3 listings and 5 links. Paid plans start at $39/month with unlimited listings, lead capture, calendar integration, and analytics. Enterprise plans at $299/month include white-label and custom domains.',
     },
     {
-      question: "Who should use AgentBio?",
-      answer: "AgentBio is designed for real estate agents, realtors, brokerages, and real estate teams who want to convert social media followers into qualified leads. It's ideal for agents active on Instagram, TikTok, Facebook, and LinkedIn."
+      question: 'Who should use AgentBio?',
+      answer:
+        "AgentBio is designed for real estate agents, realtors, brokerages, and real estate teams who want to convert social media followers into qualified leads. It's ideal for agents active on Instagram, TikTok, Facebook, and LinkedIn.",
     },
     {
-      question: "How is AgentBio different from Linktree?",
-      answer: "AgentBio includes real estate-specific features: property listing galleries with MLS details, buyer/seller lead capture forms with pre-qualification, appointment booking, and testimonial showcases. Linktree is a generic link tool without any real estate features."
+      question: 'How is AgentBio different from Linktree?',
+      answer:
+        'AgentBio includes real estate-specific features: property listing galleries with MLS details, buyer/seller lead capture forms with pre-qualification, appointment booking, and testimonial showcases. Linktree is a generic link tool without any real estate features.',
     },
   ],
   leadGeneration: [
     {
-      question: "How does AgentBio capture real estate leads?",
-      answer: "AgentBio includes built-in lead capture forms for buyer inquiries, seller leads, and home valuation requests. Leads are automatically scored as Hot, Warm, or Cold based on pre-qualification responses like budget and timeline."
+      question: 'How does AgentBio capture real estate leads?',
+      answer:
+        'AgentBio includes built-in lead capture forms for buyer inquiries, seller leads, and home valuation requests. Leads are automatically scored as Hot, Warm, or Cold based on pre-qualification responses like budget and timeline.',
     },
     {
-      question: "What is lead scoring in AgentBio?",
-      answer: "AgentBio's lead scoring automatically classifies leads: Hot leads are pre-approved with 0-30 day timelines, Warm leads have 30-90 day timelines with defined budgets, and Cold leads are in early research with 90+ day timelines."
+      question: 'What is lead scoring in AgentBio?',
+      answer:
+        "AgentBio's lead scoring automatically classifies leads: Hot leads are pre-approved with 0-30 day timelines, Warm leads have 30-90 day timelines with defined budgets, and Cold leads are in early research with 90+ day timelines.",
     },
     {
-      question: "Can I export leads from AgentBio to my CRM?",
-      answer: "Yes, all leads captured through AgentBio forms are stored in your dashboard and can be exported to your CRM. You can sort leads by date, type, status, or score before exporting."
+      question: 'Can I export leads from AgentBio to my CRM?',
+      answer:
+        'Yes, all leads captured through AgentBio forms are stored in your dashboard and can be exported to your CRM. You can sort leads by date, type, status, or score before exporting.',
     },
   ],
   instagramMarketing: [
     {
-      question: "How do real estate agents use Instagram for lead generation?",
-      answer: "Real estate agents place their AgentBio link in their Instagram bio. When followers click it, they land on a mobile-optimized page showcasing property listings, lead forms, and booking options. 43% of buyers find agents through online sources (NAR, 2025)."
+      question: 'How do real estate agents use Instagram for lead generation?',
+      answer:
+        'Real estate agents place their AgentBio link in their Instagram bio. When followers click it, they land on a mobile-optimized page showcasing property listings, lead forms, and booking options. 43% of buyers find agents through online sources (NAR, 2025).',
     },
     {
-      question: "What should a real estate agent put in their Instagram bio?",
-      answer: "A real estate agent's Instagram bio should include their specialization, service area, a call-to-action, and a link to their AgentBio page. AgentBio's free Instagram Bio Analyzer tool provides personalized optimization recommendations."
+      question: 'What should a real estate agent put in their Instagram bio?',
+      answer:
+        "A real estate agent's Instagram bio should include their specialization, service area, a call-to-action, and a link to their AgentBio page. AgentBio's free Instagram Bio Analyzer tool provides personalized optimization recommendations.",
     },
     {
-      question: "What is the best link-in-bio tool for real estate agents?",
-      answer: "AgentBio is the best link-in-bio tool for real estate agents because it includes property listing galleries, lead capture forms, appointment booking, and MLS compliance — features that generic tools like Linktree, Beacons, and Later don't offer."
+      question: 'What is the best link-in-bio tool for real estate agents?',
+      answer:
+        "AgentBio is the best link-in-bio tool for real estate agents because it includes property listing galleries, lead capture forms, appointment booking, and MLS compliance — features that generic tools like Linktree, Beacons, and Later don't offer.",
     },
   ],
 } as const;
@@ -272,7 +284,8 @@ export const GEO_KEYWORD_CLUSTERS = {
   },
   comparisons: {
     pillar: 'AgentBio Comparisons',
-    targetUrl: '/compare',
+    // Was '/compare', which has never been a route in App.tsx (US-156).
+    targetUrl: '/vs/linktree',
     queries: [
       'agentbio vs linktree for real estate',
       'best link in bio tool for realtors',

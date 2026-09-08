@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
+import { PRICING_PLANS } from '@/config/pricing-plans';
+import { COMPETITORS } from '@/config/competitors';
 
 export default function VsLater() {
   const canonicalUrl = `${window.location.origin}/vs/later`;
@@ -98,7 +100,7 @@ export default function VsLater() {
               Trusted by 3,000+ Real Estate Agents
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-foreground">
               AgentBio vs Later
             </h1>
 
@@ -344,7 +346,18 @@ export default function VsLater() {
                     />
                     <ComparisonRow feature="Hashtag Suggestions" agentbio={false} later={true} />
                     <ComparisonRow feature="Best Time to Post" agentbio={false} later={true} />
-                    <ComparisonRow feature="Pricing (Monthly)" agentbio="$19" later="$25-$80" />
+                    {/* Was agentbio="$19" later="$25-$80". $19 is not one of our
+                        plans (0, 29, 49, 99, 299 in pricing-plans.ts) and the same
+                        page said $29 lower down; Later's figure was unsourced and
+                        varies by plan and region. Compare the tiers instead (US-156). */}
+                    <ComparisonRow
+                      feature="Plans"
+                      agentbio={PRICING_PLANS.filter((p) => p.price_monthly > 0)
+                        .slice(0, 2)
+                        .map((p) => `${p.name} $${p.price_monthly}`)
+                        .join(', ')}
+                      later={COMPETITORS.later.tiers.join(', ')}
+                    />
                   </tbody>
                 </table>
               </div>
@@ -412,9 +425,9 @@ export default function VsLater() {
                 <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
                   <p className="font-semibold text-green-600">✓ Use Both Platforms</p>
                   <p className="text-sm mt-1">
-                    Schedule posts with Later ($25/mo), capture leads with AgentBio ($29/mo). Total:
-                    $54/month for complete Instagram marketing stack. Many top agents run this
-                    combination.
+                    Later schedules the posts; AgentBio is what the link in them points at. They
+                    solve different halves of the same problem, and plenty of agents pay for both.
+                    Many top agents run this combination.
                   </p>
                 </div>
               </div>
@@ -608,9 +621,10 @@ export default function VsLater() {
             <div className="mt-12 glass-panel p-6 bg-primary/5 border border-primary/20">
               <p className="font-semibold mb-2">💡 Pro Tip: Use Both Platforms</p>
               <p className="text-sm text-muted-foreground">
-                Most successful agents use Later ($25/mo) for scheduling Instagram content and
-                AgentBio ($29/mo) for their link in bio page. You get the best content planning
-                tools AND the best lead generation tools for $54/month total.
+                Plenty of agents use Later for scheduling Instagram content and AgentBio for the
+                link in their bio. They are not really competitors: one plans what you post, the
+                other decides what happens when somebody taps through. Check both vendors' current
+                pricing for your region before budgeting for either.
               </p>
             </div>
           </div>

@@ -2503,8 +2503,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 156,
-      "passes": false,
-      "notes": "Depends on US-147. Do not publish comparison claims you have not checked - a stale or wrong pricing table on a competitor is both a credibility and a legal problem. Put the check date in the page copy and in a constant, so the next runner knows when it went stale."
+      "passes": true,
+      "notes": "Depends on US-147. Do not publish comparison claims you have not checked - a stale or wrong pricing table on a competitor is both a credibility and a legal problem. Put the check date in the page copy and in a constant, so the next runner knows when it went stale. Found and removed five fabricated testimonials (two on /vs/linktree, three on /vs/beacons including a $2.4M closed-volume claim), all hardcoded rather than from the testimonials table. Fixed two contradictions about our OWN price ($39 vs $49 on one page; $19 vs $29 on another; neither $39 nor $19 is a plan). Competitor prices removed entirely and deliberately: linktr.ee shows pricing in local currency by region and warns tiers change, so no single USD figure is honest - src/config/competitors.ts holds tier names plus an honest betterWhen list, dated COMPETITORS_VERIFIED_ON=2026-09-08 and rendered on the page. Pages were orphaned; now linked from the footer and the pricing FAQ. SITE-WIDE: seven more hardcoded testimonials remain outside this story's scope - see progress.txt."
     },
     {
       "id": "US-157",
