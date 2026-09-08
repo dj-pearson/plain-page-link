@@ -10,6 +10,14 @@ gsap.registerPlugin(TextPlugin);
 
 interface HeroSectionProps {
   title?: string;
+  /**
+   * The tail of `title` that takes the highlight treatment. Without it the
+   * split is positional — the last two words — which silently mangles any
+   * headline whose emphasis does not happen to be two words long. "Link in Bio
+   * for Real Estate Agents" would break as "Link in Bio for Real" / "Estate
+   * Agents" (US-152).
+   */
+  titleHighlight?: string;
   subtitle?: string;
   description?: string;
   primaryCta?: {
@@ -29,6 +37,7 @@ interface HeroSectionProps {
 
 export function HeroSection({
   title = 'AgentBio Intelligence',
+  titleHighlight,
   subtitle = 'Stop Guessing. Start Closing.',
   description = 'AI-powered platform that predicts which leads will convert, automatically matches properties to qualified buyers, and accelerates deals with market intelligence. ML-scored leads convert 2x better. Agents save 5+ hours per week. Close deals 30% faster.',
   primaryCta = {
@@ -172,17 +181,22 @@ export function HeroSection({
 
           {/* Headline */}
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-slate-900 dark:text-white mb-6 leading-[1.1]">
-            {/* `title` is split on its last two words so the highlight treatment
-                lands on the tail, matching the original hardcoded layout. */}
+            {/* Split at `titleHighlight` when the caller says where the
+                emphasis belongs, otherwise on the last two words, which is what
+                every caller relied on before the prop existed. */}
             <div ref={mainTextRef} className="inline-block">
-              {title.split(' ').slice(0, -2).join(' ')}
+              {titleHighlight && title.endsWith(titleHighlight)
+                ? title.slice(0, -titleHighlight.length).trimEnd()
+                : title.split(' ').slice(0, -2).join(' ')}
             </div>{' '}
             <br />
             <span
               ref={highlightTextRef}
               className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-500 pb-2"
             >
-              {title.split(' ').slice(-2).join(' ')}
+              {titleHighlight && title.endsWith(titleHighlight)
+                ? titleHighlight
+                : title.split(' ').slice(-2).join(' ')}
             </span>
           </h1>
 

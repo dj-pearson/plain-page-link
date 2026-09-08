@@ -1,16 +1,50 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
-import { Check, X, Home, Star } from 'lucide-react';
+import { Check, X, Home } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
+import { getBaseUrl } from '@/config/seo.config';
+import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+
+const FAQ_ENTRIES: FaqEntry[] = [
+  {
+    question: "What's the difference between AgentBio and Beacons for real estate agents?",
+    answer:
+      "AgentBio is built specifically for real estate agents with property listing galleries, real estate lead capture forms, calendar booking for showings, and MLS compliance. Beacons is designed for content creators and influencers with email marketing and store features that aren't relevant for real estate workflows.",
+  },
+  {
+    question: 'Is AgentBio better than Beacons for realtors?',
+    answer:
+      "Yes, for real estate professionals. While Beacons offers more features than basic link tools, it's designed for creators selling digital products and courses. AgentBio focuses exclusively on what real estate agents need: showcasing properties, capturing buyer/seller leads, and booking showing appointments.",
+  },
+  {
+    question: 'Can Beacons show real estate listings?',
+    answer:
+      "No. Beacons doesn't have property listing gallery features. You can add basic links to listings, but without built-in photo galleries, pricing displays, bed/bath counts, or MLS integration that real estate agents need to properly showcase properties.",
+  },
+];
 
 export default function VsBeacons() {
   const schema = {
     '@context': 'https://schema.org',
     '@graph': [
+      // BreadcrumbList was absent here while /features/*, /for/* and the
+      // tools all had one (US-157).
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: getBaseUrl() },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'AgentBio vs Beacons',
+            item: `${getBaseUrl()}/vs/beacons`,
+          },
+        ],
+      },
       // Enhanced Organization schema with social signals
       generateEnhancedOrganizationSchema(),
       {
@@ -21,35 +55,7 @@ export default function VsBeacons() {
         description:
           'Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and MLS compliance.',
       },
-      {
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: "What's the difference between AgentBio and Beacons for real estate agents?",
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "AgentBio is built specifically for real estate agents with property listing galleries, real estate lead capture forms, calendar booking for showings, and MLS compliance. Beacons is designed for content creators and influencers with email marketing and store features that aren't relevant for real estate workflows.",
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Is AgentBio better than Beacons for realtors?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "Yes, for real estate professionals. While Beacons offers more features than basic link tools, it's designed for creators selling digital products and courses. AgentBio focuses exclusively on what real estate agents need: showcasing properties, capturing buyer/seller leads, and booking showing appointments.",
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Can Beacons show real estate listings?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "No. Beacons doesn't have property listing gallery features. You can add basic links to listings, but without built-in photo galleries, pricing displays, bed/bath counts, or MLS integration that real estate agents need to properly showcase properties.",
-            },
-          },
-        ],
-      },
+      faqPageSchema(FAQ_ENTRIES),
     ],
   };
 
@@ -127,7 +133,7 @@ export default function VsBeacons() {
                     <th className="text-left py-4 px-4 font-light text-lg">Feature</th>
                     <th className="text-center py-4 px-4 font-light text-lg">
                       <div className="flex flex-col items-center">
-                        <span className="text-transparent bg-gradient-to-r from-[#80d0c7] to-[#a1c4fd] bg-clip-text font-normal">
+                        <span className="text-[#3f8f85] dark:text-[#80d0c7] font-semibold">
                           AgentBio
                         </span>
                         <span className="text-sm text-muted-foreground mt-1">Real Estate</span>
@@ -362,37 +368,22 @@ export default function VsBeacons() {
           </div>
         </section>
 
-        {/* Real Agent Testimonials */}
-        <section className="py-20 bg-background/50">
-          <div className="container mx-auto px-4">
-            <header className="text-center mb-12">
-              <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">What Real Estate Agents Say About Switching</span>
-              </h2>
-            </header>
+        {/*
+          Three testimonials stood here, attributed to "Marcus T., Luxury Agent,
+          Miami", "Jessica R., First-Time Buyer Specialist, Denver" and "David
+          K., Team Leader, Phoenix", carrying the metrics "18 leads/month from
+          Instagram", "3x more bio link clicks" and "$2.4M closed from
+          Instagram".
 
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-              <TestimonialCard
-                quote="Beacons was too complicated for what I needed. I'm not selling courses or accepting donations—I'm selling homes. AgentBio gives me exactly what I need and nothing I don't."
-                author="Marcus T."
-                role="Luxury Agent, Miami"
-                metric="18 leads/month from Instagram"
-              />
-              <TestimonialCard
-                quote="The property gallery feature alone was worth the switch. My Instagram followers can now browse all my listings without leaving the platform. Conversion rate tripled."
-                author="Jessica R."
-                role="First-Time Buyer Specialist, Denver"
-                metric="3x more bio link clicks"
-              />
-              <TestimonialCard
-                quote="I needed MLS compliance and showing booking features. Beacons couldn't do that. AgentBio had everything I needed as a real estate professional."
-                author="David K."
-                role="Team Leader, Phoenix"
-                metric="$2.4M closed from Instagram"
-              />
-            </div>
-          </div>
-        </section>
+          Hardcoded JSX, not rows from the `testimonials` table the product
+          reads through useTestimonials — so nothing records who said them or
+          whether they consented. A named endorsement carrying a specific
+          revenue figure, with no traceable source, is the clearest case of all
+          (US-156). Removed for the same reason as the two on /vs/linktree.
+
+          If these are real agents who agreed to be quoted, put them in the
+          testimonials table with consent recorded and render them from there.
+        */}
 
         {/* When Beacons Makes Sense */}
         <section className="py-20 bg-background">
@@ -555,8 +546,7 @@ export default function VsBeacons() {
               </span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Join 2,000+ agents who switched from creator tools to purpose-built real estate
-              software
+              Join agents who switched from creator tools to purpose-built real estate software
             </p>
             <Link
               to="/auth/register"
@@ -570,6 +560,7 @@ export default function VsBeacons() {
           </div>
         </section>
 
+        <FaqSection entries={FAQ_ENTRIES} />
         <PublicFooter />
       </main>
     </>
@@ -618,34 +609,6 @@ function ComparisonRow({
         )}
       </td>
     </tr>
-  );
-}
-
-function TestimonialCard({
-  quote,
-  author,
-  role,
-  metric,
-}: {
-  quote: string;
-  author: string;
-  role: string;
-  metric: string;
-}) {
-  return (
-    <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border hover:border-[#80d0c7] transition-all">
-      <div className="flex gap-1 mb-4">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-        ))}
-      </div>
-      <p className="glass-body mb-4 italic">"{quote}"</p>
-      <div className="border-t border-glass-border pt-4">
-        <p className="font-semibold text-foreground">{author}</p>
-        <p className="text-sm text-muted-foreground">{role}</p>
-        <p className="text-sm text-[#80d0c7] mt-2 font-semibold">{metric}</p>
-      </div>
-    </div>
   );
 }
 

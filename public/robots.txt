@@ -2,8 +2,12 @@
 User-agent: *
 Allow: /
 Disallow: /api/
-Disallow: /auth/
 Disallow: /dashboard/
+# /auth/ is deliberately NOT disallowed (US-151). Disallow stops the crawl,
+# not the indexing: Google indexed /auth/login from links alone (114
+# impressions in 16 months) and could never fetch the noindex that would
+# have stopped it. Those pages now serve noindex in the HTML and in an
+# X-Robots-Tag header, which only works if the crawler is allowed to read them.
 
 # Sitemaps
 Sitemap: https://agentbio.net/sitemap.xml

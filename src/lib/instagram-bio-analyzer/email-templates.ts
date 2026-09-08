@@ -153,7 +153,7 @@ Her secret? A strategic link-in-bio that converts.
    → PDF download (email capture)
    → Builds her email list automatically
 
-**The math:** 3,200 followers → ~800 monthly profile visits → ~150 link clicks → 27 leads/month
+**The point:** the bio decides whether anyone taps the link at all. What sits behind the link decides whether tapping it does anything.
 
 **Your Instagram bio is the gateway.** But your link-in-bio is where the conversion happens.
 
@@ -226,23 +226,14 @@ I analyzed data from 2,847 real estate agents using Instagram for lead generatio
 
 Here's what I found:
 
-**Average Agent (50th percentile):**
-→ 2,400 followers
-→ 6% profile visit rate
-→ 12% bio link click rate
-→ 5% lead conversion rate
-→ **Result: ~7 leads/month**
+**It is rarely the follower count.**
 
-**Top Performer (90th percentile):**
-→ 3,100 followers (only 29% more!)
-→ 9% profile visit rate
-→ 22% bio link click rate
-→ 15% lead conversion rate
-→ **Result: ~45 leads/month**
+Two agents with similar audiences can get very different results, and the gap
+is almost never the number at the top. It is whether the profile says who you
+help, whether the link is worth tapping, and whether what is behind the link
+answers the question the visitor actually had.
 
-**What's the difference?**
-
-It's not follower count. It's conversion optimization at every step.
+Those are the three things you can change this afternoon.
 
 **The 3 conversion points:**
 
@@ -266,10 +257,6 @@ If you're below 70, you're likely losing 40-60% of potential leads at step #1.
 → We helped you optimize your bio (step 1) ✓
 → Strategic link-in-bio platform (step 2)
 → Built-in lead capture + CRM integration (step 3)
-
-**Real results from ${market} agents:**
-→ Agent A: 3 leads/month → 18 leads/month (6X increase)
-→ Agent B: 8 leads/month → 31 leads/month (4X increase)
 
 [See How AgentBio Works](${appUrl}/pricing)
 
@@ -391,10 +378,10 @@ That's where AgentBio comes in.
 
 **Why AgentBio?**
 
-→ Built BY agents, FOR agents
-→ 10,000+ real estate professionals trust us
-→ Average user generates 15+ leads/month from Instagram
-→ 847 agents closed deals from AgentBio leads last month alone
+→ Property listings with photos and prices, not just links
+→ Buyer, seller and valuation forms that record where the enquiry came from
+→ Showing appointments booked from the page itself
+→ A free plan, and no credit card to start
 
 **What You Get:**
 ✓ Professional link-in-bio platform

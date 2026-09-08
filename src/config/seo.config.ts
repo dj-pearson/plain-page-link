@@ -3,7 +3,13 @@
  * Site-wide constants for consistent SEO across all pages
  */
 
+import { PRICING_PLANS } from './pricing-plans';
 import { getConfiguredAppUrl, getSafeOrigin } from '@/lib/utils';
+
+/** Lowest paid monthly plan. Was the literal '39', which is not a plan (US-157). */
+export const SEO_STARTING_PRICE = String(
+  PRICING_PLANS.filter((plan) => plan.price_monthly > 0)[0]?.price_monthly ?? 0
+);
 
 export const SEO_CONFIG = {
   siteName: 'AgentBio',
@@ -41,16 +47,19 @@ export const SEO_CONFIG = {
   ],
 
   // Default ratings
-  ratings: {
-    ratingValue: '4.8',
-    reviewCount: '523',
-    bestRating: '5',
-    worstRating: '1',
-  },
+  // `ratings` removed (US-157). It held ratingValue '4.8' over reviewCount
+  // '523' — the invented pair US-111 identified and stripped from the landing
+  // page, still being read here by LocationTemplate and emitted on 31 built
+  // pages. Real ratings come from real testimonials: see ReviewSchema.tsx and
+  // FullProfilePage, which compute them from the testimonials table.
 
   // Pricing info
   pricing: {
-    startingPrice: '39',
+    // Was '39', which is not a plan. Derived from PRICING_PLANS so it cannot
+    // drift from what Stripe actually charges (US-157).
+    startingPrice: String(
+      PRICING_PLANS.filter((plan) => plan.price_monthly > 0)[0]?.price_monthly ?? 0
+    ),
     currency: 'USD',
     priceValidUntil: '2026-12-31',
   },
@@ -231,7 +240,10 @@ export const PRICING_TIERS = [
     name: 'Professional',
     description:
       'Unlimited listings, lead capture forms, calendar booking, and advanced analytics for growing agents.',
-    price: '39',
+    // Was '39' on a node named "Professional". Professional is 49. Schema
+    // that names a plan and misprices it is a false claim about our own
+    // product, published to search (US-157).
+    price: String(PRICING_PLANS.find((plan) => plan.name === 'Professional')?.price_monthly ?? 0),
     priceCurrency: 'USD',
     billingPeriod: 'P1M',
     features: [
@@ -294,7 +306,7 @@ export const COMPARISON_DATA = {
       description:
         'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
       url: 'https://agentbio.net',
-      price: '39',
+      price: SEO_STARTING_PRICE,
       rating: '4.8',
     },
   },
@@ -312,7 +324,7 @@ export const COMPARISON_DATA = {
       description:
         'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
       url: 'https://agentbio.net',
-      price: '39',
+      price: SEO_STARTING_PRICE,
       rating: '4.8',
     },
   },
@@ -330,7 +342,7 @@ export const COMPARISON_DATA = {
       description:
         'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
       url: 'https://agentbio.net',
-      price: '39',
+      price: SEO_STARTING_PRICE,
       rating: '4.8',
     },
   },

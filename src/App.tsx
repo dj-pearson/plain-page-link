@@ -73,6 +73,8 @@ const AnalyticsFeature = lazy(() => import('./pages/features/Analytics'));
 // Lazy load tools
 const InstagramBioAnalyzer = lazy(() => import('./pages/tools/InstagramBioAnalyzer'));
 const ListingDescriptionGenerator = lazy(() => import('./pages/tools/ListingDescriptionGenerator'));
+const AgentBioGenerator = lazy(() => import('./pages/tools/AgentBioGenerator'));
+const Press = lazy(() => import('./pages/public/Press'));
 
 // Lazy load dashboard pages (code splitting for better performance)
 const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout'));
@@ -98,6 +100,7 @@ const WorkflowBuilderPage = lazy(() => import('./pages/dashboard/workflows/Workf
 
 // Lazy load SSO callback
 const SSOCallback = lazy(() => import('./components/auth/sso/SSOCallback'));
+import { AuthRouteSEO } from './components/auth/AuthRouteSEO';
 
 // Lazy load admin pages (most users won't need these)
 const AdminDashboard = lazy(() =>
@@ -176,6 +179,7 @@ function App() {
             <Route element={<PublicBoundary />}>
               <Route path="/" element={<Landing />} />
               <Route path="/pricing" element={<Pricing />} />
+              <Route path="/press" element={<Press />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/dmca" element={<DMCAPolicy />} />
@@ -211,15 +215,89 @@ function App() {
                 path="/tools/listing-description-generator"
                 element={<ListingDescriptionGenerator />}
               />
+              <Route
+                path="/tools/real-estate-agent-bio-generator"
+                element={<AgentBioGenerator />}
+              />
 
               {/* Auth */}
-              <Route path="/auth/login" element={<Login />} />
-              <Route path="/auth/register" element={<Register />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-              <Route path="/auth/mfa" element={<MFAChallenge />} />
-              <Route path="/auth/reset-password" element={<ResetPassword />} />
-              <Route path="/auth/sso/callback" element={<SSOCallback />} />
+              <Route
+                path="/auth/login"
+                element={
+                  <AuthRouteSEO
+                    title="Log in to AgentBio"
+                    description="Sign in to your AgentBio account to manage your link-in-bio page, listings and leads."
+                  >
+                    <Login />
+                  </AuthRouteSEO>
+                }
+              />
+              <Route
+                path="/auth/register"
+                element={
+                  <AuthRouteSEO
+                    title="Create your AgentBio account"
+                    description="Start your AgentBio link-in-bio page for real estate agents. Set up listings, lead capture and booking."
+                  >
+                    <Register />
+                  </AuthRouteSEO>
+                }
+              />
+              <Route
+                path="/auth/callback"
+                element={
+                  <AuthRouteSEO
+                    title="Completing sign in"
+                    description="AgentBio is finishing your sign-in. This page is part of the authentication flow."
+                  >
+                    <AuthCallback />
+                  </AuthRouteSEO>
+                }
+              />
+              <Route
+                path="/auth/forgot-password"
+                element={
+                  <AuthRouteSEO
+                    title="Reset your AgentBio password"
+                    description="Request a password reset link for your AgentBio account."
+                  >
+                    <ForgotPassword />
+                  </AuthRouteSEO>
+                }
+              />
+              <Route
+                path="/auth/mfa"
+                element={
+                  <AuthRouteSEO
+                    title="Two-factor verification"
+                    description="Enter your second factor to finish signing in to AgentBio."
+                  >
+                    <MFAChallenge />
+                  </AuthRouteSEO>
+                }
+              />
+              <Route
+                path="/auth/reset-password"
+                element={
+                  <AuthRouteSEO
+                    title="Choose a new password"
+                    description="Set a new password for your AgentBio account."
+                  >
+                    <ResetPassword />
+                  </AuthRouteSEO>
+                }
+              />
+              <Route
+                path="/auth/sso/callback"
+                element={
+                  <AuthRouteSEO
+                    title="Completing single sign-on"
+                    description="AgentBio is finishing your organisation sign-in. This page is part of the SSO flow."
+                  >
+                    <SSOCallback />
+                  </AuthRouteSEO>
+                }
+              />
 
               {/* User profiles. Last, so a real route always wins over the
                   username catch-all. */}

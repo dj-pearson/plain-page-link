@@ -75,13 +75,13 @@ export function PageSEO({
       'https://www.instagram.com/agentbio',
       'https://www.youtube.com/@agentbio',
     ],
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      reviewCount: '523',
-      bestRating: '5',
-      worstRating: '1',
-    },
+    // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
+    // reviews, the same invented pair US-111 took off the landing page and
+    // missed here — it was still reaching 31 built pages. Google renders stars
+    // in search results from this field, so a fabricated value is a false
+    // claim published to everyone who searches, and a structured-data policy
+    // violation. Reinstate only from real review data, the way
+    // FullProfilePage and ReviewSchema do.
     areaServed: {
       '@type': 'Country',
       name: 'United States',

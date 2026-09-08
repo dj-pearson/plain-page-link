@@ -1,2 +1,17 @@
-# SPA fallback - redirect all routes to index.html for client-side routing
+# Cloudflare Pages redirect rules.
+#
+# Order matters, and so does what is NOT here: static assets are matched before
+# these rules, which is why the SPA fallback at the bottom does not swallow
+# /assets/*.js or the prerendered dist/<route>/index.html files that US-147
+# writes. Rules for a prerendered path are rejected by the build for the same
+# reason — see verifyServedLayout() in scripts/prerender.mts.
+
+# /features has never been a route. App.tsx defines only the five /features/*
+# children, so this path fell through to the SPA fallback and answered with the
+# 404 page under a 200 — a soft 404 that the old hand-edited sitemap submitted
+# to Google on purpose for months (US-149). The homepage's feature section is
+# what the URL was reaching for.
+/features / 301
+
+# SPA fallback - every route not matched above or by a real file
 /* /index.html 200

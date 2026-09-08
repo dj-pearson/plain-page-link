@@ -3,6 +3,7 @@
  * Structured data generation, sitemap creation, and SEO optimization
  */
 
+import { PRICING_PLANS } from '@/config/pricing-plans';
 import { PageConfig } from '@/types/pageBuilder';
 import type { BlockConfig } from '@/types/pageBuilder';
 import { getSafeOrigin } from '@/lib/utils';
@@ -159,6 +160,11 @@ export const generateLocalBusinessSchema = (
  * Generate enhanced Organization Schema with social signals
  * Includes social media profiles, contact info, and ratings for Knowledge Graph optimization
  */
+/** Lowest paid monthly plan, from the enforced matrix rather than a literal. */
+const STARTING_PRICE = String(
+  PRICING_PLANS.filter((plan) => plan.price_monthly > 0)[0]?.price_monthly ?? 0
+);
+
 export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
   const baseUrl = getSafeOrigin();
 
@@ -195,13 +201,13 @@ export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
       'https://www.youtube.com/@agentbio',
       'https://github.com/agentbio',
     ],
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      reviewCount: '523',
-      bestRating: '5',
-      worstRating: '1',
-    },
+    // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
+    // reviews, the same invented pair US-111 took off the landing page and
+    // missed here — it was still reaching 31 built pages. Google renders stars
+    // in search results from this field, so a fabricated value is a false
+    // claim published to everyone who searches, and a structured-data policy
+    // violation. Reinstate only from real review data, the way
+    // FullProfilePage and ReviewSchema do.
     areaServed: {
       '@type': 'Country',
       name: 'United States',
@@ -229,13 +235,13 @@ export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
     },
     image: `${baseUrl}/Cover.png`,
     priceRange: '$$$',
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      reviewCount: '523',
-      bestRating: '5',
-      worstRating: '1',
-    },
+    // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
+    // reviews, the same invented pair US-111 took off the landing page and
+    // missed here — it was still reaching 31 built pages. Google renders stars
+    // in search results from this field, so a fabricated value is a false
+    // claim published to everyone who searches, and a structured-data policy
+    // violation. Reinstate only from real review data, the way
+    // FullProfilePage and ReviewSchema do.
     areaServed: {
       '@type': 'Country',
       name: 'United States',
@@ -247,7 +253,8 @@ export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
     },
     offers: {
       '@type': 'Offer',
-      price: '39',
+      // Was '39', not a plan (US-157).
+      price: STARTING_PRICE,
       priceCurrency: 'USD',
       priceValidUntil: '2026-12-31',
       availability: 'https://schema.org/InStock',
@@ -269,30 +276,18 @@ export const generateStructuredData = (page: PageConfig): Record<string, any> =>
   };
 };
 
-/**
- * Generate sitemap XML for all published pages
+/*
+ * generateSitemap() was here. It was exported, imported by nobody, and one of
+ * five separate sitemap implementations in this repository (US-149): this one,
+ * a React component at src/pages/Sitemap.tsx that had no route, two Supabase
+ * edge functions that duplicated each other and were never deployed to the
+ * served path, and the static public/sitemap.xml that was the only one Google
+ * ever read — hand-edited, listing no blog articles, and listing /features,
+ * which has no route and answered with the 404 page under a 200.
+ *
+ * There is now one, in scripts/lib/sitemap.mts, generated at build time from
+ * the pages the build actually rendered. The other four are deleted.
  */
-export const generateSitemap = (pages: PageConfig[]): string => {
-  const publishedPages = pages.filter((p) => p.published);
-  const baseUrl = getSafeOrigin();
-
-  const urlEntries = publishedPages
-    .map(
-      (page) => `
-  <url>
-    <loc>${baseUrl}/p/${page.slug}</loc>
-    <lastmod>${new Date(page.updatedAt).toISOString()}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`
-    )
-    .join('');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  ${urlEntries}
-</urlset>`;
-};
 
 /**
  * Generate robots.txt content
@@ -451,10 +446,12 @@ export const generateSoftwareApplicationSchema = (options?: {
     description:
       'Purpose-built link-in-bio platform for real estate agents. Showcase properties, capture leads, and book appointments from Instagram.',
     url: baseUrl,
-    price: '39',
+    // Was '39' with an invented 4.8/523 rating pair (US-157). The price now
+    // comes from PRICING_PLANS; the rating defaults are gone, and
+    // generateSoftwareApplicationSchema only emits aggregateRating when a
+    // caller supplies real numbers.
+    price: STARTING_PRICE,
     priceCurrency: 'USD',
-    ratingValue: '4.8',
-    reviewCount: '523',
     category: 'BusinessApplication',
     operatingSystem: 'Web, iOS, Android',
     features: [],
@@ -477,13 +474,20 @@ export const generateSoftwareApplicationSchema = (options?: {
       availability: 'https://schema.org/InStock',
       url: `${baseUrl}/pricing`,
     },
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: opts.ratingValue,
-      reviewCount: opts.reviewCount,
-      bestRating: '5',
-      worstRating: '1',
-    },
+    // Conditional: SchemaMarkup calls this without ratings, which previously
+    // emitted an AggregateRating with undefined values. Absent is correct;
+    // invented is not (US-157).
+    ...(opts.ratingValue && opts.reviewCount
+      ? {
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: opts.ratingValue,
+            reviewCount: opts.reviewCount,
+            bestRating: '5',
+            worstRating: '1',
+          },
+        }
+      : {}),
     publisher: {
       '@type': 'Organization',
       name: 'AgentBio',
@@ -636,13 +640,13 @@ export const generatePricingSchema = (
         },
       }),
     })),
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      reviewCount: '523',
-      bestRating: '5',
-      worstRating: '1',
-    },
+    // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
+    // reviews, the same invented pair US-111 took off the landing page and
+    // missed here — it was still reaching 31 built pages. Google renders stars
+    // in search results from this field, so a fabricated value is a false
+    // claim published to everyone who searches, and a structured-data policy
+    // violation. Reinstate only from real review data, the way
+    // FullProfilePage and ReviewSchema do.
   };
 };
 

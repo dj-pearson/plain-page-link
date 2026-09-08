@@ -27,6 +27,7 @@ import {
   Unlock
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MARKETING_COPY } from '@/config/marketing-claims';
 
 interface EmailCaptureModalProps {
   isOpen: boolean;
@@ -146,24 +147,14 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
           </div>
         </div>
 
-        {/* Social Proof */}
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 mb-6">
-          <div className="flex items-start gap-3">
-            <div className="flex text-yellow-400">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star key={star} className="w-4 h-4 fill-current" />
-              ))}
-            </div>
-            <div>
-              <p className="text-sm italic text-gray-700 mb-1">
-                "Changed my bio, got 3 leads in the first week! This tool is a game-changer."
-              </p>
-              <p className="text-xs font-semibold text-gray-600">
-                - Jennifer K., Miami Real Estate Agent
-              </p>
-            </div>
-          </div>
-        </div>
+        {/*
+          A five-star rating and a quote from "Jennifer K., Miami Real Estate
+          Agent" claiming three leads in the first week stood here. Hardcoded
+          JSX, not a row from the `testimonials` table, so nothing records who
+          said it or whether they consented — and the stars were decoration, not
+          a rating anyone gave. Removed rather than reworded (see
+          src/config/marketing-claims.ts).
+        */}
 
         {/* Form */}
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
@@ -235,16 +226,18 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 space-y-1">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-500" />
-              <span>Join 2,847 agents getting more leads from Instagram</span>
+              <span>{MARKETING_COPY.joinLine}</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-500" />
               <span>No spam. Unsubscribe anytime.</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-500" />
-              <span>Used by agents at Keller Williams, Coldwell Banker, RE/MAX</span>
-            </div>
+            {/*
+              "Used by agents at Keller Williams, Coldwell Banker, RE/MAX" was
+              here — three real companies named as customers with nothing behind
+              it. Naming another firm as a customer is a claim about them as
+              well as about us.
+            */}
           </div>
 
           {/* Submit Button */}
@@ -302,11 +295,7 @@ export function UnlockCTA({ onUnlock }: { onUnlock: () => void }) {
       <div className="mt-4 flex items-center justify-center gap-6 text-sm">
         <div className="flex items-center gap-1">
           <CheckCircle className="w-4 h-4" />
-          <span>2,847 agents unlocked</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Star className="w-4 h-4 fill-current" />
-          <span>4.9/5 rating</span>
+          <span>No spam. Unsubscribe anytime.</span>
         </div>
       </div>
     </div>

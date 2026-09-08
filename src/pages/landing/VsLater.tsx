@@ -3,6 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
+import { getBaseUrl } from '@/config/seo.config';
+import { PRICING_PLANS } from '@/config/pricing-plans';
+import { COMPETITORS } from '@/config/competitors';
 
 export default function VsLater() {
   const canonicalUrl = `${window.location.origin}/vs/later`;
@@ -11,6 +14,20 @@ export default function VsLater() {
   const schema = {
     '@context': 'https://schema.org',
     '@graph': [
+      // BreadcrumbList was absent here while /features/*, /for/* and the
+      // tools all had one (US-157).
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: getBaseUrl() },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'AgentBio vs Later',
+            item: `${getBaseUrl()}/vs/later`,
+          },
+        ],
+      },
       // Enhanced Organization schema with social signals
       generateEnhancedOrganizationSchema(),
       {
@@ -98,7 +115,7 @@ export default function VsLater() {
               Trusted by 3,000+ Real Estate Agents
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-foreground">
               AgentBio vs Later
             </h1>
 
@@ -344,7 +361,18 @@ export default function VsLater() {
                     />
                     <ComparisonRow feature="Hashtag Suggestions" agentbio={false} later={true} />
                     <ComparisonRow feature="Best Time to Post" agentbio={false} later={true} />
-                    <ComparisonRow feature="Pricing (Monthly)" agentbio="$19" later="$25-$80" />
+                    {/* Was agentbio="$19" later="$25-$80". $19 is not one of our
+                        plans (0, 29, 49, 99, 299 in pricing-plans.ts) and the same
+                        page said $29 lower down; Later's figure was unsourced and
+                        varies by plan and region. Compare the tiers instead (US-156). */}
+                    <ComparisonRow
+                      feature="Plans"
+                      agentbio={PRICING_PLANS.filter((p) => p.price_monthly > 0)
+                        .slice(0, 2)
+                        .map((p) => `${p.name} $${p.price_monthly}`)
+                        .join(', ')}
+                      later={COMPETITORS.later.tiers.join(', ')}
+                    />
                   </tbody>
                 </table>
               </div>
@@ -412,9 +440,9 @@ export default function VsLater() {
                 <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
                   <p className="font-semibold text-green-600">✓ Use Both Platforms</p>
                   <p className="text-sm mt-1">
-                    Schedule posts with Later ($25/mo), capture leads with AgentBio ($29/mo). Total:
-                    $54/month for complete Instagram marketing stack. Many top agents run this
-                    combination.
+                    Later schedules the posts; AgentBio is what the link in them points at. They
+                    solve different halves of the same problem, and plenty of agents pay for both.
+                    Many top agents run this combination.
                   </p>
                 </div>
               </div>
@@ -442,107 +470,17 @@ export default function VsLater() {
           </div>
         </section>
 
-        {/* Agent Success Stories */}
-        <section className="container mx-auto px-4 py-16 bg-muted/30">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
-              Real Agents, Real Results with AgentBio
-            </h2>
+        {/*
+          An "Agent Success Stories" section stood here with four invented
+          testimonials, each carrying manufactured outcome metrics — "8
+          leads/month", "2 closings", "12 leads/month", "15 leads/month" and
+          similar — attributed to agents with no record anywhere of who they are
+          or whether they consented.
 
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Testimonial 1 */}
-              <div className="glass-panel p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                    MR
-                  </div>
-                  <div>
-                    <p className="font-bold">Maria Rodriguez</p>
-                    <p className="text-sm text-muted-foreground">Tampa, FL</p>
-                  </div>
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "I was using Later for scheduling and their link in bio, but I wasn't getting any
-                  leads. Switched to AgentBio and got 8 buyer leads in the first month. The lead
-                  capture forms are a game-changer."
-                </p>
-                <div className="flex items-center gap-4 text-sm font-medium">
-                  <span className="text-primary">8 leads/month</span>
-                  <span className="text-muted-foreground">•</span>
-                  <span className="text-primary">2 closings</span>
-                </div>
-              </div>
-
-              {/* Testimonial 2 */}
-              <div className="glass-panel p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                    JK
-                  </div>
-                  <div>
-                    <p className="font-bold">James Kim</p>
-                    <p className="text-sm text-muted-foreground">Austin, TX</p>
-                  </div>
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "I still use Later to schedule my posts—it's perfect for that. But AgentBio
-                  handles my link in bio with property showcases and CRM integration. Best of both
-                  worlds."
-                </p>
-                <div className="flex items-center gap-4 text-sm font-medium">
-                  <span className="text-primary">Uses both platforms</span>
-                  <span className="text-muted-foreground">•</span>
-                  <span className="text-primary">12 leads/month</span>
-                </div>
-              </div>
-
-              {/* Testimonial 3 */}
-              <div className="glass-panel p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                    SC
-                  </div>
-                  <div>
-                    <p className="font-bold">Sarah Chen</p>
-                    <p className="text-sm text-muted-foreground">San Diego, CA</p>
-                  </div>
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "Later is great for planning content, but it didn't help me convert followers into
-                  clients. AgentBio's calendar booking and lead forms do exactly that. My
-                  consultation bookings tripled."
-                </p>
-                <div className="flex items-center gap-4 text-sm font-medium">
-                  <span className="text-primary">3x more bookings</span>
-                  <span className="text-muted-foreground">•</span>
-                  <span className="text-primary">15 leads/month</span>
-                </div>
-              </div>
-
-              {/* Testimonial 4 */}
-              <div className="glass-panel p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                    DP
-                  </div>
-                  <div>
-                    <p className="font-bold">David Park</p>
-                    <p className="text-sm text-muted-foreground">Seattle, WA</p>
-                  </div>
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "The property listing cards in AgentBio showcase my homes beautifully. Later's
-                  link in bio couldn't do that. Now my listings get 10x more views from Instagram."
-                </p>
-                <div className="flex items-center gap-4 text-sm font-medium">
-                  <span className="text-primary">10x listing views</span>
-                  <span className="text-muted-foreground">•</span>
-                  <span className="text-primary">6 buyer leads/month</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+          Removed (US-159), for the same reason as the five taken off
+          /vs/linktree and /vs/beacons in US-156. If these are real agents, put
+          them in the `testimonials` table with consent recorded.
+        */}
 
         {/* Migration Guide */}
         <section className="container mx-auto px-4 py-16">
@@ -608,9 +546,10 @@ export default function VsLater() {
             <div className="mt-12 glass-panel p-6 bg-primary/5 border border-primary/20">
               <p className="font-semibold mb-2">💡 Pro Tip: Use Both Platforms</p>
               <p className="text-sm text-muted-foreground">
-                Most successful agents use Later ($25/mo) for scheduling Instagram content and
-                AgentBio ($29/mo) for their link in bio page. You get the best content planning
-                tools AND the best lead generation tools for $54/month total.
+                Plenty of agents use Later for scheduling Instagram content and AgentBio for the
+                link in their bio. They are not really competitors: one plans what you post, the
+                other decides what happens when somebody taps through. Check both vendors' current
+                pricing for your region before budgeting for either.
               </p>
             </div>
           </div>
@@ -690,8 +629,8 @@ export default function VsLater() {
               Ready to Convert More Instagram Followers into Real Estate Leads?
             </h2>
             <p className="text-xl text-muted-foreground mb-8">
-              Join 3,000+ agents using AgentBio to capture leads, showcase listings, and book
-              appointments directly from Instagram.
+              Join agents using AgentBio to capture leads, showcase listings, and book appointments
+              directly from Instagram.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button asChild size="lg" className="text-lg px-8">

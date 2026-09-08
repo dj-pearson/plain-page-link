@@ -25,6 +25,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
     marketDescription,
     neighborhoods,
     avgDaysOnMarket,
+    indexable,
   } = location;
 
   const baseUrl = getBaseUrl();
@@ -108,13 +109,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
           priceValidUntil: SEO_CONFIG.pricing.priceValidUntil,
           availability: 'https://schema.org/InStock',
         },
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: SEO_CONFIG.ratings.ratingValue,
-          reviewCount: SEO_CONFIG.ratings.reviewCount,
-          bestRating: SEO_CONFIG.ratings.bestRating,
-          worstRating: SEO_CONFIG.ratings.worstRating,
-        },
+        // aggregateRating removed (US-157). SEO_CONFIG.ratings held the same
+        // invented 4.8-over-523 pair US-111 stripped from the landing page,
+        // and it was reaching all 23 city pages from here.
       },
       // FAQPage schema
       {
@@ -203,8 +200,16 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         <meta name="geo.region" content={`US-${stateAbbr}`} />
         <meta name="geo.placename" content={city} />
 
-        {/* Robots */}
-        <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+        {/* Robots. Off unless the location has earned it — see
+            docs/seo/CITY_PAGES.md and the `indexable` flag in
+            src/data/locations.ts (US-153). "follow" either way: the page links
+            to real pages and there is no reason to strand them. */}
+        <meta
+          name="robots"
+          content={
+            indexable ? 'index, follow, max-image-preview:large, max-snippet:-1' : 'noindex, follow'
+          }
+        />
 
         {/* AI Search Optimization */}
         <meta name="perplexity-verification" content="agentbio-verified" />
@@ -503,58 +508,17 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
           </div>
         </section>
 
-        {/* Success Stories */}
-        <section className="container mx-auto px-4 py-16">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
-              Success Stories from {city} Agents
-            </h2>
+        {/*
+          A "Success Stories from {city} Agents" section stood here: two invented
+          agents ("{city} Agent, Residential Specialist" and "{city} Team Lead,
+          Luxury Properties") quoting closed deals, with the metrics "3 closings",
+          "15 leads/month", "$2M+ in sales" and "10x engagement".
 
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="glass-panel p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                    {city.charAt(0)}A
-                  </div>
-                  <div>
-                    <p className="font-bold">{city} Agent</p>
-                    <p className="text-sm text-muted-foreground">Residential Specialist</p>
-                  </div>
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "AgentBio helped me convert my Instagram followers into real {city} buyers. I've
-                  closed 3 deals in the past 2 months directly from Instagram leads."
-                </p>
-                <div className="flex items-center gap-4 text-sm font-medium">
-                  <span className="text-primary">3 closings</span>
-                  <span className="text-muted-foreground">•</span>
-                  <span className="text-primary">15 leads/month</span>
-                </div>
-              </div>
-
-              <div className="glass-panel p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                    {city.charAt(0)}B
-                  </div>
-                  <div>
-                    <p className="font-bold">{city} Team Lead</p>
-                    <p className="text-sm text-muted-foreground">Luxury Properties</p>
-                  </div>
-                </div>
-                <p className="text-muted-foreground mb-4">
-                  "The property listing cards make it so easy to showcase my {city} luxury homes. My
-                  Instagram followers love browsing properties right from my bio link."
-                </p>
-                <div className="flex items-center gap-4 text-sm font-medium">
-                  <span className="text-primary">$2M+ in sales</span>
-                  <span className="text-muted-foreground">•</span>
-                  <span className="text-primary">10x engagement</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+          It was templated on the city name, so the same two fictional agents and
+          the same fabricated numbers rendered on all 26 city pages, each one
+          claiming to be local. Removed (US-159). Real testimonials live in the
+          `testimonials` table and are rendered from there.
+        */}
 
         {/* FAQ Section */}
         <section className="container mx-auto px-4 py-16 bg-muted/30">

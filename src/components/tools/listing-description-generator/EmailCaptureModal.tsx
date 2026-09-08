@@ -26,6 +26,7 @@ import {
   Unlock
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MARKETING_COPY } from '@/config/marketing-claims';
 
 interface EmailCaptureModalProps {
   isOpen: boolean;
@@ -157,9 +158,9 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, listingId }: Emai
               <p className="text-sm italic text-gray-700 mb-1">
                 "This AI tool writes better descriptions than I ever could. Saved me hours and my listings are getting way more interest!"
               </p>
-              <p className="text-xs font-semibold text-gray-600">
-                - Sarah M., Top Producer in Austin, TX
-              </p>
+              {/* Attribution to "Sarah M., Top Producer in Austin, TX"
+                  removed — hardcoded, untraceable, and the same initials appear
+                  with two other biographies elsewhere in this repo. */}
             </div>
           </div>
         </div>
@@ -232,7 +233,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, listingId }: Emai
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 space-y-1">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-500" />
-              <span>Join 4,200+ agents using AI for listing descriptions</span>
+              <span>{MARKETING_COPY.joinLine}</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-500" />
@@ -299,11 +300,7 @@ export function UnlockCTA({ onUnlock }: { onUnlock: () => void }) {
       <div className="mt-4 flex items-center justify-center gap-6 text-sm">
         <div className="flex items-center gap-1">
           <CheckCircle className="w-4 h-4" />
-          <span>4,200+ agents unlocked</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Star className="w-4 h-4 fill-current" />
-          <span>4.9/5 rating</span>
+          <span>No spam. Unsubscribe anytime.</span>
         </div>
       </div>
     </div>

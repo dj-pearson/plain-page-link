@@ -439,6 +439,29 @@ export default function Pricing() {
                     answer="We accept all major credit cards (Visa, Mastercard, American Express, Discover) through our secure payment processor Stripe. All payments are encrypted and PCI compliant."
                   />
                 </div>
+
+                {/*
+                  The comparison pages had no inbound link from anywhere on the
+                  site, which is part of why all three took zero impressions in
+                  the 16 months to 2026-09-08 (US-156). Somebody on the pricing
+                  page comparing us to something else is exactly who they are
+                  for.
+                */}
+                <p className="mt-10 text-center text-muted-foreground">
+                  Weighing us against something else?{' '}
+                  <Link to="/vs/linktree" className="underline underline-offset-2">
+                    AgentBio vs Linktree
+                  </Link>
+                  ,{' '}
+                  <Link to="/vs/beacons" className="underline underline-offset-2">
+                    vs Beacons
+                  </Link>{' '}
+                  and{' '}
+                  <Link to="/vs/later" className="underline underline-offset-2">
+                    vs Later
+                  </Link>
+                  , including where they are the better choice.
+                </p>
               </div>
             </div>
           </div>

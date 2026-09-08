@@ -20,6 +20,10 @@ export default defineConfig({
       // here rather than only in production, where nobody would notice it
       // breaking until an unfurl came back blank.
       'functions/**/*.test.ts',
+      // Build scripts. seo-audit.mjs decides whether a prerendered page is fit
+      // to ship (US-150); its fixtures include the pre-US-147 output, so the
+      // gate is demonstrably able to fail rather than only able to pass.
+      'scripts/**/*.test.ts',
     ],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
     // src/integrations/supabase/client.ts throws at module load when these are

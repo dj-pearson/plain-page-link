@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 import type { Database } from '@/integrations/supabase/types';
 
 /**
@@ -132,6 +133,19 @@ export function useArticles() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['articles'] });
       toast.success('Article published successfully');
+
+      // The blog is prerendered at build time (US-148), so a post that is
+      // published between deploys exists only in the database and no crawler
+      // can see it. Ask Cloudflare Pages for a rebuild.
+      //
+      // Deliberately not awaited and deliberately not surfaced: the article IS
+      // published, and a deploy hook that is unset or briefly unreachable must
+      // not present itself to the author as a failed publish.
+      void edgeFunctions.invoke('trigger-rebuild', {}).catch((error) => {
+        logger.warn('Article published but the rebuild could not be requested', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     },
     onError: (error) => {
       toast.error('Failed to publish article: ' + error.message);

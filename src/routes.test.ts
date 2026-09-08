@@ -135,6 +135,12 @@ function collectLinks(): FoundLink[] {
       if (!path || path === '/') continue;
       // Protocol-relative URLs are external.
       if (path.startsWith('//')) continue;
+      // A path with a file extension is a static asset served from public/, not
+      // a route — /logo.png, /Cover.webp, /llms.txt. React Router never sees
+      // them, so measuring them against the route table reports every one of
+      // them as broken. Same rule isReservedSegment uses in
+      // functions/_lib/social-meta.ts (US-158).
+      if (/\.[a-z0-9]{2,5}$/i.test(path)) continue;
       found.push({ file: file.replace(`${SRC}/`, ''), target: path });
     }
   }

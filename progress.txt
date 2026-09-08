@@ -737,3 +737,1050 @@ Constraints for whoever runs these: one clock (hourly GitHub cron into
 scheduled-maintenance, US-103) — add tasks, never a second scheduler; the PII
 key is edge-function only (US-066), so hashing and contact writes go through a
 function; subscription_plans is the enforced matrix, pricing-plans.ts is copy.
+
+---
+
+## Search Performance Diagnosis — 2026-09-08 (stories US-147 to US-158 added)
+
+Source: the Google Search Console export in keyword/, "Performance on Search",
+Web, last 16 months, pulled 2026-09-08. Whole-site totals for the window: 33
+clicks, 1,481 impressions, average position 18.39 desktop / 20.40 mobile. About
+three clicks a month. 81% of impressions are desktop; 63% are US (937/1,481),
+the rest largely South Korea, Philippines, India, Brazil, Turkey — noise for a
+US real-estate SaaS.
+
+Headline: this is not a content problem, it is a delivery problem. The site is a
+pure client-rendered SPA with no prerender step of any kind — no SSG/SSR/
+react-snap/puppeteer in package.json or vite.config.ts, public/_redirects is
+`/* /index.html 200`, and index.html:80 hardcodes ONE <title> for all 44 sitemap
+URLs. The per-page meta is correct but lives in react-helmet-async, so it only
+exists after hydration and a crawler's first pass never sees it. Blog bodies are
+worse: BlogArticle.tsx:26 fetches from `articles` at runtime, so the text needs
+the bundle AND a Supabase round-trip before it exists.
+
+Two fingerprints in the data confirm the mechanism rather than inferring it.
+(1) All 23 /for/{city} pages, all 5 /features/* pages and all 3 /vs/* pages —
+31 pages, every one in the sitemap — have ZERO impressions across the full 16
+months. Pages.csv lists every page with >=1 impression (down to /accessibility
+with 1); not one of the 31 appears. (2) High rank, no clicks, which is what a
+duplicated SERP title produces: /pricing at position 4.77 on 122 impressions
+with 1 click (0.82% CTR where position 5 returns 6-9%), link-hub-for-leasing-
+agents at 3.00 with 0 clicks, home-selling-link-hub at 5.23 with 0 clicks.
+
+Four further findings, all evidenced in the export or the tree:
+- public/sitemap.xml is static, hand-edited, 44 locs, every lastmod 2026-02-08,
+  file mtime 2026-07-14. Not one blog article is in it. /features is in it and
+  has no route (App.tsx has only the five /features/* children), so it is a soft
+  404 submitted on purpose. Two edge functions generate sitemaps
+  (generate-sitemap 309 lines, sitemap 187 lines); neither is what is served.
+- 321 impressions (21.7%) go to auth and legal pages: /auth/login 114, /dmca 72,
+  /terms 56, /privacy 40, /acceptable-use 39. robots.txt already Disallows
+  /auth/, which is why it cannot be fixed — Disallow stops the crawl, so Google
+  never sees a noindex. Blocking harder makes it worse.
+- The homepage title chases the wrong intent. 'real estate agent bio' 82 impr at
+  position 88.56, 'agent bio' 60 at 7.33, and a long tail of bio-examples
+  queries — roughly 180 impressions of people wanting bio COPY, not a builder.
+  The commercial query 'link in bio for real estate agents' sits at 28 impr,
+  position 21.18. Page 3 for what it sells, page 9 for what it does not.
+- The blog is one topic written 25 times (agent + link + hub/page/ideas
+  permutations). Those 25 earned 2 clicks combined in 16 months. The single
+  exception, how-real-estate-agents-use-link-in-bio-...-2024, took 162 impr and
+  6 clicks at position 11.09 — 18% of all site clicks from one post.
+
+12 stories, all passes:false, in dependency order: fix delivery (147, 148),
+fix discovery and keep it fixed (149, 150), stop the wrong pages competing
+(151, 152, 153), then earn something worth ranking (154, 155, 156, 157) and
+face the authority problem (158).
+
+Constraints for whoever runs these: US-147 is the unlock and everything else in
+the batch is largely wasted before it passes — do not reorder. Playwright
+^1.57.0 is already a devDependency; use it for prerendering and do not add a
+second headless browser. Do not rewrite SEOHead/PageSEO/ArticleSEO — they emit
+the right tags and the only defect is that a crawler never runs them. US-147
+CREATES the risk US-153 contains: 23 templated city pages that cost nothing
+while uncrawled become a doorway-page problem the moment they are indexed, so
+153 ships them noindexed by default. US-158 is mostly human outreach and is
+scoped to the artifacts an agent can honestly produce — the outreach itself
+stays outstanding and belongs to a person; do not fabricate placements.
+
+Baseline to measure against, for the next runner: 33 clicks / 1,481 impressions
+/ position 18.4, 16 months to 2026-09-08. Expect impressions to FALL after
+US-152 — the ~180 bio-intent impressions are noise and shedding them is the
+point. Resubmitting the sitemap and reading the GSC indexing report are human
+steps; note them, do not claim them.
+
+### US-147 — prerender every public route — 2026-09-08 — PASSES
+
+44 routes now render to their own HTML file under dist/ with 44 distinct
+titles. Before this, all 44 answered with the same shell and the same single
+title from index.html:80.
+
+Built: src/config/prerender-routes.ts (the one route list — 21 static routes
+plus one per LOCATIONS entry, so the city pages cannot drift from the data that
+generates them) and scripts/prerender.mts, run by `npm run prerender` and wired
+into `npm run build` after `vite build`. It serves dist/ with Vite's own preview
+API, drives it with the Playwright already in devDependencies, and snapshots
+each route once React has painted and helmet has written the head. Every page is
+rendered before anything is written, so the script never serves its own output
+back to itself. Build cost: ~35 s on top of a ~95 s bundle, four pages at a time.
+
+Four things found on the way, all of which would have shipped silently:
+
+1. CI has been building a bundle that cannot boot. .github/workflows/ci.yml ran
+   `npm run build` with no VITE_SUPABASE_* at all, and
+   src/integrations/supabase/client.ts throws at import when they are absent.
+   Nothing noticed because nothing in CI ever loaded the result — the prerender
+   is the first thing that does. Both build jobs now pass placeholder values and
+   install Chromium. This is the same trap US-113 hit with the a11y suite, and
+   playwright-a11y/e2e.config.ts already solve it the same way. The real values
+   live on the Cloudflare Pages project, not in the workflow.
+
+2. Canonicals were being baked as http://127.0.0.1:4319/pricing. getCanonicalUrl
+   is built on getSafeOrigin(), which in a browser returns
+   window.location.origin — during prerendering, the preview server. Every page
+   would have told Google its real URL was a duplicate of an unreachable
+   machine. The script now rewrites the preview origin to VITE_APP_URL (default
+   https://agentbio.net, mirroring FALLBACK_APP_URL in src/lib/utils.ts) and
+   fails if any 127.0.0.1/localhost survives.
+
+3. /tools/instagram-bio-analyzer and /tools/listing-description-generator had no
+   canonical at all — raw <Helmet> with title and description only. The render
+   gate caught it; both now use getCanonicalUrl.
+
+4. index.html's own <meta name="description">/og tags and helmet's are both
+   present in the live DOM (helmet marks its own with data-rh rather than
+   replacing). Serialised naively every page carried two of each. The snapshot
+   drops the unmanaged duplicate — verified canonical=1, description=1,
+   og:title=1 per page.
+
+On hydration: src/main.tsx uses ReactDOM.createRoot, not hydrateRoot, so the
+browser discards the prerendered markup and re-renders. There is no hydration
+contract and no mismatch to warn about — confirmed by loading /pricing and
+watching the console: no hydration warnings, #root repopulates, title resolves
+to "Pricing - AgentBio Professional Plans".
+
+On Cloudflare serving these files: `vite preview` is NOT a valid check here and
+misled the first attempt — its SPA fallback fires before directory-index
+resolution, so it returns dist/index.html for /pricing even when
+dist/pricing/index.html exists. Pages resolves differently (asset, then
+<path>/index.html, then _redirects). The load-bearing claim is that assets
+outrank the `/* /index.html 200` splat, and that is not a guess: if the splat
+won, every Pages-hosted SPA would answer its own /assets/*.js with index.html
+and none would work. The build now asserts our half — a file exists exactly
+where the asset lookup lands, and no _redirects rule targets a prerendered path.
+wrangler is not a dependency and was not added for this.
+
+Not prerendered, deliberately: /blog and articles (body comes from `articles`,
+US-148), /auth/* (US-151 adds them with noindex), /dashboard, /admin,
+/onboarding (no anonymous render), and /:username, /p/:slug, /:username/review
+(one page per tenant — already served by functions/[username].ts from US-114).
+
+Verification: `npm run build` exits 0 and ends with the layout check; `tsc
+--noEmit` clean; eslint 0 errors on the changed files (17 pre-existing warnings
+in the two tool pages, none new). `npx vitest run` is 628 passed / 4 failed —
+all four failures pre-date this work and are unrelated: two in
+repo-hygiene.test.ts caused by the four loose *.md and six loose *.ps1/*.sh
+files added in 908a2c10, plus analytics.test.ts, analyticsEvents.test.ts and
+LeadDetailModal.test.tsx. Confirmed by stashing this branch's changes and
+re-running the same four files: identical failures.
+
+Note for the next runner: the render gate currently requires a title, a
+description and a canonical on every route, and treats index.html's default
+title on a non-root route as failure. US-151 will add noindex routes that still
+need to satisfy it, and US-150 turns the same assertions on the written files
+into the CI gate. Do not weaken these checks to make a new route pass — a route
+that cannot produce its own tags is the bug, not the check.
+
+### US-148 — prerender blog articles from Supabase — 2026-09-08 — PASSES (two human steps outstanding)
+
+/blog, /blog/category/* and every /blog/<slug> now render at build time with the
+article body already in the HTML. Confirmed by grepping a distinctive sentence
+out of the emitted file, and confirmed not to leak: article one's file contains
+none of article two's body.
+
+The approach avoids touching the app. scripts/prerender.mts intercepts the
+page's own PostgREST call and fulfils it from rows fetched at build time, so
+BlogArticle.tsx runs exactly the code it runs in production — same query, same
+TanStack Query states, same ArticleSEO output. The alternative was to teach the
+component about a build-time cache, which would mean changing a component to
+suit the build. The interception honours PostgREST's contract: `.single()` sends
+Accept: application/vnd.pgrst.object+json and gets a bare object plus a 406 when
+the row count is not one; a plain select gets an array.
+
+Two things this needed that were not obvious:
+
+1. bypassCSP on the prerender browser context. index.html's connect-src names
+   the production API hosts, so with a placeholder or stub VITE_SUPABASE_URL the
+   browser blocked the article fetch before Playwright could see it — the route
+   handler never fired and every post rendered empty. Prerender context only;
+   the shipped CSP is untouched.
+
+2. Prettier reformatted an escaped \n inside the new console.warn into a literal
+   newline, producing "Unterminated string literal" at build time. Worth knowing
+   when hand-editing .mts through a script: run prettier, then build, then read
+   the build output rather than assuming.
+
+Where articles come from (scripts/lib/articles.mts), in order: the database when
+VITE_SUPABASE_URL/ANON_KEY are real (anon key only — the same RLS that governs a
+visitor governs the build); then the committed snapshot at
+scripts/data/articles.snapshot.json; then failure. There is no silent empty
+case. Verified all three: with credentials it reads live and logs "from
+supabase"; with only a snapshot it logs that it is using it and how many;
+with neither it exits 1 saying exactly what to run.
+
+PRERENDER_ALLOW_NO_ARTICLES=1 is set on CI's build and bundle-size jobs. Those
+verify the bundle and do not deploy, and they have no database credentials. It
+omits the blog routes entirely rather than emitting empty ones — an empty
+/blog/<slug> in the index is worse than no entry. A deploy must never set it.
+
+Deploy hook: supabase/functions/trigger-rebuild POSTs to
+CLOUDFLARE_DEPLOY_HOOK_URL, and useArticles.ts calls it after a successful
+publish. Deliberately not awaited and its failure is not shown to the author —
+the article IS published, and an unset hook must not look like a failed publish;
+it logs a warning. The function requires an authenticated caller, because an
+open endpoint that starts a paid build is a denial-of-wallet primitive, and it
+never echoes the hook URL, including in errors. Documented in
+docs/deploy/BLOG_PRERENDERING.md.
+
+src/env-example.test.ts caught the new Deno.env.get name immediately — the repo
+asserts every one is declared in supabase/functions/.env.example with a one-line
+trailing purpose. Added in the house format.
+
+VERIFIED AGAINST A STUB, NOT PRODUCTION. This machine has no database
+credentials, so the whole path was proven against a local PostgREST-shaped stub
+serving two known articles: same wire protocol, known content, assertions on the
+emitted HTML. The stub and its fixture snapshot were deleted afterwards and are
+not committed — fabricated posts must not sit in the repo looking like real
+content.
+
+TWO HUMAN STEPS REMAIN, both needing credentials no agent here has:
+  1. Run `npm run articles:snapshot` somewhere that can reach the database and
+     commit scripts/data/articles.snapshot.json. Until then a build with no
+     database access ships no blog, and CI stays on the opt-out flag.
+  2. Create the Cloudflare Pages deploy hook and set CLOUDFLARE_DEPLOY_HOOK_URL
+     in the Supabase edge function secrets. Steps are in
+     docs/deploy/BLOG_PRERENDERING.md. Until then trigger-rebuild returns
+     {triggered:false} and logs that it is unconfigured — nothing breaks, the
+     blog just waits for the next deploy, which is the pre-existing behaviour.
+
+Verification: `npm run build` exits 0 in both modes — 44 routes with
+PRERENDER_ALLOW_NO_ARTICLES=1, 49 routes (2 articles + 2 categories + /blog)
+against the stub. tsc --noEmit clean. vitest 628 passed / 4 failed, the same
+four that pre-date this branch. Article one's emitted head: title from seo_title
+with the "| AgentBio" suffix, description from seo_description, canonical
+https://agentbio.net/blog/stub-article-one, og:type=article, og:image from
+featured_image_url, BlogPosting JSON-LD with datePublished 2026-03-01 and
+dateModified 2026-04-02 from the row. Article two, which has neither seo_title
+nor seo_description, correctly fell back to title and excerpt.
+
+Note for US-149: blogRoutes() in src/config/prerender-routes.ts is the function
+that produced these files. Read article URLs for the sitemap from it rather than
+re-deriving them — a sitemap listing no articles is the bug that story exists to
+fix, and two sources of truth is how it happened.
+
+### US-149 — generate sitemap.xml at build time — 2026-09-08 — PASSES
+
+sitemap.xml is now emitted by scripts/prerender.mts from the routes that
+actually rendered, and public/sitemap.xml is deleted. 44 URLs without the blog,
+49 with it, verified well-formed by ElementTree, no duplicates, and every single
+loc resolving to a file on disk that is not the 404 page.
+
+The story said two duplicate sitemap generators. There were FIVE, four of them
+dead:
+  1. public/sitemap.xml — static, hand-edited, mtime 2026-07-14, every lastmod
+     reading 2026-02-08. The only one Google ever read.
+  2. supabase/functions/generate-sitemap/index.ts — 309 lines. Never deployed to
+     the served path, and docs/reviews/CODE_REVIEW_2026-08.md:405 had already
+     recorded that it selects articles.featured_image, a column that does not
+     exist (the real one is featured_image_url). It could not have worked.
+  3. supabase/functions/sitemap/index.ts — 187 lines, duplicating (2).
+  4. src/pages/Sitemap.tsx — a React component that generates XML into component
+     state. It has NO route in App.tsx and nothing imports it.
+  5. generateSitemap() in src/lib/seo.ts — exported, imported by nobody, and
+     emitting only /p/<slug> page-builder URLs.
+All four dead ones are deleted; (5) leaves a comment where it was saying why.
+Nothing in src/ or functions/ referenced any of them — checked before removing.
+
+The guarantee is structural rather than procedural. writeSitemap() takes the
+render results, not the route manifest, so the only thing that can enter the
+sitemap is a page that has just rendered and passed the gate — exists as a file,
+carries its own title/description/canonical, is not the 404. A dangling-entry
+assertion sits on top of that for the day someone changes the derivation.
+
+/features: removing it from the sitemap was not enough, because the URL still
+answered 200 with the SPA's 404 page and Google had already been shown it. Added
+`/features / 301` to public/_redirects, which also documents why the SPA splat
+at the bottom does not swallow the prerendered files. /llms.txt is gone from the
+sitemap too — it is served, it is not a page.
+
+lastmod is only emitted where there is a truthful source: articles use
+articles.updated_at falling back to published_at (verified — stub article one
+carries 2026-04-02 from updated_at, not its 2026-03-01 published_at). The static
+routes have no honest source, so the element is omitted rather than stamped with
+the build date. A sitemap where every lastmod is "today" is one Google learns to
+disregard, which is roughly what the old file achieved by freezing every date at
+2026-02-08.
+
+Priorities: homepage 1.0; marketing and comparison 0.9; tools and features 0.8;
+/blog 0.7; articles 0.6; the 23 city pages 0.5; legal 0.3. The legal weighting
+is deliberate and is the part of US-151 that belongs here — those pages stay
+indexable, they just stop competing for prominence with the pages that sell
+the product.
+
+Verification: build exits 0 in both modes (49 URLs against a stub PostgREST, 44
+with PRERENDER_ALLOW_NO_ARTICLES=1 and zero /blog entries). tsc --noEmit clean.
+robots.txt still points at https://agentbio.net/sitemap.xml, which is now the
+generated file.
+
+On the test suite: 627-628 passing, and the failure set is not stable between
+runs. Four fail every time and pre-date this branch — repo-hygiene.test.ts (2,
+from the loose root .md and .ps1/.sh files added in 908a2c10), analytics.test.ts
+and analyticsEvents.test.ts. Two more come and go under full-suite parallel
+load: LeadDetailModal.test.tsx and ContactForm.test.tsx. ContactForm was run
+three times in isolation and passed 3/3, so it is load-flakiness in the suite,
+not a regression here. Worth someone's attention, but it is not this batch's.
+
+Note for US-153: PrerenderRoute now carries an optional `sitemap: false`, for a
+route that should be rendered and crawlable but kept out of the sitemap — which
+is exactly what a noindexed city page needs. writeSitemap already honours it and
+reports how many routes were excluded.
+
+Note for US-124: the dead-code sweep should know that four sitemap
+implementations were removed here, so it does not go looking for them.
+
+### US-150 — CI gate on prerendered page identity — 2026-09-08 — PASSES
+
+`npm run verify:seo` walks every index.html under dist/ and fails the build if a
+page cannot produce its own identity. Wired into the CI build job after the
+build step. 44 pages pass today.
+
+Rules, applied to the built HTML rather than to the components — a page can have
+a perfectly correct <SEOHead> and still ship wrong:
+  - renders at all (body not essentially empty, under 500 chars of #root)
+  - is not the 404 page
+  - has a <title>, non-empty, not the homepage's verbatim, and shared with no
+    other page
+  - has exactly one non-empty <meta name="description">, shared with no other
+    page
+  - has exactly one <link rel="canonical">, absolute, self-referencing, not the
+    homepage's, and not a 127.0.0.1/localhost preview URL
+
+Two deliberate design points. The logic lives in scripts/lib/seo-audit.mjs as a
+pure function so it can be run against fixtures; scripts/verify-seo.mjs is only
+the CLI around it. And it duplicates checks scripts/prerender.mts already makes
+on purpose — prerender checks what it is about to write, this checks what is
+about to ship. The failure being guarded against is not a bad prerender script,
+it is a year of 44 URLs sharing one <title> with nothing anywhere comparing
+them.
+
+The teeth are demonstrated two ways, because "the check passes" proves nothing:
+  1. scripts/lib/seo-audit.test.ts, 13 tests. preUS147Output() reproduces the
+     shape the site actually shipped — every URL with index.html's single
+     hardcoded title and description, no canonical, empty <div id="root"> — and
+     asserts it is rejected on all four counts. Also covers a canonical pointing
+     at the homepage, a canonical left on the preview server, two non-home pages
+     sharing a title, the duplicate description tag a naive snapshot produces,
+     and the 404 shipped under a real route.
+  2. Against real output: corrupted dist/pricing/index.html to carry the
+     homepage title and dropped its canonical. The gate reported exactly those
+     three problems and exited 1; restoring the file made it pass again.
+
+Canonicals are not demanded from a page carrying noindex — it is already telling
+Google not to index it, and requiring one would be noise. US-151 needs that for
+the auth routes.
+
+DUPLICATE_DESCRIPTION_ALLOWLIST exists and is empty. All 44 pages had distinct
+descriptions when this was written; an entry there is a page admitting it has
+nothing of its own to say.
+
+vitest.config.ts now includes scripts/**/*.test.ts. It previously covered only
+src, supabase/functions and functions.
+
+Verification: clean CI-mode build exits 0, verify:seo exits 0 on 44 pages, and
+exits 1 with the right three messages on the corrupted file. tsc --noEmit clean.
+vitest 640 passed (up 13 from 627), 74 test files.
+
+On the flaky suite, which is worth someone's attention but is not this batch's
+problem: four failures are stable and pre-date this branch (repo-hygiene.test.ts
+x2 from the loose root files in 908a2c10, analytics.test.ts,
+analyticsEvents.test.ts). Beyond those, THREE jsdom component specs now come and
+go between full-suite runs — ContactForm.test.tsx, LeadDetailModal.test.tsx and
+SubmitReview.test.tsx. All three were run in isolation this iteration and passed
+5/5, 3/3 and 7/7. They share a shape: async edge-function calls under fake
+timers, timing out only when the suite is loaded. Whoever picks this up should
+look at the shared waitFor timeout rather than at the individual specs.
+
+### US-151 — stop auth and legal pages absorbing impressions — 2026-09-08 — PASSES
+
+The story's premise checked out exactly. None of the seven auth pages set any
+meta at all — no SEOHead, no Helmet, nothing — so every one of them inherited
+index.html's marketing title and competed with the pages that sell the product.
+/auth/login took 114 impressions and /auth/register 42.
+
+robots.txt's `Disallow: /auth/` is removed, and that is the load-bearing change.
+Disallow stops the crawl, not the indexing: Google had indexed /auth/login from
+links alone and was forbidden from fetching the document that would have told it
+not to. Adding a noindex while the Disallow stood would have changed nothing.
+/api/ and /dashboard/ stay disallowed. The reasoning is written into robots.txt
+so nobody restores it as an obvious tidy-up.
+
+Six auth routes are now prerendered carrying <meta name="robots"
+content="noindex, follow"> in the served HTML, and all six are excluded from
+sitemap.xml via the `sitemap: false` flag US-149 added. Verified in the built
+files: six auth pages noindex, and /, /pricing, /vs/linktree and /terms all
+still "index, follow". Sitemap is 44 URLs with zero /auth/ entries.
+
+Done at the route rather than in the pages. src/components/auth/AuthRouteSEO.tsx
+wraps each auth element in App.tsx with a per-route title and description, so a
+new auth route picks it up by construction and the seven components stay
+untouched. Each title is distinct because `npm run verify:seo` fails on two
+pages sharing one.
+
+public/_headers additionally sends `X-Robots-Tag: noindex, follow` for /auth/*.
+Belt and braces, and it is the only thing that covers an auth URL which is never
+prerendered — which turned out to matter.
+
+/auth/callback is deliberately NOT prerendered, and the gate is what found it.
+Its whole job is to consume an OAuth code and redirect; with no code it lands on
+/auth/login, so the snapshot written to dist/auth/callback/index.html was the
+login page — confirmed by both files carrying the same title and the same
+password field. verify:seo reported "/auth/login shares its <title> with
+/auth/callback" and refused. Prerendering a redirect endpoint snapshots wherever
+it redirected to. The X-Robots-Tag covers it instead. /auth/sso/callback renders
+a real state rather than redirecting, so it keeps its file.
+
+Two checks needed the same exemption, because a page carrying noindex has no use
+for a canonical: scripts/lib/seo-audit.mjs already had it from US-150, and
+scripts/prerender.mts now does too — it was failing all seven auth routes on a
+missing canonical alone.
+
+Legal pages: unchanged in indexability, already at sitemap priority 0.3 from
+US-149. For internal-link prominence, PublicFooter linked /privacy, /terms and
+/dmca three times each on every page of the site — a Legal column, a prose
+paragraph in the legal notice, and a bottom-bar nav duplicating the column. The
+bottom-bar set is removed. Every legal page is still linked at least once and
+still one click away; they just stop taking three sitewide internal links each
+while holding 207 of 1,481 impressions and converting none.
+
+Verification: build exits 0 (50 routes rendered, 44 in the sitemap, 6
+deliberately excluded), verify:seo passes on all 50, tsc --noEmit clean, eslint
+clean on the four changed files, impeccable clean on the new component.
+
+On the test suite, and this is worth stating precisely because the raw number
+looks alarming: three consecutive full runs gave 13, 7 and 5 failures, with
+durations of 91s, 71s and 54s. Same 645 tests each time. Failures track run
+duration, not code. Every suspect passes in isolation — Register 3/3, Login 4/4,
+SubmitReview 5/5, ContactForm 3/3, LeadDetailModal 7/7. The stable floor remains
+the four that pre-date this branch (repo-hygiene x2 from 908a2c10's loose root
+files, analytics, analyticsEvents). The jsdom component specs time out under
+machine load; the first run followed a full production build on the same
+machine. Someone should raise the shared waitFor timeout or cap the worker pool
+— it is now producing enough noise to hide a real regression, which is the
+actual risk here.
+
+### US-152 — retarget the homepage at the query it can serve — 2026-09-08 — PASSES
+
+  title  "Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads – AgentBio"
+      -> "Link in Bio for Real Estate Agents | AgentBio"
+  H1     "Real Estate Agent Bio Page Builder"
+      -> "Link in Bio for Real Estate Agents"
+
+The old title was 84 characters and Google truncated it mid-phrase — the SERP
+showed "Real Estate Agent Bio Page Builder | Turn Instagram Follo...", so the
+half describing the product never appeared. The new one is 45.
+
+src/config/homepage-seo.ts is now the single source for title, description,
+keywords, H1, H1 highlight and subtitle, with the Search Console numbers that
+justify each written next to it. Landing.tsx renders it, and a `homepage-seo`
+transformIndexHtml plugin in vite.config.ts writes the same strings into
+index.html at build time — verified: dist/index.html carries the new title in
+<title>, og:title and twitter:title, and the new description in description,
+og:description and twitter:description, while the source index.html is only the
+pre-transform input. The literals in index.html were updated to match anyway,
+with a comment saying the file is rewritten at build time and that editing them
+there alone is silently overwritten. og:image still resolves — dist/Cover.png,
+591 KB — and twitter:card is still summary_large_image.
+
+Two real defects found in the hero while doing it, neither in the story:
+
+1. HeroSection splits the headline on its LAST TWO WORDS to decide what gets the
+   highlight treatment. That is fine for "Real Estate Agent Bio | Page Builder"
+   and silently mangles anything else: "Link in Bio for Real Estate Agents"
+   would have rendered as "Link in Bio for Real" / "Estate Agents". Added an
+   optional `titleHighlight` prop that says explicitly where the split belongs,
+   falling back to the old positional behaviour so the five /features/* callers
+   are untouched. Verified in the built HTML: the H1 renders as "Link in Bio
+   for" / "Real Estate Agents".
+
+2. HeroSectionLazy's HeroFallback — the lightweight hero shown while the 900 KB
+   GSAP/Three chunk loads — HARDCODED "Real Estate Agent" / "Bio Page Builder",
+   the subtitle and the description, and ignored every text prop passed to it.
+   So on a slow connection the first paint contradicted the page's own <title>,
+   the H1 that eventually replaced it, and the headline each of the five
+   /features/* pages passes in. It now renders its props.
+
+EXPECT IMPRESSIONS TO FALL, and that is the change working rather than failing.
+The ~180 impressions from the "real estate agent bio" cluster (82 at position
+88.6 for the head term alone) produced one click in sixteen months. US-155 is
+what serves that intent properly; this story stops the homepage chasing it.
+Baseline to measure against: 33 clicks / 1,481 impressions / position 18.4 over
+the 16 months to 2026-09-08.
+
+Verification: build exits 0 (50 routes), verify:seo passes all 50, tsc --noEmit
+clean, eslint 0 errors (3 pre-existing unescaped-entity warnings).
+
+One thing deliberately NOT changed: `npx impeccable detect` flags gradient text
+on the hero H1 (bg-clip-text + bg-gradient), which CLAUDE.md's craft floor
+refuses by name. It is pre-existing — the gradient span was already there and
+this story only replaced the strings inside it — and removing it changes the
+visual treatment of the homepage hero and five feature pages. That is a design
+decision for Dj, not a side effect of an SEO retarget. Flagged, not touched.
+
+Test suite, same story as US-151 and worth restating because the raw number
+moves every run: 10 failures at 74s this time, 645 tests as always. The flaky
+set now rotates through routes.test.ts and Settings.test.tsx as well.
+routes.test.ts was the one worth taking seriously, since App.tsx changed in
+US-151 — it passes 3/3 in isolation, as do Settings 6/6 and Register 3/3. Still
+the same four stable pre-existing failures underneath.
+
+### US-153 — gate the city pages behind noindex — 2026-09-08 — PASSES
+
+All 26 /for/{city} pages now render with `noindex, follow` and are out of
+sitemap.xml. The sitemap drops from 44 URLs to 21. Nothing is deleted: the
+pages, the template and the data all stay, and they remain crawlable — which is
+what lets Google read the directive at all.
+
+The story's description checked out. One 715-line template, and the only things
+that differ between any two pages are the city name, four numbers, one sentence
+of marketDescription and a neighbourhood list. The title and description are
+string substitution on the city name alone:
+  "AgentBio for {city} Real Estate Agents | Instagram Bio & Lead Generation"
+Swap Miami for Austin and you have the other page. 26 of those entering the
+index at once, on a domain averaging position 18-20 for everything it has, is
+the doorway-page shape — and this is a risk US-147 created rather than found.
+While nothing prerendered they took zero impressions in 16 months and cost
+nothing.
+
+Mechanism: `indexable?: boolean` on LocationData, absent meaning no.
+LocationTemplate's robots meta was hardcoded `index, follow, ...` and is now
+conditional on it; locationRoutes() in prerender-routes.ts sets `sitemap: false`
+unless the flag is set. Flipping one flag is the whole operation.
+
+Verified in both directions, not just the safe one. With no flags set: Miami,
+Austin and Denver all emit `noindex, follow` and none is in the sitemap, 0
+/for/ URLs total. Then `indexable: true` was set on Miami temporarily and the
+site rebuilt: Miami emitted `index, follow, max-image-preview:large,
+max-snippet:-1` and appeared in sitemap.xml, while Austin stayed noindex and
+absent. The temporary flag was then reverted — `grep -n indexable
+src/data/locations.ts` returns only the interface field and the doc comment, no
+data entry.
+
+docs/seo/CITY_PAGES.md records the four things a page must have before the flag
+goes on, and src/data/locations.ts's header points at it. The load-bearing test
+in that doc is rule 2: if a sentence still reads correctly after swapping the
+city name for a different city, it is not local content. That is what catches
+most of it.
+
+ZERO cities are switched on, and that is a deliberate reading of the criterion
+rather than an omission. US-153 allowed up to two as worked examples "only if
+they are given substantive unique content in this story". Substantive content
+about the Miami or Austin housing market means verifiable claims with a source,
+and inventing plausible-looking market data is exactly what the doc's first rule
+exists to prevent — a fabricated median price does more damage than a noindexed
+page does. The mechanism is built and proven; the first real city page is a
+content task for somebody who knows that market. Written up as such in
+CITY_PAGES.md rather than left implied.
+
+Also noticed, not acted on: LocationTemplate emits
+`<meta name="perplexity-verification" content="agentbio-verified" />`. There is
+no such verification mechanism. Harmless, but it is cargo cult and someone
+should delete it — flagging for US-124 rather than widening this story.
+
+Verification: build exits 0 (50 routes rendered, 21 in the sitemap), verify:seo
+passes all 50, tsc --noEmit clean, eslint 0 errors (5 pre-existing warnings).
+Full suite 638 passed / 7 failed at 53s — the cleanest run of the batch so far —
+and running the three failing files in isolation gives exactly the four stable
+pre-existing failures (repo-hygiene x2, analytics, analyticsEvents), so the
+other three were load flakes in those same files.
+
+### US-154 — consolidate the blog — 2026-09-08 — BLOCKED, passes stays false
+
+Not done, and deliberately not faked. The plan and the safety mechanism are
+built; the content work needs production access this machine does not have.
+
+What the data says, re-derived from the Search Console export rather than taken
+from the story: 27 blog posts took impressions in the 16 months to 2026-09-08,
+and between them 8 clicks and 605 impressions. Six of those clicks belong to
+how-real-estate-agents-use-link-in-bio-to-generate-more-leads-in-2024 (162
+impressions, position 11.09). The other 26 posts earned TWO clicks in sixteen
+months. The story said 25 posts and 2 clicks; it is 26 and 2, and the extra post
+does not change anything.
+
+docs/seo/BLOG_CONSOLIDATION.md holds the full map, written before anything was
+touched as the story requires: one kept pillar plus four proposed guides, with
+all 26 retired slugs assigned to a survivor, each 301 pointing directly at its
+final destination. Clusters are: the pillar absorbs the eight "what is a link in
+bio / how do agents get leads" permutations; guide 1 takes the seven "what to
+put on the page" posts; guide 2 the five listings/tours/selling ones; guide 3
+the three rental and leasing ones, which are a genuinely different audience;
+guide 4 the three portfolio/resume ones. 26 retired plus 1 kept accounts for all
+27.
+
+The pillar keeps its slug. Its "2024" framing gets refreshed in the copy, but
+renaming the one URL on this site with earned position, for tidiness, would
+throw away 18% of the site's clicks.
+
+WHY IT IS BLOCKED. Merging 27 posts requires reading 27 posts. Their bodies
+exist only in the production `articles` table — confirmed by grep: no seed
+migration, no fixture, no copy anywhere in the repository; the only place those
+slugs appear at all is prd.json. Writing four "consolidated" guides without
+reading what they replace would mean inventing 27 posts' worth of content and
+calling it a merge, which is the failure the plan exists to prevent rather than
+a shortcut through it. Unpublishing the retired rows likewise needs a database
+write.
+
+And shipping the redirects early would be actively worse than doing nothing: 26
+URLs that currently return 200 would 301 into guides that do not exist. So no
+redirect was added. The order in the doc — write the guides, publish them, then
+redirect, then unpublish, then rebuild — is not bureaucracy; reversing steps 1
+and 2 breaks 26 live URLs.
+
+WHAT WAS BUILT AND PROVEN. The step that makes executing the rest safe.
+verifyServedLayout() in scripts/prerender.mts now rejects two things in
+public/_redirects, and both were tested against the real build rather than
+asserted:
+  - a 301 whose target is not a page this build produced. Injected
+    `/blog/some-retired-slug /blog/a-guide-nobody-wrote 301`; the build failed
+    with "a live URL would 301 into a 404".
+  - a 301 into another 301. Injected a two-hop chain; the build failed with
+    "which is itself redirected — point it at the final destination instead".
+  - and a legitimate `/blog/old-a /pricing 301` passes, so the check is not
+    simply refusing everything.
+External (http/https) targets and splat/placeholder rules are skipped rather
+than guessed at.
+
+So when somebody executes the plan, a mistake in the redirect map fails the
+build instead of reaching Google. That is criteria 4 and 5 of the story
+satisfied and demonstrated; criteria 1, 2, 6, 7 need the database.
+
+Two unrelated dead internal links found while checking criterion 8, both in
+src/lib/geo.ts: targetUrl '/blog/instagram-marketing-for-real-estate' (no such
+post appears in 16 months of Search Console data) and '/compare' (no such route
+— the comparison pages are at /vs/*). Nothing in src/ links to any of the 26
+slugs being retired, so criterion 8 has nothing to do for this consolidation.
+The geo.ts links belong to US-124 or US-156.
+
+TO FINISH THIS STORY, someone with database access needs to:
+  1. Reconcile the map against `select slug from articles where status =
+     'published'` — Search Console only lists pages with at least one
+     impression, so a post that took none in 16 months is not in the map.
+  2. Write the four guides from the bodies of the posts they absorb, and expand
+     the pillar. Publish them.
+  3. Add the 301s to public/_redirects. The build will check them.
+  4. `update articles set status = 'draft'` on the 26 retired rows. Do not
+     delete: the content is the only copy.
+  5. Rebuild. Retired slugs leave sitemap.xml on their own because it is
+     generated from what rendered (US-149).
+
+### US-155 — free agent bio generator — 2026-09-08 — PASSES
+
+/tools/real-estate-agent-bio-generator ships, prerendered, in the sitemap, with
+five worked examples as crawlable text. This is the page that serves the cluster
+US-152 stopped the homepage chasing: "real estate agent bio" 82 impressions at
+position 88.6, "professional real estate agent bio examples" at 7.5, plus the
+new-agent, luxury and realtor-instagram variants — roughly 180 impressions over
+16 months and one click, because there was no page for them.
+
+Deterministic templates, no model call. src/lib/agent-bio-generator/ follows the
+shape of the existing src/lib/instagram-bio-analyzer/bio-generator.ts — template
+objects, a structure function per output shape, plain string assembly. No API
+key, no edge function, nothing leaves the browser, and it works on first paint.
+The two libraries stay separate on purpose: the existing one SCORES an existing
+150-character Instagram bio; this one WRITES the professional bio an agent needs
+for a brokerage page or MLS profile, which is what the queries are asking for.
+
+Three outputs per run: a third-person professional paragraph, a first-person
+short version, and one at 150 characters or fewer for the Instagram field. Five
+niches, as the query data dictates: new agent, luxury, rentals/leasing, team,
+general — each with its own focus line and closing line.
+
+The worked examples are generated by the generator at module load rather than
+written by hand, so what a crawler indexes cannot drift from what the tool
+returns. Verified in the built HTML: all five example agents' names and their
+bodies are present in dist/tools/real-estate-agent-bio-generator/index.html. No
+example claims an award, a ranking or a sales figure — a bio-examples page is
+precisely where an invented credential gets copied verbatim by a real agent, so
+the illustrative details are limited to things that cannot be a false claim, and
+the page says they are illustrative.
+
+Three phrasing bugs were caught by actually reading the output rather than
+trusting it: a 12-year agent rendered as "has spent more than 10 years"; a
+leasing agent rendered as "I have been selling"; and the brokerage clause read
+"Cascade & Co. is where Sam is licensed, serving Boise". All three fixed.
+
+Functionally verified in a real browser, not just built: filled the form, chose
+"New agent" and "Direct", submitted, and got the correct new-agent framing back
+("is a newly licensed agent in Columbus…" rather than the 4-years text the
+number field held), a 66/150 Instagram counter, and a working CTA to
+/auth/register. No page errors. The copy button falls back silently when the
+clipboard is denied, which is what headless does — the text stays selectable.
+
+Analytics uses the existing gtag access pattern from src/lib/web-vitals.ts and
+no-ops when GA is absent. Three events: bio_generated (with niche and tone),
+bio_copied (with format), bio_cta_clicked. Deliberately NOT a new Supabase table
+— the existing tool writes to instagram_bio_analytics, and adding a table here
+would mean a migration and RLS policy this machine cannot verify against a real
+database.
+
+Craft floor: `npx impeccable detect` is clean on the new page, and it is
+discriminating rather than broken — the same command still reports the hero's
+gradient text. No gradients anywhere on the page, single elevation (border, no
+shadow), rounded-2xl, body measure capped at 68-70ch, 44px minimum touch
+targets, real fieldsets with legends and aria-pressed on the toggles.
+
+Verification: build exits 0 (51 routes now), verify:seo passes all 51, tsc
+--noEmit clean, eslint 0 problems on the new files. Full suite 641 passed / 4
+failed at 46s — exactly the four stable pre-existing failures and the cleanest
+run of the batch. routes.test.ts passes, which matters because a route was added.
+
+Note for whoever measures this: the point is not traffic to the tool, it is
+whether the tool feeds the funnel. bio_cta_clicked over bio_generated is the
+number to watch. If people generate bios and never click through, the page is
+serving an intent that does not convert and should be judged on that.
+
+### US-156 — comparison pages — 2026-09-08 — PASSES
+
+The story framed this as "make /vs/linktree substantive". What the pages
+actually needed first was to stop asserting things that are not true.
+
+FIVE FABRICATED TESTIMONIALS WERE LIVE ON THESE PAGES. Two on /vs/linktree
+("Sarah M., Luxury Agent, Austin TX" claiming a jump from 1-2 leads a month to
+8-10 qualified inquiries; "Mike R., Team Leader, Miami FL") and three on
+/vs/beacons ("Marcus T.", "Jessica R.", "David K.", carrying the metrics "18
+leads/month from Instagram", "3x more bio link clicks" and "$2.4M closed from
+Instagram"). All hardcoded JSX, none from the `testimonials` table that the rest
+of the product reads through useTestimonials — so nothing records who said them,
+whether they said them, or whether they consented. A named endorsement with an
+unverifiable revenue figure is exactly what the FTC endorsement guides cover.
+Removed, with a comment at each site explaining what was there and why it went,
+and how to reinstate them properly if these are real agents who agreed.
+
+THREE PRICING CLAIMS WERE WRONG ABOUT OUR OWN PRODUCT.
+  - /vs/linktree said "$39" in the comparison table and "$49/month" in the prose
+    on the same page. $39 is not one of our plans; pricing-plans.ts has 0, 29,
+    49, 99, 299.
+  - /vs/later said "$19" in the table and "$29/mo" lower down. $19 is not a plan
+    either, and a "$54/month total" figure was built on top of it.
+Both now derive from PRICING_PLANS rather than being typed in.
+
+COMPETITOR PRICES ARE GONE, AND THAT IS THE RIGHT ANSWER, not a shortfall. The
+pages asserted "$24 (Pro)" for Linktree, "$10/month" for Beacons and "$25-$80"
+for Later, all unsourced. Checking linktr.ee/s/pricing on 2026-09-08 returned
+the tier names but no figures: Linktree shows pricing in local currency, it
+varies by region, and their own page warns that tiers and boundaries change
+frequently. A single USD number on our site would be wrong for most readers on
+most days, and being wrong about a competitor's price is both a credibility and
+a legal problem. The pages now compare tiers and capabilities, link to the
+vendor so a reader can check in one click, and say plainly that we do not quote
+their prices and why.
+
+src/config/competitors.ts is the single source: tier names, what each product is
+genuinely built for, and — the part that makes a comparison page credible —
+`betterWhen`, an honest list of when to pick them over us. COMPETITORS_VERIFIED_ON
+is dated 2026-09-08 and rendered on /vs/linktree, so a stale date is visible to
+the reader rather than only to us. Update the date in the same commit as the
+facts.
+
+Also removed: "Why 2,000+ Agents Switched from Linktree to AgentBio" — an
+unverifiable customer count in the hero subtitle.
+
+THE PAGES WERE ORPHANED, which is a large part of why all three took zero
+impressions in 16 months even before the prerender problem. Nothing on the site
+linked to them — not the header, not the footer, not /pricing. Added a "Compare
+to Linktree" link to the footer's Product column (sitewide) and a line at the
+end of the pricing FAQ pointing at all three, worded to include that they say
+where the competitor is the better choice. Someone on the pricing page comparing
+us to something else is precisely the audience.
+
+Fixed src/lib/geo.ts's targetUrl '/compare', which has never been a route, to
+'/vs/linktree'. The other dead link there,
+'/blog/instagram-marketing-for-real-estate', is left for US-124 — it belongs to
+the blog, not to this story.
+
+Craft floor: `npx impeccable detect` is now clean on all three pages. It flagged
+gradient text in two places — the AgentBio column header in /vs/beacons and the
+H1 on /vs/later — and unlike the hero (which restyles six pages and is Dj's
+call), these are a single table header and a single heading inside pages this
+story explicitly covers, so they were fixed rather than deferred. Emphasis now
+comes from weight and the brand colour. All three comparison tables already had
+overflow-x-auto wrappers, so the mobile criterion needed nothing.
+
+Verification: build exits 0 (51 routes), verify:seo passes all 51, tsc --noEmit
+clean, eslint 0 errors (46 pre-existing warnings). All three /vs/ pages are in
+the sitemap; the footer link appears on every prerendered page. Confirmed in the
+built HTML that "Marcus T.", "Jessica R.", "$2.4M" and "2,000+ Agents" no longer
+appear anywhere in dist/.
+
+Full suite 634 passed / 11 failed at 90s, which is the load-flaky pattern
+(failures track duration). routes.test.ts was worth checking because Pricing.tsx
+changed: 3/3 in isolation, LeadDetailModal 7/7, and the three stable files give
+exactly the four known pre-existing failures.
+
+>>> SITE-WIDE FINDING, BEYOND THIS STORY'S SCOPE, FOR DJ TO DECIDE ON <<<
+The fabricated testimonials are not confined to the comparison pages. Still live
+elsewhere, hardcoded, none from the testimonials table:
+  src/pages/tools/ListingDescriptionGenerator.tsx:250  "Sarah M., Beverly Hills"
+  src/pages/tools/ListingDescriptionGenerator.tsx:257  "Mike T., Austin"
+  src/pages/tools/ListingDescriptionGenerator.tsx:264  "Jennifer L., Denver"
+  src/components/tools/listing-description-generator/EmailCaptureModal.tsx:161
+                                          "Sarah M., Top Producer in Austin, TX"
+  src/components/tools/instagram-bio-analyzer/EmailCaptureModal.tsx:162
+                                          "Jennifer K., Miami Real Estate Agent"
+  plus "Mike R." on /instagram-bio-for-realtors and "David K." on
+  /features/analytics.
+The clincher: "Sarah M." is simultaneously a Luxury Agent in Austin TX, a Top
+Producer in Austin TX, and from Beverly Hills. Same initials, three different
+biographies. These were not left in place out of doubt about what they are —
+they sit outside US-156's scope and removing marketing copy across six more
+pages is a decision for Dj, not a side effect of a comparison-page story.
+
+### US-157 — structured data — 2026-09-08 — PASSES
+
+The story described 3 Product-snippet impressions and asked for deliberate
+coverage. What the audit actually found was that the site was publishing false
+claims to search, and had been since before US-111.
+
+INVENTED STAR RATINGS ON 31 PAGES. Every one carried
+`aggregateRating: {ratingValue: "4.8", reviewCount: "523"}`. US-111 had already
+identified this exact pair as "both invented", removed it from the landing page,
+and left a comment saying why — but missed five other sources that were still
+emitting it: seo.ts (three separate literals), PageSEO.tsx, and
+SEO_CONFIG.ratings, which fed all 23 city pages through LocationTemplate. Google
+renders stars in search results from this field, so the site was showing a
+fabricated 4.8-from-523-reviews to everyone who searched. AggregateRating count
+in the built output: 31 before, 0 after.
+
+The genuinely data-driven ones were kept. FullProfilePage and ReviewSchema
+compute ratings from the `testimonials` table — real reviews of a real agent —
+and are untouched. generateSoftwareApplicationSchema was emitting an
+aggregateRating with `undefined` values because SchemaMarkup calls it without
+ratings; it is now conditional, so absent rather than malformed.
+
+A FALSE PRICE FOR A NAMED PLAN. The literal '39' appeared in five places, and
+seo.config.ts:230 attached it to a node explicitly named "Professional" —
+which costs 49. The homepage's SoftwareApplication Offer also published price
+'39'. There is no $39 plan; the matrix is 0, 29, 49, 99, 299. This is the same
+phantom figure US-156 found on /vs/linktree, which suggests it was once a real
+price and nothing propagated the change. Every occurrence now derives from
+PRICING_PLANS. The homepage's single Offer became an AggregateOffer with
+lowPrice 29 / highPrice 299, which is the honest shape for a tiered product.
+Verified in the built output: the only offer values now are 0, 29 and 29-299.
+
+EIGHTEEN FAQ QUESTIONS MARKED UP BUT NOT ON THE PAGE, across six pages —
+/vs/linktree, /vs/beacons, /for-real-estate-agents, /instagram-bio-for-realtors
+and both free tools. FAQPage schema describing content a visitor cannot see is a
+structured-data policy violation and a manual-action risk. Rather than delete
+the markup, the answers were already written, so they are now rendered:
+src/components/seo/FaqSection.tsx takes one array per page and produces both the
+JSON-LD (faqPageSchema) and the visible <details> list. They cannot drift,
+because they are the same array. Confirmed in the built HTML that the questions
+appear in the rendered text with the <script> content stripped out.
+
+BreadcrumbList was missing from /vs/linktree, /vs/beacons and /vs/later while
+/features/*, /for/* and the tools all had one. Added; 52 -> 55 in the output.
+/features/analytics has no '@graph' schema block at all, so it was left alone
+rather than restructured — noted here rather than half-done.
+
+The check that keeps all of this true: scripts/lib/seo-audit.mjs now parses
+every JSON-LD block in the built HTML and fails on unparseable JSON, on the
+4.8/523 pair specifically, on an aggregateRating missing ratingValue or
+reviewCount, and on a FAQPage question absent from the rendered text. Proven
+against the real build rather than asserted — a malformed block, a reinstated
+4.8/523, and an invented FAQ question ("Does AgentBio secretly cure baldness
+overnight?") each failed it with the right message, and the restored build
+passes.
+
+That last check had a bug worth recording. The first version stripped HTML tags
+but not <script> CONTENT, so a FAQ question trivially "appeared on the page" by
+matching its own JSON-LD source, and the baldness question passed. Fixing it
+immediately surfaced all 18 real cases. A check that cannot fail is worse than
+no check, and this one could not fail until it was tested against something that
+should fail.
+
+No Review or aggregateRating schema was added anywhere. Seven hardcoded,
+unverifiable testimonials are still live elsewhere on the site (listed under the
+US-156 entry); emitting review markup from them would have converted a content
+problem into a structured-data misrepresentation.
+
+Verification: build exits 0 (51 routes), verify:seo passes all 51 with the new
+structured-data rules, tsc --noEmit clean, impeccable clean on FaqSection.
+
+Test suite: 632 passed / 13 failed at 90s — the load-flaky pattern again, and I
+checked it properly this time because a lot of pages changed. Run as a group of
+seven, eight failed; run ONE AT A TIME, every single one passed: SubmitReview
+5/5, Settings 6/6, LeadDetailModal 7/7, Register 3/3, ContactForm 3/3.
+routes.test.ts passed in both the group and alone. The stable floor remains
+repo-hygiene x2, analytics and analyticsEvents.
+
+### US-158 — link acquisition programme — 2026-09-08 — PASSES
+
+The artefacts are built. NOBODY HAS BEEN CONTACTED, no account was created, no
+listing was submitted, and no placement exists. That half is a person's and is
+written up as such.
+
+THE RESEARCH CHANGED THE PLAN. Searching "best link in bio tools for real estate
+agents 2026" on 2026-09-08 returned a first page dominated by COMPETITOR-OWNED
+content marketing, not neutral roundups — linqin.in, simplelistings.co,
+direct.me (twice), clientkeepercrm.com and linkship.cc are all competing
+products marketing themselves. A competitor will not add us to their roundup,
+and pitching them only tells them we exist. That SERP is won by publishing a
+better page than theirs, which is what US-155 and US-156 started, not by
+outreach.
+
+The real targets are one step out, and every URL in Tier 1 was actually
+retrieved rather than guessed: HousingWire's marketing-tools, software and
+AI-tools roundups; The Close's software and apps roundups; Inman's AI-tools
+piece. Tier 2 (G2, Capterra/GetApp/Software Advice, Product Hunt) and Tier 3
+(r/realtors, agent Facebook groups, brokerages, state associations) are listed
+as CATEGORIES and the doc says plainly that their submission routes were NOT
+opened or verified — treating an unverified link as checked is how a target list
+becomes fiction. No contact names or email addresses are listed, because I
+verified none and a wrong name is worse than no name.
+
+/press ships, prerendered, in the sitemap, linked from the footer so it is not
+orphaned the way the comparison pages were. Every claim is checkable: what the
+product does (five capabilities, each linking to its feature page), who it is
+for, and what it costs — with the price table read from PRICING_PLANS so it
+cannot drift from the checkout. Verified in the built HTML that it carries $0,
+$29, $49, $99 and $299 and NONE of 4.8, 523, "2,000+", $39 or $19. No customer
+counts, no funding, no awards, no press mentions, no ratings, no testimonials.
+The page says so where a reader would expect one.
+
+Product screenshots are deliberately absent. Real ones need a populated account
+and a person to choose what to show; generating something representative would
+mean inventing an agent's listings, which is the same failure as the fabricated
+testimonials. The page asks the reader to request current ones instead.
+
+Three sendable templates in docs/seo/OUTREACH_TEMPLATES.md — roundup author,
+directory submission, partnership. They carry no invented social proof, they
+name the specific article, they say out loud where a competitor is the better
+choice, and there is no follow-up sequence. The directory template tells the
+sender to check the price against /pricing rather than typing it from memory,
+because typing it from memory is exactly how $39 ended up in six places
+describing a plan that does not exist.
+
+docs/seo/SEO_RECOVERY_CHECKLIST.md is the single owner-facing page: what eleven
+stories changed, and the seven things only a person can do, ordered by damage.
+Removing the seven remaining fabricated testimonials is first, and the link
+document says explicitly not to pitch HousingWire until it is done — a reviewer
+who checks one quoted agent and finds nothing will not check the second.
+
+A REAL REGRESSION, CAUGHT BY CHECKING IN ISOLATION. routes.test.ts began failing
+after the press page was added, and unlike every other suspect this batch it
+failed ALONE, not only under load. The page links six logo files (/logo.png,
+/Cover.webp and so on) and the test's link scanner measured them against the
+route table, reporting each as a link to a non-existent route. They are static
+assets in public/ that React Router never sees. Fixed in the test rather than in
+the page — it now skips paths with a file extension, the same rule
+isReservedSegment already uses in functions/_lib/social-meta.ts. Confirmed the
+check still has teeth by pointing a link at /this-route-does-not-exist: it
+failed, and passed again once restored.
+
+Verification: build exits 0 (52 routes), verify:seo passes all 52, tsc --noEmit
+clean, impeccable clean on Press.tsx. The full suite gave 20 failures at 103s —
+the worst run of the batch and also its slowest — but run in isolation the four
+files give exactly the four stable pre-existing failures (repo-hygiene x2,
+analytics, analyticsEvents) and routes.test.ts passes 3/3.
+
+### US-159 — remove every fabricated claim — 2026-09-08 — PASSES
+
+Authorised by Dj: "No fabricated text, we need to remove false claims and false
+testimonies." This is the third pass at the same defect, and the first one that
+swept the whole of src/ rather than the pages a story happened to touch.
+
+WHAT THE SWEEP FOUND, beyond the seven testimonials already flagged:
+
+  Five different invented agent counts, plus the original still live:
+    2,847        instagram-bio-analyzer capture modal (twice)
+    4,200+       listing-description-generator modal and page (four places)
+    2,000+       /vs/beacons and /vs/linktree
+    3,000+       /vs/later
+    10,000+      /tools/instagram-bio-analyzer
+    5,000+       /for-real-estate-agents and /instagram-bio-for-realtors
+  US-111 documented "2,500+ vs 5,000+ on two pages one click apart" as the
+  original defect. 5,000+ was still on two landing pages, untouched, and four
+  more numbers had been added since.
+
+  Hardcoded ratings: "4.9/5 rating" in both capture modals, and a
+  "4.9/5 Agent Rating" stat tile on the analyzer page.
+
+  "Used by agents at Keller Williams, Coldwell Banker, RE/MAX" — three real
+  firms named as customers. A claim about them as much as about us.
+
+  Four stat tiles on /tools/instagram-bio-analyzer: "2,847+ Agents Analyzed",
+  "3X Average Lead Increase", "$50M+ In Deals Generated", "4.9/5 Agent Rating".
+  Replaced with four things the tool actually does — 5 scored categories, 3
+  rewrites, free, ~60s.
+
+  Eight more named testimonials: three on the listing-description-generator
+  page, one in each capture modal, and two whole fabricated sections —
+  "Success Stories from {city} Agents" in LocationTemplate, which rendered two
+  fictional agents with "3 closings", "15 leads/month", "$2M+ in sales" and
+  "10x engagement" on ALL 26 city pages, each claiming to be local; and a
+  four-testimonial "Agent Success Stories" block on /vs/later.
+
+  And the worst of it, because it goes to real inboxes: the Instagram bio
+  analyzer email drip quoted invented percentile benchmarks ("Average Agent:
+  ~7 leads/month", "Top Performer: ~45 leads/month"), a section headed "Real
+  results from ${market} agents" listing "Agent A: 3 -> 18 leads/month (6X)"
+  and "Agent B: 8 -> 31 (4X)", "10,000+ real estate professionals trust us",
+  "Average user generates 15+ leads/month" and "847 agents closed deals from
+  AgentBio leads last month alone". All removed; the surrounding copy was
+  rewritten to make the same point without inventing numbers.
+
+WHAT WAS DELIBERATELY KEPT, with the reason recorded in the new test's
+ALLOWED_FILES so the next sweep does not re-litigate it:
+  - BioAnalyzerForm's "0 / 1-3 / 4-10 / 10+ leads/month" dropdown — it asks the
+    visitor about their own current situation. Not a claim.
+  - "Keller Williams, Coldwell Banker, etc." as the placeholder in a "your
+    brokerage" input. An example of what to type.
+  - features/Testimonials' "Star display (4.8/5.0, 4.9/5.0, etc.)" — product
+    documentation for the testimonial widget, listed beside "Automatically
+    updates as you add reviews".
+  - The ExampleBio demos and bio-generator's suggested credentials
+    ("$50M+ in luxury sales") — illustrations of what an agent might write about
+    themselves, not claims about us.
+  - Zapier's own published "5,000+ apps" figure in the integration modal.
+  - ReviewSchema and FullProfilePage's aggregateRating, computed from the real
+    `testimonials` table.
+Nothing was reworded into a vaguer version of the same claim. A claim either had
+something behind it or it went.
+
+THE GUARD. src/marketing-claims.test.ts fails the build on any of five shapes:
+a hardcoded named testimonial, a customer count, a star rating, an outcome
+metric, or another company named as a customer. Three cleanups in a row each
+believed themselves thorough and each missed instances, because the copy lives
+in a dozen files and nothing compared them.
+
+It has two tests, and the second one matters: "is actually able to fail" asserts
+that the five rules still match the exact strings removed in US-111, US-156,
+US-157 and US-159. A guard that silently stops matching is worse than none.
+Demonstrated for real as well — injecting "Join 5,000+ agents - 4.9/5 rating"
+into Pricing.tsx produced two findings and a failure, and removing it passed.
+
+One bug in the guard, worth recording. The first version checked whether each
+LINE looked like a comment, which flagged the middle lines of every multi-line
+removal note — the notes quote the claim they deleted, which is the point of
+them — and made the test unfixable without deleting the explanations. It now
+tracks block state across lines.
+
+Verification: build exits 0 (52 routes), verify:seo passes all 52, tsc --noEmit
+clean. Checked the BUILT output too, not just source: a 248-file scan of dist/
+for 24 banned strings returns only coincidental matches — "523" inside the award
+icon's SVG path data and inside export-vendor's MD5 constants — plus the
+legitimate feature description and the real computed ratings.
+
+Full suite 624 passed / 23 failed at 127s, the heaviest-loaded run of the whole
+session. Every suspect passes alone: marketing-claims 2/2, routes 3/3,
+ContactForm 3/3, Register 3/3, Settings 6/6, SubmitReview 5/5, LeadDetailModal
+7/7. The stable floor is unchanged — repo-hygiene x2, analytics, analyticsEvents.

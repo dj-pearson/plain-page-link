@@ -7,6 +7,14 @@
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com https://esm.sh https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.agentbio.net https://functions.agentbio.net https://*.agentbio.net https://www.google-analytics.com https://api.stripe.com https://raw.githack.com https://raw.githubusercontent.com wss://api.agentbio.net wss://*.agentbio.net https://cloudflareinsights.com; frame-src 'self' https://js.stripe.com; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; form-action 'self'; base-uri 'self'; upgrade-insecure-requests
 
+# Auth pages carry noindex in their HTML too (US-151), but a header covers every
+# /auth/ URL whether or not it was prerendered — including the OAuth callbacks,
+# and any auth route added later before somebody remembers the meta tag. "follow"
+# is deliberate: these pages link into the app, and there is no reason to strand
+# whatever they link to.
+/auth/*
+  X-Robots-Tag: noindex, follow
+
 /*.js
   Content-Type: application/javascript
   Cache-Control: public, max-age=31536000, immutable

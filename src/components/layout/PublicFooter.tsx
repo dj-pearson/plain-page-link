@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
-import { Home, Mail, Facebook, Instagram, Linkedin } from "lucide-react";
-import { openCookiePreferences } from "@/lib/cookie-consent";
+import { Link } from 'react-router-dom';
+import { Home, Mail, Facebook, Instagram, Linkedin } from 'lucide-react';
+import { openCookiePreferences } from '@/lib/cookie-consent';
 
 export function PublicFooter() {
   return (
@@ -14,14 +14,17 @@ export function PublicFooter() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand Section */}
           <div className="md:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4" aria-label="AgentBio.net - Go to homepage">
+            <Link
+              to="/"
+              className="flex items-center gap-2 mb-4"
+              aria-label="AgentBio.net - Go to homepage"
+            >
               <Home className="h-6 w-6 text-blue-500" aria-hidden="true" />
-              <span className="text-xl font-bold text-white">
-                AgentBio.net
-              </span>
+              <span className="text-xl font-bold text-white">AgentBio.net</span>
             </Link>
             <p className="text-sm text-gray-400 mb-4">
-              Professional real estate agent portfolio links to showcase your properties and capture qualified leads.
+              Professional real estate agent portfolio links to showcase your properties and capture
+              qualified leads.
             </p>
             {/* Social Links */}
             <div className="flex gap-3" role="list" aria-label="Social media links">
@@ -43,8 +46,14 @@ export function PublicFooter() {
                 aria-label="X, formerly Twitter (opens in a new tab)"
                 role="listitem"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>
               </a>
               <a
@@ -87,6 +96,24 @@ export function PublicFooter() {
               <li>
                 <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
                   Blog
+                </Link>
+              </li>
+              <li>
+                {/* The comparison pages were reachable only by typing the URL,
+                    which is part of why they took zero impressions in 16 months
+                    (US-156). */}
+                <Link
+                  to="/vs/linktree"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Compare to Linktree
+                </Link>
+              </li>
+              <li>
+                {/* A roundup author who cannot find the facts writes about
+                    somebody else (US-158). */}
+                <Link to="/press" className="text-gray-400 hover:text-white transition-colors">
+                  Press &amp; product facts
                 </Link>
               </li>
             </ul>
@@ -134,12 +161,18 @@ export function PublicFooter() {
                 </Link>
               </li>
               <li>
-                <Link to="/acceptable-use" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/acceptable-use"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Acceptable Use
                 </Link>
               </li>
               <li>
-                <Link to="/accessibility" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/accessibility"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Accessibility
                 </Link>
               </li>
@@ -149,7 +182,10 @@ export function PublicFooter() {
                 </Link>
               </li>
               <li>
-                <Link to="/privacy-choices" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/privacy-choices"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Your Privacy Choices
                 </Link>
               </li>
@@ -163,12 +199,18 @@ export function PublicFooter() {
                 </button>
               </li>
               <li>
-                <a href="mailto:legal@agentbio.net" className="text-gray-400 hover:text-white transition-colors">
+                <a
+                  href="mailto:legal@agentbio.net"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Legal Inquiries
                 </a>
               </li>
               <li>
-                <a href="mailto:support@agentbio.net" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1">
+                <a
+                  href="mailto:support@agentbio.net"
+                  className="text-gray-400 hover:text-white transition-colors flex items-center gap-1"
+                >
                   <Mail className="h-4 w-4" />
                   Support
                 </a>
@@ -183,11 +225,29 @@ export function PublicFooter() {
             <div className="flex items-center gap-3">
               {/* Equal Housing Opportunity Logo */}
               <div className="bg-white rounded p-2">
-                <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Equal Housing Opportunity logo">
-                  <rect width="100" height="100" fill="white"/>
-                  <path d="M50 10L20 40H30V90H70V40H80L50 10Z" fill="#000"/>
-                  <rect x="40" y="50" width="20" height="20" fill="white"/>
-                  <text x="50" y="66" fontFamily="Arial" fontSize="20" fontWeight="bold" fill="#000" textAnchor="middle">=</text>
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 100 100"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  role="img"
+                  aria-label="Equal Housing Opportunity logo"
+                >
+                  <rect width="100" height="100" fill="white" />
+                  <path d="M50 10L20 40H30V90H70V40H80L50 10Z" fill="#000" />
+                  <rect x="40" y="50" width="20" height="20" fill="white" />
+                  <text
+                    x="50"
+                    y="66"
+                    fontFamily="Arial"
+                    fontSize="20"
+                    fontWeight="bold"
+                    fill="#000"
+                    textAnchor="middle"
+                  >
+                    =
+                  </text>
                 </svg>
               </div>
               <div className="text-left">
@@ -198,35 +258,52 @@ export function PublicFooter() {
               </div>
             </div>
           </div>
-          
+
           {/* Platform Disclaimers */}
           <div className="space-y-3 text-xs text-gray-500 text-center max-w-4xl mx-auto">
-            <p className="font-semibold text-gray-400">
-              Important Legal Notices
+            <p className="font-semibold text-gray-400">Important Legal Notices</p>
+            <p>
+              <strong className="text-gray-400">Passive Hosting Platform:</strong> AgentBio.net is a
+              passive hosting platform and interactive computer service under 47 U.S.C. § 230. We do
+              NOT create, verify, endorse, or take responsibility for any content posted by agents,
+              including property listings, photographs, descriptions, pricing, credentials,
+              testimonials, or any other information.
             </p>
             <p>
-              <strong className="text-gray-400">Passive Hosting Platform:</strong> AgentBio.net is a passive hosting platform and interactive computer service under 47 U.S.C. § 230. 
-              We do NOT create, verify, endorse, or take responsibility for any content posted by agents, including property listings, photographs, descriptions, pricing, 
-              credentials, testimonials, or any other information.
+              <strong className="text-gray-400">Agent Responsibility:</strong> All real estate
+              agents using this platform are solely and exclusively responsible for: (1) the
+              accuracy of all property information and credentials, (2) copyright compliance for all
+              photos and materials they upload, (3) Fair Housing Act compliance in all listings and
+              content, (4) obtaining photographer permissions and license authorizations, and (5)
+              compliance with state licensing and advertising requirements in all jurisdictions
+              where they hold licenses.
             </p>
             <p>
-              <strong className="text-gray-400">Agent Responsibility:</strong> All real estate agents using this platform are solely and exclusively responsible for: 
-              (1) the accuracy of all property information and credentials, (2) copyright compliance for all photos and materials they upload, 
-              (3) Fair Housing Act compliance in all listings and content, (4) obtaining photographer permissions and license authorizations, 
-              and (5) compliance with state licensing and advertising requirements in all jurisdictions where they hold licenses.
+              <strong className="text-gray-400">Fair Housing Compliance:</strong> All listings must
+              comply with the Fair Housing Act (42 U.S.C. § 3604) and applicable state fair housing
+              laws prohibiting discrimination based on race, color, religion, sex, handicap,
+              familial status, national origin, or other protected characteristics.
             </p>
             <p>
-              <strong className="text-gray-400">Fair Housing Compliance:</strong> All listings must comply with the Fair Housing Act (42 U.S.C. § 3604) and applicable state fair housing laws 
-              prohibiting discrimination based on race, color, religion, sex, handicap, familial status, national origin, or other protected characteristics.
-            </p>
-            <p>
-              <strong className="text-gray-400">Copyright Notice:</strong> Violations of copyright law may result in liability, including statutory damages ranging from $750 to $150,000 per work. 
-              Users who receive three valid DMCA notices within 12 months will have their accounts permanently terminated. See our DMCA Policy for details.
+              <strong className="text-gray-400">Copyright Notice:</strong> Violations of copyright
+              law may result in liability, including statutory damages ranging from $750 to $150,000
+              per work. Users who receive three valid DMCA notices within 12 months will have their
+              accounts permanently terminated. See our DMCA Policy for details.
             </p>
             <p className="pt-2">
-              For complete terms, please review our <Link to="/terms" className="text-blue-400 hover:text-blue-300">Terms of Service</Link>, {" "}
-              <Link to="/privacy" className="text-blue-400 hover:text-blue-300">Privacy Policy</Link>, and {" "}
-              <Link to="/dmca" className="text-blue-400 hover:text-blue-300">DMCA Policy</Link>.
+              For complete terms, please review our{' '}
+              <Link to="/terms" className="text-blue-400 hover:text-blue-300">
+                Terms of Service
+              </Link>
+              ,{' '}
+              <Link to="/privacy" className="text-blue-400 hover:text-blue-300">
+                Privacy Policy
+              </Link>
+              , and{' '}
+              <Link to="/dmca" className="text-blue-400 hover:text-blue-300">
+                DMCA Policy
+              </Link>
+              .
             </p>
           </div>
         </div>
@@ -237,27 +314,15 @@ export function PublicFooter() {
             <p className="text-sm text-center md:text-left text-gray-400">
               &copy; {new Date().getFullYear()} AgentBio.net. All rights reserved.
             </p>
-            <nav className="flex gap-4 text-sm flex-wrap justify-center" aria-label="Footer legal links">
-              <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors">
-                Privacy
-              </Link>
-              <span className="text-gray-600" aria-hidden="true">•</span>
-              <Link to="/terms" className="text-gray-400 hover:text-white transition-colors">
-                Terms
-              </Link>
-              <span className="text-gray-600" aria-hidden="true">•</span>
-              <Link to="/dmca" className="text-gray-400 hover:text-white transition-colors">
-                DMCA
-              </Link>
-              <span className="text-gray-600" aria-hidden="true">•</span>
-              <Link to="/acceptable-use" className="text-gray-400 hover:text-white transition-colors">
-                Acceptable Use
-              </Link>
-              <span className="text-gray-600" aria-hidden="true">•</span>
-              <Link to="/accessibility" className="text-gray-400 hover:text-white transition-colors">
-                Accessibility
-              </Link>
-            </nav>
+            {/*
+              The legal links that were repeated here are in the Legal column
+              above, and the ones the notice text refers to are linked in that
+              paragraph. Three sitewide link sets to the same six pages pushed
+              internal link equity at pages that took 207 of 1,481 impressions
+              in the 16 months to 2026-09-08 and converted none of them
+              (US-151). The pages stay indexable and stay one click away; they
+              just stop being linked three times from every page on the site.
+            */}
           </div>
         </div>
       </div>

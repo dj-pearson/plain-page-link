@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { getCanonicalUrl } from '@/config/seo.config';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { BioAnalyzerForm } from '@/components/tools/instagram-bio-analyzer/BioAnalyzerForm';
 import { ScoreDisplay } from '@/components/tools/instagram-bio-analyzer/ScoreDisplay';
@@ -33,6 +34,30 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+
+const FAQ_ENTRIES: FaqEntry[] = [
+  {
+    question: 'What does the Instagram bio analyzer check?',
+    answer:
+      'The Instagram bio analyzer evaluates your realtor bio across 6 critical factors: clarity of value proposition, call-to-action effectiveness, keyword optimization for your market, link strategy, credibility signals (years of experience, certifications), and mobile readability. Each factor is scored and you receive an overall effectiveness grade from F to A+.',
+  },
+  {
+    question: 'How long does the Instagram bio analysis take?',
+    answer:
+      'The Instagram bio analysis takes approximately 60 seconds. You simply enter your current bio text, add your market details, and receive instant results including your effectiveness score, category-by-category breakdown, and 3 professionally rewritten bio versions optimized for real estate lead generation.',
+  },
+  {
+    question: 'Is the Instagram bio analyzer really free?',
+    answer:
+      'Yes, the Instagram bio analyzer is 100% free to use with no signup required. You can analyze your bio and see your score immediately. To unlock all 3 optimized bio rewrites and detailed recommendations, simply enter your email to receive the full report.',
+  },
+  {
+    question: 'What makes a good real estate Instagram bio?',
+    answer:
+      'A good real estate Instagram bio includes: your specific market/location, years of experience or credentials, a clear value proposition (what makes you different), a strong call-to-action, and a strategic link to your portfolio or listings. Top-performing agent bios score 85+ on our analyzer by balancing these elements for mobile readability.',
+  },
+];
 
 export default function InstagramBioAnalyzer() {
   const [currentStep, setCurrentStep] = useState<'form' | 'results'>('form');
@@ -227,43 +252,7 @@ export default function InstagramBioAnalyzer() {
           },
         ],
       },
-      {
-        "@type": "FAQPage",
-        "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "What does the Instagram bio analyzer check?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "The Instagram bio analyzer evaluates your realtor bio across 6 critical factors: clarity of value proposition, call-to-action effectiveness, keyword optimization for your market, link strategy, credibility signals (years of experience, certifications), and mobile readability. Each factor is scored and you receive an overall effectiveness grade from F to A+.",
-            },
-          },
-          {
-            "@type": "Question",
-            "name": "How long does the Instagram bio analysis take?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "The Instagram bio analysis takes approximately 60 seconds. You simply enter your current bio text, add your market details, and receive instant results including your effectiveness score, category-by-category breakdown, and 3 professionally rewritten bio versions optimized for real estate lead generation.",
-            },
-          },
-          {
-            "@type": "Question",
-            "name": "Is the Instagram bio analyzer really free?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Yes, the Instagram bio analyzer is 100% free to use with no signup required. You can analyze your bio and see your score immediately. To unlock all 3 optimized bio rewrites and detailed recommendations, simply enter your email to receive the full report.",
-            },
-          },
-          {
-            "@type": "Question",
-            "name": "What makes a good real estate Instagram bio?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "A good real estate Instagram bio includes: your specific market/location, years of experience or credentials, a clear value proposition (what makes you different), a strong call-to-action, and a strategic link to your portfolio or listings. Top-performing agent bios score 85+ on our analyzer by balancing these elements for mobile readability.",
-            },
-          },
-        ],
-      },
+      faqPageSchema(FAQ_ENTRIES),
     ],
   };
 
@@ -271,6 +260,7 @@ export default function InstagramBioAnalyzer() {
     <>
       <Helmet>
         <title>Free Instagram Bio Analyzer for Real Estate Agents | AgentBio</title>
+        <link rel="canonical" href={getCanonicalUrl('/tools/instagram-bio-analyzer')} />
         <meta
           name="description"
           content="Analyze your realtor Instagram bio in 60 seconds. Get your effectiveness score + 3 optimized bio rewrites. Free tool for agents. No signup required."
@@ -357,10 +347,14 @@ export default function InstagramBioAnalyzer() {
               <div className="container max-w-6xl mx-auto px-4">
                 <div className="grid md:grid-cols-4 gap-8 text-center">
                   {[
-                    { icon: Users, number: '2,847+', label: 'Agents Analyzed' },
-                    { icon: TrendingUp, number: '3X', label: 'Average Lead Increase' },
-                    { icon: DollarSign, number: '$50M+', label: 'In Deals Generated' },
-                    { icon: Award, number: '4.9/5', label: 'Agent Rating' },
+                    // Was "2,847+ Agents Analyzed", "3X Average Lead Increase",
+                    // "$50M+ In Deals Generated" and "4.9/5 Agent Rating" — four
+                    // numbers with nothing measuring any of them (US-159). These
+                    // four describe what the tool actually does.
+                    { icon: Users, number: '5', label: 'Scored categories' },
+                    { icon: TrendingUp, number: '3', label: 'Rewrites per analysis' },
+                    { icon: DollarSign, number: 'Free', label: 'No account needed' },
+                    { icon: Award, number: '60s', label: 'Typical run time' },
                   ].map((stat, i) => (
                     <div key={i}>
                       <div className="flex justify-center mb-2">
@@ -563,7 +557,9 @@ export default function InstagramBioAnalyzer() {
               </Button>
 
               <p className="text-sm text-purple-200 mt-4">
-                No credit card required • Cancel anytime • Used by 10,000+ agents
+                {/* "Used by 10,000+ agents" removed — the fifth different
+                    invented agent count on this site (US-159). */}
+                No credit card required • Cancel anytime
               </p>
             </div>
 
@@ -592,6 +588,7 @@ export default function InstagramBioAnalyzer() {
           onSubmit={handleEmailCapture}
           analysisId={analysisId}
         />
+        <FaqSection entries={FAQ_ENTRIES} />
       </main>
     </>
   );

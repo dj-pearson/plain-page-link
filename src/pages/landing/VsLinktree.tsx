@@ -6,11 +6,42 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
+import { getBaseUrl } from '@/config/seo.config';
+import { PRICING_PLANS } from '@/config/pricing-plans';
+import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
+import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+
+const FAQ_ENTRIES: FaqEntry[] = [
+  {
+    question: "What's the difference between AgentBio and Linktree for real estate agents?",
+    answer:
+      'AgentBio includes property listing galleries with photos and pricing, real estate-specific lead capture forms, calendar booking for showings, testimonials display, and MLS compliance features. Linktree only offers basic link organization without these real estate features.',
+  },
+  {
+    question: 'Is AgentBio better than Linktree for realtors?',
+    answer:
+      "Yes, for real estate professionals. AgentBio is purpose-built for agents with features like property galleries, buyer/seller lead forms, and showing appointment booking. Linktree is a generic link tool that wasn't designed for real estate workflows.",
+  },
+];
 
 export default function VsLinktree() {
   const schema = {
     '@context': 'https://schema.org',
     '@graph': [
+      // BreadcrumbList was absent here while /features/*, /for/* and the
+      // tools all had one (US-157).
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: getBaseUrl() },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'AgentBio vs Linktree',
+            item: `${getBaseUrl()}/vs/linktree`,
+          },
+        ],
+      },
       // Enhanced Organization schema with social signals
       generateEnhancedOrganizationSchema(),
       {
@@ -21,27 +52,7 @@ export default function VsLinktree() {
         description:
           "Compare AgentBio and Linktree for real estate agents. AgentBio includes property listings, lead capture, and calendar booking—features Linktree doesn't offer.",
       },
-      {
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: "What's the difference between AgentBio and Linktree for real estate agents?",
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'AgentBio includes property listing galleries with photos and pricing, real estate-specific lead capture forms, calendar booking for showings, testimonials display, and MLS compliance features. Linktree only offers basic link organization without these real estate features.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Is AgentBio better than Linktree for realtors?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "Yes, for real estate professionals. AgentBio is purpose-built for agents with features like property galleries, buyer/seller lead forms, and showing appointment booking. Linktree is a generic link tool that wasn't designed for real estate workflows.",
-            },
-          },
-        ],
-      },
+      faqPageSchema(FAQ_ENTRIES),
     ],
   };
 
@@ -83,7 +94,7 @@ export default function VsLinktree() {
         {/* Hero */}
         <HeroSectionLazy
           title="AgentBio vs Linktree for Real Estate Agents"
-          subtitle="Why 2,000+ Agents Switched from Linktree to AgentBio"
+          subtitle="What a real estate agent gets that a general link tool does not"
           description="Linktree wasn't designed for real estate. AgentBio was. Discover the features real estate professionals need that generic link tools can't provide."
           primaryCta={{
             text: 'Try AgentBio Free',
@@ -111,6 +122,20 @@ export default function VsLinktree() {
               </h2>
               <p className="text-xl glass-body max-w-3xl mx-auto">
                 Side-by-side comparison of features that matter to real estate professionals
+              </p>
+              <p className="mt-4 text-sm text-muted-foreground max-w-3xl mx-auto">
+                Linktree&rsquo;s tiers checked against{' '}
+                <a
+                  href={COMPETITORS.linktree.homepage}
+                  className="underline underline-offset-2"
+                  rel="nofollow noopener"
+                  target="_blank"
+                >
+                  linktr.ee
+                </a>{' '}
+                on {COMPETITORS_VERIFIED_LABEL}. We do not quote their prices: they are shown in
+                local currency and vary by region, so check theirs against ours rather than taking a
+                number from us.
               </p>
             </header>
 
@@ -209,10 +234,19 @@ export default function VsLinktree() {
                       description: 'Match your brokerage or personal brand',
                     },
                     {
-                      feature: 'Price (Monthly)',
-                      agentbio: '$39',
-                      linktree: '$24 (Pro)',
-                      description: 'Professional plan pricing',
+                      // Was "$39" against "$24 (Pro)". Neither survived a check:
+                      // $39 is not one of our plans (they are 0, 29 and 49 in
+                      // pricing-plans.ts), and Linktree publishes no single USD
+                      // figure — its pricing is shown in local currency and
+                      // varies by region. Compare the tiers, link to their page,
+                      // and let the reader check (US-156).
+                      feature: 'Plans',
+                      agentbio: PRICING_PLANS.filter((p) => p.price_monthly > 0)
+                        .slice(0, 2)
+                        .map((p) => `${p.name} $${p.price_monthly}`)
+                        .join(', '),
+                      linktree: COMPETITORS.linktree.tiers.join(', '),
+                      description: 'Their prices vary by region; check linktr.ee for yours',
                     },
                   ].map((row, i) => (
                     <tr
@@ -301,37 +335,32 @@ export default function VsLinktree() {
 
               <ReasonCard
                 icon={<DollarSign />}
-                title="Better ROI on Pricing"
-                description="AgentBio's professional plan is $49/month vs Linktree Pro at $24/month. But one extra lead per month from AgentBio's specialized features pays for the difference 50x over."
+                title="Price, honestly"
+                description="Linktree is cheaper, and for a lot of people it is the right call. What you are paying us for is the property gallery, the lead forms and the booking — the things you would otherwise pay a web developer to build. If you are not capturing leads from Instagram, do not pay us for the ability to."
               />
             </div>
           </div>
         </section>
 
-        {/* Testimonials */}
-        <section className="py-20 bg-background/50">
-          <div className="container mx-auto px-4">
-            <header className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">What Real Estate Agents Say About Switching</span>
-              </h2>
-            </header>
+        {/*
+          A testimonials section stood here with two quotes attributed to
+          "Sarah M., Luxury Agent, Austin TX" and "Mike R., Team Leader, Miami
+          FL", one of them claiming a jump from 1-2 leads a month to 8-10
+          qualified inquiries.
 
-            <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
-              <TestimonialCard
-                quote="I was using Linktree for 2 years and getting maybe 1-2 leads per month from Instagram. Switched to AgentBio and now I'm getting 8-10 qualified inquiries. The property galleries make all the difference."
-                author="Sarah M."
-                role="Luxury Agent, Austin TX"
-              />
+          They were hardcoded JSX, not rows from the `testimonials` table that
+          the rest of the product reads through useTestimonials — so there is no
+          record of who said them, whether they said them, or whether they
+          consented to being quoted. An endorsement that cannot be traced to a
+          real customer is not a testimonial, and an unverifiable performance
+          claim next to a named person is the kind of thing the FTC's
+          endorsement guides exist for (US-156).
 
-              <TestimonialCard
-                quote="Linktree was fine for organizing links, but it didn't help me convert Instagram followers into actual buyers. AgentBio's lead forms and showing appointment booking changed everything for my social media strategy."
-                author="Mike R."
-                role="Team Leader, Miami FL"
-              />
-            </div>
-          </div>
-        </section>
+          Removed rather than rewritten. If these are real agents who agreed to
+          be quoted, put them in the testimonials table with their consent
+          recorded and render them from there like every other testimonial on
+          the site.
+        */}
 
         {/* When Linktree Makes Sense (and When It Doesn't) */}
         <section className="py-20 bg-background">
@@ -422,8 +451,7 @@ export default function VsLinktree() {
               <span className="glass-heading">Ready to Upgrade from Linktree?</span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Join 2,000+ agents who switched from generic link tools to AgentBio's real estate
-              platform
+              Switch from a generic link tool to AgentBio's real estate platform
             </p>
             <Link
               to="/auth/register"
@@ -437,6 +465,7 @@ export default function VsLinktree() {
           </div>
         </section>
 
+        <FaqSection entries={FAQ_ENTRIES} />
         <PublicFooter />
       </main>
     </>
@@ -461,20 +490,6 @@ function ReasonCard({
         <div>
           <h3 className="text-xl font-light text-foreground mb-2">{title}</h3>
           <p className="glass-body leading-relaxed">{description}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TestimonialCard({ quote, author, role }: { quote: string; author: string; role: string }) {
-  return (
-    <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-      <p className="glass-body italic mb-4">"{quote}"</p>
-      <div className="flex items-center gap-3">
-        <div>
-          <p className="text-sm font-light text-foreground">{author}</p>
-          <p className="text-xs text-muted-foreground">{role}</p>
         </div>
       </div>
     </div>
