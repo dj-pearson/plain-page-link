@@ -401,14 +401,45 @@ async function verifyServedLayout(results: Rendered[]): Promise<void> {
       .map((l) => l.trim())
       .filter((l) => l && !l.startsWith('#'));
 
+    // Sources of redirect rules, for the chain check below.
+    const redirectSources = new Set<string>();
     for (const line of lines) {
-      const [from] = line.split(/\s+/);
+      const [from, , status] = line.split(/\s+/);
+      if (from && from !== '/*' && (status ?? '').startsWith('3')) redirectSources.add(from);
+    }
+
+    for (const line of lines) {
+      const [from, to, status] = line.split(/\s+/);
       if (!from || from === '/*') continue; // the SPA fallback, which step 2 outranks
       // A concrete rule for a path we prerender would be consulted at step 3,
       // but only if step 2 missed — except for a rule that is itself a redirect
       // (3xx), which Pages honours regardless. Flag the overlap either way.
       if (prerendered.has(from)) {
         problems.push(`_redirects has a rule for ${from}, which is also prerendered: "${line}"`);
+      }
+
+      // US-154 retires 26 blog slugs into five surviving URLs. A 301 into a page
+      // that does not exist turns a working URL into a 404, and a 301 into
+      // another 301 bleeds authority at every hop and is what Google gives up
+      // following. Both are cheap to check here and expensive to find later.
+      if (!to || !(status ?? '').startsWith('3')) continue;
+      if (/^https?:\/\//i.test(to)) continue; // off-site, not ours to verify
+      if (to.includes(':') || to.includes('*')) continue; // placeholder or splat
+
+      const target = to.split('#')[0].split('?')[0];
+      if (redirectSources.has(target)) {
+        problems.push(
+          `_redirects sends ${from} to ${target}, which is itself redirected — ` +
+            `point it at the final destination instead: "${line}"`
+        );
+      } else if (!prerendered.has(target)) {
+        const asFile = target === '/' ? 'index.html' : `${target.replace(/^\//, '')}/index.html`;
+        if (!existsSync(join(DIST, asFile))) {
+          problems.push(
+            `_redirects sends ${from} to ${target}, which is not a page this build produced — ` +
+              `a live URL would 301 into a 404: "${line}"`
+          );
+        }
       }
     }
   }

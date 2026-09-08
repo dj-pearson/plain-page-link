@@ -1302,3 +1302,82 @@ Full suite 638 passed / 7 failed at 53s — the cleanest run of the batch so far
 and running the three failing files in isolation gives exactly the four stable
 pre-existing failures (repo-hygiene x2, analytics, analyticsEvents), so the
 other three were load flakes in those same files.
+
+### US-154 — consolidate the blog — 2026-09-08 — BLOCKED, passes stays false
+
+Not done, and deliberately not faked. The plan and the safety mechanism are
+built; the content work needs production access this machine does not have.
+
+What the data says, re-derived from the Search Console export rather than taken
+from the story: 27 blog posts took impressions in the 16 months to 2026-09-08,
+and between them 8 clicks and 605 impressions. Six of those clicks belong to
+how-real-estate-agents-use-link-in-bio-to-generate-more-leads-in-2024 (162
+impressions, position 11.09). The other 26 posts earned TWO clicks in sixteen
+months. The story said 25 posts and 2 clicks; it is 26 and 2, and the extra post
+does not change anything.
+
+docs/seo/BLOG_CONSOLIDATION.md holds the full map, written before anything was
+touched as the story requires: one kept pillar plus four proposed guides, with
+all 26 retired slugs assigned to a survivor, each 301 pointing directly at its
+final destination. Clusters are: the pillar absorbs the eight "what is a link in
+bio / how do agents get leads" permutations; guide 1 takes the seven "what to
+put on the page" posts; guide 2 the five listings/tours/selling ones; guide 3
+the three rental and leasing ones, which are a genuinely different audience;
+guide 4 the three portfolio/resume ones. 26 retired plus 1 kept accounts for all
+27.
+
+The pillar keeps its slug. Its "2024" framing gets refreshed in the copy, but
+renaming the one URL on this site with earned position, for tidiness, would
+throw away 18% of the site's clicks.
+
+WHY IT IS BLOCKED. Merging 27 posts requires reading 27 posts. Their bodies
+exist only in the production `articles` table — confirmed by grep: no seed
+migration, no fixture, no copy anywhere in the repository; the only place those
+slugs appear at all is prd.json. Writing four "consolidated" guides without
+reading what they replace would mean inventing 27 posts' worth of content and
+calling it a merge, which is the failure the plan exists to prevent rather than
+a shortcut through it. Unpublishing the retired rows likewise needs a database
+write.
+
+And shipping the redirects early would be actively worse than doing nothing: 26
+URLs that currently return 200 would 301 into guides that do not exist. So no
+redirect was added. The order in the doc — write the guides, publish them, then
+redirect, then unpublish, then rebuild — is not bureaucracy; reversing steps 1
+and 2 breaks 26 live URLs.
+
+WHAT WAS BUILT AND PROVEN. The step that makes executing the rest safe.
+verifyServedLayout() in scripts/prerender.mts now rejects two things in
+public/_redirects, and both were tested against the real build rather than
+asserted:
+  - a 301 whose target is not a page this build produced. Injected
+    `/blog/some-retired-slug /blog/a-guide-nobody-wrote 301`; the build failed
+    with "a live URL would 301 into a 404".
+  - a 301 into another 301. Injected a two-hop chain; the build failed with
+    "which is itself redirected — point it at the final destination instead".
+  - and a legitimate `/blog/old-a /pricing 301` passes, so the check is not
+    simply refusing everything.
+External (http/https) targets and splat/placeholder rules are skipped rather
+than guessed at.
+
+So when somebody executes the plan, a mistake in the redirect map fails the
+build instead of reaching Google. That is criteria 4 and 5 of the story
+satisfied and demonstrated; criteria 1, 2, 6, 7 need the database.
+
+Two unrelated dead internal links found while checking criterion 8, both in
+src/lib/geo.ts: targetUrl '/blog/instagram-marketing-for-real-estate' (no such
+post appears in 16 months of Search Console data) and '/compare' (no such route
+— the comparison pages are at /vs/*). Nothing in src/ links to any of the 26
+slugs being retired, so criterion 8 has nothing to do for this consolidation.
+The geo.ts links belong to US-124 or US-156.
+
+TO FINISH THIS STORY, someone with database access needs to:
+  1. Reconcile the map against `select slug from articles where status =
+     'published'` — Search Console only lists pages with at least one
+     impression, so a post that took none in 16 months is not in the map.
+  2. Write the four guides from the bodies of the posts they absorb, and expand
+     the pillar. Publish them.
+  3. Add the 301s to public/_redirects. The build will check them.
+  4. `update articles set status = 'draft'` on the 26 retired rows. Do not
+     delete: the content is the only copy.
+  5. Rebuild. Retired slugs leave sitemap.xml on their own because it is
+     generated from what rendered (US-149).
