@@ -82,6 +82,9 @@ export const STATIC_ROUTES: readonly PrerenderRoute[] = [
 
   { path: '/tools/instagram-bio-analyzer', kind: 'tool' },
   { path: '/tools/listing-description-generator', kind: 'tool' },
+  // US-155. The page that serves the ~180-impression "real estate agent bio"
+  // cluster the homepage stopped chasing in US-152.
+  { path: '/tools/real-estate-agent-bio-generator', kind: 'tool' },
 
   { path: '/privacy', kind: 'legal' },
   { path: '/terms', kind: 'legal' },

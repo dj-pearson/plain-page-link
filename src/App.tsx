@@ -73,6 +73,7 @@ const AnalyticsFeature = lazy(() => import('./pages/features/Analytics'));
 // Lazy load tools
 const InstagramBioAnalyzer = lazy(() => import('./pages/tools/InstagramBioAnalyzer'));
 const ListingDescriptionGenerator = lazy(() => import('./pages/tools/ListingDescriptionGenerator'));
+const AgentBioGenerator = lazy(() => import('./pages/tools/AgentBioGenerator'));
 
 // Lazy load dashboard pages (code splitting for better performance)
 const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout'));
@@ -211,6 +212,10 @@ function App() {
               <Route
                 path="/tools/listing-description-generator"
                 element={<ListingDescriptionGenerator />}
+              />
+              <Route
+                path="/tools/real-estate-agent-bio-generator"
+                element={<AgentBioGenerator />}
               />
 
               {/* Auth */}
