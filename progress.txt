@@ -1047,3 +1047,65 @@ reports how many routes were excluded.
 
 Note for US-124: the dead-code sweep should know that four sitemap
 implementations were removed here, so it does not go looking for them.
+
+### US-150 — CI gate on prerendered page identity — 2026-09-08 — PASSES
+
+`npm run verify:seo` walks every index.html under dist/ and fails the build if a
+page cannot produce its own identity. Wired into the CI build job after the
+build step. 44 pages pass today.
+
+Rules, applied to the built HTML rather than to the components — a page can have
+a perfectly correct <SEOHead> and still ship wrong:
+  - renders at all (body not essentially empty, under 500 chars of #root)
+  - is not the 404 page
+  - has a <title>, non-empty, not the homepage's verbatim, and shared with no
+    other page
+  - has exactly one non-empty <meta name="description">, shared with no other
+    page
+  - has exactly one <link rel="canonical">, absolute, self-referencing, not the
+    homepage's, and not a 127.0.0.1/localhost preview URL
+
+Two deliberate design points. The logic lives in scripts/lib/seo-audit.mjs as a
+pure function so it can be run against fixtures; scripts/verify-seo.mjs is only
+the CLI around it. And it duplicates checks scripts/prerender.mts already makes
+on purpose — prerender checks what it is about to write, this checks what is
+about to ship. The failure being guarded against is not a bad prerender script,
+it is a year of 44 URLs sharing one <title> with nothing anywhere comparing
+them.
+
+The teeth are demonstrated two ways, because "the check passes" proves nothing:
+  1. scripts/lib/seo-audit.test.ts, 13 tests. preUS147Output() reproduces the
+     shape the site actually shipped — every URL with index.html's single
+     hardcoded title and description, no canonical, empty <div id="root"> — and
+     asserts it is rejected on all four counts. Also covers a canonical pointing
+     at the homepage, a canonical left on the preview server, two non-home pages
+     sharing a title, the duplicate description tag a naive snapshot produces,
+     and the 404 shipped under a real route.
+  2. Against real output: corrupted dist/pricing/index.html to carry the
+     homepage title and dropped its canonical. The gate reported exactly those
+     three problems and exited 1; restoring the file made it pass again.
+
+Canonicals are not demanded from a page carrying noindex — it is already telling
+Google not to index it, and requiring one would be noise. US-151 needs that for
+the auth routes.
+
+DUPLICATE_DESCRIPTION_ALLOWLIST exists and is empty. All 44 pages had distinct
+descriptions when this was written; an entry there is a page admitting it has
+nothing of its own to say.
+
+vitest.config.ts now includes scripts/**/*.test.ts. It previously covered only
+src, supabase/functions and functions.
+
+Verification: clean CI-mode build exits 0, verify:seo exits 0 on 44 pages, and
+exits 1 with the right three messages on the corrupted file. tsc --noEmit clean.
+vitest 640 passed (up 13 from 627), 74 test files.
+
+On the flaky suite, which is worth someone's attention but is not this batch's
+problem: four failures are stable and pre-date this branch (repo-hygiene.test.ts
+x2 from the loose root files in 908a2c10, analytics.test.ts,
+analyticsEvents.test.ts). Beyond those, THREE jsdom component specs now come and
+go between full-suite runs — ContactForm.test.tsx, LeadDetailModal.test.tsx and
+SubmitReview.test.tsx. All three were run in isolation this iteration and passed
+5/5, 3/3 and 7/7. They share a shape: async edge-function calls under fake
+timers, timing out only when the suite is loaded. Whoever picks this up should
+look at the shared waitFor timeout rather than at the individual specs.

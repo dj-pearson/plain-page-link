@@ -2400,8 +2400,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 150,
-      "passes": false,
-      "notes": "Depends on US-147. Keep it in the same spirit as the existing verify:schema / size-check scripts: a plain node script with a clear failure message naming the offending file."
+      "passes": true,
+      "notes": "Depends on US-147. Keep it in the same spirit as the existing verify:schema / size-check scripts: a plain node script with a clear failure message naming the offending file. Teeth demonstrated twice: seo-audit.test.ts rejects a reproduction of the pre-US-147 output on all four counts, and a real dist/pricing/index.html corrupted to carry the homepage title with no canonical was caught and exited 1. vitest.config.ts now includes scripts/**/*.test.ts."
     },
     {
       "id": "US-151",

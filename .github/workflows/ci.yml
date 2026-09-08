@@ -116,6 +116,13 @@ jobs:
           # The Cloudflare Pages deploy must NOT set this (US-148).
           PRERENDER_ALLOW_NO_ARTICLES: '1'
 
+      - name: Verify prerendered pages have their own SEO identity
+        # 44 URLs shipped for a year sharing one <title> because nothing
+        # compared them. This is what compares them (US-150).
+        run: npm run verify:seo
+        env:
+          VITE_APP_URL: https://agentbio.net
+
   bundle-size:
     name: Bundle Size
     needs: build
