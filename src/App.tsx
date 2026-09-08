@@ -74,6 +74,7 @@ const AnalyticsFeature = lazy(() => import('./pages/features/Analytics'));
 const InstagramBioAnalyzer = lazy(() => import('./pages/tools/InstagramBioAnalyzer'));
 const ListingDescriptionGenerator = lazy(() => import('./pages/tools/ListingDescriptionGenerator'));
 const AgentBioGenerator = lazy(() => import('./pages/tools/AgentBioGenerator'));
+const Press = lazy(() => import('./pages/public/Press'));
 
 // Lazy load dashboard pages (code splitting for better performance)
 const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout'));
@@ -178,6 +179,7 @@ function App() {
             <Route element={<PublicBoundary />}>
               <Route path="/" element={<Landing />} />
               <Route path="/pricing" element={<Pricing />} />
+              <Route path="/press" element={<Press />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/dmca" element={<DMCAPolicy />} />

@@ -67,6 +67,8 @@ export interface PrerenderRoute {
 export const STATIC_ROUTES: readonly PrerenderRoute[] = [
   { path: '/', kind: 'marketing' },
   { path: '/pricing', kind: 'marketing' },
+  // US-158. What a roundup author needs in order to include the product.
+  { path: '/press', kind: 'marketing' },
   { path: '/for-real-estate-agents', kind: 'marketing' },
   { path: '/instagram-bio-for-realtors', kind: 'marketing' },
 

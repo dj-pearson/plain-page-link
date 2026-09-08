@@ -1621,3 +1621,73 @@ seven, eight failed; run ONE AT A TIME, every single one passed: SubmitReview
 5/5, Settings 6/6, LeadDetailModal 7/7, Register 3/3, ContactForm 3/3.
 routes.test.ts passed in both the group and alone. The stable floor remains
 repo-hygiene x2, analytics and analyticsEvents.
+
+### US-158 — link acquisition programme — 2026-09-08 — PASSES
+
+The artefacts are built. NOBODY HAS BEEN CONTACTED, no account was created, no
+listing was submitted, and no placement exists. That half is a person's and is
+written up as such.
+
+THE RESEARCH CHANGED THE PLAN. Searching "best link in bio tools for real estate
+agents 2026" on 2026-09-08 returned a first page dominated by COMPETITOR-OWNED
+content marketing, not neutral roundups — linqin.in, simplelistings.co,
+direct.me (twice), clientkeepercrm.com and linkship.cc are all competing
+products marketing themselves. A competitor will not add us to their roundup,
+and pitching them only tells them we exist. That SERP is won by publishing a
+better page than theirs, which is what US-155 and US-156 started, not by
+outreach.
+
+The real targets are one step out, and every URL in Tier 1 was actually
+retrieved rather than guessed: HousingWire's marketing-tools, software and
+AI-tools roundups; The Close's software and apps roundups; Inman's AI-tools
+piece. Tier 2 (G2, Capterra/GetApp/Software Advice, Product Hunt) and Tier 3
+(r/realtors, agent Facebook groups, brokerages, state associations) are listed
+as CATEGORIES and the doc says plainly that their submission routes were NOT
+opened or verified — treating an unverified link as checked is how a target list
+becomes fiction. No contact names or email addresses are listed, because I
+verified none and a wrong name is worse than no name.
+
+/press ships, prerendered, in the sitemap, linked from the footer so it is not
+orphaned the way the comparison pages were. Every claim is checkable: what the
+product does (five capabilities, each linking to its feature page), who it is
+for, and what it costs — with the price table read from PRICING_PLANS so it
+cannot drift from the checkout. Verified in the built HTML that it carries $0,
+$29, $49, $99 and $299 and NONE of 4.8, 523, "2,000+", $39 or $19. No customer
+counts, no funding, no awards, no press mentions, no ratings, no testimonials.
+The page says so where a reader would expect one.
+
+Product screenshots are deliberately absent. Real ones need a populated account
+and a person to choose what to show; generating something representative would
+mean inventing an agent's listings, which is the same failure as the fabricated
+testimonials. The page asks the reader to request current ones instead.
+
+Three sendable templates in docs/seo/OUTREACH_TEMPLATES.md — roundup author,
+directory submission, partnership. They carry no invented social proof, they
+name the specific article, they say out loud where a competitor is the better
+choice, and there is no follow-up sequence. The directory template tells the
+sender to check the price against /pricing rather than typing it from memory,
+because typing it from memory is exactly how $39 ended up in six places
+describing a plan that does not exist.
+
+docs/seo/SEO_RECOVERY_CHECKLIST.md is the single owner-facing page: what eleven
+stories changed, and the seven things only a person can do, ordered by damage.
+Removing the seven remaining fabricated testimonials is first, and the link
+document says explicitly not to pitch HousingWire until it is done — a reviewer
+who checks one quoted agent and finds nothing will not check the second.
+
+A REAL REGRESSION, CAUGHT BY CHECKING IN ISOLATION. routes.test.ts began failing
+after the press page was added, and unlike every other suspect this batch it
+failed ALONE, not only under load. The page links six logo files (/logo.png,
+/Cover.webp and so on) and the test's link scanner measured them against the
+route table, reporting each as a link to a non-existent route. They are static
+assets in public/ that React Router never sees. Fixed in the test rather than in
+the page — it now skips paths with a file extension, the same rule
+isReservedSegment already uses in functions/_lib/social-meta.ts. Confirmed the
+check still has teeth by pointing a link at /this-route-does-not-exist: it
+failed, and passed again once restored.
+
+Verification: build exits 0 (52 routes), verify:seo passes all 52, tsc --noEmit
+clean, impeccable clean on Press.tsx. The full suite gave 20 failures at 103s —
+the worst run of the batch and also its slowest — but run in isolation the four
+files give exactly the four stable pre-existing failures (repo-hygiene x2,
+analytics, analyticsEvents) and routes.test.ts passes 3/3.

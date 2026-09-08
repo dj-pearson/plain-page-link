@@ -2537,8 +2537,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 158,
-      "passes": false,
-      "notes": "Last, and mostly not a coding task - it is here so it is not forgotten, and the story is scoped to the artifacts an agent can honestly produce. Do NOT attempt to acquire links, create accounts, post to communities or contact anyone; produce the list, the assets and the templates and stop. Say plainly in progress.txt that the outreach itself is outstanding and belongs to a person."
+      "passes": true,
+      "notes": "Last, and mostly not a coding task - it is here so it is not forgotten, and the story is scoped to the artifacts an agent can honestly produce. Do NOT attempt to acquire links, create accounts, post to communities or contact anyone; produce the list, the assets and the templates and stop. Say plainly in progress.txt that the outreach itself is outstanding and belongs to a person. Research changed the plan: the money-query SERP is dominated by COMPETITOR-owned listicles (linqin, simplelistings, direct.me, clientkeeper, linkship), which are not link targets. Real targets are HousingWire, The Close and Inman - every Tier 1 URL actually retrieved 2026-09-08. Tier 2/3 listed as categories with their submission routes explicitly marked unverified. /press ships with only checkable facts, prices read from PRICING_PLANS, and no counts, funding, awards, ratings or testimonials; screenshots deliberately absent rather than invented. NOBODY WAS CONTACTED, no account created, no listing submitted, no placement claimed - that half is human and is item 7 of docs/seo/SEO_RECOVERY_CHECKLIST.md, gated behind removing the seven remaining fabricated testimonials. Also fixed a real regression: routes.test.ts treated static assets like /logo.png as broken routes."
     }
   ]
 }

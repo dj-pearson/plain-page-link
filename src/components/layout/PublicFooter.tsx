@@ -109,6 +109,13 @@ export function PublicFooter() {
                   Compare to Linktree
                 </Link>
               </li>
+              <li>
+                {/* A roundup author who cannot find the facts writes about
+                    somebody else (US-158). */}
+                <Link to="/press" className="text-gray-400 hover:text-white transition-colors">
+                  Press &amp; product facts
+                </Link>
+              </li>
             </ul>
           </div>
 
