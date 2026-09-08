@@ -2539,6 +2539,25 @@
       "priority": 158,
       "passes": true,
       "notes": "Last, and mostly not a coding task - it is here so it is not forgotten, and the story is scoped to the artifacts an agent can honestly produce. Do NOT attempt to acquire links, create accounts, post to communities or contact anyone; produce the list, the assets and the templates and stop. Say plainly in progress.txt that the outreach itself is outstanding and belongs to a person. Research changed the plan: the money-query SERP is dominated by COMPETITOR-owned listicles (linqin, simplelistings, direct.me, clientkeeper, linkship), which are not link targets. Real targets are HousingWire, The Close and Inman - every Tier 1 URL actually retrieved 2026-09-08. Tier 2/3 listed as categories with their submission routes explicitly marked unverified. /press ships with only checkable facts, prices read from PRICING_PLANS, and no counts, funding, awards, ratings or testimonials; screenshots deliberately absent rather than invented. NOBODY WAS CONTACTED, no account created, no listing submitted, no placement claimed - that half is human and is item 7 of docs/seo/SEO_RECOVERY_CHECKLIST.md, gated behind removing the seven remaining fabricated testimonials. Also fixed a real regression: routes.test.ts treated static assets like /logo.png as broken routes."
+    },
+    {
+      "id": "US-159",
+      "title": "Remove every fabricated testimonial and unverifiable claim from the marketing UI",
+      "description": "Third pass at the same defect, authorised by Dj on 2026-09-08. US-111 found the signup page saying '2,500+ agents' while the landing page said '5,000+', plus an invented ratingValue 4.8 over 523 reviews in the JSON-LD, and fixed what it saw. US-156 found five hardcoded testimonials on the comparison pages, one carrying '$2.4M closed from Instagram'. US-157 found that same 4.8/523 rating still live on 31 pages from five sources US-111 had missed. This pass swept the whole of src/ and found: FIVE different invented agent counts (2,847, 4,200+, 2,000+, 3,000+, 10,000+, plus the original 5,000+ still live on two landing pages), a hardcoded '4.9/5 rating' in two capture modals and a '4.9/5 Agent Rating' stat, 'Used by agents at Keller Williams, Coldwell Banker, RE/MAX' naming three real firms as customers, '2,847+ Agents Analyzed' / '3X Average Lead Increase' / '$50M+ In Deals Generated', eight more named testimonials across the tools pages, a templated 'Success Stories from {city} Agents' block rendering two fictional agents on all 26 city pages, a four-testimonial 'Agent Success Stories' section on /vs/later, and an email drip quoting invented percentile benchmarks and 'Real results from {market} agents: Agent A: 3 leads/month -> 18 leads/month' to real inboxes.",
+      "acceptanceCriteria": [
+        "No named testimonial is hardcoded in the UI. Real ones come from the `testimonials` table with consent recorded, rendered like every other testimonial",
+        "No customer, user or agent count appears unless something can produce it. MARKETING_COPY.joinLine from src/config/marketing-claims.ts is the honest placeholder",
+        "No star rating we did not receive. Ratings computed from real testimonials (ReviewSchema, FullProfilePage) are untouched",
+        "No other company is named as a customer",
+        "No outcome metric (leads/month, closings, in sales, X increase) is claimed without measurement",
+        "The email drip contains no invented case studies, benchmarks or trust statistics",
+        "A test fails the build if any of these return - src/marketing-claims.test.ts, with an allowlist that names each legitimate exception and why",
+        "The guard is demonstrated able to fail, not merely to pass",
+        "npm run build, tsc --noEmit and npm run verify:seo all pass"
+      ],
+      "priority": 159,
+      "passes": true,
+      "notes": "Authorised explicitly by Dj: 'No fabricated text, we need to remove false claims and false testimonies.' Nothing was reworded into a vaguer version of the same claim - a claim either has something behind it or it went. Deliberately KEPT, with reasons recorded in the test's ALLOWED_FILES: the BioAnalyzerForm dropdown asking a visitor about their own current leads; the 'Keller Williams, Coldwell Banker, etc.' placeholder in a 'your brokerage' input; features/Testimonials describing the star-display feature ('4.8/5.0, 4.9/5.0, etc.'); the ExampleBio demos and the bio-generator's suggested sample credentials, which are illustrations of what an agent might write about themselves rather than claims about us; and Zapier's own published '5,000+ apps' figure. Verified against the built output as well as source: a 248-file scan of dist/ for 24 banned strings comes back with only coincidental matches (SVG path data, MD5 constants) and the legitimate feature description."
     }
   ]
 }

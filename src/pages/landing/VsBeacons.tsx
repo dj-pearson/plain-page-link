@@ -546,8 +546,7 @@ export default function VsBeacons() {
               </span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Join 2,000+ agents who switched from creator tools to purpose-built real estate
-              software
+              Join agents who switched from creator tools to purpose-built real estate software
             </p>
             <Link
               to="/auth/register"

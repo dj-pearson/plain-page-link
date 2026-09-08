@@ -334,8 +334,8 @@ export default function ForRealEstateAgents() {
               <span className="glass-heading">Ready to Upgrade from Generic Links?</span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Join 5,000+ real estate agents using AgentBio to convert social media traffic into
-              qualified leads
+              Turn social media traffic into qualified leads, with a page built for how agents
+              actually get enquiries
             </p>
             <Link
               to="/auth/register"

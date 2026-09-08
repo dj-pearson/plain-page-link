@@ -347,10 +347,14 @@ export default function InstagramBioAnalyzer() {
               <div className="container max-w-6xl mx-auto px-4">
                 <div className="grid md:grid-cols-4 gap-8 text-center">
                   {[
-                    { icon: Users, number: '2,847+', label: 'Agents Analyzed' },
-                    { icon: TrendingUp, number: '3X', label: 'Average Lead Increase' },
-                    { icon: DollarSign, number: '$50M+', label: 'In Deals Generated' },
-                    { icon: Award, number: '4.9/5', label: 'Agent Rating' },
+                    // Was "2,847+ Agents Analyzed", "3X Average Lead Increase",
+                    // "$50M+ In Deals Generated" and "4.9/5 Agent Rating" — four
+                    // numbers with nothing measuring any of them (US-159). These
+                    // four describe what the tool actually does.
+                    { icon: Users, number: '5', label: 'Scored categories' },
+                    { icon: TrendingUp, number: '3', label: 'Rewrites per analysis' },
+                    { icon: DollarSign, number: 'Free', label: 'No account needed' },
+                    { icon: Award, number: '60s', label: 'Typical run time' },
                   ].map((stat, i) => (
                     <div key={i}>
                       <div className="flex justify-center mb-2">
@@ -553,7 +557,9 @@ export default function InstagramBioAnalyzer() {
               </Button>
 
               <p className="text-sm text-purple-200 mt-4">
-                No credit card required • Cancel anytime • Used by 10,000+ agents
+                {/* "Used by 10,000+ agents" removed — the fifth different
+                    invented agent count on this site (US-159). */}
+                No credit card required • Cancel anytime
               </p>
             </div>
 

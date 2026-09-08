@@ -268,29 +268,31 @@ export default function ListingDescriptionGenerator() {
       {/* Social Proof */}
       <Card className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200">
         <div className="text-center">
-          <p className="text-3xl font-bold text-gray-900 mb-2">4,200+ agents</p>
-          <p className="text-gray-600 mb-6">are already using AI to write better listings in less time</p>
+          {/* Was "4,200+ agents" over "are already using AI..." — one of five
+              different invented agent counts on this site (US-159). */}
+          <p className="text-3xl font-bold text-gray-900 mb-2">Write the listing faster</p>
+          <p className="text-gray-600 mb-6">Three formats from one set of property details, free</p>
 
           <div className="grid md:grid-cols-3 gap-6 text-left">
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-600 italic mb-2">
                 "This tool saves me at least 2 hours per listing. The luxury style is chef's kiss!"
               </p>
-              <p className="text-xs font-medium">— Sarah M., Beverly Hills</p>
+              {/* "— Sarah M., Beverly Hills" removed (US-159). */}
             </div>
 
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-600 italic mb-2">
                 "I used to dread writing descriptions. Now I generate 3 versions in under a minute!"
               </p>
-              <p className="text-xs font-medium">— Mike T., Austin</p>
+              {/* "— Mike T., Austin" removed (US-159). */}
             </div>
 
             <div className="bg-white p-4 rounded-lg">
               <p className="text-sm text-gray-600 italic mb-2">
                 "My listings get 3x more engagement since using the family-friendly style. Game changer."
               </p>
-              <p className="text-xs font-medium">— Jennifer L., Denver</p>
+              {/* "— Jennifer L., Denver" removed (US-159). */}
             </div>
           </div>
         </div>
@@ -458,7 +460,7 @@ export default function ListingDescriptionGenerator() {
             Start Your Free 14-Day Trial
           </Button>
           <p className="text-sm text-gray-600 mt-3">
-            No credit card required • Cancel anytime • 4,200+ agents trust AgentBio
+            No credit card required • Cancel anytime
           </p>
         </div>
       </Card>

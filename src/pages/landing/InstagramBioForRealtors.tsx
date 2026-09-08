@@ -344,8 +344,7 @@ export default function InstagramBioForRealtors() {
               </span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Join 5,000+ real estate agents using AgentBio to convert Instagram followers into
-              qualified buyer and seller leads
+              Convert Instagram followers into qualified buyer and seller leads
             </p>
             <Link
               to="/auth/register"

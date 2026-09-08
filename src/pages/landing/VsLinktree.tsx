@@ -451,8 +451,7 @@ export default function VsLinktree() {
               <span className="glass-heading">Ready to Upgrade from Linktree?</span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Join 2,000+ agents who switched from generic link tools to AgentBio's real estate
-              platform
+              Switch from a generic link tool to AgentBio's real estate platform
             </p>
             <Link
               to="/auth/register"
