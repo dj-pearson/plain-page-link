@@ -6,13 +6,42 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
+import { getBaseUrl } from '@/config/seo.config';
 import { PRICING_PLANS } from '@/config/pricing-plans';
 import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
+import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+
+const FAQ_ENTRIES: FaqEntry[] = [
+  {
+    question: "What's the difference between AgentBio and Linktree for real estate agents?",
+    answer:
+      'AgentBio includes property listing galleries with photos and pricing, real estate-specific lead capture forms, calendar booking for showings, testimonials display, and MLS compliance features. Linktree only offers basic link organization without these real estate features.',
+  },
+  {
+    question: 'Is AgentBio better than Linktree for realtors?',
+    answer:
+      "Yes, for real estate professionals. AgentBio is purpose-built for agents with features like property galleries, buyer/seller lead forms, and showing appointment booking. Linktree is a generic link tool that wasn't designed for real estate workflows.",
+  },
+];
 
 export default function VsLinktree() {
   const schema = {
     '@context': 'https://schema.org',
     '@graph': [
+      // BreadcrumbList was absent here while /features/*, /for/* and the
+      // tools all had one (US-157).
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: getBaseUrl() },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'AgentBio vs Linktree',
+            item: `${getBaseUrl()}/vs/linktree`,
+          },
+        ],
+      },
       // Enhanced Organization schema with social signals
       generateEnhancedOrganizationSchema(),
       {
@@ -23,27 +52,7 @@ export default function VsLinktree() {
         description:
           "Compare AgentBio and Linktree for real estate agents. AgentBio includes property listings, lead capture, and calendar booking—features Linktree doesn't offer.",
       },
-      {
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: "What's the difference between AgentBio and Linktree for real estate agents?",
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'AgentBio includes property listing galleries with photos and pricing, real estate-specific lead capture forms, calendar booking for showings, testimonials display, and MLS compliance features. Linktree only offers basic link organization without these real estate features.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Is AgentBio better than Linktree for realtors?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "Yes, for real estate professionals. AgentBio is purpose-built for agents with features like property galleries, buyer/seller lead forms, and showing appointment booking. Linktree is a generic link tool that wasn't designed for real estate workflows.",
-            },
-          },
-        ],
-      },
+      faqPageSchema(FAQ_ENTRIES),
     ],
   };
 
@@ -457,6 +466,7 @@ export default function VsLinktree() {
           </div>
         </section>
 
+        <FaqSection entries={FAQ_ENTRIES} />
         <PublicFooter />
       </main>
     </>

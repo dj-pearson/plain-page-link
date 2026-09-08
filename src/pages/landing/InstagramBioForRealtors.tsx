@@ -6,6 +6,20 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
+import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+
+const FAQ_ENTRIES: FaqEntry[] = [
+  {
+    question: 'How do I add a link to my Instagram bio?',
+    answer:
+      'Go to your Instagram profile, tap Edit Profile, and paste your AgentBio link in the Website field. Your link will appear in your bio and can be accessed by tapping it. You can also add links to Instagram Stories using the link sticker when you have 10K+ followers or a verified account.',
+  },
+  {
+    question: 'What should I put in my real estate Instagram bio?',
+    answer:
+      'Include your name and credentials (Realtor, Broker), your service area, a clear value proposition (what you help with), a call-to-action, and your bio page link. Use emojis for visual breaks and keep it under 150 characters.',
+  },
+];
 
 export default function InstagramBioForRealtors() {
   const schema = {
@@ -52,27 +66,7 @@ export default function InstagramBioForRealtors() {
           },
         ],
       },
-      {
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: 'How do I add a link to my Instagram bio?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Go to your Instagram profile, tap Edit Profile, and paste your AgentBio link in the Website field. Your link will appear in your bio and can be accessed by tapping it. You can also add links to Instagram Stories using the link sticker when you have 10K+ followers or a verified account.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'What should I put in my real estate Instagram bio?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Include your name and credentials (Realtor, Broker), your service area, a clear value proposition (what you help with), a call-to-action, and your bio page link. Use emojis for visual breaks and keep it under 150 characters.',
-            },
-          },
-        ],
-      },
+      faqPageSchema(FAQ_ENTRIES),
     ],
   };
 
@@ -365,6 +359,7 @@ export default function InstagramBioForRealtors() {
           </div>
         </section>
 
+        <FaqSection entries={FAQ_ENTRIES} />
         <PublicFooter />
       </main>
     </>

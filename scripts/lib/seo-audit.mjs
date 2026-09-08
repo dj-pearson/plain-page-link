@@ -83,6 +83,105 @@ export const MIN_BODY_HTML = 500;
  * @param {{origin: string}} options
  * @returns {{route: string, problem: string}[]}
  */
+/**
+ * Every JSON-LD block on a page, parsed (US-157).
+ *
+ * Returns `{ blocks, problems }` rather than throwing, so one malformed block
+ * does not hide the rest.
+ */
+export function readJsonLd(html) {
+  const blocks = [];
+  const problems = [];
+  const scripts =
+    html.match(/<script[^>]*type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/gi) || [];
+
+  for (const script of scripts) {
+    const body = script.replace(/^<script[^>]*>/i, '').replace(/<\/script>$/i, '');
+    try {
+      blocks.push(JSON.parse(body));
+    } catch (error) {
+      problems.push(`JSON-LD block does not parse: ${String(error.message).slice(0, 80)}`);
+    }
+  }
+  return { blocks, problems };
+}
+
+/** Walk every object in a JSON-LD graph, however deeply nested. */
+function walkJsonLd(node, visit) {
+  if (Array.isArray(node)) {
+    for (const item of node) walkJsonLd(item, visit);
+  } else if (node && typeof node === 'object') {
+    visit(node);
+    for (const value of Object.values(node)) walkJsonLd(value, visit);
+  }
+}
+
+/**
+ * Structured-data rules, checked against the built HTML.
+ *
+ * The aggregateRating rule is the one with history. US-111 found ratingValue
+ * "4.8" over reviewCount "523" on the landing page — both invented — and
+ * removed it there. It survived in five other places and was still reaching 31
+ * built pages when US-157 looked. Google renders stars from this field, so a
+ * fabricated value is a false claim shown to everyone who searches. The check
+ * below does not ban the field; it bans the specific invented pair, and it
+ * requires anything claiming a rating to also name a review count.
+ */
+export function auditStructuredData(route, html) {
+  const problems = [];
+  const { blocks, problems: parseProblems } = readJsonLd(html);
+  problems.push(...parseProblems);
+
+  // Strip <script> and <style> CONTENT first. Stripping tags alone leaves the
+  // JSON-LD source itself in the text, so every FAQ question trivially "appears
+  // on the page" by matching its own markup — the check passed a question about
+  // curing baldness before this line existed.
+  const visibleText = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/\s+/g, ' ');
+
+  for (const block of blocks) {
+    walkJsonLd(block, (node) => {
+      const type = node['@type'];
+
+      if (node.aggregateRating) {
+        const rating = node.aggregateRating;
+        const value = String(rating.ratingValue ?? '');
+        const count = String(rating.reviewCount ?? '');
+        if (value === '4.8' && count === '523') {
+          problems.push(
+            'aggregateRating 4.8/523 is the invented pair removed in US-111 and US-157'
+          );
+        }
+        if (!value || value === 'undefined') {
+          problems.push(`aggregateRating on ${type} has no ratingValue`);
+        }
+        if (!count || count === 'undefined') {
+          problems.push(`aggregateRating on ${type} has no reviewCount`);
+        }
+      }
+
+      // A FAQPage that describes questions nobody can see on the page is
+      // schema for a crawler rather than markup of the content.
+      if (type === 'FAQPage' && Array.isArray(node.mainEntity)) {
+        for (const entry of node.mainEntity) {
+          const question = entry && entry.name;
+          if (typeof question !== 'string' || question.length < 12) continue;
+          const probe = question.slice(0, 40).replace(/\s+/g, ' ');
+          if (!visibleText.includes(probe)) {
+            problems.push(`FAQPage question is not visible on the page: "${probe}…"`);
+          }
+        }
+      }
+    });
+  }
+
+  return problems.map((problem) => ({ route, problem }));
+}
+
 export function auditPages(pages, { origin }) {
   const problems = [];
   const add = (route, problem) => problems.push({ route, problem });
@@ -163,6 +262,9 @@ export function auditPages(pages, { origin }) {
         add(route, 'canonical points at a local preview server');
       }
     }
+
+    // --- structured data (US-157) ----------------------------------------
+    problems.push(...auditStructuredData(route, html));
   }
 
   return problems;

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Home, BarChart3, Users, Brain, Target, Zap, Sparkles } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
 import { HOMEPAGE_SEO } from '@/config/homepage-seo';
+import { PRICING_PLANS } from '@/config/pricing-plans';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
@@ -120,9 +121,16 @@ export default function Landing() {
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web',
         offers: {
-          '@type': 'Offer',
-          price: '39',
+          // Was price '39', which is not one of our plans and is what Google
+          // was being shown as the product price. AggregateOffer is the honest
+          // shape for a product with tiers (US-157).
+          '@type': 'AggregateOffer',
+          lowPrice: String(PRICING_PLANS.filter((p) => p.price_monthly > 0)[0].price_monthly),
+          highPrice: String(
+            PRICING_PLANS.filter((p) => p.price_monthly > 0).slice(-1)[0].price_monthly
+          ),
           priceCurrency: 'USD',
+          offerCount: PRICING_PLANS.length,
         },
         description:
           'Real estate agent bio page builder that turns Instagram followers into qualified leads. Showcase listings, capture inquiries, and book showings from one mobile-optimized portfolio.',

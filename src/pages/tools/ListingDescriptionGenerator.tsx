@@ -19,8 +19,37 @@ import type { Json } from '@/integrations/supabase/types';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { PropertyDetails, GeneratedDescription, EmailCaptureData } from '@/lib/listing-description-generator/types';
 import { logger } from '@/lib/logger';
+import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
 
 type FlowStep = 'intro' | 'form' | 'generating' | 'results';
+
+const FAQ_ENTRIES: FaqEntry[] = [
+  {
+    question: 'How does the AI listing description generator work?',
+    answer:
+      'The AI listing description generator uses advanced natural language processing to analyze your property details and create professional descriptions optimized for your target buyer. You input basic property information (address, price, beds/baths, features) and select your target buyer type. The AI then generates three distinct writing styles—Luxury, Family-Friendly, and Investment—each with complete MLS descriptions, social media posts, email copy, and SMS snippets. The entire process takes under 60 seconds.',
+  },
+  {
+    question: 'What formats do I get with the AI generator?',
+    answer:
+      'For each of the 3 styles (Luxury, Family-Friendly, Investment), you receive: Full MLS listing description (300-500 words), Instagram post caption, Facebook post copy, LinkedIn professional summary, Email marketing template, and SMS text snippet. That\'s 15+ different formats total, all professionally written and ready to copy-paste into your marketing channels.',
+  },
+  {
+    question: 'Is the listing description generator free?',
+    answer:
+      'Yes, the AI listing description generator is completely free to use. You can generate descriptions for unlimited properties with no cost. Simply enter your property details and receive all 3 professional styles with 15+ ready-to-use formats. To receive your descriptions via email for future reference, you can optionally provide your email address.',
+  },
+  {
+    question: 'Can I edit the AI-generated descriptions?',
+    answer:
+      'Yes, all generated descriptions are fully editable. The AI provides professional, compelling copy as your starting point, which you can customize with specific details, local market information, or your personal writing style. Most agents use the AI output as-is or with minor tweaks, saving 2+ hours per listing compared to writing from scratch.',
+  },
+  {
+    question: 'What makes a good real estate listing description?',
+    answer:
+      'A good real estate listing description includes: an attention-grabbing opening line, specific property features (beds, baths, square footage, lot size), lifestyle benefits tailored to your target buyer, neighborhood and location highlights, unique selling points, emotional triggers that create desire, a strong call-to-action, and SEO-optimized keywords for online visibility. Our AI generator incorporates all these elements automatically based on your property details and target buyer selection.',
+  },
+];
 
 export default function ListingDescriptionGenerator() {
   const [currentStep, setCurrentStep] = useState<FlowStep>('intro');
@@ -476,51 +505,7 @@ export default function ListingDescriptionGenerator() {
           },
         ],
       },
-      {
-        "@type": "FAQPage",
-        "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "How does the AI listing description generator work?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "The AI listing description generator uses advanced natural language processing to analyze your property details and create professional descriptions optimized for your target buyer. You input basic property information (address, price, beds/baths, features) and select your target buyer type. The AI then generates three distinct writing styles—Luxury, Family-Friendly, and Investment—each with complete MLS descriptions, social media posts, email copy, and SMS snippets. The entire process takes under 60 seconds.",
-            },
-          },
-          {
-            "@type": "Question",
-            "name": "What formats do I get with the AI generator?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "For each of the 3 styles (Luxury, Family-Friendly, Investment), you receive: Full MLS listing description (300-500 words), Instagram post caption, Facebook post copy, LinkedIn professional summary, Email marketing template, and SMS text snippet. That's 15+ different formats total, all professionally written and ready to copy-paste into your marketing channels.",
-            },
-          },
-          {
-            "@type": "Question",
-            "name": "Is the listing description generator free?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Yes, the AI listing description generator is completely free to use. You can generate descriptions for unlimited properties with no cost. Simply enter your property details and receive all 3 professional styles with 15+ ready-to-use formats. To receive your descriptions via email for future reference, you can optionally provide your email address.",
-            },
-          },
-          {
-            "@type": "Question",
-            "name": "Can I edit the AI-generated descriptions?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Yes, all generated descriptions are fully editable. The AI provides professional, compelling copy as your starting point, which you can customize with specific details, local market information, or your personal writing style. Most agents use the AI output as-is or with minor tweaks, saving 2+ hours per listing compared to writing from scratch.",
-            },
-          },
-          {
-            "@type": "Question",
-            "name": "What makes a good real estate listing description?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "A good real estate listing description includes: an attention-grabbing opening line, specific property features (beds, baths, square footage, lot size), lifestyle benefits tailored to your target buyer, neighborhood and location highlights, unique selling points, emotional triggers that create desire, a strong call-to-action, and SEO-optimized keywords for online visibility. Our AI generator incorporates all these elements automatically based on your property details and target buyer selection.",
-            },
-          },
-        ],
-      },
+      faqPageSchema(FAQ_ENTRIES),
     ],
   };
 
@@ -560,6 +545,7 @@ export default function ListingDescriptionGenerator() {
           onSubmit={handleEmailCapture}
           listingId={listingId}
         />
+        <FaqSection entries={FAQ_ENTRIES} />
       </main>
     </>
   );

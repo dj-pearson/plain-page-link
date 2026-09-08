@@ -109,13 +109,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
           priceValidUntil: SEO_CONFIG.pricing.priceValidUntil,
           availability: 'https://schema.org/InStock',
         },
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: SEO_CONFIG.ratings.ratingValue,
-          reviewCount: SEO_CONFIG.ratings.reviewCount,
-          bestRating: SEO_CONFIG.ratings.bestRating,
-          worstRating: SEO_CONFIG.ratings.worstRating,
-        },
+        // aggregateRating removed (US-157). SEO_CONFIG.ratings held the same
+        // invented 4.8-over-523 pair US-111 stripped from the landing page,
+        // and it was reaching all 23 city pages from here.
       },
       // FAQPage schema
       {

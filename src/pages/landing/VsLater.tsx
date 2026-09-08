@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
+import { getBaseUrl } from '@/config/seo.config';
 import { PRICING_PLANS } from '@/config/pricing-plans';
 import { COMPETITORS } from '@/config/competitors';
 
@@ -13,6 +14,20 @@ export default function VsLater() {
   const schema = {
     '@context': 'https://schema.org',
     '@graph': [
+      // BreadcrumbList was absent here while /features/*, /for/* and the
+      // tools all had one (US-157).
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: getBaseUrl() },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'AgentBio vs Later',
+            item: `${getBaseUrl()}/vs/later`,
+          },
+        ],
+      },
       // Enhanced Organization schema with social signals
       generateEnhancedOrganizationSchema(),
       {

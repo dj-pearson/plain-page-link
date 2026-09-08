@@ -6,11 +6,45 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
+import { getBaseUrl } from '@/config/seo.config';
+import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+
+const FAQ_ENTRIES: FaqEntry[] = [
+  {
+    question: "What's the difference between AgentBio and Beacons for real estate agents?",
+    answer:
+      "AgentBio is built specifically for real estate agents with property listing galleries, real estate lead capture forms, calendar booking for showings, and MLS compliance. Beacons is designed for content creators and influencers with email marketing and store features that aren't relevant for real estate workflows.",
+  },
+  {
+    question: 'Is AgentBio better than Beacons for realtors?',
+    answer:
+      "Yes, for real estate professionals. While Beacons offers more features than basic link tools, it's designed for creators selling digital products and courses. AgentBio focuses exclusively on what real estate agents need: showcasing properties, capturing buyer/seller leads, and booking showing appointments.",
+  },
+  {
+    question: 'Can Beacons show real estate listings?',
+    answer:
+      "No. Beacons doesn't have property listing gallery features. You can add basic links to listings, but without built-in photo galleries, pricing displays, bed/bath counts, or MLS integration that real estate agents need to properly showcase properties.",
+  },
+];
 
 export default function VsBeacons() {
   const schema = {
     '@context': 'https://schema.org',
     '@graph': [
+      // BreadcrumbList was absent here while /features/*, /for/* and the
+      // tools all had one (US-157).
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: getBaseUrl() },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'AgentBio vs Beacons',
+            item: `${getBaseUrl()}/vs/beacons`,
+          },
+        ],
+      },
       // Enhanced Organization schema with social signals
       generateEnhancedOrganizationSchema(),
       {
@@ -21,35 +55,7 @@ export default function VsBeacons() {
         description:
           'Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and MLS compliance.',
       },
-      {
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: "What's the difference between AgentBio and Beacons for real estate agents?",
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "AgentBio is built specifically for real estate agents with property listing galleries, real estate lead capture forms, calendar booking for showings, and MLS compliance. Beacons is designed for content creators and influencers with email marketing and store features that aren't relevant for real estate workflows.",
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Is AgentBio better than Beacons for realtors?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "Yes, for real estate professionals. While Beacons offers more features than basic link tools, it's designed for creators selling digital products and courses. AgentBio focuses exclusively on what real estate agents need: showcasing properties, capturing buyer/seller leads, and booking showing appointments.",
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Can Beacons show real estate listings?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: "No. Beacons doesn't have property listing gallery features. You can add basic links to listings, but without built-in photo galleries, pricing displays, bed/bath counts, or MLS integration that real estate agents need to properly showcase properties.",
-            },
-          },
-        ],
-      },
+      faqPageSchema(FAQ_ENTRIES),
     ],
   };
 
@@ -555,6 +561,7 @@ export default function VsBeacons() {
           </div>
         </section>
 
+        <FaqSection entries={FAQ_ENTRIES} />
         <PublicFooter />
       </main>
     </>

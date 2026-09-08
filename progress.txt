@@ -1543,3 +1543,81 @@ Producer in Austin TX, and from Beverly Hills. Same initials, three different
 biographies. These were not left in place out of doubt about what they are —
 they sit outside US-156's scope and removing marketing copy across six more
 pages is a decision for Dj, not a side effect of a comparison-page story.
+
+### US-157 — structured data — 2026-09-08 — PASSES
+
+The story described 3 Product-snippet impressions and asked for deliberate
+coverage. What the audit actually found was that the site was publishing false
+claims to search, and had been since before US-111.
+
+INVENTED STAR RATINGS ON 31 PAGES. Every one carried
+`aggregateRating: {ratingValue: "4.8", reviewCount: "523"}`. US-111 had already
+identified this exact pair as "both invented", removed it from the landing page,
+and left a comment saying why — but missed five other sources that were still
+emitting it: seo.ts (three separate literals), PageSEO.tsx, and
+SEO_CONFIG.ratings, which fed all 23 city pages through LocationTemplate. Google
+renders stars in search results from this field, so the site was showing a
+fabricated 4.8-from-523-reviews to everyone who searched. AggregateRating count
+in the built output: 31 before, 0 after.
+
+The genuinely data-driven ones were kept. FullProfilePage and ReviewSchema
+compute ratings from the `testimonials` table — real reviews of a real agent —
+and are untouched. generateSoftwareApplicationSchema was emitting an
+aggregateRating with `undefined` values because SchemaMarkup calls it without
+ratings; it is now conditional, so absent rather than malformed.
+
+A FALSE PRICE FOR A NAMED PLAN. The literal '39' appeared in five places, and
+seo.config.ts:230 attached it to a node explicitly named "Professional" —
+which costs 49. The homepage's SoftwareApplication Offer also published price
+'39'. There is no $39 plan; the matrix is 0, 29, 49, 99, 299. This is the same
+phantom figure US-156 found on /vs/linktree, which suggests it was once a real
+price and nothing propagated the change. Every occurrence now derives from
+PRICING_PLANS. The homepage's single Offer became an AggregateOffer with
+lowPrice 29 / highPrice 299, which is the honest shape for a tiered product.
+Verified in the built output: the only offer values now are 0, 29 and 29-299.
+
+EIGHTEEN FAQ QUESTIONS MARKED UP BUT NOT ON THE PAGE, across six pages —
+/vs/linktree, /vs/beacons, /for-real-estate-agents, /instagram-bio-for-realtors
+and both free tools. FAQPage schema describing content a visitor cannot see is a
+structured-data policy violation and a manual-action risk. Rather than delete
+the markup, the answers were already written, so they are now rendered:
+src/components/seo/FaqSection.tsx takes one array per page and produces both the
+JSON-LD (faqPageSchema) and the visible <details> list. They cannot drift,
+because they are the same array. Confirmed in the built HTML that the questions
+appear in the rendered text with the <script> content stripped out.
+
+BreadcrumbList was missing from /vs/linktree, /vs/beacons and /vs/later while
+/features/*, /for/* and the tools all had one. Added; 52 -> 55 in the output.
+/features/analytics has no '@graph' schema block at all, so it was left alone
+rather than restructured — noted here rather than half-done.
+
+The check that keeps all of this true: scripts/lib/seo-audit.mjs now parses
+every JSON-LD block in the built HTML and fails on unparseable JSON, on the
+4.8/523 pair specifically, on an aggregateRating missing ratingValue or
+reviewCount, and on a FAQPage question absent from the rendered text. Proven
+against the real build rather than asserted — a malformed block, a reinstated
+4.8/523, and an invented FAQ question ("Does AgentBio secretly cure baldness
+overnight?") each failed it with the right message, and the restored build
+passes.
+
+That last check had a bug worth recording. The first version stripped HTML tags
+but not <script> CONTENT, so a FAQ question trivially "appeared on the page" by
+matching its own JSON-LD source, and the baldness question passed. Fixing it
+immediately surfaced all 18 real cases. A check that cannot fail is worse than
+no check, and this one could not fail until it was tested against something that
+should fail.
+
+No Review or aggregateRating schema was added anywhere. Seven hardcoded,
+unverifiable testimonials are still live elsewhere on the site (listed under the
+US-156 entry); emitting review markup from them would have converted a content
+problem into a structured-data misrepresentation.
+
+Verification: build exits 0 (51 routes), verify:seo passes all 51 with the new
+structured-data rules, tsc --noEmit clean, impeccable clean on FaqSection.
+
+Test suite: 632 passed / 13 failed at 90s — the load-flaky pattern again, and I
+checked it properly this time because a lot of pages changed. Run as a group of
+seven, eight failed; run ONE AT A TIME, every single one passed: SubmitReview
+5/5, Settings 6/6, LeadDetailModal 7/7, Register 3/3, ContactForm 3/3.
+routes.test.ts passed in both the group and alone. The stable floor remains
+repo-hygiene x2, analytics and analyticsEvents.

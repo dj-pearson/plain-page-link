@@ -2521,8 +2521,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 157,
-      "passes": false,
-      "notes": "Depends on US-147 and US-150. subscription_plans is the enforced matrix and pricing-plans.ts is copy (see the constraints noted for US-128..US-143) - schema must follow the enforced source or it will advertise prices the app will not honour. Review schema needs real reviews; do not emit aggregateRating from seeded or sample testimonials."
+      "passes": true,
+      "notes": "Depends on US-147 and US-150. subscription_plans is the enforced matrix and pricing-plans.ts is copy (see the constraints noted for US-128..US-143) - schema must follow the enforced source or it will advertise prices the app will not honour. Review schema needs real reviews; do not emit aggregateRating from seeded or sample testimonials. Found invented star ratings (4.8 from 523 reviews) live on 31 pages from five sources US-111 missed - now 0. Found the phantom $39 price in five places, one of them attached to a node named Professional which costs 49; all now derive from PRICING_PLANS, and the homepage Offer became an AggregateOffer 29-299. Found 18 FAQ questions marked up but not visible across six pages; FaqSection.tsx now produces the schema and the visible list from one array so they cannot drift. verify:seo now parses every JSON-LD block and was proven to fail on malformed JSON, on a reinstated 4.8/523, and on an invisible FAQ question. No Review or aggregateRating schema added anywhere."
     },
     {
       "id": "US-158",
