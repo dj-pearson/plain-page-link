@@ -1109,3 +1109,71 @@ SubmitReview.test.tsx. All three were run in isolation this iteration and passed
 5/5, 3/3 and 7/7. They share a shape: async edge-function calls under fake
 timers, timing out only when the suite is loaded. Whoever picks this up should
 look at the shared waitFor timeout rather than at the individual specs.
+
+### US-151 — stop auth and legal pages absorbing impressions — 2026-09-08 — PASSES
+
+The story's premise checked out exactly. None of the seven auth pages set any
+meta at all — no SEOHead, no Helmet, nothing — so every one of them inherited
+index.html's marketing title and competed with the pages that sell the product.
+/auth/login took 114 impressions and /auth/register 42.
+
+robots.txt's `Disallow: /auth/` is removed, and that is the load-bearing change.
+Disallow stops the crawl, not the indexing: Google had indexed /auth/login from
+links alone and was forbidden from fetching the document that would have told it
+not to. Adding a noindex while the Disallow stood would have changed nothing.
+/api/ and /dashboard/ stay disallowed. The reasoning is written into robots.txt
+so nobody restores it as an obvious tidy-up.
+
+Six auth routes are now prerendered carrying <meta name="robots"
+content="noindex, follow"> in the served HTML, and all six are excluded from
+sitemap.xml via the `sitemap: false` flag US-149 added. Verified in the built
+files: six auth pages noindex, and /, /pricing, /vs/linktree and /terms all
+still "index, follow". Sitemap is 44 URLs with zero /auth/ entries.
+
+Done at the route rather than in the pages. src/components/auth/AuthRouteSEO.tsx
+wraps each auth element in App.tsx with a per-route title and description, so a
+new auth route picks it up by construction and the seven components stay
+untouched. Each title is distinct because `npm run verify:seo` fails on two
+pages sharing one.
+
+public/_headers additionally sends `X-Robots-Tag: noindex, follow` for /auth/*.
+Belt and braces, and it is the only thing that covers an auth URL which is never
+prerendered — which turned out to matter.
+
+/auth/callback is deliberately NOT prerendered, and the gate is what found it.
+Its whole job is to consume an OAuth code and redirect; with no code it lands on
+/auth/login, so the snapshot written to dist/auth/callback/index.html was the
+login page — confirmed by both files carrying the same title and the same
+password field. verify:seo reported "/auth/login shares its <title> with
+/auth/callback" and refused. Prerendering a redirect endpoint snapshots wherever
+it redirected to. The X-Robots-Tag covers it instead. /auth/sso/callback renders
+a real state rather than redirecting, so it keeps its file.
+
+Two checks needed the same exemption, because a page carrying noindex has no use
+for a canonical: scripts/lib/seo-audit.mjs already had it from US-150, and
+scripts/prerender.mts now does too — it was failing all seven auth routes on a
+missing canonical alone.
+
+Legal pages: unchanged in indexability, already at sitemap priority 0.3 from
+US-149. For internal-link prominence, PublicFooter linked /privacy, /terms and
+/dmca three times each on every page of the site — a Legal column, a prose
+paragraph in the legal notice, and a bottom-bar nav duplicating the column. The
+bottom-bar set is removed. Every legal page is still linked at least once and
+still one click away; they just stop taking three sitewide internal links each
+while holding 207 of 1,481 impressions and converting none.
+
+Verification: build exits 0 (50 routes rendered, 44 in the sitemap, 6
+deliberately excluded), verify:seo passes on all 50, tsc --noEmit clean, eslint
+clean on the four changed files, impeccable clean on the new component.
+
+On the test suite, and this is worth stating precisely because the raw number
+looks alarming: three consecutive full runs gave 13, 7 and 5 failures, with
+durations of 91s, 71s and 54s. Same 645 tests each time. Failures track run
+duration, not code. Every suspect passes in isolation — Register 3/3, Login 4/4,
+SubmitReview 5/5, ContactForm 3/3, LeadDetailModal 7/7. The stable floor remains
+the four that pre-date this branch (repo-hygiene x2 from 908a2c10's loose root
+files, analytics, analyticsEvents). The jsdom component specs time out under
+machine load; the first run followed a full production build on the same
+machine. Someone should raise the shared waitFor timeout or cap the worker pool
+— it is now producing enough noise to hide a real regression, which is the
+actual risk here.

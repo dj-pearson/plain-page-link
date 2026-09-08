@@ -31,7 +31,16 @@ export interface PrerenderRoute {
    * Why this route is in the list. Read by nobody at runtime; it exists so the
    * next person can tell a marketing page from a legal obligation.
    */
-  kind: 'marketing' | 'feature' | 'comparison' | 'tool' | 'location' | 'legal' | 'blog' | 'article';
+  kind:
+    | 'marketing'
+    | 'feature'
+    | 'comparison'
+    | 'tool'
+    | 'location'
+    | 'legal'
+    | 'blog'
+    | 'article'
+    | 'auth';
   /**
    * Set false for a route that should be rendered and crawlable but kept out of
    * sitemap.xml — a page carrying a noindex directive, for instance. Omitted
@@ -46,7 +55,7 @@ export interface PrerenderRoute {
  * Deliberately absent, each for a reason:
  *   - /blog, /blog/:slug, /blog/category/:category — the body comes from the
  *     `articles` table and has to be fetched at build time (US-148).
- *   - /auth/* — prerendered with a noindex directive by US-151, not here.
+ *   - (/auth/* used to be listed here; US-151 added it below.)
  *   - /dashboard/*, /admin/*, /onboarding/* — behind a session; there is no
  *     meaningful anonymous render.
  *   - /:username, /p/:slug, /:username/review — one page per tenant. These are
@@ -81,6 +90,24 @@ export const STATIC_ROUTES: readonly PrerenderRoute[] = [
   { path: '/cookies', kind: 'legal' },
   { path: '/privacy-choices', kind: 'legal' },
   { path: '/accessibility', kind: 'legal' },
+
+  // Prerendered so the noindex directive is in the served HTML rather than only
+  // after hydration, and kept out of the sitemap. robots.txt no longer
+  // Disallows /auth/, because a blocked page is one Google can index from links
+  // alone while never being allowed to read the directive that would stop it
+  // (US-151). public/_headers sends X-Robots-Tag for the same paths.
+  { path: '/auth/login', kind: 'auth', sitemap: false },
+  { path: '/auth/register', kind: 'auth', sitemap: false },
+  // /auth/callback is NOT prerendered. Its whole job is to consume an OAuth
+  // code and redirect, so with no code it lands on /auth/login and the
+  // snapshot is the login page under the callback's URL — caught by
+  // `npm run verify:seo` complaining the two shared a title. The
+  // X-Robots-Tag in public/_headers keeps it out of the index without
+  // needing a file. Do not add it back.
+  { path: '/auth/forgot-password', kind: 'auth', sitemap: false },
+  { path: '/auth/mfa', kind: 'auth', sitemap: false },
+  { path: '/auth/reset-password', kind: 'auth', sitemap: false },
+  { path: '/auth/sso/callback', kind: 'auth', sitemap: false },
 ] as const;
 
 /**

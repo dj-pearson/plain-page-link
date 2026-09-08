@@ -102,6 +102,7 @@ interface Snapshot {
   h1: string;
   hasCanonical: boolean;
   hasDescription: boolean;
+  noindex: boolean;
 }
 
 /**
@@ -139,6 +140,9 @@ const SERIALISE_EXPR = `(() => {
     h1: (h1 && h1.textContent ? h1.textContent : '').trim(),
     hasCanonical: !!doc.head.querySelector('link[rel="canonical"]'),
     hasDescription: !!doc.head.querySelector('meta[name="description"]'),
+    noindex: ((doc.head.querySelector('meta[name="robots"]') || {}).content || '')
+      .toLowerCase()
+      .indexOf('noindex') !== -1,
   };
 })()`;
 
@@ -195,7 +199,10 @@ async function renderRoute(
     if (!result.hasDescription) {
       problems.push('no <meta name="description">');
     }
-    if (!result.hasCanonical) {
+    // A page carrying noindex is telling Google not to index it; which URL it
+    // would have preferred is beside the point (US-151). Same exemption as
+    // scripts/lib/seo-audit.mjs, which gates the same property at ship time.
+    if (!result.hasCanonical && !result.noindex) {
       problems.push('no <link rel="canonical">');
     }
 

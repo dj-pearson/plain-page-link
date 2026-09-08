@@ -2416,8 +2416,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 151,
-      "passes": false,
-      "notes": "Depends on US-147 and US-149. Do not add `noindex` to the legal pages - they are legitimate pages and removing them from the index does not redistribute their impressions to anything. The 22% figure is a symptom of a thin site, and the cure is US-155/156 having something better to rank; this story only stops the auth URLs from competing."
+      "passes": true,
+      "notes": "Depends on US-147 and US-149. Do not add `noindex` to the legal pages - they are legitimate pages and removing them from the index does not redistribute their impressions to anything. The 22% figure is a symptom of a thin site, and the cure is US-155/156 having something better to rank; this story only stops the auth URLs from competing. Applied at the route via src/components/auth/AuthRouteSEO.tsx rather than editing seven components. /auth/callback is deliberately NOT prerendered: it redirects, so its snapshot was the login page, which verify:seo caught as a shared title. X-Robots-Tag on /auth/* in public/_headers covers it. Footer bottom-bar legal nav removed (was a third sitewide link set to the same pages)."
     },
     {
       "id": "US-152",
