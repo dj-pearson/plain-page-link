@@ -9,6 +9,8 @@ const HeroSectionFull = lazy(() =>
 
 interface HeroSectionProps {
   title?: string;
+  /** See HeroSection: which tail of `title` takes the highlight (US-152). */
+  titleHighlight?: string;
   subtitle?: string;
   description?: string;
   primaryCta?: {
@@ -32,10 +34,23 @@ interface HeroSectionProps {
  * Saves ~900KB+ on initial page load (GSAP + Three.js)
  */
 function HeroFallback({
+  title = 'AgentBio Intelligence',
+  titleHighlight,
+  subtitle = 'Stop Guessing. Start Closing.',
+  description = 'The link in bio built for real estate agents.',
   primaryCta = { text: 'Start Building Your Data Moat', href: '/auth/register' },
   secondaryCta = { text: 'See How It Works', href: '#demo-profiles' },
   badge,
 }: HeroSectionProps) {
+  // The fallback used to hardcode "Real Estate Agent / Bio Page Builder" and
+  // ignore every text prop, so on a slow connection the first paint contradicted
+  // the <title>, the H1 that finally rendered, and each of the five /features/*
+  // pages that pass their own headline through (US-152).
+  const highlight =
+    titleHighlight && title.endsWith(titleHighlight)
+      ? titleHighlight
+      : title.split(' ').slice(-2).join(' ');
+  const lead = title.slice(0, title.length - highlight.length).trimEnd();
   return (
     <section className="relative w-full min-h-[90vh] flex items-center overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* Lightweight CSS gradient background */}
@@ -63,23 +78,20 @@ function HeroFallback({
 
           {/* Headline */}
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-slate-900 dark:text-white mb-6 leading-[1.1]">
-            <span>Real Estate Agent</span> <br />
+            <span>{lead}</span> <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-500 pb-2">
-              Bio Page Builder
+              {highlight}
             </span>
           </h1>
 
           {/* Subheadline */}
           <h2 className="text-2xl md:text-3xl font-semibold text-slate-700 dark:text-slate-200 mb-6">
-            Turn Your Instagram Followers Into <br />
-            Qualified Buyer & Seller Leads
+            {subtitle}
           </h2>
 
           {/* Description */}
           <p className="text-lg text-slate-600 dark:text-slate-400 mb-10 max-w-2xl leading-relaxed">
-            While your competitors use basic link-in-bio tools, you'll have a complete real estate
-            portfolio with property galleries, lead capture forms, and appointment booking—all
-            optimized to convert social media traffic into closings.
+            {description}
           </p>
 
           {/* CTAs */}

@@ -3,6 +3,7 @@ import { MARKETING_COPY } from '@/config/marketing-claims';
 import { Link } from 'react-router-dom';
 import { Home, BarChart3, Users, Brain, Target, Zap, Sparkles } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
+import { HOMEPAGE_SEO } from '@/config/homepage-seo';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
@@ -161,20 +162,9 @@ export default function Landing() {
   return (
     <>
       <SEOHead
-        title="Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads – AgentBio"
-        description="Purpose-built link-in-bio for real estate agents. Showcase properties, capture leads, and book appointments from Instagram. Start converting followers into clients today."
-        keywords={[
-          'real estate agent bio page',
-          'Instagram bio page for realtors',
-          'real estate link in bio',
-          'agent portfolio website',
-          'turn Instagram followers into real estate leads',
-          'real estate agent mobile portfolio',
-          'showcase property listings Instagram',
-          'real estate bio page with lead capture',
-          'agent booking page for showings',
-          'real estate social media landing page',
-        ]}
+        title={HOMEPAGE_SEO.title}
+        description={HOMEPAGE_SEO.description}
+        keywords={[...HOMEPAGE_SEO.keywords]}
         canonicalUrl={origin}
         schema={schema}
       />
@@ -184,8 +174,9 @@ export default function Landing() {
 
         {/* Hero Section - Lazy loaded with lightweight fallback */}
         <HeroSectionLazy
-          title="Real Estate Agent Bio Page Builder"
-          subtitle="Turn Your Instagram Followers Into Qualified Buyer & Seller Leads"
+          title={HOMEPAGE_SEO.h1}
+          titleHighlight={HOMEPAGE_SEO.h1Highlight}
+          subtitle={HOMEPAGE_SEO.subtitle}
           description="While your competitors use basic link-in-bio tools, you'll have a complete real estate portfolio with property galleries, lead capture forms, and appointment booking—all optimized to convert social media traffic into closings."
           primaryCta={{
             text: 'Create Your Agent Bio Page Free',

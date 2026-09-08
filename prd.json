@@ -2432,8 +2432,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 152,
-      "passes": false,
-      "notes": "Depends on US-147 (a title change is worthless while every URL shares one title). Expect impressions to FALL and clicks to rise - the 180 wrong-intent impressions are noise and losing them is the point. Record the pre-change baseline in progress.txt (33 clicks / 1,481 impressions / position 18.4 over the 16 months to 2026-09-08) so the next runner can tell improvement from drift. Do not also change the brand name; that is not this story."
+      "passes": true,
+      "notes": "Depends on US-147 (a title change is worthless while every URL shares one title). Expect impressions to FALL and clicks to rise - the 180 wrong-intent impressions are noise and losing them is the point. Record the pre-change baseline in progress.txt (33 clicks / 1,481 impressions / position 18.4 over the 16 months to 2026-09-08) so the next runner can tell improvement from drift. Do not also change the brand name; that is not this story. Single source is src/config/homepage-seo.ts; a homepage-seo transformIndexHtml plugin in vite.config.ts writes the same strings into index.html at build time. Found two hero defects on the way: HeroSection split the H1 on its last two words (would have rendered 'Link in Bio for Real' / 'Estate Agents'), fixed with an explicit titleHighlight prop; and HeroSectionLazy's fallback hardcoded the old headline and ignored every text prop, contradicting the title on slow connections and on all five /features/* pages. Gradient text on the hero H1 is a pre-existing craft-floor violation, flagged but deliberately not changed."
     },
     {
       "id": "US-153",

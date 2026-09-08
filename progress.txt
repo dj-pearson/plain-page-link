@@ -1177,3 +1177,68 @@ machine load; the first run followed a full production build on the same
 machine. Someone should raise the shared waitFor timeout or cap the worker pool
 — it is now producing enough noise to hide a real regression, which is the
 actual risk here.
+
+### US-152 — retarget the homepage at the query it can serve — 2026-09-08 — PASSES
+
+  title  "Real Estate Agent Bio Page Builder | Turn Instagram Followers into Leads – AgentBio"
+      -> "Link in Bio for Real Estate Agents | AgentBio"
+  H1     "Real Estate Agent Bio Page Builder"
+      -> "Link in Bio for Real Estate Agents"
+
+The old title was 84 characters and Google truncated it mid-phrase — the SERP
+showed "Real Estate Agent Bio Page Builder | Turn Instagram Follo...", so the
+half describing the product never appeared. The new one is 45.
+
+src/config/homepage-seo.ts is now the single source for title, description,
+keywords, H1, H1 highlight and subtitle, with the Search Console numbers that
+justify each written next to it. Landing.tsx renders it, and a `homepage-seo`
+transformIndexHtml plugin in vite.config.ts writes the same strings into
+index.html at build time — verified: dist/index.html carries the new title in
+<title>, og:title and twitter:title, and the new description in description,
+og:description and twitter:description, while the source index.html is only the
+pre-transform input. The literals in index.html were updated to match anyway,
+with a comment saying the file is rewritten at build time and that editing them
+there alone is silently overwritten. og:image still resolves — dist/Cover.png,
+591 KB — and twitter:card is still summary_large_image.
+
+Two real defects found in the hero while doing it, neither in the story:
+
+1. HeroSection splits the headline on its LAST TWO WORDS to decide what gets the
+   highlight treatment. That is fine for "Real Estate Agent Bio | Page Builder"
+   and silently mangles anything else: "Link in Bio for Real Estate Agents"
+   would have rendered as "Link in Bio for Real" / "Estate Agents". Added an
+   optional `titleHighlight` prop that says explicitly where the split belongs,
+   falling back to the old positional behaviour so the five /features/* callers
+   are untouched. Verified in the built HTML: the H1 renders as "Link in Bio
+   for" / "Real Estate Agents".
+
+2. HeroSectionLazy's HeroFallback — the lightweight hero shown while the 900 KB
+   GSAP/Three chunk loads — HARDCODED "Real Estate Agent" / "Bio Page Builder",
+   the subtitle and the description, and ignored every text prop passed to it.
+   So on a slow connection the first paint contradicted the page's own <title>,
+   the H1 that eventually replaced it, and the headline each of the five
+   /features/* pages passes in. It now renders its props.
+
+EXPECT IMPRESSIONS TO FALL, and that is the change working rather than failing.
+The ~180 impressions from the "real estate agent bio" cluster (82 at position
+88.6 for the head term alone) produced one click in sixteen months. US-155 is
+what serves that intent properly; this story stops the homepage chasing it.
+Baseline to measure against: 33 clicks / 1,481 impressions / position 18.4 over
+the 16 months to 2026-09-08.
+
+Verification: build exits 0 (50 routes), verify:seo passes all 50, tsc --noEmit
+clean, eslint 0 errors (3 pre-existing unescaped-entity warnings).
+
+One thing deliberately NOT changed: `npx impeccable detect` flags gradient text
+on the hero H1 (bg-clip-text + bg-gradient), which CLAUDE.md's craft floor
+refuses by name. It is pre-existing — the gradient span was already there and
+this story only replaced the strings inside it — and removing it changes the
+visual treatment of the homepage hero and five feature pages. That is a design
+decision for Dj, not a side effect of an SEO retarget. Flagged, not touched.
+
+Test suite, same story as US-151 and worth restating because the raw number
+moves every run: 10 failures at 74s this time, 645 tests as always. The flaky
+set now rotates through routes.test.ts and Settings.test.tsx as well.
+routes.test.ts was the one worth taking seriously, since App.tsx changed in
+US-151 — it passes 3/3 in isolation, as do Settings 6/6 and Register 3/3. Still
+the same four stable pre-existing failures underneath.

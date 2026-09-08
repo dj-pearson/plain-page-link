@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
+import { HOMEPAGE_SEO } from './src/config/homepage-seo';
 // Cache bust: 2026-01-02 - Performance optimization
 
 // Bundle size baseline (2026-05-17, production build, minified, pre-gzip).
@@ -45,6 +46,31 @@ export default defineConfig(({ mode }) => {
           handler(html: string) {
             const id = (env.VITE_GA_MEASUREMENT_ID ?? '').trim();
             return html.replace(/(<meta name="ga-measurement-id" content=")[^"]*(")/, `$1${id}$2`);
+          },
+        },
+      },
+      // index.html's <title>, description and og/twitter tags are the ONLY thing a
+      // crawler sees before the bundle runs, and they were a hand-maintained
+      // second copy of the homepage's marketing copy. They drifted, and the
+      // stale half is what shipped. Written from src/config/homepage-seo.ts at
+      // build time so there is one source (US-152).
+      {
+        name: 'homepage-seo',
+        transformIndexHtml: {
+          order: 'pre' as const,
+          handler(html: string) {
+            const { title, description } = HOMEPAGE_SEO;
+            const escape = (value: string) =>
+              value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            const t = escape(title);
+            const d = escape(description);
+            return html
+              .replace(/<title>[\s\S]*?<\/title>/, `<title>${t}</title>`)
+              .replace(/(<meta name="description" content=")[^"]*(")/, `$1${d}$2`)
+              .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${t}$2`)
+              .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${d}$2`)
+              .replace(/(<meta property="twitter:title" content=")[^"]*(")/, `$1${t}$2`)
+              .replace(/(<meta property="twitter:description" content=")[^"]*(")/, `$1${d}$2`);
           },
         },
       },
