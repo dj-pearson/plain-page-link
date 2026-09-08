@@ -118,6 +118,11 @@ export function locationRoutes(): PrerenderRoute[] {
   return LOCATIONS.map((location) => ({
     path: `/for/${location.slug}`,
     kind: 'location' as const,
+    // Indexing is opt-in per location (US-153). A page that is not indexable
+    // still renders and is still crawlable — that is how the noindex directive
+    // reaches Google at all — it just does not get advertised in the sitemap.
+    // Flipping `indexable` in src/data/locations.ts moves it here automatically.
+    ...(location.indexable ? {} : { sitemap: false as const }),
   }));
 }
 

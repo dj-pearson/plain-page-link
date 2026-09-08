@@ -2448,8 +2448,8 @@
         "Typecheck passes: tsc --noEmit succeeds"
       ],
       "priority": 153,
-      "passes": false,
-      "notes": "Depends on US-147 and US-149. This is deliberately conservative and will feel like a step backwards - it is not. 23 templated pages ranking nowhere cost nothing; 23 templated pages indexed on a weak domain can cost the pages that matter. Do not delete the pages or the data; the template is fine and the approach becomes viable once the domain has authority."
+      "passes": true,
+      "notes": "Depends on US-147 and US-149. This is deliberately conservative and will feel like a step backwards - it is not. 23 templated pages ranking nowhere cost nothing; 23 templated pages indexed on a weak domain can cost the pages that matter. Do not delete the pages or the data; the template is fine and the approach becomes viable once the domain has authority. ZERO cities switched on, deliberately: the criterion allowed up to two 'only if they are given substantive unique content', and writing verifiable local market claims without a source would be fabrication - the exact thing docs/seo/CITY_PAGES.md rule 1 forbids. The flag was proven in both directions (Miami temporarily flipped to indexable, rebuilt, appeared in the sitemap with index,follow, then reverted). The first real city page is a content task for someone who knows that market."
     },
     {
       "id": "US-154",

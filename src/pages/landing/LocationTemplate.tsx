@@ -25,6 +25,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
     marketDescription,
     neighborhoods,
     avgDaysOnMarket,
+    indexable,
   } = location;
 
   const baseUrl = getBaseUrl();
@@ -203,8 +204,16 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         <meta name="geo.region" content={`US-${stateAbbr}`} />
         <meta name="geo.placename" content={city} />
 
-        {/* Robots */}
-        <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+        {/* Robots. Off unless the location has earned it — see
+            docs/seo/CITY_PAGES.md and the `indexable` flag in
+            src/data/locations.ts (US-153). "follow" either way: the page links
+            to real pages and there is no reason to strand them. */}
+        <meta
+          name="robots"
+          content={
+            indexable ? 'index, follow, max-image-preview:large, max-snippet:-1' : 'noindex, follow'
+          }
+        />
 
         {/* AI Search Optimization */}
         <meta name="perplexity-verification" content="agentbio-verified" />

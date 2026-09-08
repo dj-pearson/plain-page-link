@@ -1242,3 +1242,63 @@ set now rotates through routes.test.ts and Settings.test.tsx as well.
 routes.test.ts was the one worth taking seriously, since App.tsx changed in
 US-151 — it passes 3/3 in isolation, as do Settings 6/6 and Register 3/3. Still
 the same four stable pre-existing failures underneath.
+
+### US-153 — gate the city pages behind noindex — 2026-09-08 — PASSES
+
+All 26 /for/{city} pages now render with `noindex, follow` and are out of
+sitemap.xml. The sitemap drops from 44 URLs to 21. Nothing is deleted: the
+pages, the template and the data all stay, and they remain crawlable — which is
+what lets Google read the directive at all.
+
+The story's description checked out. One 715-line template, and the only things
+that differ between any two pages are the city name, four numbers, one sentence
+of marketDescription and a neighbourhood list. The title and description are
+string substitution on the city name alone:
+  "AgentBio for {city} Real Estate Agents | Instagram Bio & Lead Generation"
+Swap Miami for Austin and you have the other page. 26 of those entering the
+index at once, on a domain averaging position 18-20 for everything it has, is
+the doorway-page shape — and this is a risk US-147 created rather than found.
+While nothing prerendered they took zero impressions in 16 months and cost
+nothing.
+
+Mechanism: `indexable?: boolean` on LocationData, absent meaning no.
+LocationTemplate's robots meta was hardcoded `index, follow, ...` and is now
+conditional on it; locationRoutes() in prerender-routes.ts sets `sitemap: false`
+unless the flag is set. Flipping one flag is the whole operation.
+
+Verified in both directions, not just the safe one. With no flags set: Miami,
+Austin and Denver all emit `noindex, follow` and none is in the sitemap, 0
+/for/ URLs total. Then `indexable: true` was set on Miami temporarily and the
+site rebuilt: Miami emitted `index, follow, max-image-preview:large,
+max-snippet:-1` and appeared in sitemap.xml, while Austin stayed noindex and
+absent. The temporary flag was then reverted — `grep -n indexable
+src/data/locations.ts` returns only the interface field and the doc comment, no
+data entry.
+
+docs/seo/CITY_PAGES.md records the four things a page must have before the flag
+goes on, and src/data/locations.ts's header points at it. The load-bearing test
+in that doc is rule 2: if a sentence still reads correctly after swapping the
+city name for a different city, it is not local content. That is what catches
+most of it.
+
+ZERO cities are switched on, and that is a deliberate reading of the criterion
+rather than an omission. US-153 allowed up to two as worked examples "only if
+they are given substantive unique content in this story". Substantive content
+about the Miami or Austin housing market means verifiable claims with a source,
+and inventing plausible-looking market data is exactly what the doc's first rule
+exists to prevent — a fabricated median price does more damage than a noindexed
+page does. The mechanism is built and proven; the first real city page is a
+content task for somebody who knows that market. Written up as such in
+CITY_PAGES.md rather than left implied.
+
+Also noticed, not acted on: LocationTemplate emits
+`<meta name="perplexity-verification" content="agentbio-verified" />`. There is
+no such verification mechanism. Harmless, but it is cargo cult and someone
+should delete it — flagging for US-124 rather than widening this story.
+
+Verification: build exits 0 (50 routes rendered, 21 in the sitemap), verify:seo
+passes all 50, tsc --noEmit clean, eslint 0 errors (5 pre-existing warnings).
+Full suite 638 passed / 7 failed at 53s — the cleanest run of the batch so far —
+and running the three failing files in isolation gives exactly the four stable
+pre-existing failures (repo-hygiene x2, analytics, analyticsEvents), so the
+other three were load flakes in those same files.
