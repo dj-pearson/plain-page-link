@@ -93,10 +93,23 @@ export function BlogSection({
                 />
               </div>
             )}
+            {/*
+              The trigger needs a name of its own. `SelectValue` renders the
+              selected item's text, but Radix only knows that text once the
+              content has mounted — and the content is unmounted while the menu
+              is closed. So on first paint the trigger held nothing at all: axe
+              reported it as the landing page's one critical violation
+              (button-name), and a sighted visitor saw an empty box where a
+              filter should be. The placeholder fixes what is drawn; the
+              aria-label is what a screen reader announces either way.
+            */}
             {showFilters && (
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue />
+                <SelectTrigger
+                  className="w-full sm:w-[200px]"
+                  aria-label="Filter articles by category"
+                >
+                  <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (

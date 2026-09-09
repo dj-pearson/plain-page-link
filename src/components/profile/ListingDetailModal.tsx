@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { getImageUrls, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { listingStatusBadgeClass, listingStatusLabel } from '@/lib/listingStatus';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
 import { realEstateListingSchema } from '@/lib/structured-data';
@@ -42,22 +43,6 @@ interface ListingDetailModalProps {
    */
   onRequestShowing?: (listing: PublicProfileListing) => void;
 }
-
-const statusColors: Record<string, string> = {
-  active: 'bg-green-500 text-white',
-  pending: 'bg-yellow-500 text-white',
-  under_contract: 'bg-orange-500 text-white',
-  sold: 'bg-blue-500 text-white',
-  draft: 'bg-gray-500 text-white',
-};
-
-const statusLabels: Record<string, string> = {
-  active: 'Active',
-  pending: 'Pending',
-  under_contract: 'Under Contract',
-  sold: 'Sold',
-  draft: 'Draft',
-};
 
 const propertyTypeLabels: Record<string, string> = {
   single_family: 'Single Family',
@@ -240,10 +225,10 @@ export default function ListingDetailModal({
               <span
                 className={cn(
                   'px-2.5 py-1 rounded-full text-xs font-semibold',
-                  statusColors[listing.status ?? 'active'] || 'bg-gray-500 text-white'
+                  listingStatusBadgeClass(listing.status ?? 'active')
                 )}
               >
-                {statusLabels[listing.status ?? 'active'] || listing.status}
+                {listingStatusLabel(listing.status ?? 'active')}
               </span>
               {mlsNumber && <span className="text-xs text-gray-500">MLS# {mlsNumber}</span>}
             </div>

@@ -2280,3 +2280,111 @@ document that everything else is written from. The lesson is not "add guards" �
 this repository has plenty. It is that a guard's failure message is the whole
 product, and that the artifacts steering the work need checking too, not just
 the code they produce.
+
+================================================================================
+ITERATION 3 — US-167: the accessibility suite passed while reporting 8 failures
+================================================================================
+
+WHERE I LOOKED. Product runtime, after two iterations on repository artifacts.
+Read FullProfilePage, leadSubmission and the profile components; they are in
+good shape. Then noticed ci.yml runs the accessibility job with
+`continue-on-error: true`, and went to see what it had been reporting.
+
+  6 passed (22.4s)
+
+  [a11y] landing: 3 critical/serious → button-name (critical), color-contrast,
+                                       link-in-text-block
+  [a11y] login: 1 → color-contrast
+  [a11y] register: 1 → color-contrast
+  [a11y] dashboard: 1 → color-contrast
+  [a11y] public profile: 1 → color-contrast
+  [a11y] listing modal: 1 → color-contrast
+
+Six passes, eight findings. The suite shipped with a per-page BASELINE that
+permits exactly the violations present, a comment reading "drive these numbers
+down over time", and a CI job that cannot fail. Each of the three is defensible
+on its own; together they are a guard that certifies whatever it finds.
+
+This is the same shape as iterations 1 and 2, third variation: US-165's guard
+fired and was misread, US-166 had no guard at all, and here the guard is
+configured to agree with the defect. In all three the detection existed.
+
+THE CRITICAL ONE, and why it had survived. The landing page's blog category
+filter is a Radix Select whose trigger had no accessible name. `SelectValue`
+renders the selected item's text — but Radix only knows that text once the
+content has mounted, and content is unmounted while the menu is closed. So on
+first paint the trigger contained nothing at all. A screen reader announced
+"button". A sighted visitor saw an empty box where a filter should be. It was
+a visible UI bug and an a11y violation, and neither got noticed, because the
+one thing watching had been told 3 was acceptable.
+
+Fixed with a placeholder (what is drawn) and an aria-label (what is announced).
+
+CONTRAST: computed, not guessed. Every colour decision here came out of a WCAG
+relative-luminance calculation, because eyeballing "looks dark enough" is what
+produced the problem. What that turned up:
+
+  bg-green-500 + white   2.28:1   the "Active" pill on every listing card
+  bg-yellow-500 + white  1.92:1   "Pending"
+  bg-blue-500 + white    3.68:1   "Sold"
+  text-gray-400 on white 2.53:1   bd / ba / sqft on every card
+  text-gray-500 on #111827 3.67:1 the Fair Housing / DMCA / §230 notices
+  #22c55e, #ef4444 badges, the "or" divider, four avatar swatches, and more
+
+Three findings deserve their own note.
+
+ONE — the status pill was wrong twice, for a reason the codebase already knew
+about. ListingCard and ListingDetailModal each kept a private `statusColors`
+map. src/lib/listingStatus.ts exists precisely to stop that: US-107 wrote it
+after finding three divergent status lists, and it says "Adding a status means
+adding it here, and every surface follows." These two never followed. So the
+fix was not to correct two maps but to add `badge` to the canonical list, add
+`listingStatusBadgeClass()`, and delete both copies. Three of the six canonical
+`color` values also failed AA (green-600 3.30, yellow-600 2.94, orange-600 3.56)
+and were corrected in the same pass. Pending is amber now: no yellow weight dark
+enough to pass still reads as yellow.
+
+Both components were also missing `off_market` from their maps entirely, so it
+rendered a grey fallback labelled with the raw string. Gone with the copies.
+
+TWO — the fixture bounds the coverage. StickyActionBar's "Text" button is
+bg-green-600, 3.30:1, and axe never reported it, because the mock profile has no
+phone so that button never renders. I found it by checking every colour in the
+component rather than only the one axe named. An a11y suite measures the states
+its fixtures produce, and nothing tells you which states those are.
+
+THREE — the suite passed while the app was broken, and that was my own doing.
+A syntax error I introduced in BlogSection.tsx turned landing and login into one
+identical `scrollable-region-focusable` finding, and the run reported six passes.
+`assertAppRendered` — added in US-113 exactly so a blank page could not pass —
+checks that `body` has text. A Vite error overlay has text. The suite now fails
+if `vite-error-overlay` is present. Worth recording that the tripwire written
+for "the app did not mount" did not cover "the app did not compile", which is
+the more common way to break it.
+
+ALSO — the suite now prints the offending node and the reason, not just the rule
+name. Getting from "landing: 3 → button-name, color-contrast, link-in-text-block"
+to knowing WHICH button took a throwaway spec bolted onto the suite. The nodes
+were in the axe result all along; nobody was printing them.
+
+RESULT:
+
+  landing        3 -> 0        public profile  1 -> 0
+  login          1 -> 0        listing modal   1 -> 0
+  register       1 -> 0        dashboard       1 -> 0
+
+All six baselines set to 0, with a comment saying that raising one is not a fix.
+`continue-on-error` removed from the CI job — it now has something to protect.
+
+THE GUARD: listingStatus.test.ts computes WCAG contrast for every entry in
+LISTING_STATUSES and fails below 4.5:1, with a failure message that explains why
+yellow is not an option. Demonstrated able to fail against the real pre-fix
+values (#22c55e, #eab308, #3b82f6), and against a passing one so it is not
+merely asserting that everything fails.
+
+VERIFICATION: 680 tests across 77 files (was 671). tsc clean, eslint 0 errors,
+a11y 6/6 at zero.
+
+NOT DONE, deliberately: the a11y suite covers five pages. The dashboard's
+interior — leads, listings, settings — is not in it, and neither is any form
+error state. Worth a story; not this one.

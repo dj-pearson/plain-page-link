@@ -661,7 +661,7 @@ export default function FullProfilePage() {
                   © {new Date().getFullYear()} {profile.full_name || profile.username}. All rights
                   reserved.
                 </p>
-                <p className="text-xs text-gray-400 mt-1 sm:mt-2">
+                <p className="text-xs text-gray-500 mt-1 sm:mt-2">
                   Powered by{' '}
                   <a
                     href="https://agentbio.net"

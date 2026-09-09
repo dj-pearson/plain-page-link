@@ -58,8 +58,8 @@ export function StickyActionBar({
         label: 'Text',
         icon: MessageSquare,
         action: () => handleAction('sms', profile.phone ?? ''),
-        color: 'bg-green-600 hover:bg-green-700',
-        mobileColor: 'bg-green-600',
+        color: 'bg-green-700 hover:bg-green-800',
+        mobileColor: 'bg-green-700',
       },
     profile.email_display && {
       id: 'email',
@@ -74,8 +74,8 @@ export function StickyActionBar({
       label: 'Schedule',
       icon: Calendar,
       action: () => handleAction('schedule'),
-      color: 'bg-orange-600 hover:bg-orange-700',
-      mobileColor: 'bg-orange-600',
+      color: 'bg-orange-700 hover:bg-orange-800',
+      mobileColor: 'bg-orange-700',
     },
     onGetHomeValue && {
       id: 'valuation',

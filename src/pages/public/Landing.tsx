@@ -334,7 +334,7 @@ export default function Landing() {
                 {/* Problem */}
                 <div className="space-y-4">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full text-sm font-light mb-4">
-                    <span className="text-red-400">The Problem</span>
+                    <span className="text-red-700">The Problem</span>
                   </div>
                   <p className="glass-body leading-relaxed mb-6">
                     43% of real estate referrals come through text messages and social media. But
@@ -363,7 +363,7 @@ export default function Landing() {
                 {/* Solution */}
                 <div className="space-y-4">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-sm font-light mb-4">
-                    <span className="text-green-400">The Solution</span>
+                    <span className="text-green-700">The Solution</span>
                   </div>
                   <p className="glass-body leading-relaxed mb-6">
                     Your AgentBio page loads in under 2 seconds, puts your best listings front and

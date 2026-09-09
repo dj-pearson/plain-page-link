@@ -20,7 +20,7 @@ export function BeforeAfterComparison() {
         <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
           {/* Before: Generic Link Tool */}
           <div className="relative">
-            <div className="absolute -top-4 left-4 bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold z-10">
+            <div className="absolute -top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold z-10">
               ❌ Generic Link Tool
             </div>
             <div className="bg-glass-background backdrop-blur-md border-2 border-red-200 rounded-xl p-8 pt-12">
@@ -46,27 +46,39 @@ export function BeforeAfterComparison() {
               <div className="space-y-3">
                 <div className="flex items-start gap-3 text-sm">
                   <X className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-muted-foreground">No way to showcase sold properties or track record</span>
+                  <span className="text-muted-foreground">
+                    No way to showcase sold properties or track record
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <X className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-muted-foreground">Generic contact forms don't qualify leads</span>
+                  <span className="text-muted-foreground">
+                    Generic contact forms don't qualify leads
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <X className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-muted-foreground">Can't display active listings with photos and prices</span>
+                  <span className="text-muted-foreground">
+                    Can't display active listings with photos and prices
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <X className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-muted-foreground">No buyer/seller specific forms or home valuation</span>
+                  <span className="text-muted-foreground">
+                    No buyer/seller specific forms or home valuation
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <X className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-muted-foreground">Limited analytics - can't track lead sources</span>
+                  <span className="text-muted-foreground">
+                    Limited analytics - can't track lead sources
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <X className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-muted-foreground">Looks like every other agent's profile</span>
+                  <span className="text-muted-foreground">
+                    Looks like every other agent's profile
+                  </span>
                 </div>
               </div>
             </div>
@@ -74,7 +86,7 @@ export function BeforeAfterComparison() {
 
           {/* After: AgentBio */}
           <div className="relative">
-            <div className="absolute -top-4 left-4 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold z-10">
+            <div className="absolute -top-4 left-4 bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold z-10">
               ✅ With AgentBio
             </div>
             <div className="bg-glass-background backdrop-blur-md border-2 border-green-200 rounded-xl p-8 pt-12">
@@ -100,27 +112,39 @@ export function BeforeAfterComparison() {
               <div className="space-y-3">
                 <div className="flex items-start gap-3 text-sm">
                   <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-foreground font-medium">Showcase sold properties with before/after photos</span>
+                  <span className="text-foreground font-medium">
+                    Showcase sold properties with before/after photos
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-foreground font-medium">Buyer & seller forms with automatic lead scoring</span>
+                  <span className="text-foreground font-medium">
+                    Buyer & seller forms with automatic lead scoring
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-foreground font-medium">Featured listings with price, beds/baths, MLS#</span>
+                  <span className="text-foreground font-medium">
+                    Featured listings with price, beds/baths, MLS#
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-foreground font-medium">Home valuation requests & property inquiries</span>
+                  <span className="text-foreground font-medium">
+                    Home valuation requests & property inquiries
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-foreground font-medium">Advanced analytics: lead sources, conversions, ROI</span>
+                  <span className="text-foreground font-medium">
+                    Advanced analytics: lead sources, conversions, ROI
+                  </span>
                 </div>
                 <div className="flex items-start gap-3 text-sm">
                   <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-foreground font-medium">Professional themes designed for real estate</span>
+                  <span className="text-foreground font-medium">
+                    Professional themes designed for real estate
+                  </span>
                 </div>
               </div>
             </div>

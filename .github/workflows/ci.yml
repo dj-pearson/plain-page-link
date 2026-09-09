@@ -223,8 +223,15 @@ jobs:
   accessibility:
     name: Accessibility (axe-core)
     runs-on: ubuntu-latest
-    # Warn-only initially: surfaces a11y regressions without blocking merges.
-    continue-on-error: true
+    # Blocking as of US-167. It was warn-only "initially", paired with a
+    # non-zero per-page baseline — a job that cannot fail, guarding a number
+    # that permits the failures it found. Between them the landing page kept a
+    # critical violation (a filter control with no accessible name, rendering as
+    # an empty box) for as long as anyone had been looking.
+    #
+    # Every page is at zero now, so the job has something to protect. If it goes
+    # red, a page regressed: read the [a11y] lines in the log, which name the
+    # element and the reason.
     steps:
       - uses: actions/checkout@v4
 

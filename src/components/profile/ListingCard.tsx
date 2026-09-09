@@ -6,27 +6,12 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
 import { currentListingShareUrl } from '@/lib/listingShare';
+import { listingStatusBadgeClass, listingStatusLabel } from '@/lib/listingStatus';
 
 interface ListingCardProps {
   listing: PublicProfileListing;
   onClick?: () => void;
 }
-
-const statusColors: Record<string, string> = {
-  active: 'bg-green-500',
-  pending: 'bg-yellow-500',
-  under_contract: 'bg-orange-500',
-  sold: 'bg-blue-500',
-  draft: 'bg-gray-500',
-};
-
-const statusLabels: Record<string, string> = {
-  active: 'Active',
-  pending: 'Pending',
-  under_contract: 'Under Contract',
-  sold: 'Sold',
-  draft: 'Draft',
-};
 
 const SAVED_LISTINGS_KEY = 'agentbio_saved_listings';
 
@@ -138,10 +123,10 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
           <span
             className={cn(
               'px-2.5 py-1 text-white text-xs font-semibold rounded-full shadow-sm backdrop-blur-sm',
-              statusColors[listing.status ?? 'active'] || 'bg-gray-500'
+              listingStatusBadgeClass(listing.status ?? 'active')
             )}
           >
-            {statusLabels[listing.status ?? 'active'] || listing.status}
+            {listingStatusLabel(listing.status ?? 'active')}
           </span>
           {isFeatured && (
             <span className="px-2.5 py-1 bg-purple-600/90 backdrop-blur-sm text-white text-xs font-semibold rounded-full flex items-center gap-1">
@@ -226,32 +211,32 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
             <div className="flex items-center gap-1.5">
               <Bed className="h-4 w-4 text-gray-400" />
               <span className="text-sm font-medium">{beds}</span>
-              <span className="text-xs text-gray-400">bd</span>
+              <span className="text-xs text-gray-500">bd</span>
             </div>
           )}
           {baths > 0 && (
             <div className="flex items-center gap-1.5">
               <Bath className="h-4 w-4 text-gray-400" />
               <span className="text-sm font-medium">{baths}</span>
-              <span className="text-xs text-gray-400">ba</span>
+              <span className="text-xs text-gray-500">ba</span>
             </div>
           )}
           {sqft > 0 && (
             <div className="flex items-center gap-1.5">
               <Maximize className="h-4 w-4 text-gray-400" />
               <span className="text-sm font-medium">{formatNumber(sqft)}</span>
-              <span className="text-xs text-gray-400">sqft</span>
+              <span className="text-xs text-gray-500">sqft</span>
             </div>
           )}
         </div>
 
         {/* View Details prompt */}
         <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-          <span className="text-xs text-gray-400 group-hover:text-blue-500 transition-colors flex items-center gap-1">
+          <span className="text-xs text-gray-500 group-hover:text-blue-600 transition-colors flex items-center gap-1">
             <Eye className="h-3.5 w-3.5" /> View Details
           </span>
           {sqft > 0 && price > 0 && (
-            <span className="text-xs text-gray-400">${Math.round(price / sqft)}/sqft</span>
+            <span className="text-xs text-gray-500">${Math.round(price / sqft)}/sqft</span>
           )}
         </div>
       </div>

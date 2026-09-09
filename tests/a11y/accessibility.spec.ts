@@ -5,17 +5,28 @@
  * 'serious' violations. Supabase + cookie consent are mocked so the run is
  * hermetic (no live backend), matching the E2E approach.
  *
- * Baseline (initial run, 2026) — count of distinct critical/serious axe rules
- * per page. To avoid blocking on the pre-existing baseline (per the story:
- * "warn but not fail initially"), each test fails only when critical/serious
- * violations EXCEED this baseline — i.e. it's a regression guard. Drive these
- * numbers down over time; the CI job is also configured warn-only.
+ * Baseline — the number of distinct critical/serious axe rules each page is
+ * allowed. Every page is now ZERO (US-167). It was not: the suite shipped with
+ * a non-zero baseline per page, "drive these numbers down over time", and a
+ * warn-only CI job, which together meant the violations were permanent. They
+ * sat there long enough that the landing page's critical finding — a filter
+ * control with no accessible name, which also rendered as a visibly empty box —
+ * read as normal.
  *
- *   landing        : 3  (button-name [critical], color-contrast, link-in-text-block)
- *   login          : 1  (color-contrast)
- *   register       : 1  (color-contrast)
- *   dashboard      : 1  (color-contrast)
- *   public profile : 1  (color-contrast)
+ * What US-167 cleared:
+ *
+ *   landing        : 3 -> 0  (button-name [critical], color-contrast x9,
+ *                             link-in-text-block x3 on the legal links)
+ *   login          : 1 -> 0  (the "or" divider)
+ *   register       : 1 -> 0  (four avatar swatches, username helper text)
+ *   dashboard      : 1 -> 0
+ *   public profile : 1 -> 0  (listing status pills, bd/ba/sqft units,
+ *                             "Powered by", the muted-foreground token)
+ *   listing modal  : 1 -> 0  (the status pill again, from a second copy of
+ *                             the colour map)
+ *
+ * Raising a number here is not a fix. If a page needs a non-zero baseline
+ * again, say in a comment which violation and why it cannot be fixed now.
  *
  * US-113 added the listing-modal case. ListingDetailModal was a hand-rolled
  * overlay — no role=dialog, no aria-modal, no focus trap, no focus restore,
@@ -25,12 +36,12 @@
  */
 
 const BASELINE: Record<string, number> = {
-  landing: 3,
-  login: 1,
-  register: 1,
-  dashboard: 1,
-  'public profile': 1,
-  'public profile with a listing modal open': 1,
+  landing: 0,
+  login: 0,
+  register: 0,
+  dashboard: 0,
+  'public profile': 0,
+  'public profile with a listing modal open': 0,
 };
 
 import { test, expect, type Page } from '@playwright/test';
@@ -148,12 +159,56 @@ async function assertAppRendered(page: Page) {
   expect(text, 'The app mounted straight into its error boundary.').not.toMatch(
     /This page didn.t load/i
   );
+
+  // US-167: a compile error does not blank the page — Vite covers it with an
+  // overlay, so `body` still has text and the check above still passes. What
+  // axe then measures is the overlay: during this story a syntax error in
+  // BlogSection.tsx turned landing and login into one identical
+  // `scrollable-region-focusable` finding and the suite reported six passes.
+  // The overlay lives in a shadow root, so it has to be asked for by element
+  // name rather than found in innerText.
+  const overlays = await page.locator('vite-error-overlay').count();
+  expect(
+    overlays,
+    'A Vite error overlay is covering the page: the build is broken, and axe is ' +
+      'measuring the overlay rather than the application.'
+  ).toBe(0);
 }
 
 async function analyze(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   const blocking = results.violations.filter((v) => SERIOUS.includes(v.impact ?? ''));
   return { blocking, total: results.violations.length };
+}
+
+/**
+ * Print what failed, and on which element.
+ *
+ * Naming the rule is not enough to act on it: US-167 began with "landing: 3
+ * critical/serious → button-name, color-contrast, link-in-text-block" and
+ * needed a throwaway spec bolted onto the suite before anyone could tell WHICH
+ * button or WHICH text. The nodes are already in the axe result; they just were
+ * not being printed.
+ */
+function reportBlocking(
+  name: string,
+  blocking: Awaited<ReturnType<typeof analyze>>['blocking'],
+  total: number
+) {
+  if (blocking.length === 0) return;
+
+  console.log(
+    `[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`,
+    blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+  );
+  for (const violation of blocking) {
+    for (const node of violation.nodes.slice(0, 5)) {
+      console.log(`  ${violation.id} :: ${node.html.slice(0, 160).replace(/\s+/g, ' ')}`);
+      for (const check of node.any) {
+        console.log(`      ${check.message.slice(0, 160)}`);
+      }
+    }
+  }
 }
 
 const PAGES: { name: string; path: string }[] = [
@@ -174,12 +229,7 @@ test.describe('Accessibility (axe-core)', () => {
       await assertAppRendered(page);
 
       const { blocking, total } = await analyze(page);
-      if (blocking.length > 0) {
-        console.log(
-          `[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`,
-          blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
-        );
-      }
+      reportBlocking(name, blocking, total);
       const baseline = BASELINE[name] ?? 0;
       expect(
         blocking.length,
@@ -207,12 +257,7 @@ test.describe('Accessibility (axe-core)', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     const { blocking, total } = await analyze(page);
-    if (blocking.length > 0) {
-      console.log(
-        `[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`,
-        blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
-      );
-    }
+    reportBlocking(name, blocking, total);
     const baseline = BASELINE[name] ?? 0;
     expect(
       blocking.length,

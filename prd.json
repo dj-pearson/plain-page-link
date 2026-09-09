@@ -2668,6 +2668,24 @@
       "priority": 166,
       "passes": true,
       "notes": "The repository already had npm run types:check to hold types.ts to the database. Nothing held CLAUDE.md to types.ts, and CLAUDE.md is what a person or an assistant actually reads before writing a query — so it was the one link in the chain with no check on it. The guard deliberately does NOT require the document to list every column: a guide may summarise. It requires that every column it names is real, because a name in that document functions as an instruction to use it. Demonstrated against the committed document: 3 failures (leads.email/phone, the 134-vs-135 count, and the \"No automated tests yet\" claim). Also documented the guard-test convention itself in the Testing Strategy section, including the two rules earned in US-165: say what is at stake in the failure message, and demonstrate the guard can fail."
+    },
+    {
+      "id": "US-167",
+      "title": "Clear every critical and serious accessibility violation, and make the a11y job able to fail",
+      "description": "The accessibility suite was passing while reporting 8 critical/serious findings, because it shipped with a per-page baseline that permitted exactly the violations it found, a comment saying \"drive these numbers down over time\", and a CI job set continue-on-error. A job that cannot fail, guarding a number that allows the current failures, is not a guard. The landing page kept a CRITICAL button-name violation for as long as anyone had been looking: the blog category filter had no accessible name, and because SelectValue had no placeholder and Radix cannot know the selected item text while the menu is unmounted, it also rendered as a visibly empty box to sighted users. Alongside it: 9 color-contrast nodes and 3 link-in-text-block nodes on the landing page, and single findings on login, register, dashboard and the public profile. The public profile ones were on the listing card - the status pill (\"Active\" at 2.27:1, \"Pending\" at 1.92:1 against a required 4.5:1) and the bd/ba/sqft unit labels at 2.53:1.",
+      "acceptanceCriteria": [
+        "Every page in the a11y suite reports zero critical/serious violations, and the baseline is zero for all six",
+        "The CI accessibility job is no longer continue-on-error",
+        "Colour choices are computed against WCAG relative luminance, not guessed",
+        "Listing status colours come from src/lib/listingStatus.ts, the canonical list US-107 established, rather than from a private map in each component",
+        "A unit guard fails the build if any status colour drops below AA, demonstrated able to fail against the real pre-fix values",
+        "The a11y suite prints which element failed and why, not just the rule name",
+        "The suite fails when a Vite error overlay is covering the page",
+        "npm run test:run, tsc --noEmit, eslint and the a11y suite all pass"
+      ],
+      "priority": 167,
+      "passes": true,
+      "notes": "Found by running the suite rather than reading it. Three things generalise. (1) The listing status pill was wrong in TWO places because ListingCard and ListingDetailModal each kept a private statusColors map - the precise divergence US-107 wrote listingStatus.ts to end - so the fix was to move the colour into the canonical list and delete both copies. Three of the six canonical text colours also failed AA and were corrected in the same pass. (2) The Text/SMS button in StickyActionBar failed too (green-600, 3.30:1) and axe never saw it, because the mock profile has no phone so that button never renders - a11y coverage is only as good as the fixture. (3) A syntax error I introduced mid-story turned two pages into one identical scrollable-region-focusable finding and the suite still reported six passes: assertAppRendered only checked that body had text, and a Vite error overlay has text. The suite now fails on the overlay. The four register avatar swatches are aria-hidden AND darkened: aria-hidden answers the screen-reader half, but axe keys color-contrast off visual visibility and is right to, since a low-vision sighted user still reads them."
     }
   ]
 }
