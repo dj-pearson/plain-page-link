@@ -2706,17 +2706,19 @@
     },
     {
       "id": "US-169",
-      "title": "Audit and wire up the E2E suite, and check the security suite for vacuous passes",
-      "description": "Follow-on from US-168, noted while fixing it. tests/e2e/ holds six spec files - analytics-tracking, auth, listing-deep-link, onboarding, page-builder-surface, public-profile-visibility - and no workflow runs any of them, exactly as was true of tests/security/. They have not been run or audited. Separately, US-168 fixed the 9 failing security specs but did not individually audit the 45 that were passing. The /api/* case established that a spec pointed at a nonexistent endpoint gets the SPA fallback at 200, which can satisfy an assertion as easily as break one - so a pass in that suite is not by itself evidence that the property holds.",
+      "title": "Wire up the E2E suite, and replace the security tests that could not fail",
+      "description": "Follow-on from US-168. tests/e2e/ holds 22 specs across six files that no workflow ran. Unlike the security suite they all passed and were all sound - written under US-114/US-116, asserting positively (toBeVisible) so a blank page fails them - they had simply never been wired up, so nothing would have said if they stopped. The audit half found more. Three XSS specs were vacuous, each aiming a payload at a surface this application does not have: /?search= (nothing on the landing page reads it), /profile/<payload> (there is no /profile/:x route; profiles are /:username), and ?redirect= asserting that page.url() does not start with javascript:, which a same-document form submit can never produce. The third mattered: Login.tsx really does read ?redirect and pass it to validateRedirectPath, so there is a genuine open-redirect surface - and src/utils/navigation.ts, which holds that guard plus the protocol allow-list, had no unit test of any kind.",
       "acceptanceCriteria": [
-        "Every spec in tests/e2e/ is run, and each failure is classified as a real defect, a harness defect, or an assertion about something the app does not have",
         "The E2E suite runs in CI and can fail",
-        "Each passing security spec is checked for whether it could pass against a blank page or an SPA fallback, and those that could are either strengthened or removed",
-        "Anything that cannot be asserted without a live backend says so where it is, rather than pretending"
+        "src/utils/navigation.ts has real tests: validateRedirectPath, isValidExternalUrl and getSafeReturnUrl, against actual open-redirect and script-scheme payloads",
+        "Those tests are verified by MUTATION - the guard is broken and the suite observed going red - not assumed to work",
+        "The three vacuous XSS specs are replaced with ones aimed at surfaces that exist, each asserting the app rendered before concluding anything",
+        "Each replaced spec records what it used to assert and why that could not fail",
+        "No VITE_SUPABASE_* override in either CI job: both configs default them to the dev origin, which the CSP connect-src self requires"
       ],
       "priority": 169,
-      "passes": false,
-      "notes": "NEXT ITERATION. The generalisable question is not \"do these tests pass\" but \"could this test fail if the property it names were violated\" - which is the same question US-165 (a guard whose message understated its stake), US-166 (no guard at all) and US-167 (a guard configured to permit the defect) each answered no to in a different way."
+      "passes": true,
+      "notes": "MUTATION RESULTS, which are the point. Replacing the allow-list prefix check (cleanPath === allowed || startsWith(allowed + \"/\")) with a plain startsWith(allowed) was CAUGHT - that is the load-bearing check. Deleting the cleanPath.startsWith(\"//\") rejection was NOT caught, and correctly so: with this allow-list, //evil.example.com fails the allow-list anyway, so removing that clause changes no observable behaviour. It is defence in depth against a future loosening of the list, and a behavioural test cannot see an unreachable branch. Recorded in the test file so nobody reads it as a hole, and so nobody deletes the clause because nothing failed. Also caught myself writing expect(url.origin).toBe(new URL(page.url()).origin) - a thing compared to itself, exactly the shape this story is about - and fixed it to compare against baseURL."
     }
   ]
 }

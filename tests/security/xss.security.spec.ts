@@ -82,57 +82,77 @@ test.describe('XSS Security', () => {
   });
 
   test.describe('URL Parameter XSS', () => {
-    test('should sanitize XSS in URL query parameters', async ({ page }) => {
+    /**
+     * US-169: these three tests were vacuous, each in the same way — they aimed
+     * a payload at a surface this application does not have, and passed because
+     * nothing rendered it.
+     *
+     *   /?search=<payload>      nothing on the landing page reads ?search
+     *   /profile/<payload>      there is no /profile/:x route; profiles are /:username
+     *   ?redirect=<payload>     asserted page.url() does not start with "javascript:",
+     *                           which a same-document form submit can never produce
+     *
+     * The third is the one that mattered: Login.tsx really does read ?redirect
+     * and pass it to validateRedirectPath, so there IS an open-redirect surface
+     * — and the test covering it could not fail if the guard were deleted. That
+     * guard now has real tests, in src/utils/navigation.test.ts, verified by
+     * mutation.
+     *
+     * What is left here is the part that needs a browser: that the payload
+     * reaches a real route, is rendered by React, and neither executes nor
+     * appears unescaped in the DOM.
+     */
+    test('a payload in the profile slug is rendered as text, never executed', async ({ page }) => {
       for (const payload of XSS_PAYLOADS.slice(0, 5)) {
-        const encodedPayload = encodeURIComponent(payload);
-
-        await page.goto(`/?search=${encodedPayload}`);
+        // /:username is a real route, and the slug reaches the page.
+        await page.goto(`/${encodeURIComponent(payload)}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(300);
 
         const xssTriggered = await page.evaluate(
           () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
         );
+        expect(xssTriggered, `payload executed: ${payload}`).not.toBe(true);
 
-        expect(xssTriggered).not.toBe(true);
+        // The app must have rendered SOMETHING, or this proves nothing — the
+        // vacuous-pass trap these tests fell into (US-168, US-169).
+        const bodyText = (await page.locator('body').innerText()).trim();
+        expect(
+          bodyText.length,
+          'the SPA did not render; this assertion is meaningless'
+        ).toBeGreaterThan(0);
 
-        // Check DOM for unencoded payload
-        const content = await page.content();
-        expect(content).not.toContain(payload);
+        // No live element from the payload anywhere in the document.
+        const injected = await page.evaluate(
+          () => document.querySelectorAll('script[data-xss], img[onerror], svg[onload]').length
+        );
+        expect(injected, `payload produced live DOM: ${payload}`).toBe(0);
       }
     });
 
-    test('should sanitize XSS in path parameters', async ({ page }) => {
-      for (const payload of XSS_PAYLOADS.slice(0, 3)) {
-        const encodedPayload = encodeURIComponent(payload);
+    test('a script-bearing redirect never becomes the destination', async ({ page, baseURL }) => {
+      for (const payload of [
+        'javascript:alert(1)',
+        '//evil.example.com',
+        'https://evil.example.com',
+      ]) {
+        await page.goto(`/auth/login?redirect=${encodeURIComponent(payload)}`, {
+          waitUntil: 'domcontentloaded',
+        });
+        await page.waitForTimeout(300);
 
-        try {
-          await page.goto(`/profile/${encodedPayload}`);
+        // The login page must actually be there for this to mean anything.
+        await expect(page.locator('input[type="password"]')).toBeVisible();
 
-          const xssTriggered = await page.evaluate(
-            () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
-          );
+        // Whatever the page decided to do with ?redirect, it must not have
+        // navigated off-origin or into a script URL. Compared against the
+        // origin under test, not against itself — `url.origin === url.origin`
+        // is precisely the shape of assertion this story is about.
+        const expectedOrigin = new URL(baseURL ?? 'http://127.0.0.1:8080').origin;
+        const url = new URL(page.url());
 
-          expect(xssTriggered).not.toBe(true);
-        } catch {
-          // Page might error out - that's acceptable
-        }
-      }
-    });
-
-    test('should sanitize XSS in redirect URLs', async ({ page }) => {
-      for (const payload of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>']) {
-        const encodedPayload = encodeURIComponent(payload);
-
-        await page.goto(`/auth/login?redirect=${encodedPayload}`);
-
-        // Submit login form (with dummy data)
-        await page.fill('input[type="email"], input[name="email"]', 'test@test.com');
-        await page.fill('input[type="password"]', 'password123');
-        await page.click('button[type="submit"]');
-
-        // Should not navigate to javascript: or data: URLs
-        const url = page.url();
-        expect(url).not.toMatch(/^javascript:/);
-        expect(url).not.toMatch(/^data:/);
+        expect(url.origin, `left the origin for ${payload}`).toBe(expectedOrigin);
+        expect(url.protocol, `unsafe protocol for ${payload}`).toMatch(/^https?:$/);
+        expect(url.hostname, `left the host for ${payload}`).not.toContain('evil.example.com');
       }
     });
   });

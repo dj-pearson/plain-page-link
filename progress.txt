@@ -2494,3 +2494,86 @@ test pass" but "could it fail if the property it names were violated":
   US-167  a guard configured to permit exactly the defects it found
   US-168  a suite nobody ran, asserting against an app that does not exist
 Different mechanisms, same answer: no.
+
+================================================================================
+ITERATION 5 — US-169: the E2E suite, and the security tests that could not fail
+================================================================================
+
+Picked up the story US-168 filed. Two halves.
+
+HALF ONE — tests/e2e/. 22 specs across six files, run by no workflow. Ran them:
+22 passed in 27.5s. Unlike the security suite these are sound. They were written
+under US-114/US-116 and they assert POSITIVELY —
+
+  await expect(dialog(page)).toBeVisible();
+  await expect(dialog(page).getByText(SECOND.address).first()).toBeVisible();
+
+— so a blank page fails them. That is the structural difference from the
+security suite, which leaned on `not.toContain` and so passed on an empty
+document. Nothing to fix; they had simply never been wired up, so nothing would
+have said if they stopped. Now a CI job.
+
+HALF TWO — the audit US-168 asked for: could a passing security spec fail if the
+property it names were violated?
+
+Three could not, each in the same way — a payload aimed at a surface this
+application does not have:
+
+  /?search=<payload>      verified: nothing on the landing page reads ?search
+  /profile/<payload>      verified: there is no /profile/:x route at all
+                          (profiles are /:username)
+  ?redirect=<payload>     asserted page.url() does not start with "javascript:",
+                          which a same-document form submit cannot produce
+
+The third is the one that mattered, and it inverts the finding. Login.tsx DOES
+read ?redirect:
+
+  const rawRedirect = searchParams.get('redirect') || '/dashboard';
+  const redirectTo = validateRedirectPath(sanitizedRedirect, '/dashboard');
+
+So there is a real open-redirect surface, guarded by a real function — and
+src/utils/navigation.ts, which holds validateRedirectPath, isValidExternalUrl
+and getSafeReturnUrl, had NO TEST OF ANY KIND. The only thing claiming to cover
+it was an assertion that could not fail if the guard were deleted outright.
+
+It now has 30, against actual payloads: //evil.example.com, ///evil.example.com,
+https://evil.example.com, //evil.example.com/dashboard, javascript:, data:,
+vbscript:, file:, and the near-misses /dashboard-evil and /adminpanel.
+
+VERIFIED BY MUTATION, not assumed. I broke the guard twice and re-ran:
+
+  Mutation A: `cleanPath === allowed || cleanPath.startsWith(allowed + '/')`
+              -> plain `startsWith(allowed)`
+              CAUGHT — "refuses a path that merely resembles an allowed one".
+              That is the load-bearing check.
+
+  Mutation B: delete the `cleanPath.startsWith('//')` rejection
+              NOT CAUGHT — all 30 still passed.
+
+B is the interesting one, and it is not a hole. With this allow-list,
+`//evil.example.com` fails the allow-list anyway, so removing that clause
+changes no observable behaviour: it is defence in depth against a future
+loosening of the list, and a behavioural test cannot see an unreachable branch.
+Recorded in the test file so nobody reads it as a gap — and, more importantly,
+so nobody deletes the clause on the grounds that nothing failed.
+
+That distinction is worth keeping: "no test failed when I removed it" means
+either the test is weak OR the code is redundant, and only reading it tells you
+which.
+
+ONE ON MYSELF. My first draft of the replacement redirect spec contained:
+
+  expect(url.origin).toBe(new URL(page.url()).origin);
+
+A thing compared to itself. Precisely the shape of assertion this whole story is
+about, written by the person writing the story about it, ten minutes after
+describing it. It now compares against baseURL. The lesson is not "be careful" —
+it is that vacuous assertions are easy to write and invisible on a green run,
+which is why mutation is the check that matters.
+
+VERIFICATION: 710 unit tests across 78 files (was 680/77). Security 54 passed,
+1 skipped. E2E 22 passed. tsc clean, eslint 0 errors.
+
+CI now runs, and can fail on: typecheck, unit, build, bundle size, lint, audit,
+E2E, security, accessibility. When this loop started, three of those nine did
+not exist or could not fail.
