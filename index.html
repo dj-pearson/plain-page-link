@@ -68,19 +68,39 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-    <!-- Open Graph / Facebook -->
+    <!--
+      Open Graph / Facebook — the fallback card for a route that sets none.
+
+      og:url and twitter:url are deliberately ABSENT (US-170). They used to be
+      hardcoded to https://agentbio.net/, and any page that did not set its own
+      inherited them — so a shared link to /pricing, /vs/linktree or a city page
+      advertised itself as the homepage. A wrong URL is worse than no URL: with
+      neither tag, a crawler falls back to the canonical, and verify-seo already
+      requires every page to have a correct self-referencing one.
+    -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://agentbio.net/" />
     <meta property="og:title" content="Link in Bio for Real Estate Agents | AgentBio" />
     <meta property="og:description" content="The link in bio built for real estate agents and realtors. Show your listings, capture buyer and seller leads, and take bookings straight from Instagram." />
     <meta property="og:image" content="https://agentbio.net/Cover.png" />
 
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://agentbio.net/" />
-    <meta property="twitter:title" content="Link in Bio for Real Estate Agents | AgentBio" />
-    <meta property="twitter:description" content="The link in bio built for real estate agents and realtors. Show your listings, capture buyer and seller leads, and take bookings straight from Instagram." />
-    <meta property="twitter:image" content="https://agentbio.net/Cover.png" />
+    <!--
+      Twitter — declared with name=, not property= (US-170).
+
+      These are the fallback card for any route that does not set its own. They
+      used to say property="twitter:*", while SEOHead emits name="twitter:*".
+      react-helmet dedupes on the key attribute, so it replaced the og:* tags
+      above and left these standing: every prerendered page shipped TWO twitter
+      cards, and the surviving stale one said "Link in Bio for Real Estate
+      Agents" pointing at the homepage. Sharing any interior page — a city page,
+      a feature page, an article — could render the generic homepage card.
+
+      Matching the attribute is the whole fix: helmet now replaces these the way
+      it already replaced og:*. scripts/verify-seo.mjs fails on a duplicate.
+    -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Link in Bio for Real Estate Agents | AgentBio" />
+    <meta name="twitter:description" content="The link in bio built for real estate agents and realtors. Show your listings, capture buyer and seller leads, and take bookings straight from Instagram." />
+    <meta name="twitter:image" content="https://agentbio.net/Cover.png" />
 
     <title>Link in Bio for Real Estate Agents | AgentBio</title>
   </head>

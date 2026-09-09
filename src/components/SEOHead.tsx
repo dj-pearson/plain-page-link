@@ -156,6 +156,9 @@ export const SEOHead = ({
       <meta property="og:image:height" content="630" />
       <meta property="og:image:alt" content={fullTitle} />
       {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+      {/* US-170: the twitter card needs its own url too, or it inherits
+          whatever index.html last declared. */}
+      {canonicalUrl && <meta name="twitter:url" content={canonicalUrl} />}
       <meta property="og:locale" content={locale} />
 
       {/* Article-specific OG tags */}

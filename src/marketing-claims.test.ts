@@ -57,6 +57,26 @@ const RULES: { rule: string; pattern: RegExp }[] = [
       /\b(Join|Trusted by|Used by|Over)\s+[0-9][0-9,.]*\+?\s*(agents|realtors|users|customers|professionals)/i,
   },
   {
+    // US-170: the 24 city pages carried a "{city} Real Estate Market Overview"
+    // — Median Home Price $565,000, Market Trend Rising, Active Agents 8,500+,
+    // Avg. Days on Market 42 — all hardcoded in src/data/locations.ts with no
+    // source, no as-of date, and no update since the file was written. 96
+    // numbers presented as current market fact, to an audience of local agents
+    // who know the real ones.
+    //
+    // Market data is not banned. Market data with nothing behind it is. If a
+    // feed is wired up, render the source and the as-of date beside the number
+    // and add the label here with that reason.
+    // "Market Trend" is deliberately NOT in this pattern: "market trends"
+    // appears in ordinary blog copy ("Expert advice, market trends, and
+    // guides"), and a rule that fires on prose gets muted rather than obeyed.
+    // That one is covered structurally instead — see the LocationData test
+    // below, which is the stronger check anyway since the value has to come
+    // from somewhere.
+    rule: 'a market statistic with no source and no as-of date',
+    pattern: /Median Home Price|Avg\.?\s*Days on Market|Average Days on Market|\bActive Agents\b/i,
+  },
+  {
     rule: 'a star rating we did not receive',
     pattern: /\b[0-9](\.[0-9])?\s*\/\s*5\b/,
   },
@@ -173,6 +193,58 @@ describe('marketing claims', () => {
         RULES.some(({ pattern }) => pattern.test(sample)),
         `no rule catches: ${sample}`
       ).toBe(true);
+    }
+  });
+});
+
+/**
+ * US-170: the structural half of the market-statistic rule.
+ *
+ * The 24 entries in LOCATIONS each carried `medianPrice`, `marketTrend`,
+ * `agentCount` and `avgDaysOnMarket`, rendered as a "{city} Real Estate Market
+ * Overview" of four stat tiles. No source, no as-of date, and no update since
+ * the file was written — 96 numbers presented as current market fact, on pages
+ * read by local agents, who are the one audience that knows the real ones.
+ *
+ * A text pattern can be worked around by renaming a label. This cannot: the
+ * number has to come from a field, and there is no field to put it in.
+ */
+describe('city pages carry no unsourced market data (US-170)', () => {
+  const locationsSource = readFileSync(join(SRC, 'data/locations.ts'), 'utf8');
+
+  const BANNED_FIELDS = [
+    'medianPrice',
+    'marketTrend',
+    'agentCount',
+    'avgDaysOnMarket',
+    'population',
+  ];
+
+  it.each(BANNED_FIELDS)('LocationData has no %s', (field) => {
+    const declared = new RegExp(`^\\s*${field}\\??:`, 'm').test(locationsSource);
+
+    expect(
+      declared,
+      `src/data/locations.ts declares "${field}". Every value in that file is ` +
+        `hardcoded, so a market statistic there has nothing behind it — that is ` +
+        `what US-170 removed. If real market data is wired up, it needs a feed, ` +
+        `a visible source and an as-of date rendered beside the number, and this ` +
+        `list needs updating with that reason.`
+    ).toBe(false);
+  });
+
+  it('keeps the fields that are not measurements', () => {
+    // The point is not that city pages must be empty. A characterisation of a
+    // city is not a statistic, and a neighbourhood list is checkable fact.
+    expect(locationsSource).toMatch(/^\s*marketDescription:/m);
+    expect(locationsSource).toMatch(/^\s*neighborhoods:/m);
+  });
+
+  it('detects a banned field rather than passing whatever it is given', () => {
+    // Against the file as it was, not a synthetic sample.
+    const asItWas = "  medianPrice: '$565,000',\n  marketTrend: 'Rising',";
+    for (const field of ['medianPrice', 'marketTrend']) {
+      expect(new RegExp(`^\\s*${field}\\??:`, 'm').test(asItWas)).toBe(true);
     }
   });
 });

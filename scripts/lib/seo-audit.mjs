@@ -54,6 +54,29 @@ export function readDescription(html) {
   return { value: value ? value.trim() : null, count: metas.length };
 }
 
+/**
+ * Every occurrence of a social-card tag, counting BOTH spellings.
+ *
+ * US-170: index.html declared the Twitter card as property="twitter:*" while
+ * SEOHead emits name="twitter:*". react-helmet dedupes on the key attribute, so
+ * it replaced the og:* tags and left the static twitter ones standing — every
+ * prerendered page shipped two Twitter cards, and the stale survivor said
+ * "Link in Bio for Real Estate Agents" pointing at the homepage. Sharing any
+ * interior page could render the generic homepage card.
+ *
+ * Counting only one spelling would have missed it, which is exactly how it
+ * survived. Both are counted here.
+ */
+export function readSocialTag(html, key) {
+  const head = headOf(html);
+  const escaped = key.replace(':', '\\:');
+  const metas =
+    head.match(new RegExp(`<meta[^>]*(?:name|property)="${escaped}"[^>]*>`, 'gi')) || [];
+  if (metas.length === 0) return { values: [], count: 0 };
+  const values = metas.map((m) => attr(m, /<meta[^>]*>/gi, 'content')).filter(Boolean);
+  return { values, count: metas.length };
+}
+
 export function readCanonical(html) {
   const head = headOf(html);
   const links = head.match(/<link[^>]*rel="canonical"[^>]*>/gi) || [];
@@ -260,6 +283,32 @@ export function auditPages(pages, { origin }) {
       }
       if (/127\.0\.0\.1|localhost/.test(canonical.value)) {
         add(route, 'canonical points at a local preview server');
+      }
+    }
+
+    // --- social cards (US-170) -----------------------------------------------
+    // A page that ships two og:title or two twitter:title tags has an
+    // undefined card: which one a crawler keeps is not something to leave to
+    // chance, and the duplicate here was always the stale homepage one.
+    for (const key of ['og:title', 'og:url', 'twitter:title', 'twitter:url']) {
+      const tag = readSocialTag(html, key);
+      if (tag.count > 1) {
+        add(
+          route,
+          `has ${tag.count} ${key} tags — index.html and SEOHead must use the same ` +
+            `attribute (name= or property=) or react-helmet cannot dedupe them`
+        );
+      }
+    }
+
+    // And the card that survives must be this page's, not the homepage's.
+    if (!isHome) {
+      for (const key of ['og:url', 'twitter:url']) {
+        const tag = readSocialTag(html, key);
+        const value = tag.values[0];
+        if (value && (value === base || value === `${base}/`)) {
+          add(route, `${key} points at the homepage, not at this page`);
+        }
       }
     }
 

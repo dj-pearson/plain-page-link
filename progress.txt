@@ -2577,3 +2577,86 @@ VERIFICATION: 710 unit tests across 78 files (was 680/77). Security 54 passed,
 CI now runs, and can fail on: typecheck, unit, build, bundle size, lint, audit,
 E2E, security, accessibility. When this loop started, three of those nine did
 not exist or could not fail.
+
+================================================================================
+ITERATION 6 — US-170: 96 invented market statistics, and two Twitter cards
+================================================================================
+
+WHERE I LOOKED. Five iterations of engineering rigour; this time I wanted a
+product defect. Built the app and read what a visitor actually receives.
+
+First the app's own checks, all of which pass and none of which found this:
+verify:migrations OK, verify:seo OK (52 pages), size-check OK. So the question
+was what they do not check.
+
+FINDING ONE — 96 market statistics with nothing behind them.
+
+Every /for/{city} page renders a "{city} Real Estate Market Overview":
+
+    Median Home Price   $565,000
+    Market Trend        Rising
+    Active Agents       8,500+
+    Avg. Days on Market 42 days
+
+All four are hardcoded fields in src/data/locations.ts. No source. No as-of
+date. Never updated since the file was written. 24 cities x 4 numbers = 96
+figures presented as current market fact — on pages whose entire readership is
+local real estate agents, the one audience that knows what the real numbers are.
+
+This is the defect US-111, US-156, US-157 and US-159 each found somewhere else,
+and the guard those stories left behind does not cover it. Its rules match
+"Join N agents" phrasing, star ratings, named brokerages, leads/month. A bare
+value under an "Active Agents" label matches none of them.
+
+Deliberately NOT softened. US-159's rule: "a claim either has something behind
+it or it went." There is no market-data feed in this application, so they went.
+marketDescription stays — a characterisation of a city is not a measurement —
+and so do neighborhoods, which are checkable. `population` went too: declared in
+the interface, rendered nowhere, dead for as long as it existed.
+
+The guard is in two halves, and the second is the real one:
+  - a text rule on the labels (Median Home Price, Active Agents, Avg. Days on
+    Market). "Market Trend" is deliberately absent: "market trends" appears in
+    ordinary blog copy, and a rule that fires on prose gets muted rather than
+    obeyed. I found that by adding it and watching it flag BlogCategory.tsx.
+  - a structural rule that LocationData declares none of those fields. A text
+    pattern can be dodged by renaming a label; this cannot, because the number
+    has to come from somewhere and there is nowhere to put it.
+
+Demonstrated against the file as it was at HEAD, not a sample: 6 failures.
+
+FINDING TWO — every page shipped two Twitter cards.
+
+index.html declared the card as `property="twitter:*"`. SEOHead emits
+`name="twitter:*"`. react-helmet dedupes on the key attribute — so it replaced
+the og:* tags correctly and left the static twitter ones standing.
+
+Result: all 52 prerendered pages carried TWO twitter:title tags, and the stale
+survivor said "Link in Bio for Real Estate Agents | AgentBio" with
+twitter:url = https://agentbio.net/. Share a city page, a comparison page, a
+feature page, an article — and the card could render as the generic homepage.
+
+Same root cause one layer on: og:url and twitter:url were hardcoded to the
+homepage in index.html, so any page not setting its own inherited them. Those
+are now absent rather than wrong — with neither tag a crawler falls back to the
+canonical, and verify-seo already requires every page to have a correct
+self-referencing one. SEOHead now emits twitter:url beside og:url.
+
+THE GUARD counts BOTH spellings, which is the point: counting one is exactly how
+this survived. Run against the pre-fix build it failed 52 of 52 pages — that is
+what established the defect was universal rather than incidental.
+
+ALSO FIXED, found on the way. scripts/prerender.mts was the only browser launch
+in the repository not honouring PW_CHROMIUM_PATH. playwright.config.ts,
+playwright-e2e.config.ts and playwright-a11y.config.ts all do, each with a
+comment about why. prerender is the one inside `npm run build` — so on any
+machine with a pre-installed Chromium rather than Playwright's own download, the
+DEPLOY COMMAND failed, not merely the tests. Three lines.
+
+VERIFICATION: 717 tests across 78 files (was 710). Build + prerender of 52
+routes, verify:seo clean, size-check clean, tsc clean, eslint 0 errors.
+
+THE THREAD, six for six, with a variation. Iterations 1-5 were all "a check
+existed and could not fail". This one is the other half: the check was fine, it
+simply did not cover this. The city pages were noindexed for being thin (US-153,
+a good call) — and nobody asked whether the thin content was also invented.

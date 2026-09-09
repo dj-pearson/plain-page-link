@@ -2719,6 +2719,24 @@
       "priority": 169,
       "passes": true,
       "notes": "MUTATION RESULTS, which are the point. Replacing the allow-list prefix check (cleanPath === allowed || startsWith(allowed + \"/\")) with a plain startsWith(allowed) was CAUGHT - that is the load-bearing check. Deleting the cleanPath.startsWith(\"//\") rejection was NOT caught, and correctly so: with this allow-list, //evil.example.com fails the allow-list anyway, so removing that clause changes no observable behaviour. It is defence in depth against a future loosening of the list, and a behavioural test cannot see an unreachable branch. Recorded in the test file so nobody reads it as a hole, and so nobody deletes the clause because nothing failed. Also caught myself writing expect(url.origin).toBe(new URL(page.url()).origin) - a thing compared to itself, exactly the shape this story is about - and fixed it to compare against baseURL."
+    },
+    {
+      "id": "US-170",
+      "title": "Remove 96 unsourced market statistics from the city pages, and give every page its own social card",
+      "description": "Found by building the app and reading what a visitor actually receives. Two defects in the shipped HTML. FIRST: each of the 24 /for/{city} pages rendered a \"{city} Real Estate Market Overview\" of four stat tiles - Median Home Price $565,000, Market Trend Rising, Active Agents 8,500+, Avg. Days on Market 42. All four came from hardcoded fields in src/data/locations.ts with no source, no as-of date, and no update since the file was written: 96 numbers presented as current market fact, on pages whose readers are local agents, the one audience that knows the real ones. This is the defect US-111, US-156, US-157 and US-159 each found somewhere else, and the marketing-claims guard did not cover it - its rules match \"Join N agents\" phrasing and star ratings, not a bare value under an \"Active Agents\" label. SECOND: index.html declared the Twitter card as property=\"twitter:*\" while SEOHead emits name=\"twitter:*\". react-helmet dedupes on the key attribute, so it replaced the og:* tags and left the static twitter ones standing - all 52 prerendered pages shipped TWO twitter cards, and the stale survivor read \"Link in Bio for Real Estate Agents\" pointing at the homepage. og:url and twitter:url were also hardcoded to https://agentbio.net/, so any page not setting its own advertised itself as the homepage when shared.",
+      "acceptanceCriteria": [
+        "No market statistic is rendered that has no source and no as-of date",
+        "The fields are gone from LocationData, not merely unrendered, so a value cannot be reintroduced without somewhere to put it",
+        "marketDescription and neighborhoods survive: a characterisation of a city is not a measurement, and a neighbourhood list is checkable",
+        "src/marketing-claims.test.ts fails if the stat labels or the data fields return, demonstrated against the file as it was at HEAD",
+        "Every prerendered page carries exactly one og:title, og:url, twitter:title and twitter:url",
+        "No page advertises the homepage URL as its own",
+        "scripts/lib/seo-audit.mjs fails on either, counting BOTH the name= and property= spellings",
+        "npm run build, verify:seo, test:run, tsc and eslint all pass"
+      ],
+      "priority": 170,
+      "passes": true,
+      "notes": "The social-card check counts both spellings deliberately - counting one is exactly how the duplicate survived. Run against the pre-fix build it failed all 52 of 52 pages, which is what established the defect was universal rather than incidental. On the market data: nothing was softened into a vaguer version of the same claim, per US-159 - there is no market-data feed in this application, so the numbers went. If real data is wanted the guard says what it needs: a feed, a visible source, an as-of date beside the number. \"Market Trend\" is deliberately NOT in the text pattern because \"market trends\" appears in ordinary blog copy, and a rule that fires on prose gets muted rather than obeyed; it is covered structurally instead, which is the stronger check anyway. Also fixed: scripts/prerender.mts was the one browser launch in the repository not honouring PW_CHROMIUM_PATH, and it is the one inside npm run build - so on any machine with a pre-installed Chromium the DEPLOY COMMAND failed, not merely the tests. population was removed too: declared, never rendered."
     }
   ]
 }

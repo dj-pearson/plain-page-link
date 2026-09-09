@@ -14,19 +14,7 @@ interface LocationTemplateProps {
 }
 
 export default function LocationTemplate({ location }: LocationTemplateProps) {
-  const {
-    city,
-    state,
-    stateAbbr,
-    slug,
-    medianPrice,
-    marketTrend,
-    agentCount,
-    marketDescription,
-    neighborhoods,
-    avgDaysOnMarket,
-    indexable,
-  } = location;
+  const { city, state, stateAbbr, slug, marketDescription, neighborhoods, indexable } = location;
 
   const baseUrl = getBaseUrl();
   const canonicalUrl = `${baseUrl}/for/${slug}`;
@@ -286,53 +274,38 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
           </div>
         </section>
 
-        {/* Market Stats Section */}
-        {(medianPrice || marketTrend || agentCount) && (
+        {/*
+          US-170: this was a "{city} Real Estate Market Overview" — four stat
+          tiles reading Median Home Price $565,000, Market Trend Rising, Active
+          Agents 8,500+, Avg. Days on Market 42.
+
+          All four were hardcoded in src/data/locations.ts, carried no source and
+          no as-of date, and had never been updated since the file was written.
+          Twenty-four cities x four numbers = 96 market statistics presented as
+          current fact, on pages whose audience is local agents — the one
+          readership that knows what the real numbers are.
+
+          This is the defect US-111, US-156, US-157 and US-159 each found
+          somewhere else: a claim in the UI that nothing can produce. US-159 set
+          the rule and it applies unchanged here — "a claim either has something
+          behind it or it went". There is no market-data source wired into this
+          application, so they went rather than being softened into a vaguer
+          version of the same assertion.
+
+          If real market data is wanted here, it needs a feed, a visible source
+          and an as-of date. src/marketing-claims.test.ts fails the build if
+          these tiles come back without one.
+
+          marketDescription stays: it is a qualitative characterisation of a
+          city, not a measurement.
+        */}
+        {marketDescription && (
           <section className="container mx-auto px-4 py-16">
-            <div className="max-w-5xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
-                {city} Real Estate Market Overview
-              </h2>
-
-              <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {medianPrice && (
-                  <div className="glass-panel p-6 text-center">
-                    <Home className="h-10 w-10 text-primary mx-auto mb-3" />
-                    <div className="text-2xl font-bold mb-1">{medianPrice}</div>
-                    <div className="text-sm text-muted-foreground">Median Home Price</div>
-                  </div>
-                )}
-
-                {marketTrend && (
-                  <div className="glass-panel p-6 text-center">
-                    <TrendingUp className="h-10 w-10 text-green-500 mx-auto mb-3" />
-                    <div className="text-2xl font-bold mb-1">{marketTrend}</div>
-                    <div className="text-sm text-muted-foreground">Market Trend</div>
-                  </div>
-                )}
-
-                {agentCount && (
-                  <div className="glass-panel p-6 text-center">
-                    <Users className="h-10 w-10 text-primary mx-auto mb-3" />
-                    <div className="text-2xl font-bold mb-1">{agentCount}</div>
-                    <div className="text-sm text-muted-foreground">Active Agents</div>
-                  </div>
-                )}
-
-                {avgDaysOnMarket && (
-                  <div className="glass-panel p-6 text-center">
-                    <CheckCircle className="h-10 w-10 text-primary mx-auto mb-3" />
-                    <div className="text-2xl font-bold mb-1">{avgDaysOnMarket} days</div>
-                    <div className="text-sm text-muted-foreground">Avg. Days on Market</div>
-                  </div>
-                )}
-              </div>
-
-              {marketDescription && (
-                <div className="mt-8 glass-panel p-6">
-                  <p className="text-muted-foreground text-center">{marketDescription}</p>
-                </div>
-              )}
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-3xl md:text-4xl font-bold text-center mb-8">Selling in {city}</h2>
+              <p className="text-lg text-muted-foreground text-center leading-relaxed">
+                {marketDescription}
+              </p>
             </div>
           </section>
         )}

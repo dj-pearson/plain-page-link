@@ -546,7 +546,17 @@ async function main() {
       preview: { port: PORT, strictPort: true, host: '127.0.0.1', open: false },
       logLevel: 'warn',
     });
-    browser = await chromium.launch();
+    // US-170: honour PW_CHROMIUM_PATH, as playwright.config.ts,
+    // playwright-e2e.config.ts and playwright-a11y.config.ts all do. This is
+    // the one browser launch in the repository that did not, and it is the one
+    // inside `npm run build` — so on any machine with a pre-installed Chromium
+    // rather than Playwright's own download (a sandbox, a hardened image, an
+    // air-gapped builder) the DEPLOY COMMAND failed, not merely the tests.
+    browser = await chromium.launch(
+      process.env.PW_CHROMIUM_PATH
+        ? { executablePath: process.env.PW_CHROMIUM_PATH }
+        : undefined
+    );
     results = await renderAll(browser, routes, defaultTitle, articles);
   } finally {
     await browser?.close().catch(() => {});

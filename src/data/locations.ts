@@ -20,14 +20,9 @@ export interface LocationData {
   state: string;
   stateAbbr: string;
   slug: string;
-  medianPrice: string;
-  marketTrend: 'Rising' | 'Stable' | 'Cooling' | 'Hot';
-  agentCount: string;
   marketDescription: string;
   neighborhoods: string[];
   metroArea?: string;
-  population?: string;
-  avgDaysOnMarket?: string;
   /**
    * Whether this page may be indexed. Absent means no: the page still renders
    * and is still crawlable, it just carries `noindex, follow` and stays out of
@@ -47,11 +42,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Florida',
     stateAbbr: 'FL',
     slug: 'miami-real-estate-agents',
-    medianPrice: '$565,000',
-    marketTrend: 'Rising',
-    agentCount: '8,500+',
-    population: '450,000',
-    avgDaysOnMarket: '42',
     marketDescription:
       "Miami's luxury condo market and international buyer demand create unique opportunities for agents with strong Instagram presence and bilingual capabilities.",
     neighborhoods: [
@@ -74,11 +64,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Texas',
     stateAbbr: 'TX',
     slug: 'austin-real-estate-agents',
-    medianPrice: '$525,000',
-    marketTrend: 'Stable',
-    agentCount: '6,200+',
-    population: '1,000,000',
-    avgDaysOnMarket: '55',
     marketDescription:
       "Austin's tech-driven economy and influx of California transplants have reshaped the market. Agents succeed by showcasing modern homes and lifestyle amenities.",
     neighborhoods: [
@@ -101,11 +86,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Arizona',
     stateAbbr: 'AZ',
     slug: 'phoenix-real-estate-agents',
-    medianPrice: '$445,000',
-    marketTrend: 'Stable',
-    agentCount: '7,800+',
-    population: '1,600,000',
-    avgDaysOnMarket: '48',
     marketDescription:
       'Phoenix offers affordability compared to coastal markets, attracting remote workers and retirees. Agents benefit from showcasing desert lifestyle and modern communities.',
     neighborhoods: [
@@ -128,11 +108,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Colorado',
     stateAbbr: 'CO',
     slug: 'denver-real-estate-agents',
-    medianPrice: '$595,000',
-    marketTrend: 'Stable',
-    agentCount: '5,500+',
-    population: '715,000',
-    avgDaysOnMarket: '38',
     marketDescription:
       "Denver's outdoor lifestyle appeal and growing tech sector drive consistent demand. Agents succeed by highlighting mountain access and urban amenities.",
     neighborhoods: [
@@ -155,11 +130,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'California',
     stateAbbr: 'CA',
     slug: 'los-angeles-real-estate-agents',
-    medianPrice: '$975,000',
-    marketTrend: 'Stable',
-    agentCount: '25,000+',
-    population: '3,900,000',
-    avgDaysOnMarket: '45',
     marketDescription:
       "LA's diverse neighborhoods and entertainment industry create a dynamic market. Agents with strong social media presence capture high-value clients from Instagram.",
     neighborhoods: [
@@ -184,11 +154,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'New York',
     stateAbbr: 'NY',
     slug: 'new-york-real-estate-agents',
-    medianPrice: '$750,000',
-    marketTrend: 'Stable',
-    agentCount: '45,000+',
-    population: '8,300,000',
-    avgDaysOnMarket: '65',
     marketDescription:
       "NYC's competitive market demands agents with strong digital presence. Instagram-savvy agents showcase luxury listings and neighborhood expertise to stand out.",
     neighborhoods: [
@@ -211,11 +176,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'California',
     stateAbbr: 'CA',
     slug: 'san-francisco-real-estate-agents',
-    medianPrice: '$1,350,000',
-    marketTrend: 'Cooling',
-    agentCount: '8,200+',
-    population: '875,000',
-    avgDaysOnMarket: '52',
     marketDescription:
       "SF's tech wealth creates demand for premium properties. Agents leverage Instagram to reach tech professionals seeking urban living with Bay Area lifestyle.",
     neighborhoods: [
@@ -238,11 +198,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Washington',
     stateAbbr: 'WA',
     slug: 'seattle-real-estate-agents',
-    medianPrice: '$825,000',
-    marketTrend: 'Stable',
-    agentCount: '6,800+',
-    population: '750,000',
-    avgDaysOnMarket: '35',
     marketDescription:
       "Seattle's tech giants drive consistent housing demand. Agents use Instagram to showcase waterfront properties and access to Pacific Northwest outdoor lifestyle.",
     neighborhoods: [
@@ -265,11 +220,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Illinois',
     stateAbbr: 'IL',
     slug: 'chicago-real-estate-agents',
-    medianPrice: '$335,000',
-    marketTrend: 'Rising',
-    agentCount: '12,000+',
-    population: '2,700,000',
-    avgDaysOnMarket: '42',
     marketDescription:
       'Chicago offers urban living at accessible prices. Agents showcase diverse neighborhoods from luxury high-rises to classic brownstones via social media.',
     neighborhoods: [
@@ -292,11 +242,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Texas',
     stateAbbr: 'TX',
     slug: 'dallas-real-estate-agents',
-    medianPrice: '$395,000',
-    marketTrend: 'Rising',
-    agentCount: '9,500+',
-    population: '1,300,000',
-    avgDaysOnMarket: '38',
     marketDescription:
       'Dallas attracts corporate relocations with no state income tax. Agents succeed by showcasing master-planned communities and urban revitalization projects.',
     neighborhoods: [
@@ -319,11 +264,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Texas',
     stateAbbr: 'TX',
     slug: 'houston-real-estate-agents',
-    medianPrice: '$335,000',
-    marketTrend: 'Rising',
-    agentCount: '11,000+',
-    population: '2,300,000',
-    avgDaysOnMarket: '45',
     marketDescription:
       "Houston's energy sector and medical center drive diverse housing needs. Agents leverage Instagram to reach relocating professionals and international buyers.",
     neighborhoods: [
@@ -346,11 +286,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'California',
     stateAbbr: 'CA',
     slug: 'san-diego-real-estate-agents',
-    medianPrice: '$895,000',
-    marketTrend: 'Stable',
-    agentCount: '7,200+',
-    population: '1,400,000',
-    avgDaysOnMarket: '35',
     marketDescription:
       "San Diego's beach lifestyle and military presence create steady demand. Agents showcase coastal living and perfect weather year-round on Instagram.",
     neighborhoods: [
@@ -373,11 +308,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Georgia',
     stateAbbr: 'GA',
     slug: 'atlanta-real-estate-agents',
-    medianPrice: '$415,000',
-    marketTrend: 'Rising',
-    agentCount: '8,500+',
-    population: '500,000',
-    avgDaysOnMarket: '35',
     marketDescription:
       "Atlanta's film industry and corporate headquarters drive relocation demand. Agents use social media to showcase diverse neighborhoods and Southern charm.",
     neighborhoods: [
@@ -400,11 +330,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Tennessee',
     stateAbbr: 'TN',
     slug: 'nashville-real-estate-agents',
-    medianPrice: '$450,000',
-    marketTrend: 'Hot',
-    agentCount: '5,800+',
-    population: '690,000',
-    avgDaysOnMarket: '32',
     marketDescription:
       "Nashville's music industry and low taxes attract relocations from coastal cities. Agents showcase the city's unique culture and growing neighborhoods.",
     neighborhoods: [
@@ -427,11 +352,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'North Carolina',
     stateAbbr: 'NC',
     slug: 'charlotte-real-estate-agents',
-    medianPrice: '$395,000',
-    marketTrend: 'Rising',
-    agentCount: '6,200+',
-    population: '880,000',
-    avgDaysOnMarket: '38',
     marketDescription:
       "Charlotte's banking sector and NASCAR culture create unique market dynamics. Agents succeed by highlighting family-friendly suburbs and urban revitalization.",
     neighborhoods: [
@@ -454,11 +374,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Nevada',
     stateAbbr: 'NV',
     slug: 'las-vegas-real-estate-agents',
-    medianPrice: '$425,000',
-    marketTrend: 'Stable',
-    agentCount: '7,500+',
-    population: '650,000',
-    avgDaysOnMarket: '42',
     marketDescription:
       'Las Vegas attracts retirees and remote workers with no state income tax. Agents showcase luxury properties and master-planned communities on Instagram.',
     neighborhoods: [
@@ -481,11 +396,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Massachusetts',
     stateAbbr: 'MA',
     slug: 'boston-real-estate-agents',
-    medianPrice: '$795,000',
-    marketTrend: 'Stable',
-    agentCount: '6,500+',
-    population: '685,000',
-    avgDaysOnMarket: '28',
     marketDescription:
       "Boston's universities and biotech sector drive consistent demand. Agents showcase historic brownstones and waterfront condos to educated buyers.",
     neighborhoods: [
@@ -508,11 +418,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Oregon',
     stateAbbr: 'OR',
     slug: 'portland-real-estate-agents',
-    medianPrice: '$525,000',
-    marketTrend: 'Cooling',
-    agentCount: '4,800+',
-    population: '650,000',
-    avgDaysOnMarket: '48',
     marketDescription:
       "Portland's creative culture and outdoor access appeal to buyers seeking work-life balance. Agents highlight unique neighborhoods and sustainable living.",
     neighborhoods: [
@@ -535,11 +440,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Florida',
     stateAbbr: 'FL',
     slug: 'tampa-real-estate-agents',
-    medianPrice: '$395,000',
-    marketTrend: 'Rising',
-    agentCount: '6,800+',
-    population: '400,000',
-    avgDaysOnMarket: '38',
     marketDescription:
       "Tampa's waterfront living and no state income tax attract Northeast relocations. Agents showcase beach access and growing downtown development.",
     neighborhoods: [
@@ -562,11 +462,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Florida',
     stateAbbr: 'FL',
     slug: 'orlando-real-estate-agents',
-    medianPrice: '$385,000',
-    marketTrend: 'Rising',
-    agentCount: '7,200+',
-    population: '310,000',
-    avgDaysOnMarket: '42',
     marketDescription:
       "Orlando's tourism industry and theme parks create unique investment opportunities. Agents market vacation rentals and family homes to diverse buyers.",
     neighborhoods: [
@@ -589,11 +484,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Texas',
     stateAbbr: 'TX',
     slug: 'san-antonio-real-estate-agents',
-    medianPrice: '$295,000',
-    marketTrend: 'Rising',
-    agentCount: '5,500+',
-    population: '1,500,000',
-    avgDaysOnMarket: '45',
     marketDescription:
       'San Antonio offers Texas affordability with rich history and culture. Agents showcase military-friendly communities and historic neighborhoods.',
     neighborhoods: [
@@ -616,11 +506,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'North Carolina',
     stateAbbr: 'NC',
     slug: 'raleigh-real-estate-agents',
-    medianPrice: '$425,000',
-    marketTrend: 'Hot',
-    agentCount: '4,500+',
-    population: '470,000',
-    avgDaysOnMarket: '32',
     marketDescription:
       "Raleigh's Research Triangle drives tech relocations with affordable living. Agents showcase growing suburbs and access to universities and innovation.",
     neighborhoods: [
@@ -643,11 +528,6 @@ export const LOCATIONS: LocationData[] = [
     state: 'Utah',
     stateAbbr: 'UT',
     slug: 'salt-lake-city-real-estate-agents',
-    medianPrice: '$550,000',
-    marketTrend: 'Stable',
-    agentCount: '3,800+',
-    population: '200,000',
-    avgDaysOnMarket: '35',
     marketDescription:
       "Salt Lake's outdoor recreation and growing tech scene attract active buyers. Agents highlight ski access and family-friendly communities on social media.",
     neighborhoods: [
