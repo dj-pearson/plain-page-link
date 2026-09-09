@@ -3,8 +3,19 @@
  * Supports CSV and PDF export formats
  */
 
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// jsPDF and jspdf-autotable are imported dynamically inside the PDF functions,
+// NOT at the top of this module, and that is load-bearing (US-162).
+//
+// This module also exports exportToCSV, which builds a string and calls
+// URL.createObjectURL — it has nothing to do with PDF. But a top-level
+// `import { jsPDF } from 'jspdf'` makes the 605 KB export-vendor chunk a static
+// dependency of every module that imports anything from here, and Rollup cannot
+// tree-shake it away because other exports in the same module do use it. That
+// put the whole PDF library on the critical path of /dashboard/leads — the most
+// visited page in the product — to render one "Export CSV" button.
+//
+// Keep these imports inside the functions. A top-level import of either package
+// silently restores the regression.
 
 export interface ExportData {
   headers: string[];
@@ -80,10 +91,10 @@ export function exportToCSV(data: ExportData): void {
  * Export data to PDF format using jsPDF
  * Creates a professional, downloadable PDF report
  */
-export function exportToPDF(data: ExportData): void {
+export async function exportToPDF(data: ExportData): Promise<void> {
   const { headers, rows, title, dateRange } = data;
 
-  generatePDFReport({
+  await generatePDFReport({
     title: title || 'Analytics Report',
     dateRange,
     headers,
@@ -94,7 +105,12 @@ export function exportToPDF(data: ExportData): void {
 /**
  * Generate a professional PDF report with jsPDF
  */
-export function generatePDFReport(options: PDFReportOptions): void {
+export async function generatePDFReport(options: PDFReportOptions): Promise<void> {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+
   const {
     title,
     subtitle,

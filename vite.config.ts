@@ -159,8 +159,18 @@ export default defineConfig(({ mode }) => {
             'charts-vendor': ['recharts'],
             // Animation libraries
             'animation-vendor': ['framer-motion', 'gsap', '@gsap/react'],
-            // PDF/Export - only needed for exports
-            'export-vendor': ['jspdf', 'jspdf-autotable', 'html2canvas'],
+            // jspdf / jspdf-autotable are deliberately NOT listed here (US-162).
+            //
+            // They are reached only through the `await import('jspdf')` inside
+            // src/lib/exportUtils.ts, so Rollup already gives them their own
+            // async chunk. Naming them in manualChunks forced that chunk into
+            // existence eagerly and, worse, Rollup then placed Vite's
+            // `__vitePreload` helper inside it — so every module that used the
+            // helper statically imported 605 KB of PDF library to get a 200-byte
+            // function. Let Rollup do the splitting it can already do.
+            //
+            // html2canvas was listed here too and is not a dependency of this
+            // project at all; jspdf only references it optionally.
             // Markdown rendering - only needed for blog
             'markdown-vendor': ['react-markdown', 'remark-gfm'],
             // Firebase - only needed for push notifications

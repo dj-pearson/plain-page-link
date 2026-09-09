@@ -1839,3 +1839,80 @@ STORIES OPENED
     palette and type decision taken first and then a page-by-page pass. Deferred
     to a later iteration deliberately, per the loop's own rule about work that
     does not fit in one.
+
+### Iteration 2/15 — US-162: the Leads page loaded a PDF library to render a CSV button
+
+Iteration 1 left `npm run size-check` red on main: export-vendor 605 KB against a
+600 KB vendor budget. The obvious move is to raise the budget or add an
+exception. Both would have been wrong, because the chunk was not lazy.
+
+WHAT WAS ACTUALLY WRONG. src/lib/exportUtils.ts opened with
+`import { jsPDF } from 'jspdf'`. That module also exports exportToCSV, which is
+a string builder and a Blob download and touches nothing from jspdf. But a
+top-level import makes the jspdf chunk a static dependency of every consumer,
+and Rollup cannot tree-shake it away because generatePDFReport in the same
+module genuinely uses it.
+
+src/pages/dashboard/Leads.tsx imports exportToCSV and nothing else from there.
+Read out of the built output rather than reasoned about:
+  Leads-CcCFikjE.js -> exportUtils-RdteEteH.js (3 KB) -> export-vendor (605 KB,
+  184 KB gzip)
+605 KB on the critical path of the most-visited page in a lead-generation CRM,
+for a button that never calls it.
+
+TWO MORE DEFECTS FELL OUT OF THE SAME manualChunks LINE:
+  'export-vendor': ['jspdf', 'jspdf-autotable', 'html2canvas']
+  - html2canvas is not a dependency of this project. It is not in package.json.
+    jspdf references it optionally; the entry did nothing.
+  - Naming jspdf there made Rollup place Vite's `__vitePreload` helper inside
+    the resulting chunk, so consumers emitted `import{_}from"./export-vendor"` —
+    a static import of 605 KB to obtain a 200-byte function.
+
+THE FIX
+  - exportUtils.ts loads jsPDF and jspdf-autotable with
+    `await Promise.all([import('jspdf'), import('jspdf-autotable')])` inside
+    generatePDFReport. exportToPDF and generatePDFReport are now async.
+  - Both call sites await them. SearchAnalyticsDashboard's handler is async with
+    a try/catch, so the toast follows the download instead of racing it and a
+    failed chunk fetch is reported instead of becoming an unhandled rejection;
+    ReportBuilder was already inside an async try/catch and just needed the
+    await.
+  - The manualChunks entry is deleted, not edited. A dynamically imported
+    dependency does not need one — Rollup already splits it — and the entry was
+    what dragged the preload helper in.
+
+RESULT, from the build: export-vendor no longer exists. jspdf is a 386 KB async
+chunk plus a 31 KB autotable chunk, fetched on click. The Leads chunk's static
+imports contain no jspdf. exportUtils emits `import("./jspdf.es.min-*.js")`.
+`npm run size-check` passes — 195 chunks, one documented exception.
+
+THE TEST TOLD ME SOMETHING I WOULD HAVE MISSED. Making the functions async
+without awaiting them at the call sites left `savedFilenames` empty and wrote
+two real PDFs into the repository root — the exact US-121 defect the mock exists
+to prevent, resurrected by an unawaited promise racing the test's teardown. The
+suite caught it in the intermediate state. Both files were deleted; a clean run
+now leaves the working tree clean.
+
+The four PDF tests are awaited, and there is a new guard: two tests read
+exportUtils.ts as text and assert no top-level import of jspdf or
+jspdf-autotable, and that the dynamic form is present. One line restores this
+regression, and nothing else in the suite would notice — the page still works,
+it just costs half a megabyte to open. 10/10 pass. tsc --noEmit clean.
+
+STORY OPENED — US-163, and it is worse than the one just fixed. The preload
+helper has no home of its own, so with export-vendor gone Rollup moved it into
+three-vendor (800 KB). FullProfilePage now emits
+`import{_}from"./three-vendor-BHOYcAMp.js"` — a static import. That is
+/:username, the page every agent puts in their Instagram bio, paying 800 KB /
+220 KB gzip for Three.js before first paint whether or not the theme renders a
+3D background. Before this iteration the helper was in the jspdf chunk and the
+same page paid 605 KB for that, so it has been true continuously and only the
+victim changed. It also makes check-bundle-size.mjs's exception text — "lazy-
+loaded only on 3D hero sections, never on first paint" — false.
+
+Attempted and reverted: adding 'vite/preload-helper' to the react-vendor array.
+The object form of manualChunks resolves entries as package specifiers and the
+build dies with `Missing "./preload-helper" specifier in "vite" package`. The
+route is the function form of manualChunks, matching the virtual module id,
+which means re-deriving every existing grouping by path and proving no chunk
+reshuffles. Next iteration.

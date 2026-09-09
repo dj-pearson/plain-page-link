@@ -2586,6 +2586,36 @@
       "priority": "medium",
       "passes": false,
       "notes": "Opened 2026-09-09 during the platform-improvement loop. Take the palette/type decision first in one iteration, then the two tools pages (16 of the 49 palette findings sit in those two files), then the rest."
+    },
+    {
+      "id": "US-162",
+      "title": "The Leads page downloaded 605 KB of PDF library to render an Export CSV button",
+      "description": "src/lib/exportUtils.ts opened with `import { jsPDF } from 'jspdf'` at the top. It also exports exportToCSV, which is a string builder and a Blob download and has nothing to do with PDF. src/pages/dashboard/Leads.tsx imports exportToCSV and nothing else from that module \u2014 but a top-level import makes the jspdf chunk a static dependency of every consumer, and Rollup cannot tree-shake it because generatePDFReport in the same module genuinely uses it. Verified in the built output: Leads -> exportUtils (3 KB) -> export-vendor (605 KB / 184 KB gzip), all on the critical path of the most-visited page in a lead-generation CRM. Two knock-on defects came out of the same manualChunks entry: 'html2canvas' was listed in it and is not a dependency of this project at all, and naming jspdf there made Rollup place Vite's __vitePreload helper inside the resulting chunk, so consumers statically imported 605 KB to get a 200-byte function. This is also why `npm run size-check` was red on main: export-vendor was 605 KB against a 600 KB vendor budget.",
+      "acceptanceCriteria": [
+        "jsPDF and jspdf-autotable are loaded with a dynamic import inside the PDF functions, not at module top level.",
+        "The built Leads chunk has no static import of any jspdf chunk.",
+        "The PDF call sites await the now-async functions, so the success toast follows the download and a failure is reported rather than becoming an unhandled rejection.",
+        "A test asserts on the source that no top-level jspdf import has come back.",
+        "`npm run size-check` passes."
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-09. export-vendor no longer exists: jspdf is a 386 KB async chunk plus a 31 KB autotable chunk, fetched on click. Verified in dist, not inferred."
+    },
+    {
+      "id": "US-163",
+      "title": "The public profile page statically loads 800 KB of Three.js it usually never renders",
+      "description": "Vite's __vitePreload helper is a virtual module with no home of its own, so Rollup files it into whichever manualChunks group it likes. It currently lands in three-vendor. Every module that lazy-loads anything therefore emits `import{_}from\"./three-vendor-<hash>.js\"` \u2014 a STATIC import of an 800 KB chunk to obtain a 200-byte function. FullProfilePage is one of them. That is /:username, the page every agent puts in their Instagram bio and the single most-visited page on the platform, and it pays 800 KB / 220 KB gzip for Three.js before first paint whether or not the agent's theme uses a 3D background \u2014 most do not. Before US-162 the helper lived in the jspdf chunk and FullProfilePage paid 605 KB for that instead, so this has been true continuously, only the victim changed. It also makes the documented exception in scripts/check-bundle-size.mjs false where it says three-vendor is \"lazy-loaded only on 3D hero sections, never on first paint\".",
+      "acceptanceCriteria": [
+        "The __vitePreload helper lives in a chunk that every page loads anyway (react-vendor or the entry), not in a lazy vendor chunk.",
+        "No chunk statically imports three-vendor except the 3D components themselves.",
+        "FullProfilePage's static import graph contains no three-vendor.",
+        "The three-vendor exception text in scripts/check-bundle-size.mjs is true again, or corrected.",
+        "A check keeps the helper from drifting back into a lazy chunk."
+      ],
+      "priority": "high",
+      "passes": false,
+      "notes": "Next iteration. Adding 'vite/preload-helper' to the react-vendor array does NOT work \u2014 the object form of manualChunks resolves entries as package specifiers and the build dies with 'Missing \"./preload-helper\" specifier in \"vite\" package'. Tried and reverted. The route is to convert manualChunks to the function form and match on the virtual module id, which means re-deriving the existing groupings by path and verifying no chunk reshuffles \u2014 worth its own iteration."
     }
   ]
 }
