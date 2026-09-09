@@ -2751,3 +2751,89 @@ cosmetic and would bury a real finding in noise. The 19 exhaustive-deps warnings
 are the ones still worth reading — VoiceInput.tsx:102 (`missing dependencies:
 'onChange' and 'value'`) looks like a genuine stale closure in a mobile input,
 and that deserves its own pass rather than a hasty fix at the end of this one.
+
+================================================================================
+ITERATION 8 — US-172: nothing could say whether code was reachable
+================================================================================
+
+THE THREAD I LEFT. Iteration 7 flagged VoiceInput.tsx:102 as a likely stale
+closure. It is one, and a real one:
+
+    recognition.onresult = (event) => { ... const newValue = value + final; }
+    }, [isSupported, maxLength]);
+
+`onresult` closes over `value`, the deps do not include it, so the handler
+captures `value` from the first render forever. The comment says "Append final
+transcript to existing value" and the code does the opposite: every dictated
+phrase after the first overwrites the one before.
+
+Then I checked whether anything renders VoiceInput. Nothing does.
+
+That is the SECOND iteration running where a substantial module turned out to
+have no caller — US-171 found mortgageCalculator.ts, 378 lines, the same way,
+by following an unrelated lint warning into it. Both were advertised as
+features: `mortgageCalculator: true` on every pricing plan, and CLAUDE.md
+listing PullToRefresh and sync-manager under "PWA Features".
+
+Twice by accident is the finding. Nothing in this repository could answer "is
+this code reachable?", so the answer only ever arrived sideways.
+
+TWO MEASUREMENT MISTAKES, both mine, both worth recording.
+
+FIRST: I wrote an import walker. It reported 260 dead modules — including
+Breadcrumbs.tsx, which I had read being imported twenty minutes earlier.
+`React.lazy(() => import(...))` and multi-line imports defeat a regex. I did
+not report that number; I threw the tool away. Rollup already computes the real
+graph during the build, so the script asks Rollup.
+
+SECOND: Rollup said 84. But 20 of those export only types, are erased by tsc,
+and can never appear in a bundle — their absence is correct, not dead. Counting
+them would have inflated the claim by a third.
+
+The honest figure is 61 runtime modules under src/ that reach no browser.
+
+I also set BUDGET to 61 rather than the 49 I had estimated from a looser
+heuristic. A budget below reality is a permanently red job, and a permanently
+red job teaches people to raise budgets — which is precisely how US-167's a11y
+baseline came to permit the violations it found.
+
+A HYPOTHESIS I HAD AND DISPROVED, before writing any of it down. Grepping for
+`serviceWorker.register` found only sw-cleanup.ts, which UNREGISTERS service
+workers — and sw-cleanup explicitly allowlists `/sw.js` as one to keep. So it
+looked like the app protects a registration it never creates, i.e. the PWA does
+not work. It does: src/lib/register-sw.ts registers it via workbox-window from
+main.tsx, production only (US-027). My grep was for the wrong string. Checking
+before claiming is the only reason that is a footnote and not this entry's
+headline.
+
+WHY A GREP CANNOT DO THIS, which is the generalisable part:
+
+    usePullToRefresh  <- imported by PullToRefresh
+    PullToRefresh     <- imported by nothing
+
+Every link has an importer. The chain is dead. Grep for either name and both
+look live. Reachability is a graph property and only the graph answers it.
+
+WHAT IS DEAD, in outline: the whole pull-to-refresh chain; four of the five
+components in src/components/mobile/ (CameraUpload, MobileListingCard,
+PullToRefresh, VoiceInput); useOfflineStorage, useNetworkStatus,
+useTouchInteraction, useMotionPreference; five superseded
+locations/*Agents.tsx pages; several admin dashboards; and sync-manager.ts —
+which matters more than the rest, because it is the ONLY writer to the IndexedDB
+stores App.tsx creates on every single load. Those stores are created, and
+nothing ever puts anything in them.
+
+WHAT I DID. scripts/check-unbundled.mjs, wired into CI beside the bundle-size
+check. It reports, it does not delete, and it ratchets. Demonstrated able to
+fail: added a one-line module nobody imports, count went 61 -> 62, exit 1.
+
+Corrected CLAUDE.md's Mobile Optimization section to separate what is wired
+(register-sw, MobileNav, offlineStorage.init, touch targets) from what is
+written but unreachable, and said explicitly not to assume a mobile behaviour
+exists because a hook for it does.
+
+FILED US-173 for the deletion itself. Not done here on purpose: deleting 61
+modules in the same commit that builds the measurement would leave nobody able
+to check the measurement against the before state.
+
+VERIFICATION: 728 tests, tsc clean, eslint 0 errors, ratchet demonstrated.

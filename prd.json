@@ -2755,6 +2755,38 @@
       "priority": 171,
       "passes": true,
       "notes": "The route in was an ESLint warning, which is worth recording: 687 warnings sit in this codebase and the two highest-signal categories are no-useless-assignment and react-hooks/exhaustive-deps. The mortgageCalculator warnings turned out to be benign let-initialisers - but reading them surfaced that the module has no caller, which surfaced the pricing config, which surfaced the live rendering bug. The warning was not the defect; it was the thread. What the pricing page actually reads is subscription_plans from the database, seeded by 20260902000014, whose 7 features are all implemented - US-118 had already cleaned THAT up. The stale 15-feature matrix survived beside it because nothing read it, which is the same two-sources-of-truth shape as US-107 (three status lists), US-166 (CLAUDE.md vs types.ts) and US-170 (two status colour maps). Deliberately not touched: 240 no-explicit-any and 315 react/no-unescaped-entities warnings, and the 19 exhaustive-deps ones - VoiceInput.tsx:102 in particular looks like a genuine stale closure and is worth its own pass."
+    },
+    {
+      "id": "US-172",
+      "title": "Make code reachability measurable, and correct the mobile claims it disproves",
+      "description": "Two iterations in a row found a substantial dead module by accident. US-171 found src/lib/mortgageCalculator.ts - 378 lines with no caller - by following an unrelated lint warning into it, and this one found src/components/mobile/VoiceInput.tsx the same way. Both were advertised as features: mortgageCalculator: true sat on every pricing plan, and CLAUDE.md listed PullToRefresh, usePullToRefresh and sync-manager under PWA Features. Nothing in the repository could answer whether a module is reachable, so the answer kept arriving by chance. Asking Rollup for the real module graph says 61 runtime modules under src/ reach no browser. Among them the entire pull-to-refresh chain, four of the five components in src/components/mobile/, and src/lib/sync-manager.ts - which is the only writer to the IndexedDB stores App.tsx creates on every load, so those stores are created and never used.",
+      "acceptanceCriteria": [
+        "A script reports which modules under src/ never enter the bundle, using the bundler own graph rather than a grep or a hand-written import walker",
+        "Type-only modules are not counted: they are erased at compile time and their absence is correct",
+        "Non-app entry points are allowlisted by path with what reaches them",
+        "The count ratchets - it may fall, never rise - and the failure message forbids raising the budget",
+        "The ratchet is demonstrated able to fail against a newly added dead module",
+        "CLAUDE.md distinguishes the mobile and PWA capabilities that are wired up from those that are not",
+        "It runs in CI",
+        "tsc, eslint and the test suite pass"
+      ],
+      "priority": 172,
+      "passes": true,
+      "notes": "TWO MEASUREMENT MISTAKES MADE AND CORRECTED, both worth recording because both would have been overclaims. First, a hand-written import walker reported 260 dead modules including ones that are plainly live - React.lazy(() => import(...)) and multi-line imports defeat a regex. I did not report that number; I replaced the tool with the bundler. Second, the bundler said 84, but 20 of those export only types and are erased at compile time, so their absence from a bundle is correct rather than dead. The honest figure is 61. I also set the budget to 61 - the truth - rather than to the 49 I had estimated from a looser heuristic, because a budget below reality is a red CI that teaches people to raise budgets. A HYPOTHESIS I HAD AND DISPROVED: I thought the service worker was never registered, since grepping for serviceWorker.register found only sw-cleanup.ts, which unregisters. src/lib/register-sw.ts registers it via workbox-window from main.tsx (US-027). The PWA works. Filed US-173 for actually deleting the 61."
+    },
+    {
+      "id": "US-173",
+      "title": "Delete or wire up the 61 modules that reach no browser",
+      "description": "US-172 made the list measurable and ratcheted it; this is the work of shortening it. 61 runtime modules under src/ are unreachable from src/main.tsx, including the whole pull-to-refresh chain, four of five src/components/mobile/ components, src/lib/sync-manager.ts, src/lib/mortgageCalculator.ts, several admin dashboards and a number of hooks. Each needs a decision rather than a sweep: some are staged work someone intended to finish, some are superseded (the five src/pages/landing/locations/*Agents.tsx pages were replaced by DynamicLocationPage), and some are simply dead. A module whose only consumer is its own test counts as unreachable but is the ambiguous case - the test proves someone cared, not that anything ships.",
+      "acceptanceCriteria": [
+        "Every one of the 61 gets a decision: deleted, wired up, or allowlisted with the reason it is an entry point",
+        "The BUDGET in scripts/check-unbundled.mjs comes down to match",
+        "Nothing is deleted that a test covers without first deciding whether the tested behaviour is wanted",
+        "sync-manager and offline-storage are resolved together: App.tsx creates IndexedDB stores that only sync-manager would write to, so either wire the pair up or stop creating the stores"
+      ],
+      "priority": 173,
+      "passes": false,
+      "notes": "NEXT ITERATION. Deliberately not done in US-172: deleting 61 modules is a large reviewable change, and doing it in the same pass as building the measurement would have meant nobody could check the measurement against the before state."
     }
   ]
 }

@@ -1029,16 +1029,28 @@ logger.authEvent('login_success', user.id);
 
 ### Mobile Optimization
 
-**PWA Features:**
-- `usePullToRefresh` hook for mobile refresh patterns
-- Offline storage with IndexedDB (`src/lib/offline-storage.ts`)
-- Sync manager for offline data synchronization
+**What is actually wired into the app:**
+- Service worker registration with update prompt — `src/lib/register-sw.ts`,
+  called from `main.tsx`, production builds only (US-027). `public/sw.js` is
+  auth-safe by design and `sw-cleanup.ts` allowlists it.
+- `MobileNav`, from `DashboardLayout`
+- `offlineStorage.init()` from `App.tsx`, which creates the IndexedDB stores
 - 44px minimum touch targets for iOS compliance
 
-**Mobile Components (`src/components/mobile/`):**
-- `MobileNav` with responsive navigation
-- `PullToRefresh` component
-- Mobile-optimized form inputs with proper `inputMode`
+**Written, but reaching no browser (US-172):**
+
+`PullToRefresh`, `usePullToRefresh`, `CameraUpload`, `MobileListingCard`,
+`VoiceInput`, `useOfflineStorage`, `useNetworkStatus`, `useTouchInteraction`,
+`useMotionPreference` and `src/lib/sync-manager.ts` are all unreachable from
+`src/main.tsx`. `offlineStorage.init()` therefore creates object stores that
+nothing writes to or reads from — sync-manager is their only writer and it is
+not wired up.
+
+Do not describe these as platform capabilities, and do not assume a mobile
+behaviour exists because a hook for it does. `npm run check:unbundled` lists
+every module in this state; `usePullToRefresh` is the shape to watch for — it
+*is* imported, by `PullToRefresh`, which is imported by nothing, so a grep for
+either one makes both look live.
 
 ### Error Handling Patterns
 
@@ -1100,10 +1112,10 @@ try {
 
 ### Mobile & PWA
 
-- `src/hooks/usePullToRefresh.ts` - Pull-to-refresh functionality
-- `src/lib/offline-storage.ts` - IndexedDB offline storage
-- `src/lib/sync-manager.ts` - Offline sync management
+- `src/lib/register-sw.ts` - Service worker registration (the real PWA entry point)
+- `src/lib/offline-storage.ts` - IndexedDB offline storage (initialised, not yet read)
 - `src/components/mobile/MobileNav.tsx` - Mobile navigation
+- `scripts/check-unbundled.mjs` - Which modules under `src/` reach no browser
 
 ---
 

@@ -32,7 +32,8 @@
     "prepare": "husky",
     "prerender": "tsx scripts/prerender.mts",
     "articles:snapshot": "tsx scripts/snapshot-articles.mts",
-    "verify:seo": "node scripts/verify-seo.mjs"
+    "verify:seo": "node scripts/verify-seo.mjs",
+    "check:unbundled": "node scripts/check-unbundled.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
