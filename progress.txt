@@ -1916,3 +1916,69 @@ build dies with `Missing "./preload-helper" specifier in "vite" package`. The
 route is the function form of manualChunks, matching the virtual module id,
 which means re-deriving every existing grouping by path and proving no chunk
 reshuffles. Next iteration.
+
+### Iteration 3/15 — US-163: Three.js was on the critical path of every page
+
+Opened at the end of iteration 2 believing FullProfilePage was the victim.
+Writing the guard showed it was worse than that.
+
+THE MECHANISM. Vite's `__vitePreload` helper is a virtual module with no home of
+its own, so Rollup files it into whichever manualChunks group it picks. It had
+landed in three-vendor. Every chunk that lazy-loads anything then emitted
+`import{_}from"./three-vendor-<hash>.js"` — a STATIC import of an 800 KB chunk to
+obtain a 200-byte function.
+
+THE ACTUAL BLAST RADIUS, from the guard run against the old config:
+  FullProfilePage-B8_AhUTY.js  statically imports three-vendor (800 KB)
+  exportUtils-D862ke8l.js      statically imports three-vendor (800 KB)
+  index-PBqFv9Am.js            statically imports three-vendor (800 KB)
+  jspdf.es.min-Ad-4HYgU.js     statically imports three-vendor (800 KB)
+`index-*.js` is the ENTRY. It loads on every route. So every visitor to every
+page on the platform — the marketing landing page, the blog, every agent's
+public profile — downloaded 800 KB / 220 KB gzip of Three.js before first paint,
+whether or not anything on the page rendered 3D. Before US-162 the helper lived
+in the jspdf chunk and the same importers paid 605 KB for that instead. This has
+been true continuously; only the victim changed.
+
+THE FIX. manualChunks converted from the object form to a function. That is
+forced, not stylistic: the object form resolves its entries as package
+specifiers, so a virtual module cannot be named in it — putting
+`'vite/preload-helper'` in the react-vendor array kills the build with
+`Missing "./preload-helper" specifier in "vite" package` (tried in iteration 2,
+reverted). A function can match the id directly, and does, first thing.
+
+The groupings moved into a VENDOR_CHUNKS table matched on the package directory
+a module resolves into. One deliberate difference from the object form: a
+package's transitive dependencies are no longer welded into its group —
+recharts' d3-* packages get their own chunks. That could have reshuffled
+everything, so it was checked rather than assumed.
+
+VERIFICATION, all against real builds:
+  - helper now in react-vendor: `import{_}from"./react-vendor-DtYTAvso.js"`.
+  - the only static importers of three-vendor are FloatingGeometry, GradientMesh
+    and ThreeDBackground — the 3D components themselves.
+  - FullProfilePage's static vendor deps: animation, form, react, state. No three.
+  - the entry chunk's: charts, form, react, state, supabase, ui. No three.
+  - chunk name set identical before and after — 195 both times, `diff` clean.
+  - vendor sizes within 6 KB (react-vendor 155 -> 161.5 KB, the helper and
+    react-router; three-vendor 818 -> 797 KB).
+  - tsc --noEmit clean; vitest still resolves the config.
+
+THE GUARD, and why the old one could not have caught this. The exception in
+check-bundle-size.mjs said three-vendor was "lazy-loaded only on 3D hero
+sections, never on first paint". That was false for months and nothing noticed,
+because an exception made of prose asserts nothing. It now carries a
+`staticImporters` list — the only chunks allowed to `import ... from` it — and
+the check walks every built chunk and fails on any other static importer. A
+static import renders as `from"./chunk.js"` and a dynamic one as
+`import("./chunk.js")`, so matching on `from` picks up exactly the imports that
+put a chunk on a critical path.
+
+Demonstrated, not assumed: stashing the new vite.config, rebuilding with the old
+one and running the check produced the four-importer failure quoted above.
+Restored, it passes.
+
+STORY OPENED — US-164. With three-vendor gone from the entry, what remains
+static there is charts-vendor: 394 KB of recharts, in a chunk whose own comment
+reads "Charts - dashboard only", loaded on every route including the marketing
+landing page. Next iteration.

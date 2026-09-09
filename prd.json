@@ -2604,18 +2604,32 @@
     },
     {
       "id": "US-163",
-      "title": "The public profile page statically loads 800 KB of Three.js it usually never renders",
-      "description": "Vite's __vitePreload helper is a virtual module with no home of its own, so Rollup files it into whichever manualChunks group it likes. It currently lands in three-vendor. Every module that lazy-loads anything therefore emits `import{_}from\"./three-vendor-<hash>.js\"` \u2014 a STATIC import of an 800 KB chunk to obtain a 200-byte function. FullProfilePage is one of them. That is /:username, the page every agent puts in their Instagram bio and the single most-visited page on the platform, and it pays 800 KB / 220 KB gzip for Three.js before first paint whether or not the agent's theme uses a 3D background \u2014 most do not. Before US-162 the helper lived in the jspdf chunk and FullProfilePage paid 605 KB for that instead, so this has been true continuously, only the victim changed. It also makes the documented exception in scripts/check-bundle-size.mjs false where it says three-vendor is \"lazy-loaded only on 3D hero sections, never on first paint\".",
+      "title": "Every page loaded 800 KB of Three.js it never rendered",
+      "description": "Vite's __vitePreload helper is a virtual module with no home of its own, so Rollup files it into whichever manualChunks group it likes. It had landed in three-vendor. Every chunk that lazy-loads anything therefore emitted `import{_}from\"./three-vendor-<hash>.js\"` \u2014 a STATIC import of an 800 KB chunk to obtain a 200-byte function. The story was opened believing FullProfilePage (/:username, the page every agent puts in their Instagram bio) was the victim. Writing the guard showed it was worse: the ENTRY chunk index-*.js was a static importer too, so every visitor to every route on the platform \u2014 landing page included \u2014 downloaded 800 KB / 220 KB gzip of Three.js before first paint, whether or not anything on the page rendered 3D. Before US-162 the helper lived in the jspdf chunk and the same importers paid 605 KB for that instead, so this has been true continuously; only the victim changed. It also made the exception in scripts/check-bundle-size.mjs \u2014 three-vendor is \"lazy-loaded only on 3D hero sections, never on first paint\" \u2014 false, and nothing noticed, because the exception carried only prose.",
       "acceptanceCriteria": [
-        "The __vitePreload helper lives in a chunk that every page loads anyway (react-vendor or the entry), not in a lazy vendor chunk.",
-        "No chunk statically imports three-vendor except the 3D components themselves.",
-        "FullProfilePage's static import graph contains no three-vendor.",
-        "The three-vendor exception text in scripts/check-bundle-size.mjs is true again, or corrected.",
-        "A check keeps the helper from drifting back into a lazy chunk."
+        "The __vitePreload helper lives in react-vendor, which every page loads anyway, not in a lazy vendor chunk.",
+        "Only the 3D components themselves statically import three-vendor.",
+        "Neither the entry chunk nor FullProfilePage has three-vendor in its static import graph.",
+        "The bundle-size exception names the chunks allowed to statically import it, and the check enforces that \u2014 prose alone could not catch this.",
+        "The chunk name set and vendor chunk sizes are unchanged, so the manualChunks rewrite reshuffled nothing."
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-09. manualChunks converted from the object form to a function, because the object form resolves its entries as package specifiers and cannot name a virtual module \u2014 `'vite/preload-helper'` in the react-vendor array kills the build with `Missing \"./preload-helper\" specifier in \"vite\" package`. Verified against real builds: identical 195-chunk name set before and after, vendor sizes within 6 KB, and the new guard demonstrated failing against the old config \u2014 where it named four static importers including the entry chunk."
+    },
+    {
+      "id": "US-164",
+      "title": "recharts is in the entry chunk, so the landing page ships a dashboard charting library",
+      "description": "With three-vendor off the critical path (US-163), the entry chunk's remaining static vendor imports are charts-vendor, form-vendor, react-vendor, state-vendor, supabase and ui-vendor. charts-vendor is 394 KB of recharts, and its own comment in vite.config.ts says \"Charts - dashboard only\". The entry chunk loads on every route, so every visitor to the marketing landing page, every blog reader and every public profile visitor pays for a charting library they will never see. Something in the eagerly-loaded graph imports recharts statically \u2014 App.tsx and the landing page are eager by design, so the path is short and findable.",
+      "acceptanceCriteria": [
+        "The static importer of recharts in the eager graph is identified and made lazy.",
+        "The built entry chunk has no static import of charts-vendor.",
+        "charts-vendor is reached only from dashboard and admin routes.",
+        "The bundle-size check enforces it, the way US-163's staticImporters list does for three-vendor."
       ],
       "priority": "high",
       "passes": false,
-      "notes": "Next iteration. Adding 'vite/preload-helper' to the react-vendor array does NOT work \u2014 the object form of manualChunks resolves entries as package specifiers and the build dies with 'Missing \"./preload-helper\" specifier in \"vite\" package'. Tried and reverted. The route is to convert manualChunks to the function form and match on the virtual module id, which means re-deriving the existing groupings by path and verifying no chunk reshuffles \u2014 worth its own iteration."
+      "notes": "Opened 2026-09-09 while verifying US-163. Next iteration."
     }
   ]
 }

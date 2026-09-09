@@ -39,6 +39,77 @@ const ANALYZE = process.env.ANALYZE === 'true';
 // dist without that flag set.
 const BUILD_SOURCEMAPS = process.env.BUILD_SOURCEMAPS === 'true';
 
+// Vendor chunk groupings, applied by the manualChunks function below.
+//
+// Matched on the package directory a module resolves into, so a package's own
+// files all land together. Transitive dependencies are deliberately NOT pulled
+// in: recharts' d3-* packages, for instance, get their own chunks rather than
+// being welded into charts-vendor, which is what the old object form did.
+//
+// Order matters only in that the first match wins; the lists are disjoint.
+const VENDOR_CHUNKS: readonly (readonly [string, readonly string[]])[] = [
+  // React core - rarely changes, caches well
+  ['react-vendor', ['react', 'react-dom', 'react-router-dom', 'react-router']],
+  // Supabase client - used everywhere
+  ['supabase', ['@supabase/supabase-js']],
+  // UI framework - Radix components
+  [
+    'ui-vendor',
+    [
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-select',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-switch',
+      '@radix-ui/react-toast',
+      '@radix-ui/react-label',
+      '@radix-ui/react-progress',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-slot',
+      '@radix-ui/react-alert-dialog',
+    ],
+  ],
+  // Heavy 3D libraries - lazy loaded, and they must STAY lazy: see the
+  // preload-helper note in manualChunks below.
+  ['three-vendor', ['three', '@react-three/fiber', '@react-three/drei']],
+  // Charts - dashboard only
+  ['charts-vendor', ['recharts']],
+  // Animation libraries
+  ['animation-vendor', ['framer-motion', 'gsap', '@gsap/react']],
+  // Markdown rendering - blog only
+  ['markdown-vendor', ['react-markdown', 'remark-gfm']],
+  // Form handling
+  ['form-vendor', ['react-hook-form', '@hookform/resolvers', 'zod']],
+  // State management
+  ['state-vendor', ['zustand', '@tanstack/react-query']],
+  // Date utilities
+  ['date-vendor', ['date-fns']],
+];
+
+// jspdf / jspdf-autotable are deliberately absent from the table above
+// (US-162). They are reached only through the `await import('jspdf')` inside
+// src/lib/exportUtils.ts, so Rollup already gives them their own async chunk.
+// Naming them here forced that chunk into existence eagerly and made it the
+// preload helper's home. html2canvas was listed too and is not a dependency of
+// this project at all; jspdf only references it optionally.
+
+/**
+ * The package a module id belongs to, or undefined for first-party source.
+ * Handles scoped names, and the last node_modules segment so a nested
+ * dependency is attributed to itself rather than to its parent.
+ */
+function packageOf(id: string): string | undefined {
+  const marker = 'node_modules/';
+  const last = id.lastIndexOf(marker);
+  if (last === -1) return undefined;
+
+  const rest = id.slice(last + marker.length).split('/');
+  return rest[0].startsWith('@') ? `${rest[0]}/${rest[1]}` : rest[0];
+}
+
 export default defineConfig(({ mode }) => {
   // '' as the prefix so .env files are read whole; only VITE_GA_MEASUREMENT_ID
   // is used below, and Vite still applies its own VITE_ prefix rule to what the
@@ -131,55 +202,34 @@ export default defineConfig(({ mode }) => {
         output: {
           format: 'es',
           // Manual chunk splitting for better caching and smaller initial bundle
-          manualChunks: {
-            // React core - rarely changes, cache well
-            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-            // Supabase client - used everywhere
-            supabase: ['@supabase/supabase-js'],
-            // UI framework - Radix components
-            'ui-vendor': [
-              '@radix-ui/react-dialog',
-              '@radix-ui/react-dropdown-menu',
-              '@radix-ui/react-tabs',
-              '@radix-ui/react-select',
-              '@radix-ui/react-popover',
-              '@radix-ui/react-accordion',
-              '@radix-ui/react-checkbox',
-              '@radix-ui/react-switch',
-              '@radix-ui/react-toast',
-              '@radix-ui/react-label',
-              '@radix-ui/react-progress',
-              '@radix-ui/react-separator',
-              '@radix-ui/react-slot',
-              '@radix-ui/react-alert-dialog',
-            ],
-            // Heavy 3D libraries - lazy loaded
-            'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-            // Charts - only needed in dashboard
-            'charts-vendor': ['recharts'],
-            // Animation libraries
-            'animation-vendor': ['framer-motion', 'gsap', '@gsap/react'],
-            // jspdf / jspdf-autotable are deliberately NOT listed here (US-162).
+          manualChunks(id) {
+            // Vite's __vitePreload helper is a virtual module with no home of
+            // its own, so left to Rollup it is filed into whichever manual
+            // chunk it happens to pick. Every module that lazy-loads anything
+            // then emits `import{_}from"./<that chunk>"` — a STATIC import of
+            // the whole chunk to obtain a 200-byte function.
             //
-            // They are reached only through the `await import('jspdf')` inside
-            // src/lib/exportUtils.ts, so Rollup already gives them their own
-            // async chunk. Naming them in manualChunks forced that chunk into
-            // existence eagerly and, worse, Rollup then placed Vite's
-            // `__vitePreload` helper inside it — so every module that used the
-            // helper statically imported 605 KB of PDF library to get a 200-byte
-            // function. Let Rollup do the splitting it can already do.
+            // It had landed in the 605 KB jspdf chunk, and after US-162 removed
+            // that chunk it moved into the 818 KB three-vendor one, which put
+            // Three.js on the critical path of FullProfilePage — /:username,
+            // the page every agent puts in their Instagram bio, whose theme
+            // usually renders no 3D at all. Same defect both times; only the
+            // victim changed.
             //
-            // html2canvas was listed here too and is not a dependency of this
-            // project at all; jspdf only references it optionally.
-            // Markdown rendering - only needed for blog
-            'markdown-vendor': ['react-markdown', 'remark-gfm'],
-            // Firebase - only needed for push notifications
-            // Form handling
-            'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
-            // State management
-            'state-vendor': ['zustand', '@tanstack/react-query'],
-            // Date utilities
-            'date-vendor': ['date-fns'],
+            // This is why manualChunks is a function rather than the object
+            // form it used to be: the object form resolves its entries as
+            // package specifiers, so 'vite/preload-helper' cannot be named in
+            // it — the build dies with `Missing "./preload-helper" specifier in
+            // "vite" package`. A function can match the virtual id directly.
+            if (id.includes('vite/preload-helper')) return 'react-vendor';
+
+            const pkg = packageOf(id);
+            if (!pkg) return undefined;
+
+            for (const [chunk, packages] of VENDOR_CHUNKS) {
+              if (packages.includes(pkg)) return chunk;
+            }
+            return undefined;
           },
         },
       },
