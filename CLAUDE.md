@@ -1018,9 +1018,16 @@ logger.authEvent('login_success', user.id);
 ```
 
 **IDOR Protection:**
-- All database queries validate user ownership
-- Row Level Security (RLS) enforced on all tables
+- **Row Level Security is the enforcement**, on every table, verified by
+  `npm run verify:schema`. Read that as the whole answer.
 - Input sanitization with DOMPurify
+- `src/lib/security/` and `src/hooks/useSecurity.ts` implement a four-layer
+  authentication / authorization / ownership / validation model, and are
+  **not wired up** — no component imports them, and `npm run check:unbundled`
+  lists them as unreachable (US-173). This section used to say "all database
+  queries validate user ownership", which is true only via RLS. Do not cite
+  that layer as active protection, and do not assume a client-side ownership
+  check exists because a helper for it does.
 
 **Login Security (`src/hooks/useLoginSecurity.ts`):**
 - Brute force protection with login throttling

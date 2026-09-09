@@ -9,6 +9,27 @@
  * 2. Authorization - WHAT can you do?
  * 3. Ownership - IS this yours?
  * 4. Database RLS - FINAL enforcement
+ *
+ * ---------------------------------------------------------------------------
+ * US-173: NOT WIRED UP. Layers 1-3 do not run.
+ *
+ * No component imports this hook, and `npm run check:unbundled` confirms it and
+ * the whole of src/lib/security/ (authorization, ownership, secureQuery,
+ * validation) are unreachable from src/main.tsx. src/lib/security/
+ * authentication.ts is the one exception, reached via useNativeMFA.
+ *
+ * So the description above reads as a statement of how this application
+ * protects data, and only layer 4 is true. **RLS is the enforcement**, on every
+ * table, verified by scripts/verify-schema.mjs — which is why this being unused
+ * is a documentation and dead-code problem rather than a live vulnerability.
+ * Do not read the comment above as a description of what runs.
+ *
+ * Two honest options, and this file is deliberately left rather than deleted so
+ * that whoever picks it up makes the choice: wire it into the components that
+ * read user-scoped data, or delete the layer and say plainly that RLS is the
+ * only enforcement. Deleting a security layer is not a call to make on the way
+ * past.
+ * ---------------------------------------------------------------------------
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';

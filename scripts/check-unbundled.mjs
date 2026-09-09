@@ -24,8 +24,9 @@
  * script, the test suites. Those are allowlisted by path, each with a reason.
  *
  * This does not delete anything. It reports, and it ratchets: the count may
- * fall, never rise. Deleting 61 modules is a reviewable change of its own, and
- * US-173 is filed for it.
+ * fall, never rise. US-173 took the first 11: five superseded
+ * locations/*Agents.tsx pages (DynamicLocationPage replaced them), the whole
+ * dead pull-to-refresh and mobile chain, and mortgageCalculator.ts. 61 -> 50.
  *
  * A caution on reading the list: several entries are imported by their own test
  * and by nothing else. That still counts as unreachable, because a module whose
@@ -44,7 +45,7 @@ const SRC = join(ROOT, 'src');
  * never raise it. A new unreachable module is either dead on arrival or wired
  * up wrong, and both are worth a moment before merging.
  */
-const BUDGET = 61;
+const BUDGET = 50;
 
 /**
  * Reachable from something other than the app, each with what reaches it.

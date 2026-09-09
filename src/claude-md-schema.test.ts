@@ -191,3 +191,47 @@ describe('CLAUDE.md describes the schema that exists (US-166)', () => {
     expect(real!.has('phone'), 'the plaintext column US-086 dropped').toBe(false);
   });
 });
+
+/**
+ * US-173: a security layer that does not run must not read as though it does.
+ *
+ * src/lib/security/ and src/hooks/useSecurity.ts implement four layers —
+ * authentication, authorization, ownership, validation — and useSecurity's own
+ * header calls itself "the primary interface for security checks in React
+ * components". No component imports it. `npm run check:unbundled` lists the
+ * whole tree as unreachable from src/main.tsx.
+ *
+ * That is not a live vulnerability: RLS is the enforcement, on every table, and
+ * scripts/verify-schema.mjs checks it. It is a documentation problem, and a
+ * dangerous one — the next person to read useSecurity.ts has every reason to
+ * believe client-side ownership checks are happening.
+ *
+ * These hold the disclosure in place. If the layer gets wired up, delete them
+ * and say where; do not quietly remove the warning while the code stays dead.
+ */
+describe('the unwired security layer says so (US-173)', () => {
+  it('useSecurity.ts warns that layers 1-3 do not run', () => {
+    const source = readFileSync(join(ROOT, 'src/hooks/useSecurity.ts'), 'utf8');
+
+    expect(source, 'the file must say it is not wired up').toMatch(/NOT WIRED UP/i);
+    expect(source, 'and must name RLS as the actual enforcement').toMatch(
+      /RLS is the enforcement/i
+    );
+  });
+
+  it('CLAUDE.md does not claim queries validate ownership client-side', () => {
+    // The old wording: "All database queries validate user ownership".
+    // True only via RLS, and it read as a description of that unwired layer.
+    const idor = CLAUDE_MD.slice(CLAUDE_MD.indexOf('**IDOR Protection:**'));
+    const section = idor.slice(0, idor.indexOf('**Login Security'));
+
+    expect(section, 'must name RLS as the enforcement').toMatch(
+      /Row Level Security is the enforcement/i
+    );
+    expect(section, 'must say the helper layer is not wired up').toMatch(/not wired up/i);
+    expect(
+      section.includes('- All database queries validate user ownership'),
+      'the old unqualified claim is back'
+    ).toBe(false);
+  });
+});

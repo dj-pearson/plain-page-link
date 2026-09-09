@@ -2776,17 +2776,20 @@
     },
     {
       "id": "US-173",
-      "title": "Delete or wire up the 61 modules that reach no browser",
-      "description": "US-172 made the list measurable and ratcheted it; this is the work of shortening it. 61 runtime modules under src/ are unreachable from src/main.tsx, including the whole pull-to-refresh chain, four of five src/components/mobile/ components, src/lib/sync-manager.ts, src/lib/mortgageCalculator.ts, several admin dashboards and a number of hooks. Each needs a decision rather than a sweep: some are staged work someone intended to finish, some are superseded (the five src/pages/landing/locations/*Agents.tsx pages were replaced by DynamicLocationPage), and some are simply dead. A module whose only consumer is its own test counts as unreachable but is the ambiguous case - the test proves someone cared, not that anything ships.",
+      "title": "Delete the first 11 unreachable modules, and disclose the security layer that does not run",
+      "description": "US-172 made reachability measurable and ratcheted it at 61. This is the first pass at shortening the list, plus the most important thing the list turned up. DELETED, 11 modules and 1289 lines, each with a verified reason: the five src/pages/landing/locations/*Agents.tsx pages, superseded by DynamicLocationPage which is the only one routed (/for/:slug) - the build still prerenders all 52 routes afterwards, which is the proof; the whole dead mobile chain - VoiceInput (which also carried a real stale-closure bug: onresult closes over value with deps [isSupported, maxLength], so every dictated phrase after the first overwrote the one before), CameraUpload, MobileListingCard, PullToRefresh and usePullToRefresh; and mortgageCalculator.ts, whose advertisement US-171 had already removed. None had a test. DISCLOSED rather than deleted: src/lib/security/ and src/hooks/useSecurity.ts implement a four-layer defence-in-depth model - authentication, authorization, ownership, validation - and useSecurity describes itself as \"the primary interface for security checks in React components\". No component imports it. The whole tree except authentication.ts is unreachable.",
       "acceptanceCriteria": [
-        "Every one of the 61 gets a decision: deleted, wired up, or allowlisted with the reason it is an entry point",
-        "The BUDGET in scripts/check-unbundled.mjs comes down to match",
-        "Nothing is deleted that a test covers without first deciding whether the tested behaviour is wanted",
-        "sync-manager and offline-storage are resolved together: App.tsx creates IndexedDB stores that only sync-manager would write to, so either wire the pair up or stop creating the stores"
+        "Every deletion has a verified reason, not an inference from a grep",
+        "The build still prerenders all 52 routes after the location pages go",
+        "The unwired security layer says so at its entry point, and names RLS as the actual enforcement",
+        "CLAUDE.md no longer claims all database queries validate user ownership, which was true only via RLS",
+        "A guard holds the disclosure in place so it cannot be quietly removed while the code stays dead",
+        "The unbundled budget comes down from 61 to 50",
+        "tsc, eslint, the test suite, the build and verify:seo all pass"
       ],
       "priority": 173,
-      "passes": false,
-      "notes": "NEXT ITERATION. Deliberately not done in US-172: deleting 61 modules is a large reviewable change, and doing it in the same pass as building the measurement would have meant nobody could check the measurement against the before state."
+      "passes": true,
+      "notes": "THE SECURITY LAYER IS NOT A LIVE VULNERABILITY and the story is careful to say so: RLS is the enforcement, on every table, checked by verify-schema.mjs. It is a documentation problem, and a dangerous one - the next person to read useSecurity.ts has every reason to believe client-side ownership checks are running. It was deliberately NOT deleted: deleting a security layer is a decision for Dj, not something to do on the way past, and the file now states both honest options (wire it up, or delete it and say plainly that RLS is the only enforcement). 50 remain unreachable. The ambiguous ones are those whose only importer is their own test - the test proves someone cared, not that anything ships - and the admin dashboards, which look like staged work rather than abandoned work."
     }
   ]
 }

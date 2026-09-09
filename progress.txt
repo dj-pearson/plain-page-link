@@ -2837,3 +2837,86 @@ modules in the same commit that builds the measurement would leave nobody able
 to check the measurement against the before state.
 
 VERIFICATION: 728 tests, tsc clean, eslint 0 errors, ratchet demonstrated.
+
+================================================================================
+ITERATION 9 — US-173: 11 modules deleted, and a security layer that never runs
+================================================================================
+
+Picked up the story US-172 filed. The measurement said 61 unreachable modules;
+this pass was meant to shorten the list. It did — and on the way it turned up
+something more interesting than dead code.
+
+WHAT I DELETED — 11 modules, 1289 lines, each with a reason I checked rather
+than inferred:
+
+  5 x pages/landing/locations/*Agents.tsx    superseded. App.tsx routes only
+                                             /for/:slug -> DynamicLocationPage.
+                                             The build still prerenders all 52
+                                             routes afterwards — that is the
+                                             proof, not the reasoning.
+  components/mobile/VoiceInput.tsx           187L, no consumer, and carrying a
+                                             real stale closure: onresult closes
+                                             over `value` with deps
+                                             [isSupported, maxLength], so every
+                                             dictated phrase after the first
+                                             overwrote the one before. The
+                                             comment said "append".
+  components/mobile/CameraUpload.tsx         243L, no consumer
+  components/mobile/MobileListingCard.tsx    263L, no consumer
+  components/mobile/PullToRefresh.tsx        77L, no consumer
+  hooks/usePullToRefresh.ts                  102L, imported only by the above
+  lib/mortgageCalculator.ts                  378L, advertisement removed in
+                                             US-171, implementation never called
+
+None had a test. 61 -> 50, budget lowered to match.
+
+WHAT I DID NOT DELETE, and why it is the real finding.
+
+src/lib/security/ is a four-layer defence-in-depth security architecture —
+authentication, authorization, ownership, validation — with src/hooks/
+useSecurity.ts on top, whose own header reads:
+
+    "This is the primary interface for security checks in React components.
+     1. Authentication - WHO are you?
+     2. Authorization - WHAT can you do?
+     3. Ownership - IS this yours?
+     4. Database RLS - FINAL enforcement"
+
+No component imports it. Grep for useSecurity across every .tsx in the
+repository: nothing. The whole tree except authentication.ts (reached via
+useNativeMFA) is unreachable from main.tsx.
+
+So of the four layers described, ONE runs. Layer 4.
+
+THIS IS NOT A LIVE VULNERABILITY and the story says so plainly. RLS is the
+enforcement, on every table, and scripts/verify-schema.mjs checks it — that is
+real, and it is what protects the data. What is wrong is what a reader
+concludes. Anyone opening useSecurity.ts has every reason to believe
+client-side ownership checks are happening, and CLAUDE.md's security section
+said "All database queries validate user ownership", which is true only via RLS
+and reads exactly like a description of this layer.
+
+So I disclosed it instead of deleting it. Deleting a security layer is Dj's
+call, not something to do on the way past — and the file now states both honest
+options: wire it into the components that read user-scoped data, or delete it
+and say plainly that RLS is the only enforcement. A guard in
+claude-md-schema.test.ts holds the disclosure in place, so it cannot be quietly
+removed while the code stays dead.
+
+WHAT REMAINS: 50. The two ambiguous groups are modules whose only importer is
+their own test — where the test proves someone cared, not that anything ships —
+and the admin dashboards, which read like staged work rather than abandoned
+work. Neither is a sweep; both want someone who knows the intent.
+
+VERIFICATION: 730 tests (was 728), tsc clean, eslint 0 errors, build +
+prerender of 52 routes, verify:seo clean, unbundled 50/50.
+
+THE PATTERN, nine iterations in. Iterations 1-5 were "a check existed and could
+not fail". 6-7 were "nothing checked this at all". 8-9 are the third kind:
+**code and documentation describing a system that is not the running one** —
+mortgageCalculator advertised on every plan, PWA features listed that reach no
+browser, and now a security architecture that describes how the app protects
+data while three quarters of it is switched off. In each case the code is
+sincere. Nobody wrote it to mislead. It simply stopped being true and nothing
+noticed, because nothing was watching the gap between what the repository says
+and what it runs.
