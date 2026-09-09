@@ -6,11 +6,18 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { XSS_PAYLOADS, setupXSSDetection, testXSSVulnerability } from './security-utils';
+import {
+  XSS_PAYLOADS,
+  setupXSSDetection,
+  testXSSVulnerability,
+  dismissCookieConsent,
+} from './security-utils';
 
 test.describe('XSS Security', () => {
   test.beforeEach(async ({ page }) => {
     await setupXSSDetection(page);
+    // The consent banner covers the submit button on the auth pages (US-168).
+    await dismissCookieConsent(page);
   });
 
   test.describe('Input Field XSS', () => {
@@ -21,8 +28,8 @@ test.describe('XSS Security', () => {
         await page.fill('input[type="email"], input[name="email"]', payload);
 
         // Check if XSS was triggered
-        const xssTriggered = await page.evaluate(() =>
-          (window as unknown as { xssTriggered?: boolean }).xssTriggered
+        const xssTriggered = await page.evaluate(
+          () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
         );
 
         expect(xssTriggered).not.toBe(true);
@@ -40,12 +47,12 @@ test.describe('XSS Security', () => {
 
       for (const selector of inputSelectors) {
         const input = page.locator(selector);
-        if (await input.count() > 0) {
+        if ((await input.count()) > 0) {
           for (const payload of XSS_PAYLOADS.slice(0, 3)) {
             await input.fill(payload);
 
-            const xssTriggered = await page.evaluate(() =>
-              (window as unknown as { xssTriggered?: boolean }).xssTriggered
+            const xssTriggered = await page.evaluate(
+              () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
             );
 
             expect(xssTriggered).not.toBe(true);
@@ -59,13 +66,13 @@ test.describe('XSS Security', () => {
 
       const searchInputs = page.locator('input[type="search"], input[placeholder*="search" i]');
 
-      if (await searchInputs.count() > 0) {
+      if ((await searchInputs.count()) > 0) {
         for (const payload of XSS_PAYLOADS.slice(0, 3)) {
           await searchInputs.first().fill(payload);
           await page.keyboard.press('Enter');
 
-          const xssTriggered = await page.evaluate(() =>
-            (window as unknown as { xssTriggered?: boolean }).xssTriggered
+          const xssTriggered = await page.evaluate(
+            () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
           );
 
           expect(xssTriggered).not.toBe(true);
@@ -81,8 +88,8 @@ test.describe('XSS Security', () => {
 
         await page.goto(`/?search=${encodedPayload}`);
 
-        const xssTriggered = await page.evaluate(() =>
-          (window as unknown as { xssTriggered?: boolean }).xssTriggered
+        const xssTriggered = await page.evaluate(
+          () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
         );
 
         expect(xssTriggered).not.toBe(true);
@@ -100,8 +107,8 @@ test.describe('XSS Security', () => {
         try {
           await page.goto(`/profile/${encodedPayload}`);
 
-          const xssTriggered = await page.evaluate(() =>
-            (window as unknown as { xssTriggered?: boolean }).xssTriggered
+          const xssTriggered = await page.evaluate(
+            () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
           );
 
           expect(xssTriggered).not.toBe(true);
@@ -137,7 +144,7 @@ test.describe('XSS Security', () => {
       await page.goto('/dashboard/settings');
 
       const bioInput = page.locator('textarea[name="bio"]');
-      if (await bioInput.count() > 0) {
+      if ((await bioInput.count()) > 0) {
         for (const payload of XSS_PAYLOADS.slice(0, 3)) {
           await bioInput.fill(payload);
           await page.click('button[type="submit"]');
@@ -145,8 +152,8 @@ test.describe('XSS Security', () => {
           // Navigate to public profile
           await page.goto('/profile/testuser');
 
-          const xssTriggered = await page.evaluate(() =>
-            (window as unknown as { xssTriggered?: boolean }).xssTriggered
+          const xssTriggered = await page.evaluate(
+            () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
           );
 
           expect(xssTriggered).not.toBe(true);
@@ -160,8 +167,8 @@ test.describe('XSS Security', () => {
       for (const payload of XSS_PAYLOADS.slice(0, 3)) {
         await page.goto(`/#${encodeURIComponent(payload)}`);
 
-        const xssTriggered = await page.evaluate(() =>
-          (window as unknown as { xssTriggered?: boolean }).xssTriggered
+        const xssTriggered = await page.evaluate(
+          () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
         );
 
         expect(xssTriggered).not.toBe(true);
@@ -176,8 +183,8 @@ test.describe('XSS Security', () => {
         window.postMessage('<script>alert("XSS")</script>', '*');
       });
 
-      const xssTriggered = await page.evaluate(() =>
-        (window as unknown as { xssTriggered?: boolean }).xssTriggered
+      const xssTriggered = await page.evaluate(
+        () => (window as unknown as { xssTriggered?: boolean }).xssTriggered
       );
 
       expect(xssTriggered).not.toBe(true);
@@ -202,7 +209,9 @@ test.describe('XSS Security', () => {
           const script = document.createElement('script');
           script.textContent = 'window.inlineScriptExecuted = true';
           document.body.appendChild(script);
-          return (window as unknown as { inlineScriptExecuted?: boolean }).inlineScriptExecuted === true;
+          return (
+            (window as unknown as { inlineScriptExecuted?: boolean }).inlineScriptExecuted === true
+          );
         } catch {
           return false;
         }
@@ -231,10 +240,7 @@ test.describe('XSS Security', () => {
 
       // Verify that text content is not interpreted as HTML
       const textContent = await page.evaluate(() => {
-        const walker = document.createTreeWalker(
-          document.body,
-          NodeFilter.SHOW_TEXT
-        );
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
 
         let hasUnescapedHTML = false;
         let node;

@@ -2686,6 +2686,37 @@
       "priority": 167,
       "passes": true,
       "notes": "Found by running the suite rather than reading it. Three things generalise. (1) The listing status pill was wrong in TWO places because ListingCard and ListingDetailModal each kept a private statusColors map - the precise divergence US-107 wrote listingStatus.ts to end - so the fix was to move the colour into the canonical list and delete both copies. Three of the six canonical text colours also failed AA and were corrected in the same pass. (2) The Text/SMS button in StickyActionBar failed too (green-600, 3.30:1) and axe never saw it, because the mock profile has no phone so that button never renders - a11y coverage is only as good as the fixture. (3) A syntax error I introduced mid-story turned two pages into one identical scrollable-region-focusable finding and the suite still reported six passes: assertAppRendered only checked that body had text, and a Vite error overlay has text. The suite now fails on the overlay. The four register avatar swatches are aria-hidden AND darkened: aria-hidden answers the screen-reader half, but axe keys color-contrast off visual visibility and is right to, since a low-vision sighted user still reads them."
+    },
+    {
+      "id": "US-168",
+      "title": "Make the security suite honest, and run it in CI",
+      "description": "tests/security/ holds four spec files and no workflow ran any of them. Run by hand, 9 of 55 failed. None of the 9 was a security defect. Four were the cookie consent banner: it is fixed inset-x-0 bottom-0 z-[100], so on the auth pages it covers the submit button, and Playwright spent the full 60-second timeout refusing to click through it - reported as \"should block SQL injection in login form\" failing. The a11y suite has seeded consent since US-113; this suite never did. The other five probed an architecture this application does not have. There are no /api/* routes: it is a static SPA plus Supabase, with data at /rest/v1/* under RLS and privileged work at /functions/v1/*, both on another origin. So testAuthBypass(/api/profile) got the Vite SPA fallback - index.html, 200 - and testAuthBypass treats any 200 as a bypass, making the most alarming-sounding failure in the suite (\"should reject unauthenticated access to protected API\", vulnerable on all four endpoints) a report of the dev server correctly serving a web page. Likewise \"should return appropriate error status codes\" expected 404 from an SPA, which must answer 200 with index.html for any unmatched path or client routing cannot work: it asserted the opposite of correct behaviour.",
+      "acceptanceCriteria": [
+        "The security suite passes, and every remaining assertion is about something this application actually has",
+        "Consent is seeded rather than clicked, so no security spec is coupled to the banner markup",
+        "Tests that needed a live backend are replaced by assertions that can really see what they claim, following the model of edge-authz.security.spec.ts",
+        "Every replaced test records what it used to assert and why that was wrong, so it is not re-added",
+        "A guard fails if this app ever grows a real /api/* origin, since that would need real authorization tests",
+        "The suite runs in CI on push and pull request, and can fail",
+        "No VITE_SUPABASE_* override in the CI job: the config defaults them to the dev origin because the CSP connect-src is self"
+      ],
+      "priority": 168,
+      "passes": true,
+      "notes": "Two tests were on their way to a VACUOUS PASS rather than a failure, which is the worse outcome: the user-enumeration checks read [role=alert] and compared two messages, and with no backend no alert is ever rendered - they timed out, but had they not, they would have compared two empty strings and passed. Both are now source assertions that the client adds no enumerating branch of its own, since non-enumeration is GoTrue behaviour the client can only make worse. Runtime fell from 2.5 minutes to 26 seconds; almost all of it was those timeouts. NOT DONE, and the reason for US-169: tests/e2e/ has six more spec files that no workflow runs either, and they have not been audited for the same defect. The 45 tests that were passing here have also not been individually audited for vacuous passes - the /api/ ones proved that a spec can pass against the SPA fallback as easily as fail against it."
+    },
+    {
+      "id": "US-169",
+      "title": "Audit and wire up the E2E suite, and check the security suite for vacuous passes",
+      "description": "Follow-on from US-168, noted while fixing it. tests/e2e/ holds six spec files - analytics-tracking, auth, listing-deep-link, onboarding, page-builder-surface, public-profile-visibility - and no workflow runs any of them, exactly as was true of tests/security/. They have not been run or audited. Separately, US-168 fixed the 9 failing security specs but did not individually audit the 45 that were passing. The /api/* case established that a spec pointed at a nonexistent endpoint gets the SPA fallback at 200, which can satisfy an assertion as easily as break one - so a pass in that suite is not by itself evidence that the property holds.",
+      "acceptanceCriteria": [
+        "Every spec in tests/e2e/ is run, and each failure is classified as a real defect, a harness defect, or an assertion about something the app does not have",
+        "The E2E suite runs in CI and can fail",
+        "Each passing security spec is checked for whether it could pass against a blank page or an SPA fallback, and those that could are either strengthened or removed",
+        "Anything that cannot be asserted without a live backend says so where it is, rather than pretending"
+      ],
+      "priority": 169,
+      "passes": false,
+      "notes": "NEXT ITERATION. The generalisable question is not \"do these tests pass\" but \"could this test fail if the property it names were violated\" - which is the same question US-165 (a guard whose message understated its stake), US-166 (no guard at all) and US-167 (a guard configured to permit the defect) each answered no to in a different way."
     }
   ]
 }

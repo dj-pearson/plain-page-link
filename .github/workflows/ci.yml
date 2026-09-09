@@ -220,6 +220,52 @@ jobs:
       - name: Run ESLint
         run: npx eslint src/ --max-warnings=-1
 
+  security-suite:
+    name: Security (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # US-168: this suite existed for months and no workflow ran it. Nine of
+      # its specs failed and nobody saw, including one that reported an
+      # authentication bypass on four endpoints this application does not have.
+      #
+      # security-chrome only: the security-mobile project is WebKit, and this
+      # runner installs Chromium. Adding the WebKit bundle is a separate call,
+      # not a silent `|| true` here.
+      # No VITE_SUPABASE_* here on purpose. playwright.config.ts defaults them
+      # to the dev server's OWN origin, because index.html ships a CSP whose
+      # connect-src is 'self' — pointing them at placeholder.supabase.co would
+      # have the browser block the connection before any spec saw it.
+      - name: Run security suite
+        run: npx playwright test --config=playwright.config.ts --project=security-chrome
+
+      - name: Upload security report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: playwright-report/
+          retention-days: 14
+
   accessibility:
     name: Accessibility (axe-core)
     runs-on: ubuntu-latest

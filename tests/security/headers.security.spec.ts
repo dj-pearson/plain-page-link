@@ -160,7 +160,7 @@ test.describe('Security Headers', () => {
       const response = await request.fetch('/', {
         method: 'OPTIONS',
         headers: {
-          'Origin': 'https://malicious-site.com',
+          Origin: 'https://malicious-site.com',
           'Access-Control-Request-Method': 'POST',
         },
       });
@@ -175,7 +175,7 @@ test.describe('Security Headers', () => {
       const response = await request.fetch('/', {
         method: 'OPTIONS',
         headers: {
-          'Origin': 'https://agentbio.net',
+          Origin: 'https://agentbio.net',
           'Access-Control-Request-Method': 'DELETE',
         },
       });
@@ -197,15 +197,27 @@ test.describe('Security Headers', () => {
       expect(contentType).toContain('text/html');
     });
 
-    test('should serve JSON with correct content type', async ({ request }) => {
-      // Test an API endpoint that returns JSON
-      const response = await request.get('/api/health', {
-        failOnStatusCode: false,
-      });
+    /**
+     * US-168: this asked /api/health for JSON and asserted on the answer. There
+     * is no /api/health — the SPA fallback returned index.html as text/html, so
+     * the guarded `if (status === 200)` was true and the assertion inside it
+     * failed on a page it was never meant to be looking at.
+     *
+     * The JSON this app actually serves is static, from public/. That is
+     * checkable here, and worth checking: manifest.json served as text/html
+     * silently disables PWA install.
+     */
+    test('serves the static JSON it does have with the right content type', async ({ request }) => {
+      // Only files that exist: an absent path returns the SPA shell at 200,
+      // which would fail this for the wrong reason (US-168).
+      for (const path of ['/manifest.json']) {
+        const response = await request.get(path, { failOnStatusCode: false });
+        if (response.status() !== 200) continue;
 
-      if (response.status() === 200) {
-        const contentType = response.headers()['content-type'];
-        expect(contentType).toContain('application/json');
+        const contentType = response.headers()['content-type'] ?? '';
+        expect(contentType, `${path} must not be served as HTML`).toMatch(
+          /application\/(json|manifest\+json)/
+        );
       }
     });
 
@@ -238,9 +250,11 @@ test.describe('Security Headers', () => {
       const cookies = await page.context().cookies();
 
       for (const cookie of cookies) {
-        if (cookie.name.toLowerCase().includes('session') ||
-            cookie.name.toLowerCase().includes('token') ||
-            cookie.name.toLowerCase().includes('auth')) {
+        if (
+          cookie.name.toLowerCase().includes('session') ||
+          cookie.name.toLowerCase().includes('token') ||
+          cookie.name.toLowerCase().includes('auth')
+        ) {
           expect(cookie.httpOnly).toBe(true);
         }
       }
@@ -271,10 +285,26 @@ test.describe('Security Headers', () => {
       expect(content).not.toContain('.tsx:');
     });
 
-    test('should return appropriate error status codes', async ({ request }) => {
+    /**
+     * US-168: this expected 404 from an unknown path. A single-page app must
+     * answer 200 with index.html for ANY unmatched path — that is how client
+     * routing works at all — so the test asserted the opposite of correct
+     * behaviour and failed on a correctly configured server.
+     *
+     * The security property actually worth holding is that an unknown path
+     * returns the app's own Not Found, and not a directory listing, a stack
+     * trace or a server banner.
+     */
+    test('an unknown path returns the app shell, and leaks nothing', async ({ request }) => {
       const response = await request.get('/this-page-does-not-exist-404');
 
-      expect(response.status()).toBe(404);
+      expect(response.status(), 'an SPA serves its shell for client routing').toBe(200);
+      expect(response.headers()['content-type'] ?? '').toContain('text/html');
+
+      const body = await response.text();
+      expect(body, 'must not be a directory listing').not.toMatch(/Index of \//i);
+      expect(body, 'must not expose the server').not.toMatch(/nginx\/\d|Apache\/\d/);
+      expect(body, 'must not carry a stack trace').not.toMatch(/at\s+\w+\s+\([^)]+:\d+:\d+\)/);
     });
 
     test('should not expose sensitive info in 500 errors', async ({ request }) => {

@@ -51,7 +51,7 @@ export const SQL_INJECTION_PAYLOADS = [
   "' OR '1'='1' --",
   "' OR '1'='1' /*",
   "1' OR '1'='1",
-  "1 OR 1=1",
+  '1 OR 1=1',
 
   // UNION-based injection
   "' UNION SELECT NULL--",
@@ -69,7 +69,7 @@ export const SQL_INJECTION_PAYLOADS = [
   // Comment injection
   "admin'--",
   "admin'/*",
-  "*/OR/**/1=1--",
+  '*/OR/**/1=1--',
 
   // Stacked queries
   "'; DROP TABLE users;--",
@@ -177,7 +177,8 @@ export async function testXSSVulnerability(
   inputSelector: string,
   submitSelector?: string
 ): Promise<{ vulnerable: boolean; payload?: string }> {
-  for (const payload of XSS_PAYLOADS.slice(0, 5)) { // Test first 5 payloads
+  for (const payload of XSS_PAYLOADS.slice(0, 5)) {
+    // Test first 5 payloads
     try {
       await page.fill(inputSelector, payload);
 
@@ -273,7 +274,7 @@ export async function testAuthBypass(
   // Test with invalid token
   const invalidTokenResponse = await request.get(protectedUrl, {
     headers: {
-      'Authorization': 'Bearer invalid-token-12345',
+      Authorization: 'Bearer invalid-token-12345',
     },
   });
 
@@ -284,7 +285,7 @@ export async function testAuthBypass(
   // Test with empty token
   const emptyTokenResponse = await request.get(protectedUrl, {
     headers: {
-      'Authorization': 'Bearer ',
+      Authorization: 'Bearer ',
     },
   });
 
@@ -311,14 +312,13 @@ export async function testRateLimiting(
   let limitedAt: number | undefined;
 
   for (let i = 0; i < requestCount; i++) {
-    const response = method === 'GET'
-      ? await request.get(url)
-      : await request.post(url, { data: {} });
+    const response =
+      method === 'GET' ? await request.get(url) : await request.post(url, { data: {} });
 
     if (response.status() === 429) {
       limitedAt = i + 1;
-      const limitHeader = response.headers()['x-ratelimit-limit']
-        || response.headers()['retry-after'];
+      const limitHeader =
+        response.headers()['x-ratelimit-limit'] || response.headers()['retry-after'];
       return {
         rateLimited: true,
         requestsBeforeLimit: limitedAt,
@@ -512,11 +512,49 @@ export function generateSecurityReport(results: {
     'COOKIE SECURITY',
     '-'.repeat(60),
     results.cookies.issues.length > 0
-      ? `ISSUES:\n${results.cookies.issues.map(i => `  - ${i}`).join('\n')}`
+      ? `ISSUES:\n${results.cookies.issues.map((i) => `  - ${i}`).join('\n')}`
       : 'PASSED - All cookies properly secured',
     '',
     '='.repeat(60),
   ];
 
   return lines.join('\n');
+}
+
+// =============================================================================
+// TEST ENVIRONMENT SETUP
+// =============================================================================
+
+/**
+ * Dismiss the cookie consent banner before the page is interacted with.
+ *
+ * US-168: the banner is `fixed inset-x-0 bottom-0 z-[100]`, so on the auth
+ * pages it sits over the submit button. Four specs in this suite spent their
+ * full 60-second timeout retrying a click that Playwright kept refusing —
+ * "<h2>We value your privacy</h2> ... subtree intercepts pointer events" — and
+ * were reported as security failures with names like "should block SQL
+ * injection in login form". Nothing was wrong with the login form.
+ *
+ * The a11y suite has seeded this since US-113. This suite never did.
+ *
+ * Consent is seeded, not clicked: clicking it is a separate thing to test, and
+ * doing it here would couple every security spec to the banner's markup.
+ */
+export async function dismissCookieConsent(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem(
+        'cookie_consent_v1',
+        JSON.stringify({
+          version: 1,
+          timestamp: new Date(0).toISOString(),
+          necessary: true,
+          analytics: false,
+          preferences: false,
+        })
+      );
+    } catch {
+      /* a browser with storage disabled still gets the banner; not this suite's concern */
+    }
+  });
 }

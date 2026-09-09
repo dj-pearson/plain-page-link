@@ -2388,3 +2388,109 @@ a11y 6/6 at zero.
 NOT DONE, deliberately: the a11y suite covers five pages. The dashboard's
 interior — leads, listings, settings — is not in it, and neither is any form
 error state. Worth a story; not this one.
+
+================================================================================
+ITERATION 4 — US-168: a security suite nobody ran, testing an app that isn't this
+================================================================================
+
+WHERE I LOOKED. Iteration 3 paid off by RUNNING a suite instead of reading it,
+so I checked what else CI never runs:
+
+  tests/security/  4 spec files   not in any workflow
+  tests/e2e/       6 spec files   not in any workflow
+
+Ten spec files, including the entire security suite, executed by nothing.
+
+RUN BY HAND: 9 failed, 45 passed, 2.5 minutes. Not one of the 9 was a security
+defect.
+
+FOUR were the cookie consent banner. It is `fixed inset-x-0 bottom-0 z-[100]`,
+so on the auth pages it sits over the submit button, and Playwright refused the
+click for the full 60-second timeout:
+
+  <h2>We value your privacy</h2> ... subtree intercepts pointer events
+
+reported as `should block SQL injection in login form` FAILING. Nothing was
+wrong with the login form. The a11y suite has seeded consent since US-113; this
+suite never did.
+
+FIVE probed an architecture this application does not have. There are no
+`/api/*` routes — it is a static SPA plus Supabase, data at `/rest/v1/*` under
+RLS and privileged work at `/functions/v1/*`, both on another origin. So:
+
+  testAuthBypass(request, '/api/profile')
+    -> Vite dev server answers the SPA fallback: index.html, 200
+    -> testAuthBypass treats any 200 as a bypass
+    -> "should reject unauthenticated access to protected API": VULNERABLE on
+       all four endpoints
+
+The most alarming-sounding failure in the suite was the dev server correctly
+serving a web page. Same for `/api/auth/reset-password` ("no rate limiting on
+password reset"), `/auth/login` (a CLIENT route, POSTed 20 times, "no rate
+limiting"), and `/api/health` ("JSON endpoint returns text/html").
+
+And `should return appropriate error status codes` expected 404 from an
+unmatched path. An SPA MUST answer 200 with index.html for any unmatched path —
+that is how client routing works. The test asserted the opposite of correct
+behaviour and could only pass on a broken server.
+
+THE WORSE CASE, and the one worth carrying forward. Two tests — the
+user-enumeration checks — read `[role="alert"]` and compared two error messages.
+With no Supabase behind the dev server, no request resolves and no alert is ever
+rendered. They timed out. But had they not, they would have compared two empty
+strings and PASSED. A vacuous pass on a security property nobody had checked is
+strictly worse than the failure, because nothing then prompts anyone to look.
+
+That reframes the 45 passes: a spec pointed at a nonexistent endpoint gets the
+SPA fallback at 200, which can satisfy an assertion as easily as break one. A
+pass in this suite was not, by itself, evidence of anything.
+
+WHAT I DID.
+
+  - Seeded consent via a `dismissCookieConsent` helper rather than clicking the
+    banner: clicking it is a separate thing to test, and doing it here would
+    couple every security spec to the banner's markup. Four failures gone.
+
+  - Replaced each phantom-endpoint test with one about something that exists,
+    following the model already in this directory. edge-authz.security.spec.ts
+    is the good one — it opens by saying it makes SOURCE assertions, not live
+    probes, and why: "there is no Deno runtime and no Supabase instance in CI
+    ... What they do prove is that the guard is still in the file — which is the
+    failure mode that actually happens." That is the honest shape, and the three
+    older specs were written as though a live stack existed.
+
+    So: rate limiting now asserts submit-lead still consults checkRateLimitDb
+    before answering; the login throttle asserts useLoginSecurity still asks the
+    server (check_throttle / record_attempt), because a client-side counter is
+    not a throttle; enumeration asserts the client adds no branch of its own,
+    since non-enumeration is GoTrue's behaviour and the client can only make it
+    worse; the 404 test asserts the shell is returned AND leaks no directory
+    listing, server banner or stack trace.
+
+  - Every replacement records what it used to assert and why that was wrong,
+    so it does not get re-added.
+
+  - Added a guard on the absence: if this app ever grows a real `/api/*` origin,
+    a test fails and says "write authorization tests against it — do not just
+    widen the assertion."
+
+  - Wired the suite into CI. Deliberately WITHOUT VITE_SUPABASE_* overrides: I
+    had added them by habit and then read the config, which defaults them to the
+    dev server's own origin on purpose, because index.html ships a CSP whose
+    connect-src is 'self'. Pointing them at placeholder.supabase.co would have
+    the browser block the connection before any spec saw it — the same class of
+    silent-blank-page defect US-119 fixed here and US-113 fixed in a11y.
+
+RESULT: 55 passed, 1 skipped, 0 failed — and 26 seconds instead of 2.5 minutes,
+because almost all of the runtime was those timeouts.
+
+CARRIED FORWARD as US-169 (next iteration): the six e2e specs nobody runs
+either, and an audit of the 45 security passes for the vacuous kind.
+
+THE THREAD, four for four. The question that keeps mattering is not "does this
+test pass" but "could it fail if the property it names were violated":
+  US-165  a guard whose message understated its stake — read as a lint nit
+  US-166  no guard at all over the document everything is written from
+  US-167  a guard configured to permit exactly the defects it found
+  US-168  a suite nobody ran, asserting against an app that does not exist
+Different mechanisms, same answer: no.
