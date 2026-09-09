@@ -2558,6 +2558,34 @@
       "priority": 159,
       "passes": true,
       "notes": "Authorised explicitly by Dj: 'No fabricated text, we need to remove false claims and false testimonies.' Nothing was reworded into a vaguer version of the same claim - a claim either has something behind it or it went. Deliberately KEPT, with reasons recorded in the test's ALLOWED_FILES: the BioAnalyzerForm dropdown asking a visitor about their own current leads; the 'Keller Williams, Coldwell Banker, etc.' placeholder in a 'your brokerage' input; features/Testimonials describing the star-display feature ('4.8/5.0, 4.9/5.0, etc.'); the ExampleBio demos and the bio-generator's suggested sample credentials, which are illustrations of what an agent might write about themselves rather than claims about us; and Zapier's own published '5,000+ apps' figure. Verified against the built output as well as source: a 248-file scan of dist/ for 24 banned strings comes back with only coincidental matches (SVG path data, MD5 constants) and the legitimate feature description."
+    },
+    {
+      "id": "US-160",
+      "title": "Stop deploying 17 MB of source maps that publish the entire TypeScript source",
+      "description": "vite.config.ts set `sourcemap: 'hidden'` unconditionally, with the comment \"These are hidden source maps that won't expose source code to users\". That is not what 'hidden' does. It omits the `//# sourceMappingURL=` comment from the bundle so a browser will not fetch the map on its own; the .map files are still written into dist/ and still deployed. The URL is derivable from any chunk name visible in the network tab, so `https://agentbio.net/assets/index-<hash>.js.map` returned the whole source. 193 maps, 17 MB, 71% of a 24 MB deploy \u2014 every query shape, every RLS assumption and every unshipped route, public. The stated justification was Sentry symbolication, but nothing consumed them: there is no @sentry/vite-plugin and no upload step in .github/workflows. US-125 reduced this and did not close it.",
+      "acceptanceCriteria": [
+        "A default `npm run build` writes no .map file into dist/.",
+        "BUILD_SOURCEMAPS=true still emits hidden maps, for a local analyze run or a CI job that uploads to an error tracker and deletes them before deploy.",
+        "scripts/check-bundle-size.mjs (the CI `size-check` job) fails when a .map reaches dist/assets without that flag set.",
+        "The misleading comment in vite.config.ts is replaced with what 'hidden' actually does."
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-09. dist drops 24 MB -> 6.4 MB. Both paths verified against a real build: default emits 0 maps, BUILD_SOURCEMAPS=true emits 193, and the guard was demonstrated failing by dropping one .map into dist/assets."
+    },
+    {
+      "id": "US-161",
+      "title": "The UI has 65 machine-detectable AI-generated-design tells",
+      "description": "`npx impeccable detect src` reports 65 anti-patterns across the app: 49 ai-color-palette (purple/violet gradients \u2014 InstagramBioAnalyzer and ListingDescriptionGenerator are the worst, but Landing, Pricing, Login, Register and LocationTemplate all carry them), 10 gradient-text on headings, 3 side-tab, 1 overused-font, 1 gray-on-color and 1 border-accent-on-rounded. CLAUDE.md names every one of these as a category default to refuse. This is not a lint fix: removing a purple gradient means deciding what replaces it, so it needs a palette and type decision first and then a page-by-page pass. Multi-iteration by nature.",
+      "acceptanceCriteria": [
+        "A single documented palette and type scale exists, chosen deliberately rather than inherited from the shadcn default.",
+        "`npx impeccable detect src` reports zero gradient-text and zero ai-color-palette findings.",
+        "The remaining side-tab, overused-font, gray-on-color and border-accent-on-rounded findings are each fixed or recorded with a reason.",
+        "A CI check runs the detector so the count cannot silently climb back."
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-09 during the platform-improvement loop. Take the palette/type decision first in one iteration, then the two tools pages (16 of the 49 palette findings sit in those two files), then the rest."
     }
   ]
 }

@@ -19,6 +19,26 @@ import { HOMEPAGE_SEO } from './src/config/homepage-seo';
 // ANALYZE=true `vite build` writes dist/stats.html and opens it.
 const ANALYZE = process.env.ANALYZE === 'true';
 
+// Source maps are OFF by default, and that is a deliberate change (US-160).
+//
+// The build used to emit `sourcemap: 'hidden'` unconditionally, with a comment
+// claiming hidden maps "won't expose source code to users". That is not what
+// `hidden` does. It only omits the `//# sourceMappingURL=` comment from the
+// bundle; the .map files are still written to dist/ and still deployed, at a
+// URL derivable from the chunk name you can read in any browser's network tab.
+// 193 of them, 17 MB, publishing the entire TypeScript source of the app —
+// every query shape, every RLS assumption, every not-yet-shipped route.
+//
+// The stated reason was Sentry symbolication, but nothing uploads them: there
+// is no @sentry/vite-plugin and no upload step in .github/workflows. They were
+// pure cost.
+//
+// Set BUILD_SOURCEMAPS=true to get them back — for a local `npm run analyze`,
+// or for a CI job that uploads to Sentry and then deletes dist/**/*.map before
+// the deploy step. scripts/check-bundle-size.mjs fails the build if maps reach
+// dist without that flag set.
+const BUILD_SOURCEMAPS = process.env.BUILD_SOURCEMAPS === 'true';
+
 export default defineConfig(({ mode }) => {
   // '' as the prefix so .env files are read whole; only VITE_GA_MEASUREMENT_ID
   // is used below, and Vite still applies its own VITE_ prefix rule to what the
@@ -102,9 +122,11 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      // Enable source maps for production (needed for Sentry error tracking)
-      // These are hidden source maps that won't expose source code to users
-      sourcemap: 'hidden',
+      // See BUILD_SOURCEMAPS above. 'hidden' keeps the sourceMappingURL
+      // comment out of the bundle so browsers do not fetch maps automatically;
+      // it does NOT stop anyone requesting the .map directly, which is why the
+      // default is false and the deploy guard exists.
+      sourcemap: BUILD_SOURCEMAPS ? 'hidden' : false,
       rollupOptions: {
         output: {
           format: 'es',

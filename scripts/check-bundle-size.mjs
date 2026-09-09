@@ -36,6 +36,14 @@ function exceptionFor(name) {
   return Object.keys(EXCEPTIONS).find((prefix) => name.startsWith(prefix));
 }
 
+// US-160: source maps must not reach the CDN. `sourcemap: 'hidden'` only
+// removes the sourceMappingURL comment — the .map files are still deployed and
+// still fetchable at a URL derived from the chunk name, which publishes the
+// whole TypeScript source. vite.config.ts emits them only when
+// BUILD_SOURCEMAPS=true; that flag is for a local analyze run, or for a CI job
+// that uploads to Sentry and then deletes dist/**/*.map before deploying.
+const SOURCEMAPS_ALLOWED = process.env.BUILD_SOURCEMAPS === "true";
+
 let files;
 try {
   files = readdirSync(ASSETS_DIR).filter((f) => f.endsWith(".js"));
@@ -44,6 +52,26 @@ try {
     `[bundle-size] dist/assets not found. Run \`npm run build\` first.`
   );
   process.exit(1);
+}
+
+if (!SOURCEMAPS_ALLOWED) {
+  const maps = readdirSync(ASSETS_DIR).filter((f) => f.endsWith(".map"));
+  if (maps.length) {
+    const bytes = maps.reduce(
+      (sum, f) => sum + statSync(join(ASSETS_DIR, f)).size,
+      0
+    );
+    console.error(
+      `[bundle-size] FAILED — ${maps.length} source map(s) in dist/assets ` +
+        `(${(bytes / KB / KB).toFixed(1)} MB).`
+    );
+    console.error(
+      "  Deployed .map files are publicly fetchable and publish the app's " +
+        "source. Build without BUILD_SOURCEMAPS=true, or delete " +
+        "dist/**/*.map after uploading them to your error tracker."
+    );
+    process.exit(1);
+  }
 }
 
 const violations = [];

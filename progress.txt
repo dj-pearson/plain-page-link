@@ -1784,3 +1784,58 @@ Full suite 624 passed / 23 failed at 127s, the heaviest-loaded run of the whole
 session. Every suspect passes alone: marketing-claims 2/2, routes 3/3,
 ContactForm 3/3, Register 3/3, Settings 6/6, SubmitReview 5/5, LeadDetailModal
 7/7. The stable floor is unchanged — repo-hygiene x2, analytics, analyticsEvents.
+
+## Platform Improvement Loop — 2026-09-09 (self-paced, 15 iterations)
+
+### Iteration 1/15 — US-160: 17 MB of source maps were being published to the CDN
+
+vite.config.ts carried `sourcemap: 'hidden'` with the comment "These are hidden
+source maps that won't expose source code to users". That comment is wrong, and
+it had been wrong long enough to survive US-125, which was explicitly about the
+17 MB of maps in the build output and only reduced them.
+
+`hidden` omits the `//# sourceMappingURL=` comment from the emitted bundle. That
+stops a *browser* fetching the map on its own. It does not stop anyone else: the
+map filename is the chunk filename plus `.map`, and the chunk filename is in the
+network tab of every visit. `https://agentbio.net/assets/index-<hash>.js.map`
+returned the whole TypeScript source — 193 files, 17 MB, 71% of a 24 MB deploy.
+Every query shape, every RLS assumption, every route not yet announced.
+
+The justification recorded in the comment was Sentry symbolication. Nothing
+consumed them. There is no @sentry/vite-plugin, no `sentry-cli sourcemaps`
+invocation, and no upload step anywhere in .github/workflows — `@sentry/react`
+is the only Sentry dependency and it needs the maps on Sentry's side, not on
+Cloudflare's. They were cost with no benefit attached.
+
+WHAT CHANGED
+  - vite.config.ts: `sourcemap: BUILD_SOURCEMAPS ? 'hidden' : false`, off by
+    default. The comment now says what 'hidden' actually does.
+  - The flag is a real escape hatch, not a formality: `BUILD_SOURCEMAPS=true`
+    is what a local `npm run analyze` wants, and what a future CI job would set
+    to upload to an error tracker and then delete dist/**/*.map before deploy.
+  - scripts/check-bundle-size.mjs — already the CI `size-check` job — now fails
+    if any .map reaches dist/assets without that flag. The check runs before the
+    per-chunk budget loop so it reports even when a chunk is also over budget.
+
+VERIFICATION, against real builds rather than reasoning about the flag:
+  - default build: dist 24 MB -> 6.4 MB, `ls dist/assets/*.map` = 0.
+  - `BUILD_SOURCEMAPS=true npx vite build`: 193 maps, as before.
+  - the guard was demonstrated failing, not just written: dropping one .map into
+    dist/assets produced the failure and its message, and removing it passed.
+  - tsc --noEmit clean.
+
+NOTED, NOT FIXED — `npm run size-check` is already red on main, and was before
+this change: export-vendor is 605.0 KB against a 600 KB vendor budget (jspdf +
+html2canvas). Same chunk hash before and after, so it is untouched by this work.
+A CI gate that is red by default teaches everyone to ignore it, so this is the
+candidate for the next iteration.
+
+STORIES OPENED
+  - US-161: `npx impeccable detect src` reports 65 AI-generated-design tells —
+    49 ai-color-palette (purple/violet gradients), 10 gradient-text on headings,
+    3 side-tab, 1 overused-font, 1 gray-on-color, 1 border-accent-on-rounded.
+    CLAUDE.md names every one of these as a default to refuse. Not a lint fix:
+    removing a purple gradient means deciding what replaces it, so it needs a
+    palette and type decision taken first and then a page-by-page pass. Deferred
+    to a later iteration deliberately, per the loop's own rule about work that
+    does not fit in one.
