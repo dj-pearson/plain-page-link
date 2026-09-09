@@ -22,32 +22,50 @@ const KB = 1024;
 const VENDOR_BUDGET = 600 * KB;
 const DEFAULT_BUDGET = 500 * KB;
 
-// chunk name prefix -> { reason, staticImporters }.
-//
-// `reason` is the justification for going over budget. `staticImporters` is the
-// enforcement of it: the ONLY chunks allowed to `import ... from "./<chunk>"`.
-// Everything else must reach it through a dynamic import, or not at all.
-//
-// This second field exists because the reason was false for months and nothing
-// noticed (US-163). Vite's __vitePreload helper is a virtual module, so Rollup
-// filed it into three-vendor, and every chunk that lazy-loads anything then
-// statically imported 797 KB of Three.js to obtain a 200-byte function.
-// FullProfilePage was one of them — /:username, the page every agent puts in
-// their Instagram bio, whose theme usually renders no 3D at all. An exception
-// that only carries prose cannot catch that; one that names its importers can.
-//
+const fmt = (n) => `${(n / KB).toFixed(1)} KB`;
+
+// chunk name prefix -> reason. The budget allowlist, and nothing else.
 // Kept tiny on purpose.
 const EXCEPTIONS = {
-  "three-vendor": {
-    reason:
-      "Three.js/R3F — lazy-loaded only on 3D hero sections, never on first paint",
-    staticImporters: [
-      /^FloatingGeometry-/,
-      /^GradientMesh-/,
-      /^ThreeDBackground-/,
-      /^Hero3D/,
-    ],
-  },
+  "three-vendor":
+    "Three.js/R3F — lazy-loaded only on 3D hero sections, never on first paint",
+};
+
+// chunk name prefix -> the ONLY chunks allowed to `import ... from "./<chunk>"`.
+// Anything else must reach it through a dynamic import, or not at all.
+//
+// This exists because "lazy-loaded, never on first paint" sat in the exception
+// above as prose for months while being false, and prose asserts nothing
+// (US-163). Vite's __vitePreload helper is a virtual module, so Rollup filed it
+// into three-vendor; every chunk that lazy-loads anything then statically
+// imported 797 KB of Three.js to obtain a 200-byte function, the ENTRY chunk
+// among them. Every visitor to every route paid for it.
+//
+// US-164 was the same shape one layer down. clsx has no home either, and
+// recharts depends on it, so Rollup put it in charts-vendor and the entry chunk
+// imported 394 KB of dashboard charting library to get cn(). @babel/runtime's
+// helpers landed there too, which is how loading a 3D profile theme pulled in
+// recharts. Both are now named in vite.config.ts's VENDOR_CHUNKS table.
+//
+// The rule generalises: a tiny shared module with no assigned home gets adopted
+// by whichever large chunk happens to want it, and every consumer then pays for
+// the whole thing. It is invisible in the chunk listing — sizes look fine — and
+// only shows up in who imports what. So check who imports what.
+const MUST_STAY_LAZY = {
+  "three-vendor": [
+    /^FloatingGeometry-/,
+    /^GradientMesh-/,
+    /^ThreeDBackground-/,
+    /^Hero3D/,
+  ],
+  // Dashboard and admin only. Never the entry, never a public page.
+  "charts-vendor": [
+    /^Analytics-/,
+    /^HealthDashboard-/,
+    /^SEOManager-/,
+    /^SearchAnalyticsDashboard-/,
+    /^MLLeadScoringDashboard-/,
+  ],
 };
 
 function budgetFor(name) {
@@ -96,6 +114,45 @@ if (!SOURCEMAPS_ALLOWED) {
   }
 }
 
+// Hold every must-stay-lazy chunk to its declared importers. A static import
+// renders as `from"./chunk.js"` and a dynamic one as `import("./chunk.js")`, so
+// matching on `from` picks up exactly the imports that put a chunk on a
+// critical path.
+const sources = new Map(
+  files.map((f) => [f, readFileSync(join(ASSETS_DIR, f), "utf8")])
+);
+
+const leaks = [];
+for (const [prefix, allowed] of Object.entries(MUST_STAY_LAZY)) {
+  const chunk = files.find((f) => f.startsWith(`${prefix}-`));
+  if (!chunk) continue;
+  const size = statSync(join(ASSETS_DIR, chunk)).size;
+
+  for (const [file, source] of sources) {
+    if (file === chunk) continue;
+    if (!source.includes(`from"./${chunk}"`)) continue;
+    if (allowed.some((pattern) => pattern.test(file))) continue;
+    leaks.push({ file, chunk, size });
+  }
+}
+
+if (leaks.length) {
+  console.error(
+    "[bundle-size] FAILED — a chunk that must stay lazy is statically imported:"
+  );
+  for (const l of leaks) {
+    console.error(`  - ${l.file} statically imports ${l.chunk} (${fmt(l.size)})`);
+  }
+  console.error(
+    "  That puts the whole chunk on that page's critical path. Usually the " +
+      "cause is a tiny shared module with no home — a helper, clsx, a babel " +
+      "runtime import — that Rollup filed into the big chunk; name it in " +
+      "VENDOR_CHUNKS in vite.config.ts. If the import is genuinely legitimate, " +
+      "add the importer to MUST_STAY_LAZY in this file."
+  );
+  process.exit(1);
+}
+
 const violations = [];
 const exempted = [];
 
@@ -106,13 +163,12 @@ for (const file of files) {
 
   const ex = exceptionFor(file);
   if (ex) {
-    exempted.push({ file, size, reason: EXCEPTIONS[ex].reason });
+    exempted.push({ file, size, reason: EXCEPTIONS[ex] });
   } else {
     violations.push({ file, size, budget });
   }
 }
 
-const fmt = (n) => `${(n / KB).toFixed(1)} KB`;
 
 if (exempted.length) {
   console.log("[bundle-size] Documented exceptions (over budget, allowed):");
@@ -121,37 +177,6 @@ if (exempted.length) {
   }
 }
 
-// Hold each exception to its own justification. A static import renders as
-// `from"./chunk.js"`; a dynamic one renders as `import("./chunk.js")`, so
-// matching on `from` picks up exactly the imports that put the chunk on a
-// critical path.
-const laxExceptions = [];
-for (const e of exempted) {
-  const allowed = EXCEPTIONS[exceptionFor(e.file)].staticImporters;
-  for (const file of files) {
-    if (file === e.file) continue;
-    const source = readFileSync(join(ASSETS_DIR, file), "utf8");
-    if (!source.includes(`from"./${e.file}"`)) continue;
-    if (allowed.some((pattern) => pattern.test(file))) continue;
-    laxExceptions.push({ file, chunk: e.file, size: e.size });
-  }
-}
-
-if (laxExceptions.length) {
-  console.error(
-    "[bundle-size] FAILED — a chunk documented as lazy is statically imported:"
-  );
-  for (const l of laxExceptions) {
-    console.error(`  - ${l.file} statically imports ${l.chunk} (${fmt(l.size)})`);
-  }
-  console.error(
-    "  That puts the whole chunk on that page's critical path, which is the " +
-      "opposite of what its exception claims. Reach it with a dynamic " +
-      "import(), or — if the import is legitimate — add the importer to " +
-      "staticImporters in this file and correct the reason."
-  );
-  process.exit(1);
-}
 
 if (violations.length) {
   console.error("[bundle-size] FAILED — chunks over budget:");

@@ -48,8 +48,36 @@ const BUILD_SOURCEMAPS = process.env.BUILD_SOURCEMAPS === 'true';
 //
 // Order matters only in that the first match wins; the lists are disjoint.
 const VENDOR_CHUNKS: readonly (readonly [string, readonly string[]])[] = [
-  // React core - rarely changes, caches well
-  ['react-vendor', ['react', 'react-dom', 'react-router-dom', 'react-router']],
+  // React core - rarely changes, caches well.
+  //
+  // clsx, tailwind-merge and class-variance-authority are here for the same
+  // reason the preload helper is (US-164). They are a few KB each, every
+  // component in the app calls cn() from src/lib/utils.ts, and recharts happens
+  // to depend on clsx too — so Rollup, having no instruction, filed clsx into
+  // charts-vendor and the ENTRY chunk then emitted
+  // `import{e as Tr}from"./charts-vendor-<hash>.js"` to get it. 394 KB of
+  // dashboard charting library on the critical path of the marketing landing
+  // page, for one 500-byte function. Same shape as US-163, one layer down:
+  // a tiny shared module with no home, adopted by the largest chunk that
+  // happened to want it. Name them, and they land where they are needed.
+  [
+    'react-vendor',
+    [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'react-router',
+      'clsx',
+      'tailwind-merge',
+      'class-variance-authority',
+      // Same story again, and the reason three-vendor was reaching into
+      // charts-vendor: @babel/runtime's helpers (_extends and friends) are a
+      // few hundred bytes, and both recharts and @react-three/drei depend on
+      // them. Rollup put them in charts-vendor, so loading a 3D profile theme
+      // pulled in 394 KB of charting library to get Object.assign.
+      '@babel/runtime',
+    ],
+  ],
   // Supabase client - used everywhere
   ['supabase', ['@supabase/supabase-js']],
   // UI framework - Radix components

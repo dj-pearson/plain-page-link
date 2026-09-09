@@ -1982,3 +1982,67 @@ STORY OPENED — US-164. With three-vendor gone from the entry, what remains
 static there is charts-vendor: 394 KB of recharts, in a chunk whose own comment
 reads "Charts - dashboard only", loaded on every route including the marketing
 landing page. Next iteration.
+
+### Iteration 4/15 — US-164: the landing page shipped recharts to supply clsx
+
+Left over from iteration 3: with three-vendor off the critical path, the entry
+chunk still statically imported charts-vendor — 394 KB of recharts, in a chunk
+whose own comment in vite.config.ts reads "Charts - dashboard only". The entry
+loads on every route, so every visitor to the marketing landing page, every blog
+reader and every public profile visitor paid for it.
+
+It was not a stray chart component. All six recharts importers are admin or
+dashboard files and all are correctly lazy. The entry pulled exactly ONE binding:
+
+  import{e as Tr}from"./charts-vendor-DgQnpdXW.js"
+  ...
+  function X(...t){return el(Tr(t))}
+
+`el(Tr(t))` is `twMerge(clsx(inputs))` — cn() from src/lib/utils.ts, which every
+component in the app calls. clsx had no assigned home in VENDOR_CHUNKS, recharts
+happens to depend on it, so Rollup filed it into charts-vendor and the entry
+imported the whole 394 KB chunk to get a 500-byte function.
+
+@babel/runtime's helpers had been adopted the same way. That is why three-vendor
+statically imported charts-vendor: `import{_ as xa}` there is `_extends`, and
+both recharts and @react-three/drei depend on @babel/runtime. Loading a 3D
+profile theme pulled in a charting library to get Object.assign.
+
+This is US-163's defect one layer down, and the generalisation is worth stating:
+a tiny shared module with no assigned home gets adopted by whichever large chunk
+happens to want it, and every consumer then pays for the whole thing. It is
+invisible in a chunk listing — every size looks fine — and shows up only in who
+imports what.
+
+THE FIX. clsx, tailwind-merge, class-variance-authority and @babel/runtime named
+in VENDOR_CHUNKS, landing in react-vendor, which every page loads anyway.
+
+VERIFICATION:
+  - entry static vendor imports: form, react, state, supabase, ui. No charts.
+  - charts-vendor's static importers: Analytics, HealthDashboard, SEOManager,
+    SearchAnalyticsDashboard. Dashboard and admin only.
+  - three-vendor no longer imports charts-vendor.
+  - react-vendor 161.5 -> 184.3 KB: four utility packages moving into a chunk
+    that was already loaded, against 394 KB leaving the critical path.
+  - chunk name set identical to iteration 3's; tsc clean; tests pass.
+
+THE GUARD, generalised. US-163 added a staticImporters list to the over-budget
+exception for three-vendor. charts-vendor is under budget, so it was not covered
+— the enforcement was tied to the wrong thing. It is now a separate MUST_STAY_LAZY
+map keyed by chunk, independent of size, covering three-vendor and charts-vendor.
+Its failure message names the actual cause, because "X statically imports Y" does
+not tell you what to do about it: look for a tiny shared module with no home and
+name it in VENDOR_CHUNKS.
+
+Demonstrated against the pre-fix config, not assumed:
+  index-DyYjmFjj.js       statically imports charts-vendor (393.9 KB)
+  three-vendor-9DsfYJow.js statically imports charts-vendor (393.9 KB)
+
+Also removed a duplicated block in check-bundle-size.mjs — the budget loop and
+its reporting appeared twice, the second copy dead. Introduced by an earlier
+edit in this session, caught by node refusing to parse `const violations`
+declared twice.
+
+RUNNING TOTAL for a first-time visitor to any public page, across iterations
+1-4: 17 MB of source maps off the deploy, 800 KB of Three.js and 394 KB of
+recharts off the critical path.
