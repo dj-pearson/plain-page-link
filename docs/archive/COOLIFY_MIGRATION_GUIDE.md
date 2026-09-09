@@ -1,3 +1,14 @@
+> **Archived, and redacted (US-165).** This describes the one-off move to
+> self-hosted Supabase on Coolify, which is complete — see
+> `docs/deploy/MIGRATION_COMPLETE.md`. It is history, not instructions.
+>
+> As committed, this file contained the production Postgres superuser password
+> in plaintext, in a public repository. The values are gone from the working
+> tree but remain in git history, so **the credentials it named must be treated
+> as compromised and rotated.** The PowerShell and shell scripts it refers to
+> carried the same password plus a root SSH password; they have been deleted.
+> Nothing here should be re-run.
+
 # Coolify Self-Hosted Supabase Migration Guide
 
 ## Prerequisites

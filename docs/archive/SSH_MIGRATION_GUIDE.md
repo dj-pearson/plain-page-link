@@ -1,3 +1,14 @@
+> **Archived, and redacted (US-165).** This describes the one-off move to
+> self-hosted Supabase on Coolify, which is complete — see
+> `docs/deploy/MIGRATION_COMPLETE.md`. It is history, not instructions.
+>
+> As committed, this file contained the production Postgres superuser password
+> in plaintext, in a public repository. The values are gone from the working
+> tree but remain in git history, so **the credentials it named must be treated
+> as compromised and rotated.** The PowerShell and shell scripts it refers to
+> carried the same password plus a root SSH password; they have been deleted.
+> Nothing here should be re-run.
+
 # Quick SSH Migration Guide
 
 ## Prerequisites
@@ -24,7 +35,7 @@ $SSH_USER = "root"  # or your username
 
 **Run the script:**
 ```powershell
-.\deploy-migrations-ssh.ps1
+<the deploy script, removed in US-165>
 ```
 
 The script will:
@@ -58,7 +69,7 @@ scp -r .\supabase\migrations\*.sql root@209.145.59.219:/tmp/supabase-migrations/
 cd /tmp/supabase-migrations
 
 # Set variables
-DB_CONN="postgresql://postgres:C2o2aHEhDjLf5R6Q5mKnD7O1FTSR0s24@localhost:5432/postgres"
+DB_CONN="postgresql://postgres:$PGPASSWORD@localhost:5432/postgres"
 CONTAINER="supabase-db-rwwccs4k8o8kog4s0w4ggggg"
 
 # Setup tracking
@@ -120,17 +131,17 @@ After migration, verify on the server:
 ```bash
 # Check tables exist
 docker exec supabase-db-rwwccs4k8o8kog4s0w4ggggg psql \
-  "postgresql://postgres:C2o2aHEhDjLf5R6Q5mKnD7O1FTSR0s24@localhost:5432/postgres" \
+  "postgresql://postgres:$PGPASSWORD@localhost:5432/postgres" \
   -c "\dt"
 
 # Check migration history
 docker exec supabase-db-rwwccs4k8o8kog4s0w4ggggg psql \
-  "postgresql://postgres:C2o2aHEhDjLf5R6Q5mKnD7O1FTSR0s24@localhost:5432/postgres" \
+  "postgresql://postgres:$PGPASSWORD@localhost:5432/postgres" \
   -c "SELECT * FROM supabase_migrations.schema_migrations ORDER BY inserted_at DESC LIMIT 10;"
 
 # Count total tables
 docker exec supabase-db-rwwccs4k8o8kog4s0w4ggggg psql \
-  "postgresql://postgres:C2o2aHEhDjLf5R6Q5mKnD7O1FTSR0s24@localhost:5432/postgres" \
+  "postgresql://postgres:$PGPASSWORD@localhost:5432/postgres" \
   -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';"
 ```
 

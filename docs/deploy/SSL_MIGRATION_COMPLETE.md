@@ -82,7 +82,7 @@ VITE_SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
 ### Production (.env.local)
 ```env
 VITE_SUPABASE_URL=https://api.agentbio.net
-VITE_SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTAzOTk4MCwiZXhwIjo0OTIwNzEzNTgwLCJyb2xlIjoiYW5vbiJ9.QhDHf45z3FazBIiYTGKO43KBquCaOjIjqhGmWSJw2Ms
+VITE_SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.<payload>.<signature>   # redacted US-165 — see docs/setup/supabase-keys.md
 ```
 
 ### Server (.env)

@@ -2046,3 +2046,130 @@ declared twice.
 RUNNING TOTAL for a first-time visitor to any public page, across iterations
 1-4: 17 MB of source maps off the deploy, 800 KB of Three.js and 394 KB of
 recharts off the critical path.
+
+================================================================================
+ITERATION 1 (new loop) — US-165: live production credentials in a public repo
+================================================================================
+
+WHAT I WAS LOOKING FOR: one thing to make the platform better. I started, as
+usual, by establishing a baseline — and the baseline was red. `npm run test:run`
+on main: 2 failed, 647 passed.
+
+The failing file was src/repo-hygiene.test.ts, the guard US-121 wrote to hold
+the repository root to six markdown files and no loose scripts. Ten files had
+been added to the root on 2026-09-04. On its face this is housekeeping.
+
+It was not housekeeping.
+
+WHAT WAS ACTUALLY IN THEM:
+
+  SUPABASE_KEYS_GUIDE.md          this deployment's live anon AND service_role
+                                  JWTs, in full, under the heading
+                                  "These are valid and working! ✅"
+  deploy-migrations-ssh.ps1       the root SSH password for the production host,
+                                  plus the Postgres superuser password
+  migrate-to-coolify.ps1          the Postgres superuser password
+  migrate-via-files.ps1           the Postgres superuser password
+  test-db-connection.ps1          the Postgres superuser password
+  SSH_MIGRATION_GUIDE.md          the Postgres superuser password, four times
+
+And the repository is PUBLIC — confirmed against the GitHub API, not assumed:
+`"private": false, "visibility": "public"`. These were world-readable for five
+days.
+
+The service_role key is the worst of it. It bypasses every RLS policy in the
+database — every row of `leads` and `profiles` included — and it is not
+independently revocable: the only way to invalidate it is to rotate JWT_SECRET
+and reissue both keys. Its exp is the year 2125, so it was never going to expire
+its way out of the problem.
+
+WHY IT SAT THERE FOR FIVE DAYS. The guard worked. It went red the day the files
+landed, CI runs `npm run test:coverage`, and so the Test job on main has been
+failing since 2026-09-04 — everything merged since merged over a red CI. What
+failed was not the detection but the framing: a guard that says "these belong
+under docs/" reads like a lint nit, so it got treated as one. Nothing in the
+repository was in a position to say "there is a superuser password in that file."
+
+That is the generalisation worth keeping: a guard is only worth what the
+attention paid to it is worth, and a guard that understates its own stake
+teaches people to scroll past it.
+
+THE FIX, in two halves.
+
+Half one, the purge:
+  - deleted the five one-shot migration scripts. The Coolify migration is
+    complete (docs/deploy/MIGRATION_COMPLETE.md), nothing in src/ or scripts/
+    references them, and every one of them carried a password. Same defect
+    US-122 fixed for edge-function build configs: several ad-hoc paths for a
+    job that has one.
+  - deleted SUPABASE_KEYS_GUIDE.md and SUPABASE_KEYS_QUICK_ANSWER.md, which
+    said the same thing twice and both published keys. Replaced by one
+    docs/setup/supabase-keys.md: what the three values are, who may hold each,
+    where each actually lives, and how to rotate — with no key material in it.
+  - archived the two migration guides under docs/archive/ with the password
+    replaced by $PGPASSWORD and a header saying plainly that what they named
+    must be treated as compromised.
+  - moved generate-supabase-keys.js into scripts/ (it generates random keys and
+    leaks nothing; it was just loose). Deleted ga-check.tmp.mjs, a temp file
+    from an earlier session.
+
+Half two, the guard — src/secret-scan.test.ts. It scans every tracked text file
+for credential VALUES rather than policing folders, which matters, because it
+immediately found four leaks the root sweep would have missed entirely:
+
+  docs/deploy/COOLIFY_EDGE_FUNCTIONS_SETUP.md   anon key, in full
+  docs/deploy/SSL_MIGRATION_COMPLETE.md         anon key, in full
+  docs/setup/AUTH_SETUP_DOCUMENTATION.md        anon key, in full, twice
+                                                — and from a DIFFERENT
+                                                  JWT_SECRET era than the first
+
+Anon keys ship in the frontend bundle by design, so these are not severity-one
+on their own. They are the same habit that published the service_role key, and
+they will be dead the moment rotation happens. Redacted to their header segment.
+
+Five rules: complete JWTs (three real segments — a truncated "eyJhbGci..." in
+documentation still passes, deliberately), passwords assigned to literals,
+connection strings with inline passwords, private key blocks with an actual
+base64 body, and live third-party keys (Stripe, Supabase PAT, GitHub, OpenAI,
+Anthropic, AWS, Slack).
+
+It never prints a matched value — only file, line, rule and why. Reporting a
+leak must not re-publish it.
+
+FALSE POSITIVES, each judged and pinned. The first run produced 16 findings; 4
+were real (above) and 12 were not. Rather than allowlist files wholesale I
+narrowed the rules, and then pinned each exemption as its own assertion so that
+widening one to smuggle a real secret past fails the test:
+  - postgres:postgres@localhost — the throwaway verify-backend.yml runs. Exempt
+    only because user equals password; a real password there still fails.
+  - `Password: anything` / `Password: password` in QUICK_START.md — seeded demo
+    accounts. Exact-match list of words-for-a-password, so `password_Xk92mQ`
+    is not exempt.
+  - $POSTGRES_PASSWORD, [password], ${...} — leading-sigil check.
+  - google-indexing/index.ts stripping PEM headers with .replace(). The rule now
+    requires base64 after the header: handling a key is not leaking one.
+Two files are allowlisted outright, each with its reason: logger.test.ts, whose
+fixture passwords exist to prove the logger redacts them, and tests/e2e/auth.spec.ts.
+
+DEMONSTRATED ABLE TO FAIL, against the files as actually committed at 908a2c1,
+not against a synthetic sample:
+  SUPABASE_KEYS_GUIDE.md:82   complete JWT
+  SUPABASE_KEYS_GUIDE.md:84   complete JWT
+  deploy-migrations-ssh.ps1:11 password assigned to a literal
+  deploy-migrations-ssh.ps1:13 password assigned to a literal
+
+VERIFICATION: 76 test files, 654 tests, all passing — up from 75/647-with-2-red.
+tsc --noEmit clean. eslint clean. prettier clean. CI needs no change: it already
+runs npm run test:coverage, so the guard is enforced from the next push.
+
+STILL OUTSTANDING, AND NOT SOMETHING THIS LOOP CAN DO:
+
+  ROTATE. Removing a secret from the working tree does not remove it from git
+  history, from clones, from forks, or from anyone who watched a public
+  repository for five days. Treat as compromised: JWT_SECRET (which forces
+  reissuing both anon and service_role), the Postgres superuser password, and
+  the root SSH password on the production host. Procedure in
+  docs/setup/supabase-keys.md.
+
+  Scrubbing the history rewrites published commits. That is Dj's call, not this
+  loop's, and rotation matters more than scrubbing either way.

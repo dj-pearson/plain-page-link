@@ -37,7 +37,7 @@ Add these in Coolify's environment variables section:
 
 ```env
 SUPABASE_URL=https://supabasekong-rwwccs4k8o8kog4s0w4ggggg.209.145.59.219.sslip.io
-SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTAzOTk4MCwiZXhwIjo0OTIwNzEzNTgwLCJyb2xlIjoiYW5vbiJ9.QhDHf45z3FazBIiYTGKO43KBquCaOjIjqhGmWSJw2Ms
+SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.<payload>.<signature>   # redacted US-165 — see docs/setup/supabase-keys.md
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 ```
 
