@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useSubscription, stripePriceIdFor } from '@/hooks/useSubscription';
+import { planFeatureLabel } from '@/config/pricing-plans';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useToast } from '@/hooks/use-toast';
@@ -352,14 +353,20 @@ export default function Pricing() {
                             </span>
                           </li>
                         )}
-                        {Object.entries(plan.features).map(([key, value]) =>
-                          value ? (
+                        {Object.entries(plan.features).map(([key, value]) => {
+                          // US-171: was `capitalize` over `key.replace(/_/g, ' ')`.
+                          // The keys are camelCase, so that printed
+                          // "AiListingDescriptions" and "RemoveBranding" to a
+                          // customer deciding whether to pay.
+                          const label = planFeatureLabel(key, value);
+                          if (!label) return null;
+                          return (
                             <li key={key} className="flex items-start gap-2">
                               <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                              <span className="text-sm capitalize">{key.replace(/_/g, ' ')}</span>
+                              <span className="text-sm">{label}</span>
                             </li>
-                          ) : null
-                        )}
+                          );
+                        })}
                       </ul>
                     </CardContent>
 

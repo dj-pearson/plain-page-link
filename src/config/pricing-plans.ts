@@ -35,13 +35,9 @@ export interface PlanFeatures {
   aiListingDescriptions: boolean | 'limited';
   leadScoring: boolean;
   followUpSequences: boolean | 'limited';
-  marketReports: boolean | 'limited';
   virtualStaging: boolean | 'limited';
   predictiveAnalytics: boolean;
-  videoTours: boolean | 'limited';
   openHouseManagement: boolean;
-  mortgageCalculator: boolean;
-  cmaGenerator: boolean | 'limited';
 }
 
 export interface PlanLimits {
@@ -53,9 +49,7 @@ export interface PlanLimits {
 
   // AI Generation limits (per month)
   aiListingDescriptions: number; // 0 = disabled, -1 = unlimited
-  marketReports: number;
   virtualStagingPhotos: number;
-  videoTours: number;
   cmaReports: number;
 
   // Automation limits
@@ -89,13 +83,9 @@ export const PRICING_PLANS: PricingTier[] = [
       aiListingDescriptions: false,
       leadScoring: false,
       followUpSequences: false,
-      marketReports: false,
       virtualStaging: false,
       predictiveAnalytics: false,
-      videoTours: false,
       openHouseManagement: false,
-      mortgageCalculator: true, // Free tool
-      cmaGenerator: false,
     },
     limits: {
       listings: 3,
@@ -103,9 +93,7 @@ export const PRICING_PLANS: PricingTier[] = [
       testimonials: 3,
       soldProperties: 3,
       aiListingDescriptions: 0,
-      marketReports: 0,
       virtualStagingPhotos: 0,
-      videoTours: 0,
       cmaReports: 0,
       followUpSequences: 0,
       emailsPerMonth: 0,
@@ -131,13 +119,9 @@ export const PRICING_PLANS: PricingTier[] = [
       aiListingDescriptions: 'limited',
       leadScoring: true,
       followUpSequences: 'limited',
-      marketReports: false,
       virtualStaging: false,
       predictiveAnalytics: true,
-      videoTours: false,
       openHouseManagement: true,
-      mortgageCalculator: true,
-      cmaGenerator: false,
     },
     limits: {
       listings: 10,
@@ -145,9 +129,7 @@ export const PRICING_PLANS: PricingTier[] = [
       testimonials: 10,
       soldProperties: 10,
       aiListingDescriptions: 10, // 10 per month
-      marketReports: 0,
       virtualStagingPhotos: 0,
-      videoTours: 0,
       cmaReports: 0,
       followUpSequences: 3, // 3 active sequences
       emailsPerMonth: 500,
@@ -174,13 +156,9 @@ export const PRICING_PLANS: PricingTier[] = [
       aiListingDescriptions: true,
       leadScoring: true,
       followUpSequences: true,
-      marketReports: 'limited',
       virtualStaging: 'limited',
       predictiveAnalytics: true,
-      videoTours: 'limited',
       openHouseManagement: true,
-      mortgageCalculator: true,
-      cmaGenerator: 'limited',
     },
     limits: {
       listings: 25,
@@ -188,9 +166,7 @@ export const PRICING_PLANS: PricingTier[] = [
       testimonials: 25,
       soldProperties: 25,
       aiListingDescriptions: 25, // 25 per month
-      marketReports: 5, // 5 per month
       virtualStagingPhotos: 20, // 20 per month
-      videoTours: 5, // 5 per month
       cmaReports: 10, // 10 per month
       followUpSequences: 10,
       emailsPerMonth: 2000,
@@ -216,13 +192,9 @@ export const PRICING_PLANS: PricingTier[] = [
       aiListingDescriptions: true,
       leadScoring: true,
       followUpSequences: true,
-      marketReports: true,
       virtualStaging: true,
       predictiveAnalytics: true,
-      videoTours: true,
       openHouseManagement: true,
-      mortgageCalculator: true,
-      cmaGenerator: true,
     },
     limits: {
       listings: -1, // unlimited
@@ -230,9 +202,7 @@ export const PRICING_PLANS: PricingTier[] = [
       testimonials: -1,
       soldProperties: -1,
       aiListingDescriptions: 100, // 100 per month
-      marketReports: 20,
       virtualStagingPhotos: 100,
-      videoTours: 20,
       cmaReports: 50,
       followUpSequences: -1, // unlimited
       emailsPerMonth: 10000,
@@ -258,13 +228,9 @@ export const PRICING_PLANS: PricingTier[] = [
       aiListingDescriptions: true,
       leadScoring: true,
       followUpSequences: true,
-      marketReports: true,
       virtualStaging: true,
       predictiveAnalytics: true,
-      videoTours: true,
       openHouseManagement: true,
-      mortgageCalculator: true,
-      cmaGenerator: true,
     },
     limits: {
       listings: -1,
@@ -272,9 +238,7 @@ export const PRICING_PLANS: PricingTier[] = [
       testimonials: -1,
       soldProperties: -1,
       aiListingDescriptions: -1, // unlimited
-      marketReports: -1,
       virtualStagingPhotos: -1,
-      videoTours: -1,
       cmaReports: -1,
       followUpSequences: -1,
       emailsPerMonth: -1,
@@ -289,80 +253,24 @@ export const PRICING_PLANS: PricingTier[] = [
 // ============================================
 // PAY-PER-USE PRICING (for overage/add-ons)
 // ============================================
-
-export interface UsagePricing {
-  feature_key: string;
-  name: string;
-  price_per_use: number;
-  cost_to_provide: number;
-  min_purchase?: number; // Minimum units to purchase
-}
-
-export const USAGE_PRICING: UsagePricing[] = [
-  {
-    feature_key: 'ai_listing_description',
-    name: 'AI Listing Description',
-    price_per_use: 2.0,
-    cost_to_provide: 0.3,
-  },
-  {
-    feature_key: 'market_reports',
-    name: 'Market Report',
-    price_per_use: 10.0,
-    cost_to_provide: 2.0,
-  },
-  {
-    feature_key: 'virtual_staging',
-    name: 'Virtual Staging (per photo)',
-    price_per_use: 5.0,
-    cost_to_provide: 3.0,
-  },
-  {
-    feature_key: 'video_tours',
-    name: 'Video Tour',
-    price_per_use: 15.0,
-    cost_to_provide: 8.0,
-  },
-  {
-    feature_key: 'cma_generator',
-    name: 'CMA Report',
-    price_per_use: 19.99,
-    cost_to_provide: 3.0,
-  },
-  {
-    feature_key: 'sms_messages',
-    name: 'SMS Messages (per 100)',
-    price_per_use: 10.0,
-    cost_to_provide: 0.75, // ~$0.0075 per SMS
-    min_purchase: 100,
-  },
-];
-
+// REMOVED: add-on billing that priced features nobody built (US-171)
 // ============================================
-// FEATURE KEYS MAPPING
-// ============================================
-
-export const FEATURE_KEYS = {
-  // AI Generation
-  AI_LISTING_DESCRIPTION: 'ai_listing_description',
-  MARKET_REPORTS: 'market_reports',
-  VIRTUAL_STAGING: 'virtual_staging',
-  VIDEO_TOURS: 'video_tours',
-  CMA_GENERATOR: 'cma_generator',
-
-  // Analytics & Scoring
-  LEAD_SCORING: 'lead_scoring',
-  PREDICTIVE_ANALYTICS: 'predictive_analytics',
-
-  // Automation
-  FOLLOW_UP_SEQUENCES: 'follow_up_sequences',
-  EMAIL_AUTOMATION: 'email_automation',
-  SMS_AUTOMATION: 'sms_automation',
-
-  // Tools
-  OPEN_HOUSE_MANAGEMENT: 'open_house_management',
-  MORTGAGE_CALCULATOR: 'mortgage_calculator',
-} as const;
+//
+// USAGE_PRICING, FEATURE_KEYS, UsagePricing, calculateOverageCharge and
+// calculateTotalCost lived here and were referenced by nothing — verified
+// across src/, supabase/ and scripts/. Between them they set a per-use price
+// for a Market Report ($10), a Video Tour ($15) and a CMA Report ($19.99),
+// none of which exist in this application, and named a MORTGAGE_CALCULATOR
+// feature whose 378-line implementation has no caller either.
+//
+// Dead config that prices unbuilt features is a trap: it reads as a decision
+// someone made, so the next person costs a roadmap against it. If metered
+// add-ons are built, price them then, against something shippable.
+//
+// The plan feature matrix itself is owned by
+// supabase/migrations/20260902000014_seed_subscription_plans.sql — the
+// pricing page reads subscription_plans, not this file. pricing-plans.test.ts
+// holds the two in step.
 
 // ============================================
 // HELPER FUNCTIONS
@@ -376,13 +284,6 @@ export function getPlanById(planId: string): PricingTier | undefined {
 }
 
 /**
- * Get usage pricing for a feature
- */
-export function getUsagePricing(featureKey: string): UsagePricing | undefined {
-  return USAGE_PRICING.find((pricing) => pricing.feature_key === featureKey);
-}
-
-/**
  * Check if a plan has a feature enabled
  */
 export function planHasFeature(planId: string, featureKey: string): boolean {
@@ -392,15 +293,11 @@ export function planHasFeature(planId: string, featureKey: string): boolean {
   // Map feature keys to plan features
   const featureMap: Record<string, keyof PlanFeatures> = {
     ai_listing_description: 'aiListingDescriptions',
-    market_reports: 'marketReports',
     virtual_staging: 'virtualStaging',
-    video_tours: 'videoTours',
-    cma_generator: 'cmaGenerator',
     lead_scoring: 'leadScoring',
     predictive_analytics: 'predictiveAnalytics',
     follow_up_sequences: 'followUpSequences',
     open_house_management: 'openHouseManagement',
-    mortgage_calculator: 'mortgageCalculator',
   };
 
   const planFeatureKey = featureMap[featureKey];
@@ -418,16 +315,6 @@ export function getFeatureLimit(planId: string, limitKey: keyof PlanLimits): num
   if (!plan) return 0;
 
   return plan.limits[limitKey];
-}
-
-/**
- * Calculate overage charges
- */
-export function calculateOverageCharge(featureKey: string, overageCount: number): number {
-  const pricing = getUsagePricing(featureKey);
-  if (!pricing) return 0;
-
-  return pricing.price_per_use * overageCount;
 }
 
 /**
@@ -460,32 +347,59 @@ export function getRecommendedPlan(monthlyUsage: {
 }
 
 /**
- * Calculate monthly cost with usage
+ * How a plan feature is named to a customer.
+ *
+ * US-171: Pricing.tsx rendered the raw key —
+ *
+ *     <span className="capitalize">{key.replace(/_/g, ' ')}</span>
+ *
+ * The keys in `subscription_plans.features` are camelCase, so the underscore
+ * replace is a no-op and CSS `capitalize` only uppercases the first letter.
+ * The purchase page therefore listed "CustomThemes", "RemoveBranding",
+ * "PrioritySupport", "LeadScoring" and — the one that gives it away —
+ * "AiListingDescriptions". Programmer identifiers, on the page where money
+ * changes hands. The `replace(/_/g, ' ')` says the author expected snake_case;
+ * nothing has ever put snake_case in that column.
+ *
+ * Keys come from the database, not from this file, so this map is keyed on what
+ * `20260902000014_seed_subscription_plans.sql` actually seeds.
+ * pricing-plans.test.ts fails if that migration grows a key with no label here.
  */
-export function calculateMonthlyCost(planId: string, usage: Partial<PlanLimits>): number {
-  const plan = getPlanById(planId);
-  if (!plan) return 0;
+export const PLAN_FEATURE_LABELS: Record<string, string> = {
+  analytics: 'Analytics dashboard',
+  customThemes: 'Custom themes',
+  customDomain: 'Custom domain',
+  removeBranding: 'AgentBio branding removed',
+  prioritySupport: 'Priority support',
+  leadScoring: 'Lead scoring',
+  aiListingDescriptions: 'AI listing descriptions',
+};
 
-  let totalCost = plan.price_monthly;
+/**
+ * A readable label for a feature key, and whether it is capped.
+ *
+ * Returns null for a feature the plan does not include, so a caller can map
+ * over every key without filtering first.
+ *
+ * `'limited'` used to render as a plain tick, indistinguishable from full
+ * inclusion — a customer comparing tiers could not see what they were paying
+ * to lift. It is now said out loud.
+ */
+export function planFeatureLabel(key: string, value: unknown): string | null {
+  if (value === false || value === null || value === undefined) return null;
 
-  // Calculate overage charges for each feature
-  Object.entries(usage).forEach(([key, value]) => {
-    const limitKey = key as keyof PlanLimits;
-    const limit = plan.limits[limitKey];
+  // An unknown key still has to read as English rather than as an identifier:
+  // split the camelCase rather than printing it raw.
+  const label =
+    PLAN_FEATURE_LABELS[key] ??
+    key
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ')
+      .toLowerCase()
+      .trim()
+      .replace(/^./, (c) => c.toUpperCase());
 
-    if (typeof value === 'number' && limit !== -1 && value > limit) {
-      const overage = value - limit;
-      // Map limit keys to feature keys for pricing
-      const featureKey = limitKey
-        .replace('PerMonth', '')
-        .replace(/([A-Z])/g, '_$1')
-        .toLowerCase();
-      const charge = calculateOverageCharge(featureKey, overage);
-      totalCost += charge;
-    }
-  });
-
-  return totalCost;
+  return value === 'limited' ? `${label} (limited)` : label;
 }
 
 export default PRICING_PLANS;

@@ -1,96 +1,145 @@
 /**
- * US-118: three places each held their own copy of what a plan costs and
- * allows, and they disagreed.
+ * US-171: the pricing page listed programmer identifiers, and the config beside
+ * it priced features nobody had built.
  *
- *   src/config/pricing-plans.ts   29 / 49 / 99, analytics 30 days on free
- *   stripe-webhook getPlanLimits  its own table, analytics 7 days on free
- *   Pricing.tsx copy and JSON-LD  Starter $19, Professional $39, Team $29/agent
+ * Pricing.tsx rendered each plan feature as
  *
- * subscription_plans is the source of truth now, seeded by
- * 20260902000014_seed_subscription_plans.sql, and the webhook reads limits from
- * it. This file is what remains of the frontend copy — the feature matrix — and
- * this test holds its numbers to the seed, so the two cannot drift again
- * silently.
+ *     <span className="capitalize">{key.replace(/_/g, ' ')}</span>
+ *
+ * The keys in `subscription_plans.features` are camelCase, so the underscore
+ * replace does nothing and CSS `capitalize` only lifts the first letter. The
+ * page where money changes hands therefore read: CustomThemes, CustomDomain,
+ * RemoveBranding, PrioritySupport, LeadScoring, AiListingDescriptions.
+ *
+ * Separately, this file carried a 15-entry PlanFeatures matrix while the
+ * migration that owns the plans seeds 7 — and four of the extras
+ * (marketReports, videoTours, mortgageCalculator, cmaGenerator) had no
+ * implementation anywhere in src/ or supabase/functions/. A USAGE_PRICING table
+ * put a price on three of them ($10 a Market Report, $15 a Video Tour, $19.99 a
+ * CMA) and was referenced by nothing.
+ *
+ * These tests hold two things: every feature the database can hand the pricing
+ * page has a human label, and this file cannot drift from the migration again.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PRICING_PLANS } from './pricing-plans';
+import { PLAN_FEATURE_LABELS, planFeatureLabel, PRICING_PLANS } from './pricing-plans';
 
-const MIGRATION = join(
-  process.cwd(),
-  'supabase/migrations/20260902000014_seed_subscription_plans.sql'
-);
+const SEED = join(process.cwd(), 'supabase/migrations/20260902000014_seed_subscription_plans.sql');
 
-/** Plan name → { monthly, yearly, listings, analytics_days } from the seed SQL. */
-function seededPlans(): Record<
-  string,
-  { monthly: number; yearly: number; listings: number; analyticsDays: number }
-> {
-  const sql = readFileSync(MIGRATION, 'utf8');
-  const out: Record<
-    string,
-    { monthly: number; yearly: number; listings: number; analyticsDays: number }
-  > = {};
+/**
+ * The feature keys the migration actually seeds into
+ * `subscription_plans.features` — which is what the pricing page renders.
+ */
+function seededFeatureKeys(): string[] {
+  const sql = readFileSync(SEED, 'utf8');
+  const insert = sql.slice(sql.indexOf('INSERT INTO public.subscription_plans'));
+  const keys = new Set<string>();
 
-  // Each VALUES row opens with ( 'name', monthly, yearly, sort, is_active,
-  // and carries its limits further down the same tuple.
-  const rowPattern =
-    /\(\s*'(\w+)',\s*(\d+),\s*(\d+),\s*\d+,\s*true,[\s\S]*?'listings',\s*(-?\d+)[\s\S]*?'analytics_days',\s*(-?\d+)/g;
-
-  for (const m of sql.matchAll(rowPattern)) {
-    out[m[1]] = {
-      monthly: Number(m[2]),
-      yearly: Number(m[3]),
-      listings: Number(m[4]),
-      analyticsDays: Number(m[5]),
-    };
+  // jsonb_build_object('analytics', true, 'customThemes', false, ...)
+  for (const block of insert.matchAll(/jsonb_build_object\(([\s\S]*?)\)/g)) {
+    const body = block[1];
+    // Only the features objects carry these; limits use snake_case nouns.
+    for (const pair of body.matchAll(/'([a-zA-Z][a-zA-Z0-9]*)',\s*(true|false)/g)) {
+      keys.add(pair[1]);
+    }
   }
-  return out;
+  return [...keys].sort();
 }
 
-describe('pricing config matches the seeded plans', () => {
-  const seeded = seededPlans();
+describe('plan features the pricing page can render', () => {
+  const seeded = seededFeatureKeys();
 
-  it('parses the seed migration', () => {
-    // A parsing failure would make every comparison below vacuous.
-    expect(Object.keys(seeded).sort()).toEqual([
-      'enterprise',
-      'free',
-      'professional',
-      'starter',
-      'team',
-    ]);
-    expect(seeded.professional.monthly).toBe(49);
+  it('reads the seed migration, so an empty result cannot pass for agreement', () => {
+    expect(seeded.length, 'no feature keys parsed out of the seed migration').toBeGreaterThan(4);
   });
 
-  it('names the same plans', () => {
-    expect(PRICING_PLANS.map((p) => p.id).sort()).toEqual(Object.keys(seeded).sort());
+  it.each(seededFeatureKeys())('%s has a human label', (key) => {
+    expect(
+      PLAN_FEATURE_LABELS[key],
+      `subscription_plans.features can contain "${key}", and the pricing page ` +
+        `renders whatever it finds. Without an entry in PLAN_FEATURE_LABELS a ` +
+        `customer sees the identifier.`
+    ).toBeTruthy();
   });
 
-  it('quotes the same prices', () => {
-    for (const plan of PRICING_PLANS) {
-      expect(plan.price_monthly, `${plan.id} monthly`).toBe(seeded[plan.id].monthly);
-      expect(plan.price_yearly, `${plan.id} yearly`).toBe(seeded[plan.id].yearly);
+  it('labels no key the database never sends', () => {
+    // Not fatal, but a label for a key that cannot appear is a sign the two
+    // have started drifting again — which is the whole defect.
+    for (const key of Object.keys(PLAN_FEATURE_LABELS)) {
+      expect(seeded, `PLAN_FEATURE_LABELS has "${key}", which the seed does not`).toContain(key);
     }
   });
 
-  it('allows the same listings and analytics history', () => {
-    for (const plan of PRICING_PLANS) {
-      expect(plan.limits.listings, `${plan.id} listings`).toBe(seeded[plan.id].listings);
-      expect(plan.limits.analyticsRetentionDays, `${plan.id} analytics days`).toBe(
-        seeded[plan.id].analyticsDays
-      );
-    }
-  });
-
-  it('carries no Stripe price ids', () => {
-    // They were the literals 'price_starter_monthly' and friends — strings that
-    // pass create-checkout-session's /^price_/ check and are then rejected by
-    // Stripe with "No such price". They belong to the Stripe account, per
-    // environment, in subscription_plans.
+  it('declares no plan feature that has no implementation', () => {
+    // The four removed in US-171. Named explicitly rather than inferred,
+    // because "no implementation" is a judgement someone had to make by
+    // reading the codebase, and it should be re-made rather than assumed.
+    const unbuilt = ['marketReports', 'videoTours', 'mortgageCalculator', 'cmaGenerator'];
     const source = readFileSync(join(process.cwd(), 'src/config/pricing-plans.ts'), 'utf8');
-    const declared = source.match(/stripe_price_id\w*:\s*'[^']+'/g) ?? [];
-    expect(declared).toEqual([]);
+    const declarations = source
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('//') && !line.trim().startsWith('*'));
+
+    for (const feature of unbuilt) {
+      expect(
+        declarations.some((line) => new RegExp(`\\b${feature}\\b`).test(line)),
+        `"${feature}" is back in pricing-plans.ts. It was removed because nothing ` +
+          `in src/ or supabase/functions/ implements it. If it has been built, ` +
+          `delete it from this list and say where.`
+      ).toBe(false);
+    }
+  });
+});
+
+describe('planFeatureLabel', () => {
+  it('names a known feature in English, not in camelCase', () => {
+    expect(planFeatureLabel('aiListingDescriptions', true)).toBe('AI listing descriptions');
+    expect(planFeatureLabel('removeBranding', true)).toBe('AgentBio branding removed');
+    expect(planFeatureLabel('customDomain', true)).toBe('Custom domain');
+  });
+
+  it('says when a feature is capped rather than showing the same tick', () => {
+    // 'limited' is truthy, so the old `value ? <Check/> : null` rendered it
+    // identically to full inclusion — a customer comparing tiers could not see
+    // what they were paying to lift.
+    expect(planFeatureLabel('aiListingDescriptions', 'limited')).toBe(
+      'AI listing descriptions (limited)'
+    );
+  });
+
+  it('returns null for a feature the plan does not include', () => {
+    expect(planFeatureLabel('customDomain', false)).toBeNull();
+    expect(planFeatureLabel('customDomain', undefined)).toBeNull();
+    expect(planFeatureLabel('customDomain', null)).toBeNull();
+  });
+
+  it('still reads as English for a key it has never seen', () => {
+    // The database can be edited without touching this file, so the fallback
+    // has to be readable rather than raw. This is the case the old code got
+    // wrong for every key.
+    expect(planFeatureLabel('smsAutomation', true)).toBe('Sms automation');
+    expect(planFeatureLabel('open_house_management', true)).toBe('Open house management');
+  });
+
+  it('does not reproduce the identifiers the old renderer produced', () => {
+    // The exact strings that shipped, as the guard against regressing.
+    const wasRendered = (key: string) =>
+      key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+    expect(wasRendered('aiListingDescriptions')).toBe('AiListingDescriptions');
+    expect(planFeatureLabel('aiListingDescriptions', true)).not.toBe('AiListingDescriptions');
+  });
+});
+
+describe('PRICING_PLANS', () => {
+  it('is still the price source the marketing pages read', () => {
+    // seo.ts, Landing, Press, VsLater, VsLinktree and HealthDashboard all read
+    // prices from here; only the feature matrix moved to the database.
+    expect(PRICING_PLANS.length).toBeGreaterThan(0);
+    for (const plan of PRICING_PLANS) {
+      expect(typeof plan.price_monthly, `${plan.id} price_monthly`).toBe('number');
+    }
   });
 });

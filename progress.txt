@@ -2660,3 +2660,94 @@ THE THREAD, six for six, with a variation. Iterations 1-5 were all "a check
 existed and could not fail". This one is the other half: the check was fine, it
 simply did not cover this. The city pages were noindexed for being thin (US-153,
 a good call) — and nobody asked whether the thin content was also invented.
+
+================================================================================
+ITERATION 7 — US-171: identifiers on the purchase page, prices on unbuilt things
+================================================================================
+
+WHERE I LOOKED. 687 ESLint warnings sit in this codebase and nobody had sorted
+them. Broke them down by rule:
+
+  315  react/no-unescaped-entities      cosmetic
+  240  @typescript-eslint/no-explicit-any
+   51  no-unused-vars
+   19  react-hooks/exhaustive-deps      can be real (stale closures)
+    7  no-useless-assignment            highest signal
+
+`no-useless-assignment` is the one to read first: a value computed and then
+discarded usually means an intended effect did not happen. Two of the seven were
+in src/lib/mortgageCalculator.ts.
+
+They turned out to be benign `let x = 0` initialisers. But reading the file
+surfaced something else: **378 lines of mortgage maths with no caller anywhere.**
+And grepping for why it existed led to src/config/pricing-plans.ts declaring
+`mortgageCalculator: true` on every plan.
+
+The warning was not the defect. It was the thread.
+
+DEFECT ONE — the purchase page listed programmer identifiers.
+
+  {Object.entries(plan.features).map(([key, value]) =>
+    value ? <span className="capitalize">{key.replace(/_/g, ' ')}</span> : null
+  )}
+
+The keys in `subscription_plans.features` are camelCase. `.replace(/_/g, ' ')`
+is therefore a no-op, and CSS `capitalize` lifts only the first letter. So the
+page where money changes hands read:
+
+    CustomThemes   CustomDomain   RemoveBranding
+    PrioritySupport   LeadScoring   AiListingDescriptions
+
+The `replace(/_/g, ' ')` is the tell — someone expected snake_case keys. Nothing
+has ever put snake_case in that column.
+
+In the same expression, `value ? <Check/> : null` treats the string `'limited'`
+as full inclusion. A capped feature rendered identically to an uncapped one, so
+a customer comparing tiers could not see what they were paying to lift.
+
+DEFECT TWO — config pricing things nobody built.
+
+pricing-plans.ts declared 15 plan features. The migration that owns the plans —
+20260902000014, whose own comment says "the source of truth for plan prices,
+features and limits" — seeds 7. Of the extras, four have no implementation
+anywhere in src/ or supabase/functions/:
+
+    marketReports   videoTours   mortgageCalculator   cmaGenerator
+
+And a USAGE_PRICING table put a per-use price on three of them: $10 a Market
+Report, $15 a Video Tour, $19.99 a CMA Report. Together with FEATURE_KEYS and
+three overage helpers it was referenced by NOTHING — verified across src/,
+supabase/ and scripts/.
+
+Dead config that prices unbuilt features is worse than dead code, because it
+reads as a decision someone made. The next person costs a roadmap against it.
+
+WHY IT SURVIVED. The pricing page reads the DATABASE, not this file, and the
+database side is honest — US-118 cleaned it up and all 7 seeded features are
+implemented. The stale 15-feature matrix survived precisely because nothing read
+it. Same shape as US-107 (three status lists), US-166 (CLAUDE.md vs types.ts),
+US-170 (two status colour maps): a second source of truth, diverging quietly
+because only one of them is load-bearing.
+
+WHAT I DID. A PLAN_FEATURE_LABELS map keyed on what the migration actually
+seeds, and planFeatureLabel(key, value) which names a feature in English, says
+"(limited)" out loud, returns null for excluded, and — for a key it has never
+seen, since the database can be edited without touching the code — splits the
+camelCase into sentence case rather than printing it raw. Removed the four
+unbuilt features and the entire dead add-on billing block (107 lines), with a
+note in its place saying what was there and why it went.
+
+THE GUARD, src/config/pricing-plans.test.ts, parses the seed migration and
+requires every key it finds to have a label — so the failure arrives when the
+migration grows a feature, not when a customer sees an identifier. Plus: no
+label for a key the database never sends (drift in the other direction), and no
+return of the four unbuilt features. Demonstrated against the file as it was at
+HEAD: 12 failures.
+
+VERIFICATION: 728 tests (was 717), tsc clean, eslint 0 errors.
+
+NOT DONE, deliberately. 240 no-explicit-any and 315 no-unescaped-entities are
+cosmetic and would bury a real finding in noise. The 19 exhaustive-deps warnings
+are the ones still worth reading — VoiceInput.tsx:102 (`missing dependencies:
+'onChange' and 'value'`) looks like a genuine stale closure in a mobile input,
+and that deserves its own pass rather than a hasty fix at the end of this one.
