@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for AgentBio Platform
 
-**Last Updated:** 2026-01-01
+**Last Updated:** 2026-09-09
 **Platform:** AgentBio Intelligence - AI-Powered Real Estate Platform
 **Repository:** plain-page-link
 
@@ -562,7 +562,7 @@ try {
 
 ### `src/integrations/supabase/types.ts` is authoritative
 
-The `public` schema has **134 tables**. Do not guess a table or column name from
+The `public` schema has **135 tables**. Do not guess a table or column name from
 this document, from a table's name, or from what a feature "should" have — read
 `src/integrations/supabase/types.ts`, which is generated from the applied
 schema and covers all of them.
@@ -592,7 +592,8 @@ see `.github/workflows/verify-backend.yml` and `scripts/README-types-generation.
 
 ### The tables you will touch most
 
-Columns below are the real ones as of 2026-08. Everything is `uuid`/`text`
+Columns below are the real ones as of 2026-09, and `src/claude-md-schema.test.ts`
+fails the build if a column named here stops existing. Everything is `uuid`/`text`
 unless noted.
 
 **profiles** — one row per agent, keyed by `auth.users.id`. ~45 columns.
@@ -605,6 +606,7 @@ instagram_url, facebook_url, linkedin_url, tiktok_url, youtube_url, zillow_url,
   realtor_com_url, website_url
 seo_title, seo_description, og_image, custom_css, custom_domain, is_published (bool)
 view_count / lead_count / link_click_count (int, denormalised counters)
+notification_preferences (jsonb), onboarding_completed_at
 created_at, updated_at
 ```
 
@@ -612,19 +614,30 @@ created_at, updated_at
 no `title` or `images` column.
 ```
 id, user_id (NOT NULL), address (NOT NULL), city (NOT NULL), price (text, NOT NULL)
+state, zip_code
 beds (int, NOT NULL), baths (int, NOT NULL), sqft (int)
 bedrooms / bathrooms (numeric), square_feet (int), lot_size_acres (numeric)
+year_built (int), stories (int), garage_spaces (int), highlights (jsonb)
 image (single, legacy), photos (jsonb, the real gallery), virtual_tour_url
 status ('active' | 'sold' | 'pending'), property_type, description, mls_number
 listed_date, sold_date (date), days_on_market (int), is_featured (bool), sort_order (int)
+open_house_date, open_house_end_date
+is_sample (bool)
 created_at, updated_at
 ```
 
 **leads** — captured leads. The type column is `lead_type`, **not** `type`; a
 trigger referencing `NEW.type` once aborted every insert.
+
+There is **no `email` or `phone` column.** US-086 dropped both: a lead's contact
+details exist only as ciphertext, and are decrypted at a boundary
+(`useLeads.decryptLeadRows`, `useAnalytics.decryptRecentLeads`, the `pii-crypto`
+function) rather than read from the row. If an insert of yours is rejected for a
+missing `email`, the fix is to encrypt, not to add the column back.
 ```
-id, user_id (NOT NULL), lead_type (NOT NULL), name (NOT NULL), email (NOT NULL), phone
-encrypted_email, encrypted_phone   -- US-016 dual-write; plaintext still populated
+id, user_id (NOT NULL), lead_type (NOT NULL), name (NOT NULL)
+encrypted_email, encrypted_phone   -- the only store; there is no plaintext pair
+is_sample (bool)   -- seeded demo rows, excluded from real counts
 message, notes, status, source, form_data (jsonb)
 assigned_to, listing_id, price_range, timeline, property_address, preapproved (bool)
 first_responded_at, contacted_at, closed_at
@@ -636,6 +649,7 @@ created_at, updated_at
 ```
 id, user_id (NOT NULL), title (NOT NULL), url (NOT NULL), icon
 position (int, NOT NULL), is_active (bool), click_count (int)
+is_sample (bool)
 created_at, updated_at
 ```
 `click_count` is written **only** through `increment_link_clicks(link_id)`, a
@@ -658,7 +672,7 @@ generated_from_suggestion_id, keyword_id
 id, user_id (NOT NULL), role (app_role enum, NOT NULL)
 ```
 
-The other ~128 tables cluster into: SEO tooling (`seo_*`, ~40 tables), search
+The other 129 tables cluster into: SEO tooling (`seo_*`, ~40 tables), search
 console integrations (`gsc_*`, `ga4_*`, `bing_*`, `yandex_*`), billing
 (`subscriptions`, `user_subscriptions`, `invoices`, `stripe_*`, `feature_*`),
 auth and security (`mfa_*`, `sso_*`, `login_attempts`, `user_sessions`,
@@ -938,26 +952,49 @@ useQuery({
 
 ### Current State
 
-- **No automated tests yet** - Tests should be added progressively
-- Manual testing workflow in place
+There are tests, and CI enforces them. This section used to say "No automated
+tests yet"; by the time anyone noticed, `npm run test:run` was running 654 of
+them across 77 files. Do not skip running them on that basis.
 
-### Recommended Testing Approach
+| Command | What it runs |
+| --- | --- |
+| `npm run test:run` | Vitest — unit, component and guard tests under `src/` |
+| `npm run test:coverage` | The same with coverage. **This is what CI runs.** |
+| `npm run test:e2e` | Playwright end-to-end (`tests/e2e/`) |
+| `npm run test:security` | Playwright security suite (`tests/security/`) |
+| `npm run test:a11y` | axe-core accessibility sweep (warn-only in CI) |
 
-**Unit Tests:**
-- Test utilities and pure functions
-- Use Vitest (fast, Vite-native)
+Unit and component tests use Vitest with `@testing-library/react` in jsdom;
+`src/test/setup.ts` provides the `matchMedia`, `ResizeObserver` and
+`IntersectionObserver` mocks, and `src/test/fixtures/` the row builders.
 
-**Component Tests:**
-- Test UI components in isolation
-- Use Testing Library
+### Guard tests
 
-**Integration Tests:**
-- Test user flows
-- Mock Supabase client
+A recurring pattern here, and the one to reach for when a defect is a *class*
+rather than an instance. A guard asserts a property of the repository itself, so
+that a mistake someone already made once cannot come back quietly:
 
-**E2E Tests:**
-- Test critical paths (auth, lead capture, listing creation)
-- Use Playwright or Cypress
+| Guard | Holds |
+| --- | --- |
+| `src/secret-scan.test.ts` | No credential value anywhere in the tracked tree |
+| `src/repo-hygiene.test.ts` | The repository root's shape |
+| `src/claude-md-schema.test.ts` | This document's schema claims against `types.ts` |
+| `src/marketing-claims.test.ts` | No fabricated testimonial, count or rating in the UI |
+| `scripts/check-bundle-size.mjs` | Per-chunk budgets, and what must stay lazy |
+| `scripts/verify-seo.mjs` | Every prerendered page has its own SEO identity |
+
+Two conventions make them worth having. **Say what is at stake in the failure
+message** — the root-hygiene guard said "these belong under `docs/`" about files
+that contained a production SSH password, and was read as a lint nit for five
+days. And **demonstrate the guard can fail**, in the same file, against the real
+case it was written for; a guard only ever observed passing is indistinguishable
+from one that checks nothing.
+
+### Where coverage is thin
+
+Integration tests that exercise a full user flow against a mocked Supabase, and
+E2E coverage beyond auth. Both are worth adding; neither is a reason to treat
+the suite as absent.
 
 ---
 
@@ -1154,7 +1191,7 @@ When making significant changes to the codebase:
 - **Update database schema** when tables are added/modified
 - **Update common tasks** when workflows change
 
-**Last major update:** 2026-01-01
+**Last major update:** 2026-09-09
 
 ---
 

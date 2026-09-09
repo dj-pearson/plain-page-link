@@ -2173,3 +2173,110 @@ STILL OUTSTANDING, AND NOT SOMETHING THIS LOOP CAN DO:
 
   Scrubbing the history rewrites published commits. That is Dj's call, not this
   loop's, and rotation matters more than scrubbing either way.
+
+================================================================================
+ITERATION 2 — US-166: CLAUDE.md documents columns that do not exist
+================================================================================
+
+WHERE I LOOKED. Deliberately away from iteration 1: the core product paths.
+Read src/lib/leadSubmission.ts, src/lib/edgeFunctions.ts and
+supabase/functions/submit-lead/index.ts end to end. They are in good shape —
+US-069, US-086, US-096 and US-119 have all been through them, the rate limiting
+is database-backed and correctly bucketed, the Zapier webhook is SSRF-checked,
+and lead PII is encrypted at the only place it is stored.
+
+One small thing found and NOT fixed, because it is cosmetic and I would rather
+spend the iteration on something real: submit-lead returns `{ lead_id }` and
+submitLead reads `result?.leadId`, so LeadSubmissionResponse.leadId is always
+undefined. Nothing consumes it. Noted here rather than inflated into a story.
+
+WHAT I FOUND INSTEAD. Reading submit-lead, I noticed its comment says the
+plaintext `leads.email` / `leads.phone` columns are gone (US-086) — while
+CLAUDE.md's schema section documents both as live, `email` as NOT NULL, with
+the note "US-016 dual-write; plaintext still populated".
+
+types.ts is authoritative and says the columns do not exist. So CLAUDE.md is
+wrong, and wrong in the specific way it warns about itself:
+
+  "Do not guess a table or column name from this document ... An earlier version
+   described a `blog_posts` table that has never existed, and the `gdpr-export`
+   edge function duly queried `blog_posts` ... it silently returned zero
+   articles on every subject access request. Getting this section wrong
+   propagates."
+
+This case is worse than the blog_posts one. Following the document, you write
+plaintext email and phone for every captured lead. The insert is rejected — and
+the obvious fix, when the guide says the column exists, is to add the column
+back. That undoes US-086, which removed it on purpose so that lead PII is only
+ever stored as ciphertext.
+
+MEASURED, rather than eyeballed. Parsed the six documented tables and diffed
+against types.ts:
+
+  leads      DOCUMENTED, DO NOT EXIST: email, phone
+             REAL, UNDOCUMENTED:       is_sample
+  listings   REAL, UNDOCUMENTED:       state, zip_code, year_built, stories,
+                                       garage_spaces, highlights, is_sample,
+                                       open_house_date, open_house_end_date
+  profiles   REAL, UNDOCUMENTED:       notification_preferences,
+                                       onboarding_completed_at
+  links      REAL, UNDOCUMENTED:       is_sample
+  articles   accurate
+  user_roles accurate
+
+  4 of 6 tables drifted. Stated table count 134; real count 135.
+
+`is_sample` deserves its own mention: it is US-109, a cross-cutting column on
+four tables that marks demo content so it stays out of plan limits and off
+public pages. CLAUDE.md did not mention it anywhere. `state` and `zip_code`
+missing from `listings` is the kind of omission that makes someone stuff a
+state into `city`.
+
+And one more, found while checking the rest of the document for the same defect:
+the Testing Strategy section said "**No automated tests yet** - Tests should be
+added progressively". `npm run test:run` at that moment: 77 files, 671 tests,
+enforced in CI by `npm run test:coverage`. A guide that denies the suite teaches
+its reader not to run it.
+
+THE FIX. Corrected the four drifted tables and the count. The leads entry no
+longer merely omits the dead columns — it says explicitly that there is no
+email or phone column, why, where decryption happens, and that a rejected
+insert means encrypt rather than add the column back. Closing the failure mode
+beats correcting the fact.
+
+Rewrote Testing Strategy to describe the suite that exists, with the five
+commands and which one CI runs. Added a "Guard tests" subsection documenting the
+pattern itself and the two conventions earned in US-165: say what is at stake in
+the failure message (the root-hygiene guard said "these belong under docs/"
+about a file containing a production SSH password, and was read as a lint nit
+for five days), and demonstrate the guard can fail.
+
+THE GUARD — src/claude-md-schema.test.ts. The repository already had
+`npm run types:check` holding types.ts to the database. Nothing held CLAUDE.md
+to types.ts, and CLAUDE.md is what a person or an assistant actually reads
+before writing a query: the one link in the chain with no check on it.
+
+It parses the fenced blocks (annotations in parens, `--` notes and `/`
+separators all come off) and requires every name to be a real column. It
+deliberately does NOT require the document to list every column — a guide may
+summarise. It requires that every column it names is real, because a name in
+that document functions as an instruction to use it.
+
+It also fails loudly rather than quietly if the section is renamed, the table
+list changes, or a fenced block is emptied — a parser-based guard that finds
+nothing to parse must not report success.
+
+DEMONSTRATED ABLE TO FAIL against CLAUDE.md as actually committed at HEAD:
+  × every column CLAUDE.md names on leads exists   -> ['email', 'phone']
+  × states the right number of tables              -> expected 134 to be 135
+  × does not tell its reader the test suite exists -> 'No automated tests yet'
+
+VERIFICATION: 77 test files, 671 tests, all passing (was 76/654). tsc clean.
+
+RUNNING THEME across iterations 1-2, and worth naming: both defects were
+already detectable and neither was detected. US-165's guard fired and was
+misread because it understated its stake; US-166 had no guard at all over the
+document that everything else is written from. The lesson is not "add guards" —
+this repository has plenty. It is that a guard's failure message is the whole
+product, and that the artifacts steering the work need checking too, not just
+the code they produce.

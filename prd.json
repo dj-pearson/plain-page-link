@@ -2649,6 +2649,25 @@
       "priority": 165,
       "passes": true,
       "notes": "ROTATION IS STILL OUTSTANDING AND IS NOT SOMETHING THIS STORY CAN DO. Removing a secret from the working tree does not remove it from git history, from clones, from forks, or from anyone who was watching a public repository for five days. Every credential named above must be treated as compromised: JWT_SECRET (which forces reissuing both the anon and service_role keys), the Postgres superuser password, and the root SSH password on 209.145.59.219. docs/setup/supabase-keys.md carries the procedure. Scrubbing the history itself rewrites published commits and is Dj's call, not this loop's. The guard also found four further anon-key publications in docs/ that the root sweep would have missed — COOLIFY_EDGE_FUNCTIONS_SETUP.md, SSL_MIGRATION_COMPLETE.md and AUTH_SETUP_DOCUMENTATION.md twice, from two different JWT_SECRET eras — which is the argument for scanning values rather than policing folders."
+    },
+    {
+      "id": "US-166",
+      "title": "Hold CLAUDE.md to the schema that exists, and guard it against drifting again",
+      "description": "CLAUDE.md opens its schema section by warning that getting it wrong propagates — an earlier version documented a blog_posts table that never existed, and the gdpr-export edge function duly queried it, silently returning zero articles on every subject access request. The section had drifted again, in four of the six tables it details. The worst case is worse than the one that prompted the warning: leads.email and leads.phone are documented as live columns annotated \"US-016 dual-write; plaintext still populated\", when US-086 deliberately DROPPED both so that lead PII is only ever stored as ciphertext. A reader following the document would reintroduce plaintext email and phone for every captured lead, and on finding the insert rejected, the obvious fix is to add the column back — undoing US-086. Separately the document stated 134 tables against a real 135, omitted nine real listings columns including state and zip_code, never mentioned is_sample (US-109) on any of the four tables that carry it, and told its reader there were \"No automated tests yet\" while CI was running 654 of them across 77 files.",
+      "acceptanceCriteria": [
+        "No column named in CLAUDE.md is absent from src/integrations/supabase/types.ts",
+        "leads is documented as having no plaintext email or phone, with the reason and the decrypting boundary named, so the failure mode is closed rather than merely corrected",
+        "The stated table count matches types.ts",
+        "is_sample is documented on the tables that carry it",
+        "The Testing Strategy section describes the suite that exists and names the command CI runs",
+        "A guard fails the build on any of the above: src/claude-md-schema.test.ts",
+        "The guard fails loudly if the section is renamed or a fenced block emptied, rather than quietly checking nothing",
+        "The guard is demonstrated able to fail against CLAUDE.md as actually committed",
+        "npm run test:run and tsc --noEmit pass"
+      ],
+      "priority": 166,
+      "passes": true,
+      "notes": "The repository already had npm run types:check to hold types.ts to the database. Nothing held CLAUDE.md to types.ts, and CLAUDE.md is what a person or an assistant actually reads before writing a query — so it was the one link in the chain with no check on it. The guard deliberately does NOT require the document to list every column: a guide may summarise. It requires that every column it names is real, because a name in that document functions as an instruction to use it. Demonstrated against the committed document: 3 failures (leads.email/phone, the 134-vs-135 count, and the \"No automated tests yet\" claim). Also documented the guard-test convention itself in the Testing Strategy section, including the two rules earned in US-165: say what is at stake in the failure message, and demonstrate the guard can fail."
     }
   ]
 }
