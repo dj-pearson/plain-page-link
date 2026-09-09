@@ -1784,3 +1784,265 @@ Full suite 624 passed / 23 failed at 127s, the heaviest-loaded run of the whole
 session. Every suspect passes alone: marketing-claims 2/2, routes 3/3,
 ContactForm 3/3, Register 3/3, Settings 6/6, SubmitReview 5/5, LeadDetailModal
 7/7. The stable floor is unchanged — repo-hygiene x2, analytics, analyticsEvents.
+
+## Platform Improvement Loop — 2026-09-09 (self-paced, 15 iterations)
+
+### Iteration 1/15 — US-160: 17 MB of source maps were being published to the CDN
+
+vite.config.ts carried `sourcemap: 'hidden'` with the comment "These are hidden
+source maps that won't expose source code to users". That comment is wrong, and
+it had been wrong long enough to survive US-125, which was explicitly about the
+17 MB of maps in the build output and only reduced them.
+
+`hidden` omits the `//# sourceMappingURL=` comment from the emitted bundle. That
+stops a *browser* fetching the map on its own. It does not stop anyone else: the
+map filename is the chunk filename plus `.map`, and the chunk filename is in the
+network tab of every visit. `https://agentbio.net/assets/index-<hash>.js.map`
+returned the whole TypeScript source — 193 files, 17 MB, 71% of a 24 MB deploy.
+Every query shape, every RLS assumption, every route not yet announced.
+
+The justification recorded in the comment was Sentry symbolication. Nothing
+consumed them. There is no @sentry/vite-plugin, no `sentry-cli sourcemaps`
+invocation, and no upload step anywhere in .github/workflows — `@sentry/react`
+is the only Sentry dependency and it needs the maps on Sentry's side, not on
+Cloudflare's. They were cost with no benefit attached.
+
+WHAT CHANGED
+  - vite.config.ts: `sourcemap: BUILD_SOURCEMAPS ? 'hidden' : false`, off by
+    default. The comment now says what 'hidden' actually does.
+  - The flag is a real escape hatch, not a formality: `BUILD_SOURCEMAPS=true`
+    is what a local `npm run analyze` wants, and what a future CI job would set
+    to upload to an error tracker and then delete dist/**/*.map before deploy.
+  - scripts/check-bundle-size.mjs — already the CI `size-check` job — now fails
+    if any .map reaches dist/assets without that flag. The check runs before the
+    per-chunk budget loop so it reports even when a chunk is also over budget.
+
+VERIFICATION, against real builds rather than reasoning about the flag:
+  - default build: dist 24 MB -> 6.4 MB, `ls dist/assets/*.map` = 0.
+  - `BUILD_SOURCEMAPS=true npx vite build`: 193 maps, as before.
+  - the guard was demonstrated failing, not just written: dropping one .map into
+    dist/assets produced the failure and its message, and removing it passed.
+  - tsc --noEmit clean.
+
+NOTED, NOT FIXED — `npm run size-check` is already red on main, and was before
+this change: export-vendor is 605.0 KB against a 600 KB vendor budget (jspdf +
+html2canvas). Same chunk hash before and after, so it is untouched by this work.
+A CI gate that is red by default teaches everyone to ignore it, so this is the
+candidate for the next iteration.
+
+STORIES OPENED
+  - US-161: `npx impeccable detect src` reports 65 AI-generated-design tells —
+    49 ai-color-palette (purple/violet gradients), 10 gradient-text on headings,
+    3 side-tab, 1 overused-font, 1 gray-on-color, 1 border-accent-on-rounded.
+    CLAUDE.md names every one of these as a default to refuse. Not a lint fix:
+    removing a purple gradient means deciding what replaces it, so it needs a
+    palette and type decision taken first and then a page-by-page pass. Deferred
+    to a later iteration deliberately, per the loop's own rule about work that
+    does not fit in one.
+
+### Iteration 2/15 — US-162: the Leads page loaded a PDF library to render a CSV button
+
+Iteration 1 left `npm run size-check` red on main: export-vendor 605 KB against a
+600 KB vendor budget. The obvious move is to raise the budget or add an
+exception. Both would have been wrong, because the chunk was not lazy.
+
+WHAT WAS ACTUALLY WRONG. src/lib/exportUtils.ts opened with
+`import { jsPDF } from 'jspdf'`. That module also exports exportToCSV, which is
+a string builder and a Blob download and touches nothing from jspdf. But a
+top-level import makes the jspdf chunk a static dependency of every consumer,
+and Rollup cannot tree-shake it away because generatePDFReport in the same
+module genuinely uses it.
+
+src/pages/dashboard/Leads.tsx imports exportToCSV and nothing else from there.
+Read out of the built output rather than reasoned about:
+  Leads-CcCFikjE.js -> exportUtils-RdteEteH.js (3 KB) -> export-vendor (605 KB,
+  184 KB gzip)
+605 KB on the critical path of the most-visited page in a lead-generation CRM,
+for a button that never calls it.
+
+TWO MORE DEFECTS FELL OUT OF THE SAME manualChunks LINE:
+  'export-vendor': ['jspdf', 'jspdf-autotable', 'html2canvas']
+  - html2canvas is not a dependency of this project. It is not in package.json.
+    jspdf references it optionally; the entry did nothing.
+  - Naming jspdf there made Rollup place Vite's `__vitePreload` helper inside
+    the resulting chunk, so consumers emitted `import{_}from"./export-vendor"` —
+    a static import of 605 KB to obtain a 200-byte function.
+
+THE FIX
+  - exportUtils.ts loads jsPDF and jspdf-autotable with
+    `await Promise.all([import('jspdf'), import('jspdf-autotable')])` inside
+    generatePDFReport. exportToPDF and generatePDFReport are now async.
+  - Both call sites await them. SearchAnalyticsDashboard's handler is async with
+    a try/catch, so the toast follows the download instead of racing it and a
+    failed chunk fetch is reported instead of becoming an unhandled rejection;
+    ReportBuilder was already inside an async try/catch and just needed the
+    await.
+  - The manualChunks entry is deleted, not edited. A dynamically imported
+    dependency does not need one — Rollup already splits it — and the entry was
+    what dragged the preload helper in.
+
+RESULT, from the build: export-vendor no longer exists. jspdf is a 386 KB async
+chunk plus a 31 KB autotable chunk, fetched on click. The Leads chunk's static
+imports contain no jspdf. exportUtils emits `import("./jspdf.es.min-*.js")`.
+`npm run size-check` passes — 195 chunks, one documented exception.
+
+THE TEST TOLD ME SOMETHING I WOULD HAVE MISSED. Making the functions async
+without awaiting them at the call sites left `savedFilenames` empty and wrote
+two real PDFs into the repository root — the exact US-121 defect the mock exists
+to prevent, resurrected by an unawaited promise racing the test's teardown. The
+suite caught it in the intermediate state. Both files were deleted; a clean run
+now leaves the working tree clean.
+
+The four PDF tests are awaited, and there is a new guard: two tests read
+exportUtils.ts as text and assert no top-level import of jspdf or
+jspdf-autotable, and that the dynamic form is present. One line restores this
+regression, and nothing else in the suite would notice — the page still works,
+it just costs half a megabyte to open. 10/10 pass. tsc --noEmit clean.
+
+STORY OPENED — US-163, and it is worse than the one just fixed. The preload
+helper has no home of its own, so with export-vendor gone Rollup moved it into
+three-vendor (800 KB). FullProfilePage now emits
+`import{_}from"./three-vendor-BHOYcAMp.js"` — a static import. That is
+/:username, the page every agent puts in their Instagram bio, paying 800 KB /
+220 KB gzip for Three.js before first paint whether or not the theme renders a
+3D background. Before this iteration the helper was in the jspdf chunk and the
+same page paid 605 KB for that, so it has been true continuously and only the
+victim changed. It also makes check-bundle-size.mjs's exception text — "lazy-
+loaded only on 3D hero sections, never on first paint" — false.
+
+Attempted and reverted: adding 'vite/preload-helper' to the react-vendor array.
+The object form of manualChunks resolves entries as package specifiers and the
+build dies with `Missing "./preload-helper" specifier in "vite" package`. The
+route is the function form of manualChunks, matching the virtual module id,
+which means re-deriving every existing grouping by path and proving no chunk
+reshuffles. Next iteration.
+
+### Iteration 3/15 — US-163: Three.js was on the critical path of every page
+
+Opened at the end of iteration 2 believing FullProfilePage was the victim.
+Writing the guard showed it was worse than that.
+
+THE MECHANISM. Vite's `__vitePreload` helper is a virtual module with no home of
+its own, so Rollup files it into whichever manualChunks group it picks. It had
+landed in three-vendor. Every chunk that lazy-loads anything then emitted
+`import{_}from"./three-vendor-<hash>.js"` — a STATIC import of an 800 KB chunk to
+obtain a 200-byte function.
+
+THE ACTUAL BLAST RADIUS, from the guard run against the old config:
+  FullProfilePage-B8_AhUTY.js  statically imports three-vendor (800 KB)
+  exportUtils-D862ke8l.js      statically imports three-vendor (800 KB)
+  index-PBqFv9Am.js            statically imports three-vendor (800 KB)
+  jspdf.es.min-Ad-4HYgU.js     statically imports three-vendor (800 KB)
+`index-*.js` is the ENTRY. It loads on every route. So every visitor to every
+page on the platform — the marketing landing page, the blog, every agent's
+public profile — downloaded 800 KB / 220 KB gzip of Three.js before first paint,
+whether or not anything on the page rendered 3D. Before US-162 the helper lived
+in the jspdf chunk and the same importers paid 605 KB for that instead. This has
+been true continuously; only the victim changed.
+
+THE FIX. manualChunks converted from the object form to a function. That is
+forced, not stylistic: the object form resolves its entries as package
+specifiers, so a virtual module cannot be named in it — putting
+`'vite/preload-helper'` in the react-vendor array kills the build with
+`Missing "./preload-helper" specifier in "vite" package` (tried in iteration 2,
+reverted). A function can match the id directly, and does, first thing.
+
+The groupings moved into a VENDOR_CHUNKS table matched on the package directory
+a module resolves into. One deliberate difference from the object form: a
+package's transitive dependencies are no longer welded into its group —
+recharts' d3-* packages get their own chunks. That could have reshuffled
+everything, so it was checked rather than assumed.
+
+VERIFICATION, all against real builds:
+  - helper now in react-vendor: `import{_}from"./react-vendor-DtYTAvso.js"`.
+  - the only static importers of three-vendor are FloatingGeometry, GradientMesh
+    and ThreeDBackground — the 3D components themselves.
+  - FullProfilePage's static vendor deps: animation, form, react, state. No three.
+  - the entry chunk's: charts, form, react, state, supabase, ui. No three.
+  - chunk name set identical before and after — 195 both times, `diff` clean.
+  - vendor sizes within 6 KB (react-vendor 155 -> 161.5 KB, the helper and
+    react-router; three-vendor 818 -> 797 KB).
+  - tsc --noEmit clean; vitest still resolves the config.
+
+THE GUARD, and why the old one could not have caught this. The exception in
+check-bundle-size.mjs said three-vendor was "lazy-loaded only on 3D hero
+sections, never on first paint". That was false for months and nothing noticed,
+because an exception made of prose asserts nothing. It now carries a
+`staticImporters` list — the only chunks allowed to `import ... from` it — and
+the check walks every built chunk and fails on any other static importer. A
+static import renders as `from"./chunk.js"` and a dynamic one as
+`import("./chunk.js")`, so matching on `from` picks up exactly the imports that
+put a chunk on a critical path.
+
+Demonstrated, not assumed: stashing the new vite.config, rebuilding with the old
+one and running the check produced the four-importer failure quoted above.
+Restored, it passes.
+
+STORY OPENED — US-164. With three-vendor gone from the entry, what remains
+static there is charts-vendor: 394 KB of recharts, in a chunk whose own comment
+reads "Charts - dashboard only", loaded on every route including the marketing
+landing page. Next iteration.
+
+### Iteration 4/15 — US-164: the landing page shipped recharts to supply clsx
+
+Left over from iteration 3: with three-vendor off the critical path, the entry
+chunk still statically imported charts-vendor — 394 KB of recharts, in a chunk
+whose own comment in vite.config.ts reads "Charts - dashboard only". The entry
+loads on every route, so every visitor to the marketing landing page, every blog
+reader and every public profile visitor paid for it.
+
+It was not a stray chart component. All six recharts importers are admin or
+dashboard files and all are correctly lazy. The entry pulled exactly ONE binding:
+
+  import{e as Tr}from"./charts-vendor-DgQnpdXW.js"
+  ...
+  function X(...t){return el(Tr(t))}
+
+`el(Tr(t))` is `twMerge(clsx(inputs))` — cn() from src/lib/utils.ts, which every
+component in the app calls. clsx had no assigned home in VENDOR_CHUNKS, recharts
+happens to depend on it, so Rollup filed it into charts-vendor and the entry
+imported the whole 394 KB chunk to get a 500-byte function.
+
+@babel/runtime's helpers had been adopted the same way. That is why three-vendor
+statically imported charts-vendor: `import{_ as xa}` there is `_extends`, and
+both recharts and @react-three/drei depend on @babel/runtime. Loading a 3D
+profile theme pulled in a charting library to get Object.assign.
+
+This is US-163's defect one layer down, and the generalisation is worth stating:
+a tiny shared module with no assigned home gets adopted by whichever large chunk
+happens to want it, and every consumer then pays for the whole thing. It is
+invisible in a chunk listing — every size looks fine — and shows up only in who
+imports what.
+
+THE FIX. clsx, tailwind-merge, class-variance-authority and @babel/runtime named
+in VENDOR_CHUNKS, landing in react-vendor, which every page loads anyway.
+
+VERIFICATION:
+  - entry static vendor imports: form, react, state, supabase, ui. No charts.
+  - charts-vendor's static importers: Analytics, HealthDashboard, SEOManager,
+    SearchAnalyticsDashboard. Dashboard and admin only.
+  - three-vendor no longer imports charts-vendor.
+  - react-vendor 161.5 -> 184.3 KB: four utility packages moving into a chunk
+    that was already loaded, against 394 KB leaving the critical path.
+  - chunk name set identical to iteration 3's; tsc clean; tests pass.
+
+THE GUARD, generalised. US-163 added a staticImporters list to the over-budget
+exception for three-vendor. charts-vendor is under budget, so it was not covered
+— the enforcement was tied to the wrong thing. It is now a separate MUST_STAY_LAZY
+map keyed by chunk, independent of size, covering three-vendor and charts-vendor.
+Its failure message names the actual cause, because "X statically imports Y" does
+not tell you what to do about it: look for a tiny shared module with no home and
+name it in VENDOR_CHUNKS.
+
+Demonstrated against the pre-fix config, not assumed:
+  index-DyYjmFjj.js       statically imports charts-vendor (393.9 KB)
+  three-vendor-9DsfYJow.js statically imports charts-vendor (393.9 KB)
+
+Also removed a duplicated block in check-bundle-size.mjs — the budget loop and
+its reporting appeared twice, the second copy dead. Introduced by an earlier
+edit in this session, caught by node refusing to parse `const violations`
+declared twice.
+
+RUNNING TOTAL for a first-time visitor to any public page, across iterations
+1-4: 17 MB of source maps off the deploy, 800 KB of Three.js and 394 KB of
+recharts off the critical path.

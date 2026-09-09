@@ -81,7 +81,7 @@ export function SearchAnalyticsDashboard() {
     });
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     // Use real query data from the hook
     if (!topQueries || topQueries.length === 0) {
       toast({
@@ -99,12 +99,23 @@ export function SearchAnalyticsDashboard() {
       dateRangeText
     );
 
-    exportToPDF(exportData);
-
-    toast({
-      title: 'Opening PDF',
-      description: `Preparing PDF report with ${topQueries.length} queries.`,
-    });
+    // Awaited because exportToPDF now loads jsPDF on demand (US-162). The
+    // toast follows the download rather than racing it, and a failed chunk
+    // fetch is reported instead of being swallowed by an unhandled rejection.
+    try {
+      await exportToPDF(exportData);
+      toast({
+        title: 'PDF ready',
+        description: `Exported ${topQueries.length} queries to PDF.`,
+      });
+    } catch (error) {
+      logger.error('PDF export failed', error as Error);
+      toast({
+        title: 'Export failed',
+        description: 'Could not generate the PDF. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

@@ -2558,6 +2558,79 @@
       "priority": 159,
       "passes": true,
       "notes": "Authorised explicitly by Dj: 'No fabricated text, we need to remove false claims and false testimonies.' Nothing was reworded into a vaguer version of the same claim - a claim either has something behind it or it went. Deliberately KEPT, with reasons recorded in the test's ALLOWED_FILES: the BioAnalyzerForm dropdown asking a visitor about their own current leads; the 'Keller Williams, Coldwell Banker, etc.' placeholder in a 'your brokerage' input; features/Testimonials describing the star-display feature ('4.8/5.0, 4.9/5.0, etc.'); the ExampleBio demos and the bio-generator's suggested sample credentials, which are illustrations of what an agent might write about themselves rather than claims about us; and Zapier's own published '5,000+ apps' figure. Verified against the built output as well as source: a 248-file scan of dist/ for 24 banned strings comes back with only coincidental matches (SVG path data, MD5 constants) and the legitimate feature description."
+    },
+    {
+      "id": "US-160",
+      "title": "Stop deploying 17 MB of source maps that publish the entire TypeScript source",
+      "description": "vite.config.ts set `sourcemap: 'hidden'` unconditionally, with the comment \"These are hidden source maps that won't expose source code to users\". That is not what 'hidden' does. It omits the `//# sourceMappingURL=` comment from the bundle so a browser will not fetch the map on its own; the .map files are still written into dist/ and still deployed. The URL is derivable from any chunk name visible in the network tab, so `https://agentbio.net/assets/index-<hash>.js.map` returned the whole source. 193 maps, 17 MB, 71% of a 24 MB deploy \u2014 every query shape, every RLS assumption and every unshipped route, public. The stated justification was Sentry symbolication, but nothing consumed them: there is no @sentry/vite-plugin and no upload step in .github/workflows. US-125 reduced this and did not close it.",
+      "acceptanceCriteria": [
+        "A default `npm run build` writes no .map file into dist/.",
+        "BUILD_SOURCEMAPS=true still emits hidden maps, for a local analyze run or a CI job that uploads to an error tracker and deletes them before deploy.",
+        "scripts/check-bundle-size.mjs (the CI `size-check` job) fails when a .map reaches dist/assets without that flag set.",
+        "The misleading comment in vite.config.ts is replaced with what 'hidden' actually does."
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-09. dist drops 24 MB -> 6.4 MB. Both paths verified against a real build: default emits 0 maps, BUILD_SOURCEMAPS=true emits 193, and the guard was demonstrated failing by dropping one .map into dist/assets."
+    },
+    {
+      "id": "US-161",
+      "title": "The UI has 65 machine-detectable AI-generated-design tells",
+      "description": "`npx impeccable detect src` reports 65 anti-patterns across the app: 49 ai-color-palette (purple/violet gradients \u2014 InstagramBioAnalyzer and ListingDescriptionGenerator are the worst, but Landing, Pricing, Login, Register and LocationTemplate all carry them), 10 gradient-text on headings, 3 side-tab, 1 overused-font, 1 gray-on-color and 1 border-accent-on-rounded. CLAUDE.md names every one of these as a category default to refuse. This is not a lint fix: removing a purple gradient means deciding what replaces it, so it needs a palette and type decision first and then a page-by-page pass. Multi-iteration by nature.",
+      "acceptanceCriteria": [
+        "A single documented palette and type scale exists, chosen deliberately rather than inherited from the shadcn default.",
+        "`npx impeccable detect src` reports zero gradient-text and zero ai-color-palette findings.",
+        "The remaining side-tab, overused-font, gray-on-color and border-accent-on-rounded findings are each fixed or recorded with a reason.",
+        "A CI check runs the detector so the count cannot silently climb back."
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-09 during the platform-improvement loop. Take the palette/type decision first in one iteration, then the two tools pages (16 of the 49 palette findings sit in those two files), then the rest."
+    },
+    {
+      "id": "US-162",
+      "title": "The Leads page downloaded 605 KB of PDF library to render an Export CSV button",
+      "description": "src/lib/exportUtils.ts opened with `import { jsPDF } from 'jspdf'` at the top. It also exports exportToCSV, which is a string builder and a Blob download and has nothing to do with PDF. src/pages/dashboard/Leads.tsx imports exportToCSV and nothing else from that module \u2014 but a top-level import makes the jspdf chunk a static dependency of every consumer, and Rollup cannot tree-shake it because generatePDFReport in the same module genuinely uses it. Verified in the built output: Leads -> exportUtils (3 KB) -> export-vendor (605 KB / 184 KB gzip), all on the critical path of the most-visited page in a lead-generation CRM. Two knock-on defects came out of the same manualChunks entry: 'html2canvas' was listed in it and is not a dependency of this project at all, and naming jspdf there made Rollup place Vite's __vitePreload helper inside the resulting chunk, so consumers statically imported 605 KB to get a 200-byte function. This is also why `npm run size-check` was red on main: export-vendor was 605 KB against a 600 KB vendor budget.",
+      "acceptanceCriteria": [
+        "jsPDF and jspdf-autotable are loaded with a dynamic import inside the PDF functions, not at module top level.",
+        "The built Leads chunk has no static import of any jspdf chunk.",
+        "The PDF call sites await the now-async functions, so the success toast follows the download and a failure is reported rather than becoming an unhandled rejection.",
+        "A test asserts on the source that no top-level jspdf import has come back.",
+        "`npm run size-check` passes."
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-09. export-vendor no longer exists: jspdf is a 386 KB async chunk plus a 31 KB autotable chunk, fetched on click. Verified in dist, not inferred."
+    },
+    {
+      "id": "US-163",
+      "title": "Every page loaded 800 KB of Three.js it never rendered",
+      "description": "Vite's __vitePreload helper is a virtual module with no home of its own, so Rollup files it into whichever manualChunks group it likes. It had landed in three-vendor. Every chunk that lazy-loads anything therefore emitted `import{_}from\"./three-vendor-<hash>.js\"` \u2014 a STATIC import of an 800 KB chunk to obtain a 200-byte function. The story was opened believing FullProfilePage (/:username, the page every agent puts in their Instagram bio) was the victim. Writing the guard showed it was worse: the ENTRY chunk index-*.js was a static importer too, so every visitor to every route on the platform \u2014 landing page included \u2014 downloaded 800 KB / 220 KB gzip of Three.js before first paint, whether or not anything on the page rendered 3D. Before US-162 the helper lived in the jspdf chunk and the same importers paid 605 KB for that instead, so this has been true continuously; only the victim changed. It also made the exception in scripts/check-bundle-size.mjs \u2014 three-vendor is \"lazy-loaded only on 3D hero sections, never on first paint\" \u2014 false, and nothing noticed, because the exception carried only prose.",
+      "acceptanceCriteria": [
+        "The __vitePreload helper lives in react-vendor, which every page loads anyway, not in a lazy vendor chunk.",
+        "Only the 3D components themselves statically import three-vendor.",
+        "Neither the entry chunk nor FullProfilePage has three-vendor in its static import graph.",
+        "The bundle-size exception names the chunks allowed to statically import it, and the check enforces that \u2014 prose alone could not catch this.",
+        "The chunk name set and vendor chunk sizes are unchanged, so the manualChunks rewrite reshuffled nothing."
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-09. manualChunks converted from the object form to a function, because the object form resolves its entries as package specifiers and cannot name a virtual module \u2014 `'vite/preload-helper'` in the react-vendor array kills the build with `Missing \"./preload-helper\" specifier in \"vite\" package`. Verified against real builds: identical 195-chunk name set before and after, vendor sizes within 6 KB, and the new guard demonstrated failing against the old config \u2014 where it named four static importers including the entry chunk."
+    },
+    {
+      "id": "US-164",
+      "title": "A 394 KB charting library was on the landing page's critical path, to supply clsx",
+      "description": "With three-vendor off the critical path (US-163), the entry chunk still statically imported charts-vendor \u2014 394 KB of recharts, in a chunk whose own comment reads \"Charts - dashboard only\". Every visitor to the marketing landing page, every blog reader and every public profile visitor paid for it. It was not a stray chart component: all six recharts importers are admin or dashboard and correctly lazy. The entry pulled exactly one binding, and it was clsx \u2014 the `twMerge(clsx(inputs))` inside cn() in src/lib/utils.ts, which every component in the app calls. clsx has no assigned home in VENDOR_CHUNKS, recharts happens to depend on it, so Rollup filed it into charts-vendor and the entry imported the whole chunk to get a 500-byte function. @babel/runtime's helpers had been adopted the same way, which is why three-vendor also imported charts-vendor: loading a 3D profile theme pulled in recharts to get Object.assign. This is US-163's defect one layer down \u2014 a tiny shared module with no home is adopted by whichever large chunk happens to want it, and every consumer pays for the whole thing. It is invisible in a chunk listing, because the sizes all look fine.",
+      "acceptanceCriteria": [
+        "clsx, tailwind-merge, class-variance-authority and @babel/runtime are named in VENDOR_CHUNKS so they land in react-vendor, which every page loads anyway.",
+        "The built entry chunk has no static import of charts-vendor.",
+        "charts-vendor is statically imported only by dashboard and admin chunks.",
+        "three-vendor no longer statically imports charts-vendor.",
+        "The bundle-size check enforces this for charts-vendor as well as three-vendor, and the enforcement is demonstrated failing against the old config."
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-09. Entry static vendor imports are now form, react, state, supabase, ui \u2014 no charts. react-vendor grows 161.5 -> 184.3 KB, which is the four utility packages moving into a chunk that was already loaded, against 394 KB leaving the critical path. The check's staticImporters idea from US-163 was generalised into MUST_STAY_LAZY, covering three-vendor and charts-vendor and independent of whether a chunk is over budget. Demonstrated failing against the pre-fix config, where it named both the entry chunk and three-vendor."
     }
   ]
 }

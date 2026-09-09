@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { exportToPDF, generatePDFReport, exportToCSV } from './exportUtils';
 
 /**
@@ -64,16 +65,16 @@ describe('PDF export (jspdf v4 + jspdf-autotable v5)', () => {
     ['Bob', 'bob@example.com', 'contacted'],
   ];
 
-  it('renders a table to PDF without throwing', () => {
-    expect(() => exportToPDF({ title: 'Lead Report', headers, rows })).not.toThrow();
+  it('renders a table to PDF without throwing', async () => {
+    await expect(exportToPDF({ title: 'Lead Report', headers, rows })).resolves.not.toThrow();
     // It still reaches the download step; only the write to disk is stubbed.
     expect(savedFilenames).toHaveLength(1);
     expect(savedFilenames[0]).toMatch(/^lead_report_\d{4}-\d{2}-\d{2}\.pdf$/);
   });
 
-  it('writes nothing to disk', () => {
-    exportToPDF({ title: 'Lead Report', headers, rows });
-    generatePDFReport({ title: 'Performance', headers, rows });
+  it('writes nothing to disk', async () => {
+    await exportToPDF({ title: 'Lead Report', headers, rows });
+    await generatePDFReport({ title: 'Performance', headers, rows });
 
     // Both reached save(), and neither reached the filesystem. The real
     // assertion is the one `git status` makes after a test run.
@@ -82,8 +83,8 @@ describe('PDF export (jspdf v4 + jspdf-autotable v5)', () => {
     expect(existsSync(join(process.cwd(), savedFilenames[1]))).toBe(false);
   });
 
-  it('renders a full report — summary cards, autotable, footer', () => {
-    expect(() =>
+  it('renders a full report — summary cards, autotable, footer', async () => {
+    await expect(
       generatePDFReport({
         title: 'Performance',
         subtitle: 'Last 30 days',
@@ -98,7 +99,7 @@ describe('PDF export (jspdf v4 + jspdf-autotable v5)', () => {
         orientation: 'landscape',
         theme: 'grid',
       })
-    ).not.toThrow();
+    ).resolves.not.toThrow();
   });
 
   it('exports CSV and triggers a download', () => {
@@ -166,6 +167,32 @@ describe('PDF export (jspdf v4 + jspdf-autotable v5)', () => {
         rows: [['Ada', 'new']],
       });
       expect(csv).toContain('Ada,new');
+    });
+  });
+
+  /**
+   * US-162. exportToCSV is a string builder, but it lives in a module that also
+   * renders PDFs. A top-level `import { jsPDF } from 'jspdf'` therefore made the
+   * 605 KB export-vendor chunk a static dependency of /dashboard/leads, which
+   * imports exportToCSV and nothing else from here. Rollup cannot tree-shake it,
+   * because generatePDFReport in the same module genuinely uses it.
+   *
+   * The fix is one line and one line is all it takes to undo, in a way nothing
+   * else in the suite would notice: the page still works, it just costs half a
+   * megabyte to open. So assert on the source.
+   */
+  describe('jspdf stays out of the static import graph', () => {
+    const source = readFileSync(join(process.cwd(), 'src/lib/exportUtils.ts'), 'utf8');
+
+    it('has no top-level import of jspdf or jspdf-autotable', () => {
+      const topLevelImports = source.split('\n').filter((line) => /^\s*import\s/.test(line));
+
+      expect(topLevelImports.join('\n')).not.toMatch(/'jspdf(-autotable)?'/);
+    });
+
+    it('loads them with a dynamic import instead', () => {
+      expect(source).toMatch(/import\('jspdf'\)/);
+      expect(source).toMatch(/import\('jspdf-autotable'\)/);
     });
   });
 });
