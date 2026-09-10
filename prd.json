@@ -3007,6 +3007,37 @@
       "priority": 1,
       "passes": false,
       "notes": "OWNER'S CALL — NOT AN AGENT TASK. Found in iteration 4 while carrying out US-170's third acceptance criterion. The key value is deliberately not recorded here or in any commit message; it is at docs/setup/SUPABASE_KEYS_GUIDE.md as of commit 908a2c1. A repository-wide scan after redaction found no remaining service_role JWT in the working tree; the anon keys still present in docs/setup/AUTH_SETUP_DOCUMENTATION.md, docs/deploy/COOLIFY_EDGE_FUNCTIONS_SETUP.md and docs/deploy/SSL_MIGRATION_COMPLETE.md are public by design (the anon key ships in the frontend bundle) but will also be invalidated by the rotation and should be replaced with references, not values."
+    },
+    {
+      "id": "US-192",
+      "title": "Nine invisible icons, and six headings that vanish in High Contrast",
+      "description": "As a visitor to the marketing site — including one browsing with Windows High Contrast on — I need the feature icons to render and the page headings to be readable, rather than painted with a technique that produces neither.",
+      "acceptanceCriteria": [
+        "Landing.tsx's feature-card icons are a solid colour: background-clip:text never painted the inline SVG, and text-transparent made its currentColor stroke transparent",
+        "No heading uses bg-clip-text + text-transparent: under forced-colors the forced palette applies to a transparent colour and the background image is dropped, so the heading disappears",
+        "Pricing and LocationTemplate no longer fade the tail of their h1 to 60-70% opacity",
+        ".gradient-text (dead) and .glass-heading's three no-op declarations are removed",
+        "A source-level guard test fails on any reintroduction, ignores the technique's name in comments, and is verified against a real offender",
+        "npm run test:run is green; tsc --noEmit and eslint report no errors"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 5 by `npx impeccable detect src`, the deterministic checker this repo's CLAUDE.md names. The visible half — invisible icons on the marketing page — had no runtime signal at all: nothing throws, no query fails, the DOM is identical in jsdom. Detector count 65 -> 54; the remaining 49 are the palette story, US-193."
+    },
+    {
+      "id": "US-193",
+      "title": "Give the free-tools funnel an intentional palette",
+      "description": "As a real-estate agent meeting AgentBio for the first time through a free tool, I need the tool pages to look like a product someone designed, not like the default output of a code generator — because these two pages are the platform's lead-generation front door and its first impression.",
+      "acceptanceCriteria": [
+        "npx impeccable detect src reports zero [ai-color-palette] findings",
+        "The purple/violet literals in src/pages/tools/* and src/components/tools/* are replaced by the platform's own accent tokens, defined once rather than hand-written per component",
+        "The same sweep covers the eleven other files the detector names (admin, dashboard, hero, mobile, profile, badge, BlogArticle)",
+        "Contrast is checked, not assumed: every replaced colour meets WCAG AA against its surface in both themes",
+        "The three [side-tab] findings (a coloured border-left above 1px, the tell CLAUDE.md calls the single most recognizable one) and the [gray-on-color] and [overused-font] findings are resolved in the same pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "NEXT ITERATION. 54 findings across 27 files after US-192, 49 of them the purple-palette tell concentrated in InstagramBioAnalyzer.tsx (9) and ListingDescriptionGenerator.tsx (7) plus their component directories. Too large for one iteration and genuinely a design decision, not a mechanical substitution — the accent has to be chosen once and applied, not renamed in place."
     }
   ]
 }

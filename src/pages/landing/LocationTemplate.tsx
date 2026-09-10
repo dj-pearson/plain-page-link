@@ -257,7 +257,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
               Trusted by {city} Real Estate Professionals
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-foreground">
               The Link in Bio Platform for {city} Real Estate Agents
             </h1>
 

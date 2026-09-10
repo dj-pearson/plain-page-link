@@ -79,9 +79,7 @@ function HeroFallback({
           {/* Headline */}
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-slate-900 dark:text-white mb-6 leading-[1.1]">
             <span>{lead}</span> <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-500 pb-2">
-              {highlight}
-            </span>
+            <span className="text-teal-600 dark:text-teal-400 pb-2">{highlight}</span>
           </h1>
 
           {/* Subheadline */}

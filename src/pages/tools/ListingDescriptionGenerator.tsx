@@ -203,7 +203,7 @@ export default function ListingDescriptionGenerator() {
           <span className="text-sm font-medium text-purple-900">Free AI Tool for Real Estate Agents</span>
         </div>
 
-        <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+        <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
           AI Listing Description Generator
         </h1>
 
