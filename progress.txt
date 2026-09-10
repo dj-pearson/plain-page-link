@@ -2646,6 +2646,17 @@ does not depend on the answer — a page that cares about its own preview should
 say so rather than inherit it — but that is an unexplained observation, not a
 closed one.
 
+[Followed up in iteration 8. Three things were established by measurement
+rather than reasoning: index.html's og:* tags survive `vite build` intact, so
+the homepage-seo plugin is not removing them; react-helmet-async does not
+remove unmanaged tags, proven by /404, whose Helmet declares no og:* and whose
+snapshot keeps all five static ones through hydration; and the prerender's
+dedupe behaves as documented, removing a static tag only where a data-rh tag
+shares its key. The original disappearance is therefore still unexplained. It
+is no longer a live risk — verify:seo now fails any page that ships without an
+og:image, which is the condition that mattered — but it is recorded as
+unexplained rather than as solved.]
+
 All three now emit the full og:* and twitter:* set from the shared constants.
 
 The Pages Function reads dist/404.html through env.ASSETS rather than a plain
@@ -2659,3 +2670,79 @@ The existing test named "falls through for an unknown username instead of
 inventing a card" asserted exactly the behaviour this story changes, so it was
 rewritten rather than deleted, alongside two new ones covering the asymmetry
 (lookup failed -> 200, no rows -> 404) and the missing-document fallback.
+
+## SEO loop — iteration 8/15 — US-177: the file written to be quoted, quoting things that were not true
+
+Started by closing the open question from iteration 7, then went looking. The
+answer to the open question is in the note above: measured, not reasoned, and
+still unexplained — but no longer a live risk, because verify:seo now fails any
+page that ships without an og:image.
+
+Then: public/llms.txt. It exists for one purpose, which is to be read and
+quoted verbatim by AI systems, and nothing in the repository had ever checked
+it. It is a text file in public/, so a sweep of src/ never reaches it, and no
+component renders it, so no page audit sees it either. Three cleanups went past
+it. Line 6 read:
+
+    Used by 5,000+ real estate agents with a 4.8/5 star rating from 523+ reviews.
+
+Those are the exact figures US-111 found, US-157 found again, and US-159 removed
+from every component. Further down:
+
+    Real estate agents using optimized link-in-bio tools report 8-12 qualified
+    leads per month from social media (AgentBio data, 2025)
+    Average AgentBio user captures 10+ qualified leads per month
+
+The first one attributes an invented statistic to a named internal source,
+which is the only thing worse than an unattributed one.
+
+AND THE URLS. It linked to /features and to /compare/linktree, /compare/beacons
+and /compare/later. None of those has ever been a route here; the comparison
+pages are under /vs/. Since US-176 removed the catch-all, all four now return a
+real 404 — so the file handed AI systems four dead links and, until last
+iteration, four soft-200 copies of the homepage.
+
+AND THE PRICES. Professional was quoted at $39/month with "unlimited listings".
+src/config/pricing-plans.ts charges $49 and caps it at 25; unlimited listings
+start at Team. The $29 Starter plan was missing altogether. So the number an AI
+assistant would quote for the entry paid plan was wrong in both directions.
+
+Also: the X and Instagram handles were twitter.com/agentbio and
+instagram.com/agentbio, where the site links x.com/AgentBioApp and
+instagram.com/agentbioapp. Two of the three free tools were listed, and neither
+the /tools hub (US-167) nor the bio generator (US-155).
+
+REWRITTEN, against the sources rather than from memory: prices and limits read
+off the plan matrix, URLs taken from the routes the build publishes, tools from
+src/config/tools.ts, handles from the footer. The claims sections are gone; what
+replaces them is what the product does.
+
+THE GUARD — src/llms-txt.test.ts, eight checks: every URL is a published page,
+every price matches the matrix, no price appears that is not a plan, no user
+count or rating or review total or lead-volume claim or multiplier, the handles
+match, the comparison paths are /vs/ and not /compare/, every tool in TOOLS is
+listed, and the file is long enough to be worth serving.
+
+Seven of the eight fail on the file as it shipped:
+
+    × points only at pages the build publishes   ['/compare/beacons', ...3 more]
+    × quotes the prices the application charges
+    × names no price that is not a plan          ['39','3000','15000','100','300']
+    × claims no user count, rating or review total
+    × gives the social handles the site links to
+    × links the comparison pages at their real paths
+    × lists every free tool
+
+TWO BUGS IN THE TEST ITSELF, both caught by it failing on the honest rewrite it
+was written to protect:
+
+  - `[\d,]+` matches a bare comma, so "agents, realtors" registered as a user
+    count. Every count pattern requires a digit now.
+  - "100 leads a month" on the Starter pricing line is a limit the product
+    enforces. "The average user captures 10+ qualified leads a month" is a claim
+    about outcomes. The first version banned both. Only the second is a claim,
+    and the rule now requires a claim frame — average, typical, report, capture,
+    generate — before the number.
+
+That second one is the more interesting: a rule that cannot tell a capacity from
+a result would have forced the pricing section to stop stating what you get.

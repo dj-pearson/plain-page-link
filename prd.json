@@ -2803,6 +2803,21 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-10, iteration 7 of the SEO loop. The risky part is _redirects: deleting the catch-all turns any route that is neither prerendered nor listed into a broken page, and Cloudflare Pages routing cannot be exercised in this sandbox. src/spa-routes.test.ts is what stands in for a deploy \u2014 it walks App.tsx and _redirects and asserts they agree in both directions, and was demonstrated failing by deleting the /admin rules. Note the deliberate asymmetry in the Pages Function: `profiles === null` (the lookup errored or timed out) still falls through, because answering 404 there would turn a database blip into a deindexing event for every agent at once; only an empty array \u2014 PostgREST answering that there is no such profile \u2014 produces a 404. A second defect surfaced while verifying: the US-174 og:image rule, on its first run against a full build, found three pages shipping no og:image at all \u2014 /vs/later, /tools/instagram-bio-analyzer and /tools/listing-description-generator, each building its own <Helmet> with no og:* tags, while the static twitter:* tags from index.html survived still describing the homepage. Fixed in the same commit. The mechanism by which the static og:* tags vanish while the static twitter:* ones remain was not established; the fix does not depend on it, but it is an open observation."
+    },
+    {
+      "id": "US-177",
+      "title": "llms.txt still carried the invented figures three sweeps removed from the UI, and linked to four pages that do not exist",
+      "description": "public/llms.txt exists to be read and quoted verbatim by AI systems, and nothing had ever checked it. It said 'Used by 5,000+ real estate agents with a 4.8/5 star rating from 523+ reviews' \u2014 the exact numbers US-111, US-157 and US-159 removed from the UI across three passes \u2014 plus 'the average AgentBio user captures 10+ qualified leads per month' and '8-12 qualified leads per month (AgentBio data, 2025)', which attributes an invented statistic to a named internal source. It linked to /features and to /compare/linktree, /compare/beacons and /compare/later: four URLs with no page behind them, which since US-176 return a real 404. It quoted Professional at $39/month where the enforced matrix charges $49, described it as unlimited listings where the limit is 25, and omitted the $29 Starter plan entirely. Its X and Instagram handles were not the ones the site links to. It listed two of the three free tools and neither the /tools hub nor the bio generator.",
+      "acceptanceCriteria": [
+        "Every agentbio.net URL in the file is a page the build publishes",
+        "Every price matches src/config/pricing-plans.ts, and no price appears that is not a plan",
+        "No user count, rating, review total, lead-volume claim or performance multiplier",
+        "The social handles are the ones the footer links to",
+        "A test enforces all of the above and is demonstrated failing on the file as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 8 of the SEO loop. 7 of the 8 checks fail on the shipped file. Worth noting how it survived three cleanups: it is a text file in public/, so a sweep of src/ never reaches it, and it is not rendered by any component, so no page audit sees it either. The distinction the lead-volume rule had to learn: '100 leads a month' on a pricing line is a limit the product enforces, while 'the average user captures 10+ qualified leads a month' is a claim about outcomes. Only the second is banned, and getting that wrong first made the test fail on the honest rewrite it existed to protect. A `[\\d,]+` pattern also matched the bare comma in 'agents, realtors' \u2014 every count pattern now requires a digit."
     }
   ]
 }
