@@ -6,6 +6,7 @@ import { useAvatarUpload } from '@/hooks/useAvatarUpload';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SkeletonProfile } from '@/components/ui/skeleton';
+import { userFacingError } from '@/lib/userFacingError';
 
 export default function Profile() {
   const { profile, isLoading, updateProfile } = useProfile();
@@ -210,7 +211,10 @@ export default function Profile() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to update profile. Please try again.',
+        description: userFacingError(error, {
+          subject: 'profile',
+          fallback: 'Failed to update profile. Please try again.',
+        }),
         variant: 'destructive',
       });
     }

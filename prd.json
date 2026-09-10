@@ -3135,6 +3135,35 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 12. Sixth in the sequence US-069, US-095, US-096, US-197, US-198 — but this one contains the reason the whole family stayed invisible. validateReviewData has always returned a specific message; the page threw it away and printed 'There was an error submitting your review. Please try again' for every failure. A client whose testimonial was one character over the limit was told to do the one thing that could not work."
+    },
+    {
+      "id": "US-200",
+      "title": "Twenty-six places tell you to try again without saying what happened",
+      "description": "As an agent whose edit just failed, I need to be told what went wrong, so that trying again is a decision rather than a reflex.",
+      "acceptanceCriteria": [
+        "userFacingError() decides what is worth showing: a message written for a person passes through, a Postgres or PostgREST code becomes what it means for the thing they were doing, and infrastructure noise falls back to the caller's own sentence",
+        "A constraint name, a relation name, a serialised object and 'Edge Function returned a non-2xx status code' are never shown",
+        "The code is preferred over the raw text, so 23505 reads as 'That link already exists' rather than naming links_user_id_position_key",
+        "It never throws and never returns an empty string, so a caller can put the result straight into a toast",
+        "Applied to the six surfaces where an agent's own work is being lost: Links (2), Listings (2), Profile, Theme, Testimonials and useAvatarUpload"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 13 by taking US-199's finding and asking how widespread it was: a scan for catch blocks whose body says 'try again' and never reads the caught error found 26. The reason nobody had fixed them by printing error.message is that doing so is worse — a Postgres error names a constraint and a Supabase transport failure says 'non-2xx status code'. Deciding is the work. Twenty of the 26 remain and are US-201."
+    },
+    {
+      "id": "US-201",
+      "title": "The remaining twenty try-again messages",
+      "description": "As a user anywhere else in the platform, I need the same honesty about failure that the dashboard's six surfaces now have.",
+      "acceptanceCriteria": [
+        "The remaining catch blocks route through userFacingError with a subject and the existing sentence as the fallback",
+        "Each one is read before it is changed: some are legitimately generic and should keep their wording, and the point is to decide rather than to substitute mechanically",
+        "The auth pages are treated carefully — a sign-in failure must not distinguish 'no such account' from 'wrong password'",
+        "A guard test keeps new try-again-only catch blocks from appearing"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "NEXT ITERATION. The twenty are in SearchAnalyticsDashboard, AddTestimonialModal, AddLinkModal, NativeMFASettings (2), NativeMFAVerification, DashboardLayout, ZapierIntegrationModal, both tools' EmailCaptureModal, QuickStatusUpdate, useSoftDelete (2), Login (2), Register, ListingDescriptionGenerator (2) and InstagramBioAnalyzer. Login and Register are the ones to think hardest about: there, a vague message is a deliberate security property, not an oversight, and the fix is to leave them alone and say so."
     }
   ]
 }

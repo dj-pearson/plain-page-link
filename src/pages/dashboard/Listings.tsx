@@ -50,6 +50,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { parsePrice, formatPrice } from '@/lib/format';
 import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
+import { userFacingError } from '@/lib/userFacingError';
 
 type ViewMode = 'grid' | 'list';
 type StatusFilter = 'all' | (typeof LISTING_STATUSES)[number]['value'];
@@ -332,7 +333,10 @@ export default function Listings() {
       logger.error('Failed to save the listing order', error as Error);
       toast({
         title: 'Error',
-        description: 'Could not save the new order. Please try again.',
+        description: userFacingError(error, {
+          subject: 'listing',
+          fallback: 'Could not save the new order. Please try again.',
+        }),
         variant: 'destructive',
       });
     }
@@ -397,7 +401,10 @@ export default function Listings() {
     } catch {
       toast({
         title: 'Error',
-        description: 'Failed to update listing. Please try again.',
+        description: userFacingError(error, {
+          subject: 'listing',
+          fallback: 'Failed to update listing. Please try again.',
+        }),
         variant: 'destructive',
       });
     }

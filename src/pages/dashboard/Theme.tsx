@@ -23,6 +23,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { logger } from '@/lib/logger';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { userFacingError } from '@/lib/userFacingError';
 
 const AVAILABLE_FONTS = [
   'Inter',
@@ -158,7 +159,10 @@ export default function Theme() {
       logger.error('Failed to save theme', error as Error);
       toast({
         title: 'Error',
-        description: 'Failed to save theme. Please try again.',
+        description: userFacingError(error, {
+          subject: 'theme',
+          fallback: 'Failed to save theme. Please try again.',
+        }),
         variant: 'destructive',
       });
     } finally {

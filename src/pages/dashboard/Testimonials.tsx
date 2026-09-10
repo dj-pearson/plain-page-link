@@ -27,6 +27,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/lib/logger';
 import { Card, CardContent } from '@/components/ui/card';
+import { userFacingError } from '@/lib/userFacingError';
 
 export default function Testimonials() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -85,7 +86,10 @@ export default function Testimonials() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to add testimonial. Please try again.',
+        description: userFacingError(error, {
+          subject: 'testimonial',
+          fallback: 'Failed to add testimonial. Please try again.',
+        }),
         variant: 'destructive',
       });
     }

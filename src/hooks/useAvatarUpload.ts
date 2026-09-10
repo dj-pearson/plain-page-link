@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { validateUpload } from '@/lib/fileValidation';
+import { userFacingError } from '@/lib/userFacingError';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -99,7 +100,10 @@ export function useAvatarUpload() {
       logger.error('Error uploading avatar', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload profile picture. Please try again.',
+        description: userFacingError(error, {
+          subject: 'profile picture',
+          fallback: 'Failed to upload profile picture. Please try again.',
+        }),
         variant: 'destructive',
       });
       return null;
