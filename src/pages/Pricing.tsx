@@ -497,11 +497,15 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {isOpen && (
-        <CardContent className="pt-0 pb-4">
-          <p className="text-muted-foreground leading-relaxed">{answer}</p>
-        </CardContent>
-      )}
+      {/* `hidden` rather than {isOpen && …}: the answer stays in the HTML and
+          the browser does not paint it. Conditional mounting meant a closed
+          accordion had no answer text in the document at all, so 25 answers
+          asserted in FAQPage JSON-LD were on no page — and Google's FAQPage
+          requirement is that the answer be present on the page. An accordion is
+          explicitly fine; not rendering the content is not (US-185). */}
+      <CardContent className="pt-0 pb-4" hidden={!isOpen}>
+        <p className="text-muted-foreground leading-relaxed">{answer}</p>
+      </CardContent>
     </Card>
   );
 }

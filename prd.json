@@ -2918,6 +2918,20 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-10, iteration 13 of the SEO loop. The guard is the mirror of US-165's: reachability asks whether every page can be reached, this asks whether every link arrives, and the first passing says nothing about the second. It is only worth having because US-176 made 404s real \u2014 before that a broken internal link was a soft 200 serving the homepage. It reads the 200 rewrites out of public/_redirects so a link to /dashboard/settings from /privacy-choices is correctly not a defect, and src/spa-routes.test.ts is what keeps that file honest about which those are. Two false leads checked and dismissed on the way: dist appeared to contain no CSS at all \u2014 that was a `head -12` truncation in the scan, the stylesheet is there and linked \u2014 and article-to-article linking via SimilarArticles works."
+    },
+    {
+      "id": "US-185",
+      "title": "25 FAQ answers were asserted in structured data and present on no page",
+      "description": "Five pages render their FAQ as an accordion whose panel was written `{isOpen && <p>{answer}</p>}`. Conditional mounting means a closed accordion has no answer text in the document at all \u2014 not hidden, absent \u2014 and the prerender snapshots the closed state. So the homepage, /pricing, both blog category pages and two feature pages shipped FAQPage JSON-LD asserting 25 answers that appear nowhere in the HTML those pages serve. Google's FAQPage requirement is that the answer be present on the page; an accordion is explicitly allowed, and not rendering the content is not the same thing. On /features/analytics and /features/lead-capture the same block also carried itemProp='text' microdata describing an element that did not exist. The audit has checked since US-157 that FAQ questions are visible, and every question was \u2014 which is why this survived: the question and the answer are separate assertions and only one of them was being checked.",
+      "acceptanceCriteria": [
+        "Every answer in FAQPage JSON-LD appears in the HTML of the page that asserts it",
+        "The accordions still collapse \u2014 the answer is hidden, not unmounted",
+        "verify:seo checks answers as well as questions, demonstrated failing on the build as it shipped",
+        "The rule accepts an answer that is present but hidden, because that is what an accordion is"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 14 of the SEO loop. `hidden` rather than a CSS class: it is the platform attribute for 'in the document, not painted', it needs no stylesheet to work during a prerender, and it is what assistive technology already understands alongside the aria-expanded these buttons carry. The test that matters is the one asserting the question check still PASSES on the broken fixture \u2014 that is the reason 25 answers went unnoticed through six earlier audits of this same schema type."
     }
   ]
 }

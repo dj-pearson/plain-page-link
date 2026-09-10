@@ -353,10 +353,26 @@ export function auditStructuredData(route, html) {
       if (type === 'FAQPage' && Array.isArray(node.mainEntity)) {
         for (const entry of node.mainEntity) {
           const question = entry && entry.name;
-          if (typeof question !== 'string' || question.length < 12) continue;
-          const probe = question.slice(0, 40).replace(/\s+/g, ' ');
-          if (!visibleText.includes(probe)) {
-            problems.push(`FAQPage question is not visible on the page: "${probe}…"`);
+          if (typeof question === 'string' && question.length >= 12) {
+            const probe = question.slice(0, 40).replace(/\s+/g, ' ');
+            if (!visibleText.includes(probe)) {
+              problems.push(`FAQPage question is not visible on the page: "${probe}…"`);
+            }
+          }
+
+          // And the answer (US-185). Checking only the question missed 25
+          // answers that were in the JSON-LD and in no page: five accordions
+          // rendered `{isOpen && <p>{answer}</p>}`, so a closed one had no
+          // answer text in the document at all. Google's FAQPage requirement is
+          // that the answer be present on the page; an accordion is explicitly
+          // allowed, and not rendering the content is not the same thing.
+          const answer = entry && entry.acceptedAnswer && entry.acceptedAnswer.text;
+          if (typeof answer !== 'string') continue;
+          const plain = answer.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          if (plain.length < 20) continue;
+          const answerProbe = plain.slice(0, 45);
+          if (!visibleText.includes(answerProbe)) {
+            problems.push(`FAQPage answer is not on the page: "${answerProbe}…"`);
           }
         }
       }

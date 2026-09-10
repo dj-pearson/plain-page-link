@@ -471,18 +471,22 @@ function FAQCard({ question, answer }: { question: string; answer: string }) {
           </svg>
         </span>
       </div>
-      {isOpen && (
-        <div
-          className="mt-4 pt-4 border-t border-glass-border/50"
-          itemScope
-          itemType="https://schema.org/Answer"
-          itemProp="acceptedAnswer"
-        >
-          <p className="glass-body leading-relaxed" itemProp="text">
-            {answer}
-          </p>
-        </div>
-      )}
+      {/* `hidden` rather than {isOpen && …}: the answer stays in the HTML and
+          the browser does not paint it. Conditional mounting meant a closed
+          accordion had no answer text in the document, so the FAQPage JSON-LD
+          asserted answers that were on no page — and the itemProp="text"
+          microdata below described an element that did not exist (US-185). */}
+      <div
+        className="mt-4 pt-4 border-t border-glass-border/50"
+        hidden={!isOpen}
+        itemScope
+        itemType="https://schema.org/Answer"
+        itemProp="acceptedAnswer"
+      >
+        <p className="glass-body leading-relaxed" itemProp="text">
+          {answer}
+        </p>
+      </div>
     </div>
   );
 }

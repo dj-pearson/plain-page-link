@@ -3054,3 +3054,54 @@ TWO FALSE LEADS, checked and dismissed before getting here:
     -12` truncation in my own scan; the stylesheet is emitted and linked.
   - Article-to-article linking looked like a candidate. SimilarArticles works:
     /blog/tips-one links to /blog/insights-two.
+
+## SEO loop — iteration 14/15 — US-185: answers asserted, answers absent
+
+The FAQ visibility check has existed since US-157 and passes all 59 pages. It
+checks that each question in FAQPage JSON-LD appears on the page. It has never
+checked the answer, and the answer is the other half of the assertion.
+
+    answers checked: 167   not on the page: 25
+
+    5  /
+    5  /pricing
+    4  /blog/category/real-estate-tips
+    4  /blog/category/market-insights
+    4  /features/lead-capture
+    3  /features/analytics
+
+THE MECHANISM, identical in all five files:
+
+    {isOpen && (
+      <div className="px-6 pb-4">
+        <p className="glass-body leading-relaxed">{answer}</p>
+      </div>
+    )}
+
+Conditional mounting. A closed accordion does not have its answer hidden — it
+does not have it at all. The prerender snapshots the closed state, so the
+document served to a crawler contains the question, the chevron, and nothing
+else, while the JSON-LD beside it asserts a full answer.
+
+Google's FAQPage requirement is that the answer be present on the page. An
+accordion is explicitly allowed; content that is not rendered is not the same
+thing as content behind a disclosure. On /features/analytics and
+/features/lead-capture the same block also carried itemProp="text" microdata,
+describing an element that did not exist.
+
+THE FIX: `hidden={!isOpen}` on the panel, which is present in the document and
+not painted. Chosen over a CSS class deliberately — it is the platform
+attribute for exactly this, it needs no stylesheet to be correct during a
+prerender, and it is what assistive technology already understands alongside
+the aria-expanded these buttons carry.
+
+THE RULE now checks both halves. The test worth pointing at is not the one
+showing it catches the broken page; it is the one asserting that the QUESTION
+check still passes on that same fixture:
+
+    expect(problems.some((p) => p.includes('question is not visible'))).toBe(false);
+
+That is the whole explanation for how 25 answers survived six earlier audits of
+this exact schema type. A check that covers half an assertion reports success
+on a page that is half wrong, and there is no way to tell from its output which
+half it looked at.

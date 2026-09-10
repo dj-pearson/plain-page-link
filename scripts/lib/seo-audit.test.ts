@@ -589,3 +589,73 @@ describe('article authorship', () => {
     expect(problemsFor({ '@type': 'Organization', name: 'Editorial Team' })).toEqual([]);
   });
 });
+
+/**
+ * Proof that the US-185 answer rule has teeth.
+ *
+ * The question check has existed since US-157 and passed all 59 pages. Five
+ * accordions rendered their answer as {isOpen && <p>{answer}</p>}, so a closed
+ * one had no answer text in the document — 25 answers asserted in FAQPage
+ * JSON-LD and present on no page, while every question was visible.
+ */
+describe('FAQPage answers', () => {
+  const page = (bodyText: string, entries: { q: string; a: string }[]) =>
+    `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+    `<link rel="canonical" href="https://agentbio.net/x"/>` +
+    `<meta property="og:image" content="https://agentbio.net/Cover.png"/>` +
+    `<script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: entries.map((e) => ({
+        '@type': 'Question',
+        name: e.q,
+        acceptedAnswer: { '@type': 'Answer', text: e.a },
+      })),
+    })}</script></head><body><div id="root">${bodyText}${'x'.repeat(900)}</div></body></html>`;
+
+  const QUESTION = 'What is a real estate bio page?';
+  const ANSWER =
+    'A real estate bio page is a mobile-optimized landing page that shows an agent’s listings and captures enquiries.';
+
+  it('catches the accordion that rendered only its question', () => {
+    const problems = auditStructuredData(
+      '/x',
+      page(`<h3>${QUESTION}</h3>`, [{ q: QUESTION, a: ANSWER }])
+    ).map((p) => p.problem);
+    expect(problems.some((p) => p.startsWith('FAQPage answer is not on the page'))).toBe(true);
+    // The question check, which has always passed, still passes here — which is
+    // exactly why it missed this.
+    expect(problems.some((p) => p.includes('question is not visible'))).toBe(false);
+  });
+
+  it('accepts an answer that is in the HTML but hidden', () => {
+    // What `hidden` produces: present in the document, not painted. Google
+    // allows an accordion; it requires the content to be there.
+    const html = page(`<h3>${QUESTION}</h3><div hidden><p>${ANSWER}</p></div>`, [
+      { q: QUESTION, a: ANSWER },
+    ]);
+    expect(auditStructuredData('/x', html)).toEqual([]);
+  });
+
+  it('ignores an answer too short to probe for', () => {
+    expect(
+      auditStructuredData('/x', page(`<h3>${QUESTION}</h3>`, [{ q: QUESTION, a: 'Yes.' }]))
+    ).toEqual([]);
+  });
+
+  it('compares the text of an answer that carries markup', () => {
+    const html = page(`<h3>${QUESTION}</h3><p>${ANSWER}</p>`, [
+      { q: QUESTION, a: `<p><strong>${ANSWER}</strong></p>` },
+    ]);
+    expect(auditStructuredData('/x', html)).toEqual([]);
+  });
+
+  it('does not let the JSON-LD block itself count as the page', () => {
+    // The block is stripped before the visible text is taken; without that,
+    // every answer trivially "appears on the page" by matching its own markup.
+    const problems = auditStructuredData('/x', page('', [{ q: QUESTION, a: ANSWER }])).map(
+      (p) => p.problem
+    );
+    expect(problems.some((p) => p.startsWith('FAQPage answer is not on the page'))).toBe(true);
+  });
+});
