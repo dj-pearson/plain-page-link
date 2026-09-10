@@ -8,7 +8,13 @@
  * there. `preUS165Graph()` reproduces the shape.
  */
 import { describe, expect, it } from 'vitest';
-import { auditReachability, buildLinkGraph, outboundLinks, sitemapPaths } from './link-graph.mjs';
+import {
+  auditInternalLinks,
+  auditReachability,
+  buildLinkGraph,
+  outboundLinks,
+  sitemapPaths,
+} from './link-graph.mjs';
 
 function page(route: string, links: string[]) {
   const body = links.map((href) => `<a href="${href}">x</a>`).join('');
@@ -128,5 +134,78 @@ describe('sitemapPaths', () => {
     const xml =
       '<urlset><url><loc>https://agentbio.net/</loc></url><url><loc>https://agentbio.net/vs/linktree</loc></url></urlset>';
     expect([...sitemapPaths(xml)].sort()).toEqual(['/', '/vs/linktree']);
+  });
+});
+
+/**
+ * Proof that the US-184 rule has teeth.
+ *
+ * /blog rendered a card for every category in the registry, including the six
+ * with no articles — and US-166 generates a route only for a category that has
+ * one. So the page that exists to send people into the blog spent six of its
+ * links on pages the build does not render. It was itself perfectly reachable
+ * the whole time, which is why the reachability check never saw it: that one
+ * asks whether a page can be reached, this asks whether a link arrives.
+ */
+describe('auditInternalLinks', () => {
+  const none = () => false;
+  const noAssets = new Set<string>();
+
+  it('catches the six category links /blog was rendering', () => {
+    const blog = page('/blog', [
+      '/blog/category/real-estate-tips',
+      '/blog/category/buying-guide',
+      '/blog/category/investment',
+    ]);
+    const problems = auditInternalLinks(
+      [blog, page('/blog/category/real-estate-tips', [])],
+      noAssets,
+      none
+    );
+    expect(problems.map((p) => p.problem).sort()).toEqual([
+      'links to /blog/category/buying-guide, which is not a page',
+      'links to /blog/category/investment, which is not a page',
+    ]);
+  });
+
+  it('does not flag a route the SPA serves without prerendering it', () => {
+    const servedBySpa = (path: string) => path.startsWith('/dashboard');
+    const problems = auditInternalLinks(
+      [page('/privacy-choices', ['/dashboard/settings'])],
+      noAssets,
+      servedBySpa
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it('does not flag a link to a file the build wrote', () => {
+    const problems = auditInternalLinks([page('/', ['/llms.txt'])], new Set(['/llms.txt']), none);
+    expect(problems).toEqual([]);
+  });
+
+  it('ignores links out of the site and bare fragments', () => {
+    const html =
+      '<html><head></head><body><div id="root">' +
+      '<a href="https://x.com/AgentBioApp">x</a>' +
+      '<a href="mailto:support@agentbio.net">mail</a>' +
+      '<a href="#main">skip</a>' +
+      '</div></body></html>';
+    expect(auditInternalLinks([{ route: '/', html }], noAssets, none)).toEqual([]);
+  });
+
+  it('reports a broken target once per page however many times it is linked', () => {
+    const twice = page('/blog', ['/blog/category/gone', '/blog/category/gone']);
+    expect(auditInternalLinks([twice], noAssets, none)).toHaveLength(1);
+  });
+
+  it('treats a trailing slash and a query as the same target', () => {
+    const problems = auditInternalLinks(
+      [page('/', ['/pricing/', '/pricing?plan=team'])],
+      noAssets,
+      none
+    );
+    // /pricing is not in the page set here, so both resolve to the one target.
+    expect(problems).toHaveLength(1);
+    expect(problems[0].problem).toBe('links to /pricing, which is not a page');
   });
 });

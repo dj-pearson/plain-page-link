@@ -24,7 +24,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { auditPages, auditStructuredDataUrls } from './lib/seo-audit.mjs';
-import { auditReachability, sitemapPaths } from './lib/link-graph.mjs';
+import { auditInternalLinks, auditReachability, sitemapPaths } from './lib/link-graph.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const ORIGIN = (process.env.VITE_APP_URL || 'https://agentbio.net').trim();
@@ -139,3 +139,68 @@ if (danglingUrls.length > 0) {
 }
 
 console.log('[verify-seo] every URL asserted in structured data resolves to a page');
+
+// Links that go nowhere. The mirror of the reachability check above: that one
+// asks whether every page can be reached, this asks whether every link arrives
+// (US-184).
+function everyFile(dir, prefix = '', out = new Set()) {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) everyFile(full, `${prefix}/${entry}`, out);
+    else out.add(`${prefix}/${entry}`);
+  }
+  return out;
+}
+
+/**
+ * Paths the SPA still answers even though nothing was prerendered for them —
+ * /dashboard, /admin, the OAuth callbacks, a tenant profile. These are the 200
+ * rewrites in public/_redirects, and src/spa-routes.test.ts is what keeps that
+ * file honest about them.
+ */
+const spaRules = existsSync(join(process.cwd(), 'public', '_redirects'))
+  ? readFileSync(join(process.cwd(), 'public', '_redirects'), 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+      .map((line) => line.split(/\s+/))
+      .filter(([, , status]) => status === '200')
+      .map(([from]) => from)
+  : [];
+
+const servedBySpa = (path) =>
+  spaRules.some((rule) => {
+    if (rule === path) return true;
+    if (rule.endsWith('/*')) {
+      const prefix = rule.slice(0, -2);
+      return path === prefix || path.startsWith(`${prefix}/`);
+    }
+    if (rule.includes('/:')) {
+      return new RegExp(`^${rule.replace(/\/:[A-Za-z0-9_]+/g, '/[^/]+')}$`).test(path);
+    }
+    return false;
+  });
+
+const brokenLinks = auditInternalLinks(pages, everyFile(DIST), servedBySpa);
+
+if (brokenLinks.length > 0) {
+  const byTarget = new Map();
+  for (const { route, problem } of brokenLinks) {
+    if (!byTarget.has(problem)) byTarget.set(problem, []);
+    byTarget.get(problem).push(route);
+  }
+  console.error(`\n[verify-seo] ${byTarget.size} internal link target(s) have no page:\n`);
+  for (const [problem, routes] of byTarget) {
+    console.error(`  ${problem}`);
+    console.error(`      from ${routes.length} page(s), e.g. ${routes.slice(0, 3).join(', ')}`);
+  }
+  console.error(
+    '\n[verify-seo] Since US-176 these return a real 404 rather than the homepage\n' +
+      '             under a 200. Link something that exists, or stop rendering the link\n' +
+      '             when its target does not — /blog spent six links on categories\n' +
+      '             that had no articles and therefore no page.'
+  );
+  process.exit(1);
+}
+
+console.log(`[verify-seo] every internal link on ${pages.length} pages arrives at something`);

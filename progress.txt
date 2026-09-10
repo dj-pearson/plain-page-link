@@ -3006,3 +3006,51 @@ regardless of what matches them, which is what /*.ts was. The first version
 banned both and would have deleted forward-looking rules to satisfy itself.
 
 Six of the seven checks fail on the state as it shipped.
+
+## SEO loop — iteration 13/15 — US-184: the other half of the link-graph question
+
+US-165 asked whether every page can be reached. It never asked the mirror
+question — whether every link arrives — and the answer was no on the page whose
+whole job is sending people into the blog.
+
+Blog.tsx rendered a "Browse by Category" card for every entry in
+BLOG_CATEGORIES, all eight. US-166 had already stopped generating a
+/blog/category/{slug} route for a category with no published article. So /blog
+was linking to six pages the build does not render:
+
+    links to /blog/category/buying-guide, which is not a page
+    links to /blog/category/selling-guide, which is not a page
+    links to /blog/category/investment, which is not a page
+    links to /blog/category/neighborhood-guides, which is not a page
+    links to /blog/category/home-improvement, which is not a page
+    links to /blog/category/general, which is not a page
+
+Six of the twelve /blog links on that page. Each card even displayed its own
+article count — "0 articles" — next to a link to nothing.
+
+WHY NOTHING CAUGHT IT. /blog is reachable, in the sitemap, has a title, a
+canonical, a description and no dangling structured-data URL. Every check built
+in the last twelve iterations passes it. Reachability is a property of the
+target; a broken link is a property of the source, and the two do not imply each
+other in either direction.
+
+AND WHY IT IS WORTH CHECKING NOW. Before US-176 a broken internal link was not
+visibly broken: `/* /index.html 200` answered it with the homepage. A reader who
+did not look at the address bar saw a working page, and a crawler saw a
+duplicate of the homepage. Making 404s real is what turns this from invisible
+into a build failure — the two stories only work together.
+
+THE GUARD — auditInternalLinks in link-graph.mjs, run by verify:seo. Every
+<a href> in the body of every built page must resolve to a rendered page, a file
+the build wrote, or a path the SPA serves without prerendering. That last
+category is not a guess: it reads the 200 rewrites out of public/_redirects, so
+the link to /dashboard/settings from /privacy-choices is correctly not a defect,
+and src/spa-routes.test.ts is what keeps that file honest about which paths
+those are. Three guards now depend on each other rather than on prose.
+
+TWO FALSE LEADS, checked and dismissed before getting here:
+  - dist appeared to contain no CSS at all, which would have meant every
+    prerendered page rendering unstyled until JavaScript ran. It was a `head
+    -12` truncation in my own scan; the stylesheet is emitted and linked.
+  - Article-to-article linking looked like a candidate. SimilarArticles works:
+    /blog/tips-one links to /blog/insights-two.

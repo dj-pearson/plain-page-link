@@ -2903,6 +2903,21 @@
       "priority": "medium",
       "passes": true,
       "notes": "Done 2026-09-10, iteration 12 of the SEO loop. Six of the seven checks fail on the shipped state. Two judgement calls worth recording. First, the /sw.js rule is placed AFTER /*.js rather than before: Cloudflare applies every matching rule and a later one wins for a repeated header, and a reading where the more specific path wins gives the same answer from that position \u2014 so it is correct under either, which is what you want from a rule that cannot be tested from the repository. Second, the test does not ban rules that currently match nothing: a /*.jpg rule costs nothing and is right the day an image lands. It bans rules that are wrong regardless of what matches them, which is what /*.ts was. Three things were checked and found NOT to be defects: the service worker is network-first for navigations, so it cannot serve a stale document; the pages excluded from the sitemap all carry noindex (29 in the sitemap plus 30 noindex is exactly the 59 built pages); and no indexable page is thin, duplicated or missing an h1."
+    },
+    {
+      "id": "US-184",
+      "title": "The blog index linked to six category pages the build does not render",
+      "description": "Blog.tsx rendered a 'Browse by Category' card for every entry in BLOG_CATEGORIES, all eight, regardless of whether any article carried that category. US-166 made scripts/lib/articles.mts generate a /blog/category/{slug} route only for a category that has a published article \u2014 so the page whose job is to send people into the blog spent six of its links on pages the build does not produce. Under the old `/* /index.html 200` fallback those answered with the homepage: invisible to a reader who did not check the address bar, and a duplicate of the homepage to a crawler. Since US-176 they are real 404s. Nothing caught it because /blog is itself perfectly reachable, and the US-165 check asks whether a page can be reached, not whether a link arrives.",
+      "acceptanceCriteria": [
+        "The blog index links only to categories that have at least one article",
+        "The heading disappears with the grid when there are none, rather than leaving an empty section",
+        "verify:seo fails when any internal link in the built HTML has no page behind it",
+        "The check knows about routes the SPA serves without prerendering \u2014 /dashboard, /admin, a tenant profile \u2014 and about files the build wrote",
+        "Demonstrated failing against the build as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 13 of the SEO loop. The guard is the mirror of US-165's: reachability asks whether every page can be reached, this asks whether every link arrives, and the first passing says nothing about the second. It is only worth having because US-176 made 404s real \u2014 before that a broken internal link was a soft 200 serving the homepage. It reads the 200 rewrites out of public/_redirects so a link to /dashboard/settings from /privacy-choices is correctly not a defect, and src/spa-routes.test.ts is what keeps that file honest about which those are. Two false leads checked and dismissed on the way: dist appeared to contain no CSS at all \u2014 that was a `head -12` truncation in the scan, the stylesheet is there and linked \u2014 and article-to-article linking via SimilarArticles works."
     }
   ]
 }

@@ -77,6 +77,18 @@ export default function Blog() {
     ...BLOG_CATEGORIES.map((c) => ({ name: c.name, slug: c.slug, label: c.label })),
   ];
 
+  /**
+   * The categories that actually have something to show.
+   *
+   * scripts/lib/articles.mts generates a /blog/category/{slug} route only for a
+   * category with a published article (US-166), so linking a category with none
+   * is linking a page the build did not render.
+   */
+  const categoriesWithArticles = BLOG_CATEGORIES.map((category) => ({
+    category,
+    count: articles.filter((article) => article.category === category.name).length,
+  })).filter(({ count }) => count > 0);
+
   const filteredArticles = articles.filter((article) => {
     const matchesSearch =
       !searchQuery ||
@@ -156,24 +168,40 @@ export default function Blog() {
               </Select>
             </div>
 
-            {/* Category Cards */}
-            <h2 className="text-2xl font-bold mb-4">Browse by Category</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-              {categories.slice(1).map((category) => (
-                <Link key={category.slug} to={`/blog/category/${category.slug}`} className="group">
-                  <Card className="h-full hover:shadow-lg transition-all hover:border-primary/50">
-                    <CardHeader>
-                      <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                        {category.label}
-                      </CardTitle>
-                      <CardDescription>
-                        {articles.filter((a) => a.category === category.name).length} articles
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+            {/* Category Cards.
+                Only the categories that have an article. This grid used to
+                render all eight from the registry, including the ones with
+                nothing in them — and US-166 stopped generating a route for a
+                category with no articles, so /blog was linking to six pages the
+                build does not render. Under the old `/* /index.html 200`
+                fallback they answered with the homepage; since US-176 they are
+                real 404s. Six broken links, on the page that exists to send
+                people into the blog (US-184). */}
+            {categoriesWithArticles.length > 0 && (
+              <>
+                <h2 className="text-2xl font-bold mb-4">Browse by Category</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+                  {categoriesWithArticles.map(({ category, count }) => (
+                    <Link
+                      key={category.slug}
+                      to={`/blog/category/${category.slug}`}
+                      className="group"
+                    >
+                      <Card className="h-full hover:shadow-lg transition-all hover:border-primary/50">
+                        <CardHeader>
+                          <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                            {category.label}
+                          </CardTitle>
+                          <CardDescription>
+                            {count} {count === 1 ? 'article' : 'articles'}
+                          </CardDescription>
+                        </CardHeader>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Articles Grid */}
             {isLoading ? (

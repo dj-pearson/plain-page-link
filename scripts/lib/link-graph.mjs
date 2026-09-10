@@ -120,3 +120,45 @@ export function auditReachability(pages, sitemap) {
 
   return problems;
 }
+
+/**
+ * Internal links that go nowhere (US-184).
+ *
+ * auditReachability asks whether every page can be reached. This asks the other
+ * half: whether every link arrives somewhere. They are not the same question,
+ * and the first one passing says nothing about the second — /blog was linking
+ * to six /blog/category/{slug} pages that the build does not render, on every
+ * build, while itself being perfectly reachable.
+ *
+ * That only became a real 404 in US-176. Before it, `/* /index.html 200` meant
+ * a broken internal link answered with the homepage: invisible to a visitor
+ * who did not read the address bar, and a duplicate of the homepage to a
+ * crawler. Making 404s real is what makes this check worth having.
+ *
+ * @param {{route: string, html: string}[]} pages
+ * @param {Set<string>} assets every file the build wrote, as absolute paths
+ * @param {(path: string) => boolean} isServed whether a non-prerendered path is
+ *   still served by the SPA — see the `_redirects` rules
+ * @returns {{route: string, problem: string}[]}
+ */
+export function auditInternalLinks(pages, assets, isServed) {
+  const routes = new Set(pages.map((page) => page.route));
+  const problems = [];
+
+  for (const page of pages) {
+    const body = page.html.replace(/<head[\s\S]*?<\/head>/i, '');
+    const seen = new Set();
+
+    for (const match of body.matchAll(/<a\b[^>]*\bhref="([^"]*)"/gi)) {
+      const href = match[1];
+      if (!href.startsWith('/')) continue; // external, mailto, tel, bare #anchor
+      const path = href.split('#')[0].split('?')[0].replace(/\/+$/, '') || '/';
+      if (routes.has(path) || assets.has(path) || isServed(path)) continue;
+      if (seen.has(path)) continue;
+      seen.add(path);
+      problems.push({ route: page.route, problem: `links to ${path}, which is not a page` });
+    }
+  }
+
+  return problems;
+}
