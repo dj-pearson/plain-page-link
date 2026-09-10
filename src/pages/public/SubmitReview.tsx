@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { logger } from '@/lib/logger';
 import { normalizeUsername } from '@/lib/username';
+import { REVIEW_FIELD_LIMITS, shouldShowCounter } from '@/lib/reviewFieldLimits';
 
 export default function SubmitReview() {
   const { username } = useParams();
@@ -105,9 +106,21 @@ export default function SubmitReview() {
       });
     } catch (error) {
       logger.error('Error submitting review', error as Error);
+      // Say what the server said (US-199).
+      //
+      // This threw the explanation away and showed "There was an error
+      // submitting your review. Please try again" for everything — so a client
+      // whose review was one character over the limit was told to do exactly
+      // the thing that could not work, forever. validateReviewData already
+      // returns a specific message; the only reason nobody ever saw one is that
+      // this line replaced it.
+      const detail = error instanceof Error ? error.message : '';
       toast({
         title: 'Submission failed',
-        description: 'There was an error submitting your review. Please try again.',
+        description:
+          detail && !/^Edge Function/i.test(detail)
+            ? detail
+            : 'There was an error submitting your review. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -241,6 +254,7 @@ export default function SubmitReview() {
                 <Label htmlFor="client_name">Your Name *</Label>
                 <Input
                   id="client_name"
+                  maxLength={REVIEW_FIELD_LIMITS.client_name.max}
                   value={formData.client_name}
                   onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                   placeholder="John Doe"
@@ -253,6 +267,7 @@ export default function SubmitReview() {
                 <Label htmlFor="client_title">Title/Occupation (Optional)</Label>
                 <Input
                   id="client_title"
+                  maxLength={REVIEW_FIELD_LIMITS.client_title.max}
                   value={formData.client_title}
                   onChange={(e) => setFormData({ ...formData, client_title: e.target.value })}
                   placeholder="e.g., First-time Homebuyer, Real Estate Investor"
@@ -279,6 +294,7 @@ export default function SubmitReview() {
                 <Label htmlFor="property_type">Property Type (Optional)</Label>
                 <Input
                   id="property_type"
+                  maxLength={REVIEW_FIELD_LIMITS.property_type.max}
                   value={formData.property_type}
                   onChange={(e) => setFormData({ ...formData, property_type: e.target.value })}
                   placeholder="e.g., Single Family Home, Condo, Townhouse"
@@ -295,11 +311,25 @@ export default function SubmitReview() {
                   placeholder="Share your experience working with this agent..."
                   rows={6}
                   required
+                  maxLength={REVIEW_FIELD_LIMITS.review.max}
                   className="resize-none"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Please be specific about what made your experience positive.
-                </p>
+                <div className="flex items-baseline justify-between gap-4 mt-1">
+                  <p className="text-xs text-muted-foreground">
+                    Please be specific about what made your experience positive.
+                  </p>
+                  {/* Only once it is worth knowing. A counter under an empty box
+                      says "you are being measured"; one at three quarters says
+                      "you are close", which is the moment it helps (US-199). */}
+                  {shouldShowCounter(formData.review.length, REVIEW_FIELD_LIMITS.review.max) && (
+                    <p
+                      className="text-xs text-muted-foreground whitespace-nowrap"
+                      aria-live="polite"
+                    >
+                      {REVIEW_FIELD_LIMITS.review.max - formData.review.length} characters left
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Submit Button */}

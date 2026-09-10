@@ -102,6 +102,59 @@ describe('SubmitReview', () => {
     expect(options.body).not.toHaveProperty('client_email');
   });
 
+  /**
+   * US-199: the page knew why the submission failed and did not say.
+   *
+   * validateReviewData returns a specific message — "Review must be between 1
+   * and 2000 characters" — and the catch block replaced every one of them with
+   * "There was an error submitting your review. Please try again." So a client
+   * whose testimonial was one character over was told to do the one thing that
+   * could never work.
+   */
+  it('tells the client what the server said, not just that something failed', async () => {
+    invokeMock.mockResolvedValue({
+      data: { success: false, error: { message: 'Review must be between 1 and 2000 characters' } },
+      error: null,
+    });
+
+    renderPage();
+    await screen.findByText(/share your experience/i);
+    await fillAndSubmit();
+
+    await waitFor(() => expect(toastMock).toHaveBeenCalled());
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Review must be between 1 and 2000 characters',
+        variant: 'destructive',
+      })
+    );
+  });
+
+  it('falls back to plain language when the failure has nothing to say', async () => {
+    // A transport failure carries "Edge Function returned a non-2xx status
+    // code", which tells a member of the public nothing.
+    invokeMock.mockRejectedValue(new Error('Edge Function returned a non-2xx status code'));
+
+    renderPage();
+    await screen.findByText(/share your experience/i);
+    await fillAndSubmit();
+
+    await waitFor(() => expect(toastMock).toHaveBeenCalled());
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'There was an error submitting your review. Please try again.',
+      })
+    );
+  });
+
+  it('stops the client at the limit rather than after it', async () => {
+    renderPage();
+    await screen.findByText(/share your experience/i);
+
+    expect(screen.getByLabelText(/your review/i)).toHaveAttribute('maxlength', '2000');
+    expect(screen.getByLabelText(/your name/i)).toHaveAttribute('maxlength', '100');
+  });
+
   it('does not claim success when the function returns a failure body', async () => {
     // functions.invoke() only rejects on transport failures, so a 400 arrives
     // as data.success === false and used to render the thank-you screen.

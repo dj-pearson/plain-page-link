@@ -384,6 +384,24 @@ export function getClientIP(req: Request): string {
  * `client_email` is deliberately absent — the review page used to require an
  * address "for verification only" that no column stored and nothing verified.
  */
+/**
+ * The bounds validateReviewData enforces, named for the same reason
+ * LEAD_FIELD_LIMITS is (US-199).
+ *
+ * SubmitReview.tsx put no maxLength on any field, so a happy client writing a
+ * long testimonial — the most useful review an agent can get — was refused
+ * after pressing Send. src/lib/reviewFieldLimits.ts carries the same table for
+ * the browser; src/lib/reviewFieldLimits.test.ts imports both and fails if they
+ * drift.
+ */
+export const REVIEW_FIELD_LIMITS = {
+  client_name: { min: 1, max: 100 },
+  client_title: { min: 0, max: 100 },
+  property_type: { min: 0, max: 100 },
+  review: { min: 1, max: 2000 },
+  rating: { min: 1, max: 5 },
+} as const;
+
 export function validateReviewData(data: any): ValidationResult {
   const errors: string[] = [];
 
@@ -391,17 +409,18 @@ export function validateReviewData(data: any): ValidationResult {
     errors.push('Invalid agent ID');
   }
 
-  if (!data?.client_name || !validateStringLength(String(data.client_name), 1, 100)) {
+  if (!data?.client_name || !validateStringLength(String(data.client_name), REVIEW_FIELD_LIMITS.client_name.min, REVIEW_FIELD_LIMITS.client_name.max)) {
     errors.push('Name must be between 1 and 100 characters');
   }
 
-  if (!data?.review || !validateStringLength(String(data.review), 1, 2000)) {
+  if (!data?.review || !validateStringLength(String(data.review), REVIEW_FIELD_LIMITS.review.min, REVIEW_FIELD_LIMITS.review.max)) {
     errors.push('Review must be between 1 and 2000 characters');
   }
 
   // Number, not numeric-string: `rating` is an integer column, and '5' reaches
   // it as a 22P02 the visitor sees as a generic failure.
-  if (!Number.isInteger(data?.rating) || data.rating < 1 || data.rating > 5) {
+  if (!Number.isInteger(data?.rating) || data.rating < REVIEW_FIELD_LIMITS.rating.min ||
+    data.rating > REVIEW_FIELD_LIMITS.rating.max) {
     errors.push('Rating must be a whole number between 1 and 5');
   }
 
@@ -412,11 +431,11 @@ export function validateReviewData(data: any): ValidationResult {
     errors.push('Invalid transaction type');
   }
 
-  if (data?.client_title && !validateStringLength(String(data.client_title), 0, 100)) {
+  if (data?.client_title && !validateStringLength(String(data.client_title), REVIEW_FIELD_LIMITS.client_title.min, REVIEW_FIELD_LIMITS.client_title.max)) {
     errors.push('Title must be less than 100 characters');
   }
 
-  if (data?.property_type && !validateStringLength(String(data.property_type), 0, 100)) {
+  if (data?.property_type && !validateStringLength(String(data.property_type), REVIEW_FIELD_LIMITS.property_type.min, REVIEW_FIELD_LIMITS.property_type.max)) {
     errors.push('Property type must be less than 100 characters');
   }
 

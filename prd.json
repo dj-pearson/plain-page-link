@@ -3119,6 +3119,22 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 11 by reading the four client schemas against validateLeadData's bounds. Not one form carried a single .max(). The server has enforced name<=100, email<=255, message<=2000 and address<=500 all along, so a long message passed client validation, was submitted, and came back as a generic failure. Fifth in the sequence US-069, US-095, US-096, US-197 — the same failure every time: a lead the visitor filled in correctly, thrown away by the layer behind the form."
+    },
+    {
+      "id": "US-199",
+      "title": "The review page knew why it failed and would not say",
+      "description": "As a client leaving a long, detailed testimonial, I need the form to stop me at the limit while I am writing — and if something else goes wrong, I need to be told what, rather than to be advised to try again at something that can never work.",
+      "acceptanceCriteria": [
+        "The catch block surfaces the server's own message instead of replacing every failure with 'Please try again'",
+        "A transport failure, whose text tells a member of the public nothing, still falls back to plain language",
+        "maxLength on every review field, from REVIEW_FIELD_LIMITS, so the limit is reached rather than exceeded",
+        "A character counter appears at three quarters of the limit and not before, and is announced politely",
+        "REVIEW_FIELD_LIMITS exists on both sides and a test imports both and fails when they drift",
+        "The new page tests are verified against the shipped page: two of them fail there"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 12. Sixth in the sequence US-069, US-095, US-096, US-197, US-198 — but this one contains the reason the whole family stayed invisible. validateReviewData has always returned a specific message; the page threw it away and printed 'There was an error submitting your review. Please try again' for every failure. A client whose testimonial was one character over the limit was told to do the one thing that could not work."
     }
   ]
 }
