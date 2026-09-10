@@ -1,5 +1,10 @@
 # PWA Icons
 
+> Moved here from `public/icons/README.md` in US-183. Everything under
+> `public/` is deployed, so this file was published at
+> `https://agentbio.net/icons/README.md` — a document telling anyone who found
+> it that the site's icons might be missing.
+
 This directory should contain the following PWA icon files:
 
 - `icon-72.png` (72x72)
@@ -21,7 +26,7 @@ If you have ImageMagick installed, run the provided script:
 
 ```bash
 cd public/icons
-./generate-icons.sh
+scripts/generate-icons.sh
 ```
 
 To install ImageMagick:
@@ -35,7 +40,7 @@ Use one of these free online tools to generate all sizes at once:
 
 1. **PWA Builder Image Generator** (Recommended)
    - Visit: https://www.pwabuilder.com/imageGenerator
-   - Upload `../Icon.png`
+   - Upload `public/Icon.png`
    - Download all generated sizes
    - Extract to this directory
 
@@ -47,14 +52,14 @@ Use one of these free online tools to generate all sizes at once:
 
 3. **Favicon.io**
    - Visit: https://favicon.io/favicon-converter/
-   - Upload `../Icon.png`
+   - Upload `public/Icon.png`
    - Download package
 
 ### Option 3: Manual Resize (Any Image Editor)
 
 Use any image editor (Photoshop, GIMP, Preview, Paint.NET, etc.):
 
-1. Open `../Icon.png` (388x388)
+1. Open `public/Icon.png` (388x388)
 2. Resize to each required size
 3. Export as PNG
 4. Name files as: `icon-72.png`, `icon-96.png`, etc.
@@ -95,14 +100,14 @@ Run: `node scripts/generate-icons.js`
 
 If you can't generate the icons immediately, you can temporarily:
 
-1. Copy `../Icon.png` to all required filenames
+1. Copy `public/Icon.png` to all required filenames
 2. This will work but icons won't be optimized for each size
 3. Replace with properly sized icons later
 
 ```bash
 cd public/icons
 for size in 72 96 128 144 152 192 384 512; do
-  cp ../Icon.png icon-${size}.png
+  cp public/Icon.png icon-${size}.png
 done
 ```
 

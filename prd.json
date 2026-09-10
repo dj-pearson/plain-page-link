@@ -2888,6 +2888,21 @@
       "priority": "low",
       "passes": false,
       "notes": "Opened 2026-09-10 (iteration 11), found while checking a naive duplicate count rather than trusting it. Low priority: two partial descriptions of one page is untidy rather than false, which is why it was not folded into US-180."
+    },
+    {
+      "id": "US-183",
+      "title": "The deployed root held two developer files, and the header rules were written for the pre-prerender site",
+      "description": "Vite copies public/ into dist/ verbatim, so public/icons/generate-icons.sh and public/icons/README.md were published at https://agentbio.net/icons/generate-icons.sh and /icons/README.md \u2014 fetchable, crawlable, and not part of the site. The README opens 'This directory should contain the following PWA icon files', which is a document telling anyone who finds it that the site's icons may be missing. Same shape as US-160's source maps. Separately, public/_headers still described the site as it was before US-147 prerendered every page: its only HTML rule was `/index.html`, a path no visitor requests once each page is served from its own directory at an extensionless URL, so the Content-Type and revalidation policy it appeared to set applied to nothing. It had rules for /*.ts and /*.tsx declaring TypeScript source to be application/javascript and cacheable for a year; /*.mjs, which nothing emits; no rule for /*.webp, which ships; and its /*.js immutable rule matched /sw.js, telling caches never to revalidate the one file that controls whether a returning visitor gets an update.",
+      "acceptanceCriteria": [
+        "public/ contains only files a browser requests as part of the site",
+        "No header rule types a source-code extension as executable script",
+        "Every asset type the build emits has an explicit cache policy, and the service worker is excluded from the immutable one",
+        "There is a cache policy floor that applies to the prerendered pages at their real URLs",
+        "A test enforces all of it, demonstrated failing against the state as it shipped"
+      ],
+      "priority": "medium",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 12 of the SEO loop. Six of the seven checks fail on the shipped state. Two judgement calls worth recording. First, the /sw.js rule is placed AFTER /*.js rather than before: Cloudflare applies every matching rule and a later one wins for a repeated header, and a reading where the more specific path wins gives the same answer from that position \u2014 so it is correct under either, which is what you want from a rule that cannot be tested from the repository. Second, the test does not ban rules that currently match nothing: a /*.jpg rule costs nothing and is right the day an image lands. It bans rules that are wrong regardless of what matches them, which is what /*.ts was. Three things were checked and found NOT to be defects: the service worker is network-first for navigations, so it cannot serve a stale document; the pages excluded from the sitemap all carry noindex (29 in the sitemap plus 30 noindex is exactly the 59 built pages); and no indexable page is thin, duplicated or missing an h1."
     }
   ]
 }

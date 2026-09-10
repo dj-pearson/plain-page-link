@@ -1,10 +1,17 @@
 #!/bin/bash
 
 # PWA Icon Generator Script
+#
+# Moved out of public/icons/ in US-183. Everything under public/ is copied
+# verbatim into dist/ and deployed, so this script was fetchable at
+# https://agentbio.net/icons/generate-icons.sh and crawlable from there. It is
+# a build tool, not part of the site.
+#
+# Run from the repository root.
 # This script generates all required PWA icons from the source Icon.png file
 # Requires ImageMagick or similar image conversion tool
 
-SOURCE_IMAGE="../Icon.png"
+SOURCE_IMAGE="public/Icon.png"
 SIZES=(72 96 128 144 152 192 384 512)
 
 echo "Generating PWA icons from $SOURCE_IMAGE..."

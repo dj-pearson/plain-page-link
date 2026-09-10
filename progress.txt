@@ -2936,3 +2936,73 @@ That is untidy rather than false, so it is US-182 rather than part of this.
 Also added /logo.png to the audit's known-image sizes, so the Organization logo
 US-178 corrected is now checked against the file by the build as well as by the
 unit test.
+
+## SEO loop — iteration 12/15 — US-183: the deploy contained things that are not the site
+
+This iteration spent most of its time NOT finding defects, which is worth
+recording as carefully as the ones it found.
+
+CHECKED AND CLEAN:
+  - Every page is either in sitemap.xml or carries noindex. 29 + 30 = 59, no
+    page in neither and none in both. Sitemap exclusion and noindex are
+    different mechanisms and it would be easy for them to disagree; they do not.
+  - No indexable page is thin. The shortest is /blog at 408 words. Every one has
+    exactly one h1, and no two share an h1.
+  - Anchor text: 30 generic anchors across the indexable set, 29 of them "Get
+    Started" pointing at /auth/register, which is noindex. One "Learn More".
+  - The service worker is networkFirst for navigations, so it cannot serve a
+    stale document. This was worth checking because APP_SHELL precaches '/' and
+    '/index.html', and since US-147 those are the prerendered homepage rather
+    than an empty shell — a cache-first navigation strategy would have served a
+    frozen copy of the homepage to every returning visitor.
+
+WHAT WAS ACTUALLY WRONG, both in what gets deployed rather than in what the
+pages say.
+
+1. Two developer files in the deployed root. Vite copies public/ verbatim, so:
+
+       https://agentbio.net/icons/generate-icons.sh
+       https://agentbio.net/icons/README.md
+
+   The script is a build tool. The README opens "This directory should contain
+   the following PWA icon files" — a document published at the origin telling
+   anyone who finds it that the site's icons might be missing. (They are not;
+   all eight are there.) Neither is dangerous. Both are crawlable and neither is
+   part of the site. Same shape as US-160's 17 MB of source maps.
+
+2. public/_headers still described the site as it was before US-147. Its only
+   HTML rule was:
+
+       /index.html
+         Content-Type: text/html; charset=utf-8
+         Cache-Control: public, max-age=0, must-revalidate
+
+   Every page is now served at an extensionless URL from its own directory, so
+   no visitor requests /index.html and that rule applied to nothing while
+   looking like a site-wide policy. There is a Cache-Control floor on /* now,
+   which the hashed-asset rules deliberately override.
+
+   Also in that file: /*.ts and /*.tsx, declaring TypeScript source to be
+   application/javascript and cacheable for a year — wrong whether or not
+   anything matches it, and US-160 removed the only mechanism by which source
+   was reaching the deploy. /*.mjs, which nothing emits. No rule for /*.webp,
+   which does ship. And /*.js matched /sw.js, telling caches never to
+   revalidate the one script that controls whether a returning visitor ever
+   gets an update. Browsers cap service-worker caching at 24 hours anyway, so
+   that was bounded rather than fatal — but immutable is the opposite of what
+   the file needs.
+
+TWO JUDGEMENT CALLS.
+
+The /sw.js rule goes AFTER /*.js, not before. Cloudflare applies every matching
+rule and a later one wins for a header both set; a reading where the more
+specific path wins gives the same answer from that position. Correct under
+either interpretation, which is what you want from a rule you cannot test from
+the repository.
+
+The test does NOT ban rules that currently match nothing. A /*.jpg rule costs
+nothing and is right the day an image lands. It bans rules that are wrong
+regardless of what matches them, which is what /*.ts was. The first version
+banned both and would have deleted forward-looking rules to satisfy itself.
+
+Six of the seven checks fail on the state as it shipped.
