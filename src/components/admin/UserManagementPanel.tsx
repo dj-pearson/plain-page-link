@@ -358,7 +358,7 @@ export const UserManagementPanel = () => {
             <CardTitle className="text-sm">Admins</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{stats.admins}</div>
+            <div className="text-3xl font-bold text-teal-700">{stats.admins}</div>
           </CardContent>
         </Card>
 

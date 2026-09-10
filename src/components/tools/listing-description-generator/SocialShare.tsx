@@ -112,7 +112,7 @@ export function SocialShare({
       {/* Quick Actions */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Share2 className="h-5 w-5 text-purple-600" />
+          <Share2 className="h-5 w-5 text-teal-700" />
           Share This Listing
         </h3>
 
@@ -276,14 +276,14 @@ export function SocialShare({
       </Card>
 
       {/* Viral Referral CTA */}
-      <Card className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+      <Card className="p-6 bg-gradient-to-br from-teal-50 to-teal-50 border-teal-200">
         <h3 className="text-lg font-semibold mb-2">Love this tool? Share it!</h3>
         <p className="text-sm text-gray-700 mb-4">
           Share the AI Listing Description Generator with 3 colleagues and get our <strong>Premium Real Estate Photography Checklist</strong> (worth $97) for free!
         </p>
         <Button
           onClick={() => handleCopyPost('email')}
-          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+          className="w-full bg-gradient-to-r from-teal-600 to-teal-600 hover:from-teal-700 hover:to-teal-700"
         >
           Share with Colleagues
         </Button>

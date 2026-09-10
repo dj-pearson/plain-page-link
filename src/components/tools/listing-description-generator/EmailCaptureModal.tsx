@@ -74,7 +74,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, listingId }: Emai
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header with gradient */}
-        <div className="bg-gradient-to-r from-blue-500 to-purple-500 -mx-6 -mt-6 p-8 text-white mb-6">
+        <div className="bg-gradient-to-r from-blue-500 to-teal-500 -mx-6 -mt-6 p-8 text-white mb-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
               <Unlock className="w-6 h-6" />
@@ -249,7 +249,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, listingId }: Emai
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-lg py-6"
+            className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 text-lg py-6"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, listingId }: Emai
  */
 export function UnlockCTA({ onUnlock }: { onUnlock: () => void }) {
   return (
-    <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg p-8 text-center text-white">
+    <div className="bg-gradient-to-r from-blue-500 to-teal-500 rounded-lg p-8 text-center text-white">
       <Sparkles className="w-16 h-16 mx-auto mb-4 opacity-90" />
       <h3 className="text-2xl font-bold mb-2">Want All 3 Styles?</h3>
       <p className="text-blue-100 mb-6 max-w-md mx-auto">

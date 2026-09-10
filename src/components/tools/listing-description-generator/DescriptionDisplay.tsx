@@ -221,7 +221,7 @@ export function DescriptionDisplay({
                 </Button>
               </div>
 
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-200">
+              <div className="bg-gradient-to-br from-teal-50 to-teal-50 rounded-lg p-4 border border-teal-200">
                 <div className="whitespace-pre-wrap leading-relaxed">
                   {descriptions[activeStyle].instagramCaption}
                 </div>
@@ -376,7 +376,7 @@ export function DescriptionDisplay({
           <Button
             onClick={onUnlock}
             size="lg"
-            className="gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+            className="gap-2 bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
           >
             <Lock className="w-5 h-5" />
             Unlock All 3 Styles + Multiple Formats

@@ -176,7 +176,7 @@ export function SocialShare({ score, toolUrl, onShare }: SocialShareProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Button
           onClick={() => handleShare('instagram')}
-          className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+          className="gap-2 bg-gradient-to-r from-teal-500 to-teal-500 hover:from-teal-600 hover:to-teal-600"
         >
           <Instagram className="w-4 h-4" />
           Instagram
@@ -228,7 +228,7 @@ export function SocialShare({ score, toolUrl, onShare }: SocialShareProps) {
       </div>
 
       {/* Download Score Card */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+      <div className="bg-gradient-to-r from-teal-50 to-teal-50 border border-teal-200 rounded-lg p-6">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <h4 className="font-bold text-gray-900 mb-1">Download Score Card</h4>
@@ -238,7 +238,7 @@ export function SocialShare({ score, toolUrl, onShare }: SocialShareProps) {
           </div>
           <Button
             onClick={downloadScoreCard}
-            className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+            className="gap-2 bg-gradient-to-r from-teal-500 to-teal-500 hover:from-teal-600 hover:to-teal-600"
           >
             <Download className="w-4 h-4" />
             Download
@@ -299,7 +299,7 @@ export function ScoreLeaderboard({ userScore, market }: { userScore: number; mar
             className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-center font-bold text-sm">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-teal-500 to-teal-500 text-white flex items-center justify-center font-bold text-sm">
                 {item.rank}
               </div>
               <span className="text-sm text-gray-600">{item.market}</span>
@@ -309,14 +309,14 @@ export function ScoreLeaderboard({ userScore, market }: { userScore: number; mar
         ))}
 
         {userRank > 5 && (
-          <div className="flex items-center justify-between p-3 bg-purple-100 rounded-lg border-2 border-purple-500">
+          <div className="flex items-center justify-between p-3 bg-teal-100 rounded-lg border-2 border-teal-500">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold text-sm">
+              <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-sm">
                 {userRank}
               </div>
-              <span className="text-sm font-semibold text-purple-900">You</span>
+              <span className="text-sm font-semibold text-teal-900">You</span>
             </div>
-            <div className="font-bold text-lg text-purple-900">{userScore}</div>
+            <div className="font-bold text-lg text-teal-900">{userScore}</div>
           </div>
         )}
       </div>

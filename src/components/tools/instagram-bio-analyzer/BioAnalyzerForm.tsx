@@ -84,7 +84,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
         </div>
         <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
+            className="h-full bg-gradient-to-r from-teal-500 to-teal-500 transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -94,7 +94,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
       {step === 1 && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-teal-500 to-teal-500 flex items-center justify-center">
               <Instagram className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -182,7 +182,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
       {step === 2 && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-teal-500 to-teal-500 flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -205,7 +205,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
                     className={`
                       border-2 rounded-lg p-3 cursor-pointer transition-all
                       ${selectedFocus.includes(option.value)
-                        ? 'border-purple-500 bg-purple-50'
+                        ? 'border-teal-500 bg-teal-50'
                         : 'border-gray-200 hover:border-gray-300'
                       }
                     `}
@@ -329,7 +329,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
       {step === 3 && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-teal-500 to-teal-500 flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -352,7 +352,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
                 className={`
                   border-2 rounded-lg p-4 cursor-pointer transition-all
                   ${watch('primaryGoal') === goal.value
-                    ? 'border-purple-500 bg-purple-50'
+                    ? 'border-teal-500 bg-teal-50'
                     : 'border-gray-200 hover:border-gray-300'
                   }
                 `}
@@ -392,7 +392,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
           <Button
             type="button"
             onClick={nextStep}
-            className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+            className="gap-2 bg-gradient-to-r from-teal-500 to-teal-500 hover:from-teal-600 hover:to-teal-600"
           >
             Next
             <ArrowRight className="w-4 h-4" />
@@ -400,7 +400,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
         ) : (
           <Button
             type="submit"
-            className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+            className="gap-2 bg-gradient-to-r from-teal-500 to-teal-500 hover:from-teal-600 hover:to-teal-600"
           >
             Analyze My Bio
             <ArrowRight className="w-4 h-4" />

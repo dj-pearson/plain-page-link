@@ -62,8 +62,8 @@ export function CategoryBreakdown({ analysis, showDetails = false }: CategoryBre
               {/* Score Header */}
               <div className="p-4 bg-gray-50 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-purple-600" />
+                  <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
+                    <Icon className="w-5 h-5 text-teal-700" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{label}</h3>
@@ -141,9 +141,9 @@ export function CategoryBreakdown({ analysis, showDetails = false }: CategoryBre
       </div>
 
       {/* Competitive Analysis */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 border border-purple-200">
+      <div className="bg-gradient-to-r from-teal-50 to-teal-50 rounded-lg p-6 border border-teal-200">
         <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-purple-600" />
+          <TrendingUp className="w-5 h-5 text-teal-700" />
           Competitive Analysis
         </h3>
         <p className="text-gray-700 mb-4">{analysis.competitiveAnalysis.vsTopPerformers}</p>
@@ -157,7 +157,7 @@ export function CategoryBreakdown({ analysis, showDetails = false }: CategoryBre
               {analysis.competitiveAnalysis.missingElements.map((element, i) => (
                 <span
                   key={i}
-                  className="bg-white px-3 py-1 rounded-full text-sm font-medium text-purple-700 border border-purple-200"
+                  className="bg-white px-3 py-1 rounded-full text-sm font-medium text-teal-700 border border-teal-200"
                 >
                   {element}
                 </span>
@@ -166,16 +166,16 @@ export function CategoryBreakdown({ analysis, showDetails = false }: CategoryBre
           </div>
         )}
 
-        <div className="mt-4 p-4 bg-white rounded-lg border border-purple-200">
+        <div className="mt-4 p-4 bg-white rounded-lg border border-teal-200">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-gray-900">Conversion Potential</span>
-            <span className="text-2xl font-bold text-purple-600">
+            <span className="text-2xl font-bold text-teal-700">
               {analysis.competitiveAnalysis.conversionPotential}%
             </span>
           </div>
           <div className="mt-2 w-full h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+              className="h-full bg-gradient-to-r from-teal-500 to-teal-500 transition-all duration-500"
               style={{ width: `${analysis.competitiveAnalysis.conversionPotential}%` }}
             />
           </div>

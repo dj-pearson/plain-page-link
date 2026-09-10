@@ -18,7 +18,7 @@ interface BioRewriteDisplayProps {
 const STYLE_COLORS = {
   professional: 'from-blue-500 to-blue-600',
   friendly: 'from-green-500 to-green-600',
-  'problem-solver': 'from-purple-500 to-purple-600',
+  'problem-solver': 'from-teal-500 to-teal-600',
 };
 
 const STYLE_DESCRIPTIONS = {
@@ -96,7 +96,7 @@ export function BioRewriteDisplay({ rewrites, isLocked = false, onUnlock }: BioR
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Button
                         onClick={onUnlock}
-                        className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                        className="gap-2 bg-gradient-to-r from-teal-500 to-teal-500 hover:from-teal-600 hover:to-teal-600"
                       >
                         <Lock className="w-4 h-4" />
                         Unlock All 3 Bios

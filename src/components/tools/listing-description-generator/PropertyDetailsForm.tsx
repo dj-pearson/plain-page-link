@@ -88,7 +88,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
         </div>
         <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+            className="h-full bg-gradient-to-r from-blue-500 to-teal-500 transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -98,7 +98,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
       {step === 1 && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-teal-500 flex items-center justify-center">
               <Home className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -234,7 +234,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
       {step === 2 && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-teal-500 flex items-center justify-center">
               <MapPin className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -341,7 +341,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
       {step === 3 && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-teal-500 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -467,7 +467,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
       {step === 4 && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-teal-500 flex items-center justify-center">
               <Target className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -543,7 +543,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
           <Button
             type="button"
             onClick={nextStep}
-            className="gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+            className="gap-2 bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
           >
             Next
             <ArrowRight className="w-4 h-4" />
@@ -551,7 +551,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
         ) : (
           <Button
             type="submit"
-            className="gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+            className="gap-2 bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
           >
             Generate Descriptions
             <Sparkles className="w-4 h-4" />

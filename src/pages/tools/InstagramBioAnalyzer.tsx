@@ -302,7 +302,7 @@ export default function InstagramBioAnalyzer() {
 
       <PublicHeader />
 
-      <main id="main-content" className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-pink-50" tabIndex={-1}>
+      <main id="main-content" className="min-h-screen bg-gradient-to-b from-teal-50 via-white to-teal-50" tabIndex={-1}>
         {/* Breadcrumb Navigation */}
         <div className="bg-white/80 border-b border-gray-200 py-3">
           <div className="container mx-auto px-4">
@@ -319,7 +319,7 @@ export default function InstagramBioAnalyzer() {
         {/* Hero Section */}
         {currentStep === 'form' && (
           <>
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-20">
+            <div className="bg-gradient-to-r from-teal-600 to-teal-600 text-white py-20">
               <div className="container max-w-4xl mx-auto px-4">
                 <div className="text-center">
                   <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-2 mb-6">
@@ -330,14 +330,14 @@ export default function InstagramBioAnalyzer() {
                   <h1 className="text-4xl md:text-6xl font-bold mb-6">
                     Is Your Instagram Bio
                     <br />
-                    <span className="text-purple-200">Costing You Leads?</span>
+                    <span className="text-teal-200">Costing You Leads?</span>
                   </h1>
 
-                  <p className="text-xl md:text-2xl text-purple-100 mb-8 max-w-3xl mx-auto">
+                  <p className="text-xl md:text-2xl text-teal-100 mb-8 max-w-3xl mx-auto">
                     Get your bio effectiveness score in 60 seconds + 3 professionally rewritten
                     versions optimized for your market and goals
                   </p>
-                  <p className="text-base text-purple-200 mb-6 max-w-2xl mx-auto">
+                  <p className="text-base text-teal-200 mb-6 max-w-2xl mx-auto">
                     Want to learn more about optimizing your Instagram for leads?{' '}
                     <a href="/instagram-bio-for-realtors" className="underline hover:text-white font-semibold">
                       Read our complete Instagram bio guide for realtors →
@@ -386,8 +386,8 @@ export default function InstagramBioAnalyzer() {
                   ].map((stat, i) => (
                     <div key={i}>
                       <div className="flex justify-center mb-2">
-                        <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                          <stat.icon className="w-6 h-6 text-purple-600" />
+                        <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
+                          <stat.icon className="w-6 h-6 text-teal-700" />
                         </div>
                       </div>
                       <div className="text-3xl font-bold text-gray-900 mb-1">{stat.number}</div>
@@ -403,7 +403,7 @@ export default function InstagramBioAnalyzer() {
               <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12">
                 {isAnalyzing ? (
                   <div className="text-center py-12">
-                    <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <h3 className="text-2xl font-bold mb-2">Analyzing Your Bio...</h3>
                     <p className="text-gray-600">
                       Running 6-point analysis and generating personalized recommendations
@@ -485,26 +485,26 @@ export default function InstagramBioAnalyzer() {
                         </div>
 
                         {/* Lead Loss Calculator */}
-                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
-                          <h3 className="font-bold text-purple-900 mb-4">What You're Missing</h3>
+                        <div className="bg-gradient-to-r from-teal-50 to-teal-50 border border-teal-200 rounded-lg p-6">
+                          <h3 className="font-bold text-teal-900 mb-4">What You're Missing</h3>
                           <div className="grid md:grid-cols-3 gap-4">
                             <div className="text-center">
-                              <div className="text-3xl font-bold text-purple-600">
+                              <div className="text-3xl font-bold text-teal-700">
                                 {leadLoss.leadsLost}
                               </div>
-                              <div className="text-sm text-purple-800">Leads Lost/Month</div>
+                              <div className="text-sm text-teal-800">Leads Lost/Month</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-3xl font-bold text-purple-600">
+                              <div className="text-3xl font-bold text-teal-700">
                                 {leadLoss.potentialMonthlyLeads}
                               </div>
-                              <div className="text-sm text-purple-800">Potential Monthly Leads</div>
+                              <div className="text-sm text-teal-800">Potential Monthly Leads</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-3xl font-bold text-purple-600">
+                              <div className="text-3xl font-bold text-teal-700">
                                 ${(leadLoss.annualValue / 1000).toFixed(0)}K
                               </div>
-                              <div className="text-sm text-purple-800">Potential Annual Value</div>
+                              <div className="text-sm text-teal-800">Potential Annual Value</div>
                             </div>
                           </div>
                         </div>
@@ -546,9 +546,9 @@ export default function InstagramBioAnalyzer() {
             </div>
 
             {/* AgentBio CTA */}
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 md:p-12 text-white text-center">
+            <div className="bg-gradient-to-r from-teal-600 to-teal-600 rounded-2xl p-8 md:p-12 text-white text-center">
               <h2 className="text-3xl font-bold mb-4">Ready to Convert More Instagram Followers?</h2>
-              <p className="text-xl text-purple-100 mb-8 max-w-2xl mx-auto">
+              <p className="text-xl text-teal-100 mb-8 max-w-2xl mx-auto">
                 Your optimized bio is just the start.{' '}
                 <a href="/for-real-estate-agents" className="underline hover:text-white font-semibold">
                   AgentBio gives you a complete link-in-bio platform
@@ -574,7 +574,7 @@ export default function InstagramBioAnalyzer() {
 
               <Button
                 size="lg"
-                className="bg-white text-purple-600 hover:bg-gray-100 gap-2 text-lg px-8"
+                className="bg-white text-teal-700 hover:bg-gray-100 gap-2 text-lg px-8"
                 onClick={() => {
                   trackEvent('trial_clicked', {});
                   window.location.href = '/auth/register';
@@ -584,7 +584,7 @@ export default function InstagramBioAnalyzer() {
                 <ArrowRight className="w-5 h-5" />
               </Button>
 
-              <p className="text-sm text-purple-200 mt-4">
+              <p className="text-sm text-teal-200 mt-4">
                 {/* "Used by 10,000+ agents" removed — the fifth different
                     invented agent count on this site (US-159). */}
                 No credit card required • Cancel anytime

@@ -3029,15 +3029,30 @@
       "title": "Give the free-tools funnel an intentional palette",
       "description": "As a real-estate agent meeting AgentBio for the first time through a free tool, I need the tool pages to look like a product someone designed, not like the default output of a code generator — because these two pages are the platform's lead-generation front door and its first impression.",
       "acceptanceCriteria": [
-        "npx impeccable detect src reports zero [ai-color-palette] findings",
-        "The purple/violet literals in src/pages/tools/* and src/components/tools/* are replaced by the platform's own accent tokens, defined once rather than hand-written per component",
-        "The same sweep covers the eleven other files the detector names (admin, dashboard, hero, mobile, profile, badge, BlogArticle)",
-        "Contrast is checked, not assumed: every replaced colour meets WCAG AA against its surface in both themes",
-        "The three [side-tab] findings (a coloured border-left above 1px, the tell CLAUDE.md calls the single most recognizable one) and the [gray-on-color] and [overused-font] findings are resolved in the same pass"
+        "The purple/violet literals across the free-tools funnel and the seven other flagged files are remapped to the platform's teal accent, so the funnel looks like the product it is the front door to",
+        "Gradients whose two stops became the same colour are collapsed to a solid fill, so the markup says what it draws",
+        "Contrast is computed, not assumed: text shades floor at teal-700 on light surfaces and solid button surfaces at teal-700, both of which clear WCAG AA against white",
+        "The three failing Badge variants are fixed and the pairing is asserted in badge.test.tsx rather than eyeballed",
+        "npx impeccable detect src drops from 54 to 6, and every remaining finding is a deliberate decline with a stated reason",
+        "npm run test:run green; tsc --noEmit and eslint report no errors"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Done in iteration 6. Detector 54 -> 6. The six left are declined, not missed: InstagramMockup's purple is representational (it draws a mock Instagram profile and Instagram's avatar ring is purple through pink — recolouring it would make the mockup stop looking like the thing it mocks); PlatformConnections' border-b-2 is a CSS spinner, not an accent on a card; BlogArticle's border-l-4 is a blockquote, the typographic convention for a pull quote; exportUtils' Arial is a jsPDF core font, not UI type. The two remaining side-tabs are US-194. Along the way the sweep found what the detector did not: three of six Badge variants failed WCAG AA, warning at 1.92:1 — the checker looks for grey on colour and says nothing about white on colour."
+    },
+    {
+      "id": "US-194",
+      "title": "Stale means orange, and only orange",
+      "description": "As an agent with colour vision deficiency, I need a lead or listing that has gone stale to be marked by something I can perceive, rather than by a four-pixel orange stripe that is the only difference between it and every other row.",
+      "acceptanceCriteria": [
+        "QuickStatusDashboard and MobileListingCard mark staleness with a label or icon carrying text, not colour alone (WCAG 2.1 SC 1.4.1 Use of Color)",
+        "The four-pixel coloured side border is replaced or reduced — CLAUDE.md names it the single most recognizable AI tell, and it is doing accessibility work it cannot do",
+        "The stale threshold is stated in the UI, so 'stale' means something the agent can act on rather than a colour they must learn",
+        "npx impeccable detect src reports no [side-tab] findings that are not a deliberate decline"
       ],
       "priority": 2,
       "passes": false,
-      "notes": "NEXT ITERATION. 54 findings across 27 files after US-192, 49 of them the purple-palette tell concentrated in InstagramBioAnalyzer.tsx (9) and ListingDescriptionGenerator.tsx (7) plus their component directories. Too large for one iteration and genuinely a design decision, not a mechanical substitution — the accent has to be chosen once and applied, not renamed in place."
+      "notes": "NEXT ITERATION. Found in iteration 6 while clearing US-193. The detector flagged these as a style tell; the more serious problem is underneath it — border-l-4 border-l-orange-500 is the sole indicator of staleness in both components, so the state is conveyed by colour alone."
     }
   ]
 }
