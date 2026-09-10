@@ -49,6 +49,7 @@ import type { Lead } from '@/types/lead';
 import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import type { LeadScore } from '@/hooks/useMLLeadScoring';
 import { logger } from '@/lib/logger';
+import { describeLeadOrigin } from '@/lib/leadAttribution';
 
 export default function Leads() {
   // Search is local (it debounces into the query below); status and type live
@@ -338,21 +339,38 @@ export default function Leads() {
         'Type',
         'Status',
         'Source',
+        // The form's own label ('contact_form') answers a different question
+        // from the campaign that produced the lead, so both are exported
+        // (US-189). An agent reconciling ad spend needs the campaign columns
+        // in the same sheet as the leads.
+        'Channel',
+        'Campaign',
+        'Medium',
+        'Referred By',
+        'Device',
         'Message',
         'Created At',
         'First Responded At',
       ],
-      rows: filteredLeads.map((lead) => [
-        lead.name,
-        lead.email ?? '',
-        lead.phone ?? '',
-        lead.lead_type ?? '',
-        lead.status ?? '',
-        lead.source ?? '',
-        lead.message ?? '',
-        lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '',
-        lead.first_responded_at ? new Date(lead.first_responded_at).toLocaleString() : '',
-      ]),
+      rows: filteredLeads.map((lead) => {
+        const origin = describeLeadOrigin(lead);
+        return [
+          lead.name,
+          lead.email ?? '',
+          lead.phone ?? '',
+          lead.lead_type ?? '',
+          lead.status ?? '',
+          lead.source ?? '',
+          origin.label,
+          lead.utm_campaign ?? '',
+          lead.utm_medium ?? '',
+          origin.referrerHost ?? '',
+          lead.device ?? '',
+          lead.message ?? '',
+          lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '',
+          lead.first_responded_at ? new Date(lead.first_responded_at).toLocaleString() : '',
+        ];
+      }),
     });
 
     toast({

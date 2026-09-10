@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { Database } from '@/integrations/supabase/types';
 import { decryptLeadContacts } from '@/lib/pii';
+import { groupLeadsByChannel } from '@/lib/leadAttribution';
 
 export type TimeRange = '7d' | '30d' | '90d';
 
@@ -60,7 +61,20 @@ const CONTACT_LABELS: Record<string, string> = {
  */
 export type RecentLead = Pick<
   Database['public']['Tables']['leads']['Row'],
-  'id' | 'name' | 'created_at' | 'lead_type' | 'status' | 'first_responded_at'
+  | 'id'
+  | 'name'
+  | 'created_at'
+  | 'lead_type'
+  | 'status'
+  | 'first_responded_at'
+  // Attribution (US-189). Named here rather than left off, so the type says
+  // what the select above asks for and groupLeadsByChannel has something to
+  // group by.
+  | 'utm_source'
+  | 'utm_medium'
+  | 'utm_campaign'
+  | 'referrer_url'
+  | 'device'
 > & {
   email: string | null;
   phone: string | null;
@@ -76,6 +90,11 @@ type EncryptedLeadRow = Pick<
   | 'encrypted_email'
   | 'encrypted_phone'
   | 'first_responded_at'
+  | 'utm_source'
+  | 'utm_medium'
+  | 'utm_campaign'
+  | 'referrer_url'
+  | 'device'
 >;
 
 /**
@@ -179,8 +198,11 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
         // row on an undefined id and printed an empty name cell without them.
         // email/phone come from the encrypted columns (US-086 dropped the
         // plaintext ones) and are decrypted below before any consumer sees them.
+        // The attribution columns ride along on the query that is already
+        // running — the breakdown is one aggregate over this page, not a
+        // query per lead (US-189).
         .select(
-          'id, name, created_at, lead_type, status, encrypted_email, encrypted_phone, first_responded_at'
+          'id, name, created_at, lead_type, status, encrypted_email, encrypted_phone, first_responded_at, utm_source, utm_medium, utm_campaign, referrer_url, device'
         )
         .eq('user_id', user.id)
         .gte('created_at', cutoffDate) // Filter by time range
@@ -343,6 +365,15 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     value,
   }));
 
+  // Which channel produced the leads in this window (US-189). Grouped over the
+  // page already fetched above, so it costs no extra round trip. Leads captured
+  // before US-188 land in "Not recorded" rather than being credited to Direct:
+  // an honest gap reads better than a wrong attribution.
+  const leadsByChannel: LeadsDatum[] = groupLeadsByChannel(leads).map(({ label, count }) => ({
+    name: label,
+    value: count,
+  }));
+
   // Contact taps, by method — the number an agent actually wants ("thirty
   // people tapped Call this week"). Every allowed method is listed even at
   // zero, so a week with no email taps reads as zero rather than as absence.
@@ -377,6 +408,7 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     hasPreviousPeriod: (previousCounts?.views ?? 0) + (previousCounts?.leads ?? 0) > 0,
     viewsData,
     leadsData,
+    leadsByChannel,
     contactTaps,
     totalContactTaps,
     linkClicks,

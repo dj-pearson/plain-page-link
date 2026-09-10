@@ -2990,8 +2990,21 @@
         "No new N+1 queries: the breakdown is one aggregate query, not one per lead"
       ],
       "priority": 2,
+      "passes": true,
+      "notes": "Done in iteration 3. describeLeadOrigin() reports what the lead recorded and says 'Not recorded' for leads captured before US-188 rather than crediting them to Direct. The analytics breakdown groups the page of leads the hook already fetches, so it adds no query."
+    },
+    {
+      "id": "US-190",
+      "title": "The repo-hygiene test has been failing",
+      "description": "As a developer, I need `npm run test:run` to be green so that a new failure is visible, rather than hidden among failures everyone has learned to ignore.",
+      "acceptanceCriteria": [
+        "src/repo-hygiene.test.ts passes: the loose .ps1/.sh scripts in the repository root move under scripts/, and the stray root markdown files move under docs/ per the US-121 layout",
+        "Every moved script's references (docs, package.json, CI workflows) are updated to the new path",
+        "npm run test:run is green end to end"
+      ],
+      "priority": 1,
       "passes": false,
-      "notes": "NEXT ITERATION. Depends on US-188, which fills the columns. Nothing in src/components/leads or src/pages/dashboard references utm at all today, so this is the read half of the same gap and is too large to have shared US-188's iteration."
+      "notes": "NEXT ITERATION. Verified failing at HEAD before any of this loop's changes: 2 failed | 790 passed. The offenders are deploy-migrations-ssh.ps1, migrate-from-container.sh, migrate-to-coolify.ps1, migrate-to-coolify.sh, migrate-via-files.ps1, test-db-connection.ps1 and four root .md files that US-121 said belong under docs/."
     }
   ]
 }

@@ -52,6 +52,7 @@ export default function Analytics() {
     previousStats,
     viewsData,
     leadsData,
+    leadsByChannel,
     contactTaps,
     totalContactTaps,
     linkClicks,
@@ -477,6 +478,55 @@ export default function Analytics() {
               </CardContent>
             </Card>
 
+            {/* Where the leads came from (US-189).
+                "Leads by Type" says what people asked for. This says how they
+                found the page — the number an agent needs to decide whether an
+                ad, a QR code on a yard sign or a Zillow profile is paying for
+                itself. Grouped over the page of leads already fetched, so it
+                costs no extra query. */}
+            <Card>
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="text-base sm:text-lg">Where leads came from</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Campaign, referral or direct, for the selected period
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {leadsByChannel.length > 0 ? (
+                  <div className="space-y-2 sm:space-y-3">
+                    {leadsByChannel.map((item) => (
+                      <div
+                        key={item.name}
+                        className="flex items-center justify-between py-2 min-h-[44px]"
+                      >
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0" />
+                          <span className="text-xs sm:text-sm font-medium">{item.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
+                            {item.value} leads
+                          </span>
+                          <span className="text-xs sm:text-sm font-semibold min-w-[35px] text-right">
+                            {stats.totalLeads > 0
+                              ? ((item.value / stats.totalLeads) * 100).toFixed(0)
+                              : 0}
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs sm:text-sm text-muted-foreground text-center py-6 sm:py-8">
+                    No leads yet
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Taps and clicks.
                 This card used to be "Recent Activity" and printed the total
                 view count again, under a different heading. The interactions
