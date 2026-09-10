@@ -2963,6 +2963,35 @@
       "priority": 1,
       "passes": true,
       "notes": "The database already carried idx_profiles_username_lower and check_username_available() already compared with LOWER() — only the read path compared exactly. Found in iteration 1 of the platform-improvement loop."
+    },
+    {
+      "id": "US-188",
+      "title": "Leads that say which campaign produced them",
+      "description": "As an agent boosting a post on Instagram, running a Facebook campaign and printing a QR code on a yard sign, I need each captured lead to record which of the three it came from, so the platform's promise of data-driven decisions applies to my own marketing spend.",
+      "acceptanceCriteria": [
+        "captureAttribution() reads utm_source/utm_medium/utm_campaign from the landing URL once, in main.tsx, before the router can rewrite the query string",
+        "The captured campaign survives internal navigation that drops the parameters, and a fresh campaign click replaces the previous touch",
+        "submitLead() and ContactBlock send utm_source, utm_medium, utm_campaign and device on every public lead",
+        "Attribution is per browsing session (sessionStorage, 24h ceiling) and never blocks a submission when storage is unavailable",
+        "Unit tests cover capture, carry-over, replacement, empty values, truncation and storage failure; tsc --noEmit and eslint pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "submit-lead has accepted, sanitised and written all four columns since it was written (index.ts:110-113, 177-180). No caller ever sent them, so every lead in the table has four NULLs where its attribution belongs. The columns were never the missing part — reading the URL was. Found in iteration 2 of the platform-improvement loop."
+    },
+    {
+      "id": "US-189",
+      "title": "Show an agent where their leads came from",
+      "description": "As an agent, I need the leads list and lead detail to show the campaign, referrer and device a lead arrived with, and a breakdown by source over a period, so the attribution US-188 now captures is something I can act on rather than a column in a table I cannot see.",
+      "acceptanceCriteria": [
+        "Lead detail shows utm_source / utm_medium / utm_campaign, referrer_url and device, with an honest empty state for leads captured before US-188",
+        "The leads list can be filtered by source",
+        "The analytics dashboard shows leads grouped by campaign over the selected period",
+        "No new N+1 queries: the breakdown is one aggregate query, not one per lead"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "NEXT ITERATION. Depends on US-188, which fills the columns. Nothing in src/components/leads or src/pages/dashboard references utm at all today, so this is the read half of the same gap and is too large to have shared US-188's iteration."
     }
   ]
 }

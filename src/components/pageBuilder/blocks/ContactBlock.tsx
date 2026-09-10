@@ -19,6 +19,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
+import { getLeadAttribution } from '@/lib/attribution';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 
 interface ContactBlockProps {
@@ -104,7 +105,9 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
         message: messageField ? String(formData[messageField.id] || '') : undefined,
         lead_type: 'contact',
         referrer_url: window.location.href,
-        device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+        // device was already sent from here, with its own copy of the
+        // user-agent test; the campaign it came from was not (US-188).
+        ...getLeadAttribution(),
       };
 
       // Call the submit-lead edge function
