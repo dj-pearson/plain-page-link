@@ -9,6 +9,7 @@ import { Calendar, Eye, ArrowLeft, Clock, User } from 'lucide-react';
 import { ArticleSEO } from '@/components/blog/ArticleSEO';
 import { SimilarArticles } from '@/components/blog/SimilarArticles';
 import { Breadcrumbs } from '@/components/blog/Breadcrumbs';
+import { categoryByName } from '@/config/blog-categories';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import ReactMarkdown from 'react-markdown';
@@ -145,11 +146,38 @@ export default function BlogArticle() {
               </figure>
             )}
 
-            {/* Meta Info */}
+            {/* Meta Info.
+                The category was a bare badge, so an article was a dead end
+                towards its own topic — nothing led from a post to the other
+                posts about the same thing (US-165's problem, one level down).
+                It links only when the category actually has a page: the
+                registry answers that, which is the whole reason it exists
+                (US-166). An unlisted category still shows, unlinked. */}
             <div className="flex flex-wrap items-center gap-2 mb-6">
-              <Badge variant="secondary" itemProp="articleSection">
-                {article.category}
-              </Badge>
+              {(() => {
+                const category = categoryByName(article.category);
+                if (!category) {
+                  return article.category ? (
+                    <Badge variant="secondary" itemProp="articleSection">
+                      {article.category}
+                    </Badge>
+                  ) : null;
+                }
+                return (
+                  <Link
+                    to={`/blog/category/${category.slug}`}
+                    aria-label={`More articles in ${category.label}`}
+                  >
+                    <Badge
+                      variant="secondary"
+                      itemProp="articleSection"
+                      className="hover:bg-secondary/80 transition-colors"
+                    >
+                      {category.label}
+                    </Badge>
+                  </Link>
+                );
+              })()}
               {article.tags?.map((tag) => (
                 <Badge key={tag} variant="outline" itemProp="keywords">
                   {tag}

@@ -21,6 +21,8 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { categoryByName } from '../../src/config/blog-categories';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..', '..');
 
@@ -152,13 +154,41 @@ export async function loadArticles(): Promise<ArticleLoad> {
   );
 }
 
-/** Categories that actually have a published article, matched to Blog.tsx's list. */
-export function categorySlugs(articles: Article[]): string[] {
-  const present = new Set(
-    articles
-      .map((a) => a.category)
-      .filter((c): c is string => !!c)
-      .map((c) => c.toLowerCase().replace(/\s+/g, '-'))
-  );
-  return [...present].sort();
+/**
+ * Categories that have both a published article and a landing page (US-166).
+ *
+ * This used to slugify `articles.category` and return whatever came out, which
+ * generated a route for every category anyone had ever typed into the CMS.
+ * BlogCategory.tsx renders those as "Category Not Found" — no title, no
+ * canonical — the prerender gate refuses to write a page in that state, and
+ * because it writes all-or-nothing, the whole build failed. A category that has
+ * no page is now simply not a route, and is reported rather than fatal.
+ *
+ * `unlisted` is what the build prints. Silence would swap a loud wrong failure
+ * for a quiet one: an editor whose new category never gets a landing page
+ * should hear about it from the build, not from Search Console in six months.
+ */
+export function categorySlugs(articles: Article[]): {
+  slugs: string[];
+  unlisted: { name: string; articles: number }[];
+} {
+  const slugs = new Set<string>();
+  const unlisted = new Map<string, number>();
+
+  for (const article of articles) {
+    if (!article.category) continue;
+    const known = categoryByName(article.category);
+    if (known) {
+      slugs.add(known.slug);
+    } else {
+      unlisted.set(article.category, (unlisted.get(article.category) ?? 0) + 1);
+    }
+  }
+
+  return {
+    slugs: [...slugs].sort(),
+    unlisted: [...unlisted]
+      .map(([name, count]) => ({ name, articles: count }))
+      .sort((a, b) => b.articles - a.articles || a.name.localeCompare(b.name)),
+  };
 }

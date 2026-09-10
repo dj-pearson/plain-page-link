@@ -2139,3 +2139,81 @@ PRE-EXISTING AND NOT MINE: `npm run test:run` is 2 failed / 656 passed on this
 branch and on main. src/repo-hygiene.test.ts has been red since 908a2c1
 (2026-09-04) put four markdown files and six shell/PowerShell scripts back in
 the repository root, undoing part of US-121 and US-122. US-170 opened.
+
+## SEO loop — iteration 2/15 — US-166: one CMS dropdown value took the whole deploy down
+
+THE DEFECT, found by accident in iteration 1 and confirmed deliberately here.
+There were three copies of the blog category list and they agreed by luck:
+
+  src/pages/Blog.tsx        a hardcoded array of nine {name, slug, label}
+  src/pages/BlogCategory    a hardcoded Record of eight slugs to editorial copy
+  scripts/lib/articles.mts  categorySlugs(), which slugified whatever string
+                            sat in articles.category and returned it
+
+The third generated a /blog/category/{slug} route for ANY category on a
+published article, including ones the second had never heard of. BlogCategory
+renders those as a bare "Category Not Found" div with no SEOHead — no title, no
+canonical — the prerender gate correctly refuses to write a page in that state,
+and it writes all-or-nothing. So an article categorised "Agent Spotlight" did
+not produce one bad page. It produced zero pages, `npm run build` exited 1, and
+the message talked about missing titles:
+
+  [prerender] 2 of 57 routes did not render:
+    /blog/category/lead-generation
+        - still carries index.html's default title (...)
+        - no <link rel="canonical">
+  [prerender] Nothing was written.
+
+An editor changing one dropdown value takes the site down, and the error tells
+whoever is on call to go looking at <title> tags.
+
+THE FIX. src/config/blog-categories.ts is now the one list — plain data, no
+React and no `@/` import, under the same constraint as prerender-routes.ts so
+node can read it. Both directions of drift are now closed:
+
+  - a category on an article with no page → not a route. Reported, not fatal.
+  - a category in the registry with no editorial copy → `tsc` error, in
+    BlogCategory.tsx, the file that has to supply it. categoryContent is typed
+    Record<BlogCategorySlug, ...> rather than Record<string, ...>.
+
+Reported rather than silent, because silence just trades a loud wrong failure
+for a quiet one — an editor whose new category never gets a landing page should
+hear it from the build, not from Search Console in six months:
+
+  [prerender] 1 category value(s) have no landing page: Agent Spotlight (1 article).
+              Those articles still ship; they just have no category page.
+              Add the category to src/config/blog-categories.ts (and its copy to
+              categoryContent in src/pages/BlogCategory.tsx), or recategorise them.
+
+TWO MORE DEFECTS, found while fixing that one and fixed in the same pass.
+
+1. The prerender's `**/rest/v1/articles*` intercept honoured `slug` and `order`
+   and ignored `category`. Every prerendered category page therefore listed
+   EVERY published article. Verified against a real dist rather than reasoned
+   about — /blog/category/real-estate-tips contained an article whose category
+   was "Agent Spotlight". The prerendered HTML is the only version a first crawl
+   sees, so eight category pages were showing Google eight identical article
+   lists. After: real-estate-tips contains "Tips One" and neither of the other
+   two; market-insights contains "Insights Two" and neither of the other two.
+
+2. An article's category was a bare <Badge>. Nothing led from a post to the
+   other posts about the same thing — US-165's problem one level down. It is a
+   link now, and only when the category actually has a page: the registry is
+   what answers that, which is the whole reason it exists. An article in an
+   unlisted category shows its category unlinked rather than pointing at a 404.
+
+   Verified in dist: /blog/tips-one carries href="/blog/category/real-estate-tips";
+   /blog/spotlight-three carries no category href at all, still ships, and is
+   still linked from /blog.
+
+Also replaced BlogCategory's article query: it derived the stored category name
+by title-casing the URL slug, which round-trips only because all eight happen to
+be plain words, and matched with ilike '%name%'. It reads the name from the
+registry and matches with eq now.
+
+VERIFICATION. tsc clean. 10 new tests in scripts/lib/articles-categories.test.ts,
+including the old function verbatim as `preUS166Behaviour` so the test asserts
+that the deploy-breaking route WAS generated and now is not. Three real builds:
+one reproducing the break, one proving the warning path ships 56 pages, one with
+three articles across two listed categories and one unlisted proving the
+intercept and the badge link. verify:seo green on all of them.

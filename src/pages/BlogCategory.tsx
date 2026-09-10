@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { categoryBySlug, type BlogCategorySlug } from '@/config/blog-categories';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -20,9 +21,17 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 
-// Category content configuration
+/**
+ * The editorial copy behind each category page.
+ *
+ * Keyed by BlogCategorySlug rather than by string (US-166), so adding a
+ * category to src/config/blog-categories.ts without writing copy for it is a
+ * `tsc` failure here, in the file that would have to supply it — not a
+ * prerender failure two steps later that takes the whole build down and
+ * complains about a missing <title>.
+ */
 const categoryContent: Record<
-  string,
+  BlogCategorySlug,
   {
     title: string;
     description: string;
@@ -334,25 +343,26 @@ export default function BlogCategory() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Get category content
-  const content = category ? categoryContent[category] : null;
+  // The registry decides whether the slug is a category at all; the Record then
+  // always has copy for it, because it is typed against the same slugs.
+  const definition = categoryBySlug(category);
+  const content = definition ? categoryContent[definition.slug] : null;
 
   // Fetch articles for this category
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ['category-articles', category],
     queryFn: async () => {
-      if (!category) return [];
-
-      // Convert URL slug back to category name
-      const categoryName = category
-        .split('-')
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+      // The stored category name comes from the registry rather than from
+      // title-casing the slug, which only round-tripped because all eight
+      // happen to be plain words.
+      const categoryName = categoryBySlug(category)?.name;
+      if (!categoryName) return [];
 
       const { data, error } = await supabase
         .from('articles')
         .select('*')
         .eq('status', 'published')
-        .ilike('category', `%${categoryName}%`)
+        .eq('category', categoryName)
         .order('published_at', { ascending: false });
 
       if (error) throw error;

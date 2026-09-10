@@ -2640,11 +2640,12 @@
         "A category present on a published article but absent from BlogCategory's map does not fail the build",
         "The behaviour is decided deliberately: either the category page renders generic-but-real content from the articles themselves, or the route is not generated at all and the articles still appear under /blog",
         "Whichever is chosen, a test covers an article with an unknown category",
-        "If a route is skipped, it is skipped in sitemap generation too \u2014 no URL is advertised for a page that does not exist"
+        "If a route is skipped, it is skipped in sitemap generation too \u2014 no URL is advertised for a page that does not exist",
+        "A prerendered /blog/category/{slug} page lists only articles in that category"
       ],
       "priority": "high",
-      "passes": false,
-      "notes": "Found 2026-09-10 during the SEO loop (US-165 iteration 1), by giving the offline article snapshot two categories that were not in the map and watching the build refuse to write all 57 files. Do not 'fix' this by widening the hardcoded map \u2014 the next unlisted category breaks it again. The two sources of truth are categorySlugs() and categoryContent; one of them has to stop being authoritative."
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 2 of the SEO loop. The two sources of truth are now one: src/config/blog-categories.ts, plain data with no React import so scripts/lib/articles.mts can read it from node. categorySlugs() returns only categories that have a page AND a published article, plus an `unlisted` list the prerender prints \u2014 loud, not fatal, and not silent either. categoryContent in BlogCategory.tsx is now Record<BlogCategorySlug, ...>, so the other direction of drift (a registry entry with no copy written for it) is a tsc error in the file that has to supply it. Two further defects were found and fixed in the same pass: the prerender's articles intercept ignored the category filter, so every prerendered category page listed every published article regardless of category (verified against a real dist before and after); and an article's category was a bare badge, so nothing led from a post to the other posts on its topic \u2014 it links now, and only when the category actually has a page."
     },
     {
       "id": "US-167",

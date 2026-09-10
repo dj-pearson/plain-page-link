@@ -256,6 +256,23 @@ async function interceptArticles(context: BrowserContext, articles: Article[]): 
       rows = rows.filter((a) => a.slug === wanted);
     }
 
+    // BlogCategory filters on category. The intercept used to ignore this
+    // parameter entirely, so every prerendered /blog/category/{slug} page
+    // listed EVERY published article regardless of category — and the
+    // prerendered HTML is the only version a first crawl sees (US-166).
+    const category = url.searchParams.get('category');
+    if (category) {
+      const matches = (value: string | null, test: (stored: string) => boolean) =>
+        (rows = rows.filter((a) => (a.category ? test(a.category) : false)));
+      if (category.startsWith('eq.')) {
+        const wanted = decodeURIComponent(category.slice(3));
+        matches(wanted, (stored) => stored === wanted);
+      } else if (category.startsWith('ilike.')) {
+        const pattern = decodeURIComponent(category.slice(6)).replace(/^%|%$/g, '').toLowerCase();
+        matches(pattern, (stored) => stored.toLowerCase().includes(pattern));
+      }
+    }
+
     const order = url.searchParams.get('order');
     if (order?.startsWith('published_at.')) {
       const dir = order.endsWith('.asc') ? 1 : -1;
@@ -525,11 +542,28 @@ async function main() {
   } else {
     const loaded = await loadArticles();
     articles = loaded.articles;
+    const categories = categorySlugs(articles);
     blog = blogRoutes(
       articles.map((a) => a.slug),
-      categorySlugs(articles)
+      categories.slugs
     );
     console.log(`[prerender] ${articles.length} published articles (from ${loaded.source})`);
+
+    // Not fatal, and not silent. A category with no landing page is a category
+    // whose articles are reachable only through /blog and the article's own
+    // URL. Before US-166 this was fatal — and fatal for the entire build, with
+    // a message about titles rather than about categories.
+    if (categories.unlisted.length > 0) {
+      const summary = categories.unlisted
+        .map((c) => `${c.name} (${c.articles} article${c.articles === 1 ? '' : 's'})`)
+        .join(', ');
+      console.warn(
+        `[prerender] ${categories.unlisted.length} category value(s) have no landing page: ${summary}.\n` +
+          '            Those articles still ship; they just have no category page.\n' +
+          '            Add the category to src/config/blog-categories.ts (and its copy to\n' +
+          '            categoryContent in src/pages/BlogCategory.tsx), or recategorise them.'
+      );
+    }
   }
 
   const routes = allPrerenderRoutes(blog);

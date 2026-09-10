@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { BLOG_CATEGORIES } from '@/config/blog-categories';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -36,16 +37,12 @@ export default function Blog() {
     },
   });
 
+  // The filter list and the category pages read the same registry (US-166).
+  // This was a second hardcoded copy of it, in agreement with BlogCategory's by
+  // coincidence rather than by construction.
   const categories = [
     { name: 'all', slug: 'all', label: 'All Articles' },
-    { name: 'Real Estate Tips', slug: 'real-estate-tips', label: 'Real Estate Tips' },
-    { name: 'Market Insights', slug: 'market-insights', label: 'Market Insights' },
-    { name: 'Buying Guide', slug: 'buying-guide', label: 'Buying Guide' },
-    { name: 'Selling Guide', slug: 'selling-guide', label: 'Selling Guide' },
-    { name: 'Investment', slug: 'investment', label: 'Investment' },
-    { name: 'Neighborhood Guides', slug: 'neighborhood-guides', label: 'Neighborhood Guides' },
-    { name: 'Home Improvement', slug: 'home-improvement', label: 'Home Improvement' },
-    { name: 'General', slug: 'general', label: 'General' },
+    ...BLOG_CATEGORIES.map((c) => ({ name: c.name, slug: c.slug, label: c.label })),
   ];
 
   const filteredArticles = articles.filter((article) => {
