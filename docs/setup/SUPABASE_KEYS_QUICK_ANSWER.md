@@ -155,7 +155,7 @@ curl https://functions.agentbio.net/health
 ## Files Created for You
 
 1. **`generate-supabase-keys.js`** - Script to generate new keys
-2. **`SUPABASE_KEYS_GUIDE.md`** - Complete documentation
+2. **`docs/setup/SUPABASE_KEYS_GUIDE.md`** - Complete documentation
 
 ---
 
@@ -201,4 +201,4 @@ $ node generate-supabase-keys.js "your-current-jwt-secret"
 
 **Your current keys are valid and working. Only regenerate if you have a security concern!**
 
-For questions, see `SUPABASE_KEYS_GUIDE.md` for the full documentation.
+For questions, see `docs/setup/SUPABASE_KEYS_GUIDE.md` for the full documentation.

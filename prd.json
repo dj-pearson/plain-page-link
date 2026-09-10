@@ -2714,8 +2714,8 @@
         "npm run test:run is green"
       ],
       "priority": "medium",
-      "passes": false,
-      "notes": "Noticed 2026-09-10 during the SEO loop (US-165 iteration 1) — the two failures are pre-existing and unrelated to that change. Deleting the files is not the fix unless their content is genuinely duplicated under docs/; check first."
+      "passes": true,
+      "notes": "Done in iteration 4 of the platform-improvement loop. npm run test:run is green: 87 files, 792 passing. The third acceptance criterion earned its place — SUPABASE_KEYS_GUIDE.md printed both live key values, service_role included, under the caption 'These are valid and working'. Redacted in the working tree, but the value is in history at 908a2c1 in a public repository, so ROTATION IS REQUIRED and is the owner's call: see US-191."
     },
     {
       "id": "US-171",
@@ -2994,17 +2994,19 @@
       "notes": "Done in iteration 3. describeLeadOrigin() reports what the lead recorded and says 'Not recorded' for leads captured before US-188 rather than crediting them to Direct. The analytics breakdown groups the page of leads the hook already fetches, so it adds no query."
     },
     {
-      "id": "US-190",
-      "title": "The repo-hygiene test has been failing",
-      "description": "As a developer, I need `npm run test:run` to be green so that a new failure is visible, rather than hidden among failures everyone has learned to ignore.",
+      "id": "US-191",
+      "title": "Rotate the service_role key that was committed in 908a2c1",
+      "description": "As the owner of this platform, I need the self-hosted Supabase JWT secret regenerated, because a service_role key — which bypasses every RLS policy on all 134 tables — was committed to a public repository and removing it from the working tree does not remove it from history.",
       "acceptanceCriteria": [
-        "src/repo-hygiene.test.ts passes: the loose .ps1/.sh scripts in the repository root move under scripts/, and the stray root markdown files move under docs/ per the US-121 layout",
-        "Every moved script's references (docs, package.json, CI workflows) are updated to the new path",
-        "npm run test:run is green end to end"
+        "The JWT secret on the self-hosted Supabase instance is regenerated, invalidating both the anon and service_role keys published in 908a2c1",
+        "The new keys are set in Coolify environment variables, GitHub Actions secrets and every .env.local; nothing is pasted into a document",
+        "Edge functions and the frontend are redeployed against the new keys and verified working",
+        "GitHub secret scanning is run over the repository (mcp__github__run_secret_scanning) and any further finding is triaged",
+        "Decide whether to purge 908a2c1 from history; note that rotation makes the published value worthless either way, and rewriting public history breaks every existing clone"
       ],
       "priority": 1,
       "passes": false,
-      "notes": "NEXT ITERATION. Verified failing at HEAD before any of this loop's changes: 2 failed | 790 passed. The offenders are deploy-migrations-ssh.ps1, migrate-from-container.sh, migrate-to-coolify.ps1, migrate-to-coolify.sh, migrate-via-files.ps1, test-db-connection.ps1 and four root .md files that US-121 said belong under docs/."
+      "notes": "OWNER'S CALL — NOT AN AGENT TASK. Found in iteration 4 while carrying out US-170's third acceptance criterion. The key value is deliberately not recorded here or in any commit message; it is at docs/setup/SUPABASE_KEYS_GUIDE.md as of commit 908a2c1. A repository-wide scan after redaction found no remaining service_role JWT in the working tree; the anon keys still present in docs/setup/AUTH_SETUP_DOCUMENTATION.md, docs/deploy/COOLIFY_EDGE_FUNCTIONS_SETUP.md and docs/deploy/SSL_MIGRATION_COMPLETE.md are public by design (the anon key ships in the frontend bundle) but will also be invalidated by the rotation and should be replaced with references, not values."
     }
   ]
 }

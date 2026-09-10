@@ -21,7 +21,7 @@
 
 ### Method 1: Direct PowerShell Script (Recommended for Windows)
 
-1. **Update connection details** in `migrate-to-coolify.ps1`:
+1. **Update connection details** in `scripts/migration/migrate-to-coolify.ps1`:
    ```powershell
    $DB_HOST = "your-coolify-host"      # e.g., "192.168.1.100" or "supabase.yourdomain.com"
    $DB_PORT = "5432"
@@ -32,7 +32,7 @@
 
 2. **Run the migration script**:
    ```powershell
-   .\migrate-to-coolify.ps1
+   .\scripts\migration\migrate-to-coolify.ps1
    ```
 
 ### Method 2: Manual Migration via psql
