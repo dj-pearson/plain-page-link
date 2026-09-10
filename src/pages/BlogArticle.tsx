@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Calendar, Eye, ArrowLeft, Clock, User } from 'lucide-react';
 import { ArticleSEO } from '@/components/blog/ArticleSEO';
 import { SimilarArticles } from '@/components/blog/SimilarArticles';
-import { Breadcrumbs } from '@/components/blog/Breadcrumbs';
+import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import ReactMarkdown from 'react-markdown';
@@ -124,7 +124,13 @@ export default function BlogArticle() {
             itemType="https://schema.org/BlogPosting"
           >
             {/* Breadcrumbs */}
-            <Breadcrumbs items={[{ label: 'Blog', href: '/blog' }, { label: article.title }]} />
+            <Breadcrumb
+              className="mb-6"
+              trail={[
+                { name: 'Blog', path: '/blog' },
+                { name: article.title, path: `/blog/${article.slug}` },
+              ]}
+            />
 
             {/* Featured Image */}
             {article.featured_image_url && (

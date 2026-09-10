@@ -12,11 +12,7 @@ import { BeforeAfterComparison } from '@/components/landing/BeforeAfterCompariso
 import { DemoProfilesShowcase } from '@/components/landing/DemoProfilesShowcase';
 import { AgentTestimonials } from '@/components/landing/AgentTestimonials';
 import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
-import {
-  generateBreadcrumbSchema,
-  generateEnhancedLocalBusinessSchema,
-  generateEnhancedOrganizationSchema,
-} from '@/lib/seo';
+import { generateEnhancedLocalBusinessSchema, generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getSafeOrigin } from '@/lib/utils';
 
 // Lazy load BlogSection since it's below the fold and requires Supabase
@@ -82,9 +78,6 @@ export default function Landing() {
   // Safe origin for SSR/crawler compatibility
   const origin = getSafeOrigin();
 
-  // Generate breadcrumb schema for homepage
-  const breadcrumbSchema = generateBreadcrumbSchema([{ name: 'Home', url: origin }]);
-
   // Generate enhanced organization schema with social signals
   const organizationSchema = generateEnhancedOrganizationSchema();
 
@@ -149,8 +142,8 @@ export default function Landing() {
         // structured-data policy violation on top of it. Reinstate it
         // only from real review data.
       },
-      // Add BreadcrumbList schema
-      breadcrumbSchema,
+      // No BreadcrumbList. The homepage is the root of every trail, so a
+      // one-item list naming only itself says nothing (US-165).
       // Add ProfessionalService/LocalBusiness schema for local SEO
       localBusinessSchema,
       {

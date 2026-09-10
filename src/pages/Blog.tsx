@@ -16,7 +16,7 @@ import {
 import { BlogListSEO } from '@/components/blog/BlogListSEO';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { Breadcrumb } from '@/components/seo/Breadcrumb';
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,7 +87,7 @@ export default function Blog() {
               <div className="max-w-3xl">
                 {/* Breadcrumbs */}
                 <div className="mb-4">
-                  <Breadcrumbs items={[{ name: 'Blog', href: '/blog' }]} />
+                  <Breadcrumb trail={[{ name: 'Blog', path: '/blog' }]} />
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">

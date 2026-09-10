@@ -1,98 +1,99 @@
-import { Link } from "react-router-dom";
-import { ChevronRight, Home } from "lucide-react";
-import { Helmet } from "react-helmet-async";
-import { generateBreadcrumbSchema, BreadcrumbItem } from "@/lib/seo";
+import { Link } from 'react-router-dom';
+import { ChevronRight, Home } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
-interface BreadcrumbProps {
-  items: BreadcrumbItem[];
-  className?: string;
-  showHome?: boolean;
-}
+import { getCanonicalUrl } from '@/config/seo.config';
 
 /**
- * Breadcrumb Component - SEO-optimized breadcrumb navigation
+ * The one breadcrumb on the site, visible and structured, from one source
+ * (US-165).
  *
- * Features:
- * - Visual breadcrumb navigation for better UX
- * - BreadcrumbList structured data for Google rich snippets
- * - Helps search engines understand site hierarchy
- * - Mobile responsive design
+ * There were three components and eleven places building a BreadcrumbList, and
+ * every page that showed a trail shipped two or three of them. /press had
+ * three: one in its JSON-LD @graph, and the old seo/Breadcrumb emitted both a
+ * JSON-LD block and a microdata copy of the same list. Blog articles had two,
+ * from ArticleSEO and from blog/Breadcrumbs. Google does not merge competing
+ * BreadcrumbLists — it picks one, and which one is not worth finding out.
  *
- * @example
- * <Breadcrumb
- *   items={[
- *     { name: "Home", url: "/" },
- *     { name: "Features", url: "/features" },
- *     { name: "Lead Capture", url: "/features/lead-capture" }
- *   ]}
- * />
+ * The rule this component enforces by construction: a page that renders a
+ * visible trail emits exactly one BreadcrumbList, and that list is generated
+ * from the same array the nav renders, so the markup cannot drift from what a
+ * visitor sees. Pages with no visible trail (the Vs/* comparisons, Landing)
+ * keep theirs in their own @graph; nothing here competes with those.
+ *
+ * Callers pass the crumbs BELOW home, as site-relative paths:
+ *
+ *   <Breadcrumb trail={[{ name: 'Blog', path: '/blog' }, { name: title, path: `/blog/${slug}` }]} />
+ *
+ * Two things the old call sites got wrong, which the shape now prevents:
+ *
+ *   - Home was prepended by the caller, sometimes as `window.location.origin`
+ *     and sometimes as a path, so the JSON-LD mixed absolute and relative
+ *     `item` values. Home is prepended here, once, and every `item` is made
+ *     absolute through getCanonicalUrl.
+ *   - Crumbs pointed at pages that do not exist. /features and /tools have no
+ *     route in App.tsx, so "Features" pointed at /features/property-listings
+ *     and "Free Tools" at /tools/instagram-bio-analyzer — on the Instagram Bio
+ *     Analyzer page itself, giving a trail whose parent was the page. `path` is
+ *     required precisely so that a crumb has to name a real destination; a
+ *     level with no page is not a crumb.
  */
-export const Breadcrumb = ({
-  items,
-  className = "",
-  showHome = true
-}: BreadcrumbProps) => {
-  // Generate structured data for SEO
-  const breadcrumbSchema = generateBreadcrumbSchema(items);
+export interface BreadcrumbCrumb {
+  /** Shown to the visitor and used as the ListItem name. */
+  name: string;
+  /** Site-relative path of a real route, e.g. '/blog'. */
+  path: string;
+}
 
-  // Ensure home is included if showHome is true
-  const breadcrumbItems = showHome && items[0]?.name !== "Home"
-    ? [{ name: "Home", url: window.location.origin }, ...items]
-    : items;
+interface BreadcrumbProps {
+  /** The crumbs below Home, in order. The last one is the current page. */
+  trail: BreadcrumbCrumb[];
+  className?: string;
+}
+
+export const Breadcrumb = ({ trail, className = '' }: BreadcrumbProps) => {
+  const crumbs: BreadcrumbCrumb[] = [{ name: 'Home', path: '/' }, ...trail];
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: crumbs.map((crumb, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: crumb.name,
+      item: getCanonicalUrl(crumb.path),
+    })),
+  };
 
   return (
     <>
-      {/* Structured Data for SEO */}
       <Helmet>
-        <script type="application/ld+json">
-          {JSON.stringify(breadcrumbSchema)}
-        </script>
+        <script type="application/ld+json">{JSON.stringify(schema)}</script>
       </Helmet>
 
-      {/* Visual Breadcrumb Navigation */}
-      <nav
-        aria-label="Breadcrumb"
-        className={`flex items-center space-x-2 text-sm ${className}`}
-      >
-        <ol className="flex items-center space-x-2" itemScope itemType="https://schema.org/BreadcrumbList">
-          {breadcrumbItems.map((item, index) => {
-            const isLast = index === breadcrumbItems.length - 1;
-            const isHome = item.name === "Home";
+      <nav aria-label="Breadcrumb" className={className}>
+        <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          {crumbs.map((crumb, index) => {
+            const isLast = index === crumbs.length - 1;
+            const isHome = index === 0;
 
             return (
-              <li
-                key={item.url}
-                className="flex items-center space-x-2"
-                itemProp="itemListElement"
-                itemScope
-                itemType="https://schema.org/ListItem"
-              >
-                {/* Breadcrumb Link */}
+              <li key={crumb.path} className="flex items-center gap-x-2">
+                {index > 0 && (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                )}
                 {isLast ? (
-                  <span
-                    className="text-gray-600 dark:text-gray-400 font-medium"
-                    itemProp="name"
-                    aria-current="page"
-                  >
-                    {item.name}
+                  <span className="font-medium text-foreground" aria-current="page">
+                    {crumb.name}
                   </span>
                 ) : (
                   <Link
-                    to={isHome ? "/" : item.url}
-                    className="text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-                    itemProp="item"
+                    to={crumb.path}
+                    className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {isHome && <Home className="w-4 h-4" />}
-                    <span itemProp="name">{item.name}</span>
+                    {isHome && <Home className="h-4 w-4" aria-hidden="true" />}
+                    {crumb.name}
                   </Link>
-                )}
-
-                {/* Hidden metadata for structured data */}
-                <meta itemProp="position" content={String(index + 1)} />
-
-                {/* Separator */}
-                {!isLast && (
-                  <ChevronRight className="w-4 h-4 text-gray-400" aria-hidden="true" />
                 )}
               </li>
             );

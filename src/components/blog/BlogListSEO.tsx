@@ -66,26 +66,8 @@ export function BlogListSEO({ latestArticleDate }: BlogListSEOProps) {
     },
   };
 
-  // Breadcrumb list for blog homepage
-  const breadcrumbStructuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: siteUrl,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'Blog',
-        item: blogUrl,
-      },
-    ],
-  };
-
+  // No BreadcrumbList here. Blog.tsx renders <Breadcrumb>, which emits the one
+  // this page has (US-165).
   return (
     <Helmet>
       {/* Basic Meta Tags */}
@@ -135,7 +117,6 @@ export function BlogListSEO({ latestArticleDate }: BlogListSEOProps) {
       <script type="application/ld+json">{JSON.stringify(blogStructuredData)}</script>
       <script type="application/ld+json">{JSON.stringify(organizationStructuredData)}</script>
       <script type="application/ld+json">{JSON.stringify(websiteStructuredData)}</script>
-      <script type="application/ld+json">{JSON.stringify(breadcrumbStructuredData)}</script>
     </Helmet>
   );
 }

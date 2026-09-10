@@ -18,7 +18,7 @@ import { Search, Calendar, Eye, ArrowLeft } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { Breadcrumb } from '@/components/seo/Breadcrumb';
 
 // Category content configuration
 const categoryContent: Record<
@@ -402,29 +402,9 @@ export default function BlogCategory() {
           name: content.title,
         },
       },
-      {
-        '@type': 'BreadcrumbList',
-        itemListElement: [
-          {
-            '@type': 'ListItem',
-            position: 1,
-            name: 'Home',
-            item: 'https://agentbio.net',
-          },
-          {
-            '@type': 'ListItem',
-            position: 2,
-            name: 'Blog',
-            item: 'https://agentbio.net/blog',
-          },
-          {
-            '@type': 'ListItem',
-            position: 3,
-            name: content.title,
-            item: `https://agentbio.net/blog/category/${category}`,
-          },
-        ],
-      },
+      // BreadcrumbList lives in <Breadcrumb>, which renders the visible trail
+      // this page shows. Two competing BreadcrumbLists on one page is what
+      // US-165 removed.
       {
         '@type': 'FAQPage',
         mainEntity: content.faqs.map((faq) => ({
@@ -459,10 +439,10 @@ export default function BlogCategory() {
               <div className="max-w-3xl">
                 {/* Breadcrumbs */}
                 <div className="mb-4">
-                  <Breadcrumbs
-                    items={[
-                      { name: 'Blog', href: '/blog' },
-                      { name: content.title, href: `/blog/category/${category}` },
+                  <Breadcrumb
+                    trail={[
+                      { name: 'Blog', path: '/blog' },
+                      { name: content.title, path: `/blog/category/${category}` },
                     ]}
                   />
                 </div>

@@ -10,7 +10,13 @@
  * gate has stopped being worth running.
  */
 import { describe, expect, it } from 'vitest';
-import { auditPages, readCanonical, readDescription, readTitle } from './seo-audit.mjs';
+import {
+  auditBreadcrumbs,
+  auditPages,
+  readCanonical,
+  readDescription,
+  readTitle,
+} from './seo-audit.mjs';
 
 const ORIGIN = 'https://agentbio.net';
 
@@ -137,6 +143,137 @@ describe('seo-audit', () => {
         .replace(/<link data-rh="true" rel="canonical"[^>]*>/, '')
         .replace('</head>', '<meta name="robots" content="noindex, follow" /></head>');
       expect(auditPages([page], { origin: ORIGIN })).toEqual([]);
+    });
+  });
+
+  /**
+   * US-165. The shapes below are what the site shipped, copied from the built
+   * pages rather than invented: /press with three BreadcrumbLists, the
+   * Instagram Bio Analyzer with a trail whose parent was itself, and the Lead
+   * Capture page with a "Features" crumb pointing at a page that has no route.
+   * If a change to this module lets any of them through, the guard has stopped
+   * being worth running.
+   */
+  describe('breadcrumbs', () => {
+    const ROUTES = new Set([
+      '/',
+      '/blog',
+      '/press',
+      '/features/lead-capture',
+      '/tools/instagram-bio-analyzer',
+    ]);
+    const opts = { base: ORIGIN, knownRoutes: ROUTES };
+
+    const ld = (obj: unknown) =>
+      `<script type="application/ld+json">${JSON.stringify(obj)}</script>`;
+
+    const trail = (crumbs: [string, string][]) => ({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: crumbs.map(([name, path], i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name,
+        item: path === '/' ? ORIGIN : `${ORIGIN}${path}`,
+      })),
+    });
+
+    const problemsFor = (route: string, html: string) =>
+      auditBreadcrumbs(route, html, opts).map((p) => p.problem);
+
+    it('accepts a single well-formed trail', () => {
+      const html = ld(
+        trail([
+          ['Home', '/'],
+          ['Press', '/press'],
+        ])
+      );
+      expect(problemsFor('/press', html)).toEqual([]);
+    });
+
+    it('accepts a page with no breadcrumbs at all', () => {
+      expect(problemsFor('/', '<html><body>nothing</body></html>')).toEqual([]);
+    });
+
+    it("rejects /press's three copies", () => {
+      const one = trail([
+        ['Home', '/'],
+        ['Press', '/press'],
+      ]);
+      const html =
+        ld({ '@context': 'https://schema.org', '@graph': [one] }) +
+        ld(one) +
+        '<ol itemscope itemtype="https://schema.org/BreadcrumbList"></ol>';
+      expect(problemsFor('/press', html).some((p) => p.includes('3 BreadcrumbLists'))).toBe(true);
+    });
+
+    it('rejects a trail whose parent is the page itself', () => {
+      const html = ld(
+        trail([
+          ['Home', '/'],
+          ['Free Tools', '/tools/instagram-bio-analyzer'],
+          ['Instagram Bio Analyzer', '/tools/instagram-bio-analyzer'],
+        ])
+      );
+      expect(
+        problemsFor('/tools/instagram-bio-analyzer', html).some((p) => p.includes('twice'))
+      ).toBe(true);
+    });
+
+    it('rejects a crumb pointing at a page the build never rendered', () => {
+      const html = ld(
+        trail([
+          ['Home', '/'],
+          ['Features', '/features/property-listings'],
+          ['Lead Capture', '/features/lead-capture'],
+        ])
+      );
+      expect(
+        problemsFor('/features/lead-capture', html).some((p) =>
+          p.includes('which the build did not render')
+        )
+      ).toBe(true);
+    });
+
+    it('rejects a relative item URL', () => {
+      const html = ld({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: ORIGIN },
+          { '@type': 'ListItem', position: 2, name: 'Press', item: '/press' },
+        ],
+      });
+      expect(problemsFor('/press', html).some((p) => p.includes('not an absolute URL'))).toBe(true);
+    });
+
+    it("rejects the homepage's one-item list", () => {
+      const html = ld(trail([['Home', '/']]));
+      expect(problemsFor('/', html).some((p) => p.includes('names only itself'))).toBe(true);
+    });
+
+    it('rejects a trail that does not end at the page it is on', () => {
+      const html = ld(
+        trail([
+          ['Home', '/'],
+          ['Blog', '/blog'],
+        ])
+      );
+      expect(problemsFor('/press', html).some((p) => p.includes('not at the page itself'))).toBe(
+        true
+      );
+    });
+
+    it('rejects out-of-order positions', () => {
+      const html = ld({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 2, name: 'Home', item: ORIGIN },
+          { '@type': 'ListItem', position: 1, name: 'Press', item: `${ORIGIN}/press` },
+        ],
+      });
+      expect(problemsFor('/press', html).some((p) => p.includes('has position'))).toBe(true);
     });
   });
 

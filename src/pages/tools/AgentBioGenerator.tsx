@@ -144,13 +144,7 @@ export default function AgentBioGenerator() {
       <main id="main-content" className="min-h-screen bg-slate-50" tabIndex={-1}>
         <div className="border-b border-slate-200 bg-white py-3">
           <div className="container mx-auto px-4">
-            <Breadcrumb
-              items={[
-                { name: 'Home', url: getCanonicalUrl('/') },
-                { name: 'Free Tools', url: getCanonicalUrl('/tools/instagram-bio-analyzer') },
-                { name: 'Agent Bio Generator', url: CANONICAL },
-              ]}
-            />
+            <Breadcrumb trail={[{ name: 'Agent Bio Generator', path: PATH }]} />
           </div>
         </div>
 

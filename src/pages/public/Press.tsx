@@ -94,13 +94,8 @@ export default function Press() {
         description:
           'Product facts, logos and positioning for anyone writing about AgentBio: what it does, who it is for, and what it costs.',
       },
-      {
-        '@type': 'BreadcrumbList',
-        itemListElement: [
-          { '@type': 'ListItem', position: 1, name: 'Home', item: getCanonicalUrl('/') },
-          { '@type': 'ListItem', position: 2, name: 'Press', item: CANONICAL },
-        ],
-      },
+      // BreadcrumbList lives in <Breadcrumb>, which renders the visible trail
+      // this page shows. /press shipped three copies of it before US-165.
       faqPageSchema(FAQ_ENTRIES),
     ],
   };
@@ -131,12 +126,7 @@ export default function Press() {
 
         <div className="border-b border-border bg-card py-3">
           <div className="container mx-auto px-4">
-            <Breadcrumb
-              items={[
-                { name: 'Home', url: getCanonicalUrl('/') },
-                { name: 'Press', url: CANONICAL },
-              ]}
-            />
+            <Breadcrumb trail={[{ name: 'Press', path: PATH }]} />
           </div>
         </div>
 

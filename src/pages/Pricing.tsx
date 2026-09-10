@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 
 export default function Pricing() {
@@ -113,24 +113,9 @@ export default function Pricing() {
             '@id': `${baseUrl}/#website`,
           },
         },
-        // BreadcrumbList
-        {
-          '@type': 'BreadcrumbList',
-          itemListElement: [
-            {
-              '@type': 'ListItem',
-              position: 1,
-              name: 'Home',
-              item: baseUrl,
-            },
-            {
-              '@type': 'ListItem',
-              position: 2,
-              name: 'Pricing',
-              item: `${baseUrl}/pricing`,
-            },
-          ],
-        },
+        // BreadcrumbList lives in <Breadcrumb>, which renders the visible trail
+        // this page shows. Two competing BreadcrumbLists on one page is what
+        // US-165 removed.
         // FAQPage for common pricing questions
         {
           '@type': 'FAQPage',
@@ -244,7 +229,7 @@ export default function Pricing() {
             <div className="max-w-7xl mx-auto">
               {/* Breadcrumbs */}
               <div className="mb-8">
-                <Breadcrumbs items={[{ name: 'Pricing', href: '/pricing' }]} />
+                <Breadcrumb trail={[{ name: 'Pricing', path: '/pricing' }]} />
               </div>
 
               <div className="text-center mb-12">

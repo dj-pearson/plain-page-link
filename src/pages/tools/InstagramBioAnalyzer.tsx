@@ -278,13 +278,7 @@ export default function InstagramBioAnalyzer() {
         {/* Breadcrumb Navigation */}
         <div className="bg-white/80 border-b border-gray-200 py-3">
           <div className="container mx-auto px-4">
-            <Breadcrumb
-              items={[
-                { name: "Home", url: window.location.origin },
-                { name: "Free Tools", url: "/tools/instagram-bio-analyzer" },
-                { name: "Instagram Bio Analyzer", url: "/tools/instagram-bio-analyzer" }
-              ]}
-            />
+            <Breadcrumb trail={[{ name: 'Instagram Bio Analyzer', path: '/tools/instagram-bio-analyzer' }]} />
           </div>
         </div>
 

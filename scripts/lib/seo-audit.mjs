@@ -182,6 +182,99 @@ export function auditStructuredData(route, html) {
   return problems.map((problem) => ({ route, problem }));
 }
 
+/**
+ * Breadcrumb rules, checked against the built HTML (US-165).
+ *
+ * The defect: eleven places in src/ built a BreadcrumbList, across three
+ * breadcrumb components, and every page that showed a trail shipped two or
+ * three competing copies. /press had three — one in its @graph, and the old
+ * seo/Breadcrumb emitted a JSON-LD block and a microdata copy of the same
+ * list. Two of the trails were not valid trails at all: "Features" pointed at
+ * /features/property-listings and "Free Tools" at /tools/instagram-bio-analyzer
+ * — the latter on the Instagram Bio Analyzer page itself, so its own parent was
+ * itself. /features and /tools have no route in App.tsx.
+ *
+ * None of that is visible in the components; it is only visible in the built
+ * page, where the copies land together. So it is checked here.
+ *
+ * `knownRoutes` is the set of routes the build actually rendered. A crumb
+ * pointing outside it is pointing at a page that does not exist — the same
+ * class of defect US-149 removed from the sitemap.
+ */
+export function auditBreadcrumbs(route, html, { base, knownRoutes }) {
+  const problems = [];
+  const { blocks } = readJsonLd(html);
+
+  const lists = [];
+  for (const block of blocks) {
+    walkJsonLd(block, (node) => {
+      if (node['@type'] === 'BreadcrumbList') lists.push(node);
+    });
+  }
+  const microdata = (
+    html.match(/itemtype="https?:\/\/schema\.org\/BreadcrumbList"/gi) || []
+  ).length;
+
+  const total = lists.length + microdata;
+  if (total > 1) {
+    problems.push(
+      `${total} BreadcrumbLists on one page (${lists.length} JSON-LD, ${microdata} microdata); ` +
+        'a page has one trail'
+    );
+  }
+  if (total === 0) return problems.map((problem) => ({ route, problem }));
+
+  for (const list of lists) {
+    const items = Array.isArray(list.itemListElement) ? list.itemListElement : [];
+    if (items.length < 2) {
+      problems.push(`BreadcrumbList has ${items.length} item(s); a trail of one names only itself`);
+      continue;
+    }
+
+    const seen = new Set();
+    items.forEach((entry, index) => {
+      const position = entry && entry.position;
+      if (position !== index + 1) {
+        problems.push(`BreadcrumbList item ${index + 1} has position ${JSON.stringify(position)}`);
+      }
+
+      const url = typeof entry?.item === 'string' ? entry.item : entry?.item?.['@id'];
+      if (typeof url !== 'string' || !url) {
+        problems.push(`BreadcrumbList item ${index + 1} (${entry?.name}) has no item URL`);
+        return;
+      }
+      if (!url.startsWith(`${base}/`) && url !== base) {
+        problems.push(
+          `BreadcrumbList item ${index + 1} is ${JSON.stringify(url)}, not an absolute URL on ${base}`
+        );
+        return;
+      }
+      if (seen.has(url)) {
+        problems.push(`BreadcrumbList lists ${JSON.stringify(url)} twice; a trail cannot revisit a page`);
+      }
+      seen.add(url);
+
+      const path = url.slice(base.length).replace(/\/$/, '') || '/';
+      if (knownRoutes && !knownRoutes.has(path)) {
+        problems.push(
+          `BreadcrumbList item ${index + 1} points at ${JSON.stringify(path)}, which the build did not render`
+        );
+      }
+    });
+
+    const last = items[items.length - 1];
+    const lastUrl = typeof last?.item === 'string' ? last.item : last?.item?.['@id'];
+    const self = route === '/' ? base : `${base}${route}`;
+    if (typeof lastUrl === 'string' && lastUrl.replace(/\/$/, '') !== self.replace(/\/$/, '')) {
+      problems.push(
+        `BreadcrumbList ends at ${JSON.stringify(lastUrl)}, not at the page itself (${self})`
+      );
+    }
+  }
+
+  return problems.map((problem) => ({ route, problem }));
+}
+
 export function auditPages(pages, { origin }) {
   const problems = [];
   const add = (route, problem) => problems.push({ route, problem });
@@ -192,6 +285,9 @@ export function auditPages(pages, { origin }) {
 
   const titlesSeen = new Map();
   const descriptionsSeen = new Map();
+
+  /** Every route the build rendered, so a crumb cannot point at a page that is not there. */
+  const knownRoutes = new Set(pages.map((p) => p.route.replace(/\/$/, '') || '/'));
 
   for (const { route, html } of pages) {
     const isHome = route === '/';
@@ -265,6 +361,9 @@ export function auditPages(pages, { origin }) {
 
     // --- structured data (US-157) ----------------------------------------
     problems.push(...auditStructuredData(route, html));
+
+    // --- breadcrumbs (US-165) --------------------------------------------
+    problems.push(...auditBreadcrumbs(route, html, { base, knownRoutes }));
   }
 
   return problems;

@@ -2046,3 +2046,91 @@ declared twice.
 RUNNING TOTAL for a first-time visitor to any public page, across iterations
 1-4: 17 MB of source maps off the deploy, 800 KB of Three.js and 394 KB of
 recharts off the critical path.
+
+================================================================================
+SEO LOOP — ITERATION 1 of 15 · US-165 · 2026-09-10
+One breadcrumb, not three
+================================================================================
+
+THE DEFECT. Eleven places in src/ built a BreadcrumbList, across three separate
+breadcrumb components with three different item shapes — {name,href} in
+components/Breadcrumbs.tsx, {label,href} in components/blog/Breadcrumbs.tsx,
+{name,url} in components/seo/Breadcrumb.tsx. Every page that rendered a visible
+trail therefore shipped more than one of them, measured on the built bundle:
+
+  /press                            3  (2 JSON-LD + 1 microdata)
+  /for/miami-real-estate-agents     3  (2 JSON-LD + 1 microdata)
+  /pricing                          2
+  /blog                             2
+  /features/lead-capture            2  (1 JSON-LD + 1 microdata)
+  /tools/instagram-bio-analyzer     2  (1 JSON-LD + 1 microdata)
+  /tools/real-estate-agent-...      2  (1 JSON-LD + 1 microdata)
+  /                                 1, containing only "Home"
+
+seo/Breadcrumb was emitting a JSON-LD block AND a microdata copy of the same
+list, so it produced two on its own; pages that also carried one in their
+@graph got three. Google does not merge competing BreadcrumbLists — it picks
+one, and nothing in the source decides which.
+
+Two of those trails were not trails. /features and /tools have no route in
+App.tsx, which prerender-routes.ts already says in a comment and US-149 already
+removed from the sitemap. So the Lead Capture page's middle crumb "Features"
+pointed at /features/property-listings — a sibling — and the Instagram Bio
+Analyzer's "Free Tools" crumb pointed at /tools/instagram-bio-analyzer, the page
+itself, making its own parent itself. Both pages also emitted relative `item`
+URLs, because generateBreadcrumbSchema copies whatever the caller passes and
+those callers passed paths.
+
+THE FIX. One component, src/components/seo/Breadcrumb.tsx. It takes the crumbs
+BELOW home as site-relative paths, prepends Home itself, makes every URL
+absolute through getCanonicalUrl, and generates the JSON-LD from the same array
+the nav renders — so the markup cannot drift from what a visitor sees. It emits
+JSON-LD only; the microdata copy is gone. The other two components are deleted,
+their nine call sites migrated. Pages that render it dropped the BreadcrumbList
+from their own @graph (Pricing, LocationTemplate, Press, BlogCategory) or from
+their SEO head component (ArticleSEO, BlogListSEO). Landing dropped its
+one-item list: the homepage is the root of every trail, so a list naming only
+itself says nothing.
+
+The prop is `trail`, not `items`, on purpose. Two of the three old components
+took `items` with incompatible fields, and BlogArticle was already passing
+`{label}` objects to a component that reads `.name` — renaming forces every
+call site to be looked at rather than silently accepted.
+
+`path` is required rather than optional for the same reason: a crumb has to
+name a real destination. A level with no page is not a crumb, which is what
+"Features" and "Free Tools" were.
+
+THE GUARD. auditBreadcrumbs() in scripts/lib/seo-audit.mjs, wired into
+auditPages so `npm run verify:seo` runs it on every built page. It fails on:
+more than one BreadcrumbList (JSON-LD or microdata) on a page; a list of fewer
+than two items; a relative `item`; positions out of order; the same URL twice;
+a trail that does not end at the page it is on; and a crumb pointing at a route
+the build never rendered — the same class of defect US-149 removed from the
+sitemap, now checked for breadcrumbs too.
+
+VERIFICATION, against real rendered HTML rather than fixtures. `npm run build`
+cannot complete here (prerender refuses without VITE_SUPABASE_* or a committed
+articles snapshot, correctly — it will not ship a blog with no posts), so both
+bundles were built with stub Supabase env and the nine changed routes driven
+with Playwright against `vite preview`, then audited:
+
+  pre-fix   14 problems across 8 of 9 routes
+  post-fix  every route: exactly 1 JSON-LD BreadcrumbList, 0 microdata,
+            0 problems
+
+  /for/miami-real-estate-agents now reads
+    Home → https://agentbio.net/
+    For Real Estate Agents → https://agentbio.net/for-real-estate-agents
+    Miami Real Estate Agents → https://agentbio.net/for/miami-real-estate-agents
+
+  tsc clean · eslint 0 errors · 22 seo-audit specs pass (9 new).
+  Two failures in the repo-hygiene spec (loose .sh/.ps1 in the root) are
+  pre-existing and untouched by this change.
+
+CARRIED FORWARD for a later iteration, found while verifying and not fixed
+here: ArticleSEO defaults `author` to the invented string "Real Estate Expert",
+puts that same string in `twitter:creator` (which wants an @handle), hardcodes
+every article image as 1200x630 whatever its real dimensions, uses Cover.png as
+the publisher logo, and sets `backstory` to a copy of the description. That is
+one page's head, one element, one iteration.

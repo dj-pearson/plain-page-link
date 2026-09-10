@@ -2631,6 +2631,23 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-09. Entry static vendor imports are now form, react, state, supabase, ui \u2014 no charts. react-vendor grows 161.5 -> 184.3 KB, which is the four utility packages moving into a chunk that was already loaded, against 394 KB leaving the critical path. The check's staticImporters idea from US-163 was generalised into MUST_STAY_LAZY, covering three-vendor and charts-vendor and independent of whether a chunk is over budget. Demonstrated failing against the pre-fix config, where it named both the entry chunk and three-vendor."
+    },
+    {
+      "id": "US-165",
+      "title": "Every page that shows a breadcrumb ships two or three competing BreadcrumbLists",
+      "description": "Eleven places in src/ built a BreadcrumbList, across three separate breadcrumb components (src/components/Breadcrumbs.tsx, src/components/blog/Breadcrumbs.tsx and src/components/seo/Breadcrumb.tsx), each with its own item shape \u2014 {name,href}, {label,href}, {name,url}. Every page that rendered a visible trail therefore shipped more than one. /press shipped three: one in its JSON-LD @graph, plus seo/Breadcrumb emitting a JSON-LD block AND a microdata copy of the same list. /for/{city} shipped three the same way. /pricing, /blog and every blog article shipped two. Google does not merge competing BreadcrumbLists; it picks one, and which one is not decidable from the source. Two of the trails were not trails: /features and /tools have no route in App.tsx, so the Lead Capture page's middle crumb 'Features' pointed at /features/property-listings, a sibling, and the Instagram Bio Analyzer's 'Free Tools' crumb pointed at /tools/instagram-bio-analyzer \u2014 the page itself, so its own parent was itself. Those two pages also emitted relative item URLs, because generateBreadcrumbSchema copied whatever the caller passed. The homepage emitted a one-item list naming only itself. None of this is visible in any single component; it is only visible in the built page, where the copies land together.",
+      "acceptanceCriteria": [
+        "One breadcrumb component. src/components/Breadcrumbs.tsx and src/components/blog/Breadcrumbs.tsx are deleted; src/components/seo/Breadcrumb.tsx is the only one.",
+        "The component takes the crumbs below Home as site-relative paths, prepends Home itself, and generates the JSON-LD from the same array the visible nav renders, so markup cannot drift from what a visitor sees.",
+        "Exactly one BreadcrumbList per page: the component emits JSON-LD only (no microdata copy), and the pages that render it dropped the BreadcrumbList from their own @graph.",
+        "Every item URL is absolute on the site origin, positions run 1..n, no URL repeats, and the last item is the page itself.",
+        "No crumb points at a page that has no route. The 'Features' and 'Free Tools' crumbs are gone; a level with no page is not a crumb.",
+        "The homepage no longer emits a one-item BreadcrumbList.",
+        "scripts/lib/seo-audit.mjs enforces all of the above against the built HTML, and the enforcement is demonstrated failing against the pre-fix build."
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10. Verified by building both the pre-fix and post-fix bundles and driving the changed routes with Playwright against vite preview, then running the new auditBreadcrumbs over the rendered HTML. Pre-fix: 14 problems across 8 of 9 routes. Post-fix: every route has exactly 1 JSON-LD BreadcrumbList and 0 microdata, and the guard reports nothing. 22 seo-audit specs pass; tsc clean; eslint 0 errors. Note for a later iteration: `npm run build` cannot be run end to end without VITE_SUPABASE_* or a committed scripts/data/articles.snapshot.json, so `npm run verify:seo` cannot gate a sandbox build \u2014 prerender refuses, correctly, rather than shipping a blog with no posts."
     }
   ]
 }

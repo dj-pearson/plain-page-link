@@ -58,31 +58,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
           '@id': `${baseUrl}/#organization`,
         },
       },
-      // BreadcrumbList schema
-      {
-        '@type': 'BreadcrumbList',
-        '@id': `${canonicalUrl}#breadcrumb`,
-        itemListElement: [
-          {
-            '@type': 'ListItem',
-            position: 1,
-            name: 'Home',
-            item: baseUrl,
-          },
-          {
-            '@type': 'ListItem',
-            position: 2,
-            name: 'For Real Estate Agents',
-            item: `${baseUrl}/for-real-estate-agents`,
-          },
-          {
-            '@type': 'ListItem',
-            position: 3,
-            name: `${city} Real Estate Agents`,
-            item: canonicalUrl,
-          },
-        ],
-      },
+      // BreadcrumbList lives in <Breadcrumb>, which renders the visible trail
+      // this page shows. Two competing BreadcrumbLists on one page is what
+      // US-165 removed.
       // LocalBusiness/Service schema
       {
         '@type': 'ProfessionalService',
@@ -222,10 +200,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         {/* Breadcrumb Navigation */}
         <section className="container mx-auto px-4 pt-6">
           <Breadcrumb
-            items={[
-              { name: 'Home', url: baseUrl },
-              { name: 'For Real Estate Agents', url: `${baseUrl}/for-real-estate-agents` },
-              { name: `${city} Real Estate Agents`, url: canonicalUrl },
+            trail={[
+              { name: 'For Real Estate Agents', path: '/for-real-estate-agents' },
+              { name: `${city} Real Estate Agents`, path: `/for/${slug}` },
             ]}
           />
         </section>
