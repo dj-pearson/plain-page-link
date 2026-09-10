@@ -4,8 +4,9 @@
  */
 
 import { useState } from 'react';
+import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { Helmet } from 'react-helmet-async';
-import { getCanonicalUrl } from '@/config/seo.config';
+import { getCanonicalUrl, getOgImageUrl } from '@/config/seo.config';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
@@ -271,6 +272,29 @@ export default function InstagramBioAnalyzer() {
           name="keywords"
           content="instagram bio for realtors, real estate instagram bio, realtor bio examples, instagram bio analyzer"
         />
+        {/* This page built its own <Helmet> and emitted no og:* at all, so it
+            shipped with index.html's static tags removed and nothing in their
+            place — link previews fell back to whatever the platform scraped,
+            and the surviving twitter:* tags still described the homepage.
+            Found by the US-174 og:image rule on its first full-build run. */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={getCanonicalUrl('/tools/instagram-bio-analyzer')} />
+        <meta property="og:title" content="Free Instagram Bio Analyzer for Real Estate Agents" />
+        <meta
+          property="og:description"
+          content="Score your Instagram bio in 60 seconds and get three rewrites. Free, no signup."
+        />
+        <meta property="og:image" content={getOgImageUrl()} />
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+        <meta property="og:image:alt" content={DEFAULT_SOCIAL_IMAGE.alt} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Free Instagram Bio Analyzer for Real Estate Agents" />
+        <meta
+          name="twitter:description"
+          content="Score your Instagram bio in 60 seconds and get three rewrites. Free, no signup."
+        />
+        <meta name="twitter:image" content={getOgImageUrl()} />
         <script type="application/ld+json">
           {JSON.stringify(schema)}
         </script>

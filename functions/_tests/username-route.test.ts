@@ -16,9 +16,20 @@ const INDEX_HTML = `<!DOCTYPE html><html><head>
   <title>Real Estate Agent Bio Page Builder – AgentBio</title>
 </head><body><div id="root"></div></body></html>`;
 
+const NOT_FOUND_HTML = `<!DOCTYPE html><html><head>
+  <title>Page not found | AgentBio</title>
+  <meta name="robots" content="noindex, follow" />
+</head><body><div id="root"><h1>404</h1></div></body></html>`;
+
 const ENV = {
   VITE_SUPABASE_URL: 'https://api.example.test',
   VITE_SUPABASE_ANON_KEY: 'anon-key',
+  // Cloudflare Pages' static-asset binding. The route reads dist/404.html
+  // through it to answer an unknown username with a real 404 (US-176).
+  ASSETS: {
+    fetch: async () =>
+      new Response(NOT_FOUND_HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+  },
 };
 
 const PROFILE_ROW = {
@@ -143,11 +154,44 @@ describe('GET /:username', () => {
     expect(html).toContain('<title>Jane Doe — Associate Broker at Summit Realty</title>');
   });
 
-  it('falls through for an unknown username instead of inventing a card', async () => {
+  it('answers 404 for a username that does not exist (US-176)', async () => {
+    // PostgREST answered, with no rows. Before this the route called next(),
+    // which _redirects rewrote to index.html — so every typo of an agent's
+    // handle returned 200 with the prerendered homepage.
     fetchMock.mockImplementation(async () => Response.json([]));
 
-    const { promise } = call({ path: '/nobody', username: 'nobody' });
-    expect(await (await promise).text()).toBe(INDEX_HTML);
+    const response = await call({ path: '/nobody', username: 'nobody' }).promise;
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe(NOT_FOUND_HTML);
+    expect(response.headers.get('x-agentbio-prerender')).toBe('not-found');
+  });
+
+  it('does not 404 when the lookup itself failed', async () => {
+    // A database blip must not deindex every agent at once. `null` from
+    // fetchJson means errored or timed out; only an empty array is a 404.
+    fetchMock.mockImplementation(async () => {
+      throw new Error('upstream down');
+    });
+
+    const response = await call({ path: '/jane', username: 'jane' }).promise;
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(INDEX_HTML);
+  });
+
+  it('falls through rather than inventing a response when the 404 document is missing', async () => {
+    fetchMock.mockImplementation(async () => Response.json([]));
+
+    const response = await call({
+      path: '/nobody',
+      username: 'nobody',
+      env: {
+        ...ENV,
+        ASSETS: { fetch: async () => new Response('nope', { status: 500 }) },
+      } as never,
+    }).promise;
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(INDEX_HTML);
   });
 
   it('falls through when the database is unreachable — the page still loads', async () => {

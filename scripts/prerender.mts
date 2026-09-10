@@ -190,7 +190,8 @@ async function renderRoute(
     if (result.rootLength < MIN_ROOT_HTML) {
       problems.push(`#root rendered only ${result.rootLength} chars of HTML`);
     }
-    if (result.h1 === '404') {
+    // /404 is the one route whose job IS to render that page (US-176).
+    if (result.h1 === '404' && route.path !== '/404') {
       problems.push('rendered the 404 page — this route does not exist in App.tsx');
     }
     if (!result.title) {
@@ -620,7 +621,22 @@ async function main() {
     await writeFile(outPath, r.html, 'utf8');
   }
 
-  console.log(`\n[prerender] wrote ${results.length} HTML files into dist/`);
+  // Cloudflare Pages serves dist/404.html, with a 404 status, for any request
+  // matching no asset and no rule in _redirects. It has to be at the root as
+  // 404.html — dist/404/index.html answers the /404 URL and nothing else
+  // (US-176).
+  const notFound = results.find((r) => r.route.path === '/404');
+  if (!notFound) {
+    console.error(
+      '[prerender] /404 did not render. Without dist/404.html, Cloudflare Pages\n' +
+        '            has no document to return for an unknown URL and falls back to\n' +
+        '            answering 200 with whatever _redirects points at.'
+    );
+    process.exit(1);
+  }
+  await writeFile(join(DIST, '404.html'), notFound.html, 'utf8');
+
+  console.log(`\n[prerender] wrote ${results.length} HTML files into dist/, plus 404.html`);
 
   const rewritten = results.filter((r) => r.rewrites > 0);
   if (rewritten.length === 0) {

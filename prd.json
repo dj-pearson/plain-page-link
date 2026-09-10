@@ -2788,6 +2788,21 @@
       "priority": "low",
       "passes": false,
       "notes": "Opened 2026-09-10 (iteration 6). Deliberately not done there: US-174 was a correctness bug with a right answer, this is a design decision with several. Do not crop the current Cover.png blindly \u2014 it was looked at, and the composition uses the full height."
+    },
+    {
+      "id": "US-176",
+      "title": "Every URL on the site returned 200, and the body it returned was the homepage",
+      "description": "public/_redirects ended in `/* /index.html 200`. Since US-147 dist/index.html is not an empty shell \u2014 it is the fully prerendered homepage \u2014 so agentbio.net/anything-at-all answered 200 with the homepage's title, description, canonical and body, and only became the 404 page after the bundle executed and React Router matched `*`. A client-side router cannot set a status code, so nothing in NotFound.tsx could have fixed it. The effect was an infinite URL space in which every typo, every retired link and every path a crawler invented returned a duplicate of the homepage under a 200. The single-segment case is worse than the rest: /:username is indistinguishable from a typo without a database lookup, and functions/[username].ts already performed that lookup \u2014 then called next() either way, so a crawler asking for a handle that does not exist got the homepage.",
+      "acceptanceCriteria": [
+        "An unknown URL under a prefix whose real URLs are all prerendered returns 404 with the 404 document",
+        "dist/404.html exists and is what Cloudflare Pages serves for an unmatched request",
+        "Every route App.tsx defines is either prerendered or covered by a rule, and a test enforces both directions",
+        "A crawler requesting an unpublished or nonexistent username gets 404, while a failed database lookup still falls through to the SPA",
+        "The 404 page carries its own title and a noindex, and links somewhere"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 7 of the SEO loop. The risky part is _redirects: deleting the catch-all turns any route that is neither prerendered nor listed into a broken page, and Cloudflare Pages routing cannot be exercised in this sandbox. src/spa-routes.test.ts is what stands in for a deploy \u2014 it walks App.tsx and _redirects and asserts they agree in both directions, and was demonstrated failing by deleting the /admin rules. Note the deliberate asymmetry in the Pages Function: `profiles === null` (the lookup errored or timed out) still falls through, because answering 404 there would turn a database blip into a deindexing event for every agent at once; only an empty array \u2014 PostgREST answering that there is no such profile \u2014 produces a 404. A second defect surfaced while verifying: the US-174 og:image rule, on its first run against a full build, found three pages shipping no og:image at all \u2014 /vs/later, /tools/instagram-bio-analyzer and /tools/listing-description-generator, each building its own <Helmet> with no og:* tags, while the static twitter:* tags from index.html survived still describing the homepage. Fixed in the same commit. The mechanism by which the static og:* tags vanish while the static twitter:* ones remain was not established; the fix does not depend on it, but it is an open observation."
     }
   ]
 }

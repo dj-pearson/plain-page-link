@@ -4,8 +4,9 @@
  */
 
 import { useState } from 'react';
+import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { Helmet } from 'react-helmet-async';
-import { getCanonicalUrl } from '@/config/seo.config';
+import { getCanonicalUrl, getOgImageUrl } from '@/config/seo.config';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { PropertyDetailsForm } from '@/components/tools/listing-description-generator/PropertyDetailsForm';
@@ -513,6 +514,23 @@ export default function ListingDescriptionGenerator() {
           name="keywords"
           content="AI listing description generator, real estate property description, MLS listing copy, property description generator, real estate AI tools"
         />
+        {/* These three pages built their own <Helmet> and emitted no og:* at all,
+            so they shipped with index.html's static tags removed and nothing in
+            their place — link previews fell back to whatever the platform scraped,
+            and the surviving twitter:* tags still described the homepage. Found by
+            the US-174 og:image rule on its first run against a full build. */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={getCanonicalUrl('/tools/listing-description-generator')} />
+        <meta property="og:title" content="Free AI Listing Description Generator for Real Estate" />
+        <meta property="og:description" content="Three listing description styles from one set of property details. Free, no account." />
+        <meta property="og:image" content={getOgImageUrl()} />
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+        <meta property="og:image:alt" content={DEFAULT_SOCIAL_IMAGE.alt} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Free AI Listing Description Generator for Real Estate" />
+        <meta name="twitter:description" content="Three listing description styles from one set of property details. Free, no account." />
+        <meta name="twitter:image" content={getOgImageUrl()} />
         <script type="application/ld+json">
           {JSON.stringify(schema)}
         </script>

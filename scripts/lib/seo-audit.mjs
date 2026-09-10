@@ -394,7 +394,10 @@ export function auditPages(pages, { origin }) {
     const noindex = (readRobots(html) || '').toLowerCase().includes('noindex');
 
     // --- the page rendered at all -------------------------------------------
-    if (NOT_FOUND_H1.test(html)) {
+    // /404 is the one route whose job is to render that page, so Cloudflare
+    // Pages has a document to return with a 404 status (US-176). Every other
+    // route rendering it means the route does not exist.
+    if (route !== '/404' && NOT_FOUND_H1.test(html)) {
       add(route, 'renders the 404 page');
     }
     if (rootLength(html) < MIN_BODY_HTML) {

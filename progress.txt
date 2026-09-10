@@ -2539,3 +2539,123 @@ A note on og:image:alt, changed in passing: it was the page title, which is a
 title and not a description of an image. It is now a sentence describing what
 Cover.png actually shows, for the default; a page supplying its own image still
 falls back to its title, because nothing here knows what that image is either.
+
+## SEO loop — iteration 7/15 — US-176: every URL returned 200, and returned the homepage
+
+The last line of public/_redirects was:
+
+    /* /index.html 200
+
+Before US-147 that was harmless-ish: index.html was an empty shell, so an
+unknown URL returned a blank document under a 200. After US-147 it is the fully
+prerendered homepage. So agentbio.net/anything-at-all answered:
+
+    HTTP 200
+    <title>Link in Bio for Real Estate Agents | AgentBio</title>
+    <link rel="canonical" href="https://agentbio.net/">
+    ...the entire homepage...
+
+and only became the 404 page once the bundle executed and React Router matched
+`*`. An infinite URL space, every member of it a duplicate of the homepage,
+every one of them a 200.
+
+A client-side router cannot set a status code. No amount of work in
+NotFound.tsx could have fixed this; the fix had to be in _redirects and in the
+Pages Function.
+
+WHAT THE PREFIXES MADE POSSIBLE. The catch-all had to go, but the SPA still owns
+routes that are not prerendered — /dashboard, /admin, /onboarding, the OAuth
+callbacks, /p/{slug}, /:username. Those are now listed explicitly. What is NOT
+listed is the interesting part: /blog/{slug}, /blog/category/{slug} and
+/for/{city} are dynamic patterns whose every real URL is prerendered to a file,
+so an invented one now falls through to dist/404.html and returns 404. Same for
+/features/nope, /vs/nope and /tools/nope, whose children are a closed set.
+
+THE ONE SHAPE STATIC RULES CANNOT RESOLVE is /:username. A single segment is
+indistinguishable from a typo without a database lookup — and
+functions/[username].ts was already doing that lookup, for crawlers, and then
+calling next() whether or not it found anything. So a crawler asking for a
+misspelled agent handle received the homepage. It returns dist/404.html with a
+404 now.
+
+With a deliberate asymmetry, which is the part worth reading twice:
+
+    if (profiles === null) return next();   // the lookup errored or timed out
+    return notFoundResponse(context);       // PostgREST said there is no such row
+
+Answering 404 on a failed lookup would turn a database blip into a deindexing
+event for every agent on the platform at once. Only PostgREST answering "no
+rows" is a 404.
+
+THE 404 DOCUMENT. NotFound.tsx had no <title>, so it inherited index.html's,
+and no robots directive. It now carries its own title, a noindex, and links to
+/pricing, /blog, /tools and /for-real-estate-agents — a dead end offering only
+"go back" wastes the visit and gives a crawler nothing to follow. /404 is a real
+route now, prerendered like any other and kept out of the sitemap, and the
+prerender copies it to dist/404.html, which is the filename Pages looks for.
+The prerender's own "rendered the 404 page — this route does not exist" check
+needed an exemption for the one route whose job that is.
+
+THE RISK, AND WHAT STANDS IN FOR A DEPLOY. Deleting the catch-all means a route
+in App.tsx that is neither prerendered nor listed in _redirects is now a broken
+page rather than a working one, and Cloudflare Pages routing cannot be exercised
+in this sandbox. src/spa-routes.test.ts reads App.tsx and _redirects and asserts
+they agree in both directions: no route without a way to serve it, and no 200
+rewrite for a path that has no route behind it. Demonstrated failing by deleting
+the /admin rules:
+
+    these routes are in App.tsx, are not prerendered, and no _redirects rule
+    serves them: ["/admin/seo", "/admin/audit-log", "/admin/health", ...]
+
+WHAT IS STILL A SOFT 404, stated rather than glossed. RESERVED_SEGMENTS in
+functions/_lib/social-meta.ts lists segments the profile lookup must not treat
+as usernames. Most are real routes. A few — /legal, /about, /contact, /help,
+/support, /api — are not routes at all, and being single segments they match the
+/:username rule and still answer 200 with the homepage. None is linked from
+anywhere and none has ever been a URL on this site. /for is the exception worth
+a rule: it is a real prefix with 26 children and no index, so it gets the same
+301 to the homepage that /features got in US-149.
+
+VERIFICATION: 59 prerendered pages plus dist/404.html at the root, carrying
+"Page not found | AgentBio" and a noindex. verify:seo needed the same /404
+exemption the prerender did — its "renders the 404 page" rule fired on the one
+route whose job that is, which is the rule working correctly on a route that
+did not exist when it was written.
+
+WHAT THE US-174 RULE FOUND HERE, on its first run against a full build in this
+iteration: three pages ship with NO og:image at all.
+
+  /vs/later
+  /tools/instagram-bio-analyzer
+  /tools/listing-description-generator
+
+Each builds its own <Helmet> with a title, a description, a canonical and
+ld+json, and no og:* tags. index.html ships static og:* tags, and on these three
+pages they are absent from the output while the static twitter:* tags survive —
+so their link previews had no image the platform was told about, and the
+twitter:title and twitter:url that did survive still said "Link in Bio for Real
+Estate Agents" and pointed at the homepage. Three pages, one of them the highest
+commercial-intent comparison on the site, unfurling as the homepage or as
+nothing.
+
+Honest about the limit of the diagnosis: the mechanism by which the static og:*
+tags disappear while the static twitter:* tags remain was not pinned down. The
+prerender's dedupe only removes a static tag when a data-rh tag with the same
+key exists, and there are none here. It was not chased further because the fix
+does not depend on the answer — a page that cares about its own preview should
+say so rather than inherit it — but that is an unexplained observation, not a
+closed one.
+
+All three now emit the full og:* and twitter:* set from the shared constants.
+
+The Pages Function reads dist/404.html through env.ASSETS rather than a plain
+fetch, so an unknown username costs no extra subrequest — crawlers generate
+those in bulk. Plain fetch remains the fallback for a runtime without the
+binding, and if the document cannot be read at all the route falls through to
+the SPA: a working page is worth more than a correct status code on a page
+nobody asked for. All three branches have a test.
+
+The existing test named "falls through for an unknown username instead of
+inventing a card" asserted exactly the behaviour this story changes, so it was
+rewritten rather than deleted, alongside two new ones covering the asymmetry
+(lookup failed -> 200, no rows -> 404) and the missing-document fallback.

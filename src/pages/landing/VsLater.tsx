@@ -1,11 +1,12 @@
 import { Check, X, ArrowRight, Star, TrendingUp } from 'lucide-react';
+import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
-import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { getBaseUrl, getCanonicalUrl, getOgImageUrl } from '@/config/seo.config';
 import { PRICING_PLANS } from '@/config/pricing-plans';
 import { COMPETITORS } from '@/config/competitors';
 
@@ -104,6 +105,29 @@ export default function VsLater() {
           content="Compare AgentBio and Later for real estate agents. Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
         />
         <link rel="canonical" href={canonicalUrl} />
+        {/* These three pages built their own <Helmet> and emitted no og:* at all,
+            so they shipped with index.html's static tags removed and nothing in
+            their place — link previews fell back to whatever the platform scraped,
+            and the surviving twitter:* tags still described the homepage. Found by
+            the US-174 og:image rule on its first run against a full build. */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={getCanonicalUrl('/vs/later')} />
+        <meta property="og:title" content="AgentBio vs Later for Real Estate Agents" />
+        <meta
+          property="og:description"
+          content="Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
+        />
+        <meta property="og:image" content={getOgImageUrl()} />
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+        <meta property="og:image:alt" content={DEFAULT_SOCIAL_IMAGE.alt} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="AgentBio vs Later for Real Estate Agents" />
+        <meta
+          name="twitter:description"
+          content="Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
+        />
+        <meta name="twitter:image" content={getOgImageUrl()} />
         <script type="application/ld+json">{JSON.stringify(schema)}</script>
       </Helmet>
 

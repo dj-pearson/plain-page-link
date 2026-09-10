@@ -211,6 +211,11 @@ function App() {
               <Route path="/features/analytics" element={<AnalyticsFeature />} />
 
               {/* Tools */}
+              {/* An explicit route for the 404 document, so the prerender can
+                  render it to a file Cloudflare Pages serves with a real 404
+                  status. The catch-all below still renders it in the SPA
+                  (US-176). */}
+              <Route path="/404" element={<NotFound />} />
               <Route path="/tools" element={<ToolsIndex />} />
               <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
               <Route

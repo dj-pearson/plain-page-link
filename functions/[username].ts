@@ -32,6 +32,8 @@ interface Env {
   VITE_SUPABASE_ANON_KEY?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
+  /** Cloudflare Pages' static-asset binding, used to read dist/404.html. */
+  ASSETS?: { fetch: (request: Request) => Promise<Response> };
 }
 
 interface PagesContext {
@@ -70,6 +72,41 @@ async function fetchJson<T>(url: string, apiKey: string): Promise<T[] | null> {
   }
 }
 
+/**
+ * The site's 404 document, with a 404 status.
+ *
+ * dist/404.html is what Cloudflare Pages serves for a request matching no asset
+ * and no rule. This function is invoked for /:username, which _redirects DOES
+ * rewrite to index.html, so Pages' own 404 handling never runs here — it has to
+ * be fetched and returned deliberately.
+ *
+ * If that fetch fails for any reason, fall through rather than invent a
+ * response: a working profile page is worth more than a correct status code on
+ * a page nobody asked for.
+ */
+async function notFoundResponse(context: PagesContext): Promise<Response> {
+  const { request, env, next } = context;
+  try {
+    const documentUrl = new URL('/404.html', new URL(request.url).origin).toString();
+    // env.ASSETS reads the deployed file directly. Plain fetch() would work too
+    // but costs a real subrequest per unknown username, which crawlers generate
+    // in bulk; it is the fallback for a runtime that does not expose the
+    // binding.
+    const document = env.ASSETS
+      ? await env.ASSETS.fetch(new Request(documentUrl, { headers: { Accept: 'text/html' } }))
+      : await fetch(documentUrl, { headers: { Accept: 'text/html' } });
+    if (!document.ok) return next();
+
+    const headers = new Headers(document.headers);
+    headers.set('content-type', 'text/html; charset=utf-8');
+    headers.set('cache-control', 'public, max-age=0, s-maxage=60');
+    headers.set('x-agentbio-prerender', 'not-found');
+    return new Response(await document.text(), { status: 404, statusText: 'Not Found', headers });
+  } catch {
+    return next();
+  }
+}
+
 export const onRequestGet = async (context: PagesContext): Promise<Response> => {
   const { request, env, params, next } = context;
 
@@ -98,9 +135,25 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
 
   const profile = profiles?.[0];
   if (!profile) {
-    // Not an agent, not published, or the lookup failed. Either way the SPA
-    // answers — including with its own 404.
-    return next();
+    // The lookup failing and the username not existing are different things,
+    // and only one of them is a 404 (US-176).
+    //
+    // `profiles === null` means the request to PostgREST errored, timed out or
+    // was aborted. Answering 404 there would turn a database blip into a
+    // deindexing event for every agent on the platform at once, so it falls
+    // through to the SPA exactly as before.
+    //
+    // An empty array means PostgREST answered and there is no published profile
+    // with that username. Before this, that returned 200 with the prerendered
+    // homepage, because _redirects rewrote every single-segment URL to
+    // index.html — so every typo of an agent's handle was a duplicate homepage
+    // that Google had to crawl and discard. /:username is the one shape the
+    // static rules cannot resolve, because telling a real handle from a typo
+    // takes the database lookup this function has just done.
+    if (profiles === null) {
+      return next();
+    }
+    return notFoundResponse(context);
   }
 
   const url = new URL(request.url);
