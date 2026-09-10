@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import {
   auditPages,
   auditStructuredData,
+  auditStructuredDataUrls,
   readCanonical,
   readDescription,
   readTitle,
@@ -398,5 +399,132 @@ describe('image dimensions', () => {
       ])
     );
     expect(problems).toContain('BlogPosting declares one image dimension without the other');
+  });
+});
+
+/**
+ * Proof that the US-179 rule has teeth.
+ *
+ * ContactPoint.url named /contact on seven pages and the WebSite SearchAction
+ * named /search?q= on the homepage. Neither has ever been a route in App.tsx.
+ * Both are well-formed URLs on the right origin, so nothing about their shape
+ * gives them away — only comparing them to the set of pages the build renders
+ * does.
+ */
+describe('structured data URLs', () => {
+  const ORIGIN_URL = 'https://agentbio.net';
+  const page = (route: string, blocks: unknown[]) => ({
+    route,
+    html:
+      `<!DOCTYPE html><html><head><title>t</title>` +
+      blocks
+        .map((b) => `<script type="application/ld+json">${JSON.stringify(b)}</script>`)
+        .join('') +
+      `</head><body><div id="root">x</div></body></html>`,
+  });
+
+  const routes = new Set(['/', '/pricing', '/blog', '/tools']);
+  const check = (blocks: unknown[], route = '/') =>
+    auditStructuredDataUrls([page(route, blocks)], routes, { origin: ORIGIN_URL }).map(
+      (p) => p.problem
+    );
+
+  it('catches the ContactPoint url that named a page nobody built', () => {
+    const problems = check([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        contactPoint: {
+          '@type': 'ContactPoint',
+          email: 'support@agentbio.net',
+          url: `${ORIGIN_URL}/contact`,
+        },
+      },
+    ]);
+    expect(problems).toContain('structured data url points at /contact, which is not a page');
+  });
+
+  it('catches the SearchAction endpoint, placeholder and all', () => {
+    const problems = check([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: `${ORIGIN_URL}/search?q={search_term_string}`,
+          },
+        },
+      },
+    ]);
+    expect(problems).toContain(
+      'structured data urlTemplate points at /search, which is not a page'
+    );
+  });
+
+  it('accepts a search endpoint that is a real page', () => {
+    expect(
+      check([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: {
+              '@type': 'EntryPoint',
+              urlTemplate: `${ORIGIN_URL}/blog?search={search_term_string}`,
+            },
+          },
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('ignores fragments, so #organization and #website node ids pass', () => {
+    expect(
+      check([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          '@id': `${ORIGIN_URL}/pricing#webpage`,
+          isPartOf: { '@id': `${ORIGIN_URL}/#website` },
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('does not try to verify somebody else’s site', () => {
+    expect(
+      check([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          sameAs: ['https://x.com/AgentBioApp'],
+          url: 'https://partner.example.com/anything',
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('does not treat an asset as a missing page', () => {
+    expect(
+      check([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          logo: { '@type': 'ImageObject', url: `${ORIGIN_URL}/logo.png` },
+          url: `${ORIGIN_URL}/sitemap.xml`,
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('reports a dangling URL once per page, not once per mention', () => {
+    const problems = check([
+      { '@context': 'https://schema.org', '@type': 'Thing', url: `${ORIGIN_URL}/contact` },
+      { '@context': 'https://schema.org', '@type': 'Thing', url: `${ORIGIN_URL}/contact` },
+    ]);
+    expect(problems).toHaveLength(1);
   });
 });

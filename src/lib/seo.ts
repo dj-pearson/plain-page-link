@@ -196,7 +196,11 @@ export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
       '@type': 'ContactPoint',
       contactType: 'Customer Service',
       email: 'support@agentbio.net',
-      url: `${baseUrl}/contact`,
+      // No `url`. It pointed at /contact, which has never been a route here —
+      // seven pages named it, and since US-176 it does not even answer 200.
+      // The email is the contact method; a ContactPoint does not need a page
+      // to be valid, and one naming a URL that 404s is worse than one that
+      // does not (US-179).
       availableLanguage: ['English'],
     },
     // sameAs claims identity, not links. It listed six accounts under a handle

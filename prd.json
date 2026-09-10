@@ -2832,6 +2832,21 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-10, iteration 9 of the SEO loop. Six checks fail on the shipped code. The bar for inclusion is 'the footer links to it', because that is the only evidence available in this repository that an account exists and is ours \u2014 claiming an account you do not own is worse than omitting one you do, since an omission costs a link and a wrong claim hands the entity to a stranger. The YouTube and GitHub entries were dropped rather than corrected: nothing anywhere else refers to either, so there is nothing to correct them against. One test bug worth recording: the first version banned any sameAs URL ending in 'agentbio', which rejects linkedin.com/company/agentbio/ \u2014 the single entry in the old list that was actually right. The five wrong accounts are now named literally."
+    },
+    {
+      "id": "US-179",
+      "title": "Structured data asserted two URLs the site has never had, one of them a search endpoint",
+      "description": "A URL inside JSON-LD is an assertion that the URL is a thing. Two were false. ContactPoint.url named https://agentbio.net/contact on seven pages, from src/lib/seo.ts and src/components/seo/PageSEO.tsx; /contact has never been a route in App.tsx. The WebSite potentialAction named a SearchAction at /search?q={search_term_string} from three places \u2014 Landing.tsx, PageSEO.tsx and SchemaMarkup.tsx \u2014 and /search has never been a route either. SearchAction is specifically what Google reads to offer a sitelinks searchbox, so the one it would have rendered sent people to a page that does not exist. While the /* catch-all was in place both at least answered 200 with the homepage; since US-176 they are real 404s. Separately, BlogListSEO declares a SearchAction against /blog?search={search_term_string} \u2014 a claim that was equally untrue, because Blog.tsx kept its search term in useState and never read the parameter.",
+      "acceptanceCriteria": [
+        "No same-origin URL in any JSON-LD block points at a path the build does not render",
+        "ContactPoint keeps the email, which is real, and drops the URL, which is not",
+        "The site-wide SearchAction is removed rather than pointed somewhere plausible",
+        "The blog's SearchAction becomes true: /blog reads ?search= and ?category= from the URL",
+        "verify:seo fails on a dangling structured-data URL, demonstrated against the build as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 10 of the SEO loop. 8 occurrences on the shipped build. The blog case is the one worth the extra work: the schema was already declaring /blog?search=, so making Blog.tsx read the parameter turned an existing false claim true rather than deleting a capability \u2014 and a filtered blog view became a link somebody can share. Category moved to the URL with it. The site-wide SearchAction was deleted instead of repointed, because there is no site-wide search and a blog search is not one; inventing a target would have been the same defect with a different path."
     }
   ]
 }

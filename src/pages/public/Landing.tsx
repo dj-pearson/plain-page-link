@@ -108,14 +108,12 @@ export default function Landing() {
         publisher: {
           '@id': `${origin}/#organization`,
         },
-        potentialAction: {
-          '@type': 'SearchAction',
-          target: {
-            '@type': 'EntryPoint',
-            urlTemplate: `${origin}/search?q={search_term_string}`,
-          },
-          'query-input': 'required name=search_term_string',
-        },
+        // No potentialAction. A SearchAction is what Google reads to offer a
+        // sitelinks searchbox, and this one pointed at /search?q=, a route that has
+        // never existed in App.tsx. Since US-176 it returns a real 404, so the
+        // searchbox would have sent people nowhere. There is no site-wide search to
+        // point it at; the blog has its own, and BlogListSEO declares that one
+        // against /blog?search=, which Blog.tsx now actually reads (US-179).
       },
       // Use centralized Organization schema with social signals
       organizationSchema,

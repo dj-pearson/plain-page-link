@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { BLOG_CATEGORIES } from '@/config/blog-categories';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,8 +20,40 @@ import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 
 export default function Blog() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  /**
+   * The search term lives in the URL (US-179).
+   *
+   * BlogListSEO has always declared a SearchAction against
+   * /blog?search={search_term_string} — that is the schema Google reads to
+   * offer a searchbox — and nothing here read the parameter, so following one
+   * of those URLs landed on an unfiltered blog. Reading it makes the claim
+   * true, and makes a filtered view a link somebody can share.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search') ?? '';
+  const selectedCategory = searchParams.get('category') ?? 'all';
+
+  const setSearchQuery = (value: string) => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value) next.set('search', value);
+        else next.delete('search');
+        return next;
+      },
+      // A keystroke should not be a history entry to back out of.
+      { replace: true }
+    );
+  };
+
+  const setSelectedCategory = (value: string) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (value && value !== 'all') next.set('category', value);
+      else next.delete('category');
+      return next;
+    });
+  };
 
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ['published-articles'],

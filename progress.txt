@@ -2813,3 +2813,65 @@ the single entry in the old list that was actually right. A rule that cannot
 tell the real account from the invented ones is not a rule about accounts. The
 five wrong ones are named literally now, the way seo-audit names the 4.8/523
 rating.
+
+## SEO loop — iteration 10/15 — US-179: schema describing a site that does not exist
+
+A URL inside JSON-LD is an assertion that the URL is a thing. Two were false,
+and neither is detectable by looking at the URL — both are well-formed, on the
+right origin, and named exactly what you would expect a real page to be called.
+Only comparing them against the set of pages the build renders gives them away.
+
+    7  structured data url points at /contact, which is not a page
+    1  structured data urlTemplate points at /search, which is not a page
+
+/contact came from ContactPoint in src/lib/seo.ts and PageSEO.tsx. The email
+beside it is real; the page has never existed. A ContactPoint does not need a
+URL to be valid, so it says the email and stops.
+
+/search is the more interesting one. `SearchAction` inside `WebSite` is
+specifically what Google reads to decide whether to render a sitelinks
+searchbox, and three files declared one — Landing.tsx, PageSEO.tsx,
+SchemaMarkup.tsx — against /search?q={search_term_string}. There has never been
+a /search route in App.tsx. So the searchbox Google was being invited to render
+would have sent people to a page that does not exist. Until US-176 that was a
+soft 200 serving the homepage; now it is a real 404.
+
+Deleted rather than repointed. There is no site-wide search here, and a blog
+search is not one — inventing a target would have been the same defect at a
+different path.
+
+THE ONE THAT WAS WORTH FIXING PROPERLY. BlogListSEO declares its own
+SearchAction, against /blog?search={search_term_string}. That claim was equally
+untrue: Blog.tsx kept its search term in useState and never looked at the URL,
+so following one of those links landed on an unfiltered blog. Rather than
+delete the claim, Blog.tsx now reads ?search= — and ?category= with it — from
+the query string. The schema becomes true, and a filtered view becomes a link
+somebody can share. Typing replaces the history entry rather than adding one;
+changing category pushes.
+
+THE GUARD — auditStructuredDataUrls in seo-audit.mjs, run by verify:seo. It
+walks every JSON-LD block at any depth, takes every same-origin string under
+url, @id, item, urlTemplate, mainEntityOfPage or target, strips the fragment
+and query — so #organization node ids and {search_term_string} placeholders
+both resolve to the path that has to exist — and fails when that path is not a
+page the build rendered. Off-site URLs are not ours to verify and assets are
+files rather than pages; both are skipped.
+
+Like the link-graph and og:image rules before it, this is a whole-build
+property: whether a URL is a page is a fact about the build, not about the page
+naming it. Seven of the eight occurrences were on pages that were otherwise
+perfect.
+
+Demonstrated against the build as it shipped: 8 occurrences across 59 pages.
+
+VERIFIED, and the limits of it: driving the built site with Playwright,
+/blog?search=Insights arrives with the search box already containing
+"Insights", and /blog with it empty. That is the part that changed — where the
+term comes from. The filtering itself is untouched code reading the same
+`searchQuery`, and this sandbox cannot show it working end to end, because the
+hydrated page re-fetches articles from a Supabase URL that does not resolve
+here and ends up with an empty list either way.
+
+  /blog                        input=""              
+  /blog?search=Insights        input="Insights"      
+  /blog?search=NoSuchArticle   input="NoSuchArticle" 

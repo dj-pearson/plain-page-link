@@ -72,7 +72,11 @@ export function PageSEO({
       '@type': 'ContactPoint',
       contactType: 'Customer Service',
       email: 'support@agentbio.net',
-      url: `${siteUrl}/contact`,
+      // No `url`. It pointed at /contact, which has never been a route here —
+      // seven pages named it, and since US-176 it does not even answer 200.
+      // The email is the contact method; a ContactPoint does not need a page
+      // to be valid, and one naming a URL that 404s is worse than one that
+      // does not (US-179).
       availableLanguage: ['English'],
     },
     // See @/config/social-profiles: these were four accounts this company does
@@ -134,14 +138,12 @@ export function PageSEO({
     publisher: {
       '@id': `${siteUrl}#organization`,
     },
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: `${siteUrl}/search?q={search_term_string}`,
-      },
-      'query-input': 'required name=search_term_string',
-    },
+    // No potentialAction. A SearchAction is what Google reads to offer a
+    // sitelinks searchbox, and this one pointed at /search?q=, a route that has
+    // never existed in App.tsx. Since US-176 it returns a real 404, so the
+    // searchbox would have sent people nowhere. There is no site-wide search to
+    // point it at; the blog has its own, and BlogListSEO declares that one
+    // against /blog?search=, which Blog.tsx now actually reads (US-179).
   };
 
   // FAQ Schema (if FAQs provided)

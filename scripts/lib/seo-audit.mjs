@@ -378,6 +378,62 @@ export function auditStructuredData(route, html) {
   return problems.map((problem) => ({ route, problem }));
 }
 
+/**
+ * Same-origin URLs inside JSON-LD that no page answers (US-179).
+ *
+ * Structured data is a set of assertions, and a URL in it is an assertion that
+ * the URL is a thing. Two were false on every page that carried them:
+ * ContactPoint.url named https://agentbio.net/contact, and the WebSite
+ * SearchAction's urlTemplate named /search?q= — the endpoint Google reads to
+ * offer a sitelinks searchbox. Neither has ever been a route in App.tsx. While
+ * `/* /index.html 200` was in place they at least answered something; after
+ * US-176 they are 404s, and a searchbox pointing at one sends people nowhere.
+ *
+ * Only same-origin URLs are checked. An off-site sameAs is not ours to verify,
+ * and asset paths are files rather than pages.
+ *
+ * @param {{route: string, html: string}[]} pages
+ * @param {Set<string>} routes every path the build renders
+ * @returns {{route: string, problem: string}[]}
+ */
+export function auditStructuredDataUrls(pages, routes, { origin }) {
+  const problems = [];
+  const base = origin.replace(/\/+$/, '');
+  // Keys whose string value is a URL that has to resolve to a page.
+  const URL_KEYS = new Set(['url', '@id', 'item', 'urlTemplate', 'mainEntityOfPage', 'target']);
+  const IS_ASSET = /\.(png|jpe?g|webp|gif|svg|ico|xml|txt|json|pdf|mp4|webm)$/i;
+
+  for (const { route, html } of pages) {
+    const { blocks } = readJsonLd(html);
+    const seen = new Set();
+
+    for (const block of blocks) {
+      walkJsonLd(block, (node) => {
+        for (const [key, value] of Object.entries(node)) {
+          if (!URL_KEYS.has(key) || typeof value !== 'string') continue;
+          if (!value.startsWith(base)) continue;
+
+          // A urlTemplate carries a {placeholder}; the path before the query
+          // is what has to exist.
+          const path = (value.slice(base.length).split('#')[0].split('?')[0] || '/')
+            .replace(/\/+$/, '') || '/';
+          if (IS_ASSET.test(path)) continue;
+          if (routes.has(path)) continue;
+          if (seen.has(`${key}:${path}`)) continue;
+          seen.add(`${key}:${path}`);
+
+          problems.push({
+            route,
+            problem: `structured data ${key} points at ${path}, which is not a page`,
+          });
+        }
+      });
+    }
+  }
+
+  return problems;
+}
+
 export function auditPages(pages, { origin }) {
   const problems = [];
   const add = (route, problem) => problems.push({ route, problem });

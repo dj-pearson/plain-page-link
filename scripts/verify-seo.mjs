@@ -23,7 +23,7 @@
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { auditPages } from './lib/seo-audit.mjs';
+import { auditPages, auditStructuredDataUrls } from './lib/seo-audit.mjs';
 import { auditReachability, sitemapPaths } from './lib/link-graph.mjs';
 
 const DIST = join(process.cwd(), 'dist');
@@ -112,3 +112,30 @@ if (unreachable.length > 0) {
 console.log(
   `[verify-seo] ${advertised.size} sitemap URLs, every one of them reachable from / by internal links`
 );
+
+// URLs asserted inside JSON-LD. Also a whole-build property: whether a URL is
+// a page is a fact about the build, not about the page naming it (US-179).
+const danglingUrls = auditStructuredDataUrls(pages, new Set(pages.map((p) => p.route)), {
+  origin: ORIGIN,
+});
+
+if (danglingUrls.length > 0) {
+  const byProblem = new Map();
+  for (const { route, problem } of danglingUrls) {
+    if (!byProblem.has(problem)) byProblem.set(problem, []);
+    byProblem.get(problem).push(route);
+  }
+  console.error(`\n[verify-seo] structured data names ${byProblem.size} URL(s) with no page:\n`);
+  for (const [problem, routes] of byProblem) {
+    console.error(`  ${problem}`);
+    console.error(`      on ${routes.length} page(s), e.g. ${routes.slice(0, 3).join(', ')}`);
+  }
+  console.error(
+    '\n[verify-seo] A URL in structured data is an assertion that the URL is a thing.\n' +
+      '             Point it at a page that exists, or drop the field — an absent\n' +
+      '             field costs nothing and a wrong one is a claim Google checks.'
+  );
+  process.exit(1);
+}
+
+console.log('[verify-seo] every URL asserted in structured data resolves to a page');
