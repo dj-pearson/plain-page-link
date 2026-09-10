@@ -3042,17 +3042,20 @@
     },
     {
       "id": "US-194",
-      "title": "Stale means orange, and only orange",
-      "description": "As an agent with colour vision deficiency, I need a lead or listing that has gone stale to be marked by something I can perceive, rather than by a four-pixel orange stripe that is the only difference between it and every other row.",
+      "title": "Stale meant two different things depending on the device",
+      "description": "As an agent, I need a listing to be stale or not stale, rather than stale on my laptop and fresh on my phone, and I need the badge to tell me the rule it is applying.",
       "acceptanceCriteria": [
-        "QuickStatusDashboard and MobileListingCard mark staleness with a label or icon carrying text, not colour alone (WCAG 2.1 SC 1.4.1 Use of Color)",
-        "The four-pixel coloured side border is replaced or reduced — CLAUDE.md names it the single most recognizable AI tell, and it is doing accessibility work it cannot do",
-        "The stale threshold is stated in the UI, so 'stale' means something the agent can act on rather than a colour they must learn",
-        "npx impeccable detect src reports no [side-tab] findings that are not a deliberate decline"
+        "One module decides staleness; QuickStatusDashboard and MobileListingCard both read it",
+        "The boundary is settled: a listing untouched for exactly STALE_AFTER_DAYS is stale, which is where the two implementations disagreed",
+        "A sold, pending or draft listing is never marked stale on any surface — the mobile card had no status test",
+        "An unreadable or missing updatedAt is not reported as fresh",
+        "The badge states the rule, in a title and to a screen reader, so 'Stale' is not something the agent has to infer",
+        "The four-pixel orange side border is reduced to one pixel: the badge already carries the meaning in words",
+        "Unit tests cover the boundary, the statuses and the unparseable timestamp; suite green"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "NEXT ITERATION. Found in iteration 6 while clearing US-193. The detector flagged these as a style tell; the more serious problem is underneath it — border-l-4 border-l-orange-500 is the sole indicator of staleness in both components, so the state is conveyed by colour alone."
+      "passes": true,
+      "notes": "Done in iteration 7. The premise this story was filed with was wrong and worth correcting: both components DO already label staleness in words, so WCAG 1.4.1 was satisfied and colour was not the sole indicator. Reading them properly turned up the real defect underneath — QuickStatusDashboard used `>= 7 && status === 'active'` and MobileListingCard used `> 7` with no status test, so the same listing got two answers depending on the device, and an agent who had SOLD a property was nagged about it on their phone and nowhere else. Detector [side-tab] findings: 3 -> 1 (BlogArticle's blockquote, a declined finding)."
     }
   ]
 }
