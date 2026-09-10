@@ -3103,6 +3103,22 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 10 by reading the module the coverage report put at 31%. All four public lead forms validate phone as z.string().min(10), so the browser accepted '555.123.4567' and '555-123-4567 x12' and the server then refused them — reaching the visitor as a failed submission with nothing to act on. Fourth in the sequence US-069, US-095, US-096: the platform's recurring failure is a lead that was captured correctly and thrown away by the layer behind the form. The sanitizeString single-pass weakness is defence in depth, not a live hole — every email template goes through escapeHtml and React escapes the dashboard — and is described that way rather than overstated."
+    },
+    {
+      "id": "US-198",
+      "title": "No lead form had a maximum length, and the server did",
+      "description": "As a buyer writing a long message about what I am looking for, I need the form to stop me at the limit while I am typing, rather than accept everything and lose it when I press Send.",
+      "acceptanceCriteria": [
+        "The bounds validateLeadData enforces are named as LEAD_FIELD_LIMITS rather than being literals inside the comparisons",
+        "src/lib/leadFieldLimits.ts carries the same table for the browser, with a message that states the number",
+        "All four public lead forms enforce name, email, message and address maxima from that table",
+        "A test imports BOTH tables and fails when they drift, since Deno and Vite cannot import each other",
+        "The boundary itself is tested: exactly the limit passes, one character more does not, on both sides",
+        "The drift guard is verified by changing one table and watching it fail"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 11 by reading the four client schemas against validateLeadData's bounds. Not one form carried a single .max(). The server has enforced name<=100, email<=255, message<=2000 and address<=500 all along, so a long message passed client validation, was submitted, and came back as a generic failure. Fifth in the sequence US-069, US-095, US-096, US-197 — the same failure every time: a lead the visitor filled in correctly, thrown away by the layer behind the form."
     }
   ]
 }

@@ -255,11 +255,33 @@ export function isValidWebhookUrl(
 }
 
 // Lead data validation
+/**
+ * The bounds validateLeadData enforces, named rather than scattered through it.
+ *
+ * They were literals in the comparisons below, and no client knew them. Not one
+ * of the four public lead forms had a single `.max()` on any field, so a buyer
+ * writing more than 2000 characters about what they are looking for — which a
+ * motivated one does — passed client validation, pressed Send, and got a
+ * generic failure with nothing to act on. Their message was gone (US-198).
+ *
+ * src/lib/leadFieldLimits.ts carries the same numbers for the browser. The two
+ * cannot import each other — one is Deno, one is bundled by Vite — so
+ * src/lib/leadFieldLimits.test.ts imports both and fails if they drift.
+ */
+export const LEAD_FIELD_LIMITS = {
+  name: { min: 1, max: 100 },
+  email: { max: 255 },
+  message: { min: 0, max: 2000 },
+  property_address: { min: 0, max: 500 },
+  price_range: { min: 0, max: 100 },
+  timeline: { min: 0, max: 100 },
+} as const;
+
 export function validateLeadData(data: any): ValidationResult {
   const errors: string[] = [];
 
   // Required fields
-  if (!data.name || !validateStringLength(data.name, 1, 100)) {
+  if (!data.name || !validateStringLength(data.name, LEAD_FIELD_LIMITS.name.min, LEAD_FIELD_LIMITS.name.max)) {
     errors.push('Name must be between 1 and 100 characters');
   }
   
@@ -280,19 +302,19 @@ export function validateLeadData(data: any): ValidationResult {
     errors.push('Invalid phone number format');
   }
   
-  if (data.message && !validateStringLength(data.message, 0, 2000)) {
+  if (data.message && !validateStringLength(data.message, LEAD_FIELD_LIMITS.message.min, LEAD_FIELD_LIMITS.message.max)) {
     errors.push('Message must be less than 2000 characters');
   }
   
-  if (data.property_address && !validateStringLength(data.property_address, 0, 500)) {
+  if (data.property_address && !validateStringLength(data.property_address, LEAD_FIELD_LIMITS.property_address.min, LEAD_FIELD_LIMITS.property_address.max)) {
     errors.push('Property address must be less than 500 characters');
   }
   
-  if (data.price_range && !validateStringLength(data.price_range, 0, 100)) {
+  if (data.price_range && !validateStringLength(data.price_range, LEAD_FIELD_LIMITS.price_range.min, LEAD_FIELD_LIMITS.price_range.max)) {
     errors.push('Price range must be less than 100 characters');
   }
   
-  if (data.timeline && !validateStringLength(data.timeline, 0, 100)) {
+  if (data.timeline && !validateStringLength(data.timeline, LEAD_FIELD_LIMITS.timeline.min, LEAD_FIELD_LIMITS.timeline.max)) {
     errors.push('Timeline must be less than 100 characters');
   }
   

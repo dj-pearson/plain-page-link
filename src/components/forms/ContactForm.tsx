@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { LEAD_FIELD_LIMITS, tooLong } from '@/lib/leadFieldLimits';
 import { FormField, TextareaField } from './FormField';
 import { FormPrivacyNotice } from './FormPrivacyNotice';
 import { Button } from '@/components/ui/button';
@@ -11,10 +12,19 @@ import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
 import { logger } from '@/lib/logger';
 
 const contactSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email address'),
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(LEAD_FIELD_LIMITS.name.max, tooLong('Name', LEAD_FIELD_LIMITS.name.max)),
+  email: z
+    .string()
+    .email('Please enter a valid email address')
+    .max(LEAD_FIELD_LIMITS.email.max, tooLong('Email', LEAD_FIELD_LIMITS.email.max)),
   phone: z.string().min(10, 'Please enter a valid phone number'),
-  message: z.string().min(10, 'Message must be at least 10 characters'),
+  message: z
+    .string()
+    .min(10, 'Message must be at least 10 characters')
+    .max(LEAD_FIELD_LIMITS.message.max, tooLong('Message', LEAD_FIELD_LIMITS.message.max)),
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;

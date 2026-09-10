@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { LEAD_FIELD_LIMITS, tooLong } from '@/lib/leadFieldLimits';
 import { FormField, TextareaField } from './FormField';
 import { FormPrivacyNotice } from './FormPrivacyNotice';
 import { Button } from '@/components/ui/button';
@@ -20,16 +21,31 @@ import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 
 const sellerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email address'),
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(LEAD_FIELD_LIMITS.name.max, tooLong('Name', LEAD_FIELD_LIMITS.name.max)),
+  email: z
+    .string()
+    .email('Please enter a valid email address')
+    .max(LEAD_FIELD_LIMITS.email.max, tooLong('Email', LEAD_FIELD_LIMITS.email.max)),
   phone: z.string().min(10, 'Please enter a valid phone number'),
-  address: z.string().min(5, 'Please enter your property address'),
+  address: z
+    .string()
+    .min(5, 'Please enter your property address')
+    .max(
+      LEAD_FIELD_LIMITS.property_address.max,
+      tooLong('Address', LEAD_FIELD_LIMITS.property_address.max)
+    ),
   propertyType: z.string().min(1, 'Please select a property type'),
   bedrooms: z.string().min(1, 'Please select number of bedrooms'),
   bathrooms: z.string().min(1, 'Please select number of bathrooms'),
   timeline: z.string().min(1, 'Please select a timeline'),
   reason: z.string().min(1, 'Please select a reason'),
-  message: z.string().optional(),
+  message: z
+    .string()
+    .max(LEAD_FIELD_LIMITS.message.max, tooLong('Message', LEAD_FIELD_LIMITS.message.max))
+    .optional(),
 });
 
 type SellerFormData = z.infer<typeof sellerSchema>;
