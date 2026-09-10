@@ -24,9 +24,23 @@ import NotFound from './pages/public/NotFound';
 // Lazy load public review page
 const SubmitReview = lazy(() => import('./pages/public/SubmitReview'));
 
-// Auth pages (eager load for better UX)
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
+/**
+ * Auth pages, lazy like every other route (US-195).
+ *
+ * These were static imports, commented "eager load for better UX". The UX
+ * argument is real but it only applies to someone arriving AT /auth/login.
+ * A static import puts them, and the whole form stack they pull in —
+ * react-hook-form, zod, @hookform/resolvers, 22.6 kB gzipped as form-vendor —
+ * into the entry graph that EVERY visitor downloads. Including the visitor to
+ * agentbio.net/janedoe, which is the product: a link in an Instagram bio,
+ * opened on a phone, by someone who will never sign in.
+ *
+ * They are lazy now, and the UX intent is kept by warming the chunk from the
+ * marketing header that links to them (src/lib/prefetchAuthPages.ts) rather
+ * than by taxing everyone who does not.
+ */
+const Login = lazy(() => import('./pages/auth/Login'));
+const Register = lazy(() => import('./pages/auth/Register'));
 
 // Lazy load auth recovery & callback pages
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));

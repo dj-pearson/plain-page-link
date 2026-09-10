@@ -1,8 +1,16 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
-import { Home, Menu, X } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { Home, Menu, X } from 'lucide-react';
+import { prefetchAuthPages } from '@/lib/prefetchAuthPages';
 
 export function PublicHeader() {
+  // This header is the only thing on the site that links to Sign in, so it is
+  // the honest place to decide the auth chunks are worth fetching. A public
+  // profile does not render it and pays nothing (US-195).
+  useEffect(() => {
+    prefetchAuthPages();
+  }, []);
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const mobileNavRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -12,20 +20,20 @@ export function PublicHeader() {
     if (!isMenuOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         setIsMenuOpen(false);
         menuButtonRef.current?.focus();
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isMenuOpen]);
 
   // Focus first menu item when menu opens
   useEffect(() => {
     if (isMenuOpen && mobileNavRef.current) {
-      const firstLink = mobileNavRef.current.querySelector<HTMLElement>("a, button");
+      const firstLink = mobileNavRef.current.querySelector<HTMLElement>('a, button');
       firstLink?.focus();
     }
   }, [isMenuOpen]);
@@ -33,42 +41,25 @@ export function PublicHeader() {
   const closeMenu = useCallback(() => setIsMenuOpen(false), []);
 
   return (
-    <header
-      className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50"
-      role="banner"
-    >
+    <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50" role="banner">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2" aria-label="AgentBio.net - Go to homepage">
           <Home className="h-8 w-8 text-blue-600" aria-hidden="true" />
-          <span className="text-2xl font-bold text-gray-900">
-            AgentBio.net
-          </span>
+          <span className="text-2xl font-bold text-gray-900">AgentBio.net</span>
         </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">
-          <a
-            href="/#features"
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          <a href="/#features" className="text-gray-600 hover:text-gray-900 transition-colors">
             Features
           </a>
-          <Link
-            to="/blog"
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          <Link to="/blog" className="text-gray-600 hover:text-gray-900 transition-colors">
             Blog
           </Link>
-          <Link
-            to="/pricing"
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          <Link to="/pricing" className="text-gray-600 hover:text-gray-900 transition-colors">
             Pricing
           </Link>
-          <Link
-            to="/auth/login"
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          <Link to="/auth/login" className="text-gray-600 hover:text-gray-900 transition-colors">
             Log In
           </Link>
           <Link
@@ -84,11 +75,15 @@ export function PublicHeader() {
           ref={menuButtonRef}
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           className="md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label={isMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
           aria-expanded={isMenuOpen}
           aria-controls="mobile-navigation"
         >
-          {isMenuOpen ? <X className="h-6 w-6" aria-hidden="true" /> : <Menu className="h-6 w-6" aria-hidden="true" />}
+          {isMenuOpen ? (
+            <X className="h-6 w-6" aria-hidden="true" />
+          ) : (
+            <Menu className="h-6 w-6" aria-hidden="true" />
+          )}
         </button>
       </div>
 

@@ -3056,6 +3056,22 @@
       "priority": 2,
       "passes": true,
       "notes": "Done in iteration 7. The premise this story was filed with was wrong and worth correcting: both components DO already label staleness in words, so WCAG 1.4.1 was satisfied and colour was not the sole indicator. Reading them properly turned up the real defect underneath — QuickStatusDashboard used `>= 7 && status === 'active'` and MobileListingCard used `> 7` with no status test, so the same listing got two answers depending on the device, and an agent who had SOLD a property was nagged about it on their phone and nowhere else. Detector [side-tab] findings: 3 -> 1 (BlogArticle's blockquote, a declined finding)."
+    },
+    {
+      "id": "US-195",
+      "title": "The profile page was paying for the login form",
+      "description": "As a buyer opening an agent's link from an Instagram bio, on a phone, on mobile data, I need the page to load without first downloading the sign-in form I will never use.",
+      "acceptanceCriteria": [
+        "Login and Register are lazy routes like every other page",
+        "The 'eager load for better UX' intent is kept by warming the auth chunks on idle from PublicHeader, the only component that links to them; a public profile does not render it and pays nothing",
+        "form-vendor leaves the first-paint critical path: 253.97 kB gzip of eager chunks becomes 222.72 kB, a 31.25 kB (12.3%) saving on every first load",
+        "check-bundle-size.mjs walks the entry chunk's transitive STATIC imports and fails if form-vendor, charts-vendor, three-vendor or markdown-vendor is in the closure",
+        "The new check is verified against the pre-fix build: it fails there and passes here",
+        "tsc --noEmit, eslint and npm run test:run all clean"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 8 by building and reading dist/index.html. The existing MUST_STAY_LAZY check asks who statically imports a given chunk, which catches a chunk dragged onto some page's critical path but cannot say what FIRST PAINT costs — a chunk can reach the entry through a chain the per-chunk rule does not see. The new check walks the closure instead, which is the question the budget was really asking."
     }
   ]
 }
