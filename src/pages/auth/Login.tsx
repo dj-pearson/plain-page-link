@@ -219,10 +219,7 @@ export default function Login() {
           <div className="space-y-8">
             <div>
               <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight">
-                Turn every click into a{' '}
-                <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
-                  closed deal
-                </span>
+                Turn every click into a <span className="text-cyan-300">closed deal</span>
               </h1>
               <p className="mt-4 text-lg text-blue-100/60 max-w-md leading-relaxed">
                 AI-powered intelligence that transforms your real estate business with predictive

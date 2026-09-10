@@ -75,7 +75,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header with gradient */}
-        <div className="bg-gradient-to-r from-purple-500 to-pink-500 -mx-6 -mt-6 p-8 text-white mb-6">
+        <div className="bg-gradient-to-r from-teal-500 to-teal-500 -mx-6 -mt-6 p-8 text-white mb-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
               <Unlock className="w-6 h-6" />
@@ -84,7 +84,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
               <DialogTitle className="text-2xl font-bold text-white">
                 Unlock Your Complete Analysis
               </DialogTitle>
-              <DialogDescription className="text-purple-100">
+              <DialogDescription className="text-teal-100">
                 Get all 3 optimized bios + comprehensive strategy report
               </DialogDescription>
             </div>
@@ -94,7 +94,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
         {/* What's Included */}
         <div className="space-y-4 mb-6">
           <h3 className="font-bold text-lg flex items-center gap-2">
-            <Gift className="w-5 h-5 text-purple-600" />
+            <Gift className="w-5 h-5 text-teal-700" />
             Here's What You'll Get Instantly:
           </h3>
 
@@ -133,10 +133,10 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
             ].map((item, index) => (
               <div
                 key={index}
-                className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100"
+                className="flex items-start gap-3 p-3 bg-teal-50 rounded-lg border border-teal-100"
               >
-                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-4 h-4 text-purple-600" />
+                <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <item.icon className="w-4 h-4 text-teal-700" />
                 </div>
                 <div>
                   <div className="font-semibold text-gray-900">{item.title}</div>
@@ -244,7 +244,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-lg py-6"
+            className="w-full bg-gradient-to-r from-teal-500 to-teal-500 hover:from-teal-600 hover:to-teal-600 text-lg py-6"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -275,10 +275,10 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
  */
 export function UnlockCTA({ onUnlock }: { onUnlock: () => void }) {
   return (
-    <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg p-8 text-center text-white">
+    <div className="bg-gradient-to-r from-teal-500 to-teal-500 rounded-lg p-8 text-center text-white">
       <Lock className="w-16 h-16 mx-auto mb-4 opacity-90" />
       <h3 className="text-2xl font-bold mb-2">Want the Full Analysis?</h3>
-      <p className="text-purple-100 mb-6 max-w-md mx-auto">
+      <p className="text-teal-100 mb-6 max-w-md mx-auto">
         Unlock all 3 professionally rewritten bios, complete analysis report, and bonus resources.
         100% free, no credit card required.
       </p>
@@ -286,7 +286,7 @@ export function UnlockCTA({ onUnlock }: { onUnlock: () => void }) {
       <Button
         onClick={onUnlock}
         size="lg"
-        className="bg-white text-purple-600 hover:bg-gray-100 gap-2 text-lg px-8"
+        className="bg-white text-teal-700 hover:bg-gray-100 gap-2 text-lg px-8"
       >
         <Unlock className="w-5 h-5" />
         Unlock Now - It's Free

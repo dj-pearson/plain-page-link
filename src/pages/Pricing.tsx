@@ -249,9 +249,7 @@ export default function Pricing() {
               </div>
 
               <div className="text-center mb-12">
-                <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                  Choose Your Plan
-                </h1>
+                <h1 className="text-5xl font-bold mb-4 text-foreground">Choose Your Plan</h1>
                 <p className="text-xl text-muted-foreground mb-8">
                   Start free and scale as you grow
                 </p>

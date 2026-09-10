@@ -253,10 +253,7 @@ export default function Register() {
           <div className="space-y-8">
             <div>
               <h1 className="text-3xl xl:text-4xl font-bold text-white leading-tight">
-                Start closing more deals{' '}
-                <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
-                  today
-                </span>
+                Start closing more deals <span className="text-cyan-300">today</span>
               </h1>
               <p className="mt-3 text-base text-blue-100/60 max-w-sm leading-relaxed">
                 Join thousands of top-performing agents who use AI-powered intelligence to dominate

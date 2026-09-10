@@ -9,10 +9,18 @@ import { initSentry } from './lib/sentry';
 import { logger } from '@/lib/logger';
 import { initWebVitals } from '@/lib/web-vitals';
 import { registerServiceWorker } from '@/lib/register-sw';
+import { captureAttribution } from '@/lib/attribution';
 import './index.css';
 
 // Initialize Sentry as early as possible for error monitoring
 initSentry();
+
+// Record ?utm_source=... before anything can rewrite the query string.
+// React Router, the canonical-username redirect and the listing-modal
+// parameter all rewrite `location.search`; by the time a visitor opens a lead
+// form the campaign that brought them is long gone from the address bar, so it
+// is read once here, at the landing URL, and kept for the session (US-188).
+captureAttribution();
 
 const queryClient = new QueryClient({
   defaultOptions: {

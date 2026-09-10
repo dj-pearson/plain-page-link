@@ -51,7 +51,7 @@ if (-not $workingConnection) {
     Write-Host "2. Open terminal for the Supabase DB container" -ForegroundColor White
     Write-Host "3. Run: cd /tmp" -ForegroundColor White
     Write-Host "4. Upload migrations folder to /tmp" -ForegroundColor White
-    Write-Host "5. Run the migrate-from-container.sh script" -ForegroundColor White
+    Write-Host "5. Run the scripts/migration/migrate-from-container.sh script" -ForegroundColor White
     exit 1
 }
 

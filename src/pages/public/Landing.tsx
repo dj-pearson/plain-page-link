@@ -643,9 +643,12 @@ function FeatureCard({
     <div className="group p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border hover:border-[#80d0c7] hover:shadow-lg hover:shadow-[#80d0c7]/10 transition-all relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-[#80d0c7]/5 to-[#a1c4fd]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
       <div className="relative z-10">
-        <div className="mb-4 text-transparent bg-gradient-to-r from-[#80d0c7] to-[#a1c4fd] bg-clip-text">
-          {icon}
-        </div>
+        {/* Solid, not clipped. background-clip:text paints a background
+            through the shape of an element's TEXT; a lucide icon is an inline
+            SVG stroked with currentColor, so the gradient never reached it and
+            text-transparent made currentColor transparent — every one of these
+            nine feature-card icons rendered invisible (US-192). */}
+        <div className="mb-4 text-[#80d0c7]">{icon}</div>
         <h3 className="text-xl font-light tracking-tight text-foreground mb-2">{title}</h3>
         <p className="glass-body">{description}</p>
       </div>

@@ -325,7 +325,7 @@ The following documentation files contain example `supabase.co` URLs that should
 
 | File | Type | Priority |
 |------|------|----------|
-| `COOLIFY_MIGRATION_GUIDE.md` | Guide | High |
+| `docs/deploy/COOLIFY_MIGRATION_GUIDE.md` | Guide | High |
 | `COOLIFY_QUICK_FIX.md` | Guide | High |
 | `DOCKERFILE_DEPLOYMENT_GUIDE.md` | Guide | High |
 | `EXECUTION_ROADMAP.md` | Roadmap | Medium |
@@ -355,7 +355,7 @@ The following documentation files contain example `supabase.co` URLs that should
    - Removed generic `*.supabase.co` wildcards
 
 3. **Documentation files updated:**
-   - COOLIFY_MIGRATION_GUIDE.md
+   - docs/deploy/COOLIFY_MIGRATION_GUIDE.md
    - COOLIFY_QUICK_FIX.md
    - DOCKERFILE_DEPLOYMENT_GUIDE.md
    - EXECUTION_ROADMAP.md

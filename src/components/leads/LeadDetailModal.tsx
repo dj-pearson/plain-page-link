@@ -40,6 +40,9 @@ import {
   CheckSquare,
   ArrowRightLeft,
   Inbox,
+  Megaphone,
+  Link2,
+  Smartphone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,6 +54,7 @@ import { useLeadActivities, type LeadActivity } from '@/hooks/useLeadActivities'
 import { getLeadNextStep } from '@/lib/leadNextStep';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
+import { describeLeadOrigin } from '@/lib/leadAttribution';
 
 /**
  * Lead plus the one field the modal shows that is not a column.
@@ -311,6 +315,8 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     ? formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })
     : '';
 
+  const origin = describeLeadOrigin(lead);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -511,6 +517,65 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               </div>
             </div>
           )}
+
+          {/* Where this lead came from (US-189).
+              `source` above says which button the visitor pressed. This says
+              how they found the page at all — the question an agent has when
+              deciding whether an ad was worth its spend. Leads captured before
+              US-188 recorded nothing, and this says so rather than calling
+              them Direct. */}
+          <div className="space-y-2">
+            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+              Where this lead came from
+            </h3>
+            {origin.confidence === 'unrecorded' ? (
+              <p className="text-sm text-muted-foreground">
+                Captured before campaign tracking was added, so this lead carries no attribution.
+                Leads from now on record the campaign that brought them.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <Megaphone className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Channel:</span>
+                  <span className="font-medium">{origin.label}</span>
+                  {origin.confidence === 'referral' && (
+                    <Badge variant="outline" className="text-xs">
+                      inferred
+                    </Badge>
+                  )}
+                </div>
+                {origin.campaign && (
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Campaign:</span>
+                    <span className="font-medium">{origin.campaign}</span>
+                  </div>
+                )}
+                {origin.medium && (
+                  <div className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Medium:</span>
+                    <span className="font-medium">{origin.medium}</span>
+                  </div>
+                )}
+                {origin.referrerHost && (
+                  <div className="flex items-center gap-2">
+                    <Link2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Referred by:</span>
+                    <span className="font-medium">{origin.referrerHost}</span>
+                  </div>
+                )}
+                {origin.device && (
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Device:</span>
+                    <span className="font-medium">{origin.device}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Quick Response Templates */}
           <div className="space-y-2">

@@ -196,7 +196,7 @@ export function HeroSection({
             <br />
             <span
               ref={highlightTextRef}
-              className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-500 pb-2"
+              className="inline-block text-teal-600 dark:text-teal-400 pb-2"
             >
               {titleHighlight && title.endsWith(titleHighlight)
                 ? titleHighlight

@@ -17,6 +17,7 @@
  */
 
 import { callEdgeFunction } from '@/lib/edgeFunctions';
+import { getLeadAttribution } from '@/lib/attribution';
 import { logger } from '@/lib/logger';
 
 /** Lead types accepted by the edge function's validateLeadData(). */
@@ -139,6 +140,12 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
         source: leadData.source ?? 'website',
         referrer_url:
           leadData.referrer ?? (typeof document !== 'undefined' ? document.referrer : undefined),
+        // Which campaign this visit came from, and on what. submit-lead has
+        // accepted, sanitised and written utm_source/utm_medium/utm_campaign
+        // and device since it was written; no caller ever sent them, so every
+        // lead in the table has four NULLs where its attribution belongs
+        // (US-188).
+        ...getLeadAttribution(),
         ...columns,
         form_data: Object.keys(formData).length > 0 ? formData : undefined,
       },

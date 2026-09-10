@@ -76,15 +76,23 @@ Your current keys should be in:
 grep -r "SUPABASE_ANON_KEY" .env* supabase/
 ```
 
-Based on your recent edge functions setup, you're using:
+Read them from where they are stored — never from this document:
 
+```bash
+# Coolify: Project -> Environment Variables
+# GitHub:  Settings -> Secrets and variables -> Actions
+# Locally: .env.local, which is gitignored
+grep -r "SUPABASE_ANON_KEY" .env* supabase/
 ```
-SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTAzOTk4MCwiZXhwIjo0OTIwNzEzNTgwLCJyb2xlIjoiYW5vbiJ9.QhDHf45z3FazBIiYTGKO43KBquCaOjIjqhGmWSJw2Ms
 
-SUPABASE_SERVICE_ROLE_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NTAzOTk4MCwiZXhwIjo0OTIwNzEzNTgwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.SiFzNodGGE8o66DznVhlLSucYqaIKgqrFZu64Nl-KMU
-```
-
-**These are valid and working!** ✅
+> **This section used to print both live key values, service_role included, with
+> the caption "These are valid and working". They were removed here on
+> 2026-09-10, but they remain in this repository's history at commit 908a2c1 and
+> the repository is public — so the removal is not the remedy. Regenerating the
+> JWT secret, which invalidates both keys, is. See "Option 1" above.**
+>
+> A document about key regeneration is exactly where a key value gets pasted.
+> Store secrets where secrets are stored and write down only the name.
 
 ---
 

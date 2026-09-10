@@ -57,6 +57,13 @@ export function InstagramMockup({
                 <User className="w-10 h-10 text-white" />
               </div>
             )}
+            {/* The purple here is representational, not decorative, and is the
+                one place in US-193's sweep that keeps it: this component draws
+                a mock Instagram profile, and Instagram's own avatar ring is
+                purple through pink. Recolouring it to the platform accent would
+                make the mockup stop looking like the thing it is mocking. The
+                detector cannot tell those two cases apart; that is what makes
+                it a checker rather than a decision. */}
             {/* Story Ring */}
             <div className="absolute inset-0 rounded-full border-2 border-purple-500 -m-1" />
           </div>

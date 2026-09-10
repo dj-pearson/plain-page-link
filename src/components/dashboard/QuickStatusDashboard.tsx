@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import { isListingStale, staleExplanation } from '@/lib/listingStaleness';
 
 interface Listing {
   id: string;
@@ -40,13 +41,9 @@ export function QuickStatusDashboard({
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<'all' | 'active' | 'pending' | 'stale'>('all');
 
-  // Detect stale listings (not updated in 7+ days)
-  const isStale = (listing: Listing) => {
-    const daysSinceUpdate = Math.floor(
-      (Date.now() - new Date(listing.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return daysSinceUpdate >= 7 && listing.status === 'active';
-  };
+  // One rule, shared with MobileListingCard, which used to apply a different
+  // one (US-194).
+  const isStale = (listing: Listing) => isListingStale(listing);
 
   // Filter listings
   const filteredListings = listings.filter((listing) => {
@@ -347,7 +344,10 @@ function ListingQuickCard({
           ? 'border-primary bg-primary/5 shadow-md'
           : 'border-gray-200 bg-white hover:border-gray-300',
         isUpdating && 'opacity-50 pointer-events-none',
-        isStale && 'border-l-4 border-l-orange-500'
+        // The badge below already says Stale in words. A four-pixel orange
+        // stripe on top of it is decoration doing no work, and it is the tell
+        // CLAUDE.md names; one pixel is enough to group the row visually.
+        isStale && 'border-l border-l-orange-400'
       )}
     >
       {/* Checkbox */}
@@ -365,9 +365,11 @@ function ListingQuickCard({
         <Badge
           variant="outline"
           className="absolute top-2 right-2 bg-orange-100 text-orange-800 border-orange-300"
+          title={staleExplanation(listing)}
         >
-          <Clock className="w-3 h-3 mr-1" />
+          <Clock className="w-3 h-3 mr-1" aria-hidden="true" />
           Stale
+          <span className="sr-only">: {staleExplanation(listing)}</span>
         </Badge>
       )}
 

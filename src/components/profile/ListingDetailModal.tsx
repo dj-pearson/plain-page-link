@@ -439,11 +439,11 @@ export default function ListingDetailModal({
                   )}
 
                   {virtualTourUrl && (
-                    <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-5 border border-purple-100">
+                    <div className="bg-gradient-to-r from-teal-50 to-blue-50 rounded-xl p-5 border border-teal-100">
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-purple-100 rounded-lg">
-                            <Video className="h-5 w-5 text-purple-600" />
+                          <div className="p-2.5 bg-teal-100 rounded-lg">
+                            <Video className="h-5 w-5 text-teal-700" />
                           </div>
                           <div>
                             <h4 className="font-semibold text-gray-900">Virtual Tour Available</h4>
@@ -454,7 +454,7 @@ export default function ListingDetailModal({
                           href={virtualTourUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm min-h-[44px]"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 transition-colors font-medium text-sm min-h-[44px]"
                         >
                           Take Tour <ExternalLink className="h-3.5 w-3.5" />
                         </a>

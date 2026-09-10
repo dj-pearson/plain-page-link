@@ -153,6 +153,82 @@ if (leaks.length) {
   process.exit(1);
 }
 
+// US-195: what a visitor downloads before anything else.
+//
+// MUST_STAY_LAZY above asks "who statically imports this chunk". That catches a
+// big chunk being dragged onto some page's critical path, but it cannot say
+// what the FIRST paint costs, because a chunk can reach the entry through a
+// chain the per-chunk rule does not see.
+//
+// So walk it. Start at the entry chunk index.html loads, follow every static
+// import transitively, and hold the closure to a list of things that must not
+// be in it. The one that was: Login and Register were static imports in
+// App.tsx, commented "eager load for better UX", which put react-hook-form,
+// zod and @hookform/resolvers — form-vendor, 22.6 kB gzipped — into the first
+// download of every visitor, including the visitor to agentbio.net/janedoe who
+// will never sign in. That is the product's own page paying for its login form.
+const ENTRY_MUST_NOT_INCLUDE = {
+  "form-vendor":
+    "react-hook-form + zod. No public profile has a form on first paint; " +
+    "auth pages and dashboard forms are lazy routes.",
+  "charts-vendor": "recharts. Dashboard analytics only.",
+  "three-vendor": "Three.js. Only a 3D theme or the 3D hero needs it.",
+  "markdown-vendor": "react-markdown. Blog article rendering only.",
+};
+
+const html = readFileSync(join(process.cwd(), "dist", "index.html"), "utf8");
+const entryChunks = [...html.matchAll(/assets\/([A-Za-z0-9._-]+\.js)/g)].map((m) => m[1]);
+
+if (entryChunks.length === 0) {
+  console.error("[bundle-size] FAILED — no JS chunks referenced from dist/index.html.");
+  process.exit(1);
+}
+
+// Transitive closure over STATIC imports only. A static import renders as
+// `from"./chunk.js"`; a dynamic one renders as `import("./chunk.js")` and is
+// deliberately not followed — that is the whole difference this check is about.
+const eager = new Set();
+const queue = [...entryChunks];
+while (queue.length) {
+  const file = queue.pop();
+  if (eager.has(file)) continue;
+  eager.add(file);
+  const source = sources.get(file);
+  if (!source) continue;
+  for (const [, imported] of source.matchAll(/from"\.\/([A-Za-z0-9._-]+\.js)"/g)) {
+    if (!eager.has(imported)) queue.push(imported);
+  }
+}
+
+const onFirstPaint = [];
+for (const [prefix, why] of Object.entries(ENTRY_MUST_NOT_INCLUDE)) {
+  const chunk = [...eager].find((f) => f.startsWith(`${prefix}-`));
+  if (chunk) {
+    onFirstPaint.push({ chunk, why, size: statSync(join(ASSETS_DIR, chunk)).size });
+  }
+}
+
+if (onFirstPaint.length) {
+  console.error(
+    "[bundle-size] FAILED — chunk(s) on the first-paint critical path that " +
+      "should not be:"
+  );
+  for (const p of onFirstPaint) {
+    console.error(`  - ${p.chunk} (${fmt(p.size)}) — ${p.why}`);
+  }
+  console.error(
+    "  Every visitor downloads this before the page renders, including a " +
+      "visitor to a public profile. Find the static import that pulls it in " +
+      "(usually an eagerly-imported route in App.tsx) and make it lazy."
+  );
+  process.exit(1);
+}
+
+console.log(
+  `[bundle-size] Entry graph: ${eager.size} chunk(s) on first paint, none of ` +
+    `the ${Object.keys(ENTRY_MUST_NOT_INCLUDE).length} that must not be.`
+);
+
 const violations = [];
 const exempted = [];
 

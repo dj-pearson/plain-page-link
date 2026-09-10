@@ -17,14 +17,14 @@
 
 **Update the script first:**
 
-Edit `deploy-migrations-ssh.ps1` and set:
+Edit `scripts/migration/deploy-migrations-ssh.ps1` and set:
 ```powershell
 $SSH_USER = "root"  # or your username
 ```
 
 **Run the script:**
 ```powershell
-.\deploy-migrations-ssh.ps1
+.\scripts\migration\deploy-migrations-ssh.ps1
 ```
 
 The script will:

@@ -198,12 +198,12 @@ export default function ListingDescriptionGenerator() {
     <div className="max-w-4xl mx-auto">
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 px-4 py-2 rounded-full mb-6">
-          <Sparkles className="h-4 w-4 text-purple-600" />
-          <span className="text-sm font-medium text-purple-900">Free AI Tool for Real Estate Agents</span>
+        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-teal-100 to-teal-100 px-4 py-2 rounded-full mb-6">
+          <Sparkles className="h-4 w-4 text-teal-700" />
+          <span className="text-sm font-medium text-teal-900">Free AI Tool for Real Estate Agents</span>
         </div>
 
-        <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+        <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
           AI Listing Description Generator
         </h1>
 
@@ -213,7 +213,7 @@ export default function ListingDescriptionGenerator() {
 
         <p className="text-base text-gray-600 mb-8 max-w-2xl mx-auto">
           Want to showcase your listings effectively?{' '}
-          <a href="/features/property-listings" className="text-purple-600 underline hover:text-purple-700 font-semibold">
+          <a href="/features/property-listings" className="text-teal-700 underline hover:text-teal-700 font-semibold">
             Learn about AgentBio's property listing galleries →
           </a>
         </p>
@@ -224,7 +224,7 @@ export default function ListingDescriptionGenerator() {
             trackEvent('intro_cta_clicked');
           }}
           size="lg"
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-6 text-lg"
+          className="bg-gradient-to-r from-teal-600 to-teal-600 hover:from-teal-700 hover:to-teal-700 text-white px-8 py-6 text-lg"
         >
           Generate My Listing Descriptions
           <Sparkles className="ml-2 h-5 w-5" />
@@ -238,8 +238,8 @@ export default function ListingDescriptionGenerator() {
       {/* Features Grid */}
       <div className="grid md:grid-cols-3 gap-6 mb-12">
         <Card className="p-6 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mb-4">
-            <FileText className="h-6 w-6 text-purple-600" />
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-teal-100 rounded-lg mb-4">
+            <FileText className="h-6 w-6 text-teal-700" />
           </div>
           <h3 className="font-semibold mb-2">3 Professional Styles</h3>
           <p className="text-sm text-gray-600">
@@ -248,8 +248,8 @@ export default function ListingDescriptionGenerator() {
         </Card>
 
         <Card className="p-6 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-pink-100 rounded-lg mb-4">
-            <TrendingUp className="h-6 w-6 text-pink-600" />
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-teal-100 rounded-lg mb-4">
+            <TrendingUp className="h-6 w-6 text-teal-700" />
           </div>
           <h3 className="font-semibold mb-2">15 Ready-to-Use Formats</h3>
           <p className="text-sm text-gray-600">
@@ -258,8 +258,8 @@ export default function ListingDescriptionGenerator() {
         </Card>
 
         <Card className="p-6 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mb-4">
-            <Users className="h-6 w-6 text-purple-600" />
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-teal-100 rounded-lg mb-4">
+            <Users className="h-6 w-6 text-teal-700" />
           </div>
           <h3 className="font-semibold mb-2">Buyer Psychology</h3>
           <p className="text-sm text-gray-600">
@@ -322,30 +322,30 @@ export default function ListingDescriptionGenerator() {
   const renderGenerating = () => (
     <div className="max-w-2xl mx-auto text-center py-16">
       <div className="animate-pulse mb-8">
-        <Sparkles className="h-16 w-16 text-purple-600 mx-auto mb-4" />
+        <Sparkles className="h-16 w-16 text-teal-700 mx-auto mb-4" />
       </div>
 
       <h2 className="text-2xl font-bold mb-4">Generating Your Descriptions...</h2>
 
       <div className="space-y-3 text-left max-w-md mx-auto">
         <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-2 h-2 bg-purple-600 rounded-full animate-pulse"></div>
+          <div className="w-2 h-2 bg-teal-700 rounded-full animate-pulse"></div>
           <span>Analyzing property details...</span>
         </div>
         <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-2 h-2 bg-purple-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+          <div className="w-2 h-2 bg-teal-700 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
           <span>Crafting luxury style description...</span>
         </div>
         <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-2 h-2 bg-purple-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+          <div className="w-2 h-2 bg-teal-700 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
           <span>Creating family-friendly version...</span>
         </div>
         <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-2 h-2 bg-purple-600 rounded-full animate-pulse" style={{ animationDelay: '0.6s' }}></div>
+          <div className="w-2 h-2 bg-teal-700 rounded-full animate-pulse" style={{ animationDelay: '0.6s' }}></div>
           <span>Optimizing investment style...</span>
         </div>
         <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-2 h-2 bg-purple-600 rounded-full animate-pulse" style={{ animationDelay: '0.8s' }}></div>
+          <div className="w-2 h-2 bg-teal-700 rounded-full animate-pulse" style={{ animationDelay: '0.8s' }}></div>
           <span>Generating social media posts...</span>
         </div>
       </div>
@@ -429,11 +429,11 @@ export default function ListingDescriptionGenerator() {
       )}
 
       {/* CTA for AgentBio trial */}
-      <Card className="p-8 mt-8 bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+      <Card className="p-8 mt-8 bg-gradient-to-br from-teal-50 to-teal-50 border-teal-200">
         <div className="text-center">
           <h3 className="text-2xl font-bold mb-2">Want AI-Powered Marketing for Every Listing?</h3>
           <p className="text-gray-700 mb-6">
-            <a href="/for-real-estate-agents" className="text-purple-600 underline hover:text-purple-700 font-semibold">
+            <a href="/for-real-estate-agents" className="text-teal-700 underline hover:text-teal-700 font-semibold">
               AgentBio
             </a>{' '}
             creates your entire marketing presence - Instagram bios, link-in-bio pages,
@@ -441,7 +441,7 @@ export default function ListingDescriptionGenerator() {
           </p>
           <Button
             size="lg"
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+            className="bg-gradient-to-r from-teal-600 to-teal-600 hover:from-teal-700 hover:to-teal-700"
             onClick={() => {
               window.location.href = '/register?utm_source=listing-generator&utm_medium=cta';
               trackEvent('trial_clicked');
