@@ -51,7 +51,19 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         about: { '@id': `${canonicalUrl}#service` },
         breadcrumb: { '@id': `${canonicalUrl}#breadcrumb` },
         inLanguage: 'en-US',
-        dateModified: new Date().toISOString(),
+        // No dateModified. It was `new Date().toISOString()` — the moment of
+        // render — so every city page claimed it had just been updated, on
+        // every render, forever. That is the same false-freshness signal
+        // US-149 refused to put in the sitemap: a lastmod that always reads
+        // "now" is one Google learns to ignore. It also made the page
+        // nondeterministic: React renders twice, the two timestamps differed
+        // by milliseconds, react-helmet-async keys its dedupe on the
+        // serialised content, and the page shipped TWO copies of the whole
+        // schema graph — including two BreadcrumbLists. It hit 2 of 26 city
+        // pages in one build and different ones in the next, which is exactly
+        // how a race presents.
+        // An honest dateModified would come from the location data; there is
+        // no such field, and inventing one is worse than omitting it.
         publisher: {
           '@type': 'Organization',
           name: SEO_CONFIG.organization.name,
@@ -221,7 +233,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
         {/* Breadcrumb Navigation */}
         <section className="container mx-auto px-4 pt-6">
+          {/* The page's own @graph above already declares this BreadcrumbList.
+              Emitting it here too shipped two of them on all 26 city pages. */}
           <Breadcrumb
+            emitSchema={false}
             items={[
               { name: 'Home', url: baseUrl },
               { name: 'For Real Estate Agents', url: `${baseUrl}/for-real-estate-agents` },

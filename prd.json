@@ -2658,8 +2658,8 @@
         "The footer's 'Free tools' column heading links to it"
       ],
       "priority": "medium",
-      "passes": false,
-      "notes": "Opened 2026-09-10 (US-165 iteration 1). Scope it as one page plus the three breadcrumb edits; do not turn it into a directory of tools that do not exist yet. Read src/pages/tools/AgentBioGenerator.tsx for the prose register \u2014 it is the page in this repo that reads least like a template."
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 3 of the SEO loop, together with US-168. /tools exists, is prerendered, is in the sitemap and reads src/config/tools.ts \u2014 the same registry the footer's Free tools column renders, so a tool cannot be added to one and forgotten in the other, which is how the bio generator became US-165. The /features hub was NOT built: rather than invent a thin page, /features/lead-capture's breadcrumb dropped the rung it could not honour. US-171 is the open question of whether a real features hub earns its place."
     },
     {
       "id": "US-168",
@@ -2671,8 +2671,8 @@
         "grep for window.location.origin in src/pages and src/components/seo returns nothing that ends up in structured data"
       ],
       "priority": "medium",
-      "passes": false,
-      "notes": "Opened 2026-09-10 (US-165 iteration 1). Small, and it should be taken together with US-167, which changes the middle item's destination anyway."
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 3, with US-167. Wider than the story described. Both breadcrumb components built item URLs from window.location.origin and both emitted their own BreadcrumbList; seo/Breadcrumb.tsx also generated its JSON-LD from `items` while rendering `breadcrumbItems`, so on every page relying on showHome the structured data was missing the first rung readers could see. /features/lead-capture shipped two relative item URLs, which Google rejects outright."
     },
     {
       "id": "US-169",
@@ -2716,6 +2716,33 @@
       "priority": "medium",
       "passes": false,
       "notes": "Noticed 2026-09-10 during the SEO loop (US-165 iteration 1) \u2014 the two failures are pre-existing and unrelated to that change. Deleting the files is not the fix unless their content is genuinely duplicated under docs/; check first."
+    },
+    {
+      "id": "US-171",
+      "title": "Decide whether /features earns a hub page, or stays a set of five siblings",
+      "description": "/features/lead-capture's breadcrumb claimed a 'Features' parent pointing at /features/property-listings \u2014 a sibling. There is no /features route in App.tsx; US-149 removed it from the sitemap as a soft 404. US-167 resolved the lie by dropping the rung rather than by inventing the page, because a hub that only repeats the homepage's features section is the thin page US-153 noindexed 23 city pages over. The question stands: five feature pages with no shared parent have no page collecting the topical relevance between them, the way /tools now does for the three tools.",
+      "acceptanceCriteria": [
+        "A decision is recorded either way, with the reason",
+        "If built: /features has content that is not a restatement of the homepage's features section, is prerendered, is in the sitemap, passes verify:seo, and the five feature pages' breadcrumbs point at it",
+        "If not built: the footer's Product column stays the shared parent in practice, and this is stated in prerender-routes.ts next to the existing note about /features having no route"
+      ],
+      "priority": "low",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (iteration 3). Only /features/lead-capture has a breadcrumb at all; the other four have none, so this is not urgent. Do not build it just to have a hub \u2014 /tools earned one because three tools with distinct jobs benefit from a page that says which to open when. Five feature pages that are already linked from the footer may not."
+    },
+    {
+      "id": "US-172",
+      "title": "window.location.origin builds canonical and structured-data URLs on a dozen pages",
+      "description": "Pricing, InstagramBioForRealtors, VsLater and others construct canonicalUrl and JSON-LD @id/url values from window.location.origin. During the prerender that origin is the preview server on 127.0.0.1, and these survive only because scripts/prerender.mts rewrites PREVIEW_ORIGIN out of every snapshot before writing it \u2014 a safety net documented as being for canonical tags, quietly loadbearing for structured data too. getBaseUrl()/getCanonicalUrl() in src/config/seo.config.ts is the intended helper and is built on the same getSafeOrigin() the canonicals use.",
+      "acceptanceCriteria": [
+        "No src/pages or src/components file builds a canonical, an og:url or a JSON-LD url/@id from window.location.origin",
+        "getCanonicalUrl is used instead",
+        "A test or a grep-based check keeps it from coming back",
+        "The prerender's origin rewrite stays \u2014 it is defence in depth, not the fix"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (iteration 3). The two breadcrumb components were fixed there because their output is what US-168 was about; the rest is a mechanical sweep of about a dozen call sites and was left out deliberately to keep that iteration reviewable. Check whether the prerender's rewrite is masking anything else before removing any of it."
     }
   ]
 }

@@ -284,9 +284,9 @@ export default function InstagramBioAnalyzer() {
           <div className="container mx-auto px-4">
             <Breadcrumb
               items={[
-                { name: "Home", url: window.location.origin },
-                { name: "Free Tools", url: "/tools/instagram-bio-analyzer" },
-                { name: "Instagram Bio Analyzer", url: "/tools/instagram-bio-analyzer" }
+                { name: "Home", url: getCanonicalUrl("/") },
+                { name: "Free Tools", url: getCanonicalUrl("/tools") },
+                { name: "Instagram Bio Analyzer", url: getCanonicalUrl("/tools/instagram-bio-analyzer") }
               ]}
             />
           </div>

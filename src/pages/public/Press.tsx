@@ -132,6 +132,7 @@ export default function Press() {
         <div className="border-b border-border bg-card py-3">
           <div className="container mx-auto px-4">
             <Breadcrumb
+              emitSchema={false}
               items={[
                 { name: 'Home', url: getCanonicalUrl('/') },
                 { name: 'Press', url: CANONICAL },

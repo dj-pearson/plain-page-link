@@ -84,7 +84,7 @@ export default function Blog() {
               <div className="max-w-3xl">
                 {/* Breadcrumbs */}
                 <div className="mb-4">
-                  <Breadcrumbs items={[{ name: 'Blog', href: '/blog' }]} />
+                  <Breadcrumbs emitSchema={false} items={[{ name: 'Blog', href: '/blog' }]} />
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">

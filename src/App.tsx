@@ -73,6 +73,7 @@ const AnalyticsFeature = lazy(() => import('./pages/features/Analytics'));
 // Lazy load tools
 const InstagramBioAnalyzer = lazy(() => import('./pages/tools/InstagramBioAnalyzer'));
 const ListingDescriptionGenerator = lazy(() => import('./pages/tools/ListingDescriptionGenerator'));
+const ToolsIndex = lazy(() => import('./pages/tools/ToolsIndex'));
 const AgentBioGenerator = lazy(() => import('./pages/tools/AgentBioGenerator'));
 const Press = lazy(() => import('./pages/public/Press'));
 
@@ -210,6 +211,7 @@ function App() {
               <Route path="/features/analytics" element={<AnalyticsFeature />} />
 
               {/* Tools */}
+              <Route path="/tools" element={<ToolsIndex />} />
               <Route path="/tools/instagram-bio-analyzer" element={<InstagramBioAnalyzer />} />
               <Route
                 path="/tools/listing-description-generator"

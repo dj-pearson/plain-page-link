@@ -244,7 +244,7 @@ export default function Pricing() {
             <div className="max-w-7xl mx-auto">
               {/* Breadcrumbs */}
               <div className="mb-8">
-                <Breadcrumbs items={[{ name: 'Pricing', href: '/pricing' }]} />
+                <Breadcrumbs emitSchema={false} items={[{ name: 'Pricing', href: '/pricing' }]} />
               </div>
 
               <div className="text-center mb-12">

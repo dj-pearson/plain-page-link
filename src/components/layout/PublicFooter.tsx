@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Home, Mail, Facebook, Instagram, Linkedin } from 'lucide-react';
 import { openCookiePreferences } from '@/lib/cookie-consent';
+import { TOOLS } from '@/config/tools';
 
 export function PublicFooter() {
   return (
@@ -165,38 +166,25 @@ export function PublicFooter() {
           </div>
 
           {/* Free tools.
-              All three were unreachable from the homepage by any internal link.
-              Their only inbound links came from the 26 /for/{city} pages, which
-              carry noindex and are themselves unreachable — an island linking to
-              an island. The bio generator, built for a specific query cluster in
-              US-155, had zero inbound internal links from anywhere. */}
+              All three were unreachable from the homepage by any internal link
+              (US-165). The list comes from src/config/tools.ts, the same one the
+              /tools hub renders, so a tool cannot be added to one and forgotten
+              in the other — which is exactly how the bio generator ended up in
+              the sitemap with no inbound link anywhere. */}
           <div>
-            <h3 className="text-white font-semibold mb-4">Free tools</h3>
+            <h3 className="text-white font-semibold mb-4">
+              <Link to="/tools" className="hover:text-gray-300 transition-colors">
+                Free tools
+              </Link>
+            </h3>
             <ul className="space-y-2">
-              <li>
-                <Link
-                  to="/tools/real-estate-agent-bio-generator"
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  Agent bio generator
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/tools/instagram-bio-analyzer"
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  Instagram bio analyzer
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/tools/listing-description-generator"
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  Listing description writer
-                </Link>
-              </li>
+              {TOOLS.map((tool) => (
+                <li key={tool.path}>
+                  <Link to={tool.path} className="text-gray-400 hover:text-white transition-colors">
+                    {tool.shortName}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 

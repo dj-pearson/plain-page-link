@@ -10,7 +10,13 @@
  * gate has stopped being worth running.
  */
 import { describe, expect, it } from 'vitest';
-import { auditPages, readCanonical, readDescription, readTitle } from './seo-audit.mjs';
+import {
+  auditPages,
+  auditStructuredData,
+  readCanonical,
+  readDescription,
+  readTitle,
+} from './seo-audit.mjs';
 
 const ORIGIN = 'https://agentbio.net';
 
@@ -149,5 +155,142 @@ describe('seo-audit', () => {
       expect(readDescription(html).value).toBe('D');
       expect(readCanonical(html).value).toBe('https://x/y');
     });
+  });
+});
+
+/**
+ * Proof that the US-167/US-168 breadcrumb rules have teeth.
+ *
+ * Each fixture is a trail the site actually shipped, read out of dist on
+ * 2026-09-10. The interesting one is `siblingParent`: it has no duplicate URL,
+ * no relative URL, and ends at its own canonical, so every cheaper check passes
+ * it. What it claims is that /tools/instagram-bio-analyzer is the parent of
+ * /tools/real-estate-agent-bio-generator, which is the tool next to it.
+ */
+describe('BreadcrumbList', () => {
+  const page = (canonical: string, list: unknown, extra: unknown[] = []) => {
+    const blocks = [list, ...extra]
+      .map((b) => `<script type="application/ld+json">${JSON.stringify(b)}</script>`)
+      .join('');
+    return `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/><link rel="canonical" href="${canonical}"/>${blocks}</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`;
+  };
+
+  const trail = (rungs: [string, string][]) => ({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: rungs.map(([name, item], index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name,
+      item,
+    })),
+  });
+
+  const problemsFor = (canonical: string, list: unknown, extra: unknown[] = []) =>
+    auditStructuredData('/x', page(canonical, list, extra)).map((p) => p.problem);
+
+  it('rejects the relative item URLs /features/lead-capture shipped', () => {
+    const problems = problemsFor(
+      'https://agentbio.net/features/lead-capture',
+      trail([
+        ['Home', 'https://agentbio.net'],
+        ['Features', '/features/property-listings'],
+        ['Lead Capture', '/features/lead-capture'],
+      ])
+    );
+    expect(problems.filter((p) => p.includes('relative item URL'))).toHaveLength(2);
+  });
+
+  it('rejects the two rungs /tools/instagram-bio-analyzer gave the same URL', () => {
+    const problems = problemsFor(
+      'https://agentbio.net/tools/instagram-bio-analyzer',
+      trail([
+        ['Home', 'https://agentbio.net/'],
+        ['Free Tools', 'https://agentbio.net/tools/instagram-bio-analyzer'],
+        ['Instagram Bio Analyzer', 'https://agentbio.net/tools/instagram-bio-analyzer'],
+      ])
+    );
+    expect(problems.some((p) => p.includes('share the URL'))).toBe(true);
+  });
+
+  it('rejects a rung that points at a sibling rather than an ancestor', () => {
+    const siblingParent = trail([
+      ['Home', 'https://agentbio.net/'],
+      ['Free Tools', 'https://agentbio.net/tools/instagram-bio-analyzer'],
+      ['Agent Bio Generator', 'https://agentbio.net/tools/real-estate-agent-bio-generator'],
+    ]);
+    const problems = problemsFor(
+      'https://agentbio.net/tools/real-estate-agent-bio-generator',
+      siblingParent
+    );
+    // Every cheaper rule passes it; only the ancestor rule catches it.
+    expect(problems.some((p) => p.includes('relative'))).toBe(false);
+    expect(problems.some((p) => p.includes('share the URL'))).toBe(false);
+    expect(problems.some((p) => p.includes('is not an ancestor of'))).toBe(true);
+  });
+
+  it('accepts the corrected trail', () => {
+    expect(
+      problemsFor(
+        'https://agentbio.net/tools/real-estate-agent-bio-generator',
+        trail([
+          ['Home', 'https://agentbio.net/'],
+          ['Free Tools', 'https://agentbio.net/tools'],
+          ['Agent Bio Generator', 'https://agentbio.net/tools/real-estate-agent-bio-generator'],
+        ])
+      )
+    ).toEqual([]);
+  });
+
+  it('allows the declared non-path parent the city pages use', () => {
+    expect(
+      problemsFor(
+        'https://agentbio.net/for/miami-real-estate-agents',
+        trail([
+          ['Home', 'https://agentbio.net/'],
+          ['For Real Estate Agents', 'https://agentbio.net/for-real-estate-agents'],
+          ['Miami Real Estate Agents', 'https://agentbio.net/for/miami-real-estate-agents'],
+        ])
+      )
+    ).toEqual([]);
+  });
+
+  it('rejects a trail that ends somewhere other than the page', () => {
+    const problems = problemsFor(
+      'https://agentbio.net/pricing',
+      trail([
+        ['Home', 'https://agentbio.net/'],
+        ['Blog', 'https://agentbio.net/blog'],
+      ])
+    );
+    expect(problems.some((p) => p.includes("but the page's canonical is"))).toBe(true);
+  });
+
+  it('rejects the two BreadcrumbList blocks every city page shipped', () => {
+    const one = trail([
+      ['Home', 'https://agentbio.net/'],
+      ['Pricing', 'https://agentbio.net/pricing'],
+    ]);
+    const problems = problemsFor('https://agentbio.net/pricing', one, [one]);
+    expect(problems).toContain('2 BreadcrumbList blocks on one page; there can only be one trail');
+  });
+
+  it('finds a BreadcrumbList nested in an @graph', () => {
+    const graph = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        { '@type': 'WebPage', name: 'x' },
+        trail([
+          ['Home', 'https://agentbio.net/'],
+          ['Free Tools', '/tools'],
+          ['Agent Bio', 'https://agentbio.net/tools/real-estate-agent-bio-generator'],
+        ]),
+      ],
+    };
+    expect(
+      problemsFor('https://agentbio.net/tools/real-estate-agent-bio-generator', graph).some((p) =>
+        p.includes('relative item URL')
+      )
+    ).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
-import { Link } from "react-router-dom";
-import { ChevronRight, Home } from "lucide-react";
-import { Helmet } from "react-helmet-async";
+import { Link } from 'react-router-dom';
+import { ChevronRight, Home } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
+import { getCanonicalUrl } from '@/config/seo.config';
 
 export interface BreadcrumbItem {
   name: string;
@@ -10,6 +11,12 @@ export interface BreadcrumbItem {
 export interface BreadcrumbsProps {
   items: BreadcrumbItem[];
   className?: string;
+  /**
+   * Emit the BreadcrumbList JSON-LD. False on a page whose own schema @graph
+   * already declares one — /pricing, /blog and the blog category pages each
+   * shipped two, and nothing says which one Google reads (US-167).
+   */
+  emitSchema?: boolean;
 }
 
 /**
@@ -26,36 +33,34 @@ export interface BreadcrumbsProps {
  *   ]}
  * />
  */
-export function Breadcrumbs({ items, className = "" }: BreadcrumbsProps) {
-  const allItems: BreadcrumbItem[] = [
-    { name: "Home", href: "/" },
-    ...items
-  ];
+export function Breadcrumbs({ items, className = '', emitSchema = true }: BreadcrumbsProps) {
+  const allItems: BreadcrumbItem[] = [{ name: 'Home', href: '/' }, ...items];
 
   // Generate BreadcrumbList structured data
   const breadcrumbSchema = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": allItems.map((item, index) => ({
-      "@type": "ListItem",
-      "position": index + 1,
-      "name": item.name,
-      "item": `${window.location.origin}${item.href}`
-    }))
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: allItems.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      // getCanonicalUrl rather than window.location.origin: during the
+      // prerender that origin is the preview server on 127.0.0.1, and this
+      // survived only because prerender.mts rewrites it back out of every
+      // snapshot (US-168).
+      item: getCanonicalUrl(item.href),
+    })),
   };
 
   return (
     <>
-      <Helmet>
-        <script type="application/ld+json">
-          {JSON.stringify(breadcrumbSchema)}
-        </script>
-      </Helmet>
+      {emitSchema && (
+        <Helmet>
+          <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
+        </Helmet>
+      )}
 
-      <nav
-        aria-label="Breadcrumb"
-        className={`flex items-center space-x-2 text-sm ${className}`}
-      >
+      <nav aria-label="Breadcrumb" className={`flex items-center space-x-2 text-sm ${className}`}>
         <ol className="flex items-center space-x-2">
           {allItems.map((item, index) => {
             const isLast = index === allItems.length - 1;
@@ -64,19 +69,11 @@ export function Breadcrumbs({ items, className = "" }: BreadcrumbsProps) {
             return (
               <li key={item.href} className="flex items-center">
                 {index > 0 && (
-                  <ChevronRight
-                    className="h-4 w-4 mx-2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
+                  <ChevronRight className="h-4 w-4 mx-2 text-muted-foreground" aria-hidden="true" />
                 )}
                 {isLast ? (
-                  <span
-                    className="text-foreground font-medium"
-                    aria-current="page"
-                  >
-                    {isFirst && (
-                      <Home className="inline h-4 w-4 mr-1" aria-hidden="true" />
-                    )}
+                  <span className="text-foreground font-medium" aria-current="page">
+                    {isFirst && <Home className="inline h-4 w-4 mr-1" aria-hidden="true" />}
                     {item.name}
                   </span>
                 ) : (
@@ -84,9 +81,7 @@ export function Breadcrumbs({ items, className = "" }: BreadcrumbsProps) {
                     to={item.href}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    {isFirst && (
-                      <Home className="inline h-4 w-4 mr-1" aria-hidden="true" />
-                    )}
+                    {isFirst && <Home className="inline h-4 w-4 mr-1" aria-hidden="true" />}
                     {item.name}
                   </Link>
                 )}
@@ -116,10 +111,10 @@ export function generateBreadcrumbsFromPath(
   pathname: string,
   nameOverrides: Record<string, string> = {}
 ): BreadcrumbItem[] {
-  const segments = pathname.split("/").filter(Boolean);
+  const segments = pathname.split('/').filter(Boolean);
 
   return segments.map((segment, index) => {
-    const href = "/" + segments.slice(0, index + 1).join("/");
+    const href = '/' + segments.slice(0, index + 1).join('/');
     const name = nameOverrides[segment] || formatSegmentName(segment);
 
     return { name, href };
@@ -132,7 +127,7 @@ export function generateBreadcrumbsFromPath(
  */
 function formatSegmentName(segment: string): string {
   return segment
-    .split("-")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }

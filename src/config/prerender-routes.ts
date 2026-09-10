@@ -82,6 +82,8 @@ export const STATIC_ROUTES: readonly PrerenderRoute[] = [
   { path: '/vs/beacons', kind: 'comparison' },
   { path: '/vs/later', kind: 'comparison' },
 
+  // US-167. The hub the tool breadcrumbs had been claiming existed.
+  { path: '/tools', kind: 'tool' },
   { path: '/tools/instagram-bio-analyzer', kind: 'tool' },
   { path: '/tools/listing-description-generator', kind: 'tool' },
   // US-155. The page that serves the ~180-impression "real estate agent bio"

@@ -151,7 +151,7 @@ export default function AgentBioGenerator() {
             <Breadcrumb
               items={[
                 { name: 'Home', url: getCanonicalUrl('/') },
-                { name: 'Free Tools', url: getCanonicalUrl('/tools/instagram-bio-analyzer') },
+                { name: 'Free Tools', url: getCanonicalUrl('/tools') },
                 { name: 'Agent Bio Generator', url: CANONICAL },
               ]}
             />

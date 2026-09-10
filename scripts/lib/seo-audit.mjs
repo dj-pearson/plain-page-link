@@ -63,7 +63,13 @@ export function readCanonical(html) {
 }
 
 export function readRobots(html) {
-  return attr(headOf(html).match(/<meta[^>]*name="robots"[^>]*>/gi)?.join('') || '', /<meta[^>]*>/gi, 'content');
+  return attr(
+    headOf(html)
+      .match(/<meta[^>]*name="robots"[^>]*>/gi)
+      ?.join('') || '',
+    /<meta[^>]*>/gi,
+    'content'
+  );
 }
 
 function rootLength(html) {
@@ -127,6 +133,23 @@ function walkJsonLd(node, visit) {
  * below does not ban the field; it bans the specific invented pair, and it
  * requires anything claiming a rating to also name a review count.
  */
+/**
+ * Breadcrumb trails that deliberately do not mirror the URL path.
+ *
+ * Google allows a breadcrumb that reflects how a reader got somewhere rather
+ * than how the URL is spelled, so the ancestor rule below needs a way to say
+ * "this one is on purpose". It is declared here, in code, rather than left to
+ * whoever reads the failure — an exception made of prose asserts nothing, which
+ * is the lesson from the three-vendor bundle exception in US-163.
+ *
+ * Each entry is `leaf path prefix` -> the non-path parent it may claim.
+ */
+const DELIBERATE_NON_PATH_PARENTS = [
+  // The 26 city pages sit under /for/{city} while their conceptual parent is
+  // the /for-real-estate-agents marketing page. Different tree, same subject.
+  { leaf: '/for/', parent: '/for-real-estate-agents' },
+];
+
 export function auditStructuredData(route, html) {
   const problems = [];
   const { blocks, problems: parseProblems } = readJsonLd(html);
@@ -143,9 +166,13 @@ export function auditStructuredData(route, html) {
     .replace(/&[a-z]+;/gi, ' ')
     .replace(/\s+/g, ' ');
 
+  let breadcrumbLists = 0;
+
   for (const block of blocks) {
     walkJsonLd(block, (node) => {
       const type = node['@type'];
+
+      if (type === 'BreadcrumbList') breadcrumbLists += 1;
 
       if (node.aggregateRating) {
         const rating = node.aggregateRating;
@@ -164,6 +191,82 @@ export function auditStructuredData(route, html) {
         }
       }
 
+      // A BreadcrumbList that describes a hierarchy the site does not have
+      // (US-167/US-168). Three tool pages asserted a "Free Tools" rung
+      // pointing at /tools/instagram-bio-analyzer — a sibling, not a parent —
+      // for a /tools route that did not exist; /features/lead-capture did the
+      // same with /features/property-listings, and shipped both of its `item`
+      // values as relative URLs, which Google rejects.
+      if (type === 'BreadcrumbList' && Array.isArray(node.itemListElement)) {
+        const seen = new Map();
+        node.itemListElement.forEach((entry, index) => {
+          const item = entry && entry.item;
+          const url = typeof item === 'string' ? item : item && item['@id'];
+          const name = (entry && entry.name) || `position ${index + 1}`;
+
+          if (!url) {
+            problems.push(`BreadcrumbList rung "${name}" has no item URL`);
+            return;
+          }
+          if (!/^https?:\/\//i.test(url)) {
+            problems.push(
+              `BreadcrumbList rung "${name}" has a relative item URL (${url}); ` +
+                'schema.org requires an absolute one'
+            );
+            return;
+          }
+          if (seen.has(url)) {
+            problems.push(
+              `BreadcrumbList rungs "${seen.get(url)}" and "${name}" share the URL ${url}, ` +
+                'so the trail claims a level that is not one'
+            );
+          }
+          seen.set(url, name);
+        });
+
+        const last = node.itemListElement[node.itemListElement.length - 1];
+        const lastItem = last && last.item;
+        const lastUrl = typeof lastItem === 'string' ? lastItem : lastItem && lastItem['@id'];
+        const canonical = readCanonical(html).value;
+        if (lastUrl && canonical && lastUrl.replace(/\/+$/, '') !== canonical.replace(/\/+$/, '')) {
+          problems.push(
+            `BreadcrumbList ends at ${lastUrl} but the page's canonical is ${canonical}`
+          );
+        }
+
+        // The rule the two sibling-pointing trails broke, and the one a
+        // duplicate-URL check misses: every rung above the last one has to be
+        // an ancestor of it. /tools/instagram-bio-analyzer is not an ancestor of
+        // /tools/real-estate-agent-bio-generator, it is the tool next to it, and
+        // a trail saying otherwise describes a site that does not exist.
+        const pathOf = (url) => {
+          try {
+            return new URL(url).pathname.replace(/\/+$/, '') || '/';
+          } catch {
+            return null;
+          }
+        };
+        const leaf = lastUrl && pathOf(lastUrl);
+        if (leaf) {
+          for (const entry of node.itemListElement.slice(0, -1)) {
+            const item = entry && entry.item;
+            const url = typeof item === 'string' ? item : item && item['@id'];
+            const path = url && pathOf(url);
+            if (!path || path === '/') continue;
+            const declared = DELIBERATE_NON_PATH_PARENTS.some(
+              (allowed) => leaf.startsWith(allowed.leaf) && path === allowed.parent
+            );
+            if (declared) continue;
+            if (leaf !== path && !leaf.startsWith(`${path}/`)) {
+              problems.push(
+                `BreadcrumbList rung "${entry.name}" points at ${path}, which is not an ` +
+                  `ancestor of ${leaf} — the trail describes a hierarchy the site does not have`
+              );
+            }
+          }
+        }
+      }
+
       // A FAQPage that describes questions nobody can see on the page is
       // schema for a crawler rather than markup of the content.
       if (type === 'FAQPage' && Array.isArray(node.mainEntity)) {
@@ -177,6 +280,15 @@ export function auditStructuredData(route, html) {
         }
       }
     });
+  }
+
+  // Two BreadcrumbList declarations on one page are two answers to one
+  // question, and nothing says which one Google reads. Every /for/{city} page
+  // shipped two: one in the page's own @graph, one from <Breadcrumb>.
+  if (breadcrumbLists > 1) {
+    problems.push(
+      `${breadcrumbLists} BreadcrumbList blocks on one page; there can only be one trail`
+    );
   }
 
   return problems.map((problem) => ({ route, problem }));
@@ -255,7 +367,10 @@ export function auditPages(pages, { origin }) {
         if (!isHome && (actual === base || actual === `${base}/`)) {
           add(route, 'canonical points at the homepage, not at itself');
         } else {
-          add(route, `canonical is ${JSON.stringify(canonical.value)}, expected ${JSON.stringify(expected)}`);
+          add(
+            route,
+            `canonical is ${JSON.stringify(canonical.value)}, expected ${JSON.stringify(expected)}`
+          );
         }
       }
       if (/127\.0\.0\.1|localhost/.test(canonical.value)) {

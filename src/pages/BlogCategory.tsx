@@ -470,6 +470,7 @@ export default function BlogCategory() {
                 {/* Breadcrumbs */}
                 <div className="mb-4">
                   <Breadcrumbs
+                    emitSchema={false}
                     items={[
                       { name: 'Blog', href: '/blog' },
                       { name: content.title, href: `/blog/category/${category}` },

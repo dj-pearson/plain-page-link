@@ -2217,3 +2217,94 @@ that the deploy-breaking route WAS generated and now is not. Three real builds:
 one reproducing the break, one proving the warning path ships 56 pages, one with
 three articles across two listed categories and one unlisted proving the
 intercept and the badge link. verify:seo green on all of them.
+
+## SEO loop — iteration 3/15 — US-167 + US-168: the hierarchy the site claimed it had
+
+Both stories were about the same block of markup, so they went together. What
+was actually shipping, read out of dist rather than out of the source:
+
+  /tools/instagram-bio-analyzer
+      BreadcrumbList: Home -> "Free Tools" -> "Instagram Bio Analyzer"
+      rungs 2 and 3 both item="/tools/instagram-bio-analyzer"
+      — relative, which Google rejects outright, and the same URL twice
+  /tools/real-estate-agent-bio-generator
+      "Free Tools" -> https://agentbio.net/tools/instagram-bio-analyzer
+      — the tool NEXT to it, presented as its parent
+  /features/lead-capture
+      "Features" -> /features/property-listings, also relative, also a sibling
+
+There was no /tools route in App.tsx at all. Three pages had been asserting a
+level of the site that did not exist, in the one format Google reads literally.
+
+53 breadcrumb problems across the build, on the first pass of the new rules.
+
+THE HUB. /tools now exists, prerendered, in the sitemap, reading
+src/config/tools.ts — which the footer's Free tools column also renders, so a
+tool cannot be added to one and forgotten in the other. That is not a
+hypothetical: it is exactly how /tools/real-estate-agent-bio-generator came to
+be in the sitemap with no inbound link anywhere on the site (US-165).
+
+/features did NOT get one. Building a hub whose content restates the homepage's
+features section is the thin page US-153 noindexed 23 city pages over, so
+/features/lead-capture's breadcrumb dropped the rung it could not honour and
+goes Home -> Lead Capture. Two honest rungs beat three with one invented.
+US-171 holds the open question.
+
+THE COMPONENTS. Both breadcrumb components had the same three faults:
+  - item URLs built from window.location.origin, which during the prerender is
+    the preview server on 127.0.0.1. They survive only because prerender.mts
+    rewrites that origin back out of every snapshot — a net documented as being
+    for canonical tags and quietly loadbearing for structured data too.
+    getCanonicalUrl() now, the same helper the canonicals use. US-172 covers the
+    dozen other call sites that still do this.
+  - seo/Breadcrumb.tsx generated its JSON-LD from `items` and rendered the trail
+    from `breadcrumbItems`, the copy with Home prepended. On every page relying
+    on showHome the structured data was missing the first rung a reader could
+    see. Home is prepended before the schema is built now.
+  - both emitted their own BreadcrumbList unconditionally, on pages whose own
+    schema @graph already declared one. An `emitSchema` prop turns that off
+    where the page owns the trail: 26 city pages, /pricing, /press, /blog and
+    the two blog category pages were each shipping two.
+
+THE ONE THAT WAS NOT A BREADCRUMB BUG. After the emitSchema fix, two pages
+still had two BreadcrumbLists — Denver and Orlando, and only those two, which is
+what a race looks like. The two JSON-LD blocks were identical except:
+
+    dateModified: "2026-09-10T02:30:23.329Z"
+    dateModified: "2026-09-10T02:30:23.352Z"
+
+LocationTemplate set dateModified to `new Date().toISOString()`. React renders
+twice, the timestamps differed by 23ms, react-helmet-async keys its dedupe on
+the serialised content, and the page shipped two copies of the entire schema
+graph. The duplicate BreadcrumbList was a symptom.
+
+The disease is worse than the symptom: every city page was claiming it had been
+modified at the moment of rendering, on every render, forever. That is the same
+false-freshness signal US-149 refused to put in the sitemap — "a sitemap where
+every lastmod is today is one Google learns to disregard". There is no truthful
+dateModified for a static city page, so it says nothing now, which is what
+sitemap.mts already does with lastmod. /features/lead-capture had the same thing
+as citationDate; also removed.
+
+THE GUARD, in scripts/lib/seo-audit.mjs, so it runs inside `npm run verify:seo`:
+  - every item URL absolute
+  - no two rungs sharing a URL
+  - the trail ends where the canonical says the page is
+  - every rung above the last is an ancestor of it
+  - one BreadcrumbList per page
+
+The ancestor rule needed an escape hatch, because Google allows a trail that
+reflects how a reader arrived rather than how the URL is spelled — the 26 city
+pages sit under /for/{city} with /for-real-estate-agents as their conceptual
+parent. It is declared in DELIBERATE_NON_PATH_PARENTS, in code. An exception
+made of prose asserts nothing; that is the lesson from the three-vendor bundle
+exception in US-163.
+
+The ancestor rule is the one that earns its place. The sibling-parent trail on
+the bio generator has no relative URL, no duplicate URL, and ends at its own
+canonical — every cheaper check passes it. There is a test that asserts exactly
+that before asserting the ancestor rule catches it.
+
+VERIFICATION: 53 breadcrumb problems before, 0 after, against real builds both
+times. tsc clean. 8 new tests in seo-audit.test.ts. 58 pages, 29 sitemap URLs,
+all reachable. STORIES OPENED: US-171, US-172.
