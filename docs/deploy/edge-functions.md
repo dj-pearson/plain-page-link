@@ -1,57 +1,87 @@
 # Deploying edge functions
 
-There is one path. This document replaces four that contradicted each other.
+Two runtimes exist. Only one is reachable from the internet, and it is not the
+one this document used to name.
 
 ## What actually serves the functions
 
-Self-hosted Supabase runs its own **edge runtime** container, which serves
-everything under `supabase/functions/` at `/functions/v1/<name>`. That is what
-`supabase.functions.invoke('submit-lead', …)` reaches, via the
-`VITE_FUNCTIONS_URL` origin (`https://functions.agentbio.net`).
+`https://functions.agentbio.net` is Traefik-routed to the **Coolify application
+`isswgo8w4gs44ogk48wgsc88`**, which runs `edge-functions-server.ts` (built from
+the root `Dockerfile`) as `deno run ... server.ts`. `.env.example` sets
+`VITE_FUNCTIONS_URL` to that host, so it is what the client reaches.
 
-Deploy a function by getting its directory onto that container and restarting
-it — the Supabase CLI's `supabase functions deploy <name>` does this, as does
-any process that syncs `supabase/functions/` into the runtime's volume.
+Measured 2026-09-10:
 
-Nothing else in this repository is involved.
-
-## What was here before, and why it is gone
-
-`edge-functions-server.ts` was a hand-written Deno router with a `FUNCTIONS_MAP`
-listing **15** of the 86 functions in `supabase/functions/`. Four build
-configurations existed to ship it:
-
-| File | What it did |
+| Request | Result |
 | --- | --- |
-| `Dockerfile` | `deno cache edge-functions-server.ts`, serve on 8000 |
-| `edge-functions.Dockerfile` | the same, under a different filename |
-| `Dockerfile.gitclone` | the same, but cloning the repo inside the image "as a workaround for Coolify source issues" |
-| `docker-compose.edge-functions.yml` | composed the above |
-| `nixpacks.toml` | `deno run … edge-functions-server.ts` |
+| `GET functions.agentbio.net/<unknown>` | `404 {"error":"Function not found","available":[...15]}` |
+| `GET api.agentbio.net/functions/v1/<any name>` | `500 InvalidWorkerCreation: worker boot error: failed to read path` |
 
-All five are deleted, along with the router and the two `migrate-*-edge-functions.ps1`
-scripts, because the router cannot be what serves production:
+The Supabase **edge runtime** container (`supabase-edge-functions-rwwccs4k8o8kog4s0w4ggggg`)
+carries no Traefik labels, so it is reachable only through Kong at
+`api.agentbio.net/functions/v1/`. Its volume
+(`/data/coolify/services/rwwccs4k8o8kog4s0w4ggggg/volumes/functions`) holds
+`main/` and `hello/` and nothing else. The 88 directories under
+`supabase/functions/` have never been deployed into it, which is why every name
+returns the same 500, including names that exist in this repo.
 
-The app calls **34** distinct edge functions. **25 of them are not in that map** —
+So `supabase functions deploy <name>` is the right command for a runtime that is
+not currently serving anything, and running it does not make that runtime
+reachable at `functions.agentbio.net`.
+
+## Deploying a change today
+
+Redeploy the Coolify application. The build needs the root `Dockerfile`,
+`edge-functions-server.ts` and `.dockerignore`; all three were deleted in
+US-122 and restored afterwards, which left the application unbuildable for
+eight days. A function that is not listed in `FUNCTIONS_MAP` is not served,
+whatever exists on disk.
+
+Environment variables on that application are marked build-time, so a
+**restart does not pick up a changed value and a deploy is required**. This is
+how the 2026-09-10 key rotation left the app holding a retired `service_role`
+key while the Supabase stack had already moved to the new JWT secret.
+
+## What is still wrong, and was correctly identified in US-122
+
+The app calls **34** distinct edge functions. **25 are not in `FUNCTIONS_MAP`**,
 including `login-security`, `pii-crypto`, `submit-review`, `gdpr-deletion`,
-`create-portal-session` and `send-welcome-email`. If that server were live,
-three quarters of the app's edge-function calls would return 404, and login,
-lead decryption and billing would all be broken. They are not. So the runtime
-serving production is Supabase's own, and this was a parallel path that had been
-documented as though it were real (US-122).
+`create-portal-session` and `send-welcome-email`. Those calls get the 404 above.
+That finding stands and is worth fixing.
 
-The six `COOLIFY_*`, `EDGE_FUNCTIONS_*` and `DOCKERFILE_*` documents describing
-those paths are in `docs/archive/` — they record what someone tried on a
-particular day, not how this is deployed.
+What did not follow from it is the conclusion US-122 drew: that because login
+and billing were not reported broken, the router could not be what serves
+production, and Supabase's own runtime must be. No request was issued to check.
+The router is what serves production, the functions it omits are genuinely
+unserved, and the runtime named as the replacement was empty. Deleting the build
+path on that reasoning removed the only way to rebuild the container that was
+actually live.
+
+`edge-functions-server.ts` also imports each function with a dynamic `import()`
+in-process. Supabase functions call `serve()` at module top level, so importing
+one starts a second listener on the port the router already holds.
+`GET functions.agentbio.net/submit-contact` returns `502` rather than the
+router's own caught-error `500`, which is consistent with that. Verify before
+building on the current design.
+
+## Redundant build files, correctly removed and not restored
+
+`edge-functions.Dockerfile`, `Dockerfile.gitclone`,
+`docker-compose.edge-functions.yml` and `nixpacks.toml` were four more ways to
+build the same image. They stay deleted. Only the root `Dockerfile` is wired to
+the Coolify application.
+
+The `COOLIFY_*`, `EDGE_FUNCTIONS_*` and `DOCKERFILE_*` documents in
+`docs/archive/` record what someone tried on a particular day, not how this is
+deployed.
 
 ## If a function 404s in production
 
-1. Confirm the directory exists under `supabase/functions/<name>/index.ts`.
-2. Confirm it reached the edge runtime container (a deploy step was missed, or
-   the volume did not sync).
-3. Check the runtime's logs — a function that fails to import (a bad specifier,
-   a missing `_shared` file) is served as an error, not as a 404.
+1. Check whether the name is in `FUNCTIONS_MAP` in `edge-functions-server.ts`.
+   If it is absent, that is the 404 and no amount of deploying will change it.
+2. Confirm `supabase/functions/<name>/index.ts` exists.
+3. Check the application's logs in Coolify. A function that fails to import is
+   served as a 500 or drops the connection, not as a 404.
 
-`supabase/functions/deno.json` holds the import map the runtime uses. CI
-type-checks every function with `deno check` in
-`.github/workflows/verify-backend.yml`.
+`supabase/functions/deno.json` holds the import map. CI type-checks every
+function with `deno check` in `.github/workflows/verify-backend.yml`.
