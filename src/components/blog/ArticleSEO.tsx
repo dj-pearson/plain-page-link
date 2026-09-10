@@ -1,5 +1,5 @@
-import { Helmet } from "react-helmet-async";
-import { getSafeOrigin } from "@/lib/utils";
+import { Helmet } from 'react-helmet-async';
+import { getBaseUrl } from '@/config/seo.config';
 
 interface ArticleSEOProps {
   title: string;
@@ -22,14 +22,18 @@ export function ArticleSEO({
   imageUrl,
   publishedTime,
   modifiedTime,
-  author = "Real Estate Expert",
+  author = 'Real Estate Expert',
   tags = [],
-  category = "Real Estate",
+  category = 'Real Estate',
   wordCount,
   readingTime,
 }: ArticleSEOProps) {
-  const siteName = "AgentBio";
-  const siteUrl = getSafeOrigin();
+  const siteName = 'AgentBio';
+  // getBaseUrl(), not getSafeOrigin(): a canonical is a claim about identity,
+  // so it must not read the host the visitor happens to be on. A *.pages.dev
+  // preview would otherwise self-canonicalise once the bundle hydrates
+  // (US-172).
+  const siteUrl = getBaseUrl();
   const fullUrl = `${siteUrl}${url}`;
 
   // Use Cover.png as fallback if no featured image
@@ -37,12 +41,12 @@ export function ArticleSEO({
 
   // Build structured data for Article with enhanced properties for AI search
   const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "BlogPosting",
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
     headline: title,
     description: description,
     image: {
-      "@type": "ImageObject",
+      '@type': 'ImageObject',
       url: socialImage,
       width: 1200,
       height: 630,
@@ -50,50 +54,50 @@ export function ArticleSEO({
     datePublished: publishedTime,
     dateModified: modifiedTime || publishedTime,
     author: {
-      "@type": "Person",
+      '@type': 'Person',
       name: author,
       url: siteUrl,
     },
     publisher: {
-      "@type": "Organization",
+      '@type': 'Organization',
       name: siteName,
       logo: {
-        "@type": "ImageObject",
+        '@type': 'ImageObject',
         url: `${siteUrl}/Cover.png`,
       },
       url: siteUrl,
     },
     mainEntityOfPage: {
-      "@type": "WebPage",
-      "@id": fullUrl,
+      '@type': 'WebPage',
+      '@id': fullUrl,
     },
     articleSection: category,
-    keywords: tags.join(", "),
+    keywords: tags.join(', '),
     ...(wordCount && { wordCount }),
-    inLanguage: "en-US",
+    inLanguage: 'en-US',
     isAccessibleForFree: true,
     backstory: description,
   };
 
   // Breadcrumb structured data
   const breadcrumbStructuredData = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
     itemListElement: [
       {
-        "@type": "ListItem",
+        '@type': 'ListItem',
         position: 1,
-        name: "Home",
+        name: 'Home',
         item: siteUrl,
       },
       {
-        "@type": "ListItem",
+        '@type': 'ListItem',
         position: 2,
-        name: "Blog",
+        name: 'Blog',
         item: `${siteUrl}/blog`,
       },
       {
-        "@type": "ListItem",
+        '@type': 'ListItem',
         position: 3,
         name: title,
         item: fullUrl,
@@ -103,25 +107,25 @@ export function ArticleSEO({
 
   // WebPage structured data for better AI understanding
   const webPageStructuredData = {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "@id": fullUrl,
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': fullUrl,
     url: fullUrl,
     name: title,
     description: description,
     isPartOf: {
-      "@type": "WebSite",
-      "@id": siteUrl,
+      '@type': 'WebSite',
+      '@id': siteUrl,
       name: siteName,
       url: siteUrl,
     },
     primaryImageOfPage: {
-      "@type": "ImageObject",
+      '@type': 'ImageObject',
       url: socialImage,
     },
-    inLanguage: "en-US",
+    inLanguage: 'en-US',
     potentialAction: {
-      "@type": "ReadAction",
+      '@type': 'ReadAction',
       target: [fullUrl],
     },
   };
@@ -129,9 +133,11 @@ export function ArticleSEO({
   return (
     <Helmet>
       {/* Basic Meta Tags */}
-      <title>{title} | {siteName}</title>
+      <title>
+        {title} | {siteName}
+      </title>
       <meta name="description" content={description} />
-      <meta name="keywords" content={tags.join(", ")} />
+      <meta name="keywords" content={tags.join(', ')} />
       <link rel="canonical" href={fullUrl} />
 
       {/* Open Graph / Facebook */}
@@ -161,8 +167,14 @@ export function ArticleSEO({
       {readingTime && <meta name="twitter:data1" content={readingTime} />}
 
       {/* AI Search Engine Optimization */}
-      <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-      <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+      <meta
+        name="robots"
+        content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+      />
+      <meta
+        name="googlebot"
+        content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"
+      />
       <meta name="bingbot" content="index, follow" />
       <meta name="googlebot-news" content="snippet" />
 

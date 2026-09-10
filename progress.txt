@@ -2308,3 +2308,70 @@ that before asserting the ancestor rule catches it.
 VERIFICATION: 53 breadcrumb problems before, 0 after, against real builds both
 times. tsc clean. 8 new tests in seo-audit.test.ts. 58 pages, 29 sitemap URLs,
 all reachable. STORIES OPENED: US-171, US-172.
+
+## SEO loop — iteration 4/15 — US-172: every canonical was whatever host served the page
+
+The story was opened in iteration 3 as tidiness — "a dozen call sites should use
+the helper". That framing was wrong, and the measurement is what showed it.
+
+getBaseUrl() in seo.config.ts was getSafeOrigin(), which in a browser is
+window.location.origin. Around thirty call sites bypassed it and read
+window.location.origin directly. So every canonical, every og:url and every
+JSON-LD url/@id on every site-owned page was whatever host served the request.
+
+On agentbio.net that is right by coincidence. The exposure:
+
+  Cloudflare Pages gives every branch a *.pages.dev preview URL, serving the
+  whole site. The prerendered HTML carries the correct canonical, because
+  prerender.mts rewrites its own preview origin out of every snapshot. Then the
+  bundle hydrates and react-helmet-async replaces it with the pages.dev host.
+  Googlebot renders JavaScript. That is a preview deployment declaring itself
+  the original of every page on the site.
+
+A canonical is a claim about identity. It cannot be a reading of the current
+environment.
+
+THE SAFETY NET NOBODY KNEW WAS LOADBEARING. prerender.mts had one line:
+
+    const html = result.html.split(PREVIEW_ORIGIN).join(SITE_ORIGIN);
+
+documented as being for canonicals. It was silently holding up the entire
+structured-data layer as well, and it only runs at build time, so it protected
+the first crawl and nothing after it. It now counts what it moves and says so.
+Measured across real builds:
+
+    before:  moved 671 preview-server URL(s) on 58 page(s)   [every page]
+    after:   0 preview-server URLs needed moving
+
+671, not the dozen the story guessed. Worth stating plainly: the guess was off
+by fifty times, and only building it twice showed that.
+
+The counter earned its keep immediately. After the first sweep it still reported
+7 on one page — the homepage, whose WebSite and Organization @ids and canonical
+all came off `getSafeOrigin()` in a spot the grep for window.location.origin
+never touched. A sweep finds what you search for; a measurement finds what is
+there.
+
+WHERE THE VISITOR'S HOST IS STILL RIGHT, and says so at each site:
+  - /:username and /p/{slug} — a tenant may serve these from their own
+    custom_domain, and there the visitor's host IS the canonical one.
+  - Stripe successUrl/cancelUrl, OAuth redirectTo, the dashboard's
+    copy-your-link UI. Those want the host the user is actually on.
+
+THE GUARD, two tests:
+  - src/config/seo-origin.test.ts puts the page on
+    https://feature-branch.agentbio-net.pages.dev and asserts the canonical does
+    not move.
+  - src/config/seo-origin-sources.test.ts asserts no file in the SEO layer
+    mentions window.location.origin or getSafeOrigin at all, with an exception
+    list that carries a reason per entry and a test that each exception is still
+    needed. Demonstrated failing by reintroducing the pattern in
+    features/Testimonials.tsx, then restored.
+
+    src/pages/Pricing.tsx is deliberately NOT in the covered list: it builds
+    Stripe return URLs from the visitor's host, so covering it would mean a
+    blanket exception, and a blanket exception on a page that has a canonical is
+    worse than no coverage — it reads as checked.
+
+VERIFICATION: tsc clean, 58 pages, 29 sitemap URLs all reachable, verify:seo
+green, 671 -> 0 against real builds.

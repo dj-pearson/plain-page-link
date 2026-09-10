@@ -5,13 +5,13 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
-import { getBaseUrl } from '@/config/seo.config';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { PRICING_PLANS } from '@/config/pricing-plans';
 import { COMPETITORS } from '@/config/competitors';
 
 export default function VsLater() {
-  const canonicalUrl = `${window.location.origin}/vs/later`;
-  const toolUrl = `${window.location.origin}/vs/later`;
+  const canonicalUrl = getCanonicalUrl('/vs/later');
+  const toolUrl = canonicalUrl;
 
   const schema = {
     '@context': 'https://schema.org',

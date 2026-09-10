@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { useState } from 'react';
 import { Check, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -51,7 +52,7 @@ export default function Pricing() {
 
   // Generate comprehensive schema for pricing page
   const generatePricingSchema = () => {
-    const baseUrl = window.location.origin;
+    const baseUrl = getBaseUrl();
 
     return {
       '@context': 'https://schema.org',
@@ -233,7 +234,7 @@ export default function Pricing() {
         title="Pricing - AgentBio Professional Plans"
         description="Choose the perfect plan for your real estate business. Start free and scale as you grow with AgentBio."
         keywords={['real estate pricing', 'agent subscriptions', 'link in bio plans']}
-        canonicalUrl={`${window.location.origin}/pricing`}
+        canonicalUrl={getCanonicalUrl('/pricing')}
         schema={schema}
       />
       <div className="min-h-screen flex flex-col">

@@ -1,5 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import { getSafeOrigin } from '@/lib/utils';
+import { getBaseUrl } from '@/config/seo.config';
 
 interface SEOHeadProps {
   title: string;
@@ -71,8 +71,11 @@ export const SEOHead = ({
   const metaDescription =
     description.length > 160 ? description.substring(0, 157) + '...' : description;
 
-  // Safe origin detection for SSR/crawlers
-  const origin = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): a canonical is a claim about identity,
+  // so it must not read the host the visitor happens to be on. A *.pages.dev
+  // preview would otherwise self-canonicalise once the bundle hydrates
+  // (US-172).
+  const origin = getBaseUrl();
 
   // Default OG image if not provided
   const defaultOgImage = `${origin}/Cover.png`;

@@ -73,6 +73,8 @@ interface Rendered {
   html: string;
   title: string;
   problems: string[];
+  /** How many preview-server URLs had to be rewritten; see the note below. */
+  rewrites: number;
 }
 
 /**
@@ -211,14 +213,24 @@ async function renderRoute(
       problems.unshift(...bootErrors.map((m) => `threw during boot: ${m}`));
     }
 
-    // Every absolute URL the app produced points at the preview server.
-    // Canonicals, og:url and the url fields inside JSON-LD all have to move.
+    // Any absolute URL the app built from the host it was served on points at
+    // the preview server, so it has to move: canonicals, og:url, and the url
+    // and @id fields inside JSON-LD.
+    //
+    // US-172 made every site-owned URL come from the configured app URL
+    // instead, which should leave nothing here to rewrite. The count is
+    // reported rather than assumed, because this rewrite was silently
+    // loadbearing for a year — it is what kept a *.pages.dev preview deploy
+    // from self-canonicalising in the prerendered HTML, while the same pages
+    // did exactly that the moment they hydrated. A non-zero count names a page
+    // that is still reading its own host.
+    const rewrites = result.html.split(PREVIEW_ORIGIN).length - 1;
     const html = result.html.split(PREVIEW_ORIGIN).join(SITE_ORIGIN);
     if (html.includes('127.0.0.1') || html.includes('localhost')) {
       problems.push('a preview-server URL survived into the output');
     }
 
-    return { route, html, title: result.title, problems };
+    return { route, html, title: result.title, problems, rewrites };
   } finally {
     page.off('pageerror', onPageError);
   }
@@ -609,6 +621,27 @@ async function main() {
   }
 
   console.log(`\n[prerender] wrote ${results.length} HTML files into dist/`);
+
+  const rewritten = results.filter((r) => r.rewrites > 0);
+  if (rewritten.length === 0) {
+    console.log(
+      '[prerender] host rewrite: 0 preview-server URLs needed moving — every page ' +
+        'built its own URLs from the configured origin (US-172)'
+    );
+  } else {
+    const total = rewritten.reduce((sum, r) => sum + r.rewrites, 0);
+    console.warn(
+      `[prerender] host rewrite: moved ${total} preview-server URL(s) on ` +
+        `${rewritten.length} page(s):\n` +
+        rewritten
+          .slice(0, 10)
+          .map((r) => `            ${r.route.path} (${r.rewrites})`)
+          .join('\n') +
+        '\n            Those pages build a URL from the host they are served on, so on a\n' +
+        '            *.pages.dev preview they will self-canonicalise once hydrated.\n' +
+        '            Use getCanonicalUrl() from @/config/seo.config (US-172).'
+    );
+  }
 
   await verifyServedLayout(results);
   await writeSitemap(results, articles);

@@ -1,5 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import { getSafeOrigin } from '@/lib/utils';
+import { getBaseUrl } from '@/config/seo.config';
 
 interface FAQItem {
   question: string;
@@ -32,7 +32,11 @@ export function PageSEO({
   structuredData,
 }: PageSEOProps) {
   const siteName = 'AgentBio';
-  const siteUrl = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): a canonical is a claim about identity,
+  // so it must not read the host the visitor happens to be on. A *.pages.dev
+  // preview would otherwise self-canonicalise once the bundle hydrates
+  // (US-172).
+  const siteUrl = getBaseUrl();
   const fullUrl = url
     ? url.startsWith('http')
       ? url

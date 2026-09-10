@@ -470,7 +470,7 @@ export default function ListingDescriptionGenerator() {
   );
 
   const toolUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/tools/listing-description-generator`
+    ? getCanonicalUrl('/tools/listing-description-generator')
     : 'https://agentbio.net/tools/listing-description-generator';
 
   const schema = {

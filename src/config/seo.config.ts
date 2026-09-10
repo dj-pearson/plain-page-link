@@ -4,7 +4,7 @@
  */
 
 import { PRICING_PLANS } from './pricing-plans';
-import { getConfiguredAppUrl, getSafeOrigin } from '@/lib/utils';
+import { getConfiguredAppUrl } from '@/lib/utils';
 
 /** Lowest paid monthly plan. Was the literal '39', which is not a plan (US-157). */
 export const SEO_STARTING_PRICE = String(
@@ -349,13 +349,33 @@ export const COMPARISON_DATA = {
 } as const;
 
 /**
- * Get the base URL - handles SSR and client-side rendering.
+ * The origin the site canonically lives at, whatever host served this response
+ * (US-172).
  *
- * A re-export rather than a second implementation: this was a byte-for-byte
- * copy of lib/utils' getSafeOrigin, and the two could disagree because their
- * fallbacks were written separately (US-123).
+ * This was getSafeOrigin(), which in a browser is window.location.origin. Every
+ * canonical, og:url and JSON-LD url on every marketing, feature, comparison,
+ * tool, blog and legal page was therefore whatever host the visitor happened to
+ * be on. On agentbio.net that is right by coincidence. Anywhere else it is a
+ * page telling Google it is the original at an address that is not the site:
+ *
+ *   - Cloudflare Pages gives every branch a *.pages.dev preview URL serving the
+ *     whole site. The prerendered HTML carries the right canonical, because
+ *     prerender.mts rewrites its own preview origin out of every snapshot — but
+ *     the moment the bundle hydrates, react-helmet-async replaces it with the
+ *     pages.dev host. Googlebot renders JavaScript. That is how a preview
+ *     deployment self-canonicalises and gets indexed as a duplicate of the
+ *     entire site.
+ *   - The same holds for any staging domain, any alias, and any future host.
+ *
+ * A canonical is a claim about identity, so it has to be a constant, not a
+ * reading of the current environment.
+ *
+ * getSafeOrigin() is still correct for the pages a tenant owns — /:username and
+ * /p/:slug can legitimately be served from an agent's own custom_domain, and
+ * there the visitor's host IS the canonical one. Those call sites use it
+ * directly and say why.
  */
-export const getBaseUrl = (): string => getSafeOrigin();
+export const getBaseUrl = (): string => getConfiguredAppUrl();
 
 /**
  * Generate canonical URL from path

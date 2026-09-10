@@ -1,5 +1,6 @@
-import { Link } from "react-router-dom";
-import { ChevronRight, Home } from "lucide-react";
+import { Link } from 'react-router-dom';
+import { getCanonicalUrl } from '@/config/seo.config';
+import { ChevronRight, Home } from 'lucide-react';
 
 interface BreadcrumbItem {
   label: string;
@@ -29,7 +30,7 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
         <Home className="h-4 w-4" />
         <span itemProp="name">Home</span>
         <meta itemProp="position" content="1" />
-        <link itemProp="item" href={window.location.origin} />
+        <link itemProp="item" href={getCanonicalUrl('/')} />
       </Link>
 
       {items.map((item, index) => {
@@ -49,18 +50,18 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
               >
                 <span itemProp="name">{item.label}</span>
                 <meta itemProp="position" content={position.toString()} />
-                <link itemProp="item" href={`${window.location.origin}${item.href}`} />
+                <link itemProp="item" href={getCanonicalUrl(item.href)} />
               </Link>
             ) : (
               <span
-                className={isLast ? "font-medium text-foreground" : ""}
+                className={isLast ? 'font-medium text-foreground' : ''}
                 itemProp="itemListElement"
                 itemScope
                 itemType="https://schema.org/ListItem"
               >
                 <span itemProp="name">{item.label}</span>
                 <meta itemProp="position" content={position.toString()} />
-                {item.href && <link itemProp="item" href={`${window.location.origin}${item.href}`} />}
+                {item.href && <link itemProp="item" href={getCanonicalUrl(item.href)} />}
               </span>
             )}
           </div>

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getBaseUrl } from '@/config/seo.config';
 import { MARKETING_COPY } from '@/config/marketing-claims';
 import { Link } from 'react-router-dom';
 import { Home, BarChart3, Users, Brain, Target, Zap, Sparkles } from 'lucide-react';
@@ -17,7 +18,6 @@ import {
   generateEnhancedLocalBusinessSchema,
   generateEnhancedOrganizationSchema,
 } from '@/lib/seo';
-import { getSafeOrigin } from '@/lib/utils';
 
 // Lazy load BlogSection since it's below the fold and requires Supabase
 const BlogSection = React.lazy(() =>
@@ -79,8 +79,12 @@ const LANDING_FAQS = [
 ];
 
 export default function Landing() {
-  // Safe origin for SSR/crawler compatibility
-  const origin = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): the homepage's WebSite and Organization
+  // @ids and its own canonical are claims about what this site IS, so they must
+  // not read the host that served the page. It was the last one left after the
+  // US-172 sweep — the prerender's rewrite counter found it, seven URLs on this
+  // one page, which is exactly why that counter reports rather than assumes.
+  const origin = getBaseUrl();
 
   // Generate breadcrumb schema for homepage
   const breadcrumbSchema = generateBreadcrumbSchema([{ name: 'Home', url: origin }]);

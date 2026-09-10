@@ -53,7 +53,7 @@ export default function LeadCapture() {
           'home valuation request',
           'real estate lead generation',
         ]}
-        canonicalUrl={`${window.location.origin}/features/lead-capture`}
+        canonicalUrl={getCanonicalUrl('/features/lead-capture')}
         schema={schema}
         aiSearchOptimized={true}
         speakableSelectors={['h1', 'h2', '.glass-body']}

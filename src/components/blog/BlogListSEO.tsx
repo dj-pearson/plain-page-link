@@ -1,5 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import { getSafeOrigin } from '@/lib/utils';
+import { getBaseUrl } from '@/config/seo.config';
 
 interface BlogListSEOProps {
   totalArticles: number;
@@ -8,7 +8,11 @@ interface BlogListSEOProps {
 
 export function BlogListSEO({ latestArticleDate }: BlogListSEOProps) {
   const siteName = 'AgentBio';
-  const siteUrl = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): a canonical is a claim about identity,
+  // so it must not read the host the visitor happens to be on. A *.pages.dev
+  // preview would otherwise self-canonicalise once the bundle hydrates
+  // (US-172).
+  const siteUrl = getBaseUrl();
   const blogUrl = `${siteUrl}/blog`;
   const title = 'Real Estate Blog - Tips, Guides & Market Insights';
   const description =

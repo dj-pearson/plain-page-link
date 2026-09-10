@@ -71,7 +71,7 @@ export default function InstagramBioAnalyzer() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const toolUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/tools/instagram-bio-analyzer`
+    ? getCanonicalUrl('/tools/instagram-bio-analyzer')
     : 'https://agentbio.net/tools/instagram-bio-analyzer';
 
   const handleFormSubmit = async (data: BioAnalysisInput) => {

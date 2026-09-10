@@ -6,7 +6,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
-import { getBaseUrl } from '@/config/seo.config';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
 
 const FAQ_ENTRIES: FaqEntry[] = [
@@ -49,8 +49,8 @@ export default function VsBeacons() {
       generateEnhancedOrganizationSchema(),
       {
         '@type': 'WebPage',
-        '@id': `${window.location.origin}/vs/beacons`,
-        url: `${window.location.origin}/vs/beacons`,
+        '@id': getCanonicalUrl('/vs/beacons'),
+        url: getCanonicalUrl('/vs/beacons'),
         name: 'AgentBio vs Beacons for Real Estate Agents: Detailed Comparison',
         description:
           'Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and MLS compliance.',
@@ -71,7 +71,7 @@ export default function VsBeacons() {
           'real estate link in bio tool',
           'best link in bio for agents',
         ]}
-        canonicalUrl={`${window.location.origin}/vs/beacons`}
+        canonicalUrl={getCanonicalUrl('/vs/beacons')}
         schema={schema}
       />
       <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>

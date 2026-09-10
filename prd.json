@@ -2732,17 +2732,19 @@
     },
     {
       "id": "US-172",
-      "title": "window.location.origin builds canonical and structured-data URLs on a dozen pages",
-      "description": "Pricing, InstagramBioForRealtors, VsLater and others construct canonicalUrl and JSON-LD @id/url values from window.location.origin. During the prerender that origin is the preview server on 127.0.0.1, and these survive only because scripts/prerender.mts rewrites PREVIEW_ORIGIN out of every snapshot before writing it \u2014 a safety net documented as being for canonical tags, quietly loadbearing for structured data too. getBaseUrl()/getCanonicalUrl() in src/config/seo.config.ts is the intended helper and is built on the same getSafeOrigin() the canonicals use.",
+      "title": "Every canonical on the site was whatever host served the page",
+      "description": "getBaseUrl() in seo.config.ts was getSafeOrigin(), which in a browser is window.location.origin, and roughly thirty call sites built canonicals, og:url and JSON-LD url/@id from window.location.origin directly. Every site-owned page therefore declared itself canonical at whichever host served it. On agentbio.net that is right by coincidence. Cloudflare Pages gives every branch a *.pages.dev preview URL serving the whole site: the prerendered HTML carries the correct canonical because prerender.mts rewrites its own preview origin out of every snapshot, but react-helmet-async overwrites it with the pages.dev host the moment the bundle hydrates, and Googlebot renders JavaScript. A canonical is a claim about identity and cannot be a reading of the current environment.",
       "acceptanceCriteria": [
-        "No src/pages or src/components file builds a canonical, an og:url or a JSON-LD url/@id from window.location.origin",
-        "getCanonicalUrl is used instead",
-        "A test or a grep-based check keeps it from coming back",
-        "The prerender's origin rewrite stays \u2014 it is defence in depth, not the fix"
+        "getBaseUrl() returns the configured app URL, not the visitor's host",
+        "No file in the SEO layer builds a URL from window.location.origin or getSafeOrigin",
+        "getSafeOrigin stays where the visitor's host IS canonical \u2014 /:username and /p/:slug, which a tenant may serve from a custom domain \u2014 and each such call site says why",
+        "A test proves the canonical is unchanged when the page is served from a *.pages.dev host",
+        "A test fails if the pattern is reintroduced anywhere in the SEO layer",
+        "The prerender reports how many preview-server URLs it had to rewrite, rather than silently papering over them"
       ],
       "priority": "medium",
-      "passes": false,
-      "notes": "Opened 2026-09-10 (iteration 3). The two breadcrumb components were fixed there because their output is what US-168 was about; the rest is a mechanical sweep of about a dozen call sites and was left out deliberately to keep that iteration reviewable. Check whether the prerender's rewrite is masking anything else before removing any of it."
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 4 of the SEO loop. Bigger than the story as written in iteration 3, which framed it as tidiness: the point is not that a helper exists, it is that a preview deploy could self-canonicalise the entire site. The prerender's origin rewrite turned out to be silently loadbearing, so it now counts and reports what it moved. Measured against real builds: 671 preview-server URLs across all 58 pages before, 0 after. The counter earned its place immediately \u2014 after the first sweep it still found 7 on the homepage, which the sweep had missed. Stripe return URLs, OAuth redirectTo and the dashboard's copy-your-link UI keep window.location.origin deliberately: those want the host the user is actually on."
     }
   ]
 }
