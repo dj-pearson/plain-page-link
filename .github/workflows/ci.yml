@@ -112,13 +112,22 @@ jobs:
           VITE_SUPABASE_ANON_KEY: placeholder-anon-key-ci-build-only
           VITE_APP_URL: https://agentbio.net
           # This job verifies the bundle, it does not deploy it, and it has no
-          # database credentials. Skip the blog rather than prerender empty posts.
+          # database credentials. This used to omit the blog entirely, which
+          # meant verify:seo below ran against the marketing pages and never saw
+          # /blog, /blog/category/{slug} or /blog/{slug} — the pages US-180,
+          # US-184 and a third of US-185 were actually on. It now renders three
+          # obviously-labelled fixtures from scripts/data/articles.fixture.json
+          # instead, so the blog is inside every check (US-186).
           # The Cloudflare Pages deploy must NOT set this (US-148).
           PRERENDER_ALLOW_NO_ARTICLES: '1'
 
-      - name: Verify prerendered pages have their own SEO identity
+      - name: Verify prerendered pages
         # 44 URLs shipped for a year sharing one <title> because nothing
-        # compared them. This is what compares them (US-150).
+        # compared them. This is what compares them (US-150), and it has grown:
+        # page identity, every sitemap URL reachable from / (US-165), every URL
+        # asserted in structured data resolving to a page (US-179), every
+        # internal link arriving somewhere (US-184), and FAQ questions AND
+        # answers being on the page they are claimed for (US-185).
         run: npm run verify:seo
         env:
           VITE_APP_URL: https://agentbio.net
@@ -162,7 +171,12 @@ jobs:
           VITE_SUPABASE_ANON_KEY: placeholder-anon-key-ci-build-only
           VITE_APP_URL: https://agentbio.net
           # This job verifies the bundle, it does not deploy it, and it has no
-          # database credentials. Skip the blog rather than prerender empty posts.
+          # database credentials. This used to omit the blog entirely, which
+          # meant verify:seo below ran against the marketing pages and never saw
+          # /blog, /blog/category/{slug} or /blog/{slug} — the pages US-180,
+          # US-184 and a third of US-185 were actually on. It now renders three
+          # obviously-labelled fixtures from scripts/data/articles.fixture.json
+          # instead, so the blog is inside every check (US-186).
           # The Cloudflare Pages deploy must NOT set this (US-148).
           PRERENDER_ALLOW_NO_ARTICLES: '1'
 

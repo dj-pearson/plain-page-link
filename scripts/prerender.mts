@@ -37,7 +37,12 @@ import {
   outputPathForRoute,
   type PrerenderRoute,
 } from '../src/config/prerender-routes';
-import { categorySlugs, loadArticles, type Article } from './lib/articles.mts';
+import {
+  categorySlugs,
+  loadArticles,
+  loadFixtureArticles,
+  type Article,
+} from './lib/articles.mts';
 import { buildSitemapXml, weightFor, type SitemapEntry } from './lib/sitemap.mts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -548,10 +553,33 @@ async function main() {
   let articles: Article[] = [];
   let blog: PrerenderRoute[] = [];
   if (process.env.PRERENDER_ALLOW_NO_ARTICLES === '1') {
+    // Was: skip the blog entirely. That left CI's verify:seo looking at the
+    // marketing pages and never at /blog, /blog/category/{slug} or
+    // /blog/{slug} — which is where US-180, US-184 and a third of US-185
+    // actually were. A guard that cannot see the pages the defects are on is
+    // not guarding them (US-186).
+    //
+    // Three fixtures instead, from scripts/data/articles.fixture.json. They
+    // announce themselves as fixtures in their title and first sentence, and
+    // loadArticles() cannot reach this file, so a deploy cannot ship them even
+    // if it wrongly set this flag.
+    articles = await loadFixtureArticles();
+    const categories = categorySlugs(articles);
+    blog = blogRoutes(
+      articles.map((a) => a.slug),
+      categories.slugs
+    );
     console.warn(
-      '[prerender] PRERENDER_ALLOW_NO_ARTICLES=1 — skipping the blog entirely.\n' +
+      '[prerender] PRERENDER_ALLOW_NO_ARTICLES=1 — rendering the blog from ' +
+        `${articles.length} FIXTURE articles, not real ones.\n` +
         '            Correct for a verification build, wrong for a deploy.'
     );
+    if (categories.unlisted.length > 0) {
+      console.log(
+        `[prerender] fixture exercises the unlisted-category path: ` +
+          categories.unlisted.map((c) => c.name).join(', ')
+      );
+    }
   } else {
     const loaded = await loadArticles();
     articles = loaded.articles;

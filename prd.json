@@ -2932,6 +2932,21 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-10, iteration 14 of the SEO loop. `hidden` rather than a CSS class: it is the platform attribute for 'in the document, not painted', it needs no stylesheet to work during a prerender, and it is what assistive technology already understands alongside the aria-expanded these buttons carry. The test that matters is the one asserting the question check still PASSES on the broken fixture \u2014 that is the reason 25 answers went unnoticed through six earlier audits of this same schema type."
+    },
+    {
+      "id": "US-186",
+      "title": "CI ran every SEO check against a build with no blog in it",
+      "description": "CI's build job sets PRERENDER_ALLOW_NO_ARTICLES=1, because it has no database credentials, and that flag omitted the blog routes entirely. So `npm run verify:seo` \u2014 page identity (US-150), sitemap reachability (US-165), structured-data URLs (US-179), internal links (US-184), FAQ question and answer visibility (US-157/US-185) \u2014 ran against the marketing pages and never once looked at /blog, /blog/category/{slug} or /blog/{slug}. That is where the defects were: US-184's six broken category links were on /blog, US-180's fabricated Person author was on every article, and eight of US-185's 25 missing FAQ answers were on the two category pages. None of those regressions could have been caught by CI, because CI did not build the pages they were on.",
+      "acceptanceCriteria": [
+        "A database-less verification build renders the blog, so every check covers it",
+        "The articles it renders are unmistakably fixtures, in their title and their first sentence",
+        "A build that intends to deploy cannot reach the fixture, even by mistake",
+        "The fixture covers the branches that only the blog has: an article with a foreign featured image, one without, and one in a category the registry does not list",
+        "CI's comments say what the flag now does"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 15 and last of the SEO loop. No new flag: PRERENDER_ALLOW_NO_ARTICLES already means 'this build will not ship', and a deploy is already forbidden from setting it, so changing what it DOES from 'omit the blog' to 'render three fixtures' adds coverage without widening the blast radius. loadFixtureArticles() is deliberately not reachable from loadArticles(): a build that intends to deploy must never silently fall back to invented content, which is the argument of US-169 and is why the real snapshot is still uncommitted. The loader refuses any fixture whose title does not begin 'Fixture:' \u2014 if one of these ever escaped, it should be obvious in the first line rather than plausible."
     }
   ]
 }

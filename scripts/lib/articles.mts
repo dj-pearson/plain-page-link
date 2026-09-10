@@ -192,3 +192,45 @@ export function categorySlugs(articles: Article[]): {
       .sort((a, b) => b.articles - a.articles || a.name.localeCompare(b.name)),
   };
 }
+
+/** Committed, and loaded ONLY by a verification build; see scripts/data/README.md. */
+export const FIXTURE_PATH = join(root, 'scripts', 'data', 'articles.fixture.json');
+
+/**
+ * The three articles a database-less verification build renders (US-186).
+ *
+ * Deliberately NOT reachable from loadArticles(). A build that intends to
+ * deploy must never silently fall back to invented content — that is the whole
+ * argument of US-169 — so the fixture has its own entry point, called from the
+ * one branch in scripts/prerender.mts that already means "this build will not
+ * ship".
+ *
+ * Throws if the file is missing or empty. A verification build that quietly
+ * checks no blog pages is the state this replaces.
+ */
+export async function loadFixtureArticles(): Promise<Article[]> {
+  const raw = await readFile(FIXTURE_PATH, 'utf8').catch(() => null);
+  if (raw === null) {
+    throw new Error(
+      `No fixture at ${FIXTURE_PATH}. A verification build renders the blog from ` +
+        `it so the SEO checks cover /blog; without it they would silently cover ` +
+        `only the marketing pages.`
+    );
+  }
+
+  const articles = JSON.parse(raw) as Article[];
+  if (!Array.isArray(articles) || articles.length === 0) {
+    throw new Error(`${FIXTURE_PATH} has no articles in it.`);
+  }
+
+  // The one property that matters if this ever escapes: it must be obvious.
+  const unmarked = articles.filter((article) => !article.title.startsWith('Fixture:'));
+  if (unmarked.length > 0) {
+    throw new Error(
+      `Fixture articles must be titled "Fixture: …" so they are recognisable on ` +
+        `sight: ${unmarked.map((a) => a.title).join(', ')}`
+    );
+  }
+
+  return articles;
+}

@@ -3105,3 +3105,108 @@ That is the whole explanation for how 25 answers survived six earlier audits of
 this exact schema type. A check that covers half an assertion reports success
 on a page that is half wrong, and there is no way to tell from its output which
 half it looked at.
+
+## SEO loop — iteration 15/15 — US-186: the guards could not see the pages the defects were on
+
+The last iteration checked something it should have checked first: whether any
+of this runs in CI.
+
+It does. `.github/workflows/ci.yml` runs `npm run verify:seo` on every push.
+But the build step above it sets:
+
+    PRERENDER_ALLOW_NO_ARTICLES: '1'
+
+because CI has no database credentials, and that flag omitted the blog routes
+entirely. So every check built in this loop — page identity, sitemap
+reachability, structured-data URLs, internal links, FAQ question and answer
+visibility — ran against the marketing pages and never once looked at /blog,
+/blog/category/{slug} or /blog/{slug}.
+
+That is where the defects were:
+
+    US-184  six broken category links     on /blog
+    US-180  a fabricated Person author    on every article
+    US-185  8 of 25 missing FAQ answers   on the two category pages
+
+None of those regressions could have been caught by CI, because CI did not
+build the pages they were on. Three of the fifteen stories in this loop were
+found in a part of the site the automation cannot see, and the automation
+reported success the whole time.
+
+THE FIX, without a new flag. PRERENDER_ALLOW_NO_ARTICLES already means "this
+build will not ship", and a deploy is already forbidden from setting it. So
+what it DOES changes, from "omit the blog" to "render three fixtures", and the
+blast radius does not widen.
+
+    [prerender] PRERENDER_ALLOW_NO_ARTICLES=1 — rendering the blog from 3
+                FIXTURE articles, not real ones.
+    [prerender] fixture exercises the unlisted-category path: Fixture Category
+                That Is Not Registered
+    [prerender] wrote 60 HTML files into dist/, plus 404.html
+
+    [verify-seo] 60 pages, each with its own title, description and canonical
+    [verify-seo] 30 sitemap URLs, every one of them reachable from /
+    [verify-seo] every URL asserted in structured data resolves to a page
+    [verify-seo] every internal link on 60 pages arrives at something
+
+Run with no database and no snapshot, exactly as CI runs it.
+
+THE FIXTURES ARE CHOSEN, NOT ARBITRARY. Each one exists to make a branch run
+that only the blog has:
+
+    fixture-choosing-a-listing-photo   a featured image on a host we do not
+                                       control — og:image dimensions must NOT
+                                       be asserted (US-174)
+    fixture-what-a-market-report-...   no featured image, so the default social
+                                       image IS dimensioned; second category
+    fixture-an-unlisted-category       a category the registry does not have —
+                                       the shape that failed the whole build
+                                       before US-166
+
+WHAT KEEPS THEM OUT OF PRODUCTION. loadFixtureArticles() is deliberately not
+reachable from loadArticles(). A build that intends to deploy must never
+silently fall back to invented content — that is the argument of US-169, and it
+is why the real snapshot is still uncommitted. On top of that the loader
+refuses any fixture whose title does not begin "Fixture:", every body opens by
+saying the article does not exist, and the image host is under .invalid, a TLD
+that can never resolve. If one of these ever escaped it should be obvious in
+the first line rather than plausible.
+
+DEMONSTRATED, and this is the point of the story rather than a formality.
+US-184's defect was reintroduced into Blog.tsx and the CI path re-run with no
+database:
+
+    [verify-seo] 6 internal link target(s) have no page:
+      links to /blog/category/investment, which is not a page
+          from 1 page(s), e.g. /blog
+      ...
+    exit=1
+
+Before this change that same build produced no /blog at all and exited 0. The
+check was already written, already correct, and already running — and it could
+not see the page. Then restored, and the CI path is green again.
+
+---
+
+## The loop, in one paragraph
+
+Fifteen iterations. What changed is less interesting than what the changes have
+in common: almost every defect was an assertion the site was making about
+itself that was not true, and almost none of them were visible on the page that
+made them. A canonical naming the host that served it. A breadcrumb claiming a
+parent that was a sibling. An og:image declaring a shape its file did not have.
+Six social accounts the company does not own. An author who is not a person.
+Answers asserted for questions the page did not answer. Twenty-nine sitemap
+URLs, four of which nothing linked to, and six links from the blog to pages
+that do not exist.
+
+The pattern in the fixes is the same each time: find the one place the truth
+lives, make everything read from it, and add a check that fails when they
+disagree — then run the check against the code as it shipped, because a guard
+that has only ever passed has not been tested. Every story in this loop names
+the number it found: 671 host-derived URLs, 52 wrong image dimensions, 53
+breadcrumb problems, 25 missing answers, 8 dangling schema URLs, 6 broken
+links, 4 unreachable pages.
+
+The last iteration is the one that matters most for what comes next: those
+checks were running against a build with no blog in it.
