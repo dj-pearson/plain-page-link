@@ -1,0 +1,64 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Build outputs
+dist
+build
+.next
+.turbo
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in container)
+*.md
+!README.md
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+coverage
+
+# Environment files (should be injected)
+.env.local
+.env.development
+.env.production
+
+# Database backups (large files)
+db-backup/
+database/
+
+# Temp files
+*.log
+*.tmp
+migrations.zip
+migrations-temp/
+
+# Other large/unnecessary directories
+assets/
+blog-content/
+mobile-native-js/
+public/
+
+# Keep only what we need:
+# - supabase/functions/
+# - supabase/config.toml
+# - edge-functions-server.ts
+
