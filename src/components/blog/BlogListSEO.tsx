@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { getBaseUrl } from '@/config/seo.config';
 
 interface BlogListSEOProps {
@@ -107,8 +108,8 @@ export function BlogListSEO({ latestArticleDate }: BlogListSEOProps) {
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={`${siteUrl}/Cover.png`} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
+      <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+      <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
       <meta property="og:site_name" content={siteName} />
 
       {/* Twitter Card */}

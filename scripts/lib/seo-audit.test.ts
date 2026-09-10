@@ -49,6 +49,9 @@ function goodPage(route: string, title: string, description: string, body = 'x'.
 <title>${title}</title>
 <meta data-rh="true" name="description" content="${description}" />
 <link data-rh="true" rel="canonical" href="${ORIGIN}${route === '/' ? '/' : route}" />
+<meta data-rh="true" property="og:image" content="${ORIGIN}/Cover.png" />
+<meta data-rh="true" property="og:image:width" content="1536" />
+<meta data-rh="true" property="og:image:height" content="1024" />
 </head><body><div id="root">${body}</div><script src="/assets/index.js"></script></body></html>`,
   };
 }
@@ -172,7 +175,14 @@ describe('BreadcrumbList', () => {
     const blocks = [list, ...extra]
       .map((b) => `<script type="application/ld+json">${JSON.stringify(b)}</script>`)
       .join('');
-    return `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/><link rel="canonical" href="${canonical}"/>${blocks}</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`;
+    return (
+      `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+      `<link rel="canonical" href="${canonical}"/>` +
+      // Real pages all carry one; without it the og:image rule fires and makes
+      // these breadcrumb assertions about something else (US-174).
+      `<meta property="og:image" content="https://agentbio.net/Cover.png"/>` +
+      `${blocks}</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`
+    );
   };
 
   const trail = (rungs: [string, string][]) => ({
@@ -292,5 +302,101 @@ describe('BreadcrumbList', () => {
         p.includes('relative item URL')
       )
     ).toBe(true);
+  });
+});
+
+/**
+ * Proof that the US-174 image rules have teeth.
+ *
+ * All 58 pages declared og:image:width 1200 and og:image:height 630 beside a
+ * Cover.png that is 1536x1024, and ArticleSEO asserted the same pair for
+ * whatever featured_image_url an article carried — inside BlogPosting JSON-LD,
+ * where Google reads it to decide large-image rich-result eligibility. Nothing
+ * compared the markup to the file, because one is HTML and the other is a PNG.
+ */
+describe('image dimensions', () => {
+  const page = (headExtra: string, blocks: unknown[] = []) =>
+    `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+    `<link rel="canonical" href="https://agentbio.net/x"/>${headExtra}` +
+    blocks.map((b) => `<script type="application/ld+json">${JSON.stringify(b)}</script>`).join('') +
+    `</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`;
+
+  const ogTags = (url: string, width?: number, height?: number) =>
+    `<meta property="og:image" content="${url}"/>` +
+    (width === undefined ? '' : `<meta property="og:image:width" content="${width}"/>`) +
+    (height === undefined ? '' : `<meta property="og:image:height" content="${height}"/>`);
+
+  const problemsFor = (html: string) => auditStructuredData('/x', html).map((p) => p.problem);
+
+  it('rejects the 1200x630 every page declared for a 1536x1024 file', () => {
+    const problems = problemsFor(page(ogTags('https://agentbio.net/Cover.png', 1200, 630)));
+    expect(problems).toContain('og:image is 1536x1024 but the tags declare 1200x630');
+  });
+
+  it('accepts the real size', () => {
+    expect(problemsFor(page(ogTags('https://agentbio.net/Cover.png', 1536, 1024)))).toEqual([]);
+  });
+
+  it('accepts an image with no dimensions declared at all', () => {
+    expect(problemsFor(page(ogTags('https://cdn.example.com/hero.jpg')))).toEqual([]);
+  });
+
+  it('rejects dimensions declared for an image whose size is not known', () => {
+    const problems = problemsFor(page(ogTags('https://cdn.example.com/hero.jpg', 1200, 630)));
+    expect(problems.some((p) => p.includes('whose size is not known here'))).toBe(true);
+  });
+
+  it('notices a page with no og:image', () => {
+    expect(problemsFor(page(''))).toContain(
+      'no og:image — social platforms fall back to whatever they scrape'
+    );
+  });
+
+  it('rejects the BlogPosting ImageObject asserting a size for an article upload', () => {
+    const problems = problemsFor(
+      page(ogTags('https://agentbio.net/Cover.png', 1536, 1024), [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'BlogPosting',
+          headline: 'x',
+          image: {
+            '@type': 'ImageObject',
+            url: 'https://cdn.example.com/article-hero.jpg',
+            width: 1200,
+            height: 630,
+          },
+        },
+      ])
+    );
+    expect(problems.some((p) => p.includes('whose size is not known here'))).toBe(true);
+  });
+
+  it('accepts an ImageObject that only states the url', () => {
+    expect(
+      problemsFor(
+        page(ogTags('https://agentbio.net/Cover.png', 1536, 1024), [
+          {
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            headline: 'x',
+            image: { '@type': 'ImageObject', url: 'https://cdn.example.com/article-hero.jpg' },
+          },
+        ])
+      )
+    ).toEqual([]);
+  });
+
+  it('rejects one dimension without the other', () => {
+    const problems = problemsFor(
+      page(ogTags('https://agentbio.net/Cover.png', 1536, 1024), [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'BlogPosting',
+          headline: 'x',
+          image: { '@type': 'ImageObject', url: 'https://agentbio.net/Cover.png', width: 1536 },
+        },
+      ])
+    );
+    expect(problems).toContain('BlogPosting declares one image dimension without the other');
   });
 });

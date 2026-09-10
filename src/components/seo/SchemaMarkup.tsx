@@ -82,8 +82,9 @@ export function SchemaMarkup({ type, data = {}, additionalSchemas = [] }: Schema
             image: {
               '@type': 'ImageObject',
               url: data.image,
-              width: 1200,
-              height: 630,
+              // No width/height: data.image is whatever the caller passed, and
+              // a dimension asserted for an unmeasured file is a claim the
+              // crawler checks (US-174).
             },
           }),
           ...(data.wordCount && { wordCount: data.wordCount }),

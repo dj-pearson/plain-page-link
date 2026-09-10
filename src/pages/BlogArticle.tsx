@@ -141,8 +141,9 @@ export default function BlogArticle() {
                   className="w-full h-96 object-cover rounded-lg shadow-lg"
                   itemProp="url"
                 />
-                <meta itemProp="width" content="1200" />
-                <meta itemProp="height" content="630" />
+                {/* itemProp width/height stood here claiming 1200x630 for
+                    whatever featured_image_url the article carries. Nothing had
+                    measured it (US-174). */}
               </figure>
             )}
 

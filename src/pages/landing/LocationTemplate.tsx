@@ -1,4 +1,5 @@
 import { ArrowRight, Home, TrendingUp, Users, Star, CheckCircle, MapPin } from 'lucide-react';
+import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -197,8 +198,11 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
         <meta property="og:image" content={getOgImageUrl()} />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
+        {/* getOgImageUrl() with no argument is always the site default, so its
+            real size is known — 1536x1024, not the 1200x630 asserted here for
+            a year (US-174). */}
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
         <meta property="og:locale" content={SEO_CONFIG.locale} />
 
         {/* Twitter Card */}

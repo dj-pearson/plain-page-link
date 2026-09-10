@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
 import { getBaseUrl } from '@/config/seo.config';
 
 interface FAQItem {
@@ -112,8 +113,10 @@ export function PageSEO({
     primaryImageOfPage: {
       '@type': 'ImageObject',
       url: socialImage,
-      width: 1200,
-      height: 630,
+      // Dimensions only when they are known; see @/config/og-image (US-174).
+      ...(isDefaultSocialImage(socialImage)
+        ? { width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height }
+        : {}),
     },
     inLanguage: 'en-US',
     potentialAction: {
@@ -196,8 +199,15 @@ export function PageSEO({
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={socialImage} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
+      {/* Width and height only for the image whose size is known. A caller's
+          own image is one this code has never seen, and a wrong number breaks
+          the card the tag exists to build (US-174). */}
+      {isDefaultSocialImage(socialImage) && (
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+      )}
+      {isDefaultSocialImage(socialImage) && (
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+      )}
       <meta property="og:site_name" content={siteName} />
       <meta property="og:locale" content="en_US" />
 

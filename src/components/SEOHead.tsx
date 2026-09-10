@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
 import { getBaseUrl } from '@/config/seo.config';
 
 interface SEOHeadProps {
@@ -155,9 +156,19 @@ export const SEOHead = ({
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={metaDescription} />
       <meta property="og:image" content={imageUrl} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
-      <meta property="og:image:alt" content={fullTitle} />
+      {/* Width and height only for the image whose size is known. A caller's
+          own image is one this code has never seen, and a wrong number breaks
+          the card the tag exists to build (US-174). */}
+      {isDefaultSocialImage(imageUrl) && (
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+      )}
+      {isDefaultSocialImage(imageUrl) && (
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+      )}
+      <meta
+        property="og:image:alt"
+        content={isDefaultSocialImage(imageUrl) ? DEFAULT_SOCIAL_IMAGE.alt : fullTitle}
+      />
       {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
       <meta property="og:locale" content={locale} />
 

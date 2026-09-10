@@ -2460,3 +2460,82 @@ instances. The first three looked; this one and US-159 wrote rules. The
 difference showed up immediately — the rules found two claims in a file nobody
 had thought to open. A reading finds what you look at. A rule finds what is
 there.
+
+## SEO loop — iteration 6/15 — US-174: a size no code had ever measured
+
+Found in the iteration 5 survey, by reading the PNG header instead of trusting
+the tag. Four SEO components each hardcoded, right next to the URL:
+
+    <meta property="og:image" content=".../Cover.png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+
+Cover.png is 1536x1024. A 1.5 aspect ratio, declared as 1.905. Facebook,
+LinkedIn, Slack and X read those numbers to reserve layout before the bytes
+arrive, so every unfurl of 52 of the 58 pages reserved a shape the image does
+not have.
+
+THE SHARPER HALF. ArticleSEO asserted the same 1200x630 for whatever
+featured_image_url an article carries — an arbitrary upload — including inside
+the BlogPosting JSON-LD:
+
+    image: { '@type': 'ImageObject', url: socialImage, width: 1200, height: 630 }
+
+Google reads ImageObject width and height to decide large-image rich-result
+eligibility, which wants 1200px or more, and then fetches the image and measures
+it. Claiming 1200 for an upload that might be 600 is not a rounding error; it is
+a false eligibility claim about a file the crawler is about to check. Two more
+places did the same thing: SchemaMarkup for any caller-supplied image, and
+BlogArticle in microdata on the <img> element itself.
+
+THE RULE. State a dimension only for an image whose dimensions are known here.
+For anything a caller passes, emit the URL and no size — Open Graph makes them
+optional, and an absent number costs a placeholder while a wrong one costs the
+card.
+
+src/config/og-image.ts is that one place. src/config/og-image.test.ts reads the
+PNG's IHDR chunk — width and height sit at a fixed byte offset, so no image
+library — and asserts the constants match the file. Editing the numbers without
+changing the file fails; replacing the file without editing the numbers fails.
+
+WHY COVER.PNG WAS NOT RECROPPED. The obvious move is to make the file 1200x630
+and keep the tags. It was looked at rather than assumed: the composition fills
+the frame — the phone mockup runs nearly edge to edge, the wordmark sits on the
+bottom line — and cropping 1536x1024 to 1.91:1 removes about 110px from top and
+bottom, taking the wordmark and the top of the phone with it. Declaring the true
+size is correct and free. Recomposing the artwork is a design decision, and it
+is US-175 along with the question of whether pages with their own subject should
+stop unfurling as the generic product cover.
+
+THE GUARD, in seo-audit.mjs so it runs inside verify:seo:
+  - og:image:width/height must match the file, for the images whose size is
+    known here
+  - no dimensions at all for an image whose size is not
+  - the same rule for ImageObject inside JSON-LD, at any depth
+  - one dimension without the other is a mistake either way
+  - a page with no og:image at all
+
+Demonstrated against the pre-fix build:
+
+    52  og:image is 1536x1024 but the tags declare 1200x630
+    52 image problems across 58 pages
+
+Adding the "no og:image" rule broke four existing tests, which was the rule
+being right about the fixtures: they were minimal head blocks with no og:image,
+while every real page has one. The fixtures now carry what the prerender
+actually writes.
+
+VERIFICATION: 52 image problems before, 0 after, against real builds. Checked
+the two paths separately by giving one placeholder article a featured_image_url
+and the other none:
+
+  /blog/tips-one      og:image = cdn.example.com/hero.jpg, no width, no height
+  /blog/insights-two  og:image = Cover.png, width 1536, height 1024
+
+tsc clean, verify:seo green on 58 pages and 29 sitemap URLs. Opened US-175 for
+the artwork and per-page image questions.
+
+A note on og:image:alt, changed in passing: it was the page title, which is a
+title and not a description of an image. It is now a sentence describing what
+Cover.png actually shows, for the default; a page supplying its own image still
+falls back to its title, because nothing here knows what that image is either.

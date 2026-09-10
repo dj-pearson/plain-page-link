@@ -2763,17 +2763,31 @@
     },
     {
       "id": "US-174",
-      "title": "og:image declares 1200x630 for an image that is 1536x1024",
-      "description": "Every one of the 58 prerendered pages carries the same og:image, https://agentbio.net/Cover.png, with og:image:width 1200 and og:image:height 630 hardcoded beside it. The file is 1536x1024 \u2014 a 1.5 aspect ratio where the declaration claims 1.905. Facebook, LinkedIn, Slack and X use the declared dimensions to reserve layout before the image loads, so the unfurl reserves a shape the image does not have. The file is also 591 KB where a 91 KB Cover.webp sits next to it unused.",
+      "title": "og:image declared a size no code had ever measured",
+      "description": "Four SEO components hardcoded og:image:width 1200 and og:image:height 630 beside the URL. Cover.png is 1536x1024 \u2014 a 1.5 aspect ratio where the tags claim 1.905 \u2014 so 52 of 58 pages told every unfurl to reserve a shape the image does not have. The sharper half: ArticleSEO asserted the same 1200x630 for whatever featured_image_url an article carries, including inside the BlogPosting JSON-LD as ImageObject.width/.height, which Google reads to decide large-image rich-result eligibility. SchemaMarkup did it for any caller-supplied image and BlogArticle did it in microdata on the <img> itself. Those are dimensions asserted for files the code has never opened.",
       "acceptanceCriteria": [
-        "The declared og:image dimensions match the file, or the file is remade at the declared size",
-        "The value is derived from one place rather than hardcoded next to the URL",
-        "A check fails if they diverge again",
-        "Decide whether pages that have their own subject \u2014 the three tools, the comparisons, blog articles \u2014 should carry their own og:image rather than one cover for all 58"
+        "A dimension is declared only for an image whose size is known in one place",
+        "That place is checked against the bytes on disk, so editing one without the other fails",
+        "Nothing declares a size for a caller-supplied or user-uploaded image",
+        "verify:seo fails when the declared og:image size does not match the file"
       ],
       "priority": "medium",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 6 of the SEO loop. src/config/og-image.ts holds the default image and its real size; src/config/og-image.test.ts reads the PNG IHDR chunk and asserts they agree, so no image library is needed. Cover.png was NOT recropped to 1200x630: the composition fills the frame \u2014 the phone mockup runs nearly edge to edge and the footer wordmark sits at the bottom \u2014 so a 1.91:1 crop would cut both. Declaring the true size is correct and free; regenerating the artwork at 1200x630 is a design decision, and US-175 carries it along with the question of per-page images. Measured: 52 of 58 pages wrong before, 0 after."
+    },
+    {
+      "id": "US-175",
+      "title": "One cover image for all 58 pages, at an aspect ratio no social platform wants",
+      "description": "Every page shares https://agentbio.net/Cover.png. Two separate questions sit behind that. First, the artwork is 1536x1024 (3:2) where Facebook, LinkedIn and X all lay out for 1.91:1, so every card is letterboxed or centre-cropped by the platform rather than by us; the file is also 577 KB where an equivalent WebP next to it is 90 KB. Second, the pages that have a subject of their own \u2014 the three tools, the three comparisons, blog articles without a featured image \u2014 all unfurl as the generic product cover, which is the same link preview a competitor comparison and a bio generator both get.",
+      "acceptanceCriteria": [
+        "A decision on the artwork: recomposed at 1200x630, or kept at 3:2 with the reason written down",
+        "If per-page images are added, they come from one generator rather than one designer-made file per page, and DEFAULT_SOCIAL_IMAGE grows into a lookup rather than a constant",
+        "og-image.test.ts still verifies every declared size against the file it names",
+        "The 577 KB PNG is reconsidered against the 90 KB WebP, including which platforms accept WebP for og:image"
+      ],
+      "priority": "low",
       "passes": false,
-      "notes": "Found 2026-09-10 during the iteration 5 survey, by reading the PNG header rather than trusting the tag. Not fixed there because it needs an image decision, not a code one: either regenerate Cover.png at 1200x630 (losing the top and bottom of the current composition) or declare 1536x1024. The second is free and correct today; the first is what the social platforms actually want. The per-page og:image question is the bigger half and is why this is not a one-line fix."
+      "notes": "Opened 2026-09-10 (iteration 6). Deliberately not done there: US-174 was a correctness bug with a right answer, this is a design decision with several. Do not crop the current Cover.png blindly \u2014 it was looked at, and the composition uses the full height."
     }
   ]
 }

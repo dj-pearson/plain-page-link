@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
 import { getBaseUrl } from '@/config/seo.config';
 
 interface ArticleSEOProps {
@@ -37,7 +38,7 @@ export function ArticleSEO({
   const fullUrl = `${siteUrl}${url}`;
 
   // Use Cover.png as fallback if no featured image
-  const socialImage = imageUrl || `${siteUrl}/Cover.png`;
+  const socialImage = imageUrl || `${siteUrl}${DEFAULT_SOCIAL_IMAGE.path}`;
 
   // Build structured data for Article with enhanced properties for AI search
   const structuredData = {
@@ -48,8 +49,13 @@ export function ArticleSEO({
     image: {
       '@type': 'ImageObject',
       url: socialImage,
-      width: 1200,
-      height: 630,
+      // Google reads ImageObject width/height to decide large-image rich-result
+      // eligibility, which wants 1200px or more. This claimed 1200x630 for
+      // whatever featured_image_url an article carried — a file this code has
+      // never opened. Stated only when known (US-174).
+      ...(isDefaultSocialImage(socialImage)
+        ? { width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height }
+        : {}),
     },
     datePublished: publishedTime,
     dateModified: modifiedTime || publishedTime,
@@ -146,8 +152,19 @@ export function ArticleSEO({
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={socialImage} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
+      {/* Width and height only for the image whose size is known. An article's
+          featured_image_url is an arbitrary upload this code has never seen
+          (US-174). */}
+      {isDefaultSocialImage(socialImage) && (
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+      )}
+      {isDefaultSocialImage(socialImage) && (
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+      )}
+      <meta
+        property="og:image:alt"
+        content={isDefaultSocialImage(socialImage) ? DEFAULT_SOCIAL_IMAGE.alt : title}
+      />
       <meta property="og:site_name" content={siteName} />
       {publishedTime && <meta property="article:published_time" content={publishedTime} />}
       {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}

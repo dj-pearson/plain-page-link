@@ -150,6 +150,29 @@ const DELIBERATE_NON_PATH_PARENTS = [
   { leaf: '/for/', parent: '/for-real-estate-agents' },
 ];
 
+/**
+ * Images whose intrinsic size this repo actually knows, and what it is.
+ *
+ * Mirrors DEFAULT_SOCIAL_IMAGE in src/config/og-image.ts, which is itself
+ * checked against the bytes on disk by src/config/og-image.test.ts. Two
+ * declarations rather than an import because this module is plain node with no
+ * bundler, and the test on the other side is what keeps them honest.
+ */
+const KNOWN_IMAGE_SIZES = new Map([['/Cover.png', { width: 1536, height: 1024 }]]);
+
+function knownSizeFor(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    return KNOWN_IMAGE_SIZES.get(new URL(url, 'https://agentbio.net').pathname) ?? null;
+  } catch {
+    return KNOWN_IMAGE_SIZES.get(url) ?? null;
+  }
+}
+
+function isKnownImage(url) {
+  return knownSizeFor(url) !== null;
+}
+
 export function auditStructuredData(route, html) {
   const problems = [];
   const { blocks, problems: parseProblems } = readJsonLd(html);
@@ -188,6 +211,24 @@ export function auditStructuredData(route, html) {
         }
         if (!count || count === 'undefined') {
           problems.push(`aggregateRating on ${type} has no reviewCount`);
+        }
+      }
+
+      // An ImageObject asserting a size for a file nobody measured (US-174).
+      // Google fetches the image and measures it; a declared 1200x630 on a
+      // 1536x1024 file is a claim it can see is false, and on a small upload it
+      // is a false claim of large-image rich-result eligibility.
+      if (node.image && typeof node.image === 'object' && !Array.isArray(node.image)) {
+        const image = node.image;
+        const declares = image.width !== undefined || image.height !== undefined;
+        if (declares && !isKnownImage(image.url)) {
+          problems.push(
+            `${type} declares image dimensions (${image.width}x${image.height}) for ` +
+              `${image.url || 'an image with no url'}, whose size is not known here`
+          );
+        }
+        if (declares && (!image.width || !image.height)) {
+          problems.push(`${type} declares one image dimension without the other`);
         }
       }
 
@@ -280,6 +321,49 @@ export function auditStructuredData(route, html) {
         }
       }
     });
+  }
+
+  // og:image:width / :height are read by every unfurl to reserve layout before
+  // the bytes arrive, so a wrong pair breaks the card on every platform at once.
+  // All 58 pages declared 1200x630 for a 1536x1024 file (US-174).
+  {
+    const head = headOf(html);
+    const ogImage = attr(
+      head.match(/<meta[^>]*property="og:image"[^>]*>/gi)?.join('') || '',
+      /<meta[^>]*>/gi,
+      'content'
+    );
+    const declared = {
+      width: attr(
+        head.match(/<meta[^>]*property="og:image:width"[^>]*>/gi)?.join('') || '',
+        /<meta[^>]*>/gi,
+        'content'
+      ),
+      height: attr(
+        head.match(/<meta[^>]*property="og:image:height"[^>]*>/gi)?.join('') || '',
+        /<meta[^>]*>/gi,
+        'content'
+      ),
+    };
+
+    if (!ogImage) {
+      problems.push('no og:image — social platforms fall back to whatever they scrape');
+    } else if (declared.width || declared.height) {
+      const known = knownSizeFor(ogImage);
+      if (!known) {
+        problems.push(
+          `og:image:width/height declared for ${ogImage}, whose size is not known here`
+        );
+      } else if (
+        String(known.width) !== declared.width ||
+        String(known.height) !== declared.height
+      ) {
+        problems.push(
+          `og:image is ${known.width}x${known.height} but the tags declare ` +
+            `${declared.width}x${declared.height}`
+        );
+      }
+    }
   }
 
   // Two BreadcrumbList declarations on one page are two answers to one
