@@ -46,3 +46,4 @@ db-backup/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+deno.lock

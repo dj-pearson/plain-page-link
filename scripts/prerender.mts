@@ -28,7 +28,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import type { Browser, BrowserContext, Page } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
 
 import {
@@ -43,6 +43,7 @@ import {
   loadFixtureArticles,
   type Article,
 } from './lib/articles.mts';
+import { launchChromium } from './lib/chromium.mts';
 import { buildSitemapXml, weightFor, type SitemapEntry } from './lib/sitemap.mts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -621,7 +622,7 @@ async function main() {
       preview: { port: PORT, strictPort: true, host: '127.0.0.1', open: false },
       logLevel: 'warn',
     });
-    browser = await chromium.launch();
+    browser = await launchChromium();
     results = await renderAll(browser, routes, defaultTitle, articles);
   } finally {
     await browser?.close().catch(() => {});
