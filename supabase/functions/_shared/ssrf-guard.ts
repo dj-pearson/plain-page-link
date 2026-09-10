@@ -20,6 +20,29 @@
  * fetch(), and a hostile resolver can answer differently. Closing that needs
  * connect-time pinning, which Deno's fetch does not expose. Documented rather
  * than pretended away.
+ *
+ * US-196: the IPv6 half of this was bypassable, and its test passed anyway.
+ *
+ * `new URL()` does not preserve the IPv4-mapped form a person writes. It
+ * normalises it to hexadecimal:
+ *
+ *     new URL('http://[::ffff:127.0.0.1]/').hostname  ->  '[::ffff:7f00:1]'
+ *     new URL('http://[::ffff:169.254.169.254]/').hostname -> '[::ffff:a9fe:a9fe]'
+ *
+ * The old check looked for `::ffff:` followed by a DOTTED quad, which is the
+ * form the guard is never handed. So `http://[::ffff:127.0.0.1]/` was judged
+ * public and fetched — from a process holding the service-role key, with the
+ * response body returned to the caller. The exact hole US-077 exists to close,
+ * one encoding away.
+ *
+ * The test asserted `isBlockedAddress('::ffff:127.0.0.1') === true` and was
+ * right; that string just never reaches the function. A guard tested only on
+ * input the code does not see has not been tested.
+ *
+ * The fix is to stop pattern-matching text and expand the address to its eight
+ * groups, then read the embedded IPv4 out of every form that carries one:
+ * mapped (::ffff:0:0/96), compatible (::/96), NAT64 (64:ff9b::/96) and
+ * 6to4 (2002::/16).
  */
 
 /** Blocked IPv4 ranges, as [network, prefix length]. */
@@ -50,21 +73,111 @@ function v4ToInt(ip: string): number | null {
   return out >>> 0;
 }
 
+/**
+ * Expand an IPv6 address to its eight 16-bit groups.
+ *
+ * Handles `::` compression and a trailing dotted quad. Returns null for
+ * anything that is not a well-formed address, so a caller can tell "not IPv6"
+ * from "IPv6 that is fine" — the previous code could not, and answered
+ * "not blocked" to both.
+ */
+export function expandIpv6(input: string): number[] | null {
+  let addr = input.trim().replace(/^\[|\]$/g, '').toLowerCase();
+  // A zone index (fe80::1%eth0) names an interface, and an interface is local
+  // by definition. Strip it for parsing; the prefix check below catches it.
+  const zone = addr.indexOf('%');
+  if (zone !== -1) addr = addr.slice(0, zone);
+  if (!addr.includes(':')) return null;
+  if ((addr.match(/::/g) ?? []).length > 1) return null;
+
+  // A trailing dotted quad occupies the last two groups.
+  let tail: number[] = [];
+  const dotted = addr.match(/(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (dotted) {
+    const v4 = v4ToInt(dotted[1]);
+    if (v4 === null) return null;
+    tail = [v4 >>> 16, v4 & 0xffff];
+    addr = addr.slice(0, addr.length - dotted[1].length).replace(/:$/, '');
+  }
+
+  const [head, rest, extra] = addr.split('::');
+  if (extra !== undefined) return null;
+
+  const parse = (part: string): number[] | null => {
+    if (part === '') return [];
+    const out: number[] = [];
+    for (const group of part.split(':')) {
+      if (group === '' || !/^[0-9a-f]{1,4}$/.test(group)) return null;
+      out.push(parseInt(group, 16));
+    }
+    return out;
+  };
+
+  const left = parse(head.replace(/:$/, ''));
+  if (left === null) return null;
+
+  if (rest === undefined) {
+    const groups = [...left, ...tail];
+    return groups.length === 8 ? groups : null;
+  }
+
+  const right = parse(rest.replace(/^:/, ''));
+  if (right === null) return null;
+
+  const groups = [...left, ...right, ...tail];
+  if (groups.length > 8) return null;
+  const zeros = new Array(8 - groups.length).fill(0);
+  return [...left, ...zeros, ...right, ...tail];
+}
+
+/** The IPv4 address an IPv6 address embeds, in dotted form, or null. */
+function embeddedV4(g: number[]): string | null {
+  const dotted = (hi: number, lo: number) =>
+    `${hi >>> 8}.${hi & 0xff}.${lo >>> 8}.${lo & 0xff}`;
+
+  const zeroThrough = (n: number) => g.slice(0, n).every((x) => x === 0);
+
+  // ::ffff:0:0/96 — IPv4-mapped. This is the one that was getting through.
+  if (zeroThrough(5) && g[5] === 0xffff) return dotted(g[6], g[7]);
+  // ::/96 — IPv4-compatible. Deprecated, still routed by some stacks.
+  if (zeroThrough(6) && !(g[6] === 0 && (g[7] === 0 || g[7] === 1))) {
+    return dotted(g[6], g[7]);
+  }
+  // 64:ff9b::/96 — NAT64. The whole point of the prefix is to reach an IPv4.
+  if (g[0] === 0x0064 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) {
+    return dotted(g[6], g[7]);
+  }
+  // 2002::/16 — 6to4 carries its IPv4 in the next 32 bits.
+  if (g[0] === 0x2002) return dotted(g[1], g[2]);
+
+  return null;
+}
+
+/** Is this IPv6 address one we refuse to fetch from? */
+function isBlockedV6(input: string): boolean {
+  const g = expandIpv6(input);
+  // Unparseable is not "safe". Refusing something malformed costs nothing;
+  // fetching something we could not read is how this goes wrong.
+  if (g === null) return true;
+
+  if (g.every((x) => x === 0)) return true; // ::
+  if (g.slice(0, 7).every((x) => x === 0) && g[7] === 1) return true; // ::1
+
+  if ((g[0] & 0xfe00) === 0xfc00) return true; // fc00::/7 unique-local
+  if ((g[0] & 0xffc0) === 0xfe80) return true; // fe80::/10 link-local
+  if (g[0] === 0x2001 && g[1] === 0x0000) return true; // 2001::/32 Teredo tunnel
+
+  const v4 = embeddedV4(g);
+  if (v4 !== null) return isBlockedAddress(v4);
+
+  return false;
+}
+
 /** Is this literal IP address in a range we refuse to fetch from? */
 export function isBlockedAddress(ip: string): boolean {
   const addr = ip.trim().replace(/^\[|\]$/g, '');
 
-  // IPv6, including the loopback and unique-local ranges, and any
-  // IPv4-mapped form (::ffff:127.0.0.1).
-  if (addr.includes(':')) {
-    const lower = addr.toLowerCase();
-    if (lower === '::1' || lower === '::') return true;
-    if (/^f[cd][0-9a-f]{2}:/.test(lower)) return true; // fc00::/7 unique-local
-    if (/^fe[89ab][0-9a-f]:/.test(lower)) return true; // fe80::/10 link-local
-    const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return isBlockedAddress(mapped[1]);
-    return false;
-  }
+  if (addr.includes(':')) return isBlockedV6(addr);
 
   const value = v4ToInt(addr);
   if (value === null) return false;

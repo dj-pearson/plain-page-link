@@ -3072,6 +3072,22 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 8 by building and reading dist/index.html. The existing MUST_STAY_LAZY check asks who statically imports a given chunk, which catches a chunk dragged onto some page's critical path but cannot say what FIRST PAINT costs — a chunk can reach the entry through a chain the per-chunk rule does not see. The new check walks the closure instead, which is the question the budget was really asking."
+    },
+    {
+      "id": "US-196",
+      "title": "The SSRF guard was bypassable, and its test passed",
+      "description": "As the operator of a platform whose edge functions fetch caller-supplied URLs while holding the service-role key, I need the guard to refuse a private address in every encoding the URL parser can produce, not only in the one a person would type.",
+      "acceptanceCriteria": [
+        "isBlockedAddress expands an IPv6 address to its eight groups instead of pattern-matching text",
+        "Every form that embeds an IPv4 address is read and checked: mapped (::ffff:0:0/96), compatible (::/96), NAT64 (64:ff9b::/96) and 6to4 (2002::/16)",
+        "An address that cannot be parsed is refused, not treated as public",
+        "A zone index (fe80::1%eth0) does not defeat the link-local check",
+        "The tests use the literal output of new URL(...).hostname, because that is what the guard is handed",
+        "The new tests are verified against the shipped implementation: 6 of them fail there"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 9. new URL() re-serialises an IPv4-mapped address in hexadecimal — 'http://[::ffff:127.0.0.1]/' arrives at the guard as '[::ffff:7f00:1]'. The old check matched '::ffff:' followed by a DOTTED quad, a form assertFetchableUrl never receives, so it returned 'not blocked' and the fetch went out. Cloud metadata at [::ffff:169.254.169.254] and RFC1918 at [::ffff:10.0.0.5] went the same way. The existing test asserted the dotted form was blocked and was correct about a string the code never sees — the same shape as every other defect this loop has found: a guard that had only ever been run on input it is not given. Affects crawl-site, check-broken-links, check-security-headers, detect-redirect-chains, analyze-images, check-core-web-vitals and check-mobile-first."
     }
   ]
 }
