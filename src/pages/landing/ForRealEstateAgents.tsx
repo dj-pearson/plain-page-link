@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getCanonicalUrl } from '@/config/seo.config';
 import { Link } from 'react-router-dom';
 import { Home, Users, Calendar, Star, TrendingUp, Check, X } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
@@ -29,8 +30,8 @@ export default function ForRealEstateAgents() {
       generateEnhancedOrganizationSchema(),
       {
         '@type': 'WebPage',
-        '@id': `${window.location.origin}/for-real-estate-agents`,
-        url: `${window.location.origin}/for-real-estate-agents`,
+        '@id': getCanonicalUrl('/for-real-estate-agents'),
+        url: getCanonicalUrl('/for-real-estate-agents'),
         name: 'Link in Bio Built for Real Estate Agents | AgentBio',
         description:
           'AgentBio is a specialized link-in-bio platform for real estate agents that includes property listings, lead forms, and calendar booking—features not found in generic tools like Linktree.',
@@ -51,7 +52,7 @@ export default function ForRealEstateAgents() {
           'realtor link in bio',
           'real estate Instagram bio link',
         ]}
-        canonicalUrl={`${window.location.origin}/for-real-estate-agents`}
+        canonicalUrl={getCanonicalUrl('/for-real-estate-agents')}
         schema={schema}
       />
       <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>

@@ -1,5 +1,7 @@
 import { Helmet } from 'react-helmet-async';
-import { getSafeOrigin } from '@/lib/utils';
+import { SAME_AS } from '@/config/social-profiles';
+import { DEFAULT_SOCIAL_IMAGE, ORGANIZATION_LOGO, isDefaultSocialImage } from '@/config/og-image';
+import { getBaseUrl } from '@/config/seo.config';
 
 interface FAQItem {
   question: string;
@@ -32,7 +34,11 @@ export function PageSEO({
   structuredData,
 }: PageSEOProps) {
   const siteName = 'AgentBio';
-  const siteUrl = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): a canonical is a claim about identity,
+  // so it must not read the host the visitor happens to be on. A *.pages.dev
+  // preview would otherwise self-canonicalise once the bundle hydrates
+  // (US-172).
+  const siteUrl = getBaseUrl();
   const fullUrl = url
     ? url.startsWith('http')
       ? url
@@ -52,9 +58,10 @@ export function PageSEO({
     url: siteUrl,
     logo: {
       '@type': 'ImageObject',
-      url: `${siteUrl}/logo.png`,
-      width: '512',
-      height: '512',
+      url: `${siteUrl}${ORGANIZATION_LOGO.path}`,
+      // Was width '512', height '512' for a 946x436 file (US-178).
+      width: String(ORGANIZATION_LOGO.width),
+      height: String(ORGANIZATION_LOGO.height),
     },
     image: `${siteUrl}/Cover.png`,
     description:
@@ -65,16 +72,16 @@ export function PageSEO({
       '@type': 'ContactPoint',
       contactType: 'Customer Service',
       email: 'support@agentbio.net',
-      url: `${siteUrl}/contact`,
+      // No `url`. It pointed at /contact, which has never been a route here —
+      // seven pages named it, and since US-176 it does not even answer 200.
+      // The email is the contact method; a ContactPoint does not need a page
+      // to be valid, and one naming a URL that 404s is worse than one that
+      // does not (US-179).
       availableLanguage: ['English'],
     },
-    sameAs: [
-      'https://twitter.com/agentbio',
-      'https://www.facebook.com/agentbio',
-      'https://www.linkedin.com/company/agentbio',
-      'https://www.instagram.com/agentbio',
-      'https://www.youtube.com/@agentbio',
-    ],
+    // See @/config/social-profiles: these were four accounts this company does
+    // not have, and one it does (US-178).
+    sameAs: [...SAME_AS],
     // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
     // reviews, the same invented pair US-111 took off the landing page and
     // missed here — it was still reaching 31 built pages. Google renders stars
@@ -108,8 +115,10 @@ export function PageSEO({
     primaryImageOfPage: {
       '@type': 'ImageObject',
       url: socialImage,
-      width: 1200,
-      height: 630,
+      // Dimensions only when they are known; see @/config/og-image (US-174).
+      ...(isDefaultSocialImage(socialImage)
+        ? { width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height }
+        : {}),
     },
     inLanguage: 'en-US',
     potentialAction: {
@@ -129,14 +138,12 @@ export function PageSEO({
     publisher: {
       '@id': `${siteUrl}#organization`,
     },
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: `${siteUrl}/search?q={search_term_string}`,
-      },
-      'query-input': 'required name=search_term_string',
-    },
+    // No potentialAction. A SearchAction is what Google reads to offer a
+    // sitelinks searchbox, and this one pointed at /search?q=, a route that has
+    // never existed in App.tsx. Since US-176 it returns a real 404, so the
+    // searchbox would have sent people nowhere. There is no site-wide search to
+    // point it at; the blog has its own, and BlogListSEO declares that one
+    // against /blog?search=, which Blog.tsx now actually reads (US-179).
   };
 
   // FAQ Schema (if FAQs provided)
@@ -192,8 +199,15 @@ export function PageSEO({
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={socialImage} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
+      {/* Width and height only for the image whose size is known. A caller's
+          own image is one this code has never seen, and a wrong number breaks
+          the card the tag exists to build (US-174). */}
+      {isDefaultSocialImage(socialImage) && (
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+      )}
+      {isDefaultSocialImage(socialImage) && (
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+      )}
       <meta property="og:site_name" content={siteName} />
       <meta property="og:locale" content="en_US" />
 

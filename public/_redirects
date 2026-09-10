@@ -1,10 +1,28 @@
 # Cloudflare Pages redirect rules.
 #
 # Order matters, and so does what is NOT here: static assets are matched before
-# these rules, which is why the SPA fallback at the bottom does not swallow
-# /assets/*.js or the prerendered dist/<route>/index.html files that US-147
-# writes. Rules for a prerendered path are rejected by the build for the same
-# reason — see verifyServedLayout() in scripts/prerender.mts.
+# these rules, which is why the rules below do not swallow /assets/*.js or the
+# prerendered dist/<route>/index.html files that US-147 writes. Rules for a
+# prerendered path are rejected by the build for the same reason — see
+# verifyServedLayout() in scripts/prerender.mts.
+#
+# WHAT CHANGED IN US-176. This file used to end with:
+#
+#     /* /index.html 200
+#
+# which answered EVERY unmatched URL with 200 and dist/index.html. Since US-147
+# that file is not an empty shell, it is the fully prerendered homepage — so
+# agentbio.net/anything-at-all returned the homepage's title, description and
+# body under a 200, and only became the 404 page once the bundle executed. A
+# client-side router cannot set a status code, so no amount of work in
+# NotFound.tsx could fix it.
+#
+# Removing the catch-all lets Pages fall through to dist/404.html with a real
+# 404. That only works if every route the SPA owns but does not prerender is
+# listed below, so src/spa-routes.test.ts walks App.tsx and fails when a route
+# is neither prerendered nor covered here. Adding a route to App.tsx without
+# adding it to one of those two places is a broken page, and the test is what
+# says so before a deploy does.
 
 # /features has never been a route. App.tsx defines only the five /features/*
 # children, so this path fell through to the SPA fallback and answered with the
@@ -13,5 +31,47 @@
 # what the URL was reaching for.
 /features / 301
 
-# SPA fallback - every route not matched above or by a real file
-/* /index.html 200
+# /for is the same shape: a prefix with 26 children and no index. It is a single
+# segment, so the /:username rule at the bottom would answer it 200 with the
+# homepage — the exact soft 404 this story removes. Sent to the homepage
+# explicitly, as /features is.
+#
+# The other bare segments RESERVED_SEGMENTS lists but App.tsx does not route
+# (/legal, /about, /contact, /help, /support, /api) are left alone: none is
+# linked from anywhere, none has ever been a URL here, and each would be one
+# more rule to keep true. functions/[username].ts treats them as reserved and
+# they fall through to the SPA, which renders its 404 body under a 200. Worth
+# knowing about; not worth six rules.
+/for / 301
+
+# --- Routes the SPA owns and the build does not prerender --------------------
+#
+# Each of these is behind a session, or depends on a database row, so there is
+# no meaningful anonymous render to write to a file. They must answer 200 with
+# the app; anything else is a working page turned into a 404.
+
+/dashboard      /index.html 200
+/dashboard/*    /index.html 200
+/admin          /index.html 200
+/admin/*        /index.html 200
+/onboarding/*   /index.html 200
+
+# /auth/callback and /auth/sso/callback consume an OAuth code and redirect, so
+# they are not prerendered (see the note in src/config/prerender-routes.ts).
+# The prerendered /auth/* pages are matched as assets before these rules are
+# consulted, so this covers the callbacks without shadowing them.
+/auth/*         /index.html 200
+
+# Page-builder pages, one per tenant row.
+/p/*            /index.html 200
+
+# A public profile: /:username, and its review form. One path segment, which is
+# indistinguishable from a typo without a database lookup — so this rule keeps
+# every single-segment URL answering 200, and functions/[username].ts is what
+# returns a real 404 to a crawler when the username is not a published profile.
+#
+# Deliberately NOT a catch-all: /blog/nope, /features/nope, /tools/nope,
+# /vs/nope and /for/nope now reach dist/404.html and return 404, because every
+# real URL under those prefixes is prerendered to a file.
+/:username        /index.html 200
+/:username/review /index.html 200

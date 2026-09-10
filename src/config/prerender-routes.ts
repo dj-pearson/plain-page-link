@@ -82,6 +82,14 @@ export const STATIC_ROUTES: readonly PrerenderRoute[] = [
   { path: '/vs/beacons', kind: 'comparison' },
   { path: '/vs/later', kind: 'comparison' },
 
+  // US-176. Rendered so Cloudflare Pages has a real 404 document to serve.
+  // The prerender copies it to dist/404.html, which Pages returns with a 404
+  // status for anything that matches no asset and no rule. Kept out of the
+  // sitemap, and the page itself carries noindex.
+  { path: '/404', kind: 'marketing', sitemap: false },
+
+  // US-167. The hub the tool breadcrumbs had been claiming existed.
+  { path: '/tools', kind: 'tool' },
   { path: '/tools/instagram-bio-analyzer', kind: 'tool' },
   { path: '/tools/listing-description-generator', kind: 'tool' },
   // US-155. The page that serves the ~180-impression "real estate agent bio"

@@ -37,7 +37,12 @@ import {
   outputPathForRoute,
   type PrerenderRoute,
 } from '../src/config/prerender-routes';
-import { categorySlugs, loadArticles, type Article } from './lib/articles.mts';
+import {
+  categorySlugs,
+  loadArticles,
+  loadFixtureArticles,
+  type Article,
+} from './lib/articles.mts';
 import { buildSitemapXml, weightFor, type SitemapEntry } from './lib/sitemap.mts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +78,8 @@ interface Rendered {
   html: string;
   title: string;
   problems: string[];
+  /** How many preview-server URLs had to be rewritten; see the note below. */
+  rewrites: number;
 }
 
 /**
@@ -188,7 +195,8 @@ async function renderRoute(
     if (result.rootLength < MIN_ROOT_HTML) {
       problems.push(`#root rendered only ${result.rootLength} chars of HTML`);
     }
-    if (result.h1 === '404') {
+    // /404 is the one route whose job IS to render that page (US-176).
+    if (result.h1 === '404' && route.path !== '/404') {
       problems.push('rendered the 404 page — this route does not exist in App.tsx');
     }
     if (!result.title) {
@@ -211,14 +219,24 @@ async function renderRoute(
       problems.unshift(...bootErrors.map((m) => `threw during boot: ${m}`));
     }
 
-    // Every absolute URL the app produced points at the preview server.
-    // Canonicals, og:url and the url fields inside JSON-LD all have to move.
+    // Any absolute URL the app built from the host it was served on points at
+    // the preview server, so it has to move: canonicals, og:url, and the url
+    // and @id fields inside JSON-LD.
+    //
+    // US-172 made every site-owned URL come from the configured app URL
+    // instead, which should leave nothing here to rewrite. The count is
+    // reported rather than assumed, because this rewrite was silently
+    // loadbearing for a year — it is what kept a *.pages.dev preview deploy
+    // from self-canonicalising in the prerendered HTML, while the same pages
+    // did exactly that the moment they hydrated. A non-zero count names a page
+    // that is still reading its own host.
+    const rewrites = result.html.split(PREVIEW_ORIGIN).length - 1;
     const html = result.html.split(PREVIEW_ORIGIN).join(SITE_ORIGIN);
     if (html.includes('127.0.0.1') || html.includes('localhost')) {
       problems.push('a preview-server URL survived into the output');
     }
 
-    return { route, html, title: result.title, problems };
+    return { route, html, title: result.title, problems, rewrites };
   } finally {
     page.off('pageerror', onPageError);
   }
@@ -254,6 +272,23 @@ async function interceptArticles(context: BrowserContext, articles: Article[]): 
     if (slug?.startsWith('eq.')) {
       const wanted = decodeURIComponent(slug.slice(3));
       rows = rows.filter((a) => a.slug === wanted);
+    }
+
+    // BlogCategory filters on category. The intercept used to ignore this
+    // parameter entirely, so every prerendered /blog/category/{slug} page
+    // listed EVERY published article regardless of category — and the
+    // prerendered HTML is the only version a first crawl sees (US-166).
+    const category = url.searchParams.get('category');
+    if (category) {
+      const matches = (value: string | null, test: (stored: string) => boolean) =>
+        (rows = rows.filter((a) => (a.category ? test(a.category) : false)));
+      if (category.startsWith('eq.')) {
+        const wanted = decodeURIComponent(category.slice(3));
+        matches(wanted, (stored) => stored === wanted);
+      } else if (category.startsWith('ilike.')) {
+        const pattern = decodeURIComponent(category.slice(6)).replace(/^%|%$/g, '').toLowerCase();
+        matches(pattern, (stored) => stored.toLowerCase().includes(pattern));
+      }
     }
 
     const order = url.searchParams.get('order');
@@ -518,18 +553,58 @@ async function main() {
   let articles: Article[] = [];
   let blog: PrerenderRoute[] = [];
   if (process.env.PRERENDER_ALLOW_NO_ARTICLES === '1') {
+    // Was: skip the blog entirely. That left CI's verify:seo looking at the
+    // marketing pages and never at /blog, /blog/category/{slug} or
+    // /blog/{slug} — which is where US-180, US-184 and a third of US-185
+    // actually were. A guard that cannot see the pages the defects are on is
+    // not guarding them (US-186).
+    //
+    // Three fixtures instead, from scripts/data/articles.fixture.json. They
+    // announce themselves as fixtures in their title and first sentence, and
+    // loadArticles() cannot reach this file, so a deploy cannot ship them even
+    // if it wrongly set this flag.
+    articles = await loadFixtureArticles();
+    const categories = categorySlugs(articles);
+    blog = blogRoutes(
+      articles.map((a) => a.slug),
+      categories.slugs
+    );
     console.warn(
-      '[prerender] PRERENDER_ALLOW_NO_ARTICLES=1 — skipping the blog entirely.\n' +
+      '[prerender] PRERENDER_ALLOW_NO_ARTICLES=1 — rendering the blog from ' +
+        `${articles.length} FIXTURE articles, not real ones.\n` +
         '            Correct for a verification build, wrong for a deploy.'
     );
+    if (categories.unlisted.length > 0) {
+      console.log(
+        `[prerender] fixture exercises the unlisted-category path: ` +
+          categories.unlisted.map((c) => c.name).join(', ')
+      );
+    }
   } else {
     const loaded = await loadArticles();
     articles = loaded.articles;
+    const categories = categorySlugs(articles);
     blog = blogRoutes(
       articles.map((a) => a.slug),
-      categorySlugs(articles)
+      categories.slugs
     );
     console.log(`[prerender] ${articles.length} published articles (from ${loaded.source})`);
+
+    // Not fatal, and not silent. A category with no landing page is a category
+    // whose articles are reachable only through /blog and the article's own
+    // URL. Before US-166 this was fatal — and fatal for the entire build, with
+    // a message about titles rather than about categories.
+    if (categories.unlisted.length > 0) {
+      const summary = categories.unlisted
+        .map((c) => `${c.name} (${c.articles} article${c.articles === 1 ? '' : 's'})`)
+        .join(', ');
+      console.warn(
+        `[prerender] ${categories.unlisted.length} category value(s) have no landing page: ${summary}.\n` +
+          '            Those articles still ship; they just have no category page.\n' +
+          '            Add the category to src/config/blog-categories.ts (and its copy to\n' +
+          '            categoryContent in src/pages/BlogCategory.tsx), or recategorise them.'
+      );
+    }
   }
 
   const routes = allPrerenderRoutes(blog);
@@ -574,7 +649,43 @@ async function main() {
     await writeFile(outPath, r.html, 'utf8');
   }
 
-  console.log(`\n[prerender] wrote ${results.length} HTML files into dist/`);
+  // Cloudflare Pages serves dist/404.html, with a 404 status, for any request
+  // matching no asset and no rule in _redirects. It has to be at the root as
+  // 404.html — dist/404/index.html answers the /404 URL and nothing else
+  // (US-176).
+  const notFound = results.find((r) => r.route.path === '/404');
+  if (!notFound) {
+    console.error(
+      '[prerender] /404 did not render. Without dist/404.html, Cloudflare Pages\n' +
+        '            has no document to return for an unknown URL and falls back to\n' +
+        '            answering 200 with whatever _redirects points at.'
+    );
+    process.exit(1);
+  }
+  await writeFile(join(DIST, '404.html'), notFound.html, 'utf8');
+
+  console.log(`\n[prerender] wrote ${results.length} HTML files into dist/, plus 404.html`);
+
+  const rewritten = results.filter((r) => r.rewrites > 0);
+  if (rewritten.length === 0) {
+    console.log(
+      '[prerender] host rewrite: 0 preview-server URLs needed moving — every page ' +
+        'built its own URLs from the configured origin (US-172)'
+    );
+  } else {
+    const total = rewritten.reduce((sum, r) => sum + r.rewrites, 0);
+    console.warn(
+      `[prerender] host rewrite: moved ${total} preview-server URL(s) on ` +
+        `${rewritten.length} page(s):\n` +
+        rewritten
+          .slice(0, 10)
+          .map((r) => `            ${r.route.path} (${r.rewrites})`)
+          .join('\n') +
+        '\n            Those pages build a URL from the host they are served on, so on a\n' +
+        '            *.pages.dev preview they will self-canonicalise once hydrated.\n' +
+        '            Use getCanonicalUrl() from @/config/seo.config (US-172).'
+    );
+  }
 
   await verifyServedLayout(results);
   await writeSitemap(results, articles);

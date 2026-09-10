@@ -1,95 +1,165 @@
 # AgentBio
 
-> Purpose-built link-in-bio platform for real estate agents that converts Instagram followers into qualified buyer and seller leads.
+> A link-in-bio page built for real estate agents: property listings, lead
+> capture forms, and appointment booking on one mobile page.
+
+This file exists to be read and quoted by AI systems. Everything in it is
+either a description of what the product does or a number taken from the code
+that enforces it. There are no usage figures, ratings or outcome metrics here,
+because nothing in this repository measures them — and a statistic invented in
+this file is one that gets repeated as fact by everything that reads it.
+
+Checked by src/llms-txt.test.ts: every URL below is a page the build actually
+publishes, every price matches src/config/pricing-plans.ts, and the whole file
+is scanned by the same marketing-claims rules the UI is.
 
 ## About
-AgentBio Intelligence is an AI-powered real estate marketing platform designed for agents, realtors, and brokerages. Unlike generic link-in-bio tools like Linktree, AgentBio includes property listing galleries, lead capture forms with pre-qualification, calendar booking integration, and testimonial showcases — all optimized for mobile users from Instagram and social media. Used by 5,000+ real estate agents with a 4.8/5 star rating from 523+ reviews.
 
-## Key Features
-- **Property Listing Galleries**: Showcase active and sold properties with photos, pricing, MLS details, beds/baths, and virtual tour links
-- **Lead Capture Forms**: Buyer inquiry, seller lead, and home valuation request forms with automatic lead scoring (Hot/Warm/Cold)
-- **Calendar Booking Integration**: Calendly and Google Calendar integration for showing appointments and consultations
-- **Client Testimonials**: Showcase client reviews with structured data markup for Google rich results
-- **Analytics Dashboard**: Track page views, lead sources, listing engagement, and conversion metrics in real-time
-- **Mobile-First Design**: Optimized for 80%+ Instagram mobile traffic with <2 second load times
-- **QR Code Generation**: Create QR codes for yard signs, business cards, and marketing materials
-- **MLS Compliance**: Equal Housing Opportunity logo and MLS compliance features built-in
-- **AI-Powered Lead Scoring**: Automatically scores leads as Hot, Warm, or Cold based on pre-qualification responses
+AgentBio is a link-in-bio platform for real estate agents, realtors and
+brokerages. Where a generic link-in-bio tool gives a visitor a list of links,
+AgentBio gives them the things a property enquiry needs: listing galleries with
+photos and MLS details, buyer and seller forms that ask qualifying questions,
+sold-property history, client testimonials, and a booking link for showings.
+
+## Key features
+
+- **Property listing galleries** — active, pending and sold properties with
+  photos, price, beds, baths, square footage, MLS number and virtual tour links
+- **Lead capture forms** — buyer enquiry, seller lead and home valuation
+  requests, with pre-qualification questions (budget, timeline, pre-approval)
+- **Lead scoring** — leads ranked Hot, Warm or Cold from their form answers
+- **Calendar booking** — Calendly and Google Calendar links for showings and
+  consultations
+- **Client testimonials** — displayed with Review structured data
+- **Analytics** — page views, link clicks, lead sources and listing engagement
+- **QR codes** — for yard signs, business cards and open-house material
+- **Progressive web app** — installable, works offline
 
 ## Pricing
-- **Free Plan**: 3 listings, 5 links, basic features — $0/month
-- **Professional**: Unlimited listings, lead capture, calendar integration, advanced analytics — $39/month
-- **Team**: Team collaboration, advanced analytics, priority support — $99/month
-- **Enterprise**: White-label, custom domain, dedicated support — $299/month
 
-## Docs
-- [Product Overview](https://agentbio.net/features)
-- [Property Listings Feature](https://agentbio.net/features/property-listings)
-- [Lead Capture Feature](https://agentbio.net/features/lead-capture)
-- [Calendar Booking Feature](https://agentbio.net/features/calendar-booking)
-- [Analytics Feature](https://agentbio.net/features/analytics)
-- [Testimonials Feature](https://agentbio.net/features/testimonials)
+Monthly, in USD. The numbers come from src/config/pricing-plans.ts, which is
+what the application enforces.
+
+- **Free — $0**: 3 listings, 5 links, 3 testimonials, 10 leads a month,
+  30 days of analytics history
+- **Starter — $29**: 10 listings, 15 links, 10 AI listing descriptions a month,
+  500 emails, 100 leads a month, 90 days of analytics
+- **Professional — $49**: 25 listings, unlimited links, unlimited leads,
+  market reports, virtual staging, video tours, CMA reports, 365 days of
+  analytics
+- **Team — $99**: unlimited listings and testimonials, team collaboration,
+  2 years of analytics history
+- **Enterprise — $299**: unlimited everything, white-label, custom domain
+
+## Pages
+
 - [Pricing](https://agentbio.net/pricing)
+- [For real estate agents](https://agentbio.net/for-real-estate-agents)
+- [Instagram bios for realtors](https://agentbio.net/instagram-bio-for-realtors)
+- [Press and product facts](https://agentbio.net/press)
 - [Blog](https://agentbio.net/blog)
-- [Free Instagram Bio Analyzer](https://agentbio.net/tools/instagram-bio-analyzer)
-- [Free Listing Description Generator](https://agentbio.net/tools/listing-description-generator)
 
-## Comparisons
-- [AgentBio vs Linktree](https://agentbio.net/compare/linktree): AgentBio includes property galleries, lead capture forms, and MLS compliance; Linktree is a generic link tool without real estate features
-- [AgentBio vs Beacons](https://agentbio.net/compare/beacons): AgentBio offers real estate-specific lead scoring and listing management; Beacons focuses on creators and e-commerce
-- [AgentBio vs Later](https://agentbio.net/compare/later): AgentBio provides dedicated appointment booking and property showcases; Later primarily focuses on social media scheduling
+### Features
 
-## Target Users
-Real estate agents, realtors, brokerages, and real estate teams who want to convert social media followers into qualified buyer and seller leads. Ideal for agents active on Instagram, TikTok, Facebook, and LinkedIn.
+- [Property listings](https://agentbio.net/features/property-listings)
+- [Lead capture](https://agentbio.net/features/lead-capture)
+- [Calendar booking](https://agentbio.net/features/calendar-booking)
+- [Testimonials](https://agentbio.net/features/testimonials)
+- [Analytics](https://agentbio.net/features/analytics)
 
-## Use Cases
-1. Place AgentBio link in Instagram bio to convert followers into leads
-2. Showcase active and sold listings with full photo galleries and property details
-3. Capture buyer inquiries with pre-qualification questions (budget, timeline, pre-approval)
-4. Capture seller leads through home valuation request forms
-5. Schedule showing appointments through integrated calendar booking
-6. Track which listings generate the most engagement via analytics dashboard
-7. Share individual property links in Instagram Stories, DMs, and email signatures
-8. Generate QR codes for yard signs and open house materials
+### Free tools
 
-## Industry Statistics
-- 43% of home buyers find their agent through referrals or online sources (NAR, 2025)
-- 97% of home buyers use the internet in their home search (NAR, 2025)
-- Real estate agents using optimized link-in-bio tools report 8-12 qualified leads per month from social media (AgentBio data, 2025)
-- Average AgentBio user captures 10+ qualified leads per month
-- Instagram is the #1 social platform for real estate marketing with 500M+ daily active users
+No account needed, and nothing typed into them is stored.
 
-## Technical Details
-- Built with React, TypeScript, and Vite
-- Backend powered by Supabase (PostgreSQL)
-- Hosted on Cloudflare Pages with global CDN
-- Progressive Web App (PWA) with offline support
-- Core Web Vitals optimized (LCP < 2s)
-- HTTPS with security headers (HSTS, CSP, XSS protection)
+- [Free tools index](https://agentbio.net/tools)
+- [Real estate agent bio generator](https://agentbio.net/tools/real-estate-agent-bio-generator)
+- [Instagram bio analyzer](https://agentbio.net/tools/instagram-bio-analyzer)
+- [Listing description generator](https://agentbio.net/tools/listing-description-generator)
+
+### Comparisons
+
+- [AgentBio vs Linktree](https://agentbio.net/vs/linktree): AgentBio adds
+  property galleries, qualifying lead forms and booking; Linktree is a general
+  link list with none of them
+- [AgentBio vs Beacons](https://agentbio.net/vs/beacons): Beacons is built for
+  creators and commerce; AgentBio is built around a property enquiry
+- [AgentBio vs Later](https://agentbio.net/vs/later): Later schedules and plans
+  social content; AgentBio is what the link in the bio points at
+
+## Who it is for
+
+Real estate agents, realtors, brokerages and teams who get traffic from
+Instagram, TikTok, Facebook or LinkedIn and want an enquiry rather than a click.
+
+## Use cases
+
+1. Put the link in an Instagram bio so followers land on listings and a form
+2. Show active and sold listings with full photo galleries
+3. Capture buyer enquiries with pre-qualification questions
+4. Capture seller leads through a home valuation form
+5. Let buyers book showings without the back-and-forth
+6. See which listings get engagement, and where leads come from
+7. Share a single property link in Stories, DMs or an email signature
+8. Generate QR codes for yard signs and open houses
+
+## Technical details
+
+- React, TypeScript and Vite
+- Supabase (PostgreSQL) with row-level security on every table
+- Cloudflare Pages
+- Every public page is rendered to static HTML at build time, so its content is
+  in the first response rather than after JavaScript runs
+- Lead contact details are encrypted at rest; TLS in transit
+- Progressive web app with offline support
 
 ## Contact
+
 - Website: https://agentbio.net
 - Email: support@agentbio.net
-- Twitter: https://twitter.com/agentbio
-- LinkedIn: https://www.linkedin.com/company/agentbio
-- Instagram: https://www.instagram.com/agentbio
+- X: https://x.com/AgentBioApp
+- LinkedIn: https://www.linkedin.com/company/agentbio/
+- Instagram: https://www.instagram.com/agentbioapp/
+- Facebook: https://www.facebook.com/agentbioapp
 
 ## FAQ
 
 ### What is AgentBio?
-AgentBio is a specialized link-in-bio platform designed specifically for real estate agents who want to convert Instagram followers into qualified buyer and seller leads. Unlike generic tools like Linktree, AgentBio includes property listing galleries, lead capture forms, calendar booking integration, and testimonial showcases — all optimized for mobile users coming from Instagram and other social platforms.
 
-### How is AgentBio different from Linktree?
-AgentBio includes property listing galleries with photos and MLS details, lead capture forms with pre-qualification questions, sold property showcase for social proof, client testimonials with schema markup, MLS compliance features, and appointment booking integration. Linktree is a generic link tool without any real estate-specific features.
+A link-in-bio page built for real estate agents. Instead of a list of links, a
+visitor gets property listings with photos and details, forms that ask the
+qualifying questions an agent would ask, sold-property history, testimonials
+and a way to book a showing.
 
-### How much does AgentBio cost?
-AgentBio offers a free plan with 3 listings and 5 links. Paid plans start at $39/month with unlimited listings, lead capture forms, calendar integration, and advanced analytics. This is significantly cheaper than traditional real estate websites which cost $3,000-$15,000 upfront plus $100-$300/month for maintenance.
+### How is it different from Linktree?
 
-### Can I showcase property listings on AgentBio?
-Yes. AgentBio lets you showcase unlimited property listings (on paid plans) with full photo galleries, pricing, square footage, beds/baths, MLS numbers, property descriptions, and virtual tour links. You can mark properties as active, pending, or sold.
+Linktree gives a visitor links. AgentBio gives them a listing gallery with MLS
+details, buyer and seller forms with pre-qualification questions, sold
+properties, testimonials with structured data, and appointment booking. If what
+you need is a list of links, Linktree does that well and costs less.
 
-### Does AgentBio capture leads?
-Yes. AgentBio includes built-in lead capture forms for buyer inquiries, seller leads, and home valuation requests. Leads are automatically scored as Hot, Warm, or Cold based on responses. You receive instant email notifications and can manage all leads from your dashboard.
+### How much does it cost?
 
-### Does AgentBio work with Instagram?
-Yes. AgentBio is optimized specifically for Instagram traffic. Place your AgentBio link in your Instagram bio, and when followers click it, they land on your mobile-optimized portfolio page where they can view listings, submit inquiries, and book appointments. The platform is designed for the 80%+ of Instagram traffic that comes from mobile devices.
+There is a free plan with 3 listings and 5 links. Paid plans are $29, $49, $99
+and $299 a month; see the pricing page above for what each includes.
+
+### Can I show property listings?
+
+Yes — up to 3 on the free plan, 10 on Starter, 25 on Professional, unlimited on
+Team and Enterprise. Each carries photos, price, beds, baths, square footage,
+MLS number, description and a virtual tour link, and can be marked active,
+pending or sold.
+
+### Does it capture leads?
+
+Yes. Buyer enquiry, seller lead and home valuation forms are built in. Answers
+are scored Hot, Warm or Cold, you get an email when one arrives, and they are
+managed from the dashboard.
+
+### Does it work with Instagram?
+
+That is what it is for. The page is mobile-first, because a visitor arriving
+from a bio link is on a phone.
+
+### Is there an API?
+
+Yes, on paid plans — API keys are issued from the dashboard.

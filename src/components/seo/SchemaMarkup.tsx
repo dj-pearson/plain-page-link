@@ -1,5 +1,5 @@
-import { Helmet } from "react-helmet-async";
-import { getSafeOrigin } from "@/lib/utils";
+import { Helmet } from 'react-helmet-async';
+import { getBaseUrl } from '@/config/seo.config';
 import {
   generateBreadcrumbSchema,
   generateEnhancedOrganizationSchema,
@@ -7,20 +7,20 @@ import {
   generateComparisonSchema,
   generateHowToSchema,
   generatePricingSchema,
-} from "@/lib/seo";
-import { generateFAQSchema, generateCombinedSchema, type FAQItem } from "@/lib/faq-schema";
+} from '@/lib/seo';
+import { generateFAQSchema, generateCombinedSchema, type FAQItem } from '@/lib/faq-schema';
 
 type SchemaType =
-  | "organization"
-  | "software"
-  | "article"
-  | "faq"
-  | "howto"
-  | "breadcrumb"
-  | "comparison"
-  | "pricing"
-  | "website"
-  | "webpage";
+  | 'organization'
+  | 'software'
+  | 'article'
+  | 'faq'
+  | 'howto'
+  | 'breadcrumb'
+  | 'comparison'
+  | 'pricing'
+  | 'website'
+  | 'webpage';
 
 interface SchemaMarkupProps {
   type: SchemaType;
@@ -40,67 +40,72 @@ interface SchemaMarkupProps {
  * <SchemaMarkup type="comparison" data={{ items: [...] }} />
  */
 export function SchemaMarkup({ type, data = {}, additionalSchemas = [] }: SchemaMarkupProps) {
-  const siteUrl = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): a canonical is a claim about identity,
+  // so it must not read the host the visitor happens to be on. A *.pages.dev
+  // preview would otherwise self-canonicalise once the bundle hydrates
+  // (US-172).
+  const siteUrl = getBaseUrl();
 
   const generateSchema = (): Record<string, any> | null => {
     switch (type) {
-      case "organization":
+      case 'organization':
         return generateEnhancedOrganizationSchema();
 
-      case "software":
+      case 'software':
         return generateSoftwareApplicationSchema(data);
 
-      case "article": {
+      case 'article': {
         return {
-          "@context": "https://schema.org",
-          "@type": "BlogPosting",
-          "headline": data.title,
-          "description": data.description,
-          "datePublished": data.publishedTime,
-          "dateModified": data.modifiedTime || data.publishedTime,
-          "author": {
-            "@type": "Person",
-            "name": data.author || "AgentBio Team",
+          '@context': 'https://schema.org',
+          '@type': 'BlogPosting',
+          headline: data.title,
+          description: data.description,
+          datePublished: data.publishedTime,
+          dateModified: data.modifiedTime || data.publishedTime,
+          author: {
+            '@type': 'Person',
+            name: data.author || 'AgentBio Team',
           },
-          "publisher": {
-            "@type": "Organization",
-            "name": "AgentBio",
-            "logo": {
-              "@type": "ImageObject",
-              "url": `${siteUrl}/logo.png`,
+          publisher: {
+            '@type': 'Organization',
+            name: 'AgentBio',
+            logo: {
+              '@type': 'ImageObject',
+              url: `${siteUrl}/logo.png`,
             },
           },
-          "mainEntityOfPage": {
-            "@type": "WebPage",
-            "@id": data.url || siteUrl,
+          mainEntityOfPage: {
+            '@type': 'WebPage',
+            '@id': data.url || siteUrl,
           },
           ...(data.image && {
-            "image": {
-              "@type": "ImageObject",
-              "url": data.image,
-              "width": 1200,
-              "height": 630,
+            image: {
+              '@type': 'ImageObject',
+              url: data.image,
+              // No width/height: data.image is whatever the caller passed, and
+              // a dimension asserted for an unmeasured file is a claim the
+              // crawler checks (US-174).
             },
           }),
-          ...(data.wordCount && { "wordCount": data.wordCount }),
-          ...(data.category && { "articleSection": data.category }),
-          ...(data.tags && { "keywords": data.tags.join(", ") }),
-          "inLanguage": "en-US",
-          "isAccessibleForFree": true,
+          ...(data.wordCount && { wordCount: data.wordCount }),
+          ...(data.category && { articleSection: data.category }),
+          ...(data.tags && { keywords: data.tags.join(', ') }),
+          inLanguage: 'en-US',
+          isAccessibleForFree: true,
         };
       }
 
-      case "faq": {
+      case 'faq': {
         const faqs: FAQItem[] = data.faqs || [];
         if (faqs.length === 0) return null;
         return generateFAQSchema(faqs);
       }
 
-      case "howto": {
+      case 'howto': {
         if (!data.name || !data.steps) return null;
         return generateHowToSchema({
           name: data.name,
-          description: data.description || "",
+          description: data.description || '',
           totalTime: data.totalTime,
           estimatedCost: data.estimatedCost,
           steps: data.steps,
@@ -108,62 +113,60 @@ export function SchemaMarkup({ type, data = {}, additionalSchemas = [] }: Schema
         });
       }
 
-      case "breadcrumb": {
+      case 'breadcrumb': {
         const items = data.items || [];
         if (items.length === 0) return null;
         return generateBreadcrumbSchema(items);
       }
 
-      case "comparison": {
+      case 'comparison': {
         const items = data.items || [];
         if (items.length === 0) return null;
         return generateComparisonSchema(items);
       }
 
-      case "pricing": {
+      case 'pricing': {
         const tiers = data.tiers || [];
         if (tiers.length === 0) return null;
         return generatePricingSchema(tiers);
       }
 
-      case "website":
+      case 'website':
         return {
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          "@id": `${siteUrl}#website`,
-          "url": siteUrl,
-          "name": "AgentBio",
-          "description": "Purpose-built link-in-bio platform for real estate agents",
-          "publisher": {
-            "@id": `${siteUrl}/#organization`,
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          '@id': `${siteUrl}#website`,
+          url: siteUrl,
+          name: 'AgentBio',
+          description: 'Purpose-built link-in-bio platform for real estate agents',
+          publisher: {
+            '@id': `${siteUrl}/#organization`,
           },
-          "potentialAction": {
-            "@type": "SearchAction",
-            "target": {
-              "@type": "EntryPoint",
-              "urlTemplate": `${siteUrl}/search?q={search_term_string}`,
-            },
-            "query-input": "required name=search_term_string",
-          },
+          // No potentialAction. A SearchAction is what Google reads to offer a
+          // sitelinks searchbox, and this one pointed at /search?q=, a route that has
+          // never existed in App.tsx. Since US-176 it returns a real 404, so the
+          // searchbox would have sent people nowhere. There is no site-wide search to
+          // point it at; the blog has its own, and BlogListSEO declares that one
+          // against /blog?search=, which Blog.tsx now actually reads (US-179).
         };
 
-      case "webpage":
+      case 'webpage':
         return {
-          "@context": "https://schema.org",
-          "@type": "WebPage",
-          "@id": data.url || siteUrl,
-          "url": data.url || siteUrl,
-          "name": data.title || "AgentBio",
-          "description": data.description || "",
-          "publisher": {
-            "@id": `${siteUrl}/#organization`,
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          '@id': data.url || siteUrl,
+          url: data.url || siteUrl,
+          name: data.title || 'AgentBio',
+          description: data.description || '',
+          publisher: {
+            '@id': `${siteUrl}/#organization`,
           },
-          "isPartOf": {
-            "@type": "WebSite",
-            "@id": `${siteUrl}#website`,
+          isPartOf: {
+            '@type': 'WebSite',
+            '@id': `${siteUrl}#website`,
           },
-          "inLanguage": "en-US",
-          ...(data.dateModified && { "dateModified": data.dateModified }),
+          inLanguage: 'en-US',
+          ...(data.dateModified && { dateModified: data.dateModified }),
         };
 
       default:
@@ -175,21 +178,13 @@ export function SchemaMarkup({ type, data = {}, additionalSchemas = [] }: Schema
   if (!primarySchema && additionalSchemas.length === 0) return null;
 
   // Combine with additional schemas if provided
-  const allSchemas = [
-    ...(primarySchema ? [primarySchema] : []),
-    ...additionalSchemas,
-  ];
+  const allSchemas = [...(primarySchema ? [primarySchema] : []), ...additionalSchemas];
 
-  const finalSchema =
-    allSchemas.length === 1
-      ? allSchemas[0]
-      : generateCombinedSchema(allSchemas);
+  const finalSchema = allSchemas.length === 1 ? allSchemas[0] : generateCombinedSchema(allSchemas);
 
   return (
     <Helmet>
-      <script type="application/ld+json">
-        {JSON.stringify(finalSchema)}
-      </script>
+      <script type="application/ld+json">{JSON.stringify(finalSchema)}</script>
     </Helmet>
   );
 }

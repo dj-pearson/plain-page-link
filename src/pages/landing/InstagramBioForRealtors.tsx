@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getCanonicalUrl } from '@/config/seo.config';
 import { Link } from 'react-router-dom';
 import { Instagram, Home, Users, TrendingUp, Check } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
@@ -29,8 +30,8 @@ export default function InstagramBioForRealtors() {
       generateEnhancedOrganizationSchema(),
       {
         '@type': 'WebPage',
-        '@id': `${window.location.origin}/instagram-bio-for-realtors`,
-        url: `${window.location.origin}/instagram-bio-for-realtors`,
+        '@id': getCanonicalUrl('/instagram-bio-for-realtors'),
+        url: getCanonicalUrl('/instagram-bio-for-realtors'),
         name: 'Instagram Bio for Realtors That Actually Converts Followers into Leads',
         description:
           'Transform your Instagram bio into a lead generation machine with AgentBio. Showcase listings, capture qualified buyer/seller leads, and book appointments directly from your Instagram link.',
@@ -82,7 +83,7 @@ export default function InstagramBioForRealtors() {
           'convert Instagram followers to leads',
           'realtor Instagram bio page',
         ]}
-        canonicalUrl={`${window.location.origin}/instagram-bio-for-realtors`}
+        canonicalUrl={getCanonicalUrl('/instagram-bio-for-realtors')}
         schema={schema}
       />
       <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>

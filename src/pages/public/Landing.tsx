@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getBaseUrl } from '@/config/seo.config';
 import { MARKETING_COPY } from '@/config/marketing-claims';
 import { Link } from 'react-router-dom';
 import { Home, BarChart3, Users, Brain, Target, Zap, Sparkles } from 'lucide-react';
@@ -17,7 +18,6 @@ import {
   generateEnhancedLocalBusinessSchema,
   generateEnhancedOrganizationSchema,
 } from '@/lib/seo';
-import { getSafeOrigin } from '@/lib/utils';
 
 // Lazy load BlogSection since it's below the fold and requires Supabase
 const BlogSection = React.lazy(() =>
@@ -79,8 +79,12 @@ const LANDING_FAQS = [
 ];
 
 export default function Landing() {
-  // Safe origin for SSR/crawler compatibility
-  const origin = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): the homepage's WebSite and Organization
+  // @ids and its own canonical are claims about what this site IS, so they must
+  // not read the host that served the page. It was the last one left after the
+  // US-172 sweep — the prerender's rewrite counter found it, seven URLs on this
+  // one page, which is exactly why that counter reports rather than assumes.
+  const origin = getBaseUrl();
 
   // Generate breadcrumb schema for homepage
   const breadcrumbSchema = generateBreadcrumbSchema([{ name: 'Home', url: origin }]);
@@ -104,14 +108,12 @@ export default function Landing() {
         publisher: {
           '@id': `${origin}/#organization`,
         },
-        potentialAction: {
-          '@type': 'SearchAction',
-          target: {
-            '@type': 'EntryPoint',
-            urlTemplate: `${origin}/search?q={search_term_string}`,
-          },
-          'query-input': 'required name=search_term_string',
-        },
+        // No potentialAction. A SearchAction is what Google reads to offer a
+        // sitelinks searchbox, and this one pointed at /search?q=, a route that has
+        // never existed in App.tsx. Since US-176 it returns a real 404, so the
+        // searchbox would have sent people nowhere. There is no site-wide search to
+        // point it at; the blog has its own, and BlogListSEO declares that one
+        // against /blog?search=, which Blog.tsx now actually reads (US-179).
       },
       // Use centralized Organization schema with social signals
       organizationSchema,
@@ -675,11 +677,15 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {isOpen && (
-        <div className="px-6 pb-4">
-          <p className="glass-body leading-relaxed">{answer}</p>
-        </div>
-      )}
+      {/* `hidden` rather than {isOpen && …}: the answer stays in the HTML and
+          the browser does not paint it. Conditional mounting meant a closed
+          accordion had no answer text in the document at all, so 25 answers
+          asserted in FAQPage JSON-LD were on no page — and Google's FAQPage
+          requirement is that the answer be present on the page. An accordion is
+          explicitly fine; not rendering the content is not (US-185). */}
+      <div className="px-6 pb-4" hidden={!isOpen}>
+        <p className="glass-body leading-relaxed">{answer}</p>
+      </div>
     </div>
   );
 }

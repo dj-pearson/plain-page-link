@@ -4,9 +4,12 @@
  */
 
 import { useState } from 'react';
+import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { Helmet } from 'react-helmet-async';
-import { getCanonicalUrl } from '@/config/seo.config';
+import { getCanonicalUrl, getOgImageUrl } from '@/config/seo.config';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { BioAnalyzerForm } from '@/components/tools/instagram-bio-analyzer/BioAnalyzerForm';
 import { ScoreDisplay } from '@/components/tools/instagram-bio-analyzer/ScoreDisplay';
 import { CategoryBreakdown } from '@/components/tools/instagram-bio-analyzer/CategoryBreakdown';
@@ -69,7 +72,7 @@ export default function InstagramBioAnalyzer() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const toolUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/tools/instagram-bio-analyzer`
+    ? getCanonicalUrl('/tools/instagram-bio-analyzer')
     : 'https://agentbio.net/tools/instagram-bio-analyzer';
 
   const handleFormSubmit = async (data: BioAnalysisInput) => {
@@ -269,10 +272,35 @@ export default function InstagramBioAnalyzer() {
           name="keywords"
           content="instagram bio for realtors, real estate instagram bio, realtor bio examples, instagram bio analyzer"
         />
+        {/* This page built its own <Helmet> and emitted no og:* at all, so it
+            shipped with index.html's static tags removed and nothing in their
+            place — link previews fell back to whatever the platform scraped,
+            and the surviving twitter:* tags still described the homepage.
+            Found by the US-174 og:image rule on its first full-build run. */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={getCanonicalUrl('/tools/instagram-bio-analyzer')} />
+        <meta property="og:title" content="Free Instagram Bio Analyzer for Real Estate Agents" />
+        <meta
+          property="og:description"
+          content="Score your Instagram bio in 60 seconds and get three rewrites. Free, no signup."
+        />
+        <meta property="og:image" content={getOgImageUrl()} />
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+        <meta property="og:image:alt" content={DEFAULT_SOCIAL_IMAGE.alt} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Free Instagram Bio Analyzer for Real Estate Agents" />
+        <meta
+          name="twitter:description"
+          content="Score your Instagram bio in 60 seconds and get three rewrites. Free, no signup."
+        />
+        <meta name="twitter:image" content={getOgImageUrl()} />
         <script type="application/ld+json">
           {JSON.stringify(schema)}
         </script>
       </Helmet>
+
+      <PublicHeader />
 
       <main id="main-content" className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-pink-50" tabIndex={-1}>
         {/* Breadcrumb Navigation */}
@@ -280,9 +308,9 @@ export default function InstagramBioAnalyzer() {
           <div className="container mx-auto px-4">
             <Breadcrumb
               items={[
-                { name: "Home", url: window.location.origin },
-                { name: "Free Tools", url: "/tools/instagram-bio-analyzer" },
-                { name: "Instagram Bio Analyzer", url: "/tools/instagram-bio-analyzer" }
+                { name: "Home", url: getCanonicalUrl("/") },
+                { name: "Free Tools", url: getCanonicalUrl("/tools") },
+                { name: "Instagram Bio Analyzer", url: getCanonicalUrl("/tools/instagram-bio-analyzer") }
               ]}
             />
           </div>
@@ -337,7 +365,7 @@ export default function InstagramBioAnalyzer() {
             <div className="bg-white border-b border-gray-200 py-8">
               <div className="container max-w-4xl mx-auto px-4">
                 <p className="text-base md:text-lg text-gray-700 leading-relaxed">
-                  <strong>The Instagram Bio Analyzer is a free tool designed specifically for real estate agents to evaluate and optimize their Instagram bio for maximum lead generation.</strong> In 60 seconds, you'll receive an effectiveness score (0-100) based on six key factors—clarity, call-to-action strength, keyword optimization, link strategy, credibility signals, and mobile readability—plus three professionally rewritten bio versions tailored to your market and experience level. Top-performing agent bios score 85+ and convert 3x more Instagram followers into qualified buyer and seller leads compared to generic, unoptimized bios.
+                  <strong>The Instagram Bio Analyzer is a free tool designed specifically for real estate agents to evaluate and optimize their Instagram bio for maximum lead generation.</strong> In 60 seconds, you'll receive an effectiveness score (0-100) based on six key factors—clarity, call-to-action strength, keyword optimization, link strategy, credibility signals, and mobile readability—plus three professionally rewritten bio versions tailored to your market and experience level. A bio scoring in the 80s says who you help, where, and what to do next; a bio in the 40s usually says none of the three.
                 </p>
               </div>
             </div>
@@ -590,6 +618,8 @@ export default function InstagramBioAnalyzer() {
         />
         <FaqSection entries={FAQ_ENTRIES} />
       </main>
+
+      <PublicFooter />
     </>
   );
 }

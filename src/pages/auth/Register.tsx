@@ -267,7 +267,11 @@ export default function Register() {
             {/* Feature list */}
             <div className="space-y-4">
               {[
-                { icon: Zap, title: 'AI Lead Scoring', desc: 'ML-scored leads convert 2x better' },
+                {
+                  icon: Zap,
+                  title: 'AI Lead Scoring',
+                  desc: 'Leads ranked by how likely they are to convert',
+                },
                 {
                   icon: BarChart3,
                   title: 'Smart Analytics',

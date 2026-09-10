@@ -63,7 +63,13 @@ export function readCanonical(html) {
 }
 
 export function readRobots(html) {
-  return attr(headOf(html).match(/<meta[^>]*name="robots"[^>]*>/gi)?.join('') || '', /<meta[^>]*>/gi, 'content');
+  return attr(
+    headOf(html)
+      .match(/<meta[^>]*name="robots"[^>]*>/gi)
+      ?.join('') || '',
+    /<meta[^>]*>/gi,
+    'content'
+  );
 }
 
 function rootLength(html) {
@@ -127,6 +133,62 @@ function walkJsonLd(node, visit) {
  * below does not ban the field; it bans the specific invented pair, and it
  * requires anything claiming a rating to also name a review count.
  */
+/**
+ * Breadcrumb trails that deliberately do not mirror the URL path.
+ *
+ * Google allows a breadcrumb that reflects how a reader got somewhere rather
+ * than how the URL is spelled, so the ancestor rule below needs a way to say
+ * "this one is on purpose". It is declared here, in code, rather than left to
+ * whoever reads the failure — an exception made of prose asserts nothing, which
+ * is the lesson from the three-vendor bundle exception in US-163.
+ *
+ * Each entry is `leaf path prefix` -> the non-path parent it may claim.
+ */
+const DELIBERATE_NON_PATH_PARENTS = [
+  // The 26 city pages sit under /for/{city} while their conceptual parent is
+  // the /for-real-estate-agents marketing page. Different tree, same subject.
+  { leaf: '/for/', parent: '/for-real-estate-agents' },
+];
+
+/**
+ * Images whose intrinsic size this repo actually knows, and what it is.
+ *
+ * Mirrors DEFAULT_SOCIAL_IMAGE in src/config/og-image.ts, which is itself
+ * checked against the bytes on disk by src/config/og-image.test.ts. Two
+ * declarations rather than an import because this module is plain node with no
+ * bundler, and the test on the other side is what keeps them honest.
+ */
+const KNOWN_IMAGE_SIZES = new Map([
+  ['/Cover.png', { width: 1536, height: 1024 }],
+  ['/logo.png', { width: 946, height: 436 }],
+]);
+
+/**
+ * Names that describe a role instead of naming a person.
+ *
+ * 'Real Estate Expert' was the default author on every article. The list is
+ * deliberately short and literal — the point is not to police names, it is to
+ * catch a placeholder that was never replaced.
+ */
+const GENERIC_AUTHOR_NAMES = [
+  /^(real estate|seo|marketing|content|industry)?\s*(expert|team|staff|editor|admin|author|writer)$/i,
+  /^(the )?(agentbio )?(team|staff|editorial team)$/i,
+  /^(guest|anonymous|unknown)( author)?$/i,
+];
+
+function knownSizeFor(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    return KNOWN_IMAGE_SIZES.get(new URL(url, 'https://agentbio.net').pathname) ?? null;
+  } catch {
+    return KNOWN_IMAGE_SIZES.get(url) ?? null;
+  }
+}
+
+function isKnownImage(url) {
+  return knownSizeFor(url) !== null;
+}
+
 export function auditStructuredData(route, html) {
   const problems = [];
   const { blocks, problems: parseProblems } = readJsonLd(html);
@@ -143,9 +205,13 @@ export function auditStructuredData(route, html) {
     .replace(/&[a-z]+;/gi, ' ')
     .replace(/\s+/g, ' ');
 
+  let breadcrumbLists = 0;
+
   for (const block of blocks) {
     walkJsonLd(block, (node) => {
       const type = node['@type'];
+
+      if (type === 'BreadcrumbList') breadcrumbLists += 1;
 
       if (node.aggregateRating) {
         const rating = node.aggregateRating;
@@ -164,22 +230,264 @@ export function auditStructuredData(route, html) {
         }
       }
 
+      // An author who is a job description rather than a person (US-180).
+      //
+      // Article.author is what Google reads to decide who stands behind a
+      // piece. Every article shipped `author: { '@type': 'Person', name:
+      // 'Real Estate Expert' }` — a role, presented as a named human, with a
+      // url pointing at the site root rather than at any author page. That is
+      // the invented-testimonial defect in the field where it counts most.
+      //
+      // An Organization author is fine and often correct: the company
+      // published it. A Person has to be someone.
+      if (node.author && typeof node.author === 'object' && !Array.isArray(node.author)) {
+        const author = node.author;
+        const name = typeof author.name === 'string' ? author.name.trim() : '';
+        if (author['@type'] === 'Person') {
+          if (!name) {
+            problems.push(`${type} has a Person author with no name`);
+          } else if (GENERIC_AUTHOR_NAMES.some((generic) => generic.test(name))) {
+            problems.push(
+              `${type} names its author "${name}", which is a role rather than a person`
+            );
+          }
+        }
+      }
+
+      // An ImageObject asserting a size for a file nobody measured (US-174).
+      // Google fetches the image and measures it; a declared 1200x630 on a
+      // 1536x1024 file is a claim it can see is false, and on a small upload it
+      // is a false claim of large-image rich-result eligibility.
+      if (node.image && typeof node.image === 'object' && !Array.isArray(node.image)) {
+        const image = node.image;
+        const declares = image.width !== undefined || image.height !== undefined;
+        if (declares && !isKnownImage(image.url)) {
+          problems.push(
+            `${type} declares image dimensions (${image.width}x${image.height}) for ` +
+              `${image.url || 'an image with no url'}, whose size is not known here`
+          );
+        }
+        if (declares && (!image.width || !image.height)) {
+          problems.push(`${type} declares one image dimension without the other`);
+        }
+      }
+
+      // A BreadcrumbList that describes a hierarchy the site does not have
+      // (US-167/US-168). Three tool pages asserted a "Free Tools" rung
+      // pointing at /tools/instagram-bio-analyzer — a sibling, not a parent —
+      // for a /tools route that did not exist; /features/lead-capture did the
+      // same with /features/property-listings, and shipped both of its `item`
+      // values as relative URLs, which Google rejects.
+      if (type === 'BreadcrumbList' && Array.isArray(node.itemListElement)) {
+        const seen = new Map();
+        node.itemListElement.forEach((entry, index) => {
+          const item = entry && entry.item;
+          const url = typeof item === 'string' ? item : item && item['@id'];
+          const name = (entry && entry.name) || `position ${index + 1}`;
+
+          if (!url) {
+            problems.push(`BreadcrumbList rung "${name}" has no item URL`);
+            return;
+          }
+          if (!/^https?:\/\//i.test(url)) {
+            problems.push(
+              `BreadcrumbList rung "${name}" has a relative item URL (${url}); ` +
+                'schema.org requires an absolute one'
+            );
+            return;
+          }
+          if (seen.has(url)) {
+            problems.push(
+              `BreadcrumbList rungs "${seen.get(url)}" and "${name}" share the URL ${url}, ` +
+                'so the trail claims a level that is not one'
+            );
+          }
+          seen.set(url, name);
+        });
+
+        const last = node.itemListElement[node.itemListElement.length - 1];
+        const lastItem = last && last.item;
+        const lastUrl = typeof lastItem === 'string' ? lastItem : lastItem && lastItem['@id'];
+        const canonical = readCanonical(html).value;
+        if (lastUrl && canonical && lastUrl.replace(/\/+$/, '') !== canonical.replace(/\/+$/, '')) {
+          problems.push(
+            `BreadcrumbList ends at ${lastUrl} but the page's canonical is ${canonical}`
+          );
+        }
+
+        // The rule the two sibling-pointing trails broke, and the one a
+        // duplicate-URL check misses: every rung above the last one has to be
+        // an ancestor of it. /tools/instagram-bio-analyzer is not an ancestor of
+        // /tools/real-estate-agent-bio-generator, it is the tool next to it, and
+        // a trail saying otherwise describes a site that does not exist.
+        const pathOf = (url) => {
+          try {
+            return new URL(url).pathname.replace(/\/+$/, '') || '/';
+          } catch {
+            return null;
+          }
+        };
+        const leaf = lastUrl && pathOf(lastUrl);
+        if (leaf) {
+          for (const entry of node.itemListElement.slice(0, -1)) {
+            const item = entry && entry.item;
+            const url = typeof item === 'string' ? item : item && item['@id'];
+            const path = url && pathOf(url);
+            if (!path || path === '/') continue;
+            const declared = DELIBERATE_NON_PATH_PARENTS.some(
+              (allowed) => leaf.startsWith(allowed.leaf) && path === allowed.parent
+            );
+            if (declared) continue;
+            if (leaf !== path && !leaf.startsWith(`${path}/`)) {
+              problems.push(
+                `BreadcrumbList rung "${entry.name}" points at ${path}, which is not an ` +
+                  `ancestor of ${leaf} — the trail describes a hierarchy the site does not have`
+              );
+            }
+          }
+        }
+      }
+
       // A FAQPage that describes questions nobody can see on the page is
       // schema for a crawler rather than markup of the content.
       if (type === 'FAQPage' && Array.isArray(node.mainEntity)) {
         for (const entry of node.mainEntity) {
           const question = entry && entry.name;
-          if (typeof question !== 'string' || question.length < 12) continue;
-          const probe = question.slice(0, 40).replace(/\s+/g, ' ');
-          if (!visibleText.includes(probe)) {
-            problems.push(`FAQPage question is not visible on the page: "${probe}…"`);
+          if (typeof question === 'string' && question.length >= 12) {
+            const probe = question.slice(0, 40).replace(/\s+/g, ' ');
+            if (!visibleText.includes(probe)) {
+              problems.push(`FAQPage question is not visible on the page: "${probe}…"`);
+            }
+          }
+
+          // And the answer (US-185). Checking only the question missed 25
+          // answers that were in the JSON-LD and in no page: five accordions
+          // rendered `{isOpen && <p>{answer}</p>}`, so a closed one had no
+          // answer text in the document at all. Google's FAQPage requirement is
+          // that the answer be present on the page; an accordion is explicitly
+          // allowed, and not rendering the content is not the same thing.
+          const answer = entry && entry.acceptedAnswer && entry.acceptedAnswer.text;
+          if (typeof answer !== 'string') continue;
+          const plain = answer.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          if (plain.length < 20) continue;
+          const answerProbe = plain.slice(0, 45);
+          if (!visibleText.includes(answerProbe)) {
+            problems.push(`FAQPage answer is not on the page: "${answerProbe}…"`);
           }
         }
       }
     });
   }
 
+  // og:image:width / :height are read by every unfurl to reserve layout before
+  // the bytes arrive, so a wrong pair breaks the card on every platform at once.
+  // All 58 pages declared 1200x630 for a 1536x1024 file (US-174).
+  {
+    const head = headOf(html);
+    const ogImage = attr(
+      head.match(/<meta[^>]*property="og:image"[^>]*>/gi)?.join('') || '',
+      /<meta[^>]*>/gi,
+      'content'
+    );
+    const declared = {
+      width: attr(
+        head.match(/<meta[^>]*property="og:image:width"[^>]*>/gi)?.join('') || '',
+        /<meta[^>]*>/gi,
+        'content'
+      ),
+      height: attr(
+        head.match(/<meta[^>]*property="og:image:height"[^>]*>/gi)?.join('') || '',
+        /<meta[^>]*>/gi,
+        'content'
+      ),
+    };
+
+    if (!ogImage) {
+      problems.push('no og:image — social platforms fall back to whatever they scrape');
+    } else if (declared.width || declared.height) {
+      const known = knownSizeFor(ogImage);
+      if (!known) {
+        problems.push(
+          `og:image:width/height declared for ${ogImage}, whose size is not known here`
+        );
+      } else if (
+        String(known.width) !== declared.width ||
+        String(known.height) !== declared.height
+      ) {
+        problems.push(
+          `og:image is ${known.width}x${known.height} but the tags declare ` +
+            `${declared.width}x${declared.height}`
+        );
+      }
+    }
+  }
+
+  // Two BreadcrumbList declarations on one page are two answers to one
+  // question, and nothing says which one Google reads. Every /for/{city} page
+  // shipped two: one in the page's own @graph, one from <Breadcrumb>.
+  if (breadcrumbLists > 1) {
+    problems.push(
+      `${breadcrumbLists} BreadcrumbList blocks on one page; there can only be one trail`
+    );
+  }
+
   return problems.map((problem) => ({ route, problem }));
+}
+
+/**
+ * Same-origin URLs inside JSON-LD that no page answers (US-179).
+ *
+ * Structured data is a set of assertions, and a URL in it is an assertion that
+ * the URL is a thing. Two were false on every page that carried them:
+ * ContactPoint.url named https://agentbio.net/contact, and the WebSite
+ * SearchAction's urlTemplate named /search?q= — the endpoint Google reads to
+ * offer a sitelinks searchbox. Neither has ever been a route in App.tsx. While
+ * `/* /index.html 200` was in place they at least answered something; after
+ * US-176 they are 404s, and a searchbox pointing at one sends people nowhere.
+ *
+ * Only same-origin URLs are checked. An off-site sameAs is not ours to verify,
+ * and asset paths are files rather than pages.
+ *
+ * @param {{route: string, html: string}[]} pages
+ * @param {Set<string>} routes every path the build renders
+ * @returns {{route: string, problem: string}[]}
+ */
+export function auditStructuredDataUrls(pages, routes, { origin }) {
+  const problems = [];
+  const base = origin.replace(/\/+$/, '');
+  // Keys whose string value is a URL that has to resolve to a page.
+  const URL_KEYS = new Set(['url', '@id', 'item', 'urlTemplate', 'mainEntityOfPage', 'target']);
+  const IS_ASSET = /\.(png|jpe?g|webp|gif|svg|ico|xml|txt|json|pdf|mp4|webm)$/i;
+
+  for (const { route, html } of pages) {
+    const { blocks } = readJsonLd(html);
+    const seen = new Set();
+
+    for (const block of blocks) {
+      walkJsonLd(block, (node) => {
+        for (const [key, value] of Object.entries(node)) {
+          if (!URL_KEYS.has(key) || typeof value !== 'string') continue;
+          if (!value.startsWith(base)) continue;
+
+          // A urlTemplate carries a {placeholder}; the path before the query
+          // is what has to exist.
+          const path = (value.slice(base.length).split('#')[0].split('?')[0] || '/')
+            .replace(/\/+$/, '') || '/';
+          if (IS_ASSET.test(path)) continue;
+          if (routes.has(path)) continue;
+          if (seen.has(`${key}:${path}`)) continue;
+          seen.add(`${key}:${path}`);
+
+          problems.push({
+            route,
+            problem: `structured data ${key} points at ${path}, which is not a page`,
+          });
+        }
+      });
+    }
+  }
+
+  return problems;
 }
 
 export function auditPages(pages, { origin }) {
@@ -198,7 +506,10 @@ export function auditPages(pages, { origin }) {
     const noindex = (readRobots(html) || '').toLowerCase().includes('noindex');
 
     // --- the page rendered at all -------------------------------------------
-    if (NOT_FOUND_H1.test(html)) {
+    // /404 is the one route whose job is to render that page, so Cloudflare
+    // Pages has a document to return with a 404 status (US-176). Every other
+    // route rendering it means the route does not exist.
+    if (route !== '/404' && NOT_FOUND_H1.test(html)) {
       add(route, 'renders the 404 page');
     }
     if (rootLength(html) < MIN_BODY_HTML) {
@@ -255,7 +566,10 @@ export function auditPages(pages, { origin }) {
         if (!isHome && (actual === base || actual === `${base}/`)) {
           add(route, 'canonical points at the homepage, not at itself');
         } else {
-          add(route, `canonical is ${JSON.stringify(canonical.value)}, expected ${JSON.stringify(expected)}`);
+          add(
+            route,
+            `canonical is ${JSON.stringify(canonical.value)}, expected ${JSON.stringify(expected)}`
+          );
         }
       }
       if (/127\.0\.0\.1|localhost/.test(canonical.value)) {

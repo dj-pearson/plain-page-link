@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { SEO_CONFIG } from '@/config/seo.config';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +10,7 @@ import { Calendar, Eye, ArrowLeft, Clock, User } from 'lucide-react';
 import { ArticleSEO } from '@/components/blog/ArticleSEO';
 import { SimilarArticles } from '@/components/blog/SimilarArticles';
 import { Breadcrumbs } from '@/components/blog/Breadcrumbs';
+import { categoryByName } from '@/config/blog-categories';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import ReactMarkdown from 'react-markdown';
@@ -140,16 +142,44 @@ export default function BlogArticle() {
                   className="w-full h-96 object-cover rounded-lg shadow-lg"
                   itemProp="url"
                 />
-                <meta itemProp="width" content="1200" />
-                <meta itemProp="height" content="630" />
+                {/* itemProp width/height stood here claiming 1200x630 for
+                    whatever featured_image_url the article carries. Nothing had
+                    measured it (US-174). */}
               </figure>
             )}
 
-            {/* Meta Info */}
+            {/* Meta Info.
+                The category was a bare badge, so an article was a dead end
+                towards its own topic — nothing led from a post to the other
+                posts about the same thing (US-165's problem, one level down).
+                It links only when the category actually has a page: the
+                registry answers that, which is the whole reason it exists
+                (US-166). An unlisted category still shows, unlinked. */}
             <div className="flex flex-wrap items-center gap-2 mb-6">
-              <Badge variant="secondary" itemProp="articleSection">
-                {article.category}
-              </Badge>
+              {(() => {
+                const category = categoryByName(article.category);
+                if (!category) {
+                  return article.category ? (
+                    <Badge variant="secondary" itemProp="articleSection">
+                      {article.category}
+                    </Badge>
+                  ) : null;
+                }
+                return (
+                  <Link
+                    to={`/blog/category/${category.slug}`}
+                    aria-label={`More articles in ${category.label}`}
+                  >
+                    <Badge
+                      variant="secondary"
+                      itemProp="articleSection"
+                      className="hover:bg-secondary/80 transition-colors"
+                    >
+                      {category.label}
+                    </Badge>
+                  </Link>
+                );
+              })()}
               {article.tags?.map((tag) => (
                 <Badge key={tag} variant="outline" itemProp="keywords">
                   {tag}
@@ -164,14 +194,19 @@ export default function BlogArticle() {
 
             {/* Author and Date Info - Semantic markup for AI */}
             <div className="flex flex-wrap items-center gap-6 text-muted-foreground mb-8">
+              {/* The byline said "Real Estate Expert", marked up as a
+                  schema.org/Person — a job description presented as a named
+                  author, on every article. The organisation is who actually
+                  published these, and saying so is both true and a type
+                  schema.org has for it (US-180). */}
               <div
                 className="flex items-center gap-2"
                 itemProp="author"
                 itemScope
-                itemType="https://schema.org/Person"
+                itemType="https://schema.org/Organization"
               >
-                <User className="h-4 w-4" />
-                <span itemProp="name">Real Estate Expert</span>
+                <User className="h-4 w-4" aria-hidden="true" />
+                <span itemProp="name">{SEO_CONFIG.siteName}</span>
               </div>
               {article.published_at && (
                 <div className="flex items-center gap-2">

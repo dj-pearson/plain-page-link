@@ -4,7 +4,9 @@
  */
 
 import { PRICING_PLANS } from './pricing-plans';
-import { getConfiguredAppUrl, getSafeOrigin } from '@/lib/utils';
+import { getConfiguredAppUrl } from '@/lib/utils';
+import { ORGANIZATION_LOGO } from './og-image';
+import { SAME_AS, X_HANDLE } from './social-profiles';
 
 /** Lowest paid monthly plan. Was the literal '39', which is not a plan (US-157). */
 export const SEO_STARTING_PRICE = String(
@@ -20,7 +22,9 @@ export const SEO_CONFIG = {
   defaultDescription:
     'Purpose-built link-in-bio for real estate agents. Showcase properties, capture leads, and book appointments from Instagram.',
   defaultImage: '/Cover.png',
-  twitterHandle: '@agentbio',
+  // Was '@agentbio'. The account this site links to is x.com/AgentBioApp,
+  // so twitter:site named a different account on every page (US-178).
+  twitterHandle: X_HANDLE,
   locale: 'en_US',
   themeColor: '#0ea5e9',
 
@@ -31,20 +35,15 @@ export const SEO_CONFIG = {
     email: 'support@agentbio.net',
     foundingDate: '2024',
     slogan: 'Transform Instagram followers into qualified leads',
-    logo: '/logo.png',
-    logoWidth: 512,
-    logoHeight: 512,
+    logo: ORGANIZATION_LOGO.path,
+    // Were 512x512, for a 946x436 file (US-178).
+    logoWidth: ORGANIZATION_LOGO.width,
+    logoHeight: ORGANIZATION_LOGO.height,
   },
 
-  // Social links for schema
-  socialLinks: [
-    'https://twitter.com/agentbio',
-    'https://www.facebook.com/agentbio',
-    'https://www.linkedin.com/company/agentbio',
-    'https://www.instagram.com/agentbio',
-    'https://www.youtube.com/@agentbio',
-    'https://github.com/agentbio',
-  ],
+  // Social links for schema. A third copy of the same six wrong accounts stood
+  // here; @/config/social-profiles is the one list now (US-178).
+  socialLinks: SAME_AS,
 
   // Default ratings
   // `ratings` removed (US-157). It held ratingValue '4.8' over reviewCount
@@ -349,13 +348,33 @@ export const COMPARISON_DATA = {
 } as const;
 
 /**
- * Get the base URL - handles SSR and client-side rendering.
+ * The origin the site canonically lives at, whatever host served this response
+ * (US-172).
  *
- * A re-export rather than a second implementation: this was a byte-for-byte
- * copy of lib/utils' getSafeOrigin, and the two could disagree because their
- * fallbacks were written separately (US-123).
+ * This was getSafeOrigin(), which in a browser is window.location.origin. Every
+ * canonical, og:url and JSON-LD url on every marketing, feature, comparison,
+ * tool, blog and legal page was therefore whatever host the visitor happened to
+ * be on. On agentbio.net that is right by coincidence. Anywhere else it is a
+ * page telling Google it is the original at an address that is not the site:
+ *
+ *   - Cloudflare Pages gives every branch a *.pages.dev preview URL serving the
+ *     whole site. The prerendered HTML carries the right canonical, because
+ *     prerender.mts rewrites its own preview origin out of every snapshot — but
+ *     the moment the bundle hydrates, react-helmet-async replaces it with the
+ *     pages.dev host. Googlebot renders JavaScript. That is how a preview
+ *     deployment self-canonicalises and gets indexed as a duplicate of the
+ *     entire site.
+ *   - The same holds for any staging domain, any alias, and any future host.
+ *
+ * A canonical is a claim about identity, so it has to be a constant, not a
+ * reading of the current environment.
+ *
+ * getSafeOrigin() is still correct for the pages a tenant owns — /:username and
+ * /p/:slug can legitimately be served from an agent's own custom_domain, and
+ * there the visitor's host IS the canonical one. Those call sites use it
+ * directly and say why.
  */
-export const getBaseUrl = (): string => getSafeOrigin();
+export const getBaseUrl = (): string => getConfiguredAppUrl();
 
 /**
  * Generate canonical URL from path

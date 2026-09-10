@@ -2631,6 +2631,322 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-09. Entry static vendor imports are now form, react, state, supabase, ui \u2014 no charts. react-vendor grows 161.5 -> 184.3 KB, which is the four utility packages moving into a chunk that was already loaded, against 394 KB leaving the critical path. The check's staticImporters idea from US-163 was generalised into MUST_STAY_LAZY, covering three-vendor and charts-vendor and independent of whether a chunk is over budget. Demonstrated failing against the pre-fix config, where it named both the entry chunk and three-vendor."
+    },
+    {
+      "id": "US-166",
+      "title": "A blog category outside BlogCategory's hardcoded map fails the render gate and breaks the entire build",
+      "description": "scripts/lib/articles.mts categorySlugs() derives /blog/category/{slug} routes from whatever string sits in articles.category, slugified. src/pages/BlogCategory.tsx renders from categoryContent, a hardcoded Record keyed by nine slugs. A published article whose category is anything else produces a prerender route with no content: the page keeps index.html's default title and emits no canonical, prerender.mts refuses to write ANY file, and `npm run build` exits 1. An editor changing one dropdown value in the CMS takes the deploy down, and the failure message talks about titles rather than about the category.",
+      "acceptanceCriteria": [
+        "A category present on a published article but absent from BlogCategory's map does not fail the build",
+        "The behaviour is decided deliberately: either the category page renders generic-but-real content from the articles themselves, or the route is not generated at all and the articles still appear under /blog",
+        "Whichever is chosen, a test covers an article with an unknown category",
+        "If a route is skipped, it is skipped in sitemap generation too \u2014 no URL is advertised for a page that does not exist",
+        "A prerendered /blog/category/{slug} page lists only articles in that category"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 2 of the SEO loop. The two sources of truth are now one: src/config/blog-categories.ts, plain data with no React import so scripts/lib/articles.mts can read it from node. categorySlugs() returns only categories that have a page AND a published article, plus an `unlisted` list the prerender prints \u2014 loud, not fatal, and not silent either. categoryContent in BlogCategory.tsx is now Record<BlogCategorySlug, ...>, so the other direction of drift (a registry entry with no copy written for it) is a tsc error in the file that has to supply it. Two further defects were found and fixed in the same pass: the prerender's articles intercept ignored the category filter, so every prerendered category page listed every published article regardless of category (verified against a real dist before and after); and an article's category was a bare badge, so nothing led from a post to the other posts on its topic \u2014 it links now, and only when the category actually has a page."
+    },
+    {
+      "id": "US-167",
+      "title": "There is no /tools hub, so the free-tools breadcrumbs claim a level that does not exist",
+      "description": "All three tool pages render a Breadcrumb whose middle item is called 'Free Tools' and points at /tools/instagram-bio-analyzer \u2014 a sibling tool, not a hub. There is no /tools route in App.tsx. The BreadcrumbList JSON-LD therefore asserts a hierarchy the site does not have, and the three tools have no shared parent page to collect the topical relevance between them. US-165 linked the tools from the footer, which fixes reachability but not the missing hub.",
+      "acceptanceCriteria": [
+        "/tools exists as a route, is prerendered, is in the sitemap and passes verify:seo",
+        "It lists the three tools with a real description of each, not a grid of identical cards",
+        "Every tool page's breadcrumb middle item points at /tools",
+        "The footer's 'Free tools' column heading links to it"
+      ],
+      "priority": "medium",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 3 of the SEO loop, together with US-168. /tools exists, is prerendered, is in the sitemap and reads src/config/tools.ts \u2014 the same registry the footer's Free tools column renders, so a tool cannot be added to one and forgotten in the other, which is how the bio generator became US-165. The /features hub was NOT built: rather than invent a thin page, /features/lead-capture's breadcrumb dropped the rung it could not honour. US-171 is the open question of whether a real features hub earns its place."
+    },
+    {
+      "id": "US-168",
+      "title": "InstagramBioAnalyzer's breadcrumb is built from window.location.origin and repeats its own URL",
+      "description": "src/pages/tools/InstagramBioAnalyzer.tsx passes { name: 'Home', url: window.location.origin } and then gives both the 'Free Tools' item and the 'Instagram Bio Analyzer' item the same URL, /tools/instagram-bio-analyzer. AgentBioGenerator.tsx next door uses getCanonicalUrl() for exactly the same three items. The origin form is what put http://127.0.0.1:4319 into canonicals before US-147 rewrote it out of every snapshot, so the JSON-LD here survives only because of that rewrite.",
+      "acceptanceCriteria": [
+        "The breadcrumb items use getCanonicalUrl(), matching AgentBioGenerator.tsx",
+        "No two items in a BreadcrumbList share a URL",
+        "grep for window.location.origin in src/pages and src/components/seo returns nothing that ends up in structured data"
+      ],
+      "priority": "medium",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 3, with US-167. Wider than the story described. Both breadcrumb components built item URLs from window.location.origin and both emitted their own BreadcrumbList; seo/Breadcrumb.tsx also generated its JSON-LD from `items` while rendering `breadcrumbItems`, so on every page relying on showHome the structured data was missing the first rung readers could see. /features/lead-capture shipped two relative item URLs, which Google rejects outright."
+    },
+    {
+      "id": "US-169",
+      "title": "The article snapshot that is supposed to make the build work without a database has never been committed",
+      "description": "scripts/lib/articles.mts declares SNAPSHOT_PATH 'Committed so a build without database credentials still ships the blog', and loadArticles() falls back to it when Supabase is unreachable. The file has never existed in git history. A build without VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY therefore fails outright with 'Refusing to ship a blog with no posts in it', and so does a build whose credentials are present but whose database is unreachable \u2014 the documented safety net is prose.",
+      "acceptanceCriteria": [
+        "scripts/data/articles.snapshot.json is committed, generated by `npm run articles:snapshot` against the real database",
+        "`npm run build` completes with no Supabase environment variables set",
+        "The snapshot's staleness is visible: the prerender already logs which source it used, and a snapshot older than some stated age warns",
+        "CI states which source it built from"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (US-165 iteration 1). Needs someone who can reach the production database \u2014 this sandbox cannot, which is how it was noticed. Do NOT commit a hand-written placeholder: a snapshot of invented articles would ship invented articles the first time the database is unreachable, which is the US-159 problem with extra steps."
+    },
+    {
+      "id": "US-165",
+      "title": "Four sitemap URLs, the free-tools funnel among them, were unreachable from the homepage by any internal link",
+      "description": "The build advertised 28 URLs in sitemap.xml. Four of them were not part of the site's own link graph: /tools/real-estate-agent-bio-generator had no inbound internal link from anywhere, and /tools/instagram-bio-analyzer, /tools/listing-description-generator and /instagram-bio-for-realtors had ~23 each \u2014 every one of them on a /for/{city} page, which carries noindex and is itself unreachable from the homepage. An island linking to an island. The footer, the only surface on all 57 pages, linked to none of them, spent three of its links on /blog under three different anchors, and offered /#features while five real feature pages went unlinked.",
+      "acceptanceCriteria": [
+        "Every URL in sitemap.xml is reachable from / by following <a href> in prerendered HTML",
+        "The three tool pages and /vs/later render the site header and footer instead of being link dead-ends",
+        "No two footer links share a destination under different anchor text",
+        "npm run verify:seo fails on the pre-fix build and names the four pages",
+        "The rule is tested, including the case that fooled a naive inbound-link count"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 1 of the SEO loop. The measurement is in scripts/lib/link-graph.mjs and runs as part of npm run verify:seo. Inbound count is the wrong metric and was the trap: the bio generator scored 0 and the other two scored 23, and all three were equally unreachable. Depth from / is the metric."
+    },
+    {
+      "id": "US-170",
+      "title": "repo-hygiene.test.ts has been red on main since 2026-09-04",
+      "description": "Commit 908a2c1 'Add Supabase keys regeneration guide and migration scripts' put four markdown files and six shell/PowerShell scripts back in the repository root, undoing part of US-121 and US-122. src/repo-hygiene.test.ts asserts against exactly that and has failed on main ever since: 2 failed, 656 passed. A test suite with a standing failure stops being read, and the next real failure hides in it.",
+      "acceptanceCriteria": [
+        "COOLIFY_MIGRATION_GUIDE.md, SSH_MIGRATION_GUIDE.md, SUPABASE_KEYS_GUIDE.md and SUPABASE_KEYS_QUICK_ANSWER.md live under docs/, with links updated",
+        "deploy-migrations-ssh.ps1, migrate-from-container.sh, migrate-to-coolify.ps1, migrate-to-coolify.sh, migrate-via-files.ps1 and test-db-connection.ps1 live under scripts/",
+        "SUPABASE_KEYS_GUIDE.md and SUPABASE_KEYS_QUICK_ANSWER.md are read before moving them \u2014 a document about key regeneration is exactly where a key value gets pasted, and a value in git history is a value to rotate, not to move",
+        "npm run test:run is green"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Noticed 2026-09-10 during the SEO loop (US-165 iteration 1) \u2014 the two failures are pre-existing and unrelated to that change. Deleting the files is not the fix unless their content is genuinely duplicated under docs/; check first."
+    },
+    {
+      "id": "US-171",
+      "title": "Decide whether /features earns a hub page, or stays a set of five siblings",
+      "description": "/features/lead-capture's breadcrumb claimed a 'Features' parent pointing at /features/property-listings \u2014 a sibling. There is no /features route in App.tsx; US-149 removed it from the sitemap as a soft 404. US-167 resolved the lie by dropping the rung rather than by inventing the page, because a hub that only repeats the homepage's features section is the thin page US-153 noindexed 23 city pages over. The question stands: five feature pages with no shared parent have no page collecting the topical relevance between them, the way /tools now does for the three tools.",
+      "acceptanceCriteria": [
+        "A decision is recorded either way, with the reason",
+        "If built: /features has content that is not a restatement of the homepage's features section, is prerendered, is in the sitemap, passes verify:seo, and the five feature pages' breadcrumbs point at it",
+        "If not built: the footer's Product column stays the shared parent in practice, and this is stated in prerender-routes.ts next to the existing note about /features having no route"
+      ],
+      "priority": "low",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (iteration 3). Only /features/lead-capture has a breadcrumb at all; the other four have none, so this is not urgent. Do not build it just to have a hub \u2014 /tools earned one because three tools with distinct jobs benefit from a page that says which to open when. Five feature pages that are already linked from the footer may not."
+    },
+    {
+      "id": "US-172",
+      "title": "Every canonical on the site was whatever host served the page",
+      "description": "getBaseUrl() in seo.config.ts was getSafeOrigin(), which in a browser is window.location.origin, and roughly thirty call sites built canonicals, og:url and JSON-LD url/@id from window.location.origin directly. Every site-owned page therefore declared itself canonical at whichever host served it. On agentbio.net that is right by coincidence. Cloudflare Pages gives every branch a *.pages.dev preview URL serving the whole site: the prerendered HTML carries the correct canonical because prerender.mts rewrites its own preview origin out of every snapshot, but react-helmet-async overwrites it with the pages.dev host the moment the bundle hydrates, and Googlebot renders JavaScript. A canonical is a claim about identity and cannot be a reading of the current environment.",
+      "acceptanceCriteria": [
+        "getBaseUrl() returns the configured app URL, not the visitor's host",
+        "No file in the SEO layer builds a URL from window.location.origin or getSafeOrigin",
+        "getSafeOrigin stays where the visitor's host IS canonical \u2014 /:username and /p/:slug, which a tenant may serve from a custom domain \u2014 and each such call site says why",
+        "A test proves the canonical is unchanged when the page is served from a *.pages.dev host",
+        "A test fails if the pattern is reintroduced anywhere in the SEO layer",
+        "The prerender reports how many preview-server URLs it had to rewrite, rather than silently papering over them"
+      ],
+      "priority": "medium",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 4 of the SEO loop. Bigger than the story as written in iteration 3, which framed it as tidiness: the point is not that a helper exists, it is that a preview deploy could self-canonicalise the entire site. The prerender's origin rewrite turned out to be silently loadbearing, so it now counts and reports what it moved. Measured against real builds: 671 preview-server URLs across all 58 pages before, 0 after. The counter earned its place immediately \u2014 after the first sweep it still found 7 on the homepage, which the sweep had missed. Stripe return URLs, OAuth redirectTo and the dashboard's copy-your-link UI keep window.location.origin deliberately: those want the host the user is actually on."
+    },
+    {
+      "id": "US-173",
+      "title": "The performance claims US-159 could not see: multipliers, percentages and testimonials without a dash",
+      "description": "US-159 was the third sweep for fabricated marketing copy and it left a whole class behind, because its guard bans strings and shapes it had already seen. Live afterwards: HeroSection's default description ended 'ML-scored leads convert 2x better. Agents save 5+ hours per week. Close deals 30% faster.'; /vs/later said '3-5x higher conversion rates' five times, including in its meta description and in a FAQPage answer Google renders as a rich result; the dashboard insights widget told agents 'profiles with property listings get 3x more leads' and 'agents with 5+ listings convert 40% better'; /features/testimonials said video testimonials are '10x more powerful than text'; the email drip's subject line was 'The Instagram bio mistake 73% of agents make'. None has a query behind it. Separately, US-159 deleted the names under three quotes on the listing generator and left the quotes, and its attribution rule wanted an em-dash, so two named testimonials on /features/calendar-booking \u2014 'Jessica T., Luxury Agent, Scottsdale AZ' and 'Marcus L., Team Leader, Denver CO' \u2014 were never touched.",
+      "acceptanceCriteria": [
+        "No page, component default, email template or tool output states a performance multiplier, a percentage improvement or an amount of time saved that no query can produce",
+        "No fabricated testimonial remains, attributed or anonymised",
+        "The Instagram bio analyzer stops comparing the reader to a population it has never measured, and stops making a comparative claim about a named competitor",
+        "src/marketing-claims.test.ts gains rules for the shapes rather than the strings, and they are demonstrated finding something the previous rules missed",
+        "Claims about the housing market in blog copy are out of scope and the reason is written down"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 5 of the SEO loop. Standing authorisation from Dj at US-159: 'No fabricated text, we need to remove false claims and false testimonies.' The new rules earned their place on the first run: they found two claims inside the bio analyzer's scoring output that no reading had spotted \u2014 'AgentBio captures 3X more leads than Linktree for agents', an unsubstantiated comparative claim about a named competitor delivered as the tool's own advice, and 'top performers in your area score 50+ points higher, which translates to 3-5X more leads', which invents both a local benchmark and a conversion rate for a deterministic six-check rubric. This is the fourth sweep; each previous one was thorough and each missed instances, which is the argument for rules over readings."
+    },
+    {
+      "id": "US-174",
+      "title": "og:image declared a size no code had ever measured",
+      "description": "Four SEO components hardcoded og:image:width 1200 and og:image:height 630 beside the URL. Cover.png is 1536x1024 \u2014 a 1.5 aspect ratio where the tags claim 1.905 \u2014 so 52 of 58 pages told every unfurl to reserve a shape the image does not have. The sharper half: ArticleSEO asserted the same 1200x630 for whatever featured_image_url an article carries, including inside the BlogPosting JSON-LD as ImageObject.width/.height, which Google reads to decide large-image rich-result eligibility. SchemaMarkup did it for any caller-supplied image and BlogArticle did it in microdata on the <img> itself. Those are dimensions asserted for files the code has never opened.",
+      "acceptanceCriteria": [
+        "A dimension is declared only for an image whose size is known in one place",
+        "That place is checked against the bytes on disk, so editing one without the other fails",
+        "Nothing declares a size for a caller-supplied or user-uploaded image",
+        "verify:seo fails when the declared og:image size does not match the file"
+      ],
+      "priority": "medium",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 6 of the SEO loop. src/config/og-image.ts holds the default image and its real size; src/config/og-image.test.ts reads the PNG IHDR chunk and asserts they agree, so no image library is needed. Cover.png was NOT recropped to 1200x630: the composition fills the frame \u2014 the phone mockup runs nearly edge to edge and the footer wordmark sits at the bottom \u2014 so a 1.91:1 crop would cut both. Declaring the true size is correct and free; regenerating the artwork at 1200x630 is a design decision, and US-175 carries it along with the question of per-page images. Measured: 52 of 58 pages wrong before, 0 after."
+    },
+    {
+      "id": "US-175",
+      "title": "One cover image for all 58 pages, at an aspect ratio no social platform wants",
+      "description": "Every page shares https://agentbio.net/Cover.png. Two separate questions sit behind that. First, the artwork is 1536x1024 (3:2) where Facebook, LinkedIn and X all lay out for 1.91:1, so every card is letterboxed or centre-cropped by the platform rather than by us; the file is also 577 KB where an equivalent WebP next to it is 90 KB. Second, the pages that have a subject of their own \u2014 the three tools, the three comparisons, blog articles without a featured image \u2014 all unfurl as the generic product cover, which is the same link preview a competitor comparison and a bio generator both get.",
+      "acceptanceCriteria": [
+        "A decision on the artwork: recomposed at 1200x630, or kept at 3:2 with the reason written down",
+        "If per-page images are added, they come from one generator rather than one designer-made file per page, and DEFAULT_SOCIAL_IMAGE grows into a lookup rather than a constant",
+        "og-image.test.ts still verifies every declared size against the file it names",
+        "The 577 KB PNG is reconsidered against the 90 KB WebP, including which platforms accept WebP for og:image"
+      ],
+      "priority": "low",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (iteration 6). Deliberately not done there: US-174 was a correctness bug with a right answer, this is a design decision with several. Do not crop the current Cover.png blindly \u2014 it was looked at, and the composition uses the full height."
+    },
+    {
+      "id": "US-176",
+      "title": "Every URL on the site returned 200, and the body it returned was the homepage",
+      "description": "public/_redirects ended in `/* /index.html 200`. Since US-147 dist/index.html is not an empty shell \u2014 it is the fully prerendered homepage \u2014 so agentbio.net/anything-at-all answered 200 with the homepage's title, description, canonical and body, and only became the 404 page after the bundle executed and React Router matched `*`. A client-side router cannot set a status code, so nothing in NotFound.tsx could have fixed it. The effect was an infinite URL space in which every typo, every retired link and every path a crawler invented returned a duplicate of the homepage under a 200. The single-segment case is worse than the rest: /:username is indistinguishable from a typo without a database lookup, and functions/[username].ts already performed that lookup \u2014 then called next() either way, so a crawler asking for a handle that does not exist got the homepage.",
+      "acceptanceCriteria": [
+        "An unknown URL under a prefix whose real URLs are all prerendered returns 404 with the 404 document",
+        "dist/404.html exists and is what Cloudflare Pages serves for an unmatched request",
+        "Every route App.tsx defines is either prerendered or covered by a rule, and a test enforces both directions",
+        "A crawler requesting an unpublished or nonexistent username gets 404, while a failed database lookup still falls through to the SPA",
+        "The 404 page carries its own title and a noindex, and links somewhere"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 7 of the SEO loop. The risky part is _redirects: deleting the catch-all turns any route that is neither prerendered nor listed into a broken page, and Cloudflare Pages routing cannot be exercised in this sandbox. src/spa-routes.test.ts is what stands in for a deploy \u2014 it walks App.tsx and _redirects and asserts they agree in both directions, and was demonstrated failing by deleting the /admin rules. Note the deliberate asymmetry in the Pages Function: `profiles === null` (the lookup errored or timed out) still falls through, because answering 404 there would turn a database blip into a deindexing event for every agent at once; only an empty array \u2014 PostgREST answering that there is no such profile \u2014 produces a 404. A second defect surfaced while verifying: the US-174 og:image rule, on its first run against a full build, found three pages shipping no og:image at all \u2014 /vs/later, /tools/instagram-bio-analyzer and /tools/listing-description-generator, each building its own <Helmet> with no og:* tags, while the static twitter:* tags from index.html survived still describing the homepage. Fixed in the same commit. The mechanism by which the static og:* tags vanish while the static twitter:* ones remain was not established; the fix does not depend on it, but it is an open observation."
+    },
+    {
+      "id": "US-177",
+      "title": "llms.txt still carried the invented figures three sweeps removed from the UI, and linked to four pages that do not exist",
+      "description": "public/llms.txt exists to be read and quoted verbatim by AI systems, and nothing had ever checked it. It said 'Used by 5,000+ real estate agents with a 4.8/5 star rating from 523+ reviews' \u2014 the exact numbers US-111, US-157 and US-159 removed from the UI across three passes \u2014 plus 'the average AgentBio user captures 10+ qualified leads per month' and '8-12 qualified leads per month (AgentBio data, 2025)', which attributes an invented statistic to a named internal source. It linked to /features and to /compare/linktree, /compare/beacons and /compare/later: four URLs with no page behind them, which since US-176 return a real 404. It quoted Professional at $39/month where the enforced matrix charges $49, described it as unlimited listings where the limit is 25, and omitted the $29 Starter plan entirely. Its X and Instagram handles were not the ones the site links to. It listed two of the three free tools and neither the /tools hub nor the bio generator.",
+      "acceptanceCriteria": [
+        "Every agentbio.net URL in the file is a page the build publishes",
+        "Every price matches src/config/pricing-plans.ts, and no price appears that is not a plan",
+        "No user count, rating, review total, lead-volume claim or performance multiplier",
+        "The social handles are the ones the footer links to",
+        "A test enforces all of the above and is demonstrated failing on the file as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 8 of the SEO loop. 7 of the 8 checks fail on the shipped file. Worth noting how it survived three cleanups: it is a text file in public/, so a sweep of src/ never reaches it, and it is not rendered by any component, so no page audit sees it either. The distinction the lead-volume rule had to learn: '100 leads a month' on a pricing line is a limit the product enforces, while 'the average user captures 10+ qualified leads a month' is a claim about outcomes. Only the second is banned, and getting that wrong first made the test fail on the honest rewrite it existed to protect. A `[\\d,]+` pattern also matched the bare comma in 'agents, realtors' \u2014 every count pattern now requires a digit."
+    },
+    {
+      "id": "US-178",
+      "title": "The Organization schema claimed six social accounts, and the site links four different ones",
+      "description": "schema.org sameAs on an Organization is a claim of identity \u2014 these accounts ARE this organisation \u2014 and it is what Google reconciles an entity against when building a knowledge panel. Two sameAs lists shipped on every page, from src/lib/seo.ts and src/components/seo/PageSEO.tsx, plus a third copy in SEO_CONFIG.socialLinks, all naming twitter.com/agentbio, facebook.com/agentbio, linkedin.com/company/agentbio, instagram.com/agentbio, youtube.com/@agentbio and github.com/agentbio. The footer links facebook.com/agentbioapp, x.com/AgentBioApp, instagram.com/agentbioapp and linkedin.com/company/agentbio. Only LinkedIn is in both. So the site told Google it owned four accounts under a handle it does not use, and asserted a YouTube channel and a GitHub organisation that appear nowhere else in the repository. SEO_CONFIG.twitterHandle was '@agentbio' for the same reason, so twitter:site and twitter:creator named a different account on every page. Separately, SEO_CONFIG.organization declared logoWidth 512 and logoHeight 512 and both Organization schemas shipped logo ImageObject width '512' height '512'; public/logo.png is 946x436, which is the US-174 defect again in the node that says who the company is.",
+      "acceptanceCriteria": [
+        "One list of social profiles, with the bar for inclusion written down: the site links to it",
+        "The footer, both sameAs lists, SEO_CONFIG.socialLinks, twitter:site and llms.txt all read that list",
+        "Organization.logo declares the size logo.png actually is, verified against the file",
+        "A test fails if any of them names an account that is not in the list, demonstrated against the code as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 9 of the SEO loop. Six checks fail on the shipped code. The bar for inclusion is 'the footer links to it', because that is the only evidence available in this repository that an account exists and is ours \u2014 claiming an account you do not own is worse than omitting one you do, since an omission costs a link and a wrong claim hands the entity to a stranger. The YouTube and GitHub entries were dropped rather than corrected: nothing anywhere else refers to either, so there is nothing to correct them against. One test bug worth recording: the first version banned any sameAs URL ending in 'agentbio', which rejects linkedin.com/company/agentbio/ \u2014 the single entry in the old list that was actually right. The five wrong accounts are now named literally."
+    },
+    {
+      "id": "US-179",
+      "title": "Structured data asserted two URLs the site has never had, one of them a search endpoint",
+      "description": "A URL inside JSON-LD is an assertion that the URL is a thing. Two were false. ContactPoint.url named https://agentbio.net/contact on seven pages, from src/lib/seo.ts and src/components/seo/PageSEO.tsx; /contact has never been a route in App.tsx. The WebSite potentialAction named a SearchAction at /search?q={search_term_string} from three places \u2014 Landing.tsx, PageSEO.tsx and SchemaMarkup.tsx \u2014 and /search has never been a route either. SearchAction is specifically what Google reads to offer a sitelinks searchbox, so the one it would have rendered sent people to a page that does not exist. While the /* catch-all was in place both at least answered 200 with the homepage; since US-176 they are real 404s. Separately, BlogListSEO declares a SearchAction against /blog?search={search_term_string} \u2014 a claim that was equally untrue, because Blog.tsx kept its search term in useState and never read the parameter.",
+      "acceptanceCriteria": [
+        "No same-origin URL in any JSON-LD block points at a path the build does not render",
+        "ContactPoint keeps the email, which is real, and drops the URL, which is not",
+        "The site-wide SearchAction is removed rather than pointed somewhere plausible",
+        "The blog's SearchAction becomes true: /blog reads ?search= and ?category= from the URL",
+        "verify:seo fails on a dangling structured-data URL, demonstrated against the build as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 10 of the SEO loop. 8 occurrences on the shipped build. The blog case is the one worth the extra work: the schema was already declaring /blog?search=, so making Blog.tsx read the parameter turned an existing false claim true rather than deleting a capability \u2014 and a filtered blog view became a link somebody can share. Category moved to the URL with it. The site-wide SearchAction was deleted instead of repointed, because there is no site-wide search and a blog search is not one; inventing a target would have been the same defect with a different path."
+    },
+    {
+      "id": "US-180",
+      "title": "Every article was attributed to a person who does not exist",
+      "description": "ArticleSEO defaulted `author` to 'Real Estate Expert' and shipped it as author: { '@type': 'Person', name: 'Real Estate Expert', url: siteUrl } in the BlogPosting schema of every article \u2014 a job description presented as a named human, with a url pointing at the site root rather than at any author page. The same string went into meta author, article:author, citation_author, and twitter:creator, which takes an @handle rather than a name so was invalid as well. BlogArticle.tsx repeated it as a visible byline wrapped in itemProp=author itemType=schema.org/Person. Google reads Article.author to decide who stands behind a piece; a Person who does not exist is the invented-testimonial defect of US-159 and US-173 in the field where it counts most.",
+      "acceptanceCriteria": [
+        "No Person author whose name is a role rather than a name",
+        "Articles with no known author are attributed to the organisation, which is true and is a type schema.org has",
+        "twitter:creator carries the X handle, not a name",
+        "The visible byline and its microdata agree with the schema",
+        "verify:seo fails on a generic Person author, demonstrated against the build as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 11 of the SEO loop. An Organization author is not a workaround \u2014 the company did publish these, and schema.org has the type for exactly that. The `author` prop stays, so a real name can be passed the moment there is one to pass; articles.author_id exists and resolving it is US-181. Also of note for the record: a naive count of @type occurrences in the built JSON-LD suggested 26 pages had duplicate Organization nodes and 4 had duplicate WebPage nodes. Checked rather than believed \u2014 the Organization pairs are publisher and provider references carrying the same @id, which is correct JSON-LD, and most of the WebPage pairs are mainEntityOfPage references. The one real residue is two anonymous WebPage nodes with no @id on /features/lead-capture and /features/analytics, recorded as US-182 rather than folded in here."
+    },
+    {
+      "id": "US-181",
+      "title": "Resolve articles.author_id to a real byline",
+      "description": "US-180 attributes articles to the organisation because nothing in the render path knows who wrote them. The articles table carries author_id, and profiles carries full_name and avatar_url, so a real Person author is available in principle \u2014 but the prerender's article snapshot selects from `articles` alone, and the browser query does the same, so neither has the name. A real byline is the strongest E-E-A-T signal an article can carry.",
+      "acceptanceCriteria": [
+        "The article query joins the author profile, in the browser and in scripts/lib/articles.mts",
+        "ArticleSEO receives the real name and emits a Person author",
+        "An article whose author_id is null or unresolvable still falls back to the organisation rather than to a placeholder",
+        "The prerender intercept in scripts/prerender.mts answers the joined shape"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (iteration 11). Needs a schema read to confirm the profiles join is available under RLS to the anon role \u2014 the prerender uses the anon key deliberately, so an author name that anon cannot select is one the build cannot render either. Do NOT invent a display name when the join returns nothing; that is what US-180 removed."
+    },
+    {
+      "id": "US-182",
+      "title": "Two anonymous WebPage nodes on two feature pages",
+      "description": "/features/lead-capture and /features/analytics each emit two WebPage nodes with no @id, from SEOHead's schema prop and from the page's own graph. Without an @id a consumer cannot tell they describe the same page, so the page arrives as two partial descriptions of itself rather than one. Every other duplicate found in the same scan turned out to be a reference sharing an @id, which is correct; these two are not.",
+      "acceptanceCriteria": [
+        "Each page emits one WebPage node, or two that share an @id",
+        "A rule in seo-audit.mjs catches an anonymous duplicate of a node type that should be singular"
+      ],
+      "priority": "low",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (iteration 11), found while checking a naive duplicate count rather than trusting it. Low priority: two partial descriptions of one page is untidy rather than false, which is why it was not folded into US-180."
+    },
+    {
+      "id": "US-183",
+      "title": "The deployed root held two developer files, and the header rules were written for the pre-prerender site",
+      "description": "Vite copies public/ into dist/ verbatim, so public/icons/generate-icons.sh and public/icons/README.md were published at https://agentbio.net/icons/generate-icons.sh and /icons/README.md \u2014 fetchable, crawlable, and not part of the site. The README opens 'This directory should contain the following PWA icon files', which is a document telling anyone who finds it that the site's icons may be missing. Same shape as US-160's source maps. Separately, public/_headers still described the site as it was before US-147 prerendered every page: its only HTML rule was `/index.html`, a path no visitor requests once each page is served from its own directory at an extensionless URL, so the Content-Type and revalidation policy it appeared to set applied to nothing. It had rules for /*.ts and /*.tsx declaring TypeScript source to be application/javascript and cacheable for a year; /*.mjs, which nothing emits; no rule for /*.webp, which ships; and its /*.js immutable rule matched /sw.js, telling caches never to revalidate the one file that controls whether a returning visitor gets an update.",
+      "acceptanceCriteria": [
+        "public/ contains only files a browser requests as part of the site",
+        "No header rule types a source-code extension as executable script",
+        "Every asset type the build emits has an explicit cache policy, and the service worker is excluded from the immutable one",
+        "There is a cache policy floor that applies to the prerendered pages at their real URLs",
+        "A test enforces all of it, demonstrated failing against the state as it shipped"
+      ],
+      "priority": "medium",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 12 of the SEO loop. Six of the seven checks fail on the shipped state. Two judgement calls worth recording. First, the /sw.js rule is placed AFTER /*.js rather than before: Cloudflare applies every matching rule and a later one wins for a repeated header, and a reading where the more specific path wins gives the same answer from that position \u2014 so it is correct under either, which is what you want from a rule that cannot be tested from the repository. Second, the test does not ban rules that currently match nothing: a /*.jpg rule costs nothing and is right the day an image lands. It bans rules that are wrong regardless of what matches them, which is what /*.ts was. Three things were checked and found NOT to be defects: the service worker is network-first for navigations, so it cannot serve a stale document; the pages excluded from the sitemap all carry noindex (29 in the sitemap plus 30 noindex is exactly the 59 built pages); and no indexable page is thin, duplicated or missing an h1."
+    },
+    {
+      "id": "US-184",
+      "title": "The blog index linked to six category pages the build does not render",
+      "description": "Blog.tsx rendered a 'Browse by Category' card for every entry in BLOG_CATEGORIES, all eight, regardless of whether any article carried that category. US-166 made scripts/lib/articles.mts generate a /blog/category/{slug} route only for a category that has a published article \u2014 so the page whose job is to send people into the blog spent six of its links on pages the build does not produce. Under the old `/* /index.html 200` fallback those answered with the homepage: invisible to a reader who did not check the address bar, and a duplicate of the homepage to a crawler. Since US-176 they are real 404s. Nothing caught it because /blog is itself perfectly reachable, and the US-165 check asks whether a page can be reached, not whether a link arrives.",
+      "acceptanceCriteria": [
+        "The blog index links only to categories that have at least one article",
+        "The heading disappears with the grid when there are none, rather than leaving an empty section",
+        "verify:seo fails when any internal link in the built HTML has no page behind it",
+        "The check knows about routes the SPA serves without prerendering \u2014 /dashboard, /admin, a tenant profile \u2014 and about files the build wrote",
+        "Demonstrated failing against the build as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 13 of the SEO loop. The guard is the mirror of US-165's: reachability asks whether every page can be reached, this asks whether every link arrives, and the first passing says nothing about the second. It is only worth having because US-176 made 404s real \u2014 before that a broken internal link was a soft 200 serving the homepage. It reads the 200 rewrites out of public/_redirects so a link to /dashboard/settings from /privacy-choices is correctly not a defect, and src/spa-routes.test.ts is what keeps that file honest about which those are. Two false leads checked and dismissed on the way: dist appeared to contain no CSS at all \u2014 that was a `head -12` truncation in the scan, the stylesheet is there and linked \u2014 and article-to-article linking via SimilarArticles works."
+    },
+    {
+      "id": "US-185",
+      "title": "25 FAQ answers were asserted in structured data and present on no page",
+      "description": "Five pages render their FAQ as an accordion whose panel was written `{isOpen && <p>{answer}</p>}`. Conditional mounting means a closed accordion has no answer text in the document at all \u2014 not hidden, absent \u2014 and the prerender snapshots the closed state. So the homepage, /pricing, both blog category pages and two feature pages shipped FAQPage JSON-LD asserting 25 answers that appear nowhere in the HTML those pages serve. Google's FAQPage requirement is that the answer be present on the page; an accordion is explicitly allowed, and not rendering the content is not the same thing. On /features/analytics and /features/lead-capture the same block also carried itemProp='text' microdata describing an element that did not exist. The audit has checked since US-157 that FAQ questions are visible, and every question was \u2014 which is why this survived: the question and the answer are separate assertions and only one of them was being checked.",
+      "acceptanceCriteria": [
+        "Every answer in FAQPage JSON-LD appears in the HTML of the page that asserts it",
+        "The accordions still collapse \u2014 the answer is hidden, not unmounted",
+        "verify:seo checks answers as well as questions, demonstrated failing on the build as it shipped",
+        "The rule accepts an answer that is present but hidden, because that is what an accordion is"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 14 of the SEO loop. `hidden` rather than a CSS class: it is the platform attribute for 'in the document, not painted', it needs no stylesheet to work during a prerender, and it is what assistive technology already understands alongside the aria-expanded these buttons carry. The test that matters is the one asserting the question check still PASSES on the broken fixture \u2014 that is the reason 25 answers went unnoticed through six earlier audits of this same schema type."
+    },
+    {
+      "id": "US-186",
+      "title": "CI ran every SEO check against a build with no blog in it",
+      "description": "CI's build job sets PRERENDER_ALLOW_NO_ARTICLES=1, because it has no database credentials, and that flag omitted the blog routes entirely. So `npm run verify:seo` \u2014 page identity (US-150), sitemap reachability (US-165), structured-data URLs (US-179), internal links (US-184), FAQ question and answer visibility (US-157/US-185) \u2014 ran against the marketing pages and never once looked at /blog, /blog/category/{slug} or /blog/{slug}. That is where the defects were: US-184's six broken category links were on /blog, US-180's fabricated Person author was on every article, and eight of US-185's 25 missing FAQ answers were on the two category pages. None of those regressions could have been caught by CI, because CI did not build the pages they were on.",
+      "acceptanceCriteria": [
+        "A database-less verification build renders the blog, so every check covers it",
+        "The articles it renders are unmistakably fixtures, in their title and their first sentence",
+        "A build that intends to deploy cannot reach the fixture, even by mistake",
+        "The fixture covers the branches that only the blog has: an article with a foreign featured image, one without, and one in a category the registry does not list",
+        "CI's comments say what the flag now does"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 15 and last of the SEO loop. No new flag: PRERENDER_ALLOW_NO_ARTICLES already means 'this build will not ship', and a deploy is already forbidden from setting it, so changing what it DOES from 'omit the blog' to 'render three fixtures' adds coverage without widening the blast radius. loadFixtureArticles() is deliberately not reachable from loadArticles(): a build that intends to deploy must never silently fall back to invented content, which is the argument of US-169 and is why the real snapshot is still uncommitted. The loader refuses any fixture whose title does not begin 'Fixture:' \u2014 if one of these ever escaped, it should be obvious in the first line rather than plausible."
     }
   ]
 }

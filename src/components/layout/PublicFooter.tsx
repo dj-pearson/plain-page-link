@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { profileUrl } from '@/config/social-profiles';
 import { Home, Mail, Facebook, Instagram, Linkedin } from 'lucide-react';
 import { openCookiePreferences } from '@/lib/cookie-consent';
+import { TOOLS } from '@/config/tools';
 
 export function PublicFooter() {
   return (
@@ -11,9 +13,9 @@ export function PublicFooter() {
     >
       <div className="container mx-auto px-4">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-8">
           {/* Brand Section */}
-          <div className="md:col-span-1">
+          <div className="sm:col-span-2">
             <Link
               to="/"
               className="flex items-center gap-2 mb-4"
@@ -29,7 +31,7 @@ export function PublicFooter() {
             {/* Social Links */}
             <div className="flex gap-3" role="list" aria-label="Social media links">
               <a
-                href="https://www.facebook.com/agentbioapp"
+                href={profileUrl('Facebook')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-blue-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -39,7 +41,7 @@ export function PublicFooter() {
                 <Facebook className="h-5 w-5" aria-hidden="true" />
               </a>
               <a
-                href="https://x.com/AgentBioApp"
+                href={profileUrl('X')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-gray-200 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -57,7 +59,7 @@ export function PublicFooter() {
                 </svg>
               </a>
               <a
-                href="https://www.instagram.com/agentbioapp/"
+                href={profileUrl('Instagram')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-pink-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -67,7 +69,7 @@ export function PublicFooter() {
                 <Instagram className="h-5 w-5" aria-hidden="true" />
               </a>
               <a
-                href="https://www.linkedin.com/company/agentbio/"
+                href={profileUrl('LinkedIn')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -79,34 +81,141 @@ export function PublicFooter() {
             </div>
           </div>
 
-          {/* Product Links */}
+          {/* Product Links.
+              Every one of these pages was prerendered, in the sitemap and
+              linked from nowhere a crawler could reach (US-165). The footer is
+              the only surface that appears on all 57 pages, so it is what
+              decides whether a page is part of the site or an island. */}
           <div>
             <h3 className="text-white font-semibold mb-4">Product</h3>
             <ul className="space-y-2">
               <li>
-                <a href="/#features" className="text-gray-400 hover:text-white transition-colors">
-                  Features
-                </a>
+                <Link
+                  to="/features/property-listings"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Property listings
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/features/lead-capture"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Lead capture
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/features/calendar-booking"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Calendar booking
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/features/testimonials"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Testimonials
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/features/analytics"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Analytics
+                </Link>
               </li>
               <li>
                 <Link to="/pricing" className="text-gray-400 hover:text-white transition-colors">
                   Pricing
                 </Link>
               </li>
+            </ul>
+          </div>
+
+          {/* Comparison Links.
+              The comparison pages were reachable only by typing the URL, which
+              is part of why they took zero impressions in 16 months (US-156).
+              /vs/linktree was added to the footer then; the other two were not,
+              and ended the year on one inbound internal link between them. */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Compare</h3>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  to="/vs/linktree"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  AgentBio vs Linktree
+                </Link>
+              </li>
+              <li>
+                <Link to="/vs/beacons" className="text-gray-400 hover:text-white transition-colors">
+                  AgentBio vs Beacons
+                </Link>
+              </li>
+              <li>
+                <Link to="/vs/later" className="text-gray-400 hover:text-white transition-colors">
+                  AgentBio vs Later
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Free tools.
+              All three were unreachable from the homepage by any internal link
+              (US-165). The list comes from src/config/tools.ts, the same one the
+              /tools hub renders, so a tool cannot be added to one and forgotten
+              in the other — which is exactly how the bio generator ended up in
+              the sitemap with no inbound link anywhere. */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">
+              <Link to="/tools" className="hover:text-gray-300 transition-colors">
+                Free tools
+              </Link>
+            </h3>
+            <ul className="space-y-2">
+              {TOOLS.map((tool) => (
+                <li key={tool.path}>
+                  <Link to={tool.path} className="text-gray-400 hover:text-white transition-colors">
+                    {tool.shortName}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Resources.
+              This column used to hold three links — "Real Estate Tips",
+              "Market Insights" and "Agent Guides" — all three pointing at /blog.
+              Three anchors promising three destinations and delivering one is
+              worse than one honest link. */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Resources</h3>
+            <ul className="space-y-2">
               <li>
                 <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
                   Blog
                 </Link>
               </li>
               <li>
-                {/* The comparison pages were reachable only by typing the URL,
-                    which is part of why they took zero impressions in 16 months
-                    (US-156). */}
                 <Link
-                  to="/vs/linktree"
+                  to="/for-real-estate-agents"
                   className="text-gray-400 hover:text-white transition-colors"
                 >
-                  Compare to Linktree
+                  For real estate agents
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/instagram-bio-for-realtors"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Instagram bios for realtors
                 </Link>
               </li>
               <li>
@@ -118,29 +227,6 @@ export function PublicFooter() {
               </li>
             </ul>
           </div>
-
-          {/* Resources Links */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">Resources</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
-                  Real Estate Tips
-                </Link>
-              </li>
-              <li>
-                <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
-                  Market Insights
-                </Link>
-              </li>
-              <li>
-                <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
-                  Agent Guides
-                </Link>
-              </li>
-            </ul>
-          </div>
-
           {/* Legal Links */}
           <div>
             <h3 className="text-white font-semibold mb-4">Legal</h3>

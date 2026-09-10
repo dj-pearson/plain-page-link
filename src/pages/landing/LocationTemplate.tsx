@@ -1,4 +1,5 @@
 import { ArrowRight, Home, TrendingUp, Users, Star, CheckCircle, MapPin } from 'lucide-react';
+import { DEFAULT_SOCIAL_IMAGE } from '@/config/og-image';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -51,7 +52,19 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         about: { '@id': `${canonicalUrl}#service` },
         breadcrumb: { '@id': `${canonicalUrl}#breadcrumb` },
         inLanguage: 'en-US',
-        dateModified: new Date().toISOString(),
+        // No dateModified. It was `new Date().toISOString()` — the moment of
+        // render — so every city page claimed it had just been updated, on
+        // every render, forever. That is the same false-freshness signal
+        // US-149 refused to put in the sitemap: a lastmod that always reads
+        // "now" is one Google learns to ignore. It also made the page
+        // nondeterministic: React renders twice, the two timestamps differed
+        // by milliseconds, react-helmet-async keys its dedupe on the
+        // serialised content, and the page shipped TWO copies of the whole
+        // schema graph — including two BreadcrumbLists. It hit 2 of 26 city
+        // pages in one build and different ones in the next, which is exactly
+        // how a race presents.
+        // An honest dateModified would come from the location data; there is
+        // no such field, and inventing one is worse than omitting it.
         publisher: {
           '@type': 'Organization',
           name: SEO_CONFIG.organization.name,
@@ -185,8 +198,11 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
         <meta property="og:image" content={getOgImageUrl()} />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
+        {/* getOgImageUrl() with no argument is always the site default, so its
+            real size is known — 1536x1024, not the 1200x630 asserted here for
+            a year (US-174). */}
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
         <meta property="og:locale" content={SEO_CONFIG.locale} />
 
         {/* Twitter Card */}
@@ -221,7 +237,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
         {/* Breadcrumb Navigation */}
         <section className="container mx-auto px-4 pt-6">
+          {/* The page's own @graph above already declares this BreadcrumbList.
+              Emitting it here too shipped two of them on all 26 city pages. */}
           <Breadcrumb
+            emitSchema={false}
             items={[
               { name: 'Home', url: baseUrl },
               { name: 'For Real Estate Agents', url: `${baseUrl}/for-real-estate-agents` },

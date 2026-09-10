@@ -1,12 +1,20 @@
-import { Link } from "react-router-dom";
-import { ChevronRight, Home } from "lucide-react";
-import { Helmet } from "react-helmet-async";
-import { generateBreadcrumbSchema, BreadcrumbItem } from "@/lib/seo";
+import { Link } from 'react-router-dom';
+import { ChevronRight, Home } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
+import { generateBreadcrumbSchema, BreadcrumbItem } from '@/lib/seo';
+import { getCanonicalUrl } from '@/config/seo.config';
 
 interface BreadcrumbProps {
   items: BreadcrumbItem[];
   className?: string;
   showHome?: boolean;
+  /**
+   * Emit the BreadcrumbList JSON-LD. Set false on a page whose own schema
+   * @graph already declares one — every /for/{city} page shipped two
+   * BreadcrumbList blocks, one from its graph and one from here, and two
+   * declarations of the same type on a page is two answers to one question.
+   */
+  emitSchema?: boolean;
 }
 
 /**
@@ -27,37 +35,51 @@ interface BreadcrumbProps {
  *   ]}
  * />
  */
+/**
+ * A caller may pass "/tools" or a full URL; schema.org wants the full URL.
+ *
+ * getCanonicalUrl() is built on getSafeOrigin(), the same helper the canonical
+ * tags use, so a breadcrumb and a canonical can no longer disagree about what
+ * the site is called. A relative `item` is not a lenient absolute one —
+ * Google rejects it — and every /features/* page shipped two of them.
+ */
+const absolute = (url: string): string => (/^https?:\/\//i.test(url) ? url : getCanonicalUrl(url));
+
 export const Breadcrumb = ({
   items,
-  className = "",
-  showHome = true
+  className = '',
+  showHome = true,
+  emitSchema = true,
 }: BreadcrumbProps) => {
-  // Generate structured data for SEO
-  const breadcrumbSchema = generateBreadcrumbSchema(items);
+  // Home is prepended before the schema is generated, not after (US-168). The
+  // schema used to be built from `items` while the visible trail was built from
+  // `breadcrumbItems`, so on every page that relied on showHome the structured
+  // data was missing the first rung that readers could see.
+  const breadcrumbItems: BreadcrumbItem[] = (
+    showHome && items[0]?.name !== 'Home' ? [{ name: 'Home', url: '/' }, ...items] : items
+  ).map((item) => ({ ...item, url: absolute(item.url) }));
 
-  // Ensure home is included if showHome is true
-  const breadcrumbItems = showHome && items[0]?.name !== "Home"
-    ? [{ name: "Home", url: window.location.origin }, ...items]
-    : items;
+  const breadcrumbSchema = generateBreadcrumbSchema(breadcrumbItems);
 
   return (
     <>
       {/* Structured Data for SEO */}
-      <Helmet>
-        <script type="application/ld+json">
-          {JSON.stringify(breadcrumbSchema)}
-        </script>
-      </Helmet>
+      {emitSchema && (
+        <Helmet>
+          <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
+        </Helmet>
+      )}
 
       {/* Visual Breadcrumb Navigation */}
-      <nav
-        aria-label="Breadcrumb"
-        className={`flex items-center space-x-2 text-sm ${className}`}
-      >
-        <ol className="flex items-center space-x-2" itemScope itemType="https://schema.org/BreadcrumbList">
+      <nav aria-label="Breadcrumb" className={`flex items-center space-x-2 text-sm ${className}`}>
+        <ol
+          className="flex items-center space-x-2"
+          itemScope
+          itemType="https://schema.org/BreadcrumbList"
+        >
           {breadcrumbItems.map((item, index) => {
             const isLast = index === breadcrumbItems.length - 1;
-            const isHome = item.name === "Home";
+            const isHome = item.name === 'Home';
 
             return (
               <li
@@ -78,7 +100,7 @@ export const Breadcrumb = ({
                   </span>
                 ) : (
                   <Link
-                    to={isHome ? "/" : item.url}
+                    to={isHome ? '/' : item.url}
                     className="text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
                     itemProp="item"
                   >
@@ -91,9 +113,7 @@ export const Breadcrumb = ({
                 <meta itemProp="position" content={String(index + 1)} />
 
                 {/* Separator */}
-                {!isLast && (
-                  <ChevronRight className="w-4 h-4 text-gray-400" aria-hidden="true" />
-                )}
+                {!isLast && <ChevronRight className="w-4 h-4 text-gray-400" aria-hidden="true" />}
               </li>
             );
           })}

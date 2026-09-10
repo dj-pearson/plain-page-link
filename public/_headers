@@ -1,4 +1,14 @@
+# Defaults for everything. Cloudflare Pages applies every matching rule and a
+# later rule wins for a header it repeats, so this Cache-Control is the floor
+# and the asset rules further down raise it for hashed files.
+#
+# The only HTML rule here used to be `/index.html` — a path no visitor requests
+# once every page is prerendered to its own directory — so the policy it looked
+# like it set applied to nothing (US-183). max-age=0, must-revalidate keeps a
+# deploy visible immediately: a prerendered document names hashed asset URLs,
+# and a stale one points at chunks that are gone.
 /*
+  Cache-Control: public, max-age=0, must-revalidate
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   X-XSS-Protection: 1; mode=block
@@ -15,19 +25,16 @@
 /auth/*
   X-Robots-Tag: noindex, follow
 
+# Everything else under /assets/ carries a content hash in its name, so a year
+# is right and immutable is honest.
+# /*.tsx and /*.ts stood here too, declaring TypeScript source to be
+# application/javascript and cacheable for a year. Nothing in dist/ has ever had
+# either extension — the build compiles them away, and US-160 stopped the source
+# maps that were the only other way source reached the deploy. A rule that
+# serves source code as executable script is only ever wrong, whether or not
+# anything currently matches it. /*.mjs went with them; nothing emits one
+# (US-183).
 /*.js
-  Content-Type: application/javascript
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.mjs
-  Content-Type: application/javascript
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.tsx
-  Content-Type: application/javascript
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.ts
   Content-Type: application/javascript
   Cache-Control: public, max-age=31536000, immutable
 
@@ -37,6 +44,10 @@
 
 /*.png
   Content-Type: image/png
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.webp
+  Content-Type: image/webp
   Cache-Control: public, max-age=31536000, immutable
 
 /*.jpg
@@ -59,6 +70,32 @@
   Content-Type: font/woff
   Cache-Control: public, max-age=31536000, immutable
 
-/index.html
+# Prerendered pages (US-147) are served at extensionless URLs — /pricing,
+# /blog/{slug}, /tools — each backed by dist/<route>/index.html. `/*.html`
+# covers a direct request for one of those files; the extensionless URLs are
+# covered by the `/*` block at the top of this file, whose Cache-Control the
+# asset rules above deliberately override (US-183).
+/*.html
   Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
+
+# The service workers, last on purpose.
+#
+# A service worker decides what a returning visitor is served, and its URL never
+# changes — so the immutable rule for /*.js above was telling caches never to
+# revalidate the one file that controls updating. Browsers cap service-worker
+# script caching at 24 hours regardless, so this was bounded rather than fatal;
+# it was still the opposite of what the file needs (US-183).
+#
+# Placed after /*.js deliberately, and the ordering is the point: Cloudflare
+# applies every matching rule, and for a header two rules both set, the later
+# one wins. A reading where the more specific path wins instead gives the same
+# result here, so this position is correct under either — which is what you want
+# from a rule you cannot test from the repository.
+/sw.js
+  Content-Type: application/javascript
+  Cache-Control: public, max-age=0, must-revalidate
+
+/firebase-messaging-sw.js
+  Content-Type: application/javascript
   Cache-Control: public, max-age=0, must-revalidate

@@ -13,11 +13,18 @@
  * The bug it exists to prevent ran for a year: 44 URLs, one <title>, and
  * nothing anywhere comparing them.
  *
+ * It also checks that the site links to what it advertises (US-165). A page can
+ * have a perfect title, a self-referencing canonical and a sitemap entry, and
+ * still be a page no crawler ever arrives at, because nothing on the site links
+ * to it. Four pages were in exactly that state — including one built for a
+ * named query cluster two stories earlier.
+ *
  *   npm run verify:seo
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { auditPages } from './lib/seo-audit.mjs';
+import { auditPages, auditStructuredDataUrls } from './lib/seo-audit.mjs';
+import { auditInternalLinks, auditReachability, sitemapPaths } from './lib/link-graph.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const ORIGIN = (process.env.VITE_APP_URL || 'https://agentbio.net').trim();
@@ -70,4 +77,130 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`[verify-seo] ${pages.length} pages, each with its own title, description and canonical`);
+console.log(
+  `[verify-seo] ${pages.length} pages, each with its own title, description and canonical`
+);
+
+// The crawl graph. Separate from the per-page audit above because it is a
+// property of the whole build: no single page can be inspected and found
+// unreachable.
+const sitemapPath = join(DIST, 'sitemap.xml');
+if (!existsSync(sitemapPath)) {
+  console.error('[verify-seo] dist/sitemap.xml not found. The prerender writes it; it did not.');
+  process.exit(1);
+}
+
+const advertised = sitemapPaths(readFileSync(sitemapPath, 'utf8'));
+const unreachable = auditReachability(pages, advertised);
+
+if (unreachable.length > 0) {
+  console.error(
+    `\n[verify-seo] ${unreachable.length} of ${advertised.size} sitemap URLs are not ` +
+      `part of the site's own link graph:\n`
+  );
+  for (const { route, problem } of unreachable) console.error(`  ${route}\n      - ${problem}`);
+  console.error(
+    '\n[verify-seo] Submitting a URL is a request; linking to it is what makes it part\n' +
+      '             of the site. Link the page from somewhere a crawler reaches — the\n' +
+      '             footer renders on every page — or take it out of the sitemap.\n' +
+      '             Note that an inbound link from a noindex page does not count: those\n' +
+      '             pages are unreachable themselves, which is how this went unnoticed.'
+  );
+  process.exit(1);
+}
+
+console.log(
+  `[verify-seo] ${advertised.size} sitemap URLs, every one of them reachable from / by internal links`
+);
+
+// URLs asserted inside JSON-LD. Also a whole-build property: whether a URL is
+// a page is a fact about the build, not about the page naming it (US-179).
+const danglingUrls = auditStructuredDataUrls(pages, new Set(pages.map((p) => p.route)), {
+  origin: ORIGIN,
+});
+
+if (danglingUrls.length > 0) {
+  const byProblem = new Map();
+  for (const { route, problem } of danglingUrls) {
+    if (!byProblem.has(problem)) byProblem.set(problem, []);
+    byProblem.get(problem).push(route);
+  }
+  console.error(`\n[verify-seo] structured data names ${byProblem.size} URL(s) with no page:\n`);
+  for (const [problem, routes] of byProblem) {
+    console.error(`  ${problem}`);
+    console.error(`      on ${routes.length} page(s), e.g. ${routes.slice(0, 3).join(', ')}`);
+  }
+  console.error(
+    '\n[verify-seo] A URL in structured data is an assertion that the URL is a thing.\n' +
+      '             Point it at a page that exists, or drop the field — an absent\n' +
+      '             field costs nothing and a wrong one is a claim Google checks.'
+  );
+  process.exit(1);
+}
+
+console.log('[verify-seo] every URL asserted in structured data resolves to a page');
+
+// Links that go nowhere. The mirror of the reachability check above: that one
+// asks whether every page can be reached, this asks whether every link arrives
+// (US-184).
+function everyFile(dir, prefix = '', out = new Set()) {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) everyFile(full, `${prefix}/${entry}`, out);
+    else out.add(`${prefix}/${entry}`);
+  }
+  return out;
+}
+
+/**
+ * Paths the SPA still answers even though nothing was prerendered for them —
+ * /dashboard, /admin, the OAuth callbacks, a tenant profile. These are the 200
+ * rewrites in public/_redirects, and src/spa-routes.test.ts is what keeps that
+ * file honest about them.
+ */
+const spaRules = existsSync(join(process.cwd(), 'public', '_redirects'))
+  ? readFileSync(join(process.cwd(), 'public', '_redirects'), 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+      .map((line) => line.split(/\s+/))
+      .filter(([, , status]) => status === '200')
+      .map(([from]) => from)
+  : [];
+
+const servedBySpa = (path) =>
+  spaRules.some((rule) => {
+    if (rule === path) return true;
+    if (rule.endsWith('/*')) {
+      const prefix = rule.slice(0, -2);
+      return path === prefix || path.startsWith(`${prefix}/`);
+    }
+    if (rule.includes('/:')) {
+      return new RegExp(`^${rule.replace(/\/:[A-Za-z0-9_]+/g, '/[^/]+')}$`).test(path);
+    }
+    return false;
+  });
+
+const brokenLinks = auditInternalLinks(pages, everyFile(DIST), servedBySpa);
+
+if (brokenLinks.length > 0) {
+  const byTarget = new Map();
+  for (const { route, problem } of brokenLinks) {
+    if (!byTarget.has(problem)) byTarget.set(problem, []);
+    byTarget.get(problem).push(route);
+  }
+  console.error(`\n[verify-seo] ${byTarget.size} internal link target(s) have no page:\n`);
+  for (const [problem, routes] of byTarget) {
+    console.error(`  ${problem}`);
+    console.error(`      from ${routes.length} page(s), e.g. ${routes.slice(0, 3).join(', ')}`);
+  }
+  console.error(
+    '\n[verify-seo] Since US-176 these return a real 404 rather than the homepage\n' +
+      '             under a 200. Link something that exists, or stop rendering the link\n' +
+      '             when its target does not — /blog spent six links on categories\n' +
+      '             that had no articles and therefore no page.'
+  );
+  process.exit(1);
+}
+
+console.log(`[verify-seo] every internal link on ${pages.length} pages arrives at something`);

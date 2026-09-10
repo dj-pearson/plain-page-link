@@ -39,7 +39,11 @@ export function HeroSection({
   title = 'AgentBio Intelligence',
   titleHighlight,
   subtitle = 'Stop Guessing. Start Closing.',
-  description = 'AI-powered platform that predicts which leads will convert, automatically matches properties to qualified buyers, and accelerates deals with market intelligence. ML-scored leads convert 2x better. Agents save 5+ hours per week. Close deals 30% faster.',
+  // This default used to end "ML-scored leads convert 2x better. Agents save 5+
+  // hours per week. Close deals 30% faster." — three measurements of a product
+  // nobody has measured, sitting in a component default one prop away from any
+  // page that forgets to pass its own (US-173).
+  description = 'AI-powered platform that predicts which leads will convert, automatically matches properties to qualified buyers, and accelerates deals with market intelligence.',
   primaryCta = {
     text: 'Start Building Your Data Moat',
     href: '/auth/register',

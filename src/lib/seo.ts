@@ -4,9 +4,12 @@
  */
 
 import { PRICING_PLANS } from '@/config/pricing-plans';
+import { SAME_AS } from '@/config/social-profiles';
+import { ORGANIZATION_LOGO } from '@/config/og-image';
 import { PageConfig } from '@/types/pageBuilder';
 import type { BlockConfig } from '@/types/pageBuilder';
 import { getSafeOrigin } from '@/lib/utils';
+import { getBaseUrl } from '@/config/seo.config';
 
 /**
  * Breadcrumb item interface
@@ -166,7 +169,9 @@ const STARTING_PRICE = String(
 );
 
 export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
-  const baseUrl = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): this describes AgentBio itself, not a
+  // tenant's page, so it must not read the host the visitor is on (US-172).
+  const baseUrl = getBaseUrl();
 
   return {
     '@context': 'https://schema.org',
@@ -177,9 +182,10 @@ export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
     url: baseUrl,
     logo: {
       '@type': 'ImageObject',
-      url: `${baseUrl}/logo.png`,
-      width: '512',
-      height: '512',
+      url: `${baseUrl}${ORGANIZATION_LOGO.path}`,
+      // Was width '512', height '512' for a 946x436 file (US-178).
+      width: String(ORGANIZATION_LOGO.width),
+      height: String(ORGANIZATION_LOGO.height),
     },
     image: `${baseUrl}/Cover.png`,
     description:
@@ -190,17 +196,17 @@ export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
       '@type': 'ContactPoint',
       contactType: 'Customer Service',
       email: 'support@agentbio.net',
-      url: `${baseUrl}/contact`,
+      // No `url`. It pointed at /contact, which has never been a route here —
+      // seven pages named it, and since US-176 it does not even answer 200.
+      // The email is the contact method; a ContactPoint does not need a page
+      // to be valid, and one naming a URL that 404s is worse than one that
+      // does not (US-179).
       availableLanguage: ['English'],
     },
-    sameAs: [
-      'https://twitter.com/agentbio',
-      'https://www.facebook.com/agentbio',
-      'https://www.linkedin.com/company/agentbio',
-      'https://www.instagram.com/agentbio',
-      'https://www.youtube.com/@agentbio',
-      'https://github.com/agentbio',
-    ],
+    // sameAs claims identity, not links. It listed six accounts under a handle
+    // this company does not use, plus a YouTube channel and a GitHub org that
+    // appear nowhere else (US-178). One list now, in @/config/social-profiles.
+    sameAs: [...SAME_AS],
     // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
     // reviews, the same invented pair US-111 took off the landing page and
     // missed here — it was still reaching 31 built pages. Google renders stars
@@ -220,7 +226,9 @@ export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
  * Optimized for local SEO with comprehensive business information
  */
 export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
-  const baseUrl = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): this describes AgentBio itself, not a
+  // tenant's page, so it must not read the host the visitor is on (US-172).
+  const baseUrl = getBaseUrl();
 
   return {
     '@context': 'https://schema.org',
@@ -371,6 +379,10 @@ export const generateSocialPreview = (page: PageConfig) => {
  * Generate canonical URL
  */
 export const generateCanonicalUrl = (slug: string): string => {
+  // getSafeOrigin() is deliberate here and in the other /p/{slug} builders
+  // below: a page-builder page belongs to a tenant, and a tenant may serve it
+  // from their own custom_domain, where the visitor's host IS the canonical
+  // one. Everything describing AgentBio itself uses getBaseUrl() (US-172).
   return `${getSafeOrigin()}/p/${slug}`;
 };
 
@@ -440,7 +452,9 @@ export const generateSoftwareApplicationSchema = (options?: {
   operatingSystem?: string;
   features?: string[];
 }): Record<string, any> => {
-  const baseUrl = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): this describes AgentBio itself, not a
+  // tenant's page, so it must not read the host the visitor is on (US-172).
+  const baseUrl = getBaseUrl();
   const opts = {
     name: 'AgentBio',
     description:
@@ -609,7 +623,9 @@ export const generatePricingSchema = (
     url?: string;
   }[]
 ): Record<string, any> => {
-  const baseUrl = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): this describes AgentBio itself, not a
+  // tenant's page, so it must not read the host the visitor is on (US-172).
+  const baseUrl = getBaseUrl();
 
   return {
     '@context': 'https://schema.org',

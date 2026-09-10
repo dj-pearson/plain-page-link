@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { BLOG_CATEGORIES } from '@/config/blog-categories';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -19,8 +20,40 @@ import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 
 export default function Blog() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  /**
+   * The search term lives in the URL (US-179).
+   *
+   * BlogListSEO has always declared a SearchAction against
+   * /blog?search={search_term_string} — that is the schema Google reads to
+   * offer a searchbox — and nothing here read the parameter, so following one
+   * of those URLs landed on an unfiltered blog. Reading it makes the claim
+   * true, and makes a filtered view a link somebody can share.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search') ?? '';
+  const selectedCategory = searchParams.get('category') ?? 'all';
+
+  const setSearchQuery = (value: string) => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value) next.set('search', value);
+        else next.delete('search');
+        return next;
+      },
+      // A keystroke should not be a history entry to back out of.
+      { replace: true }
+    );
+  };
+
+  const setSelectedCategory = (value: string) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (value && value !== 'all') next.set('category', value);
+      else next.delete('category');
+      return next;
+    });
+  };
 
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ['published-articles'],
@@ -36,17 +69,25 @@ export default function Blog() {
     },
   });
 
+  // The filter list and the category pages read the same registry (US-166).
+  // This was a second hardcoded copy of it, in agreement with BlogCategory's by
+  // coincidence rather than by construction.
   const categories = [
     { name: 'all', slug: 'all', label: 'All Articles' },
-    { name: 'Real Estate Tips', slug: 'real-estate-tips', label: 'Real Estate Tips' },
-    { name: 'Market Insights', slug: 'market-insights', label: 'Market Insights' },
-    { name: 'Buying Guide', slug: 'buying-guide', label: 'Buying Guide' },
-    { name: 'Selling Guide', slug: 'selling-guide', label: 'Selling Guide' },
-    { name: 'Investment', slug: 'investment', label: 'Investment' },
-    { name: 'Neighborhood Guides', slug: 'neighborhood-guides', label: 'Neighborhood Guides' },
-    { name: 'Home Improvement', slug: 'home-improvement', label: 'Home Improvement' },
-    { name: 'General', slug: 'general', label: 'General' },
+    ...BLOG_CATEGORIES.map((c) => ({ name: c.name, slug: c.slug, label: c.label })),
   ];
+
+  /**
+   * The categories that actually have something to show.
+   *
+   * scripts/lib/articles.mts generates a /blog/category/{slug} route only for a
+   * category with a published article (US-166), so linking a category with none
+   * is linking a page the build did not render.
+   */
+  const categoriesWithArticles = BLOG_CATEGORIES.map((category) => ({
+    category,
+    count: articles.filter((article) => article.category === category.name).length,
+  })).filter(({ count }) => count > 0);
 
   const filteredArticles = articles.filter((article) => {
     const matchesSearch =
@@ -87,7 +128,7 @@ export default function Blog() {
               <div className="max-w-3xl">
                 {/* Breadcrumbs */}
                 <div className="mb-4">
-                  <Breadcrumbs items={[{ name: 'Blog', href: '/blog' }]} />
+                  <Breadcrumbs emitSchema={false} items={[{ name: 'Blog', href: '/blog' }]} />
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
@@ -127,24 +168,40 @@ export default function Blog() {
               </Select>
             </div>
 
-            {/* Category Cards */}
-            <h2 className="text-2xl font-bold mb-4">Browse by Category</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-              {categories.slice(1).map((category) => (
-                <Link key={category.slug} to={`/blog/category/${category.slug}`} className="group">
-                  <Card className="h-full hover:shadow-lg transition-all hover:border-primary/50">
-                    <CardHeader>
-                      <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                        {category.label}
-                      </CardTitle>
-                      <CardDescription>
-                        {articles.filter((a) => a.category === category.name).length} articles
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+            {/* Category Cards.
+                Only the categories that have an article. This grid used to
+                render all eight from the registry, including the ones with
+                nothing in them — and US-166 stopped generating a route for a
+                category with no articles, so /blog was linking to six pages the
+                build does not render. Under the old `/* /index.html 200`
+                fallback they answered with the homepage; since US-176 they are
+                real 404s. Six broken links, on the page that exists to send
+                people into the blog (US-184). */}
+            {categoriesWithArticles.length > 0 && (
+              <>
+                <h2 className="text-2xl font-bold mb-4">Browse by Category</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+                  {categoriesWithArticles.map(({ category, count }) => (
+                    <Link
+                      key={category.slug}
+                      to={`/blog/category/${category.slug}`}
+                      className="group"
+                    >
+                      <Card className="h-full hover:shadow-lg transition-all hover:border-primary/50">
+                        <CardHeader>
+                          <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                            {category.label}
+                          </CardTitle>
+                          <CardDescription>
+                            {count} {count === 1 ? 'article' : 'articles'}
+                          </CardDescription>
+                        </CardHeader>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Articles Grid */}
             {isLoading ? (

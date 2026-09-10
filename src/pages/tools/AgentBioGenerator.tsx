@@ -18,6 +18,8 @@ import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -141,13 +143,15 @@ export default function AgentBioGenerator() {
         <script type="application/ld+json">{JSON.stringify(schema)}</script>
       </Helmet>
 
+      <PublicHeader />
+
       <main id="main-content" className="min-h-screen bg-slate-50" tabIndex={-1}>
         <div className="border-b border-slate-200 bg-white py-3">
           <div className="container mx-auto px-4">
             <Breadcrumb
               items={[
                 { name: 'Home', url: getCanonicalUrl('/') },
-                { name: 'Free Tools', url: getCanonicalUrl('/tools/instagram-bio-analyzer') },
+                { name: 'Free Tools', url: getCanonicalUrl('/tools') },
                 { name: 'Agent Bio Generator', url: CANONICAL },
               ]}
             />
@@ -426,6 +430,8 @@ export default function AgentBioGenerator() {
           </section>
         </div>
       </main>
+
+      <PublicFooter />
     </>
   );
 }

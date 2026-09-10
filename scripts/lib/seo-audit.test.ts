@@ -10,7 +10,14 @@
  * gate has stopped being worth running.
  */
 import { describe, expect, it } from 'vitest';
-import { auditPages, readCanonical, readDescription, readTitle } from './seo-audit.mjs';
+import {
+  auditPages,
+  auditStructuredData,
+  auditStructuredDataUrls,
+  readCanonical,
+  readDescription,
+  readTitle,
+} from './seo-audit.mjs';
 
 const ORIGIN = 'https://agentbio.net';
 
@@ -43,6 +50,9 @@ function goodPage(route: string, title: string, description: string, body = 'x'.
 <title>${title}</title>
 <meta data-rh="true" name="description" content="${description}" />
 <link data-rh="true" rel="canonical" href="${ORIGIN}${route === '/' ? '/' : route}" />
+<meta data-rh="true" property="og:image" content="${ORIGIN}/Cover.png" />
+<meta data-rh="true" property="og:image:width" content="1536" />
+<meta data-rh="true" property="og:image:height" content="1024" />
 </head><body><div id="root">${body}</div><script src="/assets/index.js"></script></body></html>`,
   };
 }
@@ -149,5 +159,503 @@ describe('seo-audit', () => {
       expect(readDescription(html).value).toBe('D');
       expect(readCanonical(html).value).toBe('https://x/y');
     });
+  });
+});
+
+/**
+ * Proof that the US-167/US-168 breadcrumb rules have teeth.
+ *
+ * Each fixture is a trail the site actually shipped, read out of dist on
+ * 2026-09-10. The interesting one is `siblingParent`: it has no duplicate URL,
+ * no relative URL, and ends at its own canonical, so every cheaper check passes
+ * it. What it claims is that /tools/instagram-bio-analyzer is the parent of
+ * /tools/real-estate-agent-bio-generator, which is the tool next to it.
+ */
+describe('BreadcrumbList', () => {
+  const page = (canonical: string, list: unknown, extra: unknown[] = []) => {
+    const blocks = [list, ...extra]
+      .map((b) => `<script type="application/ld+json">${JSON.stringify(b)}</script>`)
+      .join('');
+    return (
+      `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+      `<link rel="canonical" href="${canonical}"/>` +
+      // Real pages all carry one; without it the og:image rule fires and makes
+      // these breadcrumb assertions about something else (US-174).
+      `<meta property="og:image" content="https://agentbio.net/Cover.png"/>` +
+      `${blocks}</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`
+    );
+  };
+
+  const trail = (rungs: [string, string][]) => ({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: rungs.map(([name, item], index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name,
+      item,
+    })),
+  });
+
+  const problemsFor = (canonical: string, list: unknown, extra: unknown[] = []) =>
+    auditStructuredData('/x', page(canonical, list, extra)).map((p) => p.problem);
+
+  it('rejects the relative item URLs /features/lead-capture shipped', () => {
+    const problems = problemsFor(
+      'https://agentbio.net/features/lead-capture',
+      trail([
+        ['Home', 'https://agentbio.net'],
+        ['Features', '/features/property-listings'],
+        ['Lead Capture', '/features/lead-capture'],
+      ])
+    );
+    expect(problems.filter((p) => p.includes('relative item URL'))).toHaveLength(2);
+  });
+
+  it('rejects the two rungs /tools/instagram-bio-analyzer gave the same URL', () => {
+    const problems = problemsFor(
+      'https://agentbio.net/tools/instagram-bio-analyzer',
+      trail([
+        ['Home', 'https://agentbio.net/'],
+        ['Free Tools', 'https://agentbio.net/tools/instagram-bio-analyzer'],
+        ['Instagram Bio Analyzer', 'https://agentbio.net/tools/instagram-bio-analyzer'],
+      ])
+    );
+    expect(problems.some((p) => p.includes('share the URL'))).toBe(true);
+  });
+
+  it('rejects a rung that points at a sibling rather than an ancestor', () => {
+    const siblingParent = trail([
+      ['Home', 'https://agentbio.net/'],
+      ['Free Tools', 'https://agentbio.net/tools/instagram-bio-analyzer'],
+      ['Agent Bio Generator', 'https://agentbio.net/tools/real-estate-agent-bio-generator'],
+    ]);
+    const problems = problemsFor(
+      'https://agentbio.net/tools/real-estate-agent-bio-generator',
+      siblingParent
+    );
+    // Every cheaper rule passes it; only the ancestor rule catches it.
+    expect(problems.some((p) => p.includes('relative'))).toBe(false);
+    expect(problems.some((p) => p.includes('share the URL'))).toBe(false);
+    expect(problems.some((p) => p.includes('is not an ancestor of'))).toBe(true);
+  });
+
+  it('accepts the corrected trail', () => {
+    expect(
+      problemsFor(
+        'https://agentbio.net/tools/real-estate-agent-bio-generator',
+        trail([
+          ['Home', 'https://agentbio.net/'],
+          ['Free Tools', 'https://agentbio.net/tools'],
+          ['Agent Bio Generator', 'https://agentbio.net/tools/real-estate-agent-bio-generator'],
+        ])
+      )
+    ).toEqual([]);
+  });
+
+  it('allows the declared non-path parent the city pages use', () => {
+    expect(
+      problemsFor(
+        'https://agentbio.net/for/miami-real-estate-agents',
+        trail([
+          ['Home', 'https://agentbio.net/'],
+          ['For Real Estate Agents', 'https://agentbio.net/for-real-estate-agents'],
+          ['Miami Real Estate Agents', 'https://agentbio.net/for/miami-real-estate-agents'],
+        ])
+      )
+    ).toEqual([]);
+  });
+
+  it('rejects a trail that ends somewhere other than the page', () => {
+    const problems = problemsFor(
+      'https://agentbio.net/pricing',
+      trail([
+        ['Home', 'https://agentbio.net/'],
+        ['Blog', 'https://agentbio.net/blog'],
+      ])
+    );
+    expect(problems.some((p) => p.includes("but the page's canonical is"))).toBe(true);
+  });
+
+  it('rejects the two BreadcrumbList blocks every city page shipped', () => {
+    const one = trail([
+      ['Home', 'https://agentbio.net/'],
+      ['Pricing', 'https://agentbio.net/pricing'],
+    ]);
+    const problems = problemsFor('https://agentbio.net/pricing', one, [one]);
+    expect(problems).toContain('2 BreadcrumbList blocks on one page; there can only be one trail');
+  });
+
+  it('finds a BreadcrumbList nested in an @graph', () => {
+    const graph = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        { '@type': 'WebPage', name: 'x' },
+        trail([
+          ['Home', 'https://agentbio.net/'],
+          ['Free Tools', '/tools'],
+          ['Agent Bio', 'https://agentbio.net/tools/real-estate-agent-bio-generator'],
+        ]),
+      ],
+    };
+    expect(
+      problemsFor('https://agentbio.net/tools/real-estate-agent-bio-generator', graph).some((p) =>
+        p.includes('relative item URL')
+      )
+    ).toBe(true);
+  });
+});
+
+/**
+ * Proof that the US-174 image rules have teeth.
+ *
+ * All 58 pages declared og:image:width 1200 and og:image:height 630 beside a
+ * Cover.png that is 1536x1024, and ArticleSEO asserted the same pair for
+ * whatever featured_image_url an article carried — inside BlogPosting JSON-LD,
+ * where Google reads it to decide large-image rich-result eligibility. Nothing
+ * compared the markup to the file, because one is HTML and the other is a PNG.
+ */
+describe('image dimensions', () => {
+  const page = (headExtra: string, blocks: unknown[] = []) =>
+    `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+    `<link rel="canonical" href="https://agentbio.net/x"/>${headExtra}` +
+    blocks.map((b) => `<script type="application/ld+json">${JSON.stringify(b)}</script>`).join('') +
+    `</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`;
+
+  const ogTags = (url: string, width?: number, height?: number) =>
+    `<meta property="og:image" content="${url}"/>` +
+    (width === undefined ? '' : `<meta property="og:image:width" content="${width}"/>`) +
+    (height === undefined ? '' : `<meta property="og:image:height" content="${height}"/>`);
+
+  const problemsFor = (html: string) => auditStructuredData('/x', html).map((p) => p.problem);
+
+  it('rejects the 1200x630 every page declared for a 1536x1024 file', () => {
+    const problems = problemsFor(page(ogTags('https://agentbio.net/Cover.png', 1200, 630)));
+    expect(problems).toContain('og:image is 1536x1024 but the tags declare 1200x630');
+  });
+
+  it('accepts the real size', () => {
+    expect(problemsFor(page(ogTags('https://agentbio.net/Cover.png', 1536, 1024)))).toEqual([]);
+  });
+
+  it('accepts an image with no dimensions declared at all', () => {
+    expect(problemsFor(page(ogTags('https://cdn.example.com/hero.jpg')))).toEqual([]);
+  });
+
+  it('rejects dimensions declared for an image whose size is not known', () => {
+    const problems = problemsFor(page(ogTags('https://cdn.example.com/hero.jpg', 1200, 630)));
+    expect(problems.some((p) => p.includes('whose size is not known here'))).toBe(true);
+  });
+
+  it('notices a page with no og:image', () => {
+    expect(problemsFor(page(''))).toContain(
+      'no og:image — social platforms fall back to whatever they scrape'
+    );
+  });
+
+  it('rejects the BlogPosting ImageObject asserting a size for an article upload', () => {
+    const problems = problemsFor(
+      page(ogTags('https://agentbio.net/Cover.png', 1536, 1024), [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'BlogPosting',
+          headline: 'x',
+          image: {
+            '@type': 'ImageObject',
+            url: 'https://cdn.example.com/article-hero.jpg',
+            width: 1200,
+            height: 630,
+          },
+        },
+      ])
+    );
+    expect(problems.some((p) => p.includes('whose size is not known here'))).toBe(true);
+  });
+
+  it('accepts an ImageObject that only states the url', () => {
+    expect(
+      problemsFor(
+        page(ogTags('https://agentbio.net/Cover.png', 1536, 1024), [
+          {
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            headline: 'x',
+            image: { '@type': 'ImageObject', url: 'https://cdn.example.com/article-hero.jpg' },
+          },
+        ])
+      )
+    ).toEqual([]);
+  });
+
+  it('rejects one dimension without the other', () => {
+    const problems = problemsFor(
+      page(ogTags('https://agentbio.net/Cover.png', 1536, 1024), [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'BlogPosting',
+          headline: 'x',
+          image: { '@type': 'ImageObject', url: 'https://agentbio.net/Cover.png', width: 1536 },
+        },
+      ])
+    );
+    expect(problems).toContain('BlogPosting declares one image dimension without the other');
+  });
+});
+
+/**
+ * Proof that the US-179 rule has teeth.
+ *
+ * ContactPoint.url named /contact on seven pages and the WebSite SearchAction
+ * named /search?q= on the homepage. Neither has ever been a route in App.tsx.
+ * Both are well-formed URLs on the right origin, so nothing about their shape
+ * gives them away — only comparing them to the set of pages the build renders
+ * does.
+ */
+describe('structured data URLs', () => {
+  const ORIGIN_URL = 'https://agentbio.net';
+  const page = (route: string, blocks: unknown[]) => ({
+    route,
+    html:
+      `<!DOCTYPE html><html><head><title>t</title>` +
+      blocks
+        .map((b) => `<script type="application/ld+json">${JSON.stringify(b)}</script>`)
+        .join('') +
+      `</head><body><div id="root">x</div></body></html>`,
+  });
+
+  const routes = new Set(['/', '/pricing', '/blog', '/tools']);
+  const check = (blocks: unknown[], route = '/') =>
+    auditStructuredDataUrls([page(route, blocks)], routes, { origin: ORIGIN_URL }).map(
+      (p) => p.problem
+    );
+
+  it('catches the ContactPoint url that named a page nobody built', () => {
+    const problems = check([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        contactPoint: {
+          '@type': 'ContactPoint',
+          email: 'support@agentbio.net',
+          url: `${ORIGIN_URL}/contact`,
+        },
+      },
+    ]);
+    expect(problems).toContain('structured data url points at /contact, which is not a page');
+  });
+
+  it('catches the SearchAction endpoint, placeholder and all', () => {
+    const problems = check([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: `${ORIGIN_URL}/search?q={search_term_string}`,
+          },
+        },
+      },
+    ]);
+    expect(problems).toContain(
+      'structured data urlTemplate points at /search, which is not a page'
+    );
+  });
+
+  it('accepts a search endpoint that is a real page', () => {
+    expect(
+      check([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: {
+              '@type': 'EntryPoint',
+              urlTemplate: `${ORIGIN_URL}/blog?search={search_term_string}`,
+            },
+          },
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('ignores fragments, so #organization and #website node ids pass', () => {
+    expect(
+      check([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          '@id': `${ORIGIN_URL}/pricing#webpage`,
+          isPartOf: { '@id': `${ORIGIN_URL}/#website` },
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('does not try to verify somebody else’s site', () => {
+    expect(
+      check([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          sameAs: ['https://x.com/AgentBioApp'],
+          url: 'https://partner.example.com/anything',
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('does not treat an asset as a missing page', () => {
+    expect(
+      check([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          logo: { '@type': 'ImageObject', url: `${ORIGIN_URL}/logo.png` },
+          url: `${ORIGIN_URL}/sitemap.xml`,
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('reports a dangling URL once per page, not once per mention', () => {
+    const problems = check([
+      { '@context': 'https://schema.org', '@type': 'Thing', url: `${ORIGIN_URL}/contact` },
+      { '@context': 'https://schema.org', '@type': 'Thing', url: `${ORIGIN_URL}/contact` },
+    ]);
+    expect(problems).toHaveLength(1);
+  });
+});
+
+/**
+ * Proof that the US-180 author rule has teeth.
+ *
+ * Every article shipped author: { '@type': 'Person', name: 'Real Estate
+ * Expert' } — a role presented as a named human, with a url pointing at the
+ * site root rather than at any author page. Google reads Article.author to
+ * decide who stands behind a piece.
+ */
+describe('article authorship', () => {
+  const page = (author: unknown) =>
+    `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+    `<link rel="canonical" href="https://agentbio.net/blog/x"/>` +
+    `<meta property="og:image" content="https://agentbio.net/Cover.png"/>` +
+    `<script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: 'x',
+      author,
+    })}</script>` +
+    `</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`;
+
+  const problemsFor = (author: unknown) =>
+    auditStructuredData('/blog/x', page(author)).map((p) => p.problem);
+
+  it('rejects the placeholder that shipped on every article', () => {
+    expect(problemsFor({ '@type': 'Person', name: 'Real Estate Expert' })).toContain(
+      'BlogPosting names its author "Real Estate Expert", which is a role rather than a person'
+    );
+  });
+
+  it('rejects the other placeholders in the same family', () => {
+    for (const name of ['Admin', 'The Team', 'Editorial Team', 'Anonymous', 'Guest Author']) {
+      expect(problemsFor({ '@type': 'Person', name }), `${name} should be rejected`).not.toEqual(
+        []
+      );
+    }
+  });
+
+  it('accepts an Organization author, which is what a company byline is', () => {
+    expect(
+      problemsFor({ '@type': 'Organization', name: 'AgentBio', url: 'https://agentbio.net' })
+    ).toEqual([]);
+  });
+
+  it('accepts a person who is a person', () => {
+    expect(problemsFor({ '@type': 'Person', name: 'Dana Okafor' })).toEqual([]);
+  });
+
+  it('rejects a Person with no name at all', () => {
+    expect(problemsFor({ '@type': 'Person', url: 'https://agentbio.net' })).toContain(
+      'BlogPosting has a Person author with no name'
+    );
+  });
+
+  it('does not object to an Organization named for a role', () => {
+    // "AgentBio Editorial Team" as an Organization is a real thing a company
+    // can be; the rule is about a Person who is not one.
+    expect(problemsFor({ '@type': 'Organization', name: 'Editorial Team' })).toEqual([]);
+  });
+});
+
+/**
+ * Proof that the US-185 answer rule has teeth.
+ *
+ * The question check has existed since US-157 and passed all 59 pages. Five
+ * accordions rendered their answer as {isOpen && <p>{answer}</p>}, so a closed
+ * one had no answer text in the document — 25 answers asserted in FAQPage
+ * JSON-LD and present on no page, while every question was visible.
+ */
+describe('FAQPage answers', () => {
+  const page = (bodyText: string, entries: { q: string; a: string }[]) =>
+    `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+    `<link rel="canonical" href="https://agentbio.net/x"/>` +
+    `<meta property="og:image" content="https://agentbio.net/Cover.png"/>` +
+    `<script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: entries.map((e) => ({
+        '@type': 'Question',
+        name: e.q,
+        acceptedAnswer: { '@type': 'Answer', text: e.a },
+      })),
+    })}</script></head><body><div id="root">${bodyText}${'x'.repeat(900)}</div></body></html>`;
+
+  const QUESTION = 'What is a real estate bio page?';
+  const ANSWER =
+    'A real estate bio page is a mobile-optimized landing page that shows an agent’s listings and captures enquiries.';
+
+  it('catches the accordion that rendered only its question', () => {
+    const problems = auditStructuredData(
+      '/x',
+      page(`<h3>${QUESTION}</h3>`, [{ q: QUESTION, a: ANSWER }])
+    ).map((p) => p.problem);
+    expect(problems.some((p) => p.startsWith('FAQPage answer is not on the page'))).toBe(true);
+    // The question check, which has always passed, still passes here — which is
+    // exactly why it missed this.
+    expect(problems.some((p) => p.includes('question is not visible'))).toBe(false);
+  });
+
+  it('accepts an answer that is in the HTML but hidden', () => {
+    // What `hidden` produces: present in the document, not painted. Google
+    // allows an accordion; it requires the content to be there.
+    const html = page(`<h3>${QUESTION}</h3><div hidden><p>${ANSWER}</p></div>`, [
+      { q: QUESTION, a: ANSWER },
+    ]);
+    expect(auditStructuredData('/x', html)).toEqual([]);
+  });
+
+  it('ignores an answer too short to probe for', () => {
+    expect(
+      auditStructuredData('/x', page(`<h3>${QUESTION}</h3>`, [{ q: QUESTION, a: 'Yes.' }]))
+    ).toEqual([]);
+  });
+
+  it('compares the text of an answer that carries markup', () => {
+    const html = page(`<h3>${QUESTION}</h3><p>${ANSWER}</p>`, [
+      { q: QUESTION, a: `<p><strong>${ANSWER}</strong></p>` },
+    ]);
+    expect(auditStructuredData('/x', html)).toEqual([]);
+  });
+
+  it('does not let the JSON-LD block itself count as the page', () => {
+    // The block is stripped before the visible text is taken; without that,
+    // every answer trivially "appears on the page" by matching its own markup.
+    const problems = auditStructuredData('/x', page('', [{ q: QUESTION, a: ANSWER }])).map(
+      (p) => p.problem
+    );
+    expect(problems.some((p) => p.startsWith('FAQPage answer is not on the page'))).toBe(true);
   });
 });

@@ -1,5 +1,7 @@
 import { Helmet } from 'react-helmet-async';
-import { getSafeOrigin } from '@/lib/utils';
+import { X_HANDLE } from '@/config/social-profiles';
+import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
+import { getBaseUrl } from '@/config/seo.config';
 
 interface SEOHeadProps {
   title: string;
@@ -56,7 +58,10 @@ export const SEOHead = ({
   modifiedTime,
   siteName = 'AgentBio',
   locale = 'en_US',
-  twitterHandle = '@agentbio',
+  // Defaulted to '@agentbio', an account this company does not use, so
+  // twitter:site and twitter:creator named a stranger on every page that
+  // did not pass one (US-178).
+  twitterHandle = X_HANDLE,
   noindex = false,
   nofollow = false,
   // AI Search Optimization
@@ -71,8 +76,11 @@ export const SEOHead = ({
   const metaDescription =
     description.length > 160 ? description.substring(0, 157) + '...' : description;
 
-  // Safe origin detection for SSR/crawlers
-  const origin = getSafeOrigin();
+  // getBaseUrl(), not getSafeOrigin(): a canonical is a claim about identity,
+  // so it must not read the host the visitor happens to be on. A *.pages.dev
+  // preview would otherwise self-canonicalise once the bundle hydrates
+  // (US-172).
+  const origin = getBaseUrl();
 
   // Default OG image if not provided
   const defaultOgImage = `${origin}/Cover.png`;
@@ -152,9 +160,19 @@ export const SEOHead = ({
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={metaDescription} />
       <meta property="og:image" content={imageUrl} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
-      <meta property="og:image:alt" content={fullTitle} />
+      {/* Width and height only for the image whose size is known. A caller's
+          own image is one this code has never seen, and a wrong number breaks
+          the card the tag exists to build (US-174). */}
+      {isDefaultSocialImage(imageUrl) && (
+        <meta property="og:image:width" content={String(DEFAULT_SOCIAL_IMAGE.width)} />
+      )}
+      {isDefaultSocialImage(imageUrl) && (
+        <meta property="og:image:height" content={String(DEFAULT_SOCIAL_IMAGE.height)} />
+      )}
+      <meta
+        property="og:image:alt"
+        content={isDefaultSocialImage(imageUrl) ? DEFAULT_SOCIAL_IMAGE.alt : fullTitle}
+      />
       {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
       <meta property="og:locale" content={locale} />
 

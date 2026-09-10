@@ -6,7 +6,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
-import { getBaseUrl } from '@/config/seo.config';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { PRICING_PLANS } from '@/config/pricing-plans';
 import { COMPETITORS, COMPETITORS_VERIFIED_LABEL } from '@/config/competitors';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
@@ -46,8 +46,8 @@ export default function VsLinktree() {
       generateEnhancedOrganizationSchema(),
       {
         '@type': 'WebPage',
-        '@id': `${window.location.origin}/vs/linktree`,
-        url: `${window.location.origin}/vs/linktree`,
+        '@id': getCanonicalUrl('/vs/linktree'),
+        url: getCanonicalUrl('/vs/linktree'),
         name: 'AgentBio vs Linktree for Real Estate Agents: Which is Better?',
         description:
           "Compare AgentBio and Linktree for real estate agents. AgentBio includes property listings, lead capture, and calendar booking—features Linktree doesn't offer.",
@@ -68,7 +68,7 @@ export default function VsLinktree() {
           'real estate link in bio tool',
           'Linktree vs real estate bio page',
         ]}
-        canonicalUrl={`${window.location.origin}/vs/linktree`}
+        canonicalUrl={getCanonicalUrl('/vs/linktree')}
         schema={schema}
       />
       <main id="main-content" className="min-h-screen bg-background" tabIndex={-1}>
