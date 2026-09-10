@@ -2746,3 +2746,70 @@ was written to protect:
 
 That second one is the more interesting: a rule that cannot tell a capacity from
 a result would have forced the pricing section to stop stating what you get.
+
+## SEO loop — iteration 9/15 — US-178: the company told Google it was somebody else
+
+Followed from iteration 8. Fixing llms.txt meant checking its social handles
+against the footer, and they were wrong. That raised the obvious next question:
+where else does this repository state who the company is?
+
+    sameAs, on every page, from two places:            the footer links:
+      twitter.com/agentbio                               facebook.com/agentbioapp
+      facebook.com/agentbio                              x.com/AgentBioApp
+      linkedin.com/company/agentbio                      instagram.com/agentbioapp
+      instagram.com/agentbio                             linkedin.com/company/agentbio
+      youtube.com/@agentbio
+      github.com/agentbio
+
+Only LinkedIn is in both columns. The real accounts are @agentbioapp and
+@AgentBioApp.
+
+This is not a broken-link problem. schema.org `sameAs` on an Organization is a
+claim of identity — "these accounts are this organisation" — and it is exactly
+what Google reconciles an entity against when it decides what belongs in a
+knowledge panel. Four of the six named an account under a handle this company
+does not use, which either belongs to somebody else or does not exist. The other
+two, a YouTube channel and a GitHub organisation, appear nowhere else in the
+repository at all; there is nothing to check them against, so they are gone
+rather than corrected.
+
+A third copy of the same six sat in SEO_CONFIG.socialLinks, and
+SEO_CONFIG.twitterHandle was '@agentbio', so twitter:site and twitter:creator
+also named a different account on every page.
+
+THE BAR, written into src/config/social-profiles.ts: an account goes in the list
+only if the site links to it from the footer. That is the only evidence
+available here that it exists and is ours. Claiming an account you do not own is
+worse than omitting one you do — an omission costs a link, a wrong claim hands
+the entity to a stranger.
+
+THE LOGO, in the same node. SEO_CONFIG.organization declared logoWidth 512 and
+logoHeight 512, and both Organization schemas shipped
+
+    logo: { '@type': 'ImageObject', url: '.../logo.png', width: '512', height: '512' }
+
+public/logo.png is 946x436. That is US-174 again, in the node that says who the
+company is — and Google fetches the logo to build a knowledge panel, so it
+measures it. ORGANIZATION_LOGO joins DEFAULT_SOCIAL_IMAGE in
+src/config/og-image.ts, checked against the PNG header by the same test.
+
+THE FOOTER now takes its four URLs from profileUrl(), which throws rather than
+returning undefined — a footer link that quietly became href="undefined" is
+worse than a build that stops. The markup and per-platform icons are unchanged;
+only the literals are gone, which is what lets the two lists drift.
+
+DEMONSTRATED against the code as it shipped, six checks failing:
+
+    × lib/seo.ts names only accounts in SOCIAL_PROFILES
+    × PageSEO.tsx names only accounts in SOCIAL_PROFILES
+    × seo.config.ts names only accounts in SOCIAL_PROFILES
+    × links every profile, so sameAs stays evidenced by something visible
+    × is what SEO_CONFIG hands to twitter:site
+    × takes its social links from the one list
+
+ONE TEST BUG, and the same shape as iteration 8's. The first version banned any
+sameAs URL ending in "agentbio" — which rejects linkedin.com/company/agentbio/,
+the single entry in the old list that was actually right. A rule that cannot
+tell the real account from the invented ones is not a rule about accounts. The
+five wrong ones are named literally now, the way seo-audit names the 4.8/523
+rating.

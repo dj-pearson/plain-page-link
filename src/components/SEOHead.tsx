@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { X_HANDLE } from '@/config/social-profiles';
 import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
 import { getBaseUrl } from '@/config/seo.config';
 
@@ -57,7 +58,10 @@ export const SEOHead = ({
   modifiedTime,
   siteName = 'AgentBio',
   locale = 'en_US',
-  twitterHandle = '@agentbio',
+  // Defaulted to '@agentbio', an account this company does not use, so
+  // twitter:site and twitter:creator named a stranger on every page that
+  // did not pass one (US-178).
+  twitterHandle = X_HANDLE,
   noindex = false,
   nofollow = false,
   // AI Search Optimization

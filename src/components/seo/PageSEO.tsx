@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet-async';
-import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
+import { SAME_AS } from '@/config/social-profiles';
+import { DEFAULT_SOCIAL_IMAGE, ORGANIZATION_LOGO, isDefaultSocialImage } from '@/config/og-image';
 import { getBaseUrl } from '@/config/seo.config';
 
 interface FAQItem {
@@ -57,9 +58,10 @@ export function PageSEO({
     url: siteUrl,
     logo: {
       '@type': 'ImageObject',
-      url: `${siteUrl}/logo.png`,
-      width: '512',
-      height: '512',
+      url: `${siteUrl}${ORGANIZATION_LOGO.path}`,
+      // Was width '512', height '512' for a 946x436 file (US-178).
+      width: String(ORGANIZATION_LOGO.width),
+      height: String(ORGANIZATION_LOGO.height),
     },
     image: `${siteUrl}/Cover.png`,
     description:
@@ -73,13 +75,9 @@ export function PageSEO({
       url: `${siteUrl}/contact`,
       availableLanguage: ['English'],
     },
-    sameAs: [
-      'https://twitter.com/agentbio',
-      'https://www.facebook.com/agentbio',
-      'https://www.linkedin.com/company/agentbio',
-      'https://www.instagram.com/agentbio',
-      'https://www.youtube.com/@agentbio',
-    ],
+    // See @/config/social-profiles: these were four accounts this company does
+    // not have, and one it does (US-178).
+    sameAs: [...SAME_AS],
     // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
     // reviews, the same invented pair US-111 took off the landing page and
     // missed here — it was still reaching 31 built pages. Google renders stars

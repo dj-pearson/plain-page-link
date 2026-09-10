@@ -2818,6 +2818,20 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-10, iteration 8 of the SEO loop. 7 of the 8 checks fail on the shipped file. Worth noting how it survived three cleanups: it is a text file in public/, so a sweep of src/ never reaches it, and it is not rendered by any component, so no page audit sees it either. The distinction the lead-volume rule had to learn: '100 leads a month' on a pricing line is a limit the product enforces, while 'the average user captures 10+ qualified leads a month' is a claim about outcomes. Only the second is banned, and getting that wrong first made the test fail on the honest rewrite it existed to protect. A `[\\d,]+` pattern also matched the bare comma in 'agents, realtors' \u2014 every count pattern now requires a digit."
+    },
+    {
+      "id": "US-178",
+      "title": "The Organization schema claimed six social accounts, and the site links four different ones",
+      "description": "schema.org sameAs on an Organization is a claim of identity \u2014 these accounts ARE this organisation \u2014 and it is what Google reconciles an entity against when building a knowledge panel. Two sameAs lists shipped on every page, from src/lib/seo.ts and src/components/seo/PageSEO.tsx, plus a third copy in SEO_CONFIG.socialLinks, all naming twitter.com/agentbio, facebook.com/agentbio, linkedin.com/company/agentbio, instagram.com/agentbio, youtube.com/@agentbio and github.com/agentbio. The footer links facebook.com/agentbioapp, x.com/AgentBioApp, instagram.com/agentbioapp and linkedin.com/company/agentbio. Only LinkedIn is in both. So the site told Google it owned four accounts under a handle it does not use, and asserted a YouTube channel and a GitHub organisation that appear nowhere else in the repository. SEO_CONFIG.twitterHandle was '@agentbio' for the same reason, so twitter:site and twitter:creator named a different account on every page. Separately, SEO_CONFIG.organization declared logoWidth 512 and logoHeight 512 and both Organization schemas shipped logo ImageObject width '512' height '512'; public/logo.png is 946x436, which is the US-174 defect again in the node that says who the company is.",
+      "acceptanceCriteria": [
+        "One list of social profiles, with the bar for inclusion written down: the site links to it",
+        "The footer, both sameAs lists, SEO_CONFIG.socialLinks, twitter:site and llms.txt all read that list",
+        "Organization.logo declares the size logo.png actually is, verified against the file",
+        "A test fails if any of them names an account that is not in the list, demonstrated against the code as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 9 of the SEO loop. Six checks fail on the shipped code. The bar for inclusion is 'the footer links to it', because that is the only evidence available in this repository that an account exists and is ours \u2014 claiming an account you do not own is worse than omitting one you do, since an omission costs a link and a wrong claim hands the entity to a stranger. The YouTube and GitHub entries were dropped rather than corrected: nothing anywhere else refers to either, so there is nothing to correct them against. One test bug worth recording: the first version banned any sameAs URL ending in 'agentbio', which rejects linkedin.com/company/agentbio/ \u2014 the single entry in the old list that was actually right. The five wrong accounts are now named literally."
     }
   ]
 }

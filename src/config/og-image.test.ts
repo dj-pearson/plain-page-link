@@ -11,7 +11,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from './og-image';
+import { DEFAULT_SOCIAL_IMAGE, ORGANIZATION_LOGO, isDefaultSocialImage } from './og-image';
 
 const PUBLIC = join(process.cwd(), 'public');
 
@@ -67,5 +67,26 @@ describe('isDefaultSocialImage', () => {
     expect(isDefaultSocialImage(null)).toBe(false);
     expect(isDefaultSocialImage(undefined)).toBe(false);
     expect(isDefaultSocialImage('')).toBe(false);
+  });
+});
+
+describe('the organisation logo', () => {
+  const file = join(PUBLIC, ORGANIZATION_LOGO.path.replace(/^\//, ''));
+
+  it('exists where the config says it does', () => {
+    expect(() => statSync(file)).not.toThrow();
+  });
+
+  it('is the size the config declares', () => {
+    expect(
+      pngSize(file),
+      'Organization.logo is what Google reads for a knowledge panel, and it ' +
+        'fetches the file. It was declared 512x512 for a 946x436 image (US-178).'
+    ).toEqual({ width: ORGANIZATION_LOGO.width, height: ORGANIZATION_LOGO.height });
+  });
+
+  it("meets Google's minimum for an organisation logo", () => {
+    // Google asks for at least 112x112 and a readable aspect ratio.
+    expect(Math.min(ORGANIZATION_LOGO.width, ORGANIZATION_LOGO.height)).toBeGreaterThanOrEqual(112);
   });
 });

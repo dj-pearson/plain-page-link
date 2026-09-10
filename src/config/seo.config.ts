@@ -5,6 +5,8 @@
 
 import { PRICING_PLANS } from './pricing-plans';
 import { getConfiguredAppUrl } from '@/lib/utils';
+import { ORGANIZATION_LOGO } from './og-image';
+import { SAME_AS, X_HANDLE } from './social-profiles';
 
 /** Lowest paid monthly plan. Was the literal '39', which is not a plan (US-157). */
 export const SEO_STARTING_PRICE = String(
@@ -20,7 +22,9 @@ export const SEO_CONFIG = {
   defaultDescription:
     'Purpose-built link-in-bio for real estate agents. Showcase properties, capture leads, and book appointments from Instagram.',
   defaultImage: '/Cover.png',
-  twitterHandle: '@agentbio',
+  // Was '@agentbio'. The account this site links to is x.com/AgentBioApp,
+  // so twitter:site named a different account on every page (US-178).
+  twitterHandle: X_HANDLE,
   locale: 'en_US',
   themeColor: '#0ea5e9',
 
@@ -31,20 +35,15 @@ export const SEO_CONFIG = {
     email: 'support@agentbio.net',
     foundingDate: '2024',
     slogan: 'Transform Instagram followers into qualified leads',
-    logo: '/logo.png',
-    logoWidth: 512,
-    logoHeight: 512,
+    logo: ORGANIZATION_LOGO.path,
+    // Were 512x512, for a 946x436 file (US-178).
+    logoWidth: ORGANIZATION_LOGO.width,
+    logoHeight: ORGANIZATION_LOGO.height,
   },
 
-  // Social links for schema
-  socialLinks: [
-    'https://twitter.com/agentbio',
-    'https://www.facebook.com/agentbio',
-    'https://www.linkedin.com/company/agentbio',
-    'https://www.instagram.com/agentbio',
-    'https://www.youtube.com/@agentbio',
-    'https://github.com/agentbio',
-  ],
+  // Social links for schema. A third copy of the same six wrong accounts stood
+  // here; @/config/social-profiles is the one list now (US-178).
+  socialLinks: SAME_AS,
 
   // Default ratings
   // `ratings` removed (US-157). It held ratingValue '4.8' over reviewCount

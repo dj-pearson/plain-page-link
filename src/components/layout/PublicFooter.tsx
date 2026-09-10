@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { profileUrl } from '@/config/social-profiles';
 import { Home, Mail, Facebook, Instagram, Linkedin } from 'lucide-react';
 import { openCookiePreferences } from '@/lib/cookie-consent';
 import { TOOLS } from '@/config/tools';
@@ -30,7 +31,7 @@ export function PublicFooter() {
             {/* Social Links */}
             <div className="flex gap-3" role="list" aria-label="Social media links">
               <a
-                href="https://www.facebook.com/agentbioapp"
+                href={profileUrl('Facebook')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-blue-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -40,7 +41,7 @@ export function PublicFooter() {
                 <Facebook className="h-5 w-5" aria-hidden="true" />
               </a>
               <a
-                href="https://x.com/AgentBioApp"
+                href={profileUrl('X')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-gray-200 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -58,7 +59,7 @@ export function PublicFooter() {
                 </svg>
               </a>
               <a
-                href="https://www.instagram.com/agentbioapp/"
+                href={profileUrl('Instagram')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-pink-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -68,7 +69,7 @@ export function PublicFooter() {
                 <Instagram className="h-5 w-5" aria-hidden="true" />
               </a>
               <a
-                href="https://www.linkedin.com/company/agentbio/"
+                href={profileUrl('LinkedIn')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"

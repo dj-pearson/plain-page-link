@@ -60,3 +60,22 @@ export function isDefaultSocialImage(url: string | null | undefined): boolean {
     return url === DEFAULT_SOCIAL_IMAGE.path;
   }
 }
+
+/**
+ * The organisation logo, and the size it actually is (US-178).
+ *
+ * SEO_CONFIG.organization declared logoWidth 512 and logoHeight 512, and two
+ * Organization schemas shipped `logo: { '@type': 'ImageObject', width: '512',
+ * height: '512' }` on every page. public/logo.png is 946x436. Google reads
+ * Organization.logo for the knowledge panel and fetches the file, so this was
+ * the US-174 defect again, in the node that says who the company is.
+ *
+ * Verified against the bytes on disk by src/config/og-image.test.ts, the same
+ * way DEFAULT_SOCIAL_IMAGE is.
+ */
+export const ORGANIZATION_LOGO: SocialImage = {
+  path: '/logo.png',
+  width: 946,
+  height: 436,
+  alt: 'AgentBio',
+};
