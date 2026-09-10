@@ -12,14 +12,55 @@ export function validateEmail(email: string): boolean {
   return emailRegex.test(email) && email.length <= 255;
 }
 
-// Phone validation (allows international formats)
-export function validatePhone(phone: string): boolean {
-  const phoneRegex = /^[\d\s\-\(\)\+]{7,20}$/;
-  return phoneRegex.test(phone);
+/**
+ * Phone validation (US-197).
+ *
+ * This was a character allow-list: /^[\d\s\-()+]{7,20}$/. Every one of the four
+ * public lead forms validates phone client-side as `z.string().min(10)`, so a
+ * visitor could type a number the browser accepted and the server then refused
+ * — and a refused submission reaches them as a failed form, not as "try a
+ * different format". These were all rejected:
+ *
+ *     555.123.4567          dots, which is how a great many people write it
+ *     555-123-4567 x12      an extension, which agents ask for
+ *     (555) 123–4567        an en dash, which iOS and Word insert for you
+ *
+ * A lost lead is the expensive error here; a slightly odd string in a text
+ * column is not. So the rule is what actually matters — enough digits to be a
+ * phone number, not so many that it is something else — plus a check that the
+ * rest is punctuation a person plausibly wrote, rather than prose.
+ */
+
+/** A trailing extension, in the forms people write. Checked separately. */
+const PHONE_EXTENSION = /(?:[,;]|\b(?:ext|extn|extension|x))\.?\s*\d{1,6}\s*$/i;
+
+/** Digits, spaces, and the separators a written phone number uses — Unicode
+ *  dashes included, because a phone keyboard and a word processor both produce
+ *  them without being asked. */
+const PHONE_BODY = /^[\d\s().+/\-\u2010-\u2015\u2212]+$/;
+
+export function validatePhone(phone: unknown): boolean {
+  if (typeof phone !== 'string') return false;
+  if (phone.length > 40) return false;
+
+  const body = phone.replace(PHONE_EXTENSION, '').trim();
+  if (!PHONE_BODY.test(body)) return false;
+
+  // E.164 allows at most 15 digits; 7 is the shortest national number in use.
+  const digits = (body.match(/\d/g) ?? []).length;
+  return digits >= 7 && digits <= 15;
 }
 
-// String length validation
-export function validateStringLength(str: string, min: number, max: number): boolean {
+/**
+ * String length validation.
+ *
+ * `unknown`, not `string`: this called `.trim()` on whatever it was handed, so
+ * a request with `"name": 12345` threw a TypeError inside validateLeadData and
+ * the caller got a 500 instead of "Name must be between 1 and 100 characters".
+ * A validator that crashes on invalid input is not validating it (US-197).
+ */
+export function validateStringLength(str: unknown, min: number, max: number): boolean {
+  if (typeof str !== 'string') return false;
   const trimmed = str.trim();
   return trimmed.length >= min && trimmed.length <= max;
 }
@@ -40,29 +81,67 @@ export function validateUuid(value: unknown): boolean {
   return typeof value === 'string' && UUID_RE.test(value);
 }
 
+/**
+ * Patterns that must not survive sanitisation, applied to a fixed point.
+ *
+ * A single pass over a blacklist can be made to reconstruct the thing it
+ * removes, because the replacement joins the text on either side of the match:
+ *
+ *     'dadata:ta:'            -> removes the inner 'data:'       -> 'data:'
+ *     'javajavascript:script:' -> removes the inner 'javascript:' -> 'javascript:'
+ *
+ * Nothing renders this output unescaped today — every email template goes
+ * through escapeHtml, and React escapes the dashboard — so this was defence in
+ * depth rather than a live hole. A sanitiser that can be talked out of its own
+ * rule is still not one worth keeping (US-197).
+ */
+const DANGEROUS: RegExp[] = [
+  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+  /<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi,
+  /<[^>]*>/g,
+  /&lt;/gi,
+  /&gt;/gi,
+  /javascript:/gi,
+  /data:/gi,
+  /vbscript:/gi,
+  /on\w+\s*=/gi,
+];
+
+/** Entities that are decoded rather than dropped: they are ordinary text. */
+const DECODE: Array<[RegExp, string]> = [
+  [/&quot;/gi, '"'],
+  [/&#x27;/gi, "'"],
+  [/&#x2F;/gi, '/'],
+  [/&amp;/gi, '&'],
+];
+
+/** Bound on the fixpoint loop, so a pathological input cannot spin. */
+const MAX_SANITIZE_PASSES = 8;
+
 // Sanitize string (remove potentially dangerous characters and XSS vectors)
-export function sanitizeString(str: string): string {
-  return str
-    .trim()
-    // Remove HTML tags and their contents for script/style
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    // Remove HTML tags
-    .replace(/<[^>]*>/g, '')
-    // Decode and remove HTML entities that could be used for XSS
-    .replace(/&lt;/gi, '')
-    .replace(/&gt;/gi, '')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#x27;/gi, "'")
-    .replace(/&#x2F;/gi, '/')
-    .replace(/&amp;/gi, '&')
-    // Remove javascript: and data: URLs
-    .replace(/javascript:/gi, '')
-    .replace(/data:/gi, '')
-    .replace(/vbscript:/gi, '')
-    // Remove event handlers (onclick, onerror, etc.)
-    .replace(/on\w+\s*=/gi, '')
-    .slice(0, 5000); // Hard limit
+export function sanitizeString(str: unknown): string {
+  // Same reason as validateStringLength: this is reached with whatever was in
+  // the request body, and `.trim()` on a number threw (US-197).
+  if (typeof str !== 'string') return '';
+
+  let out = str.trim();
+  for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass++) {
+    const before = out;
+    for (const pattern of DANGEROUS) out = out.replace(pattern, '');
+    if (out === before) break;
+  }
+
+  for (const [pattern, replacement] of DECODE) out = out.replace(pattern, replacement);
+
+  // Decoding can reveal a token that was hidden behind an entity, so the
+  // dangerous set gets one more look afterwards.
+  for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass++) {
+    const before = out;
+    for (const pattern of DANGEROUS) out = out.replace(pattern, '');
+    if (out === before) break;
+  }
+
+  return out.slice(0, 5000); // Hard limit
 }
 
 // Validate that a URL is safe (not javascript:, data:, or other dangerous protocols)

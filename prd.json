@@ -3088,6 +3088,21 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 9. new URL() re-serialises an IPv4-mapped address in hexadecimal — 'http://[::ffff:127.0.0.1]/' arrives at the guard as '[::ffff:7f00:1]'. The old check matched '::ffff:' followed by a DOTTED quad, a form assertFetchableUrl never receives, so it returned 'not blocked' and the fetch went out. Cloud metadata at [::ffff:169.254.169.254] and RFC1918 at [::ffff:10.0.0.5] went the same way. The existing test asserted the dotted form was blocked and was correct about a string the code never sees — the same shape as every other defect this loop has found: a guard that had only ever been run on input it is not given. Affects crawl-site, check-broken-links, check-security-headers, detect-redirect-chains, analyze-images, check-core-web-vitals and check-mobile-first."
+    },
+    {
+      "id": "US-197",
+      "title": "The server refused phone numbers the browser had just accepted",
+      "description": "As a buyer filling in an agent's contact form, I need my phone number accepted in the way I wrote it, and I need a malformed request to come back as a validation message rather than a 500.",
+      "acceptanceCriteria": [
+        "validatePhone judges what matters — 7 to 15 digits, E.164's own bounds — rather than applying a character allow-list",
+        "Dots, extensions, comma pauses, Unicode dashes and slashes are accepted; prose, vanity numbers and out-of-range digit counts are still refused",
+        "validateStringLength and sanitizeString take unknown and return false / '' instead of throwing on a non-string",
+        "sanitizeString applies its dangerous-token set to a fixed point, bounded, so a token cannot be reassembled from the halves either side of the one that was removed",
+        "The new tests are verified against the shipped implementation: 19 of them fail there"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 10 by reading the module the coverage report put at 31%. All four public lead forms validate phone as z.string().min(10), so the browser accepted '555.123.4567' and '555-123-4567 x12' and the server then refused them — reaching the visitor as a failed submission with nothing to act on. Fourth in the sequence US-069, US-095, US-096: the platform's recurring failure is a lead that was captured correctly and thrown away by the layer behind the form. The sanitizeString single-pass weakness is defence in depth, not a live hole — every email template goes through escapeHtml and React escapes the dashboard — and is described that way rather than overstated."
     }
   ]
 }
