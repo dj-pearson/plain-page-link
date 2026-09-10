@@ -2046,3 +2046,96 @@ declared twice.
 RUNNING TOTAL for a first-time visitor to any public page, across iterations
 1-4: 17 MB of source maps off the deploy, 800 KB of Three.js and 394 KB of
 recharts off the critical path.
+
+## SEO loop — iteration 1/15 — US-165: four sitemap URLs the site did not link to
+
+THE DEFECT. `npm run build` advertises 28 URLs in sitemap.xml. Four of them
+were not part of the site's own link graph at all:
+
+  /instagram-bio-for-realtors              24 inbound links, unreachable from /
+  /tools/instagram-bio-analyzer            23 inbound links, unreachable from /
+  /tools/listing-description-generator     23 inbound links, unreachable from /
+  /tools/real-estate-agent-bio-generator    0 inbound links
+
+Measured, not inferred: `vite build && npm run prerender` writes 57 real HTML
+files, and the graph was read out of those files by parsing <a href> in the body
+of each one and walking breadth-first from '/'.
+
+The inbound counts are the trap. Three of the four looked well-linked — two
+dozen inbound links each is more than /vs/beacons had. Every one of those links
+was on a /for/{city} page. All 26 city pages carry noindex (US-153) and none of
+them is linked from anywhere either: they link to each other and to the tools,
+and nothing outside reaches them. An island linking to an island. Depth from the
+homepage was the metric that showed it; inbound count said the opposite.
+
+The bio generator is the one that stings. US-155 built it four stories ago
+specifically to capture the ~180-impression "real estate agent bio" cluster that
+US-152 took off the homepage. It shipped, it prerendered, it went into the
+sitemap, it passed every SEO check in the repo — and no page on the site linked
+to it. Submitting a URL is a request. Linking to it is what makes it part of a
+site, and nothing anywhere was comparing the two lists.
+
+THE FOOTER, which is where this was decided. It is the only surface that renders
+on all 57 pages, so it is what decides whether a page is part of the site. It
+was spending its links on:
+  - three entries in "Resources" — "Real Estate Tips", "Market Insights",
+    "Agent Guides" — all three pointing at /blog. Three anchors, three promises,
+    one destination.
+  - "Features" as `/#features`, an anchor on the homepage, while five real
+    /features/* pages went unlinked.
+  - /vs/linktree but not /vs/beacons or /vs/later, which ended up on 2 and 1
+    inbound links respectively.
+  - seven legal pages. /cookies had 56 inbound links — the most of any page on
+    the site, more than /pricing.
+
+Rebuilt as five columns: Product (the five feature pages plus Pricing), Compare
+(all three), Free tools (all three), Resources (Blog, /for-real-estate-agents,
+/instagram-bio-for-realtors, /press), Legal (unchanged).
+
+DEAD ENDS. The three tool pages rendered neither PublicHeader nor PublicFooter,
+so their entire outbound link set was 2-3 links. /vs/later had the same problem
+where its two siblings did not. All four now render both.
+
+THE GUARD — scripts/lib/link-graph.mjs, run by `npm run verify:seo`. It is a
+whole-build property rather than a per-page one: no single page can be inspected
+and found unreachable, which is why the existing per-page audit could not have
+caught this and why every one of these four pages passed it. Only <a href> in
+the BODY counts — a canonical, an og:url or a sitemap entry is not a link a
+crawler follows for discovery, and counting them would let exactly this defect
+pass.
+
+Demonstrated failing before demonstrating passing, against the pre-fix build:
+
+  4 of 28 sitemap URLs are not in the link graph
+    /tools/real-estate-agent-bio-generator
+        - no page on the site links to it — it exists only in the sitemap
+    /tools/instagram-bio-analyzer
+        - unreachable from / — its 23 inbound link(s) are all on pages that are
+          themselves unreachable (e.g. /for/atlanta-real-estate-agents, ...)
+
+One bug in the gate, caught by its own test rather than by the build: the first
+version reported '/' as having no inbound links. It does not need any — it is
+the entry point at depth 0. Reachability, not inbound count, is the question,
+and the rule now checks depth first for every page including the homepage.
+
+AFTER: 57 pages, every one with its own title, description and canonical; 28
+sitemap URLs, all reachable from /, all at depth 1.
+
+NOTE ON RUNNING THIS LOCALLY. The prerender cannot run in this sandbox without
+two things that are not in the repo: a Playwright chromium build matching the
+pinned version, and article rows. A throwaway two-article snapshot was written
+to scripts/data/articles.snapshot.json to drive the render and deleted before
+committing — it is placeholder text and must never ship (US-169 covers the real
+fix). It did earn its keep: giving those two articles categories outside
+BlogCategory's hardcoded map broke the entire build, which is US-166.
+
+STORIES OPENED. US-166 (an unknown blog category takes the deploy down),
+US-167 (no /tools hub, so the tool breadcrumbs claim a level that does not
+exist), US-168 (InstagramBioAnalyzer's breadcrumb built from
+window.location.origin, two items sharing a URL), US-169 (the article snapshot
+the build documents as committed has never been committed).
+
+PRE-EXISTING AND NOT MINE: `npm run test:run` is 2 failed / 656 passed on this
+branch and on main. src/repo-hygiene.test.ts has been red since 908a2c1
+(2026-09-04) put four markdown files and six shell/PowerShell scripts back in
+the repository root, undoing part of US-121 and US-122. US-170 opened.

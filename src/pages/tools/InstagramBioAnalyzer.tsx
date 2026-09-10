@@ -7,6 +7,8 @@ import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { getCanonicalUrl } from '@/config/seo.config';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { BioAnalyzerForm } from '@/components/tools/instagram-bio-analyzer/BioAnalyzerForm';
 import { ScoreDisplay } from '@/components/tools/instagram-bio-analyzer/ScoreDisplay';
 import { CategoryBreakdown } from '@/components/tools/instagram-bio-analyzer/CategoryBreakdown';
@@ -273,6 +275,8 @@ export default function InstagramBioAnalyzer() {
           {JSON.stringify(schema)}
         </script>
       </Helmet>
+
+      <PublicHeader />
 
       <main id="main-content" className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-pink-50" tabIndex={-1}>
         {/* Breadcrumb Navigation */}
@@ -590,6 +594,8 @@ export default function InstagramBioAnalyzer() {
         />
         <FaqSection entries={FAQ_ENTRIES} />
       </main>
+
+      <PublicFooter />
     </>
   );
 }

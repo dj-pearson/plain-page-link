@@ -1,6 +1,8 @@
 import { Check, X, ArrowRight, Star, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Helmet } from 'react-helmet-async';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { getBaseUrl } from '@/config/seo.config';
@@ -107,6 +109,8 @@ export default function VsLater() {
         className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5"
         tabIndex={-1}
       >
+        <PublicHeader />
+
         {/* Hero Section */}
         <section className="container mx-auto px-4 pt-24 pb-16">
           <div className="max-w-4xl mx-auto text-center">
@@ -678,6 +682,7 @@ export default function VsLater() {
             </div>
           </div>
         </section>
+        <PublicFooter />
       </main>
     </>
   );

@@ -11,9 +11,9 @@ export function PublicFooter() {
     >
       <div className="container mx-auto px-4">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-8">
           {/* Brand Section */}
-          <div className="md:col-span-1">
+          <div className="sm:col-span-2">
             <Link
               to="/"
               className="flex items-center gap-2 mb-4"
@@ -79,34 +79,154 @@ export function PublicFooter() {
             </div>
           </div>
 
-          {/* Product Links */}
+          {/* Product Links.
+              Every one of these pages was prerendered, in the sitemap and
+              linked from nowhere a crawler could reach (US-165). The footer is
+              the only surface that appears on all 57 pages, so it is what
+              decides whether a page is part of the site or an island. */}
           <div>
             <h3 className="text-white font-semibold mb-4">Product</h3>
             <ul className="space-y-2">
               <li>
-                <a href="/#features" className="text-gray-400 hover:text-white transition-colors">
-                  Features
-                </a>
+                <Link
+                  to="/features/property-listings"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Property listings
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/features/lead-capture"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Lead capture
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/features/calendar-booking"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Calendar booking
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/features/testimonials"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Testimonials
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/features/analytics"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Analytics
+                </Link>
               </li>
               <li>
                 <Link to="/pricing" className="text-gray-400 hover:text-white transition-colors">
                   Pricing
                 </Link>
               </li>
+            </ul>
+          </div>
+
+          {/* Comparison Links.
+              The comparison pages were reachable only by typing the URL, which
+              is part of why they took zero impressions in 16 months (US-156).
+              /vs/linktree was added to the footer then; the other two were not,
+              and ended the year on one inbound internal link between them. */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Compare</h3>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  to="/vs/linktree"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  AgentBio vs Linktree
+                </Link>
+              </li>
+              <li>
+                <Link to="/vs/beacons" className="text-gray-400 hover:text-white transition-colors">
+                  AgentBio vs Beacons
+                </Link>
+              </li>
+              <li>
+                <Link to="/vs/later" className="text-gray-400 hover:text-white transition-colors">
+                  AgentBio vs Later
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Free tools.
+              All three were unreachable from the homepage by any internal link.
+              Their only inbound links came from the 26 /for/{city} pages, which
+              carry noindex and are themselves unreachable — an island linking to
+              an island. The bio generator, built for a specific query cluster in
+              US-155, had zero inbound internal links from anywhere. */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Free tools</h3>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  to="/tools/real-estate-agent-bio-generator"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Agent bio generator
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/tools/instagram-bio-analyzer"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Instagram bio analyzer
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/tools/listing-description-generator"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Listing description writer
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Resources.
+              This column used to hold three links — "Real Estate Tips",
+              "Market Insights" and "Agent Guides" — all three pointing at /blog.
+              Three anchors promising three destinations and delivering one is
+              worse than one honest link. */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Resources</h3>
+            <ul className="space-y-2">
               <li>
                 <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
                   Blog
                 </Link>
               </li>
               <li>
-                {/* The comparison pages were reachable only by typing the URL,
-                    which is part of why they took zero impressions in 16 months
-                    (US-156). */}
                 <Link
-                  to="/vs/linktree"
+                  to="/for-real-estate-agents"
                   className="text-gray-400 hover:text-white transition-colors"
                 >
-                  Compare to Linktree
+                  For real estate agents
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/instagram-bio-for-realtors"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Instagram bios for realtors
                 </Link>
               </li>
               <li>
@@ -118,29 +238,6 @@ export function PublicFooter() {
               </li>
             </ul>
           </div>
-
-          {/* Resources Links */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">Resources</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
-                  Real Estate Tips
-                </Link>
-              </li>
-              <li>
-                <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
-                  Market Insights
-                </Link>
-              </li>
-              <li>
-                <Link to="/blog" className="text-gray-400 hover:text-white transition-colors">
-                  Agent Guides
-                </Link>
-              </li>
-            </ul>
-          </div>
-
           {/* Legal Links */}
           <div>
             <h3 className="text-white font-semibold mb-4">Legal</h3>

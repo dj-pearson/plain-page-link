@@ -6,6 +6,8 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { getCanonicalUrl } from '@/config/seo.config';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { PropertyDetailsForm } from '@/components/tools/listing-description-generator/PropertyDetailsForm';
 import { DescriptionDisplay } from '@/components/tools/listing-description-generator/DescriptionDisplay';
 import { EmailCaptureModal } from '@/components/tools/listing-description-generator/EmailCaptureModal';
@@ -529,6 +531,8 @@ export default function ListingDescriptionGenerator() {
         </script>
       </Helmet>
 
+      <PublicHeader />
+
       <main id="main-content" className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12 px-4" tabIndex={-1}>
         {/* Render current step */}
         {currentStep === 'intro' && renderIntro()}
@@ -549,6 +553,8 @@ export default function ListingDescriptionGenerator() {
         />
         <FaqSection entries={FAQ_ENTRIES} />
       </main>
+
+      <PublicFooter />
     </>
   );
 }

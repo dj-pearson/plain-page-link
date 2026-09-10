@@ -13,11 +13,18 @@
  * The bug it exists to prevent ran for a year: 44 URLs, one <title>, and
  * nothing anywhere comparing them.
  *
+ * It also checks that the site links to what it advertises (US-165). A page can
+ * have a perfect title, a self-referencing canonical and a sitemap entry, and
+ * still be a page no crawler ever arrives at, because nothing on the site links
+ * to it. Four pages were in exactly that state — including one built for a
+ * named query cluster two stories earlier.
+ *
  *   npm run verify:seo
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { auditPages } from './lib/seo-audit.mjs';
+import { auditReachability, sitemapPaths } from './lib/link-graph.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const ORIGIN = (process.env.VITE_APP_URL || 'https://agentbio.net').trim();
@@ -70,4 +77,38 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`[verify-seo] ${pages.length} pages, each with its own title, description and canonical`);
+console.log(
+  `[verify-seo] ${pages.length} pages, each with its own title, description and canonical`
+);
+
+// The crawl graph. Separate from the per-page audit above because it is a
+// property of the whole build: no single page can be inspected and found
+// unreachable.
+const sitemapPath = join(DIST, 'sitemap.xml');
+if (!existsSync(sitemapPath)) {
+  console.error('[verify-seo] dist/sitemap.xml not found. The prerender writes it; it did not.');
+  process.exit(1);
+}
+
+const advertised = sitemapPaths(readFileSync(sitemapPath, 'utf8'));
+const unreachable = auditReachability(pages, advertised);
+
+if (unreachable.length > 0) {
+  console.error(
+    `\n[verify-seo] ${unreachable.length} of ${advertised.size} sitemap URLs are not ` +
+      `part of the site's own link graph:\n`
+  );
+  for (const { route, problem } of unreachable) console.error(`  ${route}\n      - ${problem}`);
+  console.error(
+    '\n[verify-seo] Submitting a URL is a request; linking to it is what makes it part\n' +
+      '             of the site. Link the page from somewhere a crawler reaches — the\n' +
+      '             footer renders on every page — or take it out of the sitemap.\n' +
+      '             Note that an inbound link from a noindex page does not count: those\n' +
+      '             pages are unreachable themselves, which is how this went unnoticed.'
+  );
+  process.exit(1);
+}
+
+console.log(
+  `[verify-seo] ${advertised.size} sitemap URLs, every one of them reachable from / by internal links`
+);

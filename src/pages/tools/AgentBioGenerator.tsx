@@ -18,6 +18,8 @@ import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -140,6 +142,8 @@ export default function AgentBioGenerator() {
         <meta name="twitter:card" content="summary_large_image" />
         <script type="application/ld+json">{JSON.stringify(schema)}</script>
       </Helmet>
+
+      <PublicHeader />
 
       <main id="main-content" className="min-h-screen bg-slate-50" tabIndex={-1}>
         <div className="border-b border-slate-200 bg-white py-3">
@@ -426,6 +430,8 @@ export default function AgentBioGenerator() {
           </section>
         </div>
       </main>
+
+      <PublicFooter />
     </>
   );
 }

@@ -2631,6 +2631,90 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-09. Entry static vendor imports are now form, react, state, supabase, ui \u2014 no charts. react-vendor grows 161.5 -> 184.3 KB, which is the four utility packages moving into a chunk that was already loaded, against 394 KB leaving the critical path. The check's staticImporters idea from US-163 was generalised into MUST_STAY_LAZY, covering three-vendor and charts-vendor and independent of whether a chunk is over budget. Demonstrated failing against the pre-fix config, where it named both the entry chunk and three-vendor."
+    },
+    {
+      "id": "US-166",
+      "title": "A blog category outside BlogCategory's hardcoded map fails the render gate and breaks the entire build",
+      "description": "scripts/lib/articles.mts categorySlugs() derives /blog/category/{slug} routes from whatever string sits in articles.category, slugified. src/pages/BlogCategory.tsx renders from categoryContent, a hardcoded Record keyed by nine slugs. A published article whose category is anything else produces a prerender route with no content: the page keeps index.html's default title and emits no canonical, prerender.mts refuses to write ANY file, and `npm run build` exits 1. An editor changing one dropdown value in the CMS takes the deploy down, and the failure message talks about titles rather than about the category.",
+      "acceptanceCriteria": [
+        "A category present on a published article but absent from BlogCategory's map does not fail the build",
+        "The behaviour is decided deliberately: either the category page renders generic-but-real content from the articles themselves, or the route is not generated at all and the articles still appear under /blog",
+        "Whichever is chosen, a test covers an article with an unknown category",
+        "If a route is skipped, it is skipped in sitemap generation too \u2014 no URL is advertised for a page that does not exist"
+      ],
+      "priority": "high",
+      "passes": false,
+      "notes": "Found 2026-09-10 during the SEO loop (US-165 iteration 1), by giving the offline article snapshot two categories that were not in the map and watching the build refuse to write all 57 files. Do not 'fix' this by widening the hardcoded map \u2014 the next unlisted category breaks it again. The two sources of truth are categorySlugs() and categoryContent; one of them has to stop being authoritative."
+    },
+    {
+      "id": "US-167",
+      "title": "There is no /tools hub, so the free-tools breadcrumbs claim a level that does not exist",
+      "description": "All three tool pages render a Breadcrumb whose middle item is called 'Free Tools' and points at /tools/instagram-bio-analyzer \u2014 a sibling tool, not a hub. There is no /tools route in App.tsx. The BreadcrumbList JSON-LD therefore asserts a hierarchy the site does not have, and the three tools have no shared parent page to collect the topical relevance between them. US-165 linked the tools from the footer, which fixes reachability but not the missing hub.",
+      "acceptanceCriteria": [
+        "/tools exists as a route, is prerendered, is in the sitemap and passes verify:seo",
+        "It lists the three tools with a real description of each, not a grid of identical cards",
+        "Every tool page's breadcrumb middle item points at /tools",
+        "The footer's 'Free tools' column heading links to it"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (US-165 iteration 1). Scope it as one page plus the three breadcrumb edits; do not turn it into a directory of tools that do not exist yet. Read src/pages/tools/AgentBioGenerator.tsx for the prose register \u2014 it is the page in this repo that reads least like a template."
+    },
+    {
+      "id": "US-168",
+      "title": "InstagramBioAnalyzer's breadcrumb is built from window.location.origin and repeats its own URL",
+      "description": "src/pages/tools/InstagramBioAnalyzer.tsx passes { name: 'Home', url: window.location.origin } and then gives both the 'Free Tools' item and the 'Instagram Bio Analyzer' item the same URL, /tools/instagram-bio-analyzer. AgentBioGenerator.tsx next door uses getCanonicalUrl() for exactly the same three items. The origin form is what put http://127.0.0.1:4319 into canonicals before US-147 rewrote it out of every snapshot, so the JSON-LD here survives only because of that rewrite.",
+      "acceptanceCriteria": [
+        "The breadcrumb items use getCanonicalUrl(), matching AgentBioGenerator.tsx",
+        "No two items in a BreadcrumbList share a URL",
+        "grep for window.location.origin in src/pages and src/components/seo returns nothing that ends up in structured data"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (US-165 iteration 1). Small, and it should be taken together with US-167, which changes the middle item's destination anyway."
+    },
+    {
+      "id": "US-169",
+      "title": "The article snapshot that is supposed to make the build work without a database has never been committed",
+      "description": "scripts/lib/articles.mts declares SNAPSHOT_PATH 'Committed so a build without database credentials still ships the blog', and loadArticles() falls back to it when Supabase is unreachable. The file has never existed in git history. A build without VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY therefore fails outright with 'Refusing to ship a blog with no posts in it', and so does a build whose credentials are present but whose database is unreachable \u2014 the documented safety net is prose.",
+      "acceptanceCriteria": [
+        "scripts/data/articles.snapshot.json is committed, generated by `npm run articles:snapshot` against the real database",
+        "`npm run build` completes with no Supabase environment variables set",
+        "The snapshot's staleness is visible: the prerender already logs which source it used, and a snapshot older than some stated age warns",
+        "CI states which source it built from"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (US-165 iteration 1). Needs someone who can reach the production database \u2014 this sandbox cannot, which is how it was noticed. Do NOT commit a hand-written placeholder: a snapshot of invented articles would ship invented articles the first time the database is unreachable, which is the US-159 problem with extra steps."
+    },
+    {
+      "id": "US-165",
+      "title": "Four sitemap URLs, the free-tools funnel among them, were unreachable from the homepage by any internal link",
+      "description": "The build advertised 28 URLs in sitemap.xml. Four of them were not part of the site's own link graph: /tools/real-estate-agent-bio-generator had no inbound internal link from anywhere, and /tools/instagram-bio-analyzer, /tools/listing-description-generator and /instagram-bio-for-realtors had ~23 each \u2014 every one of them on a /for/{city} page, which carries noindex and is itself unreachable from the homepage. An island linking to an island. The footer, the only surface on all 57 pages, linked to none of them, spent three of its links on /blog under three different anchors, and offered /#features while five real feature pages went unlinked.",
+      "acceptanceCriteria": [
+        "Every URL in sitemap.xml is reachable from / by following <a href> in prerendered HTML",
+        "The three tool pages and /vs/later render the site header and footer instead of being link dead-ends",
+        "No two footer links share a destination under different anchor text",
+        "npm run verify:seo fails on the pre-fix build and names the four pages",
+        "The rule is tested, including the case that fooled a naive inbound-link count"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 1 of the SEO loop. The measurement is in scripts/lib/link-graph.mjs and runs as part of npm run verify:seo. Inbound count is the wrong metric and was the trap: the bio generator scored 0 and the other two scored 23, and all three were equally unreachable. Depth from / is the metric."
+    },
+    {
+      "id": "US-170",
+      "title": "repo-hygiene.test.ts has been red on main since 2026-09-04",
+      "description": "Commit 908a2c1 'Add Supabase keys regeneration guide and migration scripts' put four markdown files and six shell/PowerShell scripts back in the repository root, undoing part of US-121 and US-122. src/repo-hygiene.test.ts asserts against exactly that and has failed on main ever since: 2 failed, 656 passed. A test suite with a standing failure stops being read, and the next real failure hides in it.",
+      "acceptanceCriteria": [
+        "COOLIFY_MIGRATION_GUIDE.md, SSH_MIGRATION_GUIDE.md, SUPABASE_KEYS_GUIDE.md and SUPABASE_KEYS_QUICK_ANSWER.md live under docs/, with links updated",
+        "deploy-migrations-ssh.ps1, migrate-from-container.sh, migrate-to-coolify.ps1, migrate-to-coolify.sh, migrate-via-files.ps1 and test-db-connection.ps1 live under scripts/",
+        "SUPABASE_KEYS_GUIDE.md and SUPABASE_KEYS_QUICK_ANSWER.md are read before moving them \u2014 a document about key regeneration is exactly where a key value gets pasted, and a value in git history is a value to rotate, not to move",
+        "npm run test:run is green"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Noticed 2026-09-10 during the SEO loop (US-165 iteration 1) \u2014 the two failures are pre-existing and unrelated to that change. Deleting the files is not the fix unless their content is genuinely duplicated under docs/; check first."
     }
   ]
 }
