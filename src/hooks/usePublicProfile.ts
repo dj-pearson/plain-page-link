@@ -3,8 +3,13 @@ import type { PublicProfileListing } from '@/types/listing';
 import { toStringList } from '@/types/profile';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeUsername } from '@/lib/username';
 
-export const usePublicProfile = (username: string) => {
+export const usePublicProfile = (rawUsername: string) => {
+  // Usernames are stored canonical (lower case); the slug comes from a URL a
+  // human typed. Compare the two in the same form or `/JaneDoe` 404s.
+  const username = normalizeUsername(rawUsername);
+
   return useQuery({
     queryKey: ['public-profile', username],
     queryFn: async () => {

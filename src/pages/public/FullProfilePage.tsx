@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import ContactButtons from '@/components/profile/ContactButtons';
@@ -38,6 +38,7 @@ import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
 import { getSafeOrigin } from '@/lib/utils';
+import { needsCanonicalRedirect, normalizeUsername } from '@/lib/username';
 
 export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -188,6 +189,21 @@ export default function FullProfilePage() {
       setIsLeadModalOpen(true);
     }
   };
+
+  // One profile, one URL. The lookup below is case-insensitive, so
+  // /JaneDoe would otherwise render the same page as /janedoe at a second
+  // address — splitting the view counter, the link-click attribution and
+  // whatever a search engine decided to index. Send the visitor to the
+  // canonical form and keep their query string and hash.
+  //
+  // Placed after every hook so the hook order is unconditional.
+  if (needsCanonicalRedirect(slug)) {
+    const query = searchParams.toString();
+    const target = `/${encodeURIComponent(normalizeUsername(slug))}${query ? `?${query}` : ''}${
+      typeof window === 'undefined' ? '' : window.location.hash
+    }`;
+    return <Navigate to={target} replace />;
+  }
 
   if (isLoading) {
     return <ProfileSkeleton />;

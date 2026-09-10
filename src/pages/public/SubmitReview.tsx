@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { logger } from '@/lib/logger';
+import { normalizeUsername } from '@/lib/username';
 
 export default function SubmitReview() {
   const { username } = useParams();
@@ -37,7 +38,7 @@ export default function SubmitReview() {
         const { data, error } = await supabase
           .from('profiles')
           .select('id, full_name, avatar_url, bio')
-          .eq('username', username)
+          .eq('username', normalizeUsername(username))
           .single();
 
         if (error) throw error;
