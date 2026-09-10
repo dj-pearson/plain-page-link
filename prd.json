@@ -2847,6 +2847,47 @@
       "priority": "high",
       "passes": true,
       "notes": "Done 2026-09-10, iteration 10 of the SEO loop. 8 occurrences on the shipped build. The blog case is the one worth the extra work: the schema was already declaring /blog?search=, so making Blog.tsx read the parameter turned an existing false claim true rather than deleting a capability \u2014 and a filtered blog view became a link somebody can share. Category moved to the URL with it. The site-wide SearchAction was deleted instead of repointed, because there is no site-wide search and a blog search is not one; inventing a target would have been the same defect with a different path."
+    },
+    {
+      "id": "US-180",
+      "title": "Every article was attributed to a person who does not exist",
+      "description": "ArticleSEO defaulted `author` to 'Real Estate Expert' and shipped it as author: { '@type': 'Person', name: 'Real Estate Expert', url: siteUrl } in the BlogPosting schema of every article \u2014 a job description presented as a named human, with a url pointing at the site root rather than at any author page. The same string went into meta author, article:author, citation_author, and twitter:creator, which takes an @handle rather than a name so was invalid as well. BlogArticle.tsx repeated it as a visible byline wrapped in itemProp=author itemType=schema.org/Person. Google reads Article.author to decide who stands behind a piece; a Person who does not exist is the invented-testimonial defect of US-159 and US-173 in the field where it counts most.",
+      "acceptanceCriteria": [
+        "No Person author whose name is a role rather than a name",
+        "Articles with no known author are attributed to the organisation, which is true and is a type schema.org has",
+        "twitter:creator carries the X handle, not a name",
+        "The visible byline and its microdata agree with the schema",
+        "verify:seo fails on a generic Person author, demonstrated against the build as it shipped"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 11 of the SEO loop. An Organization author is not a workaround \u2014 the company did publish these, and schema.org has the type for exactly that. The `author` prop stays, so a real name can be passed the moment there is one to pass; articles.author_id exists and resolving it is US-181. Also of note for the record: a naive count of @type occurrences in the built JSON-LD suggested 26 pages had duplicate Organization nodes and 4 had duplicate WebPage nodes. Checked rather than believed \u2014 the Organization pairs are publisher and provider references carrying the same @id, which is correct JSON-LD, and most of the WebPage pairs are mainEntityOfPage references. The one real residue is two anonymous WebPage nodes with no @id on /features/lead-capture and /features/analytics, recorded as US-182 rather than folded in here."
+    },
+    {
+      "id": "US-181",
+      "title": "Resolve articles.author_id to a real byline",
+      "description": "US-180 attributes articles to the organisation because nothing in the render path knows who wrote them. The articles table carries author_id, and profiles carries full_name and avatar_url, so a real Person author is available in principle \u2014 but the prerender's article snapshot selects from `articles` alone, and the browser query does the same, so neither has the name. A real byline is the strongest E-E-A-T signal an article can carry.",
+      "acceptanceCriteria": [
+        "The article query joins the author profile, in the browser and in scripts/lib/articles.mts",
+        "ArticleSEO receives the real name and emits a Person author",
+        "An article whose author_id is null or unresolvable still falls back to the organisation rather than to a placeholder",
+        "The prerender intercept in scripts/prerender.mts answers the joined shape"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (iteration 11). Needs a schema read to confirm the profiles join is available under RLS to the anon role \u2014 the prerender uses the anon key deliberately, so an author name that anon cannot select is one the build cannot render either. Do NOT invent a display name when the join returns nothing; that is what US-180 removed."
+    },
+    {
+      "id": "US-182",
+      "title": "Two anonymous WebPage nodes on two feature pages",
+      "description": "/features/lead-capture and /features/analytics each emit two WebPage nodes with no @id, from SEOHead's schema prop and from the page's own graph. Without an @id a consumer cannot tell they describe the same page, so the page arrives as two partial descriptions of itself rather than one. Every other duplicate found in the same scan turned out to be a reference sharing an @id, which is correct; these two are not.",
+      "acceptanceCriteria": [
+        "Each page emits one WebPage node, or two that share an @id",
+        "A rule in seo-audit.mjs catches an anonymous duplicate of a node type that should be singular"
+      ],
+      "priority": "low",
+      "passes": false,
+      "notes": "Opened 2026-09-10 (iteration 11), found while checking a naive duplicate count rather than trusting it. Low priority: two partial descriptions of one page is untidy rather than false, which is why it was not folded into US-180."
     }
   ]
 }

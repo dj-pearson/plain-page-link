@@ -528,3 +528,64 @@ describe('structured data URLs', () => {
     expect(problems).toHaveLength(1);
   });
 });
+
+/**
+ * Proof that the US-180 author rule has teeth.
+ *
+ * Every article shipped author: { '@type': 'Person', name: 'Real Estate
+ * Expert' } — a role presented as a named human, with a url pointing at the
+ * site root rather than at any author page. Google reads Article.author to
+ * decide who stands behind a piece.
+ */
+describe('article authorship', () => {
+  const page = (author: unknown) =>
+    `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+    `<link rel="canonical" href="https://agentbio.net/blog/x"/>` +
+    `<meta property="og:image" content="https://agentbio.net/Cover.png"/>` +
+    `<script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: 'x',
+      author,
+    })}</script>` +
+    `</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`;
+
+  const problemsFor = (author: unknown) =>
+    auditStructuredData('/blog/x', page(author)).map((p) => p.problem);
+
+  it('rejects the placeholder that shipped on every article', () => {
+    expect(problemsFor({ '@type': 'Person', name: 'Real Estate Expert' })).toContain(
+      'BlogPosting names its author "Real Estate Expert", which is a role rather than a person'
+    );
+  });
+
+  it('rejects the other placeholders in the same family', () => {
+    for (const name of ['Admin', 'The Team', 'Editorial Team', 'Anonymous', 'Guest Author']) {
+      expect(problemsFor({ '@type': 'Person', name }), `${name} should be rejected`).not.toEqual(
+        []
+      );
+    }
+  });
+
+  it('accepts an Organization author, which is what a company byline is', () => {
+    expect(
+      problemsFor({ '@type': 'Organization', name: 'AgentBio', url: 'https://agentbio.net' })
+    ).toEqual([]);
+  });
+
+  it('accepts a person who is a person', () => {
+    expect(problemsFor({ '@type': 'Person', name: 'Dana Okafor' })).toEqual([]);
+  });
+
+  it('rejects a Person with no name at all', () => {
+    expect(problemsFor({ '@type': 'Person', url: 'https://agentbio.net' })).toContain(
+      'BlogPosting has a Person author with no name'
+    );
+  });
+
+  it('does not object to an Organization named for a role', () => {
+    // "AgentBio Editorial Team" as an Organization is a real thing a company
+    // can be; the rule is about a Person who is not one.
+    expect(problemsFor({ '@type': 'Organization', name: 'Editorial Team' })).toEqual([]);
+  });
+});

@@ -2875,3 +2875,64 @@ here and ends up with an empty list either way.
   /blog                        input=""              
   /blog?search=Insights        input="Insights"      
   /blog?search=NoSuchArticle   input="NoSuchArticle" 
+
+## SEO loop — iteration 11/15 — US-180: every article written by nobody
+
+Started with a broad count of structured-data types across the 59 built pages,
+looking for whatever was left. Three things came out of it, and only one
+survived checking.
+
+WHAT SURVIVED. Every article carried:
+
+    author: { '@type': 'Person', name: 'Real Estate Expert', url: siteUrl }
+
+"Real Estate Expert" is a job description. It was the default value of
+ArticleSEO's `author` prop, so it was on every article the blog has ever
+published, and it went out five more ways: meta author, article:author,
+citation_author, twitter:creator, and a visible byline in BlogArticle.tsx
+wrapped in itemProp="author" itemType="https://schema.org/Person".
+
+Two things wrong with it beyond the name. The `url` pointed at the site root
+rather than at any author page, so the Person is a human whose home page is a
+marketing site. And twitter:creator takes an @handle, not a name, so that tag
+was invalid as well as untrue.
+
+Article.author is what Google reads to decide who stands behind a piece. A
+Person who does not exist is the invented-testimonial defect of US-159 and
+US-173, in the field where it counts most.
+
+THE FIX IS NOT A WORKAROUND. An Organization author is a real thing: the
+company published these, and schema.org has the type for exactly that. So an
+article with no known author is attributed to AgentBio, in the schema, in the
+meta tags and in the byline, with the microdata changed to Organization to
+match. The `author` prop stays, so a real name can be passed the moment there
+is one — articles.author_id exists, and resolving it is US-181.
+
+THE GUARD, in seo-audit.mjs: a Person author whose name matches a short literal
+list of roles — expert, team, staff, editor, admin, author, writer, anonymous,
+guest — is a placeholder nobody replaced. An Organization named "Editorial
+Team" is fine and the rule says so; the point is not to police names, it is to
+catch a default that shipped.
+
+    /blog/insights-two  BlogPosting names its author "Real Estate Expert",
+                        which is a role rather than a person
+    /blog/tips-one      same
+
+Two here because this build has two placeholder articles; in production it is
+every article on the blog.
+
+WHAT DID NOT SURVIVE CHECKING, which is the part worth recording. The same
+scan reported 26 pages with duplicate Organization nodes and 4 with duplicate
+WebPage nodes. Both looked like the duplicate-BreadcrumbList defect from
+iteration 3. Neither was: the Organization pairs are `publisher` and `provider`
+references carrying the same @id, which is correct JSON-LD for referring to one
+node twice, and most of the WebPage pairs are mainEntityOfPage references doing
+the same. Counting @type occurrences is not counting entities.
+
+One real residue: /features/lead-capture and /features/analytics each emit two
+WebPage nodes with NO @id, so nothing can tell they describe the same page.
+That is untidy rather than false, so it is US-182 rather than part of this.
+
+Also added /logo.png to the audit's known-image sizes, so the Organization logo
+US-178 corrected is now checked against the file by the build as well as by the
+unit test.

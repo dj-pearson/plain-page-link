@@ -158,7 +158,23 @@ const DELIBERATE_NON_PATH_PARENTS = [
  * declarations rather than an import because this module is plain node with no
  * bundler, and the test on the other side is what keeps them honest.
  */
-const KNOWN_IMAGE_SIZES = new Map([['/Cover.png', { width: 1536, height: 1024 }]]);
+const KNOWN_IMAGE_SIZES = new Map([
+  ['/Cover.png', { width: 1536, height: 1024 }],
+  ['/logo.png', { width: 946, height: 436 }],
+]);
+
+/**
+ * Names that describe a role instead of naming a person.
+ *
+ * 'Real Estate Expert' was the default author on every article. The list is
+ * deliberately short and literal — the point is not to police names, it is to
+ * catch a placeholder that was never replaced.
+ */
+const GENERIC_AUTHOR_NAMES = [
+  /^(real estate|seo|marketing|content|industry)?\s*(expert|team|staff|editor|admin|author|writer)$/i,
+  /^(the )?(agentbio )?(team|staff|editorial team)$/i,
+  /^(guest|anonymous|unknown)( author)?$/i,
+];
 
 function knownSizeFor(url) {
   if (!url || typeof url !== 'string') return null;
@@ -211,6 +227,30 @@ export function auditStructuredData(route, html) {
         }
         if (!count || count === 'undefined') {
           problems.push(`aggregateRating on ${type} has no reviewCount`);
+        }
+      }
+
+      // An author who is a job description rather than a person (US-180).
+      //
+      // Article.author is what Google reads to decide who stands behind a
+      // piece. Every article shipped `author: { '@type': 'Person', name:
+      // 'Real Estate Expert' }` — a role, presented as a named human, with a
+      // url pointing at the site root rather than at any author page. That is
+      // the invented-testimonial defect in the field where it counts most.
+      //
+      // An Organization author is fine and often correct: the company
+      // published it. A Person has to be someone.
+      if (node.author && typeof node.author === 'object' && !Array.isArray(node.author)) {
+        const author = node.author;
+        const name = typeof author.name === 'string' ? author.name.trim() : '';
+        if (author['@type'] === 'Person') {
+          if (!name) {
+            problems.push(`${type} has a Person author with no name`);
+          } else if (GENERIC_AUTHOR_NAMES.some((generic) => generic.test(name))) {
+            problems.push(
+              `${type} names its author "${name}", which is a role rather than a person`
+            );
+          }
         }
       }
 

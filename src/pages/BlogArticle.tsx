@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { SEO_CONFIG } from '@/config/seo.config';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -193,14 +194,19 @@ export default function BlogArticle() {
 
             {/* Author and Date Info - Semantic markup for AI */}
             <div className="flex flex-wrap items-center gap-6 text-muted-foreground mb-8">
+              {/* The byline said "Real Estate Expert", marked up as a
+                  schema.org/Person — a job description presented as a named
+                  author, on every article. The organisation is who actually
+                  published these, and saying so is both true and a type
+                  schema.org has for it (US-180). */}
               <div
                 className="flex items-center gap-2"
                 itemProp="author"
                 itemScope
-                itemType="https://schema.org/Person"
+                itemType="https://schema.org/Organization"
               >
-                <User className="h-4 w-4" />
-                <span itemProp="name">Real Estate Expert</span>
+                <User className="h-4 w-4" aria-hidden="true" />
+                <span itemProp="name">{SEO_CONFIG.siteName}</span>
               </div>
               {article.published_at && (
                 <div className="flex items-center gap-2">

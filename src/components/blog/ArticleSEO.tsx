@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { X_HANDLE } from '@/config/social-profiles';
 import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
 import { getBaseUrl } from '@/config/seo.config';
 
@@ -9,6 +10,7 @@ interface ArticleSEOProps {
   imageUrl?: string;
   publishedTime?: string;
   modifiedTime?: string;
+  /** A real person's name, when one is known. Omitted means the organisation. */
   author?: string;
   tags?: string[];
   category?: string;
@@ -23,7 +25,21 @@ export function ArticleSEO({
   imageUrl,
   publishedTime,
   modifiedTime,
-  author = 'Real Estate Expert',
+  /**
+   * Who wrote this.
+   *
+   * The default was 'Real Estate Expert' — a job description, not a person —
+   * shipped as `author: { '@type': 'Person', name: ... }` on every article,
+   * with a `url` pointing at the site root rather than at any author page.
+   * Google reads Article.author to assess who stands behind a piece, and a
+   * Person who does not exist is the same defect as an invented testimonial,
+   * in the field where it counts most (US-180).
+   *
+   * Undefined means the organisation published it, which is true and is what
+   * schema.org's Organization author is for. Pass a real name when there is
+   * one to pass; `articles.author_id` exists and resolving it is US-181.
+   */
+  author,
   tags = [],
   category = 'Real Estate',
   wordCount,
@@ -59,11 +75,9 @@ export function ArticleSEO({
     },
     datePublished: publishedTime,
     dateModified: modifiedTime || publishedTime,
-    author: {
-      '@type': 'Person',
-      name: author,
-      url: siteUrl,
-    },
+    author: author
+      ? { '@type': 'Person', name: author }
+      : { '@type': 'Organization', name: siteName, url: siteUrl },
     publisher: {
       '@type': 'Organization',
       name: siteName,
@@ -179,7 +193,9 @@ export function ArticleSEO({
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={socialImage} />
-      <meta name="twitter:creator" content={author} />
+      {/* twitter:creator takes an @handle, not a name; it was carrying
+          "Real Estate Expert" (US-180). */}
+      <meta name="twitter:creator" content={X_HANDLE} />
       <meta name="twitter:label1" content="Reading time" />
       {readingTime && <meta name="twitter:data1" content={readingTime} />}
 
@@ -196,15 +212,15 @@ export function ArticleSEO({
       <meta name="googlebot-news" content="snippet" />
 
       {/* Additional metadata for AI comprehension */}
-      <meta property="article:author" content={author} />
-      <meta name="author" content={author} />
+      <meta property="article:author" content={author ?? siteName} />
+      <meta name="author" content={author ?? siteName} />
       <meta name="article:content_tier" content="free" />
       <meta name="language" content="English" />
       <meta httpEquiv="content-language" content="en-US" />
 
       {/* Perplexity and AI search hints */}
       <meta name="citation_title" content={title} />
-      <meta name="citation_author" content={author} />
+      <meta name="citation_author" content={author ?? siteName} />
       {publishedTime && <meta name="citation_publication_date" content={publishedTime} />}
       <meta name="citation_language" content="en" />
 
