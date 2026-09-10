@@ -115,6 +115,62 @@ describe('GET /:username', () => {
     expect(html).not.toContain('Cover.png');
   });
 
+  /**
+   * US-202: the URL on the business card unfurled as nothing.
+   *
+   * US-187 made the SPA resolve /JaneDoe case-insensitively and the database
+   * refuse to store a non-canonical username. This function was not part of
+   * that change and queried PostgREST with `username=eq.<segment>` exactly, so
+   * a crawler fetching the capitalised URL found no row and got a hard 404 —
+   * while a human opening the very same URL got the page. The link worked in a
+   * browser and produced no unfurl at all on Facebook, iMessage or LinkedIn.
+   */
+  describe('a username typed the way a person writes it', () => {
+    it('looks the profile up by its canonical form', async () => {
+      const { promise } = call({ path: '/JaneDoe', username: 'JaneDoe' });
+      await promise;
+
+      const profileQuery = fetchMock.mock.calls
+        .map((c) => String(c[0]))
+        .find((u) => u.includes('/rest/v1/profiles'));
+      expect(profileQuery).toContain('username=eq.janedoe');
+      expect(profileQuery).not.toContain('JaneDoe');
+    });
+
+    it('does not answer 404 for a real agent whose handle was capitalised', async () => {
+      const { promise } = call({ path: '/JaneDoe', username: 'JaneDoe' });
+      const response = await promise;
+      expect(response.status).not.toBe(404);
+    });
+
+    it('sends the crawler to the one URL that is the page', async () => {
+      const { promise } = call({ path: '/JaneDoe?listing=abc', username: 'JaneDoe' });
+      const response = await promise;
+
+      expect(response.status).toBe(301);
+      expect(response.headers.get('location')).toBe('/janedoe?listing=abc');
+      expect(response.headers.get('x-agentbio-prerender')).toBe('canonical-redirect');
+    });
+
+    it('does not redirect a username that is already canonical', async () => {
+      const { promise } = call({ path: '/jane', username: 'jane' });
+      const response = await promise;
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('profile');
+    });
+
+    it('still 404s a capitalised handle that belongs to nobody', async () => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/rest/v1/profiles')) return Response.json([]);
+        return new Response(NOT_FOUND_HTML, {
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        });
+      });
+      const { promise } = call({ path: '/NoSuchAgent', username: 'NoSuchAgent' });
+      expect((await promise).status).toBe(404);
+    });
+  });
+
   it('leaves a person the SPA untouched, and does not query the database for them', async () => {
     const { promise, next } = call({ userAgent: HUMAN });
     const response = await promise;

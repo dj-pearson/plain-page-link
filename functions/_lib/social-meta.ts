@@ -123,6 +123,27 @@ const RESERVED_SEGMENTS = new Set([
   'favicon.ico',
 ]);
 
+/**
+ * The canonical form of a username (US-202).
+ *
+ * US-187 made the SPA resolve /JaneDoe case-insensitively and redirect to the
+ * canonical URL, and made the database refuse to store a non-canonical
+ * username. This function was not part of that change, and it queries
+ * PostgREST with `username=eq.<segment>` — exactly.
+ *
+ * So after US-187 a human who opens agentbio.net/JaneDoe gets the page, and a
+ * crawler who fetches the same URL gets a hard 404 from notFoundResponse(). The
+ * link on the business card works in a browser and produces no unfurl at all on
+ * Facebook, iMessage or LinkedIn, and tells Google the page does not exist.
+ *
+ * Deliberately identical to normalizeUsername in src/lib/username.ts. The two
+ * builds cannot import each other — this is a Cloudflare Pages Function — so
+ * social-meta.test.ts imports both and fails if they drift.
+ */
+export function normalizeUsername(raw: string | null | undefined): string {
+  return (raw ?? '').trim().toLowerCase();
+}
+
 export function isReservedSegment(segment: string): boolean {
   if (!segment) return true;
   // Anything with a file extension is an asset, not a profile.

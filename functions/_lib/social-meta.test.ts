@@ -5,12 +5,14 @@
  * Slack and LinkedIn never run.
  */
 import { describe, it, expect } from 'vitest';
+import { normalizeUsername as spaNormalizeUsername } from '../../src/lib/username';
 import {
   buildListingTags,
   buildProfileTags,
   injectSocialTags,
   isCrawler,
   isReservedSegment,
+  normalizeUsername,
   type ListingMeta,
   type ProfileMeta,
 } from './social-meta';
@@ -204,5 +206,30 @@ describe('injectSocialTags', () => {
     expect(injectSocialTags(INDEX, buildProfileTags(profile, ORIGIN))).toContain(
       'name="twitter:card" content="summary_large_image"'
     );
+  });
+});
+
+/**
+ * US-202: the same canonical form, on both sides of a build boundary.
+ *
+ * src/lib/username.ts decides what a username looks like for the SPA and for
+ * the database. This file decides it for the Cloudflare Pages Function that
+ * serves crawlers. They cannot import each other — different bundles, different
+ * runtimes — and when they disagreed, a human and a crawler fetching the same
+ * URL got different answers: the page, and a 404.
+ *
+ * Prose promising they match asserts nothing. This fails when they drift.
+ */
+describe('normalizeUsername agrees with the SPA (US-202)', () => {
+  it.each(['JaneDoe', 'jane', '  jane-doe  ', 'JANE_DOE', ''])(
+    'answers the same for %j',
+    (input) => {
+      expect(normalizeUsername(input)).toBe(spaNormalizeUsername(input));
+    }
+  );
+
+  it('answers the same for nothing at all', () => {
+    expect(normalizeUsername(null)).toBe(spaNormalizeUsername(null));
+    expect(normalizeUsername(undefined)).toBe(spaNormalizeUsername(undefined));
   });
 });

@@ -3165,6 +3165,22 @@
       "priority": 2,
       "passes": true,
       "notes": "Done in iteration 14. The guard earned itself immediately: it found a seventeenth site in ListingDescriptionGenerator that reading the scan output by hand had missed. The four declines are the point of the story — Login's two OAuth handlers (account enumeration), DashboardLayout's clipboard failure (NotAllowedError has no wording an agent can act on), and ZapierIntegrationModal, which was already specific and only needed the status code adding. A mechanical substitution would have got all four wrong."
+    },
+    {
+      "id": "US-202",
+      "title": "The URL on the business card unfurled as nothing",
+      "description": "As an agent who prints agentbio.net/JaneDoe on a card and pastes it into an Instagram bio, I need the link to produce my card when someone shares it, and I need search engines to be told which URL is the page.",
+      "acceptanceCriteria": [
+        "The Pages Function looks a profile up by the canonical username, not by the URL segment exactly",
+        "A non-canonical segment for a real agent answers 301 to the canonical URL, preserving the query string, so /JaneDoe and /janedoe are not two 200s with identical markup",
+        "A canonical username is not redirected",
+        "A capitalised handle that belongs to nobody is still a 404 — the fix must not turn a typo into a redirect loop or a 200",
+        "normalizeUsername exists on both sides of the build boundary and a test imports both and fails if they drift",
+        "The new tests are verified against the shipped function: eight fail there"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 15, and caused by iteration 1. US-187 made the SPA resolve /JaneDoe case-insensitively and the database refuse to store a non-canonical username; this Cloudflare Pages Function was not part of that change and still queried PostgREST with username=eq.<segment>. So after US-187 a human opening the capitalised URL got the page and a crawler fetching the identical URL got a hard 404 from notFoundResponse() — no unfurl on Facebook, iMessage or LinkedIn, and a 404 reported to Google for a page that plainly exists. The fix half of US-187 was correct; what it missed is that the truth had a third home."
     }
   ]
 }

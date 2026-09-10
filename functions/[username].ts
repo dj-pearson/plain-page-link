@@ -22,6 +22,7 @@ import {
   injectSocialTags,
   isCrawler,
   isReservedSegment,
+  normalizeUsername,
   type ListingMeta,
   type ProfileMeta,
 } from './_lib/social-meta';
@@ -115,10 +116,21 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
   }
 
   const raw = params.username;
-  const username = Array.isArray(raw) ? raw[0] : raw;
-  if (!username || isReservedSegment(username)) {
+  const segment = Array.isArray(raw) ? raw[0] : raw;
+  if (!segment || isReservedSegment(segment)) {
     return next();
   }
+
+  // Look the profile up by its canonical form (US-202).
+  //
+  // This queried PostgREST with the URL segment exactly. US-187 had already
+  // made the SPA resolve /JaneDoe case-insensitively and the database refuse to
+  // store a non-canonical username — so a crawler fetching the URL printed on
+  // an agent's business card got an empty result and a hard 404 from
+  // notFoundResponse(), while a human opening the same URL got the page. The
+  // link worked in a browser and produced no unfurl at all on Facebook,
+  // iMessage or LinkedIn.
+  const username = normalizeUsername(segment);
 
   const restUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
   const apiKey = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY;
@@ -158,6 +170,27 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
 
   const url = new URL(request.url);
   const origin = url.origin;
+
+  // One profile, one URL — for a crawler too.
+  //
+  // The SPA rewrites a non-canonical slug in the address bar, but a crawler
+  // does not run it. Without this, /JaneDoe and /janedoe would both answer 200
+  // with identical markup, which is a duplicate every search engine has to
+  // crawl and reconcile. A 301 says which one is the page, and is the same
+  // answer the SPA gives a person.
+  if (segment !== username) {
+    const canonical = new URL(url.toString());
+    canonical.pathname = `/${encodeURIComponent(username)}`;
+    return new Response(null, {
+      status: 301,
+      headers: {
+        location: canonical.pathname + canonical.search,
+        'cache-control': 'public, max-age=0, s-maxage=300',
+        'x-agentbio-prerender': 'canonical-redirect',
+      },
+    });
+  }
+
   let tags = buildProfileTags(profile, origin);
 
   const listingId = url.searchParams.get('listing');
