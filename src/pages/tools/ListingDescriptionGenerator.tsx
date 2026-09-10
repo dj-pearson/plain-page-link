@@ -23,6 +23,7 @@ import { edgeFunctions } from '@/lib/edgeFunctions';
 import { PropertyDetails, GeneratedDescription, EmailCaptureData } from '@/lib/listing-description-generator/types';
 import { logger } from '@/lib/logger';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+import { userFacingError } from '@/lib/userFacingError';
 
 type FlowStep = 'intro' | 'form' | 'generating' | 'results';
 
@@ -127,7 +128,12 @@ export default function ListingDescriptionGenerator() {
       toast.success('Descriptions generated successfully!');
     } catch (error) {
       logger.error('Generation error', error as Error);
-      toast.error('Failed to generate descriptions. Please try again.');
+      toast.error(
+        userFacingError(error, {
+          subject: 'description',
+          fallback: 'Failed to generate descriptions. Please try again.',
+        })
+      );
       setCurrentStep('form');
     }
   };
@@ -180,7 +186,12 @@ export default function ListingDescriptionGenerator() {
       toast.success('Success! All 3 styles unlocked. Check your email for your complete guide!');
     } catch (error) {
       logger.error('Email capture error', error as Error);
-      toast.error('Failed to capture email. Please try again.');
+      toast.error(
+        userFacingError(error, {
+          subject: 'request',
+          fallback: 'Failed to capture email. Please try again.',
+        })
+      );
     }
   };
 

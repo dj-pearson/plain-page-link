@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { LISTING_STATUSES } from '@/lib/listingStatus';
+import { userFacingError } from '@/lib/userFacingError';
 
 interface QuickStatusUpdateProps {
   listingId: string;
@@ -72,7 +73,10 @@ export function QuickStatusUpdate({
       setStatus(currentStatus ?? 'active');
       toast({
         title: 'Update Failed',
-        description: 'Failed to update listing status. Please try again.',
+        description: userFacingError(error, {
+          subject: 'listing',
+          fallback: 'Failed to update listing status. Please try again.',
+        }),
         variant: 'destructive',
       });
     } finally {

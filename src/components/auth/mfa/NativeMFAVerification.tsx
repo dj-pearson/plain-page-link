@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, ShieldCheck, KeyRound } from 'lucide-react';
 import { useNativeMFA } from '@/hooks/useNativeMFA';
 import { logger } from '@/lib/logger';
+import { userFacingError } from '@/lib/userFacingError';
 
 interface NativeMFAVerificationProps {
   onSuccess: () => void;
@@ -53,7 +54,12 @@ export function NativeMFAVerification({ onSuccess, onCancel }: NativeMFAVerifica
       setMigration({ factorId: enrolled.factorId, uri: enrolled.totpUri });
     } catch (err) {
       logger.error('Could not start MFA migration', err as Error);
-      setError('Could not start re-enrolment. Please try again.');
+      setError(
+        userFacingError(err, {
+          subject: 'authenticator',
+          fallback: 'Could not start re-enrolment. Please try again.',
+        })
+      );
     }
   };
 

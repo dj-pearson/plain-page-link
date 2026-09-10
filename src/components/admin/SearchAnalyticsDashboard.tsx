@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { logger } from '@/lib/logger';
+import { userFacingError } from '@/lib/userFacingError';
 
 export function SearchAnalyticsDashboard() {
   const { toast } = useToast();
@@ -112,7 +113,10 @@ export function SearchAnalyticsDashboard() {
       logger.error('PDF export failed', error as Error);
       toast({
         title: 'Export failed',
-        description: 'Could not generate the PDF. Please try again.',
+        description: userFacingError(error, {
+          subject: 'export',
+          fallback: 'Could not generate the PDF. Please try again.',
+        }),
         variant: 'destructive',
       });
     }

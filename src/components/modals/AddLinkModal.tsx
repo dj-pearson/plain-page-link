@@ -48,6 +48,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { userFacingError } from '@/lib/userFacingError';
 
 const linkSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
@@ -330,7 +331,9 @@ export function AddLinkModal({ open, onOpenChange, onSave }: AddLinkModalProps) 
       setUrlDetected(false);
     } catch (err) {
       logger.error('Failed to add link', err);
-      setError('Failed to add link. Please try again.');
+      setError(
+        userFacingError(err, { subject: 'link', fallback: 'Failed to add link. Please try again.' })
+      );
     }
   };
 

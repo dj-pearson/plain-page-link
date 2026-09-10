@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useNativeMFA } from '@/hooks/useNativeMFA';
 import { logger } from '@/lib/logger';
+import { userFacingError } from '@/lib/userFacingError';
 
 /**
  * Enrol and remove a second factor (US-085).
@@ -36,7 +37,12 @@ export function NativeMFASettings() {
       setEnrollment({ factorId: data.factorId, uri: data.totpUri, secret: data.secret });
     } catch (err) {
       logger.error('MFA enrolment failed to start', err as Error);
-      setError('Could not start setup. Please try again.');
+      setError(
+        userFacingError(err, {
+          subject: 'authenticator',
+          fallback: 'Could not start setup. Please try again.',
+        })
+      );
     }
   };
 
@@ -61,7 +67,12 @@ export function NativeMFASettings() {
       await unenroll.mutateAsync(status.factorId);
     } catch (err) {
       logger.error('MFA unenrol failed', err as Error);
-      setError('Could not remove the authenticator. Please try again.');
+      setError(
+        userFacingError(err, {
+          subject: 'authenticator',
+          fallback: 'Could not remove the authenticator. Please try again.',
+        })
+      );
     }
   };
 

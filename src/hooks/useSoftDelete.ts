@@ -3,6 +3,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 // natively supports the { action: { label, onClick }, duration } shape this hook
 // relies on. The custom use-toast hook does not, so the Undo action never rendered.
 import { toast as sonnerToast } from 'sonner';
+import { userFacingError } from '@/lib/userFacingError';
 
 interface DeleteQueueItem<T> {
   id: string;
@@ -113,7 +114,10 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
         } catch (error) {
           // Show error toast
           sonnerToast.error('Deletion failed', {
-            description: `Failed to delete ${resourceName}. Please try again.`,
+            description: userFacingError(error, {
+              subject: resourceName,
+              fallback: `Failed to delete ${resourceName}. Please try again.`,
+            }),
           });
 
           // Remove from queue on error
@@ -215,7 +219,10 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
         });
       } catch (error) {
         sonnerToast.error('Deletion failed', {
-          description: `Failed to delete ${resourceName}. Please try again.`,
+          description: userFacingError(error, {
+            subject: resourceName,
+            fallback: `Failed to delete ${resourceName}. Please try again.`,
+          }),
         });
       }
     },

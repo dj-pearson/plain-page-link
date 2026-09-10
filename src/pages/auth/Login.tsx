@@ -158,6 +158,13 @@ export default function Login() {
       await signInWithGoogle();
     } catch (error) {
       logger.error('Google sign-in failed', error as Error);
+      // Deliberately vague, and not an oversight (US-201).
+      //
+      // An OAuth failure carries provider text — "user not found", "account
+      // not linked" — that tells an attacker probing addresses whether an
+      // account exists. The rest of the platform now says what went wrong;
+      // sign-in is the one place where saying less is the feature. The detail
+      // is logged above, where only we can read it.
       toast({
         title: 'Google Sign-In Failed',
         description: 'Unable to sign in with Google. Please try again or use email/password.',
@@ -171,6 +178,13 @@ export default function Login() {
       await signInWithApple();
     } catch (error) {
       logger.error('Apple sign-in failed', error as Error);
+      // Deliberately vague, and not an oversight (US-201).
+      //
+      // An OAuth failure carries provider text — "user not found", "account
+      // not linked" — that tells an attacker probing addresses whether an
+      // account exists. The rest of the platform now says what went wrong;
+      // sign-in is the one place where saying less is the feature. The detail
+      // is logged above, where only we can read it.
       toast({
         title: 'Apple Sign-In Failed',
         description: 'Unable to sign in with Apple. Please try again or use email/password.',

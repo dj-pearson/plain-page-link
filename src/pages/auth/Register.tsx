@@ -27,6 +27,7 @@ import { OTPInput } from '@/components/auth/OTPInput';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { userFacingError } from '@/lib/userFacingError';
 
 const registerSchema = z
   .object({
@@ -184,7 +185,13 @@ export default function Register() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to resend code. Please try again.',
+        description: userFacingError(error, {
+          subject: 'code',
+          // Supabase answers a too-soon resend with "For security purposes,
+          // you can only request this after N seconds" — the one thing the
+          // person needs, and the one thing this used to hide (US-201).
+          fallback: 'Failed to resend code. Please try again.',
+        }),
         variant: 'destructive',
       });
     }

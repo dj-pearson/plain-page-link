@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Star, Upload, X } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { userFacingError } from '@/lib/userFacingError';
 
 const testimonialSchema = z.object({
   clientName: z.string().min(2, 'Client name must be at least 2 characters'),
@@ -90,7 +91,12 @@ export function AddTestimonialModal({ open, onOpenChange, onSave }: AddTestimoni
       setPhotoPreview(null);
     } catch (err) {
       logger.error('Failed to add testimonial', err);
-      setError('Failed to add testimonial. Please try again.');
+      setError(
+        userFacingError(err, {
+          subject: 'testimonial',
+          fallback: 'Failed to add testimonial. Please try again.',
+        })
+      );
     }
   };
 

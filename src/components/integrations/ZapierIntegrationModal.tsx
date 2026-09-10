@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProfile } from '@/hooks/useProfile';
 import { Loader2, CheckCircle, XCircle, Zap, AlertCircle, ExternalLink } from 'lucide-react';
 import { validateWebhookUrl } from '@/lib/webhookUrl';
+import { userFacingError } from '@/lib/userFacingError';
 
 interface ZapierIntegrationModalProps {
   open: boolean;
@@ -124,7 +125,14 @@ export function ZapierIntegrationModal({ open, onOpenChange }: ZapierIntegration
       setTestResult('error');
       toast({
         title: 'Test failed',
-        description: 'Could not reach your webhook. Check the URL and try again.',
+        // Already specific and already actionable — the sentence names the
+        // thing to check. What it was missing is the status code, which is the
+        // difference between a wrong URL and a Zap that is switched off
+        // (US-201).
+        description: userFacingError(error, {
+          subject: 'webhook',
+          fallback: 'Could not reach your webhook. Check the URL and try again.',
+        }),
         variant: 'destructive',
       });
     } finally {

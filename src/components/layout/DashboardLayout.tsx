@@ -63,6 +63,10 @@ export default function DashboardLayout() {
       }
     } catch (error) {
       logger.error('Failed to copy/share profile URL', error);
+      // Left generic on purpose (US-201). A clipboard write fails because the
+      // browser blocked it or the page is not in a secure context; neither has
+      // a wording the agent can act on, and the NotAllowedError text is worse
+      // than the sentence below.
       toast({
         title: 'Failed to copy',
         description: 'Please try again',

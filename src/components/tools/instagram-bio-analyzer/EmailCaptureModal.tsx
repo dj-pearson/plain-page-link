@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MARKETING_COPY } from '@/config/marketing-claims';
+import { userFacingError } from '@/lib/userFacingError';
 
 interface EmailCaptureModalProps {
   isOpen: boolean;
@@ -65,7 +66,12 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
       await onSubmit(captureData);
       toast.success('Success! Your full analysis is now unlocked 🎉');
     } catch (error) {
-      toast.error('Something went wrong. Please try again.');
+      toast.error(
+        userFacingError(error, {
+          subject: 'analysis',
+          fallback: 'Something went wrong. Please try again.',
+        })
+      );
     } finally {
       setIsSubmitting(false);
     }

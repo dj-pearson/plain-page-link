@@ -38,6 +38,7 @@ import {
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+import { userFacingError } from '@/lib/userFacingError';
 
 const FAQ_ENTRIES: FaqEntry[] = [
   {
@@ -123,7 +124,12 @@ export default function InstagramBioAnalyzer() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       logger.error('Analysis error', error as Error);
-      toast.error('Something went wrong. Please try again.');
+      toast.error(
+        userFacingError(error, {
+          subject: 'analysis',
+          fallback: 'Something went wrong. Please try again.',
+        })
+      );
     } finally {
       setIsAnalyzing(false);
     }

@@ -3156,14 +3156,15 @@
       "title": "The remaining twenty try-again messages",
       "description": "As a user anywhere else in the platform, I need the same honesty about failure that the dashboard's six surfaces now have.",
       "acceptanceCriteria": [
-        "The remaining catch blocks route through userFacingError with a subject and the existing sentence as the fallback",
-        "Each one is read before it is changed: some are legitimately generic and should keep their wording, and the point is to decide rather than to substitute mechanically",
-        "The auth pages are treated carefully — a sign-in failure must not distinguish 'no such account' from 'wrong password'",
-        "A guard test keeps new try-again-only catch blocks from appearing"
+        "Each of the twenty was read before it was changed; sixteen now route through userFacingError with a subject and their existing sentence as the fallback",
+        "Four are deliberate declines, each with the reason written where the next reader will find it",
+        "Login's two OAuth handlers stay vague on purpose: provider text reveals whether an account exists, and sign-in is the one place where saying less is the feature",
+        "A source-level guard fails on any new catch block that says 'try again' without reading the error, with the two deliberate cases named and justified in DELIBERATELY_VAGUE",
+        "The guard is verified by planting a real offender and watching it fail"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "NEXT ITERATION. The twenty are in SearchAnalyticsDashboard, AddTestimonialModal, AddLinkModal, NativeMFASettings (2), NativeMFAVerification, DashboardLayout, ZapierIntegrationModal, both tools' EmailCaptureModal, QuickStatusUpdate, useSoftDelete (2), Login (2), Register, ListingDescriptionGenerator (2) and InstagramBioAnalyzer. Login and Register are the ones to think hardest about: there, a vague message is a deliberate security property, not an oversight, and the fix is to leave them alone and say so."
+      "passes": true,
+      "notes": "Done in iteration 14. The guard earned itself immediately: it found a seventeenth site in ListingDescriptionGenerator that reading the scan output by hand had missed. The four declines are the point of the story — Login's two OAuth handlers (account enumeration), DashboardLayout's clipboard failure (NotAllowedError has no wording an agent can act on), and ZapierIntegrationModal, which was already specific and only needed the status code adding. A mechanical substitution would have got all four wrong."
     }
   ]
 }
