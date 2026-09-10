@@ -35,6 +35,13 @@ const ALLOWED_FILES = [
   'components/tools/listing-description-generator/EmailCaptureModal.tsx',
   // Describes what the testimonial widget can display, not our rating.
   'pages/features/Testimonials.tsx',
+  // Blog FAQ copy about the housing market — "school districts command premium
+  // prices (10-20% higher)", "FSBO sells for about 10% higher with an agent".
+  // These are claims about real estate, not about AgentBio, and the rules here
+  // are for the second kind. Editorial accuracy is a different job with a
+  // different check; conflating them would either exempt product claims or ban
+  // the blog from citing a figure (US-173).
+  'pages/BlogCategory.tsx',
   // This file.
   'marketing-claims.test.ts',
 ];
@@ -67,6 +74,43 @@ const RULES: { rule: string; pattern: RegExp }[] = [
   {
     rule: 'another company named as a customer',
     pattern: /\b(Keller Williams|Coldwell Banker|RE\/MAX|eXp Realty)\b/,
+  },
+  // --- US-173 -------------------------------------------------------------
+  // The rules above are the shapes US-111, US-156, US-157 and US-159 found.
+  // They caught none of the following, which were live the whole time:
+  //   "ML-scored leads convert 2x better. Agents save 5+ hours per week.
+  //    Close deals 30% faster."          — HeroSection's default description
+  //   "3-5x higher conversion rates"     — /vs/later, five times, including
+  //                                        the meta description and a FAQPage
+  //                                        answer Google renders as a rich result
+  //   "Profiles with property listings get 3x more leads"   — dashboard widget
+  //   "Video testimonials are 10x more powerful than text"  — /features/testimonials
+  //   "73% of agents make the same mistake"                 — email drip
+  // A number attached to an outcome is a measurement. If there is no query
+  // behind it, it is not a measurement, whatever units it is in.
+  {
+    rule: 'a performance multiplier with no measurement behind it',
+    pattern:
+      /\b[0-9]+(?:\.[0-9]+)?(?:\s*[-–]\s*[0-9]+(?:\.[0-9]+)?)?x\s+(more|higher|better|faster|greater|as many)\b/i,
+  },
+  {
+    rule: 'a percentage improvement nobody measured',
+    pattern:
+      /\b[0-9]+(?:\.[0-9]+)?%\s+(more|higher|better|faster|fewer|less|of agents|of realtors)\b/i,
+  },
+  {
+    rule: 'time saved, stated as if it had been timed',
+    pattern: /\b[0-9]+\+?\s*(?:[-–]\s*[0-9]+\s*)?hours?\s+(?:a|per)\s+week\b/i,
+  },
+  // US-159 removed the names under three quotes on the listing generator and
+  // left the quotes. An invented testimonial with the name taken off is not
+  // fixed; it reads as real feedback somebody chose not to attribute. And its
+  // own attribution rule wanted an em-dash, so the two named testimonials on
+  // /features/calendar-booking — "Jessica T., Luxury Agent, Scottsdale AZ" —
+  // went untouched, because that markup puts the name in its own <p>.
+  {
+    rule: 'a testimonial attributed to a first-name-plus-initial, with or without a dash',
+    pattern: />\s*[A-Z][a-z]+\s+[A-Z]\.\s*</,
   },
 ];
 

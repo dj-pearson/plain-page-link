@@ -115,7 +115,8 @@ export function InsightsWidget({
       type: 'warning',
       title: 'Add your first listing',
       description:
-        "Profiles with property listings get 3x more leads. Showcase what you're selling!",
+        // Was "get 3x more leads" — a measurement with no query behind it (US-173).
+        'A profile with listings on it gives a visitor something to enquire about.',
       action: {
         label: 'Add listing',
         href: '/dashboard/listings',
@@ -127,7 +128,9 @@ export function InsightsWidget({
       type: 'tip',
       title: 'Add more listings',
       description:
-        'Agents with 5+ listings convert 40% better. Add more properties to build credibility.',
+        // Was "convert 40% better" — the second invented multiplier in this
+        // one widget (US-173).
+        'A profile with one listing looks new. Several looks like a working agent.',
       action: {
         label: 'Add listings',
         href: '/dashboard/listings',

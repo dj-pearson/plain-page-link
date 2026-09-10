@@ -2745,6 +2745,35 @@
       "priority": "medium",
       "passes": true,
       "notes": "Done 2026-09-10, iteration 4 of the SEO loop. Bigger than the story as written in iteration 3, which framed it as tidiness: the point is not that a helper exists, it is that a preview deploy could self-canonicalise the entire site. The prerender's origin rewrite turned out to be silently loadbearing, so it now counts and reports what it moved. Measured against real builds: 671 preview-server URLs across all 58 pages before, 0 after. The counter earned its place immediately \u2014 after the first sweep it still found 7 on the homepage, which the sweep had missed. Stripe return URLs, OAuth redirectTo and the dashboard's copy-your-link UI keep window.location.origin deliberately: those want the host the user is actually on."
+    },
+    {
+      "id": "US-173",
+      "title": "The performance claims US-159 could not see: multipliers, percentages and testimonials without a dash",
+      "description": "US-159 was the third sweep for fabricated marketing copy and it left a whole class behind, because its guard bans strings and shapes it had already seen. Live afterwards: HeroSection's default description ended 'ML-scored leads convert 2x better. Agents save 5+ hours per week. Close deals 30% faster.'; /vs/later said '3-5x higher conversion rates' five times, including in its meta description and in a FAQPage answer Google renders as a rich result; the dashboard insights widget told agents 'profiles with property listings get 3x more leads' and 'agents with 5+ listings convert 40% better'; /features/testimonials said video testimonials are '10x more powerful than text'; the email drip's subject line was 'The Instagram bio mistake 73% of agents make'. None has a query behind it. Separately, US-159 deleted the names under three quotes on the listing generator and left the quotes, and its attribution rule wanted an em-dash, so two named testimonials on /features/calendar-booking \u2014 'Jessica T., Luxury Agent, Scottsdale AZ' and 'Marcus L., Team Leader, Denver CO' \u2014 were never touched.",
+      "acceptanceCriteria": [
+        "No page, component default, email template or tool output states a performance multiplier, a percentage improvement or an amount of time saved that no query can produce",
+        "No fabricated testimonial remains, attributed or anonymised",
+        "The Instagram bio analyzer stops comparing the reader to a population it has never measured, and stops making a comparative claim about a named competitor",
+        "src/marketing-claims.test.ts gains rules for the shapes rather than the strings, and they are demonstrated finding something the previous rules missed",
+        "Claims about the housing market in blog copy are out of scope and the reason is written down"
+      ],
+      "priority": "high",
+      "passes": true,
+      "notes": "Done 2026-09-10, iteration 5 of the SEO loop. Standing authorisation from Dj at US-159: 'No fabricated text, we need to remove false claims and false testimonies.' The new rules earned their place on the first run: they found two claims inside the bio analyzer's scoring output that no reading had spotted \u2014 'AgentBio captures 3X more leads than Linktree for agents', an unsubstantiated comparative claim about a named competitor delivered as the tool's own advice, and 'top performers in your area score 50+ points higher, which translates to 3-5X more leads', which invents both a local benchmark and a conversion rate for a deterministic six-check rubric. This is the fourth sweep; each previous one was thorough and each missed instances, which is the argument for rules over readings."
+    },
+    {
+      "id": "US-174",
+      "title": "og:image declares 1200x630 for an image that is 1536x1024",
+      "description": "Every one of the 58 prerendered pages carries the same og:image, https://agentbio.net/Cover.png, with og:image:width 1200 and og:image:height 630 hardcoded beside it. The file is 1536x1024 \u2014 a 1.5 aspect ratio where the declaration claims 1.905. Facebook, LinkedIn, Slack and X use the declared dimensions to reserve layout before the image loads, so the unfurl reserves a shape the image does not have. The file is also 591 KB where a 91 KB Cover.webp sits next to it unused.",
+      "acceptanceCriteria": [
+        "The declared og:image dimensions match the file, or the file is remade at the declared size",
+        "The value is derived from one place rather than hardcoded next to the URL",
+        "A check fails if they diverge again",
+        "Decide whether pages that have their own subject \u2014 the three tools, the comparisons, blog articles \u2014 should carry their own og:image rather than one cover for all 58"
+      ],
+      "priority": "medium",
+      "passes": false,
+      "notes": "Found 2026-09-10 during the iteration 5 survey, by reading the PNG header rather than trusting the tag. Not fixed there because it needs an image decision, not a code one: either regenerate Cover.png at 1200x630 (losing the top and bottom of the current composition) or declare 1536x1024. The second is free and correct today; the first is what the social platforms actually want. The per-page og:image question is the bigger half and is why this is not a one-line fix."
     }
   ]
 }

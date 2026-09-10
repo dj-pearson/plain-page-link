@@ -2375,3 +2375,88 @@ THE GUARD, two tests:
 
 VERIFICATION: tsc clean, 58 pages, 29 sitemap URLs all reachable, verify:seo
 green, 671 -> 0 against real builds.
+
+## SEO loop — iteration 5/15 — US-173: the claims US-159 could not see
+
+This iteration started as a broad survey of the shipped HTML rather than a
+story from the backlog: title and description lengths, h1 counts, heading
+skips, og:image coverage, alt text. Most of it came back clean or trivial —
+9 indexable pages with titles over 60 characters, one over 65. What the survey
+actually turned up was a meta description on /vs/later reading "convert 3-5x
+more leads than Later's generic link in bio tool".
+
+US-159, eight stories ago, was the THIRD sweep for fabricated marketing copy
+and shipped a guard to stop a fourth being needed. This is the fourth.
+
+WHY THE GUARD DID NOT CATCH IT. Its rules encode the shapes the previous three
+sweeps found: a named testimonial with an em-dash, a customer count, an x/5 star
+rating, closings and sales figures, a competitor named as a customer. Nothing
+about multipliers. So all of this was live:
+
+  HeroSection.tsx, the default description of the component every marketing
+  page renders:
+      "ML-scored leads convert 2x better. Agents save 5+ hours per week.
+       Close deals 30% faster."
+  /vs/later, five times — body copy, a comparison card, the meta description,
+  the on-page FAQ, and the FAQPage JSON-LD answer Google renders as a rich
+  result:
+      "3-5x higher conversion rates"
+  The dashboard insights widget, telling paying agents:
+      "Profiles with property listings get 3x more leads"
+      "Agents with 5+ listings convert 40% better"
+  /features/testimonials:
+      "Video testimonials convert 2x better than text"
+      "Video testimonials are 10x more powerful than text"
+  The bio analyzer email drip, as a subject line:
+      "The Instagram bio mistake 73% of agents make"
+
+A number attached to an outcome is a measurement. If there is no query behind
+it, it is not a measurement, whatever units it is in.
+
+THE TESTIMONIALS US-159 HALF-FIXED. On the listing description generator it
+deleted the names under three quotes and left the quotes:
+
+      "My listings get 3x more engagement since using the family-friendly
+       style. Game changer."
+      {/* "— Jennifer L., Denver" removed (US-159). */}
+
+Taking the name off an invented testimonial does not make it true. It makes it
+anonymous, and an anonymous one reads as real feedback somebody chose not to
+attribute. All three removed.
+
+And because that rule wanted an em-dash, an entire section on
+/features/calendar-booking — "What Agents Say About Automated Booking", two
+testimonials attributed to "Jessica T., Luxury Agent, Scottsdale AZ" and
+"Marcus L., Team Leader, Denver CO" — was never looked at. That markup puts the
+name in its own <p> with no dash. Removed, and the rule now matches the shape.
+
+WHAT THE NEW RULES FOUND BY THEMSELVES, on their first run, in a file no reading
+had gone near — src/lib/instagram-bio-analyzer/scoring.ts, which produces the
+personalised result the tool shows a user:
+
+    "AgentBio captures 3X more leads than Linktree for agents"
+
+  An unsubstantiated comparative claim about a named competitor, delivered as
+  the tool's own advice. That is the most exposed form this defect takes.
+
+    "Top performers in your area score 50+ points higher, which translates to
+     3-5X more leads."
+
+  Every branch of getCompetitiveComparison() compared the reader to a
+  population the tool has never measured — "the top 5% of agents on Instagram",
+  "top agents in your market", "in your area". There is no corpus of agent bios,
+  no market segmentation and no lead data. It is a deterministic rubric of six
+  checks, so it now says which of the six the bio is missing, which is the thing
+  it actually knows.
+
+OUT OF SCOPE, deliberately and in writing: BlogCategory's FAQ copy says school
+districts "command premium prices (10-20% higher)". That is a claim about the
+housing market, not about AgentBio. Editorial accuracy is a different job with a
+different check, and conflating them would either exempt product claims or ban
+the blog from citing a figure. It is in ALLOWED_FILES with that reason.
+
+THE PATTERN WORTH NAMING. Four sweeps now, each thorough, each missing
+instances. The first three looked; this one and US-159 wrote rules. The
+difference showed up immediately — the rules found two claims in a file nobody
+had thought to open. A reading finds what you look at. A rule finds what is
+there.

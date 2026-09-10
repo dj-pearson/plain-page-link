@@ -341,7 +341,7 @@ export default function InstagramBioAnalyzer() {
             <div className="bg-white border-b border-gray-200 py-8">
               <div className="container max-w-4xl mx-auto px-4">
                 <p className="text-base md:text-lg text-gray-700 leading-relaxed">
-                  <strong>The Instagram Bio Analyzer is a free tool designed specifically for real estate agents to evaluate and optimize their Instagram bio for maximum lead generation.</strong> In 60 seconds, you'll receive an effectiveness score (0-100) based on six key factors—clarity, call-to-action strength, keyword optimization, link strategy, credibility signals, and mobile readability—plus three professionally rewritten bio versions tailored to your market and experience level. Top-performing agent bios score 85+ and convert 3x more Instagram followers into qualified buyer and seller leads compared to generic, unoptimized bios.
+                  <strong>The Instagram Bio Analyzer is a free tool designed specifically for real estate agents to evaluate and optimize their Instagram bio for maximum lead generation.</strong> In 60 seconds, you'll receive an effectiveness score (0-100) based on six key factors—clarity, call-to-action strength, keyword optimization, link strategy, credibility signals, and mobile readability—plus three professionally rewritten bio versions tailored to your market and experience level. A bio scoring in the 80s says who you help, where, and what to do next; a bio in the 40s usually says none of the three.
                 </p>
               </div>
             </div>

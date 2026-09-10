@@ -326,42 +326,20 @@ export default function CalendarBooking() {
           </div>
         </section>
 
-        {/* Real Agent Results */}
-        <section className="py-20 bg-background/50">
-          <div className="container mx-auto px-4">
-            <header className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">What Agents Say About Automated Booking</span>
-              </h2>
-            </header>
+        {/* An entire "What Agents Say About Automated Booking" section stood here:
+            two testimonials attributed to "Jessica T., Luxury Agent, Scottsdale AZ"
+            and "Marcus L., Team Leader, Denver CO", quoting "2-3 hours per week
+            playing phone tag" and "2-3 appointments already scheduled".
 
-            <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
-              <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                <p className="glass-body italic mb-4">
-                  "I used to spend 2-3 hours per week playing phone tag just to schedule showings.
-                  Now buyers book themselves and I show up. It's that simple. Calendar booking alone
-                  is worth the AgentBio subscription."
-                </p>
-                <div>
-                  <p className="text-sm font-light text-foreground">Jessica T.</p>
-                  <p className="text-xs text-muted-foreground">Luxury Agent, Scottsdale AZ</p>
-                </div>
-              </div>
+            Neither agent exists. US-159 swept the site for exactly this and
+            missed it, because its guard matched an em-dash attribution
+            ("— Jessica T.") and this markup puts the name in its own <p> with no
+            dash. The rule now matches the shape rather than the punctuation
+            (US-173).
 
-              <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                <p className="glass-body italic mb-4">
-                  "The best part? I get showings booked at 9pm, 11pm, whenever buyers are scrolling
-                  Instagram. They see a listing, book a showing immediately. I wake up to 2-3
-                  appointments already scheduled."
-                </p>
-                <div>
-                  <p className="text-sm font-light text-foreground">Marcus L.</p>
-                  <p className="text-xs text-muted-foreground">Team Leader, Denver CO</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+            Nothing replaces it. There is a testimonials feature that reads real
+            rows from the `testimonials` table; a marketing page inventing its own
+            is the thing that feature exists to make unnecessary. */}
 
         {/* CTA */}
         <section className="py-20 bg-background">

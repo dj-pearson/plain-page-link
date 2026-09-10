@@ -76,7 +76,10 @@ export default function VsLater() {
             name: 'Which is better for real estate agents: AgentBio or Later?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'For link in bio and lead generation, AgentBio is purpose-built for real estate with 3-5x higher conversion rates. For social media scheduling and content planning, Later excels. Many successful agents use both: Later for scheduling content and AgentBio for converting followers into leads.',
+              // Was "with 3-5x higher conversion rates" — a measurement of a
+              // product nobody has measured, and in a FAQPage answer, which
+              // Google renders as a rich result (US-173).
+              text: 'They do different jobs. Later schedules and plans social content; AgentBio is a link-in-bio built around lead capture, property listings and booking. Many agents use both: Later for scheduling, AgentBio for what happens after somebody taps the link.',
             },
           },
           {
@@ -98,7 +101,7 @@ export default function VsLater() {
         <title>AgentBio vs Later: Real Estate Link in Bio Comparison 2025</title>
         <meta
           name="description"
-          content="Compare AgentBio and Later for real estate agents. Discover why AgentBio's real estate-focused features convert 3-5x more leads than Later's generic link in bio tool."
+          content="Compare AgentBio and Later for real estate agents. Later schedules social content; AgentBio captures leads from the link in your bio. What each one is for, and where they overlap."
         />
         <link rel="canonical" href={canonicalUrl} />
         <script type="application/ld+json">{JSON.stringify(schema)}</script>
@@ -154,11 +157,10 @@ export default function VsLater() {
               capture forms, CRM integration, calendar booking, and real estate templates designed
               to convert Instagram followers into clients. Later's link in bio is a secondary
               feature focused on driving traffic to scheduled posts rather than capturing leads.
-              Real estate agents using AgentBio report 3-5x higher conversion rates compared to
-              generic link tools because of specialized features like MLS integration, buyer/seller
-              qualification forms, and automated CRM syncing. If your priority is scheduling
-              Instagram content, Later excels. If your priority is converting followers into
-              qualified real estate leads, AgentBio is purpose-built for that goal.
+              AgentBio's lead capture is built around what a real estate enquiry needs: MLS details,
+              buyer and seller qualification questions, and CRM syncing. If your priority is
+              scheduling Instagram content, Later excels. If your priority is converting followers
+              into qualified real estate leads, AgentBio is purpose-built for that goal.
             </p>
           </div>
         </section>
@@ -406,8 +408,7 @@ export default function VsLater() {
                   <p className="font-semibold text-primary">✓ Choose AgentBio</p>
                   <p className="text-sm mt-1">
                     Purpose-built for lead capture with forms, CRM sync, property showcases, and
-                    calendar booking. Conversion-focused features generate 3-5x more leads than
-                    generic link tools.
+                    calendar booking.
                   </p>
                 </div>
               </div>
@@ -607,10 +608,10 @@ export default function VsLater() {
                   Which is better for real estate agents: AgentBio or Later?
                 </h3>
                 <p className="text-muted-foreground">
-                  For link in bio and lead generation, AgentBio is purpose-built for real estate
-                  with 3-5x higher conversion rates. For social media scheduling and content
-                  planning, Later excels. Many successful agents use both: Later for scheduling
-                  content and AgentBio for converting followers into leads.
+                  They do different jobs. Later schedules and plans social content; AgentBio is a
+                  link-in-bio built around lead capture, property listings and booking. Many agents
+                  use both: Later for scheduling, AgentBio for what happens after somebody taps the
+                  link.
                 </p>
               </div>
 

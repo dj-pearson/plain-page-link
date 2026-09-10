@@ -275,28 +275,15 @@ export default function ListingDescriptionGenerator() {
           <p className="text-3xl font-bold text-gray-900 mb-2">Write the listing faster</p>
           <p className="text-gray-600 mb-6">Three formats from one set of property details, free</p>
 
-          <div className="grid md:grid-cols-3 gap-6 text-left">
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-600 italic mb-2">
-                "This tool saves me at least 2 hours per listing. The luxury style is chef's kiss!"
-              </p>
-              {/* "— Sarah M., Beverly Hills" removed (US-159). */}
-            </div>
+          {/* Three quotes stood here — "saves me at least 2 hours per listing",
+              "I generate 3 versions in under a minute", "my listings get 3x more
+              engagement". US-159 deleted the names under them and left the quotes,
+              which does not make an invented testimonial true; it makes it
+              anonymous, and an anonymous one reads as real feedback somebody chose
+              not to attribute. Removed (US-173).
 
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-600 italic mb-2">
-                "I used to dread writing descriptions. Now I generate 3 versions in under a minute!"
-              </p>
-              {/* "— Mike T., Austin" removed (US-159). */}
-            </div>
-
-            <div className="bg-white p-4 rounded-lg">
-              <p className="text-sm text-gray-600 italic mb-2">
-                "My listings get 3x more engagement since using the family-friendly style. Game changer."
-              </p>
-              {/* "— Jennifer L., Denver" removed (US-159). */}
-            </div>
-          </div>
+              The three format cards below say what the tool produces, which is the
+              thing a visitor is actually deciding about. */}
         </div>
       </Card>
 

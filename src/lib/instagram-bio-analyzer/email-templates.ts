@@ -75,14 +75,15 @@ P.S. Reply to this email if you have questions about implementing your new bio!
 
     // Email 2: Day 1 - Common mistakes
     2: {
-      subject: 'The Instagram bio mistake 73% of agents make',
+      // Was "the mistake 73% of agents make" — a survey nobody ran (US-173).
+      subject: 'The Instagram bio mistake most agents make',
       preheader: `Don't let this kill your lead generation, ${firstName}`,
       body: `
 Hey ${firstName},
 
 Yesterday you analyzed your Instagram bio and discovered it scored ${score}/100.
 
-Here's something interesting: 73% of the ${market} agents I've analyzed make the SAME critical mistake.
+Here's something interesting: most of the ${market} agent bios I see make the SAME critical mistake.
 
 **They're using generic phrases like:**
 → "Helping you find your dream home"

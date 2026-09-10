@@ -181,7 +181,7 @@ export default function Testimonials() {
                   'Upload or link to YouTube/Vimeo',
                   'Thumbnail preview with play button',
                   'Mobile-optimized video player',
-                  'Video testimonials convert 2x better than text',
+                  'Video testimonials, for the clients willing to record one',
                 ]}
               />
 
@@ -291,7 +291,7 @@ export default function Testimonials() {
               <StepCard
                 number={4}
                 title="Offer Video Option"
-                description="Record a quick video testimonial on their phone. Video testimonials are 10x more powerful than text."
+                description="Record a quick video testimonial on their phone. A face and a voice carry more than a paragraph of text."
               />
 
               <StepCard
