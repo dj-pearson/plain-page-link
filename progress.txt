@@ -3210,3 +3210,78 @@ links, 4 unreachable pages.
 
 The last iteration is the one that matters most for what comes next: those
 checks were running against a build with no blog in it.
+
+---
+
+## Web platform loop — 2026-09-11 (self-paced, 15 iterations)
+
+### Iteration 1/15 — US-197: every edge-function failure said "[object Object]"
+
+supabase/functions/_shared/response.ts has answered every failure the same way
+since it was written:
+
+    { success: false, error: { code, message, details } }
+
+`error` is an object. Twenty-three edge functions import those helpers. The
+client that calls them, src/lib/edgeFunctions.ts, did this:
+
+    errorMessage = errorJson.error || errorJson.message || errorMessage;
+    throw new Error(errorMessage);
+
+`errorJson.error` is truthy, so it won every time. `new Error(object)` coerces
+its argument, and `.message` becomes the literal string "[object Object]".
+
+That string is not an internal one. It is the `description` of the destructive
+toast in BuyerInquiryForm, SellerInquiryForm, HomeValuationForm and
+ContactForm — all four of the capture forms reachable from a public profile,
+which is the platform's entire revenue path. A visitor who tripped the 5/min
+rate limit was shown "[object Object]" where submit-lead had sent "Too many
+requests. Please try again later." A visitor who mistyped an email was shown
+"[object Object]" where validateLeadData had named the field. Settings'
+username check, useArticles, useSocialMedia and the Stripe checkout helpers all
+went the same way.
+
+The code and the Retry-After were discarded along with the message, so no
+caller could distinguish "slow down for 90 seconds" from "that email is not
+valid" — the two failures a capture form most needs to tell apart.
+
+WHAT CHANGED
+  - toEdgeFunctionError() reads all three shapes actually on the wire: the
+    standardized `{ error: { code, message, details } }`, the older
+    `{ error: 'string' }` / `{ message: 'string' }`, and a non-JSON body.
+  - A non-JSON body is shown only when it is short and contains no markup. The
+    old code pasted `errorText` straight into the message, so a proxy's HTML
+    502 page became a wall of markup in front of the visitor.
+  - EdgeFunctionError carries `status`, `code`, `details`, `retryAfterSeconds`
+    and `functionName`. It extends Error, so every existing
+    `error instanceof Error ? error.message` caller keeps working and now gets
+    a sentence instead of a coercion.
+  - `retryAfterSeconds` is read from the Retry-After header OR from
+    `error.details.retryAfter`, because rateLimitResponse sends both and a
+    proxy may strip the header.
+  - A REQUEST_VALIDATION_FAILED response names its fields. validationError()
+    sends the message "Validation failed" and puts the useful part in
+    `details`; "Validation failed" alone does not tell a visitor which of eight
+    fields to correct. Bounded to five, because sanitizeFormData accepts forty.
+
+VERIFICATION, against the shipped implementation rather than the new one:
+  - Both fixtures in src/lib/edgeFunctions.test.ts are copied from
+    rateLimitResponse() and validationError() verbatim. The bug was that nobody
+    had ever run the client against what the server actually sends, so a test
+    written from the client's assumptions would have reproduced it.
+  - The tests were run against the code as it shipped: 7 of 11 fail there,
+    five of them reporting the string "[object Object]". All 11 pass after.
+  - tsc --noEmit clean. eslint clean on both files (the `any` warnings in
+    edgeFunctions.ts are pre-existing, on the options interface and the
+    EdgeFunctions helper signatures).
+  - npm run test:run: 829 passed, 1 failed — see below.
+
+NOTED, NOT FIXED — US-198. `src/repo-hygiene.test.ts > has no competing
+edge-function build configurations` is red on main and was red before this
+change: it bans `Dockerfile` and `edge-functions-server.ts` at the repo root,
+and ce75af6 ("Restore the edge-functions build path deleted in US-122") put
+both back deliberately. Either the restore was right and the test encodes a
+decision that has since been reversed, or the restore reintroduced what US-122
+removed. That is a question about how this platform deploys, not a failing
+assertion to edit into agreement with the tree, so it is a story for the next
+iteration rather than a line changed here.

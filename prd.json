@@ -3088,6 +3088,37 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 9. new URL() re-serialises an IPv4-mapped address in hexadecimal — 'http://[::ffff:127.0.0.1]/' arrives at the guard as '[::ffff:7f00:1]'. The old check matched '::ffff:' followed by a DOTTED quad, a form assertFetchableUrl never receives, so it returned 'not blocked' and the fetch went out. Cloud metadata at [::ffff:169.254.169.254] and RFC1918 at [::ffff:10.0.0.5] went the same way. The existing test asserted the dotted form was blocked and was correct about a string the code never sees — the same shape as every other defect this loop has found: a guard that had only ever been run on input it is not given. Affects crawl-site, check-broken-links, check-security-headers, detect-redirect-chains, analyze-images, check-core-web-vitals and check-mobile-first."
+    },
+    {
+      "id": "US-197",
+      "title": "Every edge-function failure told the visitor \"[object Object]\"",
+      "description": "As a visitor whose lead submission is rejected, I need to be told what went wrong and what to do about it, so that a recoverable failure — a mistyped email, a rate limit — does not read as a broken site.",
+      "acceptanceCriteria": [
+        "callEdgeFunction reads the standardized { error: { code, message, details } } shape and throws the message, not the object",
+        "The older { error: 'string' } and { message: 'string' } shapes still work",
+        "A non-JSON body is only shown when it is short and contains no markup; a proxy's HTML error page falls back to the status line",
+        "The HTTP status, the error code and the Retry-After window survive as fields on the thrown error instead of being discarded",
+        "A REQUEST_VALIDATION_FAILED response names the fields from error.details, bounded to five",
+        "The tests are verified against the shipped implementation: 7 of the 11 fail there",
+        "tsc --noEmit clean; no new lint warnings"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 1 of the web-platform loop. _shared/response.ts has answered every failure with error as an OBJECT since it was written, and 23 edge functions import it. The client did errorMessage = errorJson.error || errorJson.message, assigned that object to a string, and threw new Error(object) — whose .message is the literal '[object Object]'. That string is what BuyerInquiryForm, SellerInquiryForm, HomeValuationForm and ContactForm put in their destructive toast, and what Settings, useArticles and the Stripe checkout helpers surfaced too. A rate-limited lead capture said '[object Object]' where submit-lead had sent 'Too many requests. Please try again later.' The code and the Retry-After were discarded with it, so no caller could tell 'slow down' from 'that email is not valid'. Both fixtures in the test are copied from the helpers verbatim, because the bug was that nobody had run the client against what the server actually sends."
+    },
+    {
+      "id": "US-198",
+      "title": "repo-hygiene asserts a deployment path that was deliberately restored",
+      "description": "As a developer, I need the red test on main to mean something is wrong, so that a guard nobody can make green does not train the team to ignore the suite.",
+      "acceptanceCriteria": [
+        "Establish which is current: US-122's single deployment path, or commit ce75af6 'Restore the edge-functions build path deleted in US-122'",
+        "docs/deploy/edge-functions.md describes the path that actually ships",
+        "src/repo-hygiene.test.ts asserts that path rather than the superseded one",
+        "npm run test:run is green on main"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "NOTED IN ITERATION 1, NOT FIXED — hit this next. src/repo-hygiene.test.ts > 'has no competing edge-function build configurations' fails on main and failed before this iteration's change: it bans Dockerfile and edge-functions-server.ts at the repo root, and ce75af6 put both back on purpose. So either the restore was right and the test encodes a decision that was reversed, or the restore reintroduced what US-122 removed and the four other deleted configurations are the next thing to come back. This needs the deployment question answered before the test is touched — changing the assertion to match the tree would be recording the outcome rather than deciding it, which is why it is a story and not a one-line edit."
     }
   ]
 }
