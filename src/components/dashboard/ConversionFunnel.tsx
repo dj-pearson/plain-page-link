@@ -114,8 +114,14 @@ export function ConversionFunnel() {
             <CardDescription>From visitors to closed deals</CardDescription>
           </div>
           <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue />
+            {/*
+              US-209: a SelectTrigger takes its accessible name from the value
+              it shows, and SelectValue with no placeholder shows nothing until
+              one is set. The third unnamed combobox this loop has found, and
+              the first on a page the a11y suite believed it was measuring.
+            */}
+            <SelectTrigger className="w-[130px]" aria-label="Conversion funnel period">
+              <SelectValue placeholder="Last 30 days" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="7d">Last 7 days</SelectItem>

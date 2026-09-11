@@ -3290,7 +3290,7 @@
     },
     {
       "id": "US-209",
-      "title": "The admin surface has never been measured for accessibility",
+      "title": "Eight pages the a11y suite reported on but never loaded",
       "description": "As an operator using the admin console daily, I need it held to the same accessibility standard as the marketing pages.",
       "acceptanceCriteria": [
         "The a11y suite's mocks can grant an admin session (a user_roles row, and has_role returning true)",
@@ -3299,8 +3299,8 @@
         "Whatever is found is fixed, or recorded with the argument for accepting it"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "NOTED IN ITERATION 11. Five admin routes are excluded from the route-coverage guard because the a11y suite's setupMocks grants a session but no user_roles row, so ProtectedRoute redirects and axe would measure the redirect target — a green result that means nothing. Worth doing, but it needs the mock to model an admin, which is a different piece of work from listing routes. The dashboard is already covered, so this is the last unmeasured surface."
+      "passes": true,
+      "notes": "Fixed in iteration 15, and it turned out to be larger than the admin console. Granting the admin role was the easy half. The hard half: assertAppRendered only checked that SOME text rendered, so a page that redirected still passed — axe reports zero violations on whatever it is given. Adding 'and it must be the page that was asked for' failed EIGHT tests at once: all five admin routes, the onboarding wizard, the SSO callback, and `dashboard`, which has been in this suite since it was written and has been measuring /auth/login the whole time. The cause is that setupMocks intercepts /auth/v1/token and /auth/v1/user, which supabase-js only calls when it has a stored session to refresh — navigating straight to a protected route leaves storage empty, so getSession() returns null without a request and the mock answers nothing. The suite signs in through the form now, the way tests/e2e already did. What the newly-visible pages were hiding: two more CRITICAL button-name violations on the dashboard (the conversion funnel's period filter, and an icon-only copy button), an unnamed progressbar on the dashboard, the onboarding wizard and the admin dashboard — one shadcn component, three pages — and inactive tab triggers at 4.39:1 across the whole application, which is one line in ui/tabs.tsx. 42 a11y tests now, every route App.tsx declares, and the /admin exclusion is gone from src/browser-suites.test.ts."
     },
     {
       "id": "US-210",

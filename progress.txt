@@ -4328,3 +4328,100 @@ a dist — no new job, about twenty seconds.
 src/route-weight.test.ts guards the parser itself: the _headers matcher, the
 later-rule-wins merge, and that `npm run route-weight` is actually in ci.yml.
 The last one is US-205's lesson written down — a budget nobody runs is a file.
+
+### Iteration 15/15 — US-209: eight pages the suite reported on but never loaded
+
+The last unmeasured surface was the admin console, excluded in iteration 11
+because the a11y mocks granted a session but no user_roles row. Granting the
+role was the easy half.
+
+The hard half was noticing that the exclusion had been the honest one.
+
+assertAppRendered checked that the page produced SOME text and had not mounted
+into an error boundary. It did not check WHICH page. axe reports zero violations
+on whatever document it is handed, so a redirect passes — cleanly, quickly, and
+for years. Adding one assertion — the path it landed on must be the path it
+asked for — failed eight tests at once:
+
+    /admin, /admin/seo, /admin/audit-log, /admin/health,
+    /admin/search-analytics, /onboarding/wizard, /auth/sso/callback
+    ... and /dashboard
+
+`dashboard` has been in this suite since it was written. It has been measuring
+/auth/login the entire time, and passing.
+
+WHY NOBODY WAS SIGNED IN. setupMocks intercepts /auth/v1/token and
+/auth/v1/user. supabase-js only calls those when it has a stored session to
+refresh — navigating straight to a protected route leaves storage empty, so
+getSession() returns null without a request and the mocks answer nothing at all.
+The e2e specs sign in through the login form, which is what actually writes the
+session; this suite never did. The mock looked like authentication and was
+inert.
+
+WHAT THE EIGHT PAGES WERE HIDING, once they loaded:
+
+    button-name [CRITICAL] x2, dashboard
+        The conversion funnel's period filter — a SelectTrigger with a bare
+        SelectValue, the third of these this loop has found — and an icon-only
+        Copy button for the agent's own profile link, with no label at all.
+
+    aria-progressbar-name, 3 pages
+        ui/progress.tsx renders Radix's role="progressbar" with no accessible
+        name, so a screen reader announces a percentage with no indication of
+        what is progressing. Dashboard, onboarding wizard, admin dashboard —
+        one component, every page that uses it.
+
+    color-contrast, application-wide
+        ui/tabs.tsx sets text-gray-500 on bg-gray-100: 4.39:1. Every inactive
+        tab in the product, just under AA, on 26 nodes of /admin/seo alone.
+        One line.
+
+All fixed. 42 a11y tests, covering every static route App.tsx declares, and the
+/admin exclusion is gone from src/browser-suites.test.ts.
+
+THE SHAPE OF IT, which is the shape of this whole loop: the guard was real, the
+assertion was real, and the thing it asserted was not the thing anyone thought
+it was asserting. "Something rendered" is not "this page rendered", exactly as
+"the map has fifteen names" was not "the app calls fifteen functions", and "the
+baseline is zero" was not "the site has no violations".
+
+VERIFICATION
+  - The path assertion was added BEFORE the fixes and failed 8 of 42. After:
+    42 pass.
+  - E2E 26/26, tsc clean, 860 unit tests, route-weight within budget on all
+    four routes with nothing fetched twice.
+
+---
+
+## The web platform loop, in one paragraph
+
+Fifteen iterations. The first one fixed a string; the last one fixed an
+assertion; almost everything between was the same thing in different clothes —
+a check that existed, ran, passed, and was not checking what its name said.
+
+The edge-function router served 15 of 84 functions and reported the other 69 as
+"not found". The type-check gate that called itself blocking aborted on an
+import path before type-checking anything, for a year. 135 of 141 browser tests
+had never been run by CI, and the 6 that had could not fail. The accessibility
+baseline was a list of accepted defects, then a list of five pages out of
+thirty-five, then a suite that had been measuring the login page whenever it
+thought it was measuring the dashboard. The bundle-size budget was correct about
+every chunk while every page loaded twice.
+
+The defects themselves compose in a way that is worth noticing. Iteration 1 found
+that every edge-function error reached the user as "[object Object]"; iteration 2
+found 29 functions answering 404, which is why nobody had reported the first one.
+Iteration 12 found a submit button that did nothing on a form whose validation
+errors rendered on a step that was no longer mounted. Iteration 13 found two
+optimisations, written months apart, that cancelled each other out. None of these
+are visible from the code alone, and none of them are visible from a green CI
+run. They are visible from running the thing and looking at what happens.
+
+What the loop leaves behind is mostly checks, not fixes: a schema-reference test
+that needs no database, a smoke test that boots all 84 functions and refuses a
+5xx to an unauthenticated request, a route-weight budget that fails on a repeated
+URL, a guard that every Playwright config is run by a job that can fail, and a
+route-coverage test that derives its list from App.tsx rather than from memory.
+Each one was run against the commit before its fix and watched to fail. A guard
+that has only ever passed has not been tested — which is, in the end, the same
+sentence as the paragraph above.

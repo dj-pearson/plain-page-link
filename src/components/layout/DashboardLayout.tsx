@@ -197,7 +197,7 @@ export default function DashboardLayout() {
                 aria-label={`Profile avatar for ${profile?.full_name || 'user'}`}
               >
                 <span
-                  className="text-sm sm:text-base text-blue-600 font-semibold"
+                  className="text-sm sm:text-base text-blue-700 font-semibold"
                   aria-hidden="true"
                 >
                   {getInitials(profile?.full_name)}

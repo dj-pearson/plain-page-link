@@ -125,12 +125,11 @@ describe('browser test suites (US-205)', () => {
     const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf-8');
     const declared = [...app.matchAll(/<Route\s+path="([^"]+)"/g)]
       .map((m) => m[1])
-      .filter((path) => path.startsWith('/') && !path.includes(':') && !path.includes('*'))
-      // /admin/* needs an admin role. The a11y suite's mocks grant a session but
-      // no user_roles row, so visiting these measures the redirect target rather
-      // than the page — a green result that means nothing. US-209 covers giving
-      // the suite an admin session so they can be measured for real.
-      .filter((path) => !path.startsWith('/admin'));
+      .filter((path) => path.startsWith('/') && !path.includes(':') && !path.includes('*'));
+    // US-209 removed the /admin exclusion that stood here. The suite signs in
+    // and is granted a user_roles row now, and assertAppRendered checks the
+    // page it landed on is the page it asked for — so every route in App.tsx is
+    // measured, and measured for real.
 
     expect(declared.length, 'should have found the routes in App.tsx').toBeGreaterThan(20);
 

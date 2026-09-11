@@ -129,6 +129,17 @@ async function setupMocks(page: Page) {
   // Registered after the '**/rest/v1/**' catch-all on purpose: Playwright
   // matches the most recently added route first, so these win for their tables
   // and everything else still resolves to an empty array.
+  // US-209: the /admin routes sit behind <RequireAuth requireAdmin />, which
+  // reads useAuthStore's `role` — fetched from user_roles. The catch-all above
+  // answered [], so role stayed null, ProtectedRoute redirected, and axe would
+  // have measured the dashboard while reporting on the admin console. Five
+  // pages were excluded from coverage for exactly that reason.
+  await page.route('**/rest/v1/user_roles**', (r) =>
+    r.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify([{ user_id: '00000000-0000-4000-8000-000000000001', role: 'admin' }]),
+    })
+  );
   await page.route('**/rest/v1/listings**', (r) =>
     r.fulfill({
       contentType: 'application/json',
@@ -182,12 +193,46 @@ async function setupMocks(page: Page) {
 }
 
 /**
+ * Sign in through the form, the way tests/e2e does.
+ *
+ * US-209: setupMocks intercepts /auth/v1/token and /auth/v1/user, and that has
+ * never made the suite authenticated. supabase-js only calls those when it has
+ * a stored session to refresh, and navigating straight to a protected route
+ * leaves storage empty — so getSession() returns null without a request and the
+ * mock answers nothing. Signing in is what writes the session, and it is why
+ * the e2e specs manage what this one did not.
+ */
+async function signIn(page: Page) {
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' });
+  await page.fill('input[type="email"]', 'a11y@example.com');
+  await page.fill('input[type="password"]', 'A11yP@ssw0rd!');
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => !url.pathname.startsWith('/auth/login'), { timeout: 20000 });
+}
+
+/**
  * axe reports zero violations on an empty document, so a suite that never
  * notices the app failed to mount passes every page and proves nothing. That
  * is what this suite did until US-113 gave the dev server its VITE_SUPABASE_*
  * placeholders. This is the tripwire for the next time.
  */
-async function assertAppRendered(page: Page) {
+/**
+ * Routes that legitimately end up somewhere else.
+ *
+ * Each one needs a reason, because the alternative — allowing any redirect — is
+ * what US-209 was about: a page that redirects still renders text and still
+ * passes axe, so the suite reports a clean result for a page it never saw.
+ */
+const REDIRECTS_BY_DESIGN: Record<string, RegExp> = {
+  // Both are handoff endpoints: they read the provider's response and send the
+  // visitor onwards. There is no page to measure.
+  '/auth/callback': /^\/(auth\/login|dashboard|onboarding)/,
+  // With no SAML response in the URL, sso-callback reports the failure on the
+  // page it sends the visitor to. Measured: /auth/sso.
+  '/auth/sso/callback': /^\/auth\/(sso|login)/,
+};
+
+async function assertAppRendered(page: Page, requested: string) {
   const text = (await page.locator('body').innerText()).trim();
   expect(
     text.length,
@@ -196,6 +241,19 @@ async function assertAppRendered(page: Page) {
   expect(text, 'The app mounted straight into its error boundary.').not.toMatch(
     /This page didn.t load/i
   );
+
+  // US-209: and it must be the page that was asked for. The admin routes were
+  // excluded from this suite precisely because they redirected — a guard that
+  // only checks "something rendered" would have called that coverage.
+  const landed = new URL(page.url()).pathname;
+  const allowed = REDIRECTS_BY_DESIGN[requested];
+  if (allowed) {
+    expect(landed, `${requested} redirected somewhere unexpected`).toMatch(allowed);
+  } else {
+    expect(landed, `${requested} redirected to ${landed}; axe measured the wrong page`).toBe(
+      requested
+    );
+  }
 }
 
 async function analyze(page: Page) {
@@ -216,11 +274,11 @@ async function analyze(page: Page) {
  * Every public route is here now. Adding a route to App.tsx and not to this list
  * is what the route-coverage test below is for.
  */
-const PAGES: { name: string; path: string }[] = [
+const PAGES: { name: string; path: string; authenticated?: boolean }[] = [
   // Authenticated and profile surfaces, which need the mocked session.
   { name: 'login', path: '/auth/login' },
   { name: 'register', path: '/auth/register' },
-  { name: 'dashboard', path: '/dashboard' },
+  { name: 'dashboard', path: '/dashboard', authenticated: true },
   { name: 'public profile', path: '/demo' },
 
   // The public marketing, legal, blog and free-tool surface.
@@ -260,17 +318,27 @@ const PAGES: { name: string; path: string }[] = [
   { name: 'mfa', path: '/auth/mfa' },
   { name: 'auth callback', path: '/auth/callback' },
   { name: 'sso callback', path: '/auth/sso/callback' },
-  { name: 'onboarding wizard', path: '/onboarding/wizard' },
+  { name: 'onboarding wizard', path: '/onboarding/wizard', authenticated: true },
+
+  // The admin console. US-209: these were excluded because the mocks granted a
+  // session but no user_roles row, so ProtectedRoute redirected and a green
+  // result would have meant nothing. setupMocks grants the role now.
+  { name: 'admin dashboard', path: '/admin', authenticated: true },
+  { name: 'admin seo', path: '/admin/seo', authenticated: true },
+  { name: 'admin audit log', path: '/admin/audit-log', authenticated: true },
+  { name: 'admin health', path: '/admin/health', authenticated: true },
+  { name: 'admin search analytics', path: '/admin/search-analytics', authenticated: true },
 ];
 
 test.describe('Accessibility (axe-core)', () => {
-  for (const { name, path } of PAGES) {
+  for (const { name, path, authenticated } of PAGES) {
     test(`${name} critical/serious a11y violations stay at/below baseline`, async ({ page }) => {
       await setupMocks(page);
+      if (authenticated) await signIn(page);
       await page.goto(path, { waitUntil: 'domcontentloaded' });
       // Let the SPA render.
       await page.waitForTimeout(1500);
-      await assertAppRendered(page);
+      await assertAppRendered(page, path);
 
       const { blocking, total } = await analyze(page);
       if (blocking.length > 0) {
@@ -292,7 +360,7 @@ test.describe('Accessibility (axe-core)', () => {
     await setupMocks(page);
     await page.goto('/demo', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
-    await assertAppRendered(page);
+    await assertAppRendered(page, '/demo');
 
     // The card's address is the interactive element (US-113 unnested the two
     // buttons that used to sit inside a role=button container).
