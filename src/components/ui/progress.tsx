@@ -1,7 +1,7 @@
-import * as React from "react"
-import * as ProgressPrimitive from "@radix-ui/react-progress"
+import * as React from 'react';
+import * as ProgressPrimitive from '@radix-ui/react-progress';
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils';
 
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
@@ -9,10 +9,14 @@ const Progress = React.forwardRef<
 >(({ className, value, ...props }, ref) => (
   <ProgressPrimitive.Root
     ref={ref}
-    className={cn(
-      "relative h-4 w-full overflow-hidden rounded-full bg-secondary",
-      className
-    )}
+    // US-209: Radix renders role="progressbar", and a progressbar with no
+    // accessible name is a serious axe violation — a screen reader announces a
+    // percentage with no indication of what is progressing. It appeared on the
+    // dashboard, the onboarding wizard and the admin dashboard, which is every
+    // page that uses this component. A generic label is a floor, not a target:
+    // pass aria-label to say what is loading.
+    aria-label={props['aria-label'] ?? (props['aria-labelledby'] ? undefined : 'Progress')}
+    className={cn('relative h-4 w-full overflow-hidden rounded-full bg-secondary', className)}
     {...props}
   >
     <ProgressPrimitive.Indicator
@@ -20,7 +24,7 @@ const Progress = React.forwardRef<
       style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
     />
   </ProgressPrimitive.Root>
-))
-Progress.displayName = ProgressPrimitive.Root.displayName
+));
+Progress.displayName = ProgressPrimitive.Root.displayName;
 
-export { Progress }
+export { Progress };

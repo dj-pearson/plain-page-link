@@ -3,6 +3,7 @@ import { requireAdmin } from '../_shared/auth.ts';
 import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -197,7 +198,7 @@ serve(async (req) => {
     console.error('Error detecting redirect chains:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: errorStatus(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

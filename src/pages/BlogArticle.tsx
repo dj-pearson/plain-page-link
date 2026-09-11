@@ -300,7 +300,10 @@ export default function BlogArticle() {
                   a: ({ href, children, ...props }) => {
                     if (href && href.startsWith('/')) {
                       return (
-                        <Link to={href} className="text-primary hover:underline font-medium">
+                        <Link
+                          to={href}
+                          className="text-primary underline hover:no-underline font-medium"
+                        >
                           {children}
                         </Link>
                       );
@@ -310,7 +313,7 @@ export default function BlogArticle() {
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary hover:underline font-medium"
+                        className="text-primary underline hover:no-underline font-medium"
                         {...props}
                       >
                         {children}

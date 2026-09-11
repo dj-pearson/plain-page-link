@@ -309,19 +309,34 @@ serve(async (req) => {
     if (saveResults && userId) {
       const { error: insertError } = await supabase
         .from('seo_content_optimization')
+        // US-201: seven of these thirteen keys named columns that do not
+        // exist, so nothing this analyzer computed was ever stored.
+        //
+        // keyword -> target_keyword, title -> page_title,
+        // keyword_prominence -> keyword_prominence_score (an integer column).
+        // The booleans it already computes have real columns and were not being
+        // written at all, so they are now.
+        //
+        // US-202 gave meta_description, issues and recommendations real
+        // columns — the table stored page_title but not the description, and
+        // had nowhere for findings even though seo_link_analysis has jsonb for
+        // both. Storing `issues.length` under a name the table did not have was
+        // throwing away the part an operator can act on.
         .insert({
           url,
           word_count: wordCount,
           flesch_reading_ease: Math.round(fleschScore),
           flesch_kincaid_grade: Math.round(fkGradeLevel * 10) / 10,
-          keyword: targetKeyword,
+          target_keyword: targetKeyword,
           keyword_density: keywordDensity,
-          keyword_prominence: keywordProminence,
-          title: pageTitle,
+          keyword_prominence_score: Math.round(keywordProminence),
+          keyword_in_title: keywordInTitle,
+          keyword_in_h1: keywordInH1,
+          page_title: pageTitle,
           meta_description: metaDescription,
           h1_count: h1Count,
-          issues_count: issues.length,
-          recommendations: recommendations,
+          issues,
+          recommendations,
           analyzed_by: userId,
         });
 

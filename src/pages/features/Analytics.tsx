@@ -101,7 +101,7 @@ export default function Analytics() {
                     See which properties get 100+ views vs 10 views. Double down on promoting your
                     most popular listings in Instagram Stories.
                   </p>
-                  <p className="text-sm text-[#80d0c7]">
+                  <p className="text-sm text-[#0f766e]">
                     → Optimize your Instagram content strategy
                   </p>
                 </div>
@@ -112,7 +112,7 @@ export default function Analytics() {
                     Know if leads come from Instagram Stories, Posts, Reels, or DMs. Spend more time
                     on channels that actually convert.
                   </p>
-                  <p className="text-sm text-[#80d0c7]">→ Focus your marketing where it works</p>
+                  <p className="text-sm text-[#0f766e]">→ Focus your marketing where it works</p>
                 </div>
 
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
@@ -123,7 +123,7 @@ export default function Analytics() {
                     See what visitors do before submitting a lead form. Do they view 3+ listings
                     first? Watch testimonials? Understand buyer behavior.
                   </p>
-                  <p className="text-sm text-[#80d0c7]">→ Optimize your bio page layout</p>
+                  <p className="text-sm text-[#0f766e]">→ Optimize your bio page layout</p>
                 </div>
 
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
@@ -132,7 +132,7 @@ export default function Analytics() {
                     Track how many Instagram followers convert to leads. Calculate cost per lead.
                     Prove your social media marketing is working.
                   </p>
-                  <p className="text-sm text-[#80d0c7]">→ Justify your marketing spend</p>
+                  <p className="text-sm text-[#0f766e]">→ Justify your marketing spend</p>
                 </div>
               </div>
             </div>
@@ -410,7 +410,7 @@ function MetricCard({
   return (
     <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
       <div className="flex items-start gap-6 mb-6">
-        <div className="flex-shrink-0 p-4 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#80d0c7]">
+        <div className="flex-shrink-0 p-4 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
           {React.cloneElement(icon as React.ReactElement, { className: 'h-8 w-8' })}
         </div>
         <div>
@@ -426,7 +426,7 @@ function MetricCard({
         <ul className="space-y-2">
           {metrics.map((metric, i) => (
             <li key={i} className="flex items-start gap-2">
-              <Check className="h-4 w-4 text-[#80d0c7] flex-shrink-0 mt-0.5" />
+              <Check className="h-4 w-4 text-[#0f766e] flex-shrink-0 mt-0.5" />
               <span className="text-sm glass-body">{metric}</span>
             </li>
           ))}
@@ -455,7 +455,7 @@ function FAQCard({ question, answer }: { question: string; answer: string }) {
         <h3 className="text-lg font-light tracking-tight text-foreground pr-4" itemProp="name">
           {question}
         </h3>
-        <span className={`text-[#80d0c7] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+        <span className={`text-[#0f766e] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"

@@ -4,6 +4,7 @@ import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 /**
  * Optimize Page Content with AI
@@ -80,8 +81,13 @@ serve(async (req) => {
     const { data: aiConfig } = await supabase
       .from('ai_models')
       .select('*')
+      // US-200: `.eq('model_type', 'content_generation')` was here. ai_models
+      // has no model_type column — it has provider, model_id, model_name,
+      // is_active, supports_vision — so the filter 400'd and aiConfig was
+      // always null, which this function reports to the caller as "No AI model
+      // configured. Please configure an AI model in the admin panel." An admin
+      // who had configured one was told they had not.
       .eq('is_active', true)
-      .eq('model_type', 'content_generation')
       .limit(1)
       .maybeSingle();
 
@@ -207,13 +213,21 @@ Format your response as JSON with this structure:
     if (saveResults && userId) {
       const { error: insertError } = await supabase
         .from('seo_content_optimization')
+        // US-201: keyword, title, meta_description and overall_score are not
+        // columns — the table calls them target_keyword, page_title and
+        // optimization_score, and has no plain meta_description at all (it
+        // stores meta_description_suggestions). The AI response this function
+        // pays a model to produce was discarded on every run.
+        //
+        // US-202 gave the current meta description a column, next to the
+        // meta_description_suggestions that say what to change it to.
         .insert({
           url,
-          keyword: targetKeyword,
-          title: pageTitle,
+          target_keyword: targetKeyword,
+          page_title: pageTitle,
           meta_description: metaDescription,
           ai_suggestions: aiResponse,
-          overall_score: aiResponse.overallScore || 0,
+          optimization_score: aiResponse.overallScore || 0,
           analyzed_by: userId,
         });
 
@@ -231,7 +245,7 @@ Format your response as JSON with this structure:
     console.error('Error optimizing content:', error);
     return new Response(
       JSON.stringify({ error: getErrorMessage(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: errorStatus(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

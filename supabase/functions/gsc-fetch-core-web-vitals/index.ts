@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { getPagespeedApiKey } from '../_shared/env.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 /**
  * Fetch Core Web Vitals from Google Search Console
@@ -201,25 +202,41 @@ serve(async (req) => {
     if (saveResults) {
       const { error: insertError } = await supabase
         .from('seo_core_web_vitals')
+        // US-201: twelve of these keys named columns the table does not have
+        // (lcp_value/lcp_passed for lcp/lcp_pass, and so on), so every CrUX
+        // measurement this function fetched was discarded on the way in.
+        //
+        // check-core-web-vitals writes the same table correctly; this is that
+        // shape. Two differences are deliberate:
+        //   - data_source is 'crux', not the column default 'pagespeed'. This
+        //     is field data from real visitors, and the CHECK constraint has
+        //     always allowed 'crux'.
+        //   - INP and the collection period go in field_data, the jsonb column
+        //     that exists for exactly this. The table predates INP replacing
+        //     FID as a Core Web Vital and has no inp column; inventing one here
+        //     would mean hand-editing generated types. US-201 notes promoting
+        //     it to a real column as follow-up.
         .insert({
           url: siteUrl,
           device: 'mobile',
-          lcp_value: lcpValue,
-          lcp_passed: lcpValue <= 2500,
-          fid_value: fidValue,
-          fid_passed: fidValue <= 100,
-          cls_value: clsValue,
-          cls_passed: clsValue <= 0.1,
-          fcp_value: fcp?.percentiles?.p75,
-          ttfb_value: ttfb?.percentiles?.p75,
-          inp_value: inp?.percentiles?.p75,
-          collection_period_start: cruxData.record.collectionPeriod.firstDate.year + '-' +
-            String(cruxData.record.collectionPeriod.firstDate.month).padStart(2, '0') + '-' +
-            String(cruxData.record.collectionPeriod.firstDate.day).padStart(2, '0'),
-          collection_period_end: cruxData.record.collectionPeriod.lastDate.year + '-' +
-            String(cruxData.record.collectionPeriod.lastDate.month).padStart(2, '0') + '-' +
-            String(cruxData.record.collectionPeriod.lastDate.day).padStart(2, '0'),
-          checked_by: userId,
+          lcp: lcpValue,
+          lcp_pass: lcpValue <= 2500,
+          fid: fidValue,
+          fid_pass: fidValue <= 100,
+          cls: clsValue,
+          cls_pass: clsValue <= 0.1,
+          fcp: fcp?.percentiles?.p75,
+          ttfb: ttfb?.percentiles?.p75,
+          // US-202 gave INP a real column; it was parked in field_data only
+          // because the table predates INP replacing FID as a Core Web Vital.
+          inp: inp?.percentiles?.p75,
+          inp_pass: inp?.percentiles?.p75 !== undefined ? inp.percentiles.p75 <= 200 : null,
+          data_source: 'crux',
+          field_data: {
+            collectionPeriodStart: formatCruxDate(cruxData.record.collectionPeriod.firstDate),
+            collectionPeriodEnd: formatCruxDate(cruxData.record.collectionPeriod.lastDate),
+            requestedBy: userId,
+          },
         });
 
       if (insertError) {
@@ -240,12 +257,17 @@ serve(async (req) => {
     console.error('Error fetching Core Web Vitals from GSC:', error);
     return new Response(
       JSON.stringify({ error: getErrorMessage(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: errorStatus(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
 
 // Helper functions for categorizing metrics
+/** CrUX reports a collection period as { year, month, day }. */
+function formatCruxDate(date: { year: number; month: number; day: number }): string {
+  return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+}
+
 function getLCPCategory(value: number): string {
   if (value <= 2500) return 'good';
   if (value <= 4000) return 'needs-improvement';

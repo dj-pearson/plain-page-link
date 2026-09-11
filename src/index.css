@@ -20,7 +20,13 @@
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /*
+     * US-206: 46.9% clears 4.5:1 on pure white (4.75) but not on --muted, the
+     * tinted surface it is most often used against — axe measured 4.43:1 on the
+     * public profile. 43% gives it headroom on both, and is still visibly
+     * secondary to --foreground at 11.2%.
+     */
+    --muted-foreground: 215.4 16.3% 43%;
 
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;

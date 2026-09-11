@@ -40,20 +40,34 @@ interface LeadPiiRow {
 }
 
 serve(async (req: Request) => {
-  const corsHeaders = getCorsHeaders(req);
+  // US-203: `getCorsHeaders(req)` — it takes an ORIGIN, not a Request. That was
+  // the first of seven type errors in this file, and the other six all follow
+  // from the same confusion: the _shared/response.ts helpers take the Request
+  // (they derive CORS from it themselves), and every call here passed
+  // corsHeaders instead. errorResponse's signature is (message, code, req,
+  // status), so `errorResponse('Admin role required', 403, corsHeaders)` put a
+  // number in the code slot and a headers bag in the request slot.
+  //
+  // The consequence is that this function could not return ANY response —
+  // success, admin-denied or error. Each helper calls req.headers.get('origin')
+  // on something that has no headers, throws a TypeError, and the catch calls
+  // handleUnexpectedError, which throws the same TypeError again. This is the
+  // US-086 PII backfill, the prerequisite for the migration that drops the
+  // plaintext email and phone columns.
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
-    return methodNotAllowedResponse(corsHeaders);
+    return methodNotAllowedResponse(req);
   }
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return unauthorizedResponse(corsHeaders);
+      return unauthorizedResponse(req);
     }
 
     const serviceSupabase = createClient(
@@ -67,7 +81,7 @@ serve(async (req: Request) => {
     } = await serviceSupabase.auth.getUser(authHeader.replace('Bearer ', ''));
 
     if (authError || !user) {
-      return unauthorizedResponse(corsHeaders);
+      return unauthorizedResponse(req);
     }
 
     const { data: isAdmin, error: roleError } = await serviceSupabase.rpc('has_role', {
@@ -76,7 +90,7 @@ serve(async (req: Request) => {
     });
 
     if (roleError || !isAdmin) {
-      return errorResponse('Admin role required', 403, corsHeaders);
+      return errorResponse('Admin role required', 'FORBIDDEN', req, 403);
     }
 
     let encrypted = 0;
@@ -145,9 +159,9 @@ serve(async (req: Request) => {
             ? 'Nothing to backfill — every lead with contact details already has ciphertext.'
             : `Encrypted ${encrypted} of ${scanned} lead(s). Safe to apply 20260901000001_leads_drop_plaintext_pii.sql.`,
       },
-      corsHeaders
+      req
     );
   } catch (error) {
-    return handleUnexpectedError(error, corsHeaders);
+    return handleUnexpectedError(error, req);
   }
 });

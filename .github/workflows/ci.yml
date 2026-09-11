@@ -121,6 +121,16 @@ jobs:
           # The Cloudflare Pages deploy must NOT set this (US-148).
           PRERENDER_ALLOW_NO_ARTICLES: '1'
 
+      - name: Check what each route costs a visitor
+        # US-212. The bundle-size job weighs chunks in isolation and checks the
+        # entry graph; neither is what a visitor downloads. US-211 lived in that
+        # gap: every page fetched its document, its stylesheet and every entry
+        # chunk twice, while every individual chunk was within budget and the
+        # entry graph was correct. This serves dist/ with public/_headers' own
+        # cache policy, opens each route in Chromium with service workers
+        # allowed, and fails on a repeated URL.
+        run: npm run route-weight
+
       - name: Verify prerendered pages
         # 44 URLs shipped for a year sharing one <title> because nothing
         # compared them. This is what compares them (US-150), and it has grown:
@@ -234,11 +244,94 @@ jobs:
       - name: Run ESLint
         run: npx eslint src/ --max-warnings=-1
 
+  e2e:
+    name: End-to-End (Playwright)
+    runs-on: ubuntu-latest
+    # US-205: tests/e2e has six specs and 22 tests covering auth, onboarding,
+    # public profile visibility, listing deep links, analytics and the page
+    # builder — and no workflow had ever run them. They are hermetic (every
+    # /rest/v1, /auth/v1 and /functions/v1 call is intercepted, and the config
+    # supplies the VITE_SUPABASE_* values the client throws without), so they
+    # need no database and finish in under half a minute.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run end-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-e2e
+          path: playwright-report/
+          retention-days: 7
+
+  security-tests:
+    name: Security (Playwright)
+    runs-on: ubuntu-latest
+    # US-205: tests/security has 113 tests across auth, XSS, security headers
+    # and edge-function authorization, and had never been run by CI either.
+    # Slower than the other browser suites — a few minutes, single-worker by
+    # config — which is the usual reason a suite like this quietly stops being
+    # run. It is the one job here whose subject is what an attacker can do.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run security tests
+        run: npm run test:security
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-security
+          path: playwright-report/
+          retention-days: 7
+
   accessibility:
     name: Accessibility (axe-core)
     runs-on: ubuntu-latest
-    # Warn-only initially: surfaces a11y regressions without blocking merges.
-    continue-on-error: true
+    # US-205: this was continue-on-error, "warn-only initially". It has been
+    # passing 6/6 against an explicit baseline in tests/a11y, and a job that
+    # cannot fail is a job nobody reads. Blocking now; the baseline is what
+    # keeps it honest, not the continue-on-error.
     steps:
       - uses: actions/checkout@v4
 

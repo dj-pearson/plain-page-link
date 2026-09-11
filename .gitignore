@@ -47,3 +47,6 @@ db-backup/
 # TypeScript incremental build cache
 *.tsbuildinfo
 deno.lock
+
+# Created by deno check --node-modules-dir=auto
+supabase/functions/node_modules/

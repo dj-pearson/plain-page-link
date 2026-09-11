@@ -189,7 +189,7 @@ export default function LeadCapture() {
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8 mb-12">
                 <div className="p-6 rounded-xl bg-red-500/5 border border-red-500/20">
-                  <h3 className="text-xl font-light text-red-400 mb-4">
+                  <h3 className="text-xl font-light text-red-700 mb-4">
                     ❌ Generic Contact Forms Give You:
                   </h3>
                   <ul className="space-y-2 text-sm glass-body text-muted-foreground">
@@ -202,7 +202,7 @@ export default function LeadCapture() {
                 </div>
 
                 <div className="p-6 rounded-xl bg-green-500/5 border border-green-500/20">
-                  <h3 className="text-xl font-light text-green-400 mb-4">
+                  <h3 className="text-xl font-light text-green-700 mb-4">
                     ✓ AgentBio Lead Forms Give You:
                   </h3>
                   <ul className="space-y-2 text-sm glass-body">
@@ -280,7 +280,7 @@ export default function LeadCapture() {
             <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
               <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-red-500/30">
                 <div className="mb-4">
-                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-sm font-light text-red-400">
+                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-sm font-light text-red-700">
                     🔥 Hot Lead
                   </span>
                 </div>
@@ -291,12 +291,12 @@ export default function LeadCapture() {
                   <li>• Specific property interest</li>
                   <li>• High motivation to sell</li>
                 </ul>
-                <p className="text-sm text-red-400 mt-4 font-light">→ Call within 5 minutes</p>
+                <p className="text-sm text-red-700 mt-4 font-light">→ Call within 5 minutes</p>
               </div>
 
               <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-yellow-500/30">
                 <div className="mb-4">
-                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded-full text-sm font-light text-yellow-400">
+                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded-full text-sm font-light text-yellow-800">
                     ⚡ Warm Lead
                   </span>
                 </div>
@@ -307,12 +307,12 @@ export default function LeadCapture() {
                   <li>• General area interest</li>
                   <li>• Considering selling</li>
                 </ul>
-                <p className="text-sm text-yellow-400 mt-4 font-light">→ Call within 24 hours</p>
+                <p className="text-sm text-yellow-700 mt-4 font-light">→ Call within 24 hours</p>
               </div>
 
               <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-blue-500/30">
                 <div className="mb-4">
-                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full text-sm font-light text-blue-400">
+                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full text-sm font-light text-blue-700">
                     ❄️ Cold Lead
                   </span>
                 </div>
@@ -323,7 +323,7 @@ export default function LeadCapture() {
                   <li>• Budget undefined</li>
                   <li>• Information gathering</li>
                 </ul>
-                <p className="text-sm text-blue-400 mt-4 font-light">→ Add to nurture campaign</p>
+                <p className="text-sm text-blue-700 mt-4 font-light">→ Add to nurture campaign</p>
               </div>
             </div>
           </div>
@@ -392,7 +392,7 @@ function FormTypeCard({
   return (
     <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
       <div className="flex items-start gap-6 mb-6">
-        <div className="flex-shrink-0 p-4 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#80d0c7]">
+        <div className="flex-shrink-0 p-4 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
           {React.cloneElement(icon as React.ReactElement, { className: 'h-8 w-8' })}
         </div>
         <div>
@@ -408,7 +408,7 @@ function FormTypeCard({
         <ul className="space-y-2">
           {fields.map((field, i) => (
             <li key={i} className="flex items-start gap-2">
-              <Check className="h-4 w-4 text-[#80d0c7] flex-shrink-0 mt-0.5" />
+              <Check className="h-4 w-4 text-[#0f766e] flex-shrink-0 mt-0.5" />
               <span className="text-sm glass-body">{field}</span>
             </li>
           ))}
@@ -459,7 +459,7 @@ function FAQCard({ question, answer }: { question: string; answer: string }) {
         <h3 className="text-lg font-light tracking-tight text-foreground pr-4" itemProp="name">
           {question}
         </h3>
-        <span className={`text-[#80d0c7] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+        <span className={`text-[#0f766e] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"

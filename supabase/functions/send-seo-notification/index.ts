@@ -77,15 +77,24 @@ serve(async (req) => {
           timestamp: new Date().toISOString(),
         });
 
-        // Update alert notification status
+        // Record that the alert has been notified.
+        //
+        // US-201: `notified_at` and `notification_sent` are not columns. The
+        // update 400'd, so an alert stayed 'open' however many times it had been
+        // sent — and this function has no idempotency of its own, so a retry
+        // re-notified every channel.
+        //
+        // seo_alerts tracks this in `status`, whose CHECK allows open /
+        // acknowledged / resolved / ignored. A notified alert is acknowledged:
+        // someone has been told. Only 'open' alerts are moved, so a human who
+        // has already resolved or ignored one does not have it reopened by a
+        // late notification.
         if (sent) {
           await supabase
             .from('seo_alerts')
-            .update({
-              notified_at: new Date().toISOString(),
-              notification_sent: true,
-            })
-            .eq('id', alertId);
+            .update({ status: 'acknowledged', updated_at: new Date().toISOString() })
+            .eq('id', alertId)
+            .eq('status', 'open');
         }
       } catch (channelError: any) {
         results.push({

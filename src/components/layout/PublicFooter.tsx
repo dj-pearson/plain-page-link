@@ -346,17 +346,17 @@ export function PublicFooter() {
           </div>
 
           {/* Platform Disclaimers */}
-          <div className="space-y-3 text-xs text-gray-500 text-center max-w-4xl mx-auto">
-            <p className="font-semibold text-gray-400">Important Legal Notices</p>
+          <div className="space-y-3 text-xs text-gray-400 text-center max-w-4xl mx-auto">
+            <p className="font-semibold text-gray-200">Important Legal Notices</p>
             <p>
-              <strong className="text-gray-400">Passive Hosting Platform:</strong> AgentBio.net is a
+              <strong className="text-gray-200">Passive Hosting Platform:</strong> AgentBio.net is a
               passive hosting platform and interactive computer service under 47 U.S.C. § 230. We do
               NOT create, verify, endorse, or take responsibility for any content posted by agents,
               including property listings, photographs, descriptions, pricing, credentials,
               testimonials, or any other information.
             </p>
             <p>
-              <strong className="text-gray-400">Agent Responsibility:</strong> All real estate
+              <strong className="text-gray-200">Agent Responsibility:</strong> All real estate
               agents using this platform are solely and exclusively responsible for: (1) the
               accuracy of all property information and credentials, (2) copyright compliance for all
               photos and materials they upload, (3) Fair Housing Act compliance in all listings and
@@ -365,28 +365,28 @@ export function PublicFooter() {
               where they hold licenses.
             </p>
             <p>
-              <strong className="text-gray-400">Fair Housing Compliance:</strong> All listings must
+              <strong className="text-gray-200">Fair Housing Compliance:</strong> All listings must
               comply with the Fair Housing Act (42 U.S.C. § 3604) and applicable state fair housing
               laws prohibiting discrimination based on race, color, religion, sex, handicap,
               familial status, national origin, or other protected characteristics.
             </p>
             <p>
-              <strong className="text-gray-400">Copyright Notice:</strong> Violations of copyright
+              <strong className="text-gray-200">Copyright Notice:</strong> Violations of copyright
               law may result in liability, including statutory damages ranging from $750 to $150,000
               per work. Users who receive three valid DMCA notices within 12 months will have their
               accounts permanently terminated. See our DMCA Policy for details.
             </p>
             <p className="pt-2">
               For complete terms, please review our{' '}
-              <Link to="/terms" className="text-blue-400 hover:text-blue-300">
+              <Link to="/terms" className="text-blue-300 underline hover:text-blue-200">
                 Terms of Service
               </Link>
               ,{' '}
-              <Link to="/privacy" className="text-blue-400 hover:text-blue-300">
+              <Link to="/privacy" className="text-blue-300 underline hover:text-blue-200">
                 Privacy Policy
               </Link>
               , and{' '}
-              <Link to="/dmca" className="text-blue-400 hover:text-blue-300">
+              <Link to="/dmca" className="text-blue-300 underline hover:text-blue-200">
                 DMCA Policy
               </Link>
               .

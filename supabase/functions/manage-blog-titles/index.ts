@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAdmin } from '../_shared/auth.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -84,7 +85,7 @@ serve(async (req) => {
     console.error('Error managing blog title:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: errorStatus(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

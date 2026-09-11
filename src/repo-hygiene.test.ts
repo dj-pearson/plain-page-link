@@ -100,19 +100,33 @@ describe('one deployment path (US-122)', () => {
   const entries = readdirSync(ROOT);
 
   it('has no competing edge-function build configurations', () => {
-    // Five files shipped a hand-written Deno router listing 15 of the 86
-    // functions in supabase/functions/. The app calls 34, and 25 of those were
-    // not in its map — so it cannot have been what served production, and
-    // documenting it as the deploy path made the real one unfindable.
+    // US-198. This used to ban six files on the reasoning that a router listing
+    // 15 of 86 functions "cannot be what serves production". ce75af6 settled
+    // that by measurement rather than inference: functions.agentbio.net is
+    // Traefik-routed to the Coolify application that runs the root Dockerfile
+    // and edge-functions-server.ts, and the Supabase edge runtime named as its
+    // replacement holds only main/ and hello/ and answers everything else with
+    // 500 InvalidWorkerCreation. The router was production; deleting it failed
+    // the deploy that was meant to carry the 2026-09-10 key rotation.
+    //
+    // So those two are the deploy path and stay. The other four were genuinely
+    // four more ways to build the same image, and those are what this bans.
+    // The 15-of-86 problem was real and is fixed at the router — see
+    // src/edge-function-routing.test.ts (US-199) — not by deleting it again.
     const banned = [
-      'Dockerfile',
       'Dockerfile.gitclone',
       'edge-functions.Dockerfile',
       'docker-compose.edge-functions.yml',
       'nixpacks.toml',
-      'edge-functions-server.ts',
     ];
     expect(banned.filter((name) => entries.includes(name))).toEqual([]);
+  });
+
+  it('keeps the deployment path that ce75af6 measured', () => {
+    // The mirror of the above: a future cleanup that deletes these again
+    // repeats the outage rather than discovering it.
+    expect(entries).toContain('Dockerfile');
+    expect(entries).toContain('edge-functions-server.ts');
   });
 
   it('documents the one path that is real', () => {

@@ -20,6 +20,158 @@ interface EdgeFunctionOptions {
 }
 
 /**
+ * A failure returned by an edge function, carrying what the function actually
+ * said rather than only a string.
+ *
+ * US-197: every edge function that uses `_shared/response.ts` answers a failure
+ * with `{ success: false, error: { code, message, details } }` — `error` is an
+ * object. This client read `errorJson.error || errorJson.message`, assigned the
+ * object to a string, and threw `new Error(object)`, whose `.message` is the
+ * literal "[object Object]". That string is what the four public capture forms
+ * put in their failure toast, so a rate-limited or invalid lead submission told
+ * the visitor "[object Object]" instead of "Too many requests. Please try again
+ * later." The code, the HTTP status and the Retry-After were discarded with it,
+ * so no caller could distinguish "slow down" from "that email is not valid".
+ */
+export class EdgeFunctionError extends Error {
+  readonly functionName: string;
+  readonly status: number;
+  readonly code?: string;
+  readonly details?: unknown;
+  /** Seconds to wait, from a 429's Retry-After header or error.details. */
+  readonly retryAfterSeconds?: number;
+
+  constructor(
+    message: string,
+    init: {
+      functionName: string;
+      status: number;
+      code?: string;
+      details?: unknown;
+      retryAfterSeconds?: number;
+    }
+  ) {
+    super(message);
+    this.name = 'EdgeFunctionError';
+    this.functionName = init.functionName;
+    this.status = init.status;
+    this.code = init.code;
+    this.details = init.details;
+    this.retryAfterSeconds = init.retryAfterSeconds;
+  }
+}
+
+/**
+ * Field-level validation detail, flattened into something a visitor can act on.
+ *
+ * `validationError()` sends the message "Validation failed" and puts the useful
+ * part in `details` — either `{ email: 'Invalid email address' }` or
+ * `['Invalid email address']`. Showing only "Validation failed" tells the
+ * visitor nothing about which of eight fields to correct.
+ */
+function describeValidationDetails(details: unknown): string | null {
+  const parts: string[] = [];
+
+  if (Array.isArray(details)) {
+    for (const entry of details) {
+      if (typeof entry === 'string' && entry.trim()) parts.push(entry.trim());
+    }
+  } else if (details && typeof details === 'object') {
+    for (const [field, value] of Object.entries(details as Record<string, unknown>)) {
+      if (typeof value === 'string' && value.trim()) parts.push(`${field}: ${value.trim()}`);
+    }
+  }
+
+  if (parts.length === 0) return null;
+  // Bounded: a validation bag with 40 entries is not a toast.
+  return parts.slice(0, 5).join('; ');
+}
+
+/**
+ * Turn an edge function's failure response into an EdgeFunctionError.
+ *
+ * Handles all three shapes in the codebase: the standardized
+ * `{ error: { code, message, details } }`, the older `{ error: 'message' }` and
+ * `{ message: '...' }`, and a non-JSON body (a proxy's HTML 502, say), which
+ * must not be pasted into a toast.
+ */
+function toEdgeFunctionError(
+  functionName: string,
+  response: Response,
+  errorText: string
+): EdgeFunctionError {
+  const fallback = `Edge function '${functionName}' failed: ${response.status} ${response.statusText}`;
+
+  const retryAfterHeader = Number(response.headers.get('Retry-After'));
+  let retryAfterSeconds =
+    Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader : undefined;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(errorText);
+  } catch {
+    // Not JSON. Some functions still answer with a bare string, which is worth
+    // showing; a proxy's HTML error page is not, and pasting one into a toast
+    // is how a 502 becomes a wall of markup in front of the visitor.
+    const plain = errorText.trim();
+    const usable = plain && plain.length <= 200 && !plain.includes('<') ? plain : fallback;
+    return new EdgeFunctionError(usable, {
+      functionName,
+      status: response.status,
+      retryAfterSeconds,
+    });
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return new EdgeFunctionError(fallback, {
+      functionName,
+      status: response.status,
+      retryAfterSeconds,
+    });
+  }
+
+  const body = parsed as { error?: unknown; message?: unknown };
+  let message: string | undefined;
+  let code: string | undefined;
+  let details: unknown;
+
+  if (body.error && typeof body.error === 'object' && !Array.isArray(body.error)) {
+    const err = body.error as { code?: unknown; message?: unknown; details?: unknown };
+    if (typeof err.message === 'string' && err.message.trim()) message = err.message.trim();
+    if (typeof err.code === 'string') code = err.code;
+    details = err.details;
+  } else if (typeof body.error === 'string' && body.error.trim()) {
+    message = body.error.trim();
+  }
+
+  if (!message && typeof body.message === 'string' && body.message.trim()) {
+    message = body.message.trim();
+  }
+
+  // rateLimitResponse puts the wait in details as well as the header; prefer
+  // whichever is present so a proxy that strips Retry-After doesn't lose it.
+  if (retryAfterSeconds === undefined && details && typeof details === 'object') {
+    const retryAfter = (details as { retryAfter?: unknown }).retryAfter;
+    if (typeof retryAfter === 'number' && Number.isFinite(retryAfter) && retryAfter > 0) {
+      retryAfterSeconds = retryAfter;
+    }
+  }
+
+  if (code === 'REQUEST_VALIDATION_FAILED') {
+    const described = describeValidationDetails(details);
+    if (described) message = message ? `${message}: ${described}` : described;
+  }
+
+  return new EdgeFunctionError(message || fallback, {
+    functionName,
+    status: response.status,
+    code,
+    details,
+    retryAfterSeconds,
+  });
+}
+
+/**
  * Call a self-hosted edge function
  * @param functionName - Name of the edge function (e.g., 'check-username')
  * @param options - Request options
@@ -59,17 +211,7 @@ export async function callEdgeFunction<T = any>(
   // Handle errors
   if (!response.ok) {
     const errorText = await response.text();
-    let errorMessage = `Edge function '${functionName}' failed: ${response.status} ${response.statusText}`;
-
-    try {
-      const errorJson = JSON.parse(errorText);
-      errorMessage = errorJson.error || errorJson.message || errorMessage;
-    } catch {
-      // If not JSON, use text as is
-      errorMessage = errorText || errorMessage;
-    }
-
-    throw new Error(errorMessage);
+    throw toEdgeFunctionError(functionName, response, errorText);
   }
 
   // Parse and return response

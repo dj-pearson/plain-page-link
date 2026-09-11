@@ -42,20 +42,29 @@ serve(async (req) => {
     }
 
     const startTime = new Date();
-    console.log(`Starting scheduled audit: ${schedule.schedule_name}`);
+    console.log(`Starting scheduled audit: ${schedule.name}`);
 
-    // Create monitoring log entry
-    const { data: logEntry } = await supabase
+    // Create monitoring log entry.
+    //
+    // US-201: this sent user_id and check_type, which seo_monitoring_log does
+    // not have — it is a deliberately slim log (schedule_id, status,
+    // results_summary, started_at, completed_at) and both of those live on the
+    // schedule row it points at. PostgREST rejected the insert, `logEntry` came
+    // back undefined, and the very next statement reads `logEntry.id`. So every
+    // scheduled audit died with a TypeError immediately after starting.
+    const { data: logEntry, error: logError } = await supabase
       .from('seo_monitoring_log')
       .insert({
         schedule_id: scheduleId,
-        user_id: schedule.user_id,
-        check_type: schedule.audit_type,
         status: 'running',
         started_at: startTime.toISOString(),
       })
       .select()
       .single();
+
+    if (logError || !logEntry) {
+      throw new Error(`Could not open a monitoring log entry: ${logError?.message ?? 'no row returned'}`);
+    }
 
     const results: any = {
       audits: [],
@@ -65,7 +74,7 @@ serve(async (req) => {
 
     try {
       // Run audit based on type
-      switch (schedule.audit_type) {
+      switch (schedule.schedule_type) {
         case 'full_audit':
           results.audits = await runFullAudit(supabase, schedule);
           break;
@@ -85,7 +94,7 @@ serve(async (req) => {
           results.audits = await runImageOptimization(supabase, schedule);
           break;
         default:
-          throw new Error(`Unsupported audit type: ${schedule.audit_type}`);
+          throw new Error(`Unsupported audit type: ${schedule.schedule_type}`);
       }
 
       // Check alert rules and trigger if needed
@@ -98,13 +107,19 @@ serve(async (req) => {
       // Update log entry
       await supabase
         .from('seo_monitoring_log')
+        // results_summary is the jsonb column this table has for exactly this.
+        // duration_ms, checks_performed and issues_found were written as though
+        // they were columns; they are facts about the run, so they go in the
+        // summary with the rest of it.
         .update({
           status: 'completed',
           completed_at: endTime.toISOString(),
-          duration_ms: duration,
-          results_summary: results,
-          checks_performed: results.audits.length,
-          issues_found: countIssues(results),
+          results_summary: {
+            ...results,
+            durationMs: duration,
+            checksPerformed: results.audits.length,
+            issuesFound: countIssues(results),
+          },
         })
         .eq('id', logEntry.id);
 
@@ -132,7 +147,7 @@ serve(async (req) => {
         .update({
           status: 'failed',
           completed_at: new Date().toISOString(),
-          error_message: auditError.message,
+          results_summary: { error: auditError.message },
         })
         .eq('id', logEntry.id);
 
@@ -158,7 +173,7 @@ serve(async (req) => {
 });
 
 async function runFullAudit(supabase: any, schedule: any): Promise<any[]> {
-  const urls = schedule.target_urls || [];
+  const urls = scheduleUrls(schedule);
   const audits = [];
 
   for (const url of urls) {
@@ -183,7 +198,7 @@ async function runFullAudit(supabase: any, schedule: any): Promise<any[]> {
 }
 
 async function runCoreWebVitals(supabase: any, schedule: any): Promise<any[]> {
-  const urls = schedule.target_urls || [];
+  const urls = scheduleUrls(schedule);
   const audits = [];
 
   for (const url of urls) {
@@ -208,7 +223,7 @@ async function runCoreWebVitals(supabase: any, schedule: any): Promise<any[]> {
 }
 
 async function runBrokenLinksCheck(supabase: any, schedule: any): Promise<any[]> {
-  const urls = schedule.target_urls || [];
+  const urls = scheduleUrls(schedule);
   const audits = [];
 
   for (const url of urls) {
@@ -233,7 +248,7 @@ async function runBrokenLinksCheck(supabase: any, schedule: any): Promise<any[]>
 }
 
 async function runContentOptimization(supabase: any, schedule: any): Promise<any[]> {
-  const urls = schedule.target_urls || [];
+  const urls = scheduleUrls(schedule);
   const audits = [];
 
   for (const url of urls) {
@@ -258,7 +273,7 @@ async function runContentOptimization(supabase: any, schedule: any): Promise<any
 }
 
 async function runSecurityCheck(supabase: any, schedule: any): Promise<any[]> {
-  const urls = schedule.target_urls || [];
+  const urls = scheduleUrls(schedule);
   const audits = [];
 
   for (const url of urls) {
@@ -283,7 +298,7 @@ async function runSecurityCheck(supabase: any, schedule: any): Promise<any[]> {
 }
 
 async function runImageOptimization(supabase: any, schedule: any): Promise<any[]> {
-  const urls = schedule.target_urls || [];
+  const urls = scheduleUrls(schedule);
   const audits = [];
 
   for (const url of urls) {
@@ -311,10 +326,13 @@ async function checkAlertRules(supabase: any, schedule: any, results: any): Prom
   const alerts = [];
 
   // Get alert rules for this user
+  // US-200: `.eq('user_id', schedule.user_id)` was here. seo_alert_rules has
+  // no user_id — it is a global rule table (conditions, rule_type, severity,
+  // is_active). The filter 400'd, `rules` was undefined, and the function
+  // returned no alerts at all, so a scheduled audit never alerted on anything.
   const { data: rules } = await supabase
     .from('seo_alert_rules')
     .select('*')
-    .eq('user_id', schedule.user_id)
     .eq('is_active', true);
 
   if (!rules || rules.length === 0) return alerts;
@@ -325,15 +343,26 @@ async function checkAlertRules(supabase: any, schedule: any, results: any): Prom
     if (triggered) {
       const { data: alert } = await supabase
         .from('seo_alerts')
+        // US-201: five of the eight keys here named columns seo_alerts does
+        // not have (rule_id, related_url, metadata) or values its CHECK
+        // constraint forbids (status 'active' — the allowed set is open /
+        // acknowledged / resolved / ignored), while `title` is NOT NULL and was
+        // not supplied at all. The rule's own fields were invented too:
+        // seo_alert_rules has name, rule_type and conditions, not rule_name,
+        // alert_type and notification_enabled.
+        //
+        // `metadata: { results, rule }` has no home and is dropped rather than
+        // relocated: it is the entire audit payload, which is already in the
+        // monitoring log's results_summary for this run.
         .insert({
-          user_id: schedule.user_id,
-          rule_id: rule.id,
-          alert_type: rule.alert_type,
+          user_id: schedule.created_by,
+          alert_rule_id: rule.id,
+          alert_type: rule.rule_type,
           severity: rule.severity,
-          message: `Alert triggered: ${rule.rule_name}`,
-          related_url: schedule.target_urls?.[0],
-          metadata: { results, rule },
-          status: 'active',
+          title: rule.name,
+          message: `Alert triggered: ${rule.name}`,
+          affected_url: schedule.target_url,
+          status: 'open',
         })
         .select()
         .single();
@@ -342,7 +371,14 @@ async function checkAlertRules(supabase: any, schedule: any, results: any): Prom
         alerts.push(alert);
 
         // Trigger notification if configured
-        if (rule.notification_enabled) {
+        // `rule.notification_enabled` does not exist, so this has always been
+        // undefined and no alert has ever notified anyone. `conditions` is the
+        // jsonb column the rule's own thresholds already live in
+        // (evaluateAlertRule reads minScore and maxIssues from it), so the flag
+        // belongs there too. Opt-in rather than default-on: the first run in
+        // which alerting works should not also be the first in which every
+        // historical rule fires a notification at once.
+        if (rule.conditions?.notify === true) {
           await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-seo-notification`, {
             method: 'POST',
             headers: {
@@ -357,6 +393,19 @@ async function checkAlertRules(supabase: any, schedule: any, results: any): Prom
   }
 
   return alerts;
+}
+
+/**
+ * Every URL a schedule covers.
+ *
+ * US-201: all six audit functions read `schedule.target_urls`, which is not a
+ * column. The schedule has `target_url` (NOT NULL, one) and `additional_urls`
+ * (text[]). `urls` was therefore always [], every loop body ran zero times, and
+ * a scheduled audit that got as far as running produced zero audits — on top of
+ * the log insert that stopped it getting that far.
+ */
+function scheduleUrls(schedule: any): string[] {
+  return [schedule.target_url, ...(schedule.additional_urls || [])].filter(Boolean);
 }
 
 function evaluateAlertRule(rule: any, results: any): boolean {

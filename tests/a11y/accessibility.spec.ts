@@ -6,37 +6,85 @@
  * hermetic (no live backend), matching the E2E approach.
  *
  * Baseline (initial run, 2026) — count of distinct critical/serious axe rules
- * per page. To avoid blocking on the pre-existing baseline (per the story:
- * "warn but not fail initially"), each test fails only when critical/serious
- * violations EXCEED this baseline — i.e. it's a regression guard. Drive these
- * numbers down over time; the CI job is also configured warn-only.
+ * per page. The baseline is now ZERO everywhere: each of these pages had
+ * critical/serious violations accepted as pre-existing, and US-206 fixed them
+ * rather than continuing to grade against them.
  *
- *   landing        : 3  (button-name [critical], color-contrast, link-in-text-block)
- *   login          : 1  (color-contrast)
- *   register       : 1  (color-contrast)
- *   dashboard      : 1  (color-contrast)
- *   public profile : 1  (color-contrast)
+ * What was accepted, and what it actually meant to a user:
+ *
+ *   landing (3)
+ *     button-name [critical] — the blog category filter is a Radix
+ *       SelectTrigger whose accessible name comes from the value it shows, and
+ *       SelectValue had no placeholder. With no articles loaded there is no
+ *       matching item, so it showed nothing and a screen reader announced
+ *       "button". The empty state is the one every first visitor sees.
+ *     color-contrast — white on bg-red-500 (3.76) and bg-green-500 (2.27) in
+ *       the before/after badges; text-red-400 on a red-500/10 wash (2.42) and
+ *       text-green-400 on green-500/10 (1.59) in the Problem/Solution pills.
+ *     link-in-text-block — the footer's legal links were blue-400 inside
+ *       gray-500 prose at 1.9:1, with nothing but colour to mark them.
+ *
+ *   login (1), register (1) — gray-400 on white for the "or" divider (2.53)
+ *     and the username hint, and white on the 500-level avatar fills at 10px
+ *     bold (2.42-4.23).
+ *
+ *   dashboard (1) — reached only behind the mocked session; kept at 0 with the
+ *     rest, since the shared components it renders are the ones that changed.
  *
  * US-113 added the listing-modal case. ListingDetailModal was a hand-rolled
  * overlay — no role=dialog, no aria-modal, no focus trap, no focus restore,
  * and unlabelled icon buttons — so the modal state was exactly the state the
  * suite never looked at. It now uses the Radix Dialog the rest of the page
  * uses, and this holds it there.
+ *
+ * A number above zero here is an accepted defect. Add one only with the
+ * argument for it written down.
  */
 
 const BASELINE: Record<string, number> = {
-  landing: 3,
-  login: 1,
-  register: 1,
-  dashboard: 1,
-  'public profile': 1,
-  'public profile with a listing modal open': 1,
+  landing: 0,
+  login: 0,
+  register: 0,
+  dashboard: 0,
+  'public profile': 0,
+  'public profile with a listing modal open': 0,
 };
 
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const SERIOUS = ['critical', 'serious'];
+
+/**
+ * What failed, and on which element.
+ *
+ * "1 color-contrast violation" tells the next person a number and nothing they
+ * can act on — axe groups every node under one rule, so a violation can be one
+ * span or forty. US-206 spent its first twenty minutes rebuilding this by hand
+ * in a scratch script; the measured ratio and the element are what make the
+ * failure self-explanatory.
+ */
+function describe(
+  violations: Array<{
+    id: string;
+    impact?: string | null;
+    nodes: Array<{ html: string; failureSummary?: string }>;
+  }>
+): string {
+  return violations
+    .map((v) => {
+      const nodes = v.nodes
+        .slice(0, 4)
+        .map((n) => {
+          const ratio = /contrast of ([\d.]+)/.exec(n.failureSummary ?? '')?.[1];
+          return `      ${ratio ? `${ratio}:1  ` : ''}${n.html.replace(/\s+/g, ' ').slice(0, 140)}`;
+        })
+        .join('\n');
+      const more = v.nodes.length > 4 ? `\n      ... +${v.nodes.length - 4} more` : '';
+      return `  ${v.id} (${v.impact}) x${v.nodes.length}\n${nodes}${more}`;
+    })
+    .join('\n');
+}
 
 async function setupMocks(page: Page) {
   // Pre-seed cookie consent so the banner doesn't overlay/serialize into a11y noise.
@@ -81,6 +129,17 @@ async function setupMocks(page: Page) {
   // Registered after the '**/rest/v1/**' catch-all on purpose: Playwright
   // matches the most recently added route first, so these win for their tables
   // and everything else still resolves to an empty array.
+  // US-209: the /admin routes sit behind <RequireAuth requireAdmin />, which
+  // reads useAuthStore's `role` — fetched from user_roles. The catch-all above
+  // answered [], so role stayed null, ProtectedRoute redirected, and axe would
+  // have measured the dashboard while reporting on the admin console. Five
+  // pages were excluded from coverage for exactly that reason.
+  await page.route('**/rest/v1/user_roles**', (r) =>
+    r.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify([{ user_id: '00000000-0000-4000-8000-000000000001', role: 'admin' }]),
+    })
+  );
   await page.route('**/rest/v1/listings**', (r) =>
     r.fulfill({
       contentType: 'application/json',
@@ -134,12 +193,46 @@ async function setupMocks(page: Page) {
 }
 
 /**
+ * Sign in through the form, the way tests/e2e does.
+ *
+ * US-209: setupMocks intercepts /auth/v1/token and /auth/v1/user, and that has
+ * never made the suite authenticated. supabase-js only calls those when it has
+ * a stored session to refresh, and navigating straight to a protected route
+ * leaves storage empty — so getSession() returns null without a request and the
+ * mock answers nothing. Signing in is what writes the session, and it is why
+ * the e2e specs manage what this one did not.
+ */
+async function signIn(page: Page) {
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' });
+  await page.fill('input[type="email"]', 'a11y@example.com');
+  await page.fill('input[type="password"]', 'A11yP@ssw0rd!');
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => !url.pathname.startsWith('/auth/login'), { timeout: 20000 });
+}
+
+/**
  * axe reports zero violations on an empty document, so a suite that never
  * notices the app failed to mount passes every page and proves nothing. That
  * is what this suite did until US-113 gave the dev server its VITE_SUPABASE_*
  * placeholders. This is the tripwire for the next time.
  */
-async function assertAppRendered(page: Page) {
+/**
+ * Routes that legitimately end up somewhere else.
+ *
+ * Each one needs a reason, because the alternative — allowing any redirect — is
+ * what US-209 was about: a page that redirects still renders text and still
+ * passes axe, so the suite reports a clean result for a page it never saw.
+ */
+const REDIRECTS_BY_DESIGN: Record<string, RegExp> = {
+  // Both are handoff endpoints: they read the provider's response and send the
+  // visitor onwards. There is no page to measure.
+  '/auth/callback': /^\/(auth\/login|dashboard|onboarding)/,
+  // With no SAML response in the URL, sso-callback reports the failure on the
+  // page it sends the visitor to. Measured: /auth/sso.
+  '/auth/sso/callback': /^\/auth\/(sso|login)/,
+};
+
+async function assertAppRendered(page: Page, requested: string) {
   const text = (await page.locator('body').innerText()).trim();
   expect(
     text.length,
@@ -148,6 +241,19 @@ async function assertAppRendered(page: Page) {
   expect(text, 'The app mounted straight into its error boundary.').not.toMatch(
     /This page didn.t load/i
   );
+
+  // US-209: and it must be the page that was asked for. The admin routes were
+  // excluded from this suite precisely because they redirected — a guard that
+  // only checks "something rendered" would have called that coverage.
+  const landed = new URL(page.url()).pathname;
+  const allowed = REDIRECTS_BY_DESIGN[requested];
+  if (allowed) {
+    expect(landed, `${requested} redirected somewhere unexpected`).toMatch(allowed);
+  } else {
+    expect(landed, `${requested} redirected to ${landed}; axe measured the wrong page`).toBe(
+      requested
+    );
+  }
 }
 
 async function analyze(page: Page) {
@@ -156,35 +262,95 @@ async function analyze(page: Page) {
   return { blocking, total: results.violations.length };
 }
 
-const PAGES: { name: string; path: string }[] = [
-  { name: 'landing', path: '/' },
+/**
+ * US-208: this list was five pages. The public site has twenty-four routes, and
+ * running axe over all of them found 14 critical/serious violations on 12 of
+ * the 19 the suite could not see — including three more unnamed comboboxes, the
+ * same CRITICAL button-name defect US-206 had just fixed on the landing page.
+ *
+ * That is the US-186 shape again: the guard was correct, and it was pointed at
+ * the wrong pages. A sampled suite measures the sample.
+ *
+ * Every public route is here now. Adding a route to App.tsx and not to this list
+ * is what the route-coverage test below is for.
+ */
+const PAGES: { name: string; path: string; authenticated?: boolean }[] = [
+  // Authenticated and profile surfaces, which need the mocked session.
   { name: 'login', path: '/auth/login' },
   { name: 'register', path: '/auth/register' },
-  { name: 'dashboard', path: '/dashboard' },
+  { name: 'dashboard', path: '/dashboard', authenticated: true },
   { name: 'public profile', path: '/demo' },
+
+  // The public marketing, legal, blog and free-tool surface.
+  { name: 'landing', path: '/' },
+  { name: 'pricing', path: '/pricing' },
+  { name: 'press', path: '/press' },
+  { name: 'privacy', path: '/privacy' },
+  { name: 'terms', path: '/terms' },
+  { name: 'dmca', path: '/dmca' },
+  { name: 'acceptable use', path: '/acceptable-use' },
+  { name: 'accessibility statement', path: '/accessibility' },
+  { name: 'cookies', path: '/cookies' },
+  { name: 'privacy choices', path: '/privacy-choices' },
+  { name: 'blog', path: '/blog' },
+  { name: 'for real estate agents', path: '/for-real-estate-agents' },
+  { name: 'instagram bio for realtors', path: '/instagram-bio-for-realtors' },
+  { name: 'vs linktree', path: '/vs/linktree' },
+  { name: 'vs beacons', path: '/vs/beacons' },
+  { name: 'vs later', path: '/vs/later' },
+  { name: 'feature: property listings', path: '/features/property-listings' },
+  { name: 'feature: lead capture', path: '/features/lead-capture' },
+  { name: 'feature: calendar booking', path: '/features/calendar-booking' },
+  { name: 'feature: testimonials', path: '/features/testimonials' },
+  { name: 'feature: analytics', path: '/features/analytics' },
+  { name: 'tools index', path: '/tools' },
+  { name: 'instagram bio analyzer', path: '/tools/instagram-bio-analyzer' },
+  { name: 'listing description generator', path: '/tools/listing-description-generator' },
+  { name: 'agent bio generator', path: '/tools/real-estate-agent-bio-generator' },
+  { name: 'not found', path: '/404' },
+
+  // The rest of the auth and onboarding surface. The route-coverage test in
+  // src/browser-suites.test.ts is what found these: the list above was written
+  // from a sweep of the routes someone remembered, and it missed two free tools
+  // and six auth screens.
+  { name: 'forgot password', path: '/auth/forgot-password' },
+  { name: 'reset password', path: '/auth/reset-password' },
+  { name: 'mfa', path: '/auth/mfa' },
+  { name: 'auth callback', path: '/auth/callback' },
+  { name: 'sso callback', path: '/auth/sso/callback' },
+  { name: 'onboarding wizard', path: '/onboarding/wizard', authenticated: true },
+
+  // The admin console. US-209: these were excluded because the mocks granted a
+  // session but no user_roles row, so ProtectedRoute redirected and a green
+  // result would have meant nothing. setupMocks grants the role now.
+  { name: 'admin dashboard', path: '/admin', authenticated: true },
+  { name: 'admin seo', path: '/admin/seo', authenticated: true },
+  { name: 'admin audit log', path: '/admin/audit-log', authenticated: true },
+  { name: 'admin health', path: '/admin/health', authenticated: true },
+  { name: 'admin search analytics', path: '/admin/search-analytics', authenticated: true },
 ];
 
 test.describe('Accessibility (axe-core)', () => {
-  for (const { name, path } of PAGES) {
+  for (const { name, path, authenticated } of PAGES) {
     test(`${name} critical/serious a11y violations stay at/below baseline`, async ({ page }) => {
       await setupMocks(page);
+      if (authenticated) await signIn(page);
       await page.goto(path, { waitUntil: 'domcontentloaded' });
       // Let the SPA render.
       await page.waitForTimeout(1500);
-      await assertAppRendered(page);
+      await assertAppRendered(page, path);
 
       const { blocking, total } = await analyze(page);
       if (blocking.length > 0) {
         console.log(
           `[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`,
-          blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+          describe(blocking)
         );
       }
       const baseline = BASELINE[name] ?? 0;
       expect(
         blocking.length,
-        `New critical/serious a11y violations on ${name} (baseline ${baseline}): ` +
-          blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+        `New critical/serious a11y violations on ${name} (baseline ${baseline}):\n${describe(blocking)}`
       ).toBeLessThanOrEqual(baseline);
     });
   }
@@ -194,7 +360,7 @@ test.describe('Accessibility (axe-core)', () => {
     await setupMocks(page);
     await page.goto('/demo', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
-    await assertAppRendered(page);
+    await assertAppRendered(page, '/demo');
 
     // The card's address is the interactive element (US-113 unnested the two
     // buttons that used to sit inside a role=button container).
@@ -210,14 +376,13 @@ test.describe('Accessibility (axe-core)', () => {
     if (blocking.length > 0) {
       console.log(
         `[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`,
-        blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+        describe(blocking)
       );
     }
     const baseline = BASELINE[name] ?? 0;
     expect(
       blocking.length,
-      `New critical/serious a11y violations on ${name} (baseline ${baseline}): ` +
-        blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+      `New critical/serious a11y violations on ${name} (baseline ${baseline}):\n${describe(blocking)}`
     ).toBeLessThanOrEqual(baseline);
   });
 });

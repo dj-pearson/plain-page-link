@@ -61,4 +61,6 @@ public/
 # - supabase/functions/
 # - supabase/config.toml
 # - edge-functions-server.ts
+# - edge-functions-serve-shim.ts      (US-199)
+# - edge-functions-import-map.json    (US-199)
 

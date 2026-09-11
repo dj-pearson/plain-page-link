@@ -3210,3 +3210,1218 @@ links, 4 unreachable pages.
 
 The last iteration is the one that matters most for what comes next: those
 checks were running against a build with no blog in it.
+
+---
+
+## Web platform loop — 2026-09-11 (self-paced, 15 iterations)
+
+### Iteration 1/15 — US-197: every edge-function failure said "[object Object]"
+
+supabase/functions/_shared/response.ts has answered every failure the same way
+since it was written:
+
+    { success: false, error: { code, message, details } }
+
+`error` is an object. Twenty-three edge functions import those helpers. The
+client that calls them, src/lib/edgeFunctions.ts, did this:
+
+    errorMessage = errorJson.error || errorJson.message || errorMessage;
+    throw new Error(errorMessage);
+
+`errorJson.error` is truthy, so it won every time. `new Error(object)` coerces
+its argument, and `.message` becomes the literal string "[object Object]".
+
+That string is not an internal one. It is the `description` of the destructive
+toast in BuyerInquiryForm, SellerInquiryForm, HomeValuationForm and
+ContactForm — all four of the capture forms reachable from a public profile,
+which is the platform's entire revenue path. A visitor who tripped the 5/min
+rate limit was shown "[object Object]" where submit-lead had sent "Too many
+requests. Please try again later." A visitor who mistyped an email was shown
+"[object Object]" where validateLeadData had named the field. Settings'
+username check, useArticles, useSocialMedia and the Stripe checkout helpers all
+went the same way.
+
+The code and the Retry-After were discarded along with the message, so no
+caller could distinguish "slow down for 90 seconds" from "that email is not
+valid" — the two failures a capture form most needs to tell apart.
+
+WHAT CHANGED
+  - toEdgeFunctionError() reads all three shapes actually on the wire: the
+    standardized `{ error: { code, message, details } }`, the older
+    `{ error: 'string' }` / `{ message: 'string' }`, and a non-JSON body.
+  - A non-JSON body is shown only when it is short and contains no markup. The
+    old code pasted `errorText` straight into the message, so a proxy's HTML
+    502 page became a wall of markup in front of the visitor.
+  - EdgeFunctionError carries `status`, `code`, `details`, `retryAfterSeconds`
+    and `functionName`. It extends Error, so every existing
+    `error instanceof Error ? error.message` caller keeps working and now gets
+    a sentence instead of a coercion.
+  - `retryAfterSeconds` is read from the Retry-After header OR from
+    `error.details.retryAfter`, because rateLimitResponse sends both and a
+    proxy may strip the header.
+  - A REQUEST_VALIDATION_FAILED response names its fields. validationError()
+    sends the message "Validation failed" and puts the useful part in
+    `details`; "Validation failed" alone does not tell a visitor which of eight
+    fields to correct. Bounded to five, because sanitizeFormData accepts forty.
+
+VERIFICATION, against the shipped implementation rather than the new one:
+  - Both fixtures in src/lib/edgeFunctions.test.ts are copied from
+    rateLimitResponse() and validationError() verbatim. The bug was that nobody
+    had ever run the client against what the server actually sends, so a test
+    written from the client's assumptions would have reproduced it.
+  - The tests were run against the code as it shipped: 7 of 11 fail there,
+    five of them reporting the string "[object Object]". All 11 pass after.
+  - tsc --noEmit clean. eslint clean on both files (the `any` warnings in
+    edgeFunctions.ts are pre-existing, on the options interface and the
+    EdgeFunctions helper signatures).
+  - npm run test:run: 829 passed, 1 failed — see below.
+
+NOTED, NOT FIXED — US-198. `src/repo-hygiene.test.ts > has no competing
+edge-function build configurations` is red on main and was red before this
+change: it bans `Dockerfile` and `edge-functions-server.ts` at the repo root,
+and ce75af6 ("Restore the edge-functions build path deleted in US-122") put
+both back deliberately. Either the restore was right and the test encodes a
+decision that has since been reversed, or the restore reintroduced what US-122
+removed. That is a question about how this platform deploys, not a failing
+assertion to edit into agreement with the tree, so it is a story for the next
+iteration rather than a line changed here.
+
+### Iteration 2/15 — US-199 (and US-198): one POST to the lead form took the backend down
+
+US-198 asked which deployment path is real. ce75af6 had already answered it by
+measurement: functions.agentbio.net is Traefik-routed to Coolify application
+isswgo8w4gs44ogk48wgsc88, which runs edge-functions-server.ts from the root
+Dockerfile, and the Supabase edge runtime named as its replacement holds only
+main/ and hello/. The router is production. So repo-hygiene was banning the
+deploy path, and that is a two-line fix — ban the four genuinely redundant
+configurations, and assert the two that ship are still there so the next
+cleanup repeats the discovery rather than the outage.
+
+Reading that file to answer the question is where the iteration actually went.
+
+WHAT IT SERVES. The router carried a literal FUNCTIONS_MAP of 15 names. The app
+calls 40. Twenty-nine answered 404 "Function not found":
+
+    gdpr-export, gdpr-deletion          subject access and erasure — the
+                                        compliance obligations
+    create-portal-session               "Manage billing" went nowhere
+    create-stripe-customer, report-stripe-usage
+    verify-mfa, disable-mfa, get-sessions, revoke-session, login-security
+                                        the entire account-security surface
+    sso-initiate, sso-callback          SSO login
+    submit-review                       the /:username/review page
+    teams, api-keys, audit-log, send-welcome-email, optimize-image,
+    health-check, pii-crypto, trigger-rebuild, and eight more
+
+One mapped name, submit-contact, has no directory in the repo at all.
+
+Until yesterday every one of those failures reached the user as the string
+"[object Object]" — iteration 1's defect and this one compose, which is why the
+404s could sit there. The router's 404 body is {"error": "Function not found"},
+a string, so US-197 now surfaces it. Two independent bugs, and the second was
+the reason nobody could see the first.
+
+WHAT IS WORSE THAN A 404. The router invoked each module as module.default(req).
+Five of the 84 functions export a default — check-username, generate-article,
+oauth-proxy, publish-article-to-social, pii-crypto, and oauth-proxy even carries
+the comment "Export handler for edge-functions-server (NOT Deno.serve)", so
+someone adapted exactly five. The other 79 call serve() at module top level,
+which is what Supabase's own runtime expects.
+
+This was reproduced rather than reasoned about. Deno 1.42.0 — the version the
+Dockerfile pins — was fetched, the image's layout recreated (COPY supabase/
+functions ./functions, edge-functions-server.ts ./server.ts), and the server
+started with the same CMD. POST /submit-lead:
+
+    Error executing function submit-lead: TypeError: module.default is not a function
+        at Server.handler (.../server.ts:87:42)
+    error: Uncaught (in promise) AddrInUse: Address already in use (os error 98)
+        at Server.listenAndServe (https://deno.land/std@0.168.0/http/server.ts:182:27)
+        at serve (https://deno.land/std@0.168.0/http/server.ts:605:20)
+        at .../functions/submit-lead/index.ts:59:1
+
+    $ curl /health  ->  exit 7, connection refused
+
+The 500 is returned, and then the process dies. The import ran the module's
+top-level serve(), which tried to bind port 8000 — the port the router is
+holding — and the unawaited promise rejected. Deno treats an unhandled rejection
+as fatal.
+
+So: an unauthenticated POST to the public lead-capture form takes down all 84
+edge functions, and does it again to the restarted container on the next
+submission. That is the platform's revenue path shooting the platform.
+
+WHAT CHANGED
+  - edge-functions-server.ts discovers functions from disk with Deno.readDir.
+    A directory under supabase/functions/ with an index.ts is a function — the
+    same rule the real runtime uses. 15 -> 84. The defect was never the fifteen
+    names; it was that a person had to remember the sixteenth.
+  - edge-functions-serve-shim.ts stands in for std@0.168.0/http/server.ts via
+    edge-functions-import-map.json. Its serve() records the handler instead of
+    listening, which is the same contract the runtime offers a function.
+  - Deno.serve is intercepted for the duration of each import and restored in a
+    finally, covering google-indexing and trigger-rebuild.
+  - export default still wins if the other two produced nothing, so the five
+    functions written against the old router keep working.
+  - Imports are serialised: the shim's capture slot is process-wide, and two
+    concurrent first-time requests could otherwise take each other's handler.
+  - An unhandledrejection listener makes the class of crash survivable, not
+    just the one cause of it.
+  - The function's own CORS headers now win over the router's '*'. getCorsHeaders
+    in _shared checks the origin against an allowlist; overwriting it with '*'
+    silently widened every function that bothered.
+  - /functions/v1/<name> is accepted alongside /functions/<name> and /<name>.
+
+VERIFICATION, on Deno 1.42.0 against the image layout, not by reasoning:
+  - /health: 84 functions discovered.
+  - POST /submit-lead returns submit-lead's OWN response
+    ({"success":false,"error":{"code":"INTERNAL_SERVER_ERROR",...}} — there is
+    no Supabase in the sandbox), and /health still answers 200 afterwards. That
+    is the whole fix in one request.
+  - Ten functions exercised across all three registration shapes, every response
+    the function's own: trigger-rebuild 401 (Deno.serve), create-portal-session
+    400, sso-initiate 400, report-stripe-usage 400 (top-level serve),
+    check-username (export default), gdpr-export "supabaseUrl is required".
+    Nine of the ten were unreachable before.
+  - Zero "Error executing function" and zero unhandled rejections in the log.
+  - src/edge-function-routing.test.ts run against the shipped router: 5 of its
+    8 tests fail there. The reachability test parses FUNCTIONS_MAP out of the
+    router when one is present rather than reading disk — reading disk would
+    have made it pass against the very implementation it was written to catch.
+  - tsc --noEmit clean, eslint clean, deno check clean on the new server.
+  - npm run test:run: 92 files, 839 passed, 0 failed. The repo-hygiene failure
+    noted in iteration 1 is gone, and it was fixed by deciding the question
+    rather than by editing the assertion to match the tree.
+
+NOT TOUCHED — CI type-checks functions against supabase/functions/deno.json,
+which is a different import map. The shim must not apply there: a function
+should type-check against the real module it will be given at runtime by
+Supabase's runtime if this ever moves back to it.
+
+### Iteration 3/15 — US-200: columns that do not exist, checked without a database
+
+CLAUDE.md opens its schema section by saying not to guess a column name, and
+gives the reason: gdpr-export queried a `blog_posts` table that has never
+existed, coalesced the failure with `|| []`, and returned zero articles on every
+subject access request without ever erroring.
+
+That is the mechanism, and it generalises. PostgREST answers an unknown column
+with 400. Almost every call site in this repo writes `const { data } = await ...`
+and drops `error`. So the query does not throw — it returns undefined, and the
+code carries on with an empty result as though the table were empty. A feature
+built this way looks like a feature with no data in it.
+
+`npm run verify:schema` catches this, but it needs a real Postgres and runs only
+in CI. src/integrations/supabase/types.ts is generated from the applied schema
+and is committed, so the same class can be caught in the unit suite in
+milliseconds. That is what src/schema-references.test.ts now does: it parses the
+Row shape of all 148 relations out of the generated types and checks every
+`.from(...)` chain in src/ and supabase/functions/ — filters, write keys and
+relation names.
+
+FIVE LIVE FILTER DEFECTS, all in edge functions, all fixed:
+
+  profiles.email            teams/index.ts
+      The invite flow looked the invitee up by email to link an existing
+      account. `profiles` has no email column — the account address is in
+      auth.users, which is the entire reason _shared/agent-contact.ts exists
+      (US-070). 400, error dropped, `existing` always undefined. Removed: the
+      'accept' action already links the row by email, which is the only moment
+      the invitee is present to be linked.
+
+  articles.published        analyze-blog-posts-seo/index.ts
+      The column is `status`. `data` was null, `posts` became [], and the
+      function threw "No blog posts found to analyze" for every account that
+      had articles. -> .eq('status', 'published')
+
+  ai_models.model_type      optimize-page-content/index.ts
+      No such column; the table has provider, model_id, model_name, is_active,
+      supports_vision. aiConfig was always null, and the function's own error
+      message is "No AI model configured. Please configure an AI model in the
+      admin panel" — told to an admin who had configured one.
+
+  seo_alert_rules.user_id   run-scheduled-audit/index.ts
+      The table is global: conditions, rule_type, severity, is_active. No
+      user_id. `rules` was undefined, so a scheduled audit never alerted on
+      anything.
+
+  seo_performance_budget.page_url   monitor-performance-budget/index.ts
+      The column is `url_pattern`. No configured budget was ever found, so every
+      check silently ran against the hardcoded defaults instead.
+
+A DETAIL THAT MATTERS about writing this kind of checker: the first run reported
+three of the five as still broken after they were fixed. Each fix leaves a
+comment quoting the call it replaced — `.eq('published', true)` — and a scanner
+that reads comments reports the explanation as the defect. It also invented a
+sixth, profiles.user_id in pii-crypto, from a comment 45 lines below the query
+that says why `.eq('user_id', user.id)` is needed. Comments are stripped first
+now, replaced with spaces so line numbers survive. A checker that cannot tell
+code from prose about code will be turned off within a week.
+
+WHAT IT ALSO FOUND, AND WHAT IS DONE ABOUT IT — 59 write-key mismatches across
+11 tables, every one in the SEO and Search Console subsystem:
+
+    seo_core_web_vitals     12   stores lcp/lcp_pass; code writes lcp_value/lcp_passed
+    seo_content_optimization 7
+    seo_monitoring_log       6   has 7 columns; code writes 6 more
+    seo_performance_budget   6
+    seo_alerts               5
+    seo_link_analysis        5
+    gsc_keyword_performance  4   keys on property_id/query; code writes user_id/property_url/keyword
+    gsc_page_performance     4
+    articles                 4
+    seo_semantic_analysis    4
+    gsc_properties           2
+
+Each is an insert or update PostgREST rejects, so these features compute their
+results and throw them away. Telling a rename from a missing column needs the
+table's intent, and some need a migration — that is US-201, not this iteration,
+and it must not be guessed at.
+
+So they are frozen in KNOWN_BROKEN_WRITES as a RATCHET, not an exemption: the
+list may shrink and may never grow, and a fourth test fails on any entry that no
+longer matches anything. Fixing one forces deleting it from the list. The debt is
+enumerated in the suite rather than described in a document.
+
+src/ has ZERO mismatches of either kind. The whole defect is on the edge-function
+side — the side that never typechecked against the Database types.
+
+VERIFICATION
+  - The checker was run against the unfixed functions: all five filter defects
+    reported, with file and line. Zero after.
+  - Sanity assertions guard against the scanner silently matching nothing:
+    148 relations parsed, leads has lead_type and not type, profiles has no
+    email, 500+ sources scanned.
+  - deno check --config supabase/functions/deno.json clean on all five modified
+    functions.
+  - npm run test:run: 93 files, 844 passed, 0 failed.
+
+ALSO FIXED, incidental — tsc --noEmit was failing on src/config/og-image.test.ts
+before this iteration's changes: newer @types/node types Buffer.equals's
+parameter as Uint8Array<ArrayBuffer>, which a Buffer no longer satisfies. The
+PNG signature is compared as hex now. `npm run build:check` runs tsc, so this
+was a broken build gate, not a cosmetic warning.
+
+### Iteration 4/15 — US-201 (part 1): the Search Console integration was dead end to end
+
+Iteration 3 froze 59 write-column mismatches in a ratchet and said each needed a
+decision that must not be guessed at. This iteration took the Google Search
+Console half of that list — four tables, 22 entries — and the decision turned
+out to be easy, because the schema says plainly what each column is called and
+one of the two Core Web Vitals writers already gets it right.
+
+What was not easy to see is what the four defects add up to.
+
+    gsc-fetch-properties    upsert sent site_url (a duplicate of property_url
+                            under a name the table lacks) and last_sync_at (the
+                            column is last_synced_at). PostgREST rejects the
+                            STATEMENT, not the unknown keys — so no property was
+                            ever saved.
+
+    gsc-sync-data           therefore always answered "No verified GSC property
+                            found" and returned 400. If it had got past that, its
+                            own inserts named user_id, property_url, keyword,
+                            page_url and platform on two tables that key on
+                            property_id, query and url. Not one row would have
+                            landed either.
+
+So the integration has never worked, at any step, and every failure was logged
+and swallowed: `if (!insertError) keywordsSaved++` counts to zero and reports
+`keywordsSynced: 0`, which reads like an account with no search traffic rather
+than like a broken write.
+
+    gsc-fetch-core-web-vitals   twelve keys: lcp_value/lcp_passed for lcp and
+                                lcp_pass, and so on. check-core-web-vitals writes
+                                the same table correctly, so the right shape was
+                                already in the repo, eight files away.
+
+    analyze-internal-links      sent `url` for a page_url NOT NULL column. This
+                                insert could not have succeeded even by accident.
+
+WHAT CHANGED, beyond the renames — three things that would have been new defects
+if only the column names had been corrected:
+
+  - gsc-sync-data now resolves the property ROW and uses its id. It previously
+    selected only property_url, because it was writing a URL where a uuid
+    belongs. Passing propertyUrl explicitly is now checked against the account
+    rather than trusted.
+  - The day is deleted before it is inserted. The unique constraint is
+    (property_id, query, url, date, device, country) and the request asks GSC for
+    neither device nor country, so those arrive NULL — and NULLs do not conflict
+    in Postgres, which means an upsert would have silently duplicated every row
+    on a re-sync. Making a broken write work is where duplicate-on-retry
+    defects are born.
+  - One insert instead of one per row. That loop was up to 1000 sequential round
+    trips per sync.
+  - gsc-fetch-core-web-vitals writes data_source 'crux', not the column default
+    'pagespeed'. This is field data from real visitors and the CHECK constraint
+    has always allowed 'crux'.
+  - analyze-internal-links now stores `issues` and `recommendations` themselves.
+    seo_link_analysis has jsonb columns for both, and writing `issues.length`
+    into a column called issues_count threw away the only part an operator can
+    act on.
+
+A GAP IN THE CHECKER, found by this work rather than by review. US-200's scanner
+read `name: value` and missed shorthand: `{ url, device, lcp }` is three columns,
+and `seo_link_analysis.url` — the NOT NULL violation above — was invisible to it.
+Shorthand is matched now, and re-running the scanner found exactly that one new
+reference and no others, so the gap was narrow but it was hiding the worst entry
+on the list.
+
+VERIFICATION
+  - The checker was run against the four functions as they were at f014bc6:
+    28 references reported. Zero after.
+  - KNOWN_BROKEN_WRITES is down from 59 to 32, and the stale-entry test is what
+    forced each removal — the list cannot describe work that is already done.
+  - deno check --config supabase/functions/deno.json clean on all four.
+  - tsc --noEmit clean; npm run test:run 93 files, 844 passed, 0 failed.
+
+REMAINING, for the next iteration — 32 entries across six tables. Two of them
+look like genuinely missing columns rather than renames: seo_monitoring_log has
+7 columns and the code writes 6 more, and articles is written with seo_score,
+seo_issues, seo_recommendations and last_seo_check. Those need a migration and a
+types regeneration, which is a different kind of change from this one.
+
+NOT DONE, and recorded — seo_core_web_vitals has no `inp` column. The table
+predates INP replacing FID as a Core Web Vital. INP and the CrUX collection
+period go into the field_data jsonb for now, which is the column that exists for
+exactly that; promoting inp to a real column needs a migration.
+
+### Iteration 5/15 — US-201 (part 2): a scheduled audit that died four different ways
+
+The ratchet is down from 59 entries across 11 tables to 4 across one. What is
+left is `articles`, which genuinely has no SEO-score columns — a migration, not
+a rename, and that is US-202.
+
+The interesting one was run-scheduled-audit, because it is broken at four
+independent levels and any one of them alone would have been enough.
+
+  1. The seo_monitoring_log insert sent user_id and check_type. Neither is a
+     column — the table is a deliberately slim log (schedule_id, status,
+     results_summary, started_at, completed_at) and both of those facts live on
+     the schedule row it points at. PostgREST rejected it, `logEntry` came back
+     undefined, and the very next statement reads `logEntry.id`. Every scheduled
+     audit died with a TypeError seconds after starting.
+
+  2. If it had got past that: all six audit helpers read
+     `schedule.target_urls`. The schedule has `target_url` (NOT NULL, one) and
+     `additional_urls` (text[]). `urls` was always [], so every loop body ran
+     zero times and an audit that started would have produced no audits.
+
+  3. If it had produced any: the alert insert used rule_id, related_url and
+     metadata (none of them columns), status 'active' (the CHECK constraint
+     allows open / acknowledged / resolved / ignored), and no value at all for
+     `title`, which is NOT NULL. The rule's own fields were invented to match —
+     seo_alert_rules has name, rule_type and conditions, not rule_name,
+     alert_type and notification_enabled.
+
+  4. And if an alert had been written: `if (rule.notification_enabled)` reads a
+     field that does not exist, so it is undefined and no alert has ever
+     notified anyone.
+
+Four layers, and the outermost one made the other three unobservable. That is
+what this whole line of stories keeps finding: the failure is never where the
+symptom is, because there is no symptom.
+
+THE REST, six more functions:
+
+  send-seo-notification     wrote notified_at and notification_sent, which are
+                            not columns, so an alert stayed 'open' however many
+                            times it had been sent — and this function has no
+                            idempotency of its own, so a retry re-notified every
+                            channel. seo_alerts tracks this in `status`; a
+                            notified alert is now 'acknowledged', and only
+                            'open' ones are moved, so a human who already
+                            resolved one does not have it reopened by a late
+                            notification.
+
+  check-keyword-positions   four reasons its alert insert could not land. A
+                            keyword that dropped ten places raised nothing.
+
+  monitor-performance-budget  six bad keys, plus `onConflict: 'page_url'` — not
+                            a column, and url_pattern has no unique constraint
+                            either, so there was no conflict target to upsert on
+                            at all. Now an update by primary key or an insert.
+                            Separately: FCP, TTFB and TTI were compared against
+                            max_fcp_ms / max_ttfb_ms / max_tti_ms, which the
+                            table does not have. `if (check.budget && ...)`
+                            counts an undefined budget as a pass, so three of
+                            eleven checks always passed and every compliance
+                            score was inflated by up to 27 points.
+
+  analyze-content           seven of thirteen keys wrong. It already computed
+                            keyword_in_title and keyword_in_h1, which ARE
+                            columns, and was not writing them; it does now.
+
+  optimize-page-content     the AI response it pays a model to produce was
+                            discarded on every run.
+
+  analyze-semantic-keywords two independent reasons to fail: four wrong keys and
+                            a missing NOT NULL primary_topic. Two values found
+                            better homes than they had names for — the LSI
+                            suggestions are literally co-occurrence data, so they
+                            go in keyword_co_occurrence, and tf_idf_keywords was
+                            computed and then never persisted at all.
+
+A NOTE ON WHAT WAS NOT DONE. Several values have no column anywhere: the current
+meta description, an analyzer's issues and recommendations, INP. The temptation
+is to add columns and hand-edit src/integrations/supabase/types.ts to match.
+types:generate reads a live database over psql and there is none here, so a
+hand-edit would be a guess about generated output — which is the exact failure
+mode this line of stories exists to stop. They are recorded in US-202 with the
+decision each one needs, and the values stay in the response payload meanwhile.
+
+VERIFICATION
+  - The checker run against supabase/functions as of 7a09779: 35 references
+    reported. Zero after.
+  - KNOWN_BROKEN_WRITES: 32 -> 4, each removal forced by the stale-entry test.
+  - deno check --config supabase/functions/deno.json clean on all seven
+    modified functions.
+  - tsc --noEmit clean; npm run test:run 93 files, 844 passed, 0 failed.
+
+### Iteration 6/15 — US-203: the blocking type-check had never type-checked a function
+
+A new axis. Five iterations have read this code; CI has type-checked it. Nobody
+has RUN it. Deno 1.42.0 — the version the Dockerfile pins — plus the router from
+US-199 makes that a twenty-line script: start the server, POST `{}` to all 84
+functions, see what comes back and whether the process survives.
+
+The first thing it found was not in a function.
+
+    $ find supabase/functions -name '*.ts' | wc -l        # what CI checks
+    110
+    $ deno check --config supabase/functions/deno.json ...
+    error: Relative import path "vitest" not prefixed with / or ./ or ../
+        at supabase/functions/_shared/cors.test.ts:14:49
+    exit=1
+
+There are seven vitest specs under supabase/functions/_shared/. They
+`import { describe } from 'vitest'`, a bare specifier Deno cannot resolve, and
+`deno check` fails MODULE-GRAPH RESOLUTION before type-checking anything. One
+error about an import path, exit 1, and not one function looked at.
+
+The job's own comment reads: "Blocking: the deno-check baseline has been cleared
+(114 -> 0). New genuine type errors in edge functions now fail CI."
+
+Excluding the specs, on Deno 2.1.4 — the major version CI installs:
+
+    Found 14 errors.
+      7  backfill-lead-pii/index.ts
+      6  stripe-webhook/index.ts
+      1  trigger-rebuild/index.ts
+
+WHAT WAS BEHIND THE GATE
+
+  backfill-lead-pii — every response path. `getCorsHeaders(req)` takes an
+  ORIGIN, not a Request, and the same confusion runs through the file: the
+  _shared/response.ts helpers take the Request and derive CORS themselves, and
+  every call here passed `corsHeaders` in that slot instead. Including
+  `errorResponse('Admin role required', 403, corsHeaders)`, which puts a number
+  where the error code goes.
+
+  So the function could not return ANY response. Success, admin-denied, error —
+  each helper calls req.headers.get('origin') on a headers bag, throws a
+  TypeError, and the catch calls handleUnexpectedError, which throws the same
+  TypeError again. Confirmed by running it: the caller got the router's own
+  "Function execution failed", and the stack was inside errorResponse.
+
+  This is the US-086 PII backfill: the one-off that encrypts the plaintext email
+  and phone on `leads`, which 20260901000001_leads_drop_plaintext_pii.sql refuses
+  to run until it has completed. It has never been able to complete.
+
+  trigger-rebuild — `errorResponse('Deploy hook rejected the request', req, 502)`.
+  req in the code slot, 502 in the req slot. The failure path threw instead of
+  reporting the failure.
+
+  stripe-webhook — three helpers typed their client `ReturnType<typeof
+  createClient>`, which is createClient's DEFAULT generic instantiation,
+  SupabaseClient<unknown, never, GenericSchema>. What they are handed is what
+  `createClient(url, key)` infers: SupabaseClient<any, "public", any>. Six call
+  sites, all in the paths that resolve a plan from a Stripe price and load its
+  limits.
+
+WHAT CHANGED
+  - The glob excludes *.test.ts, and node_modules, which --node-modules-dir=auto
+    creates under supabase/functions and which would otherwise make a re-run
+    check 198 files instead of 103.
+  - The job fails loudly if the exclusion ever matches nearly everything, so
+    "checked 0 files, exit 0" cannot become the new way to be green.
+  - All 14 errors fixed.
+
+VERIFICATION
+  - deno check over all 103 files on Deno 2.1.4: exit 0. First time.
+  - Runtime, not just types: POST /backfill-lead-pii now answers
+    {"code":"AUTH_TOKEN_MISSING"} with 401, where before it produced a
+    router-level 500 with a TypeError inside errorResponse.
+  - The guard was run against the workflow as it was at 356b7da and fails there.
+  - tsc --noEmit clean; npm run test:run 93 files, 845 passed, 0 failed.
+
+NOTED, NOT FIXED — US-204, and it is the larger half of what the sweep found.
+Of 84 functions given an unauthenticated POST, 24 answered 401 correctly and 20
+answered 5xx — and for at least 14 of those the cause is the CALLER's missing
+credentials. requireAuth throws a plain Error before it ever touches Supabase;
+the catch hands it to handleUnexpectedError, which logs "[UnexpectedError]" and
+returns 500. Six functions print "Unauthorized: No authorization header" with a
+500 status; the rest return "An unexpected error occurred", which does not tell
+the client it was an auth problem at all. 5xx is retried by clients, CDNs and
+cron where 401 is not, so an unauthenticated caller becomes a retry storm — and
+every auth failure looks like a crash, so a real outage cannot be seen against
+the noise. The sweep itself should become a CI job: US-199's AddrInUse crash is
+the proof that running a function finds what deno check cannot.
+
+### Iteration 7/15 — US-204: telling a caller "you are not logged in" with a 500
+
+requireAuth throws before it ever touches Supabase:
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error('Unauthorized: No authorization header');
+
+A bare Error. Every function catches it in the same `catch` that guards against
+genuine faults, and answers 500. The unauthenticated sweep from iteration 6
+measured the result: of 84 functions, 24 answered 401 and 20 answered 5xx, at
+least 14 of them for this reason.
+
+Two things that costs, and neither is cosmetic:
+
+  - 5xx is retried. Browsers, CDNs, cron runners and webhook senders all treat
+    it as "the server is having a moment" and come back. 401 they do not. An
+    expired session became a retry loop against a function that was working
+    perfectly.
+  - Every auth failure looks like a crash. The logs fill with [UnexpectedError]
+    for requests that were simply unauthenticated, and a platform that cannot
+    see a real outage against that noise has wired up health-check and Sentry
+    for nothing.
+
+WHAT CHANGED
+  - _shared/http-error.ts: an HttpError carrying its own status and code, with
+    unauthorized() and forbidden() constructors. The decision stays where the
+    knowledge is — requireAuth knows it is a 401, and the error handler should
+    not have to infer that from a message string.
+  - requireAuth, requireAdmin, requireOwnership and the two webhook-auth throw
+    sites raise it.
+  - BOTH error frameworks learned to recognise it. handleUnexpectedError in
+    _shared/response.ts was the obvious one; _shared/errors.ts has a second,
+    older handleError with its own AppError hierarchy, which google-indexing
+    uses and which had the identical hole. Fixing one would have left the other.
+  - 25 functions hand-roll their catch rather than calling either, so
+    `status: 500` became `status: errorStatus(error)`. Rewriting them to the
+    standard envelope would change what their callers parse; changing the status
+    alone fixes the defect without touching the contract.
+  - send-listing-generator-email threw a bare Error for a missing email address,
+    which the same catch turned into a 500. A form submitted without an email
+    was reported as a server fault and retried. Now 400.
+
+MEASURED, not argued — the same sweep, before and after:
+
+                       before      after
+      401                 24         39
+      400                 29         29
+      429                  9          9
+      5xx                 20          5
+
+The five remaining are honest: three want a server-side API key that is genuinely
+absent, health-check correctly answers 503 with no database behind it, and
+google-indexing now answers 401.
+
+THE DURABLE PART. scripts/smoke-edge-functions.mjs makes the sweep repeatable —
+`npm run smoke:functions` — and it is a CI job now. Its three assertions are the
+three findings of this loop, in order:
+
+    the router must discover the full set        US-199, the 15-of-84 map
+    no function may answer 5xx unauthenticated   US-204, this story
+    the router must survive the sweep            US-199, the AddrInUse crash
+
+The third matters more than it looks. US-199's crash returned a 500 for the
+request that caused it and THEN killed the process, so a check that only looked
+at each response would have passed it.
+
+No database is needed for any of this: a function that reaches its own auth or
+validation check has already proved it imports, registers a handler and returns
+a Response — which is exactly what deno check cannot tell you.
+
+VERIFICATION
+  - Against supabase/functions as of bef2983 the script names 16 functions and
+    exits 1. Against this tree it exits 0.
+  - A first draft used process.exit(1) on the failure path, which races the
+    cleanup and leaves a router holding the port — so the NEXT run failed with
+    "the router did not survive the sweep" on a tree that was fine. It sets
+    exitCode and lets the finally reap the child instead. A flaky guard is worse
+    than none; this one was flaky for about four minutes.
+  - deno check over all 104 files on Deno 2.1.4: exit 0.
+  - tsc --noEmit clean; npm run test:run 93 files, 845 passed, 0 failed.
+
+### Iteration 8/15 — US-205: 141 browser tests, of which CI ran 6 and let those fail
+
+Seven iterations of backend. The same lens turned on the frontend, and the first
+thing to check was not the app but whether anyone had ever looked at it.
+
+    tests/e2e/        6 specs, 22 tests    no workflow runs it
+    tests/security/   4 specs, 113 tests   no workflow runs it
+    tests/a11y/       1 spec,  6 tests     runs, continue-on-error: true
+
+135 of 141 browser tests had never been executed by CI, and the other 6 could
+not block a merge. The a11y job's comment reads "Warn-only initially: surfaces
+a11y regressions without blocking merges" — initially has lasted.
+
+These are not placeholder specs. tests/e2e covers the login and registration
+flows, the onboarding wizard, public profile visibility including the sold-
+properties toggle, listing deep links and the Back button, analytics
+throttling, and the page-builder surface. tests/security covers SQL injection
+in the login form, XSS through inputs, query parameters, path parameters,
+redirect URLs and hash fragments, CSP, cookie flags, stack traces in error
+pages, and edge-function authorization. Someone wrote all of it carefully.
+
+The e2e config even carries the comment "CI sets no env for this job", which is
+someone reasoning about a job that does not exist.
+
+RUN BEFORE WIRED UP, because a suite nobody has run is a suite that does not
+work until proven otherwise:
+
+    tests/e2e         22 passed              27.4s
+    tests/security   113 passed, 3 skipped    5.1m
+    tests/a11y         6 passed              16.0s
+
+All of them pass. Nothing had to be fixed — only turned on. That is what makes
+this the cheap kind of gap, and also the easy kind to reintroduce: a fourth
+suite next month is one npm script and no job.
+
+They are hermetic, which is why they can be a gate at all. The e2e config
+intercepts every /rest/v1, /auth/v1 and /functions/v1 call and supplies the
+VITE_SUPABASE_* values that src/integrations/supabase/client.ts throws without,
+so nothing reaches a database. Retries on CI are already configured in all three
+configs (2, 2 and 1), so flake was budgeted for before this.
+
+WHAT CHANGED
+  - ci.yml gains an End-to-End job and a Security job, each uploading its
+    Playwright report on failure.
+  - The accessibility job loses continue-on-error. It has been passing 6/6
+    against an explicit baseline in tests/a11y; the baseline is what keeps it
+    honest, not the escape hatch.
+  - src/browser-suites.test.ts reads the configs, package.json and the
+    workflows: a playwright-*.config.ts with no npm script, an npm script no CI
+    job runs, a job carrying continue-on-error, or a config whose testDir holds
+    no specs, all fail the unit suite.
+
+A NOTE ON THE GUARD. The first version parsed the workflows with js-yaml, which
+is in node_modules only as somebody else's transitive dependency — a guard that
+breaks when an unrelated package is hoisted away is not a guard. It splits jobs
+by indentation instead, which is all it needs to know.
+
+VERIFICATION
+  - The guard was run against ci.yml as of 24c5ca6 and fails there, naming
+    playwright-e2e.config.ts, playwright.config.ts and ci.yml:accessibility.
+  - tsc --noEmit clean; npm run test:run 94 files, 850 passed, 0 failed.
+
+NOTED — running the suites here needed PW_CHROMIUM_PATH, because the sandbox
+ships chromium-1194 and this Playwright expects 1200. All three configs already
+support that variable, which is the only reason this iteration could run them
+at all.
+
+### Iteration 9/15 — US-206: the accessibility baseline was a list of accepted defects
+
+US-205 made the a11y job blocking. This is what it was blocking against:
+
+    landing        3    login 1    register 1
+    dashboard      1    public profile 1    + listing modal 1
+
+Eight accepted violations over roughly 35 elements, with the spec's own comment
+reading "Drive these numbers down over time". Turning a warn-only job into a
+gate and leaving the baseline where it is just moves the acceptance from the
+workflow file into the test file.
+
+WHAT THE NUMBERS WERE. Every one was measured in a browser rather than reasoned
+about, by running axe directly and printing the failing nodes:
+
+  landing, button-name [CRITICAL]
+      The blog category filter is a Radix SelectTrigger. Its accessible name
+      comes from the value it is showing, and SelectValue had no placeholder —
+      so with no articles loaded there is no matching item, it renders nothing,
+      and a screen reader announces "button". That is the empty state every
+      first visitor sees.
+
+  public profile, colour contrast, 11 nodes
+      The listing status badges are white on 500-level fills: Active 2.27:1,
+      Pending 1.9:1. The bd / ba / sqft unit labels under every property were
+      gray-400 at 2.53:1. This is the page the agent's clients actually read.
+
+  sticky action bar
+      Text and Schedule were green-600 and orange-600 — 3.30:1 and 3.56:1 —
+      while Call, Email and Home Value were already above 4.5:1 on their own
+      600 shades. Green and orange are simply the two hues whose 600 step is not
+      dark enough, which is why only one of the five ever appeared in a report.
+
+  landing, colour contrast + link-in-text-block
+      White on bg-red-500 (3.76) and bg-green-500 (2.27) in the before/after
+      badges; text-red-400 on a red-500/10 wash (2.42) and text-green-400 on
+      green-500/10 (1.59) — which is the "gray text on coloured surfaces" tell
+      CLAUDE.md names, arrived at from the other direction. The footer's legal
+      links were blue-400 inside gray-500 prose at 1.9:1, distinguishable only
+      by colour; they are underlined now.
+
+  login / register
+      gray-400 on white for the "or" divider (2.53) and the username hint, and
+      white on the 500-level avatar fills at 10px bold (2.42-4.23).
+
+THE ONE THAT WAS NOT JUST A COLOUR. ListingCard, FeaturedListingsCarousel and
+ListingDetailModal each carried their own copy of the status colour map. Three
+copies is how a colour decision stops being one. src/lib/listingStatus.ts has
+been the single source since US-107 — it now carries a `badge` field and all
+three read it. It also covers off_market, which none of the three maps had, so
+that status rendered an unstyled badge: text on whatever the card's own
+background is.
+
+--muted-foreground moved from 46.9% to 43% lightness. It clears 4.5:1 on pure
+white (4.75) and fails on --muted (4.43), which is the tinted surface it is
+mostly used against — a token measured against the wrong background.
+
+A DIAGNOSTIC, not just a fix. The suite reported "1 color-contrast violation".
+axe groups every node under one rule, so a violation is one span or forty, and
+the number is not actionable. Reconstructing which elements they were took the
+first twenty minutes of this iteration in a scratch script. The failure message
+now prints the measured ratio and the element for each node, so the next person
+starts where this iteration ended.
+
+VERIFICATION
+  - 6/6 a11y tests pass with every baseline at 0. The public profile went 11
+    nodes -> 6 -> 1 -> 0 across four measured rounds; nothing was assumed.
+  - The E2E suite still passes 22/22 — these are shared components, and the
+    public-profile specs assert on them.
+  - tsc --noEmit clean; npm run test:run 94 files, 850 passed.
+  - npx impeccable detect on the changed landing, footer and action-bar files:
+    no findings.
+
+A number above zero in that BASELINE map is an accepted defect. It is documented
+as such now, so adding one takes an argument.
+
+### Iteration 10/15 — US-202: a real Postgres, and the last four columns
+
+Iterations 4 and 5 stopped short of the same wall twice: the remaining schema
+mismatches needed the schema to change, and changing it means regenerating
+src/integrations/supabase/types.ts, which npm run types:generate does by reading
+a live database over psql. Hand-editing a generated file to match a migration
+you also wrote is exactly the guess this whole line of stories exists to stop,
+so it was deferred — twice.
+
+It turned out not to need deferring. `psql` was on PATH and
+/usr/lib/postgresql/16/bin had the server binaries. A cluster on port 5433, the
+prelude, and every migration applied in filename order with ON_ERROR_STOP=1 —
+the same sequence .github/workflows/verify-backend.yml runs:
+
+    migrations exit=0
+    tables: 148
+    node scripts/verify-schema.mjs  ->  All schema checks passed (22 checks)
+    node scripts/gen-supabase-types.mjs --check  ->  types.ts is up to date
+
+That is worth recording on its own. The schema job has never run in this
+sandbox across ten iterations, and it is green: RLS on every table, no
+undeclared over-permissive policy, SECURITY DEFINER functions pinning
+search_path, no secret-shaped column reachable by anon, and the lead insert
+pipeline working end to end against a real database.
+
+THE MIGRATION — 20260911000001_seo_analysis_columns.sql, three tables, and each
+addition removes the asymmetry that caused the confusion:
+
+    articles                   seo_score, seo_issues, seo_recommendations,
+                               last_seo_check. The table already carries
+                               seo_title, seo_description and seo_keywords, so
+                               an article's SEO metadata lives on the article by
+                               established convention.
+
+    seo_core_web_vitals        inp, inp_pass. The table has lcp, fid, cls, fcp,
+                               ttfb, tti, tbt and si — it predates INP replacing
+                               FID as a Core Web Vital in 2024. US-201 parked INP
+                               in the field_data jsonb because there was nowhere
+                               else; a headline metric buried in jsonb is not
+                               queryable, which is why the other eight are
+                               columns.
+
+    seo_content_optimization   meta_description, issues, recommendations. It
+                               stored page_title but not the description, and it
+                               had meta_description_suggestions — what to change
+                               it TO — with nowhere to record what it IS.
+
+KNOWN_BROKEN_WRITES is empty. 59 -> 0 over four iterations.
+
+AND A DEFECT THE CHECKER CANNOT SEE. analyze-blog-posts-seo writes those four
+article columns — and also READS post.meta_description, post.featured_image,
+post.published and post.categories. None of them are columns either: they are
+seo_description, featured_image_url, status, and category/tags.
+
+The row comes from `.select('*')` typed as `any`, so these are undefined rather
+than errors. Every article analysed was told it was missing a meta description,
+missing a featured image, unpublished, and uncategorised — four penalties
+applied to every post regardless of its content, which makes the score a
+constant dressed up as an analysis.
+
+src/schema-references.test.ts covers filters, write keys and relation names:
+the places a column name is a STRING. A property read on a returned row is the
+other half, and it is not guarded. US-207 holds that question, and the honest
+answer is probably not a bespoke checker — typing the supabase client with
+Database in edge functions would let tsc do it, if the deno-check gate can carry
+the resulting errors.
+
+VERIFICATION
+  - The migration was applied to an EMPTY database, not just to the one already
+    migrated: drop, prelude, all 34 migrations in one pass, ON_ERROR_STOP=1.
+    verify-schema and types:check both pass against that fresh result.
+  - types.ts was regenerated by the tool, not edited: a 27-line addition.
+  - deno check over all 104 files: exit 0. tsc --noEmit clean.
+  - npm run test:run: 94 files, 850 passed. npm run smoke:functions: 84
+    functions, none answering 5xx.
+  - npm run verify:migrations: 34 files structurally valid.
+
+NOTED, unrelated and already fine — npm run size-check is green
+(211 chunks within budget, one documented exception for the lazy Three.js
+vendor chunk). A previous loop recorded it red on main; it is not red now.
+
+### Iteration 11/15 — US-208: the suite measured five pages of a thirty-five page site
+
+Iteration 9 drove the a11y baseline to zero. On the five pages the suite looks
+at. The site has 24 static public routes.
+
+Running axe over all of them:
+
+    14 critical/serious violations on 12 of the 19 pages the suite could not see
+
+Including three more unnamed Radix comboboxes — the same CRITICAL button-name
+defect US-206 had just fixed on the landing page, sitting on /blog and the
+Instagram bio analyzer. The fix was one iteration old and already incomplete,
+because two components render that category filter and only one of them was on
+a measured page.
+
+That is the US-186 shape, one loop later and in a different subsystem: the
+guard was correct, and it was pointed at the wrong pages.
+
+WHAT WAS THERE
+
+  button-name [CRITICAL], 3 nodes
+      /blog renders its own copy of the category filter, not BlogSection's.
+      The Instagram bio analyzer had two: each field has a
+      <Label htmlFor="linkSituation"> pointing at an id no element carries,
+      because Radix's trigger is a button and nothing set the id. Giving the
+      trigger the id its Label already named fixes the dangling htmlFor and
+      names the control in one move — better than bolting on an aria-label
+      that duplicates the visible text.
+
+  color-contrast, 9 pages
+      text-green-400 at 1.66:1, text-red-400 at 2.59:1, text-blue-400 at
+      2.27:1, and a brand teal #80d0c7 at 1.78:1 — as headings, as the ✓/✗
+      marks on every comparison table, and as the "Active Listings" / "Sold
+      Properties" labels on the property-listings feature page. 97 replacements
+      across 10 files, all to the 700 step of the same hue.
+
+  link-in-text-block, 3 legal pages
+      `text-primary hover:underline`. An underline that appears on hover is not
+      a non-colour distinction — the link is indistinguishable at rest, at
+      1.12:1 against the prose around it. 32 links now underlined at rest,
+      un-underlined on hover.
+
+AND THEN THE GUARD FOUND EIGHT MORE ROUTES. The list above came from sweeping
+the routes I could see; src/browser-suites.test.ts now derives them from
+App.tsx instead, and immediately reported eight the sweep had missed —
+including TWO free tools nobody had named: /tools/listing-description-generator
+and /tools/real-estate-agent-bio-generator. A whole lead-generation funnel that
+no browser test has ever loaded.
+
+All eight were already clean. That is the point of deriving the list rather
+than writing it: the question "have we looked at everything" should not be
+answered from memory.
+
+  /admin/* is excluded, with the reason stated in the test: setupMocks grants a
+  session but no user_roles row, so ProtectedRoute redirects and axe would
+  measure the redirect target. A green result that means nothing is worse than
+  an absent one. US-209 holds it.
+
+VERIFICATION
+  - 24 routes measured: 14 violations -> 0, in four rounds, each one re-measured
+    rather than assumed.
+  - The a11y suite is 37 tests now (was 6) and passes in 1.2 minutes.
+  - The route-coverage guard reports 31 uncovered routes against the spec as it
+    was before this change.
+  - E2E still 22/22; tsc clean; npm run test:run 94 files, 851 passed.
+
+A NOTE ON US-207, tested and answered. Last iteration suggested that typing the
+edge-function supabase client with Database would let tsc catch column reads.
+It does not: with `createClient<Database>(...)` in place, deno check still
+accepted a deliberately misspelled column in an .update(), because
+supabase/functions/deno.json sets strict:false and the rows are `any`. The
+regex checker in src/schema-references.test.ts is the mechanism, not a stopgap.
+US-207 is updated with that result so nobody repeats the experiment.
+
+### Iteration 12/15 — US-210: both free tools ended at a button that did nothing
+
+US-208 found two free tools no browser test had ever loaded. This iteration
+loaded them and used them.
+
+    /tools/instagram-bio-analyzer     fill nothing, click Next, Next
+    -> "Step 3 of 3", press "Analyze My Bio"
+    -> nothing. Four clicks, no state change, no error, no toast, no console
+       warning, no network request.
+
+    /tools/listing-description-generator
+    -> "Step 4 of 4", press "Generate Descriptions"
+    -> the same nothing.
+
+WHY. Both are multi-step react-hook-form forms. The required fields are
+registered on the early steps:
+
+    bio analyzer     currentBio (1), city / state / location (2)   submit on 3
+    listing gen      bedrooms / bathrooms / squareFeet / price (1),
+                     city / state (2)                             submit on 4
+
+`handleSubmit` will not call the submit handler while any registered field
+fails, and it renders each message inside the JSX of the step that owns the
+field. On the last step that JSX is unmounted. So the refusal is not merely
+unhelpful — it is invisible. Nothing on the page changes, and nothing ever will,
+however many times the button is pressed.
+
+Neither form validated on Next either, so the natural path — skim through to see
+what the tool does before committing to typing — leads directly to the dead end.
+Measured against the code as it shipped: the skimmer advanced 2 steps and 3
+steps respectively, ending on the final step of each with ZERO error messages
+rendered.
+
+These are the lead-generation funnels. The entire purpose of the free tools is
+to capture an agent's email at the end of one.
+
+WHAT CHANGED
+  - A STEP_FIELDS map in each form, and `Next` now awaits
+    `trigger(STEP_FIELDS[step])` and refuses to advance while the step it is
+    leaving is invalid. The error appears next to the field, which is where the
+    person is looking.
+  - `handleSubmit(onValid, onInvalid)`: if a submit is refused anyway, jump to
+    the step holding the first error. A backstop, not the main fix — but the
+    failure mode here was specifically "silent", so it is worth closing twice.
+
+VERIFICATION, measured in a browser in both directions:
+  - After: the skimmer is stopped on "Step 2 of 3" with "City is required" and
+    on "Step 1 of 4" with "Bedrooms is required".
+  - Before: "Step 3 of 3" and "Step 4 of 4", errors: [].
+  - tests/e2e/free-tool-funnels.spec.ts, 4 tests, run against
+    src/components/tools/ as it was at fdf0d6e: all 4 fail. All 4 pass after.
+    Its second assertion is the general one — if a submit button is reachable,
+    pressing it must produce either progress or a message.
+  - E2E 26/26 (was 22), a11y 37/37, tsc clean, 851 unit tests pass.
+
+Nothing in the spec is mocked. Neither tool calls Supabase to produce its
+result, which is what makes the funnels cheap to hold to this.
+
+### Iteration 13/15 — US-211: every first-time visitor downloaded the app twice
+
+Nothing in this repository measures what a browser actually downloads for a
+route. check-bundle-size.mjs weighs chunks in isolation and checks which ones
+are on the entry graph; neither is the number a visitor experiences. So: serve
+dist/ with the cache headers public/_headers declares, open each route in
+Chromium, count.
+
+    landing          2109 KB over 57 requests
+    public profile   2274 KB over 80 requests
+    pricing          1913 KB over 49 requests
+
+And on every one of them, the same URLs twice: the document itself, the
+stylesheet, and every entry chunk — index, react-vendor, supabase,
+state-vendor, ui-vendor.
+
+Two independent causes, and the second only became visible once the first was
+removed.
+
+ONE — index.html carried two static prefetches:
+
+    <link rel="prefetch" href="/auth/login" as="document">
+    <link rel="prefetch" href="/auth/register" as="document">
+
+These are SPA routes. Each one fetches index.html in full, and Chromium then
+re-fetches the entry graph the prefetched document declares.
+
+It is in the shell, so it is on every page — including the public profile.
+US-195 made Login and Register lazy *specifically* so that "a visitor to
+agentbio.net/janedoe, opened on a phone, by someone who will never sign in"
+would not pay for them, and left prefetchAuthPages() to warm those chunks only
+where a Sign in link is rendered. This markup handed the cost straight back, to
+every page, in a heavier form: a whole document rather than a chunk. Two
+optimisations, written months apart, cancelling each other out.
+
+TWO — src/lib/register-sw.ts:
+
+    wb.addEventListener('controlling', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+
+`controlling` fires whenever a service worker takes control of the page. That
+includes the FIRST registration, on a first visit — not only an update the
+visitor asked for. So every first-time visitor loaded the page, registered the
+worker, and immediately reloaded the whole thing.
+
+Isolated by measurement rather than by reading: blocking the service worker
+dropped the landing page from 2109 KB to 1232 KB and made every repeated URL
+disappear. The reload is right for exactly one case — the visitor pressed
+Refresh on the update toast — and that case now sets a flag the handler checks.
+
+ALSO REMOVED — `<link rel="preconnect" href="https://supabase.co">`, commented
+"critical for app functionality". This is a self-hosted Supabase;
+VITE_SUPABASE_URL is https://api.agentbio.net. The browser was opening a DNS
+lookup, TCP connection and TLS handshake to a host the application never
+contacts, on every page load. Not repointed: the origin is a build-time value,
+and hard-coding one in the shell is how this went wrong.
+
+MEASURED, with the service worker ALLOWED — the real first-visit path, not the
+convenient one:
+
+                      before              after
+    landing        2109 KB / 57       1232 KB / 36
+    public profile 2274 KB / 80       1397 KB / 65
+    pricing        1913 KB / 49       1035 KB / 28
+    repeated URLs  8 per page         none
+
+VERIFICATION
+  - src/lib/register-sw.test.ts, 4 tests, run against src/lib/register-sw.ts as
+    it was at 6d5029b: 2 fail there, both on the first-visit case.
+  - E2E 26/26, a11y 37/37, tsc clean, 855 unit tests pass.
+
+NOTED — US-212. The harness that found this was a throwaway script, and it
+should not be. A per-route budget in CI is the thing that would have caught a
+90% overhead in the year it existed, and the duplicate-URL check is what made
+it obvious in one line. Recorded with the numbers to budget against, and with
+the observation that every page still loads the 171 KB supabase chunk whether
+or not it queries anything.
+
+### Iteration 14/15 — US-212: a budget for what a page costs the visitor
+
+US-211 was found with a throwaway script. This makes it a gate.
+
+scripts/check-route-weight.mjs serves dist/ the way Cloudflare Pages does,
+opens four routes in Chromium, and asserts a byte budget, a request budget, and
+— the one that matters — that nothing is fetched twice.
+
+TWO DECISIONS, both learned the hard way one iteration ago:
+
+  The cache policy is PARSED from public/_headers, not copied into the script.
+  The first run of the harness that found US-211 reported /pricing at 1914 KB
+  purely because its own server sent no Cache-Control; the real figure is 1035.
+  That is 88% of the size of the defect being measured, invented by the
+  measurement. The script now refuses to run at all if _headers stops marking
+  hashed assets immutable, rather than printing confident fiction.
+
+  Service workers are ALLOWED. Blocking them is the convenient thing to do in a
+  browser test — they cause flake, they are irrelevant to most assertions — and
+  it would have hidden US-211 completely, because that reload fired from the
+  worker's own `controlling` event. A check written for convenience would have
+  been green through the whole year the defect existed.
+
+THE REPEATED-URL ASSERTION is the useful half. Every individual chunk was
+within budget while this was broken, and the entry graph was correct, so
+check-bundle-size.mjs had nothing to say. "This page fetched 23 URLs more than
+once" needs no budget to interpret, and no baseline to drift.
+
+VERIFICATION, against the tree as it was at 6d5029b:
+
+                    before US-211          after
+    landing      2107 KB / 61, 23 dupes   1232 KB / 36, none
+    pricing      1927 KB / 49, 19 dupes   1035 KB / 28, none
+    exit                      1                        0
+
+It runs in the existing Build job, which already installs Chromium and produces
+a dist — no new job, about twenty seconds.
+
+src/route-weight.test.ts guards the parser itself: the _headers matcher, the
+later-rule-wins merge, and that `npm run route-weight` is actually in ci.yml.
+The last one is US-205's lesson written down — a budget nobody runs is a file.
+
+### Iteration 15/15 — US-209: eight pages the suite reported on but never loaded
+
+The last unmeasured surface was the admin console, excluded in iteration 11
+because the a11y mocks granted a session but no user_roles row. Granting the
+role was the easy half.
+
+The hard half was noticing that the exclusion had been the honest one.
+
+assertAppRendered checked that the page produced SOME text and had not mounted
+into an error boundary. It did not check WHICH page. axe reports zero violations
+on whatever document it is handed, so a redirect passes — cleanly, quickly, and
+for years. Adding one assertion — the path it landed on must be the path it
+asked for — failed eight tests at once:
+
+    /admin, /admin/seo, /admin/audit-log, /admin/health,
+    /admin/search-analytics, /onboarding/wizard, /auth/sso/callback
+    ... and /dashboard
+
+`dashboard` has been in this suite since it was written. It has been measuring
+/auth/login the entire time, and passing.
+
+WHY NOBODY WAS SIGNED IN. setupMocks intercepts /auth/v1/token and
+/auth/v1/user. supabase-js only calls those when it has a stored session to
+refresh — navigating straight to a protected route leaves storage empty, so
+getSession() returns null without a request and the mocks answer nothing at all.
+The e2e specs sign in through the login form, which is what actually writes the
+session; this suite never did. The mock looked like authentication and was
+inert.
+
+WHAT THE EIGHT PAGES WERE HIDING, once they loaded:
+
+    button-name [CRITICAL] x2, dashboard
+        The conversion funnel's period filter — a SelectTrigger with a bare
+        SelectValue, the third of these this loop has found — and an icon-only
+        Copy button for the agent's own profile link, with no label at all.
+
+    aria-progressbar-name, 3 pages
+        ui/progress.tsx renders Radix's role="progressbar" with no accessible
+        name, so a screen reader announces a percentage with no indication of
+        what is progressing. Dashboard, onboarding wizard, admin dashboard —
+        one component, every page that uses it.
+
+    color-contrast, application-wide
+        ui/tabs.tsx sets text-gray-500 on bg-gray-100: 4.39:1. Every inactive
+        tab in the product, just under AA, on 26 nodes of /admin/seo alone.
+        One line.
+
+All fixed. 42 a11y tests, covering every static route App.tsx declares, and the
+/admin exclusion is gone from src/browser-suites.test.ts.
+
+THE SHAPE OF IT, which is the shape of this whole loop: the guard was real, the
+assertion was real, and the thing it asserted was not the thing anyone thought
+it was asserting. "Something rendered" is not "this page rendered", exactly as
+"the map has fifteen names" was not "the app calls fifteen functions", and "the
+baseline is zero" was not "the site has no violations".
+
+VERIFICATION
+  - The path assertion was added BEFORE the fixes and failed 8 of 42. After:
+    42 pass.
+  - E2E 26/26, tsc clean, 860 unit tests, route-weight within budget on all
+    four routes with nothing fetched twice.
+
+---
+
+## The web platform loop, in one paragraph
+
+Fifteen iterations. The first one fixed a string; the last one fixed an
+assertion; almost everything between was the same thing in different clothes —
+a check that existed, ran, passed, and was not checking what its name said.
+
+The edge-function router served 15 of 84 functions and reported the other 69 as
+"not found". The type-check gate that called itself blocking aborted on an
+import path before type-checking anything, for a year. 135 of 141 browser tests
+had never been run by CI, and the 6 that had could not fail. The accessibility
+baseline was a list of accepted defects, then a list of five pages out of
+thirty-five, then a suite that had been measuring the login page whenever it
+thought it was measuring the dashboard. The bundle-size budget was correct about
+every chunk while every page loaded twice.
+
+The defects themselves compose in a way that is worth noticing. Iteration 1 found
+that every edge-function error reached the user as "[object Object]"; iteration 2
+found 29 functions answering 404, which is why nobody had reported the first one.
+Iteration 12 found a submit button that did nothing on a form whose validation
+errors rendered on a step that was no longer mounted. Iteration 13 found two
+optimisations, written months apart, that cancelled each other out. None of these
+are visible from the code alone, and none of them are visible from a green CI
+run. They are visible from running the thing and looking at what happens.
+
+What the loop leaves behind is mostly checks, not fixes: a schema-reference test
+that needs no database, a smoke test that boots all 84 functions and refuses a
+5xx to an unauthenticated request, a route-weight budget that fails on a repeated
+URL, a guard that every Playwright config is run by a job that can fail, and a
+route-coverage test that derives its list from App.tsx rather than from memory.
+Each one was run against the commit before its fix and watched to fail. A guard
+that has only ever passed has not been tested — which is, in the end, the same
+sentence as the paragraph above.

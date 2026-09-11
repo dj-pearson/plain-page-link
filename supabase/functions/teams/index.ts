@@ -79,18 +79,23 @@ serve(async (req) => {
         return errorResponse('Seat limit reached for this plan', 'RATE_LIMIT', req, 429);
       }
 
-      // Link to an existing user if the email matches.
-      const { data: existing } = await service
-        .from('profiles')
-        .select('id')
-        .eq('email', String(email).toLowerCase())
-        .maybeSingle();
-
+      // user_id is left null until the invitee accepts.
+      //
+      // US-200: this used to look the invitee up with
+      // `.from('profiles').eq('email', ...)`. `profiles` has no `email` column —
+      // the account address lives in auth.users, which is the whole reason
+      // _shared/agent-contact.ts exists (US-070). PostgREST answered 400, the
+      // `{ data }` destructure dropped the error, and `existing` was always
+      // undefined, so the branch never did anything but cost a round trip.
+      //
+      // Nothing is lost by removing it: the 'accept' action below links the row
+      // by email (`user_id.eq.<id>,email.eq.<address>`), which is the only
+      // moment the invitee is actually present to be linked.
       const { data: member, error } = await service
         .from('team_members')
         .insert({
           team_id: teamId,
-          user_id: existing?.id ?? null,
+          user_id: null,
           email: String(email).toLowerCase(),
           role: role === 'admin' ? 'admin' : 'member',
         })

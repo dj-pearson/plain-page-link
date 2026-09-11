@@ -289,7 +289,7 @@ export default function InstagramBioForRealtors() {
                   key={i}
                   className="flex items-start gap-3 p-4 rounded-lg bg-glass-background backdrop-blur-md border border-glass-border"
                 >
-                  <div className="flex-shrink-0 text-green-400 mt-1">{item.icon}</div>
+                  <div className="flex-shrink-0 text-green-700 mt-1">{item.icon}</div>
                   <p className="glass-body">{item.tip}</p>
                 </div>
               ))}
@@ -398,7 +398,7 @@ function ExampleBio({ name, bio, why }: { name: string; bio: string; why: string
         </div>
       </div>
       <div className="flex items-start gap-2">
-        <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+        <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
         <p className="text-sm glass-body text-muted-foreground">{why}</p>
       </div>
     </div>
@@ -416,7 +416,7 @@ function StrategyCard({
 }) {
   return (
     <div className="flex items-start gap-6 p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border hover:border-[#80d0c7] transition-all">
-      <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#80d0c7]">
+      <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
         {React.cloneElement(icon as React.ReactElement, { className: 'h-6 w-6' })}
       </div>
       <div>

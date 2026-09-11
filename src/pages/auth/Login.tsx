@@ -341,7 +341,7 @@ export default function Login() {
                 <div className="w-full border-t border-gray-200" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="px-3 bg-white text-gray-400 uppercase tracking-wider">or</span>
+                <span className="px-3 bg-white text-gray-500 uppercase tracking-wider">or</span>
               </div>
             </div>
 

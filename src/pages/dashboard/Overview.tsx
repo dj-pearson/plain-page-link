@@ -217,8 +217,10 @@ export default function Overview() {
                         });
                       }}
                       className="p-1 hover:bg-background rounded transition-colors"
+                      aria-label="Copy your profile link"
+                      title="Copy your profile link"
                     >
-                      <Copy className="h-3 w-3" />
+                      <Copy className="h-3 w-3" aria-hidden="true" />
                     </button>
                   </div>
                 )}

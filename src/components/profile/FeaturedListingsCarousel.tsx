@@ -18,20 +18,13 @@ import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
 import { currentListingShareUrl } from '@/lib/listingShare';
 
+import { listingStatusBadgeClass } from '@/lib/listingStatus';
 interface FeaturedListingsCarouselProps {
   listings: PublicProfileListing[];
   onViewDetails?: (listing: PublicProfileListing) => void;
   autoRotate?: boolean;
   interval?: number;
 }
-
-const statusColors: Record<string, string> = {
-  active: 'bg-green-500 text-white',
-  pending: 'bg-yellow-500 text-white',
-  under_contract: 'bg-orange-500 text-white',
-  sold: 'bg-blue-500 text-white',
-  draft: 'bg-gray-500 text-white',
-};
 
 const statusLabels: Record<string, string> = {
   active: 'Active',
@@ -229,7 +222,7 @@ export function FeaturedListingsCarousel({
                 <span
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold shadow-lg backdrop-blur-sm',
-                    statusColors[currentListing.status ?? 'active']
+                    listingStatusBadgeClass(currentListing.status)
                   )}
                 >
                   {statusLabels[currentListing.status ?? 'active']}

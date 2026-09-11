@@ -36,6 +36,7 @@
  */
 
 import { getCorsHeaders } from './cors.ts';
+import { isHttpError } from './http-error.ts';
 
 /**
  * Standard API response shape
@@ -195,6 +196,19 @@ export function methodNotAllowedResponse(req: Request, allowed: string[] = ['POS
  * @param req - Request object (for CORS headers)
  */
 export function handleUnexpectedError(error: unknown, req: Request): Response {
+  // US-204: an error that already knows its status is not unexpected. requireAuth
+  // throws before it touches Supabase, so "no authorization header" arrived here
+  // and left as a 500 — retried by every client that retries 5xx, and logged as
+  // [UnexpectedError] alongside genuine faults, which is how a real outage
+  // becomes invisible.
+  //
+  // The message is the caller's to see: it is about what THEY sent, and it
+  // cannot leak server state because these are raised before any is read.
+  if (isHttpError(error)) {
+    console.warn(`[${error.code}] ${error.message}`);
+    return errorResponse(error.message, error.code, req, error.status);
+  }
+
   console.error('[UnexpectedError]', {
     message: error instanceof Error ? error.message : 'Unknown error',
     stack: error instanceof Error ? error.stack : undefined,

@@ -4,6 +4,7 @@ import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 /**
  * Analyze Internal Linking Structure
@@ -193,13 +194,32 @@ serve(async (req) => {
     if (saveResults && userId) {
       const { error: insertError } = await supabase
         .from('seo_link_analysis')
+        // US-201: six keys, five of which the table does not have. `url` is
+        // page_url and is NOT NULL, so this insert could not have succeeded
+        // even by accident — every analysis this function ran was discarded.
+        //
+        // The counts map onto the columns that already exist, and the issues
+        // and recommendations go in as themselves: seo_link_analysis has
+        // `issues` and `recommendations` jsonb columns, and storing
+        // `issues.length` instead threw away the only part an operator can act
+        // on. There is no column for unique internal pages or for who asked;
+        // both are in the response `result` above, which is what the caller
+        // reads.
         .insert({
-          url,
-          total_internal_links: totalInternalLinks,
-          unique_internal_pages: internalLinksArray.length,
-          total_external_links: externalCount,
-          issues_count: issues.length,
-          analyzed_by: userId,
+          page_url: url,
+          total_links: totalInternalLinks + externalCount,
+          internal_links: totalInternalLinks,
+          external_links: externalCount,
+          external_nofollow_count: externalWithNoFollow,
+          anchor_texts: mostLinkedPages.map((p) => ({
+            url: p.url,
+            linkCount: p.count,
+            anchorTexts: p.anchorTexts,
+          })),
+          over_optimized_anchors: genericAnchorCount,
+          quality_score: result.score,
+          issues,
+          recommendations,
         });
 
       if (insertError) {
@@ -216,7 +236,7 @@ serve(async (req) => {
     console.error('Error analyzing internal links:', error);
     return new Response(
       JSON.stringify({ error: getErrorMessage(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: errorStatus(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

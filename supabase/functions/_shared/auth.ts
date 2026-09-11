@@ -4,6 +4,7 @@
  */
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { forbidden, unauthorized } from './http-error.ts';
 
 /**
  * Get authenticated user from request
@@ -14,14 +15,14 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 export async function requireAuth(req: Request, supabase: SupabaseClient) {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
-    throw new Error('Unauthorized: No authorization header');
+    throw unauthorized('Unauthorized: No authorization header', 'AUTH_TOKEN_MISSING');
   }
 
   const token = authHeader.replace('Bearer ', '');
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
-    throw new Error('Unauthorized: Invalid token');
+    throw unauthorized('Unauthorized: Invalid token', 'AUTH_SESSION_INVALID');
   }
 
   return user;
@@ -47,7 +48,7 @@ export async function requireAdmin(req: Request, supabase: SupabaseClient) {
     .maybeSingle();
 
   if (roleError || !adminRole) {
-    throw new Error('Forbidden: Admin access required');
+    throw forbidden('Forbidden: Admin access required');
   }
 
   return user;
@@ -73,6 +74,6 @@ export function getClientIP(req: Request): string {
  */
 export function requireOwnership(userId: string, resourceUserId: string) {
   if (userId !== resourceUserId) {
-    throw new Error('Forbidden: You do not own this resource');
+    throw forbidden('Forbidden: You do not own this resource');
   }
 }

@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAdmin } from '../_shared/auth.ts';
 import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { isValidWebhookUrl } from '../_shared/validation.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 /**
  * Send a sample article payload to a webhook, to check it is wired up.
@@ -148,7 +149,7 @@ Read the full article here: https://agentbio.net/blog/sample-article-slug
         error: errorMessage 
       }),
       { 
-        status: 500,
+        status: errorStatus(error),
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

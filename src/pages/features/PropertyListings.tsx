@@ -141,7 +141,7 @@ export default function PropertyListings() {
               <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                 <div className="mb-4">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-sm font-light mb-4">
-                    <span className="text-green-400">Active Listings</span>
+                    <span className="text-green-700">Active Listings</span>
                   </div>
                 </div>
                 <h3 className="text-2xl font-light text-foreground mb-4">
@@ -149,19 +149,19 @@ export default function PropertyListings() {
                 </h3>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="glass-body">Highlight your best listings first</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="glass-body">Mark as "Just Listed" or "Price Reduced"</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="glass-body">Add virtual tour links</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="glass-body">Include open house dates</span>
                   </li>
                 </ul>
@@ -170,7 +170,7 @@ export default function PropertyListings() {
               <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                 <div className="mb-4">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-sm font-light mb-4">
-                    <span className="text-blue-400">Sold Properties</span>
+                    <span className="text-blue-700">Sold Properties</span>
                   </div>
                 </div>
                 <h3 className="text-2xl font-light text-foreground mb-4">
@@ -178,19 +178,19 @@ export default function PropertyListings() {
                 </h3>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
                     <span className="glass-body">Display sale prices and close dates</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
                     <span className="glass-body">Show before/after photos</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
                     <span className="glass-body">Add client success stories</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
                     <span className="glass-body">Build credibility with volume</span>
                   </li>
                 </ul>
@@ -321,7 +321,7 @@ function FeatureCard({
 }) {
   return (
     <div className="flex items-start gap-6 p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border hover:border-[#80d0c7] transition-all">
-      <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#80d0c7]">
+      <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
         {React.cloneElement(icon as React.ReactElement, { className: 'h-6 w-6' })}
       </div>
       <div>

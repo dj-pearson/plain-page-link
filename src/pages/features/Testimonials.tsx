@@ -103,7 +103,7 @@ export default function Testimonials() {
 
                 <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="mb-4">
-                    <Trophy className="h-12 w-12 text-[#80d0c7] mb-2" />
+                    <Trophy className="h-12 w-12 text-[#0f766e] mb-2" />
                     <p className="text-3xl font-light text-foreground">3x</p>
                   </div>
                   <p className="glass-body">
@@ -114,7 +114,7 @@ export default function Testimonials() {
 
                 <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="mb-4">
-                    <MessageSquare className="h-12 w-12 text-[#80d0c7] mb-2" />
+                    <MessageSquare className="h-12 w-12 text-[#0f766e] mb-2" />
                     <p className="text-3xl font-light text-foreground">72%</p>
                   </div>
                   <p className="glass-body">
@@ -125,7 +125,7 @@ export default function Testimonials() {
 
                 <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="mb-4">
-                    <Users className="h-12 w-12 text-[#80d0c7] mb-2" />
+                    <Users className="h-12 w-12 text-[#0f766e] mb-2" />
                     <p className="text-3xl font-light text-foreground">63%</p>
                   </div>
                   <p className="glass-body">
@@ -244,11 +244,11 @@ export default function Testimonials() {
                     <h3 className="text-lg font-light text-foreground mb-4">{item.title}</h3>
                     <div className="space-y-3 mb-4">
                       <div className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
-                        <p className="text-xs text-green-400 mb-1">✓ Good:</p>
+                        <p className="text-xs text-green-700 mb-1">✓ Good:</p>
                         <p className="text-sm glass-body">"{item.good}"</p>
                       </div>
                       <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-                        <p className="text-xs text-red-400 mb-1">✗ Bad:</p>
+                        <p className="text-xs text-red-700 mb-1">✗ Bad:</p>
                         <p className="text-sm glass-body">"{item.bad}"</p>
                       </div>
                     </div>
@@ -406,7 +406,7 @@ function TestimonialType({
   return (
     <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
       <div className="flex items-start gap-6 mb-6">
-        <div className="flex-shrink-0 p-4 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#80d0c7]">
+        <div className="flex-shrink-0 p-4 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
           {React.cloneElement(icon as React.ReactElement, { className: 'h-8 w-8' })}
         </div>
         <div>
@@ -418,7 +418,7 @@ function TestimonialType({
       <ul className="space-y-2">
         {features.map((feature, i) => (
           <li key={i} className="flex items-start gap-2">
-            <Check className="h-4 w-4 text-[#80d0c7] flex-shrink-0 mt-0.5" />
+            <Check className="h-4 w-4 text-[#0f766e] flex-shrink-0 mt-0.5" />
             <span className="text-sm glass-body">{feature}</span>
           </li>
         ))}

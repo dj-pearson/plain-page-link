@@ -4,6 +4,7 @@ import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 /**
  * Analyze Semantic Keywords
@@ -196,12 +197,29 @@ serve(async (req) => {
     if (saveResults && userId) {
       const { error: insertError } = await supabase
         .from('seo_semantic_analysis')
+        // US-201: four of the six keys were not columns, and `primary_topic`
+        // is NOT NULL and was absent — so this insert had two independent
+        // reasons to fail and every semantic analysis was thrown away.
+        //
+        // Each value has a real home, and two of them are better ones:
+        //   unique_words       -> vocabulary_size, with lexical_diversity
+        //                         derived from it (total_words has no column
+        //                         because the ratio is what the table stores)
+        //   top_keywords       -> semantic_keywords
+        //   lsi_keywords       -> keyword_co_occurrence. The LSI suggestions
+        //                         ARE co-occurrence: words near the target with
+        //                         a proximity count.
+        // tf_idf_keywords was computed above and then never persisted at all.
         .insert({
           url,
-          total_words: filteredWords.length,
-          unique_words: wordFrequency.size,
-          top_keywords: topKeywords.slice(0, 20),
-          lsi_keywords: lsiSuggestions,
+          primary_topic: topKeywords[0]?.keyword ?? 'unknown',
+          vocabulary_size: wordFrequency.size,
+          lexical_diversity: filteredWords.length
+            ? Math.round((wordFrequency.size / filteredWords.length) * 10000) / 100
+            : 0,
+          semantic_keywords: topKeywords.slice(0, 20),
+          keyword_co_occurrence: { lsi: lsiSuggestions },
+          tf_idf_keywords: tfIdf,
           analyzed_by: userId,
         });
 
@@ -219,7 +237,7 @@ serve(async (req) => {
     console.error('Error analyzing semantic keywords:', error);
     return new Response(
       JSON.stringify({ error: getErrorMessage(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: errorStatus(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

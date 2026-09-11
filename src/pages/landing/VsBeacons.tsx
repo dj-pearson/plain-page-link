@@ -133,7 +133,7 @@ export default function VsBeacons() {
                     <th className="text-left py-4 px-4 font-light text-lg">Feature</th>
                     <th className="text-center py-4 px-4 font-light text-lg">
                       <div className="flex flex-col items-center">
-                        <span className="text-[#3f8f85] dark:text-[#80d0c7] font-semibold">
+                        <span className="text-[#0f766e] dark:text-[#0f766e] font-semibold">
                           AgentBio
                         </span>
                         <span className="text-sm text-muted-foreground mt-1">Real Estate</span>
@@ -310,7 +310,7 @@ export default function VsBeacons() {
               <div className="space-y-12">
                 <div className="space-y-4">
                   <h3 className="text-2xl font-light text-foreground flex items-center gap-3">
-                    <X className="h-6 w-6 text-red-400" />
+                    <X className="h-6 w-6 text-red-700" />
                     The Problem with Beacons for Real Estate
                   </h3>
                   <div className="pl-9 space-y-3">
@@ -338,7 +338,7 @@ export default function VsBeacons() {
 
                 <div className="space-y-4">
                   <h3 className="text-2xl font-light text-foreground flex items-center gap-3">
-                    <Check className="h-6 w-6 text-green-400" />
+                    <Check className="h-6 w-6 text-green-700" />
                     The AgentBio Advantage for Real Estate
                   </h3>
                   <div className="pl-9 space-y-3">
@@ -591,7 +591,7 @@ function ComparisonRow({
           agentbio ? (
             <Check className="h-5 w-5 text-green-500 mx-auto" />
           ) : (
-            <X className="h-5 w-5 text-red-400 mx-auto" />
+            <X className="h-5 w-5 text-red-700 mx-auto" />
           )
         ) : (
           <span className="text-foreground">{agentbio}</span>
@@ -602,7 +602,7 @@ function ComparisonRow({
           beacons ? (
             <Check className="h-5 w-5 text-green-500 mx-auto" />
           ) : (
-            <X className="h-5 w-5 text-red-400 mx-auto" />
+            <X className="h-5 w-5 text-red-700 mx-auto" />
           )
         ) : (
           <span className="text-foreground">{beacons}</span>
@@ -644,11 +644,11 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
         className="w-full px-6 py-4 text-left flex items-center justify-between group"
         aria-expanded={isOpen}
       >
-        <h3 className="text-lg font-light tracking-tight text-foreground pr-4 group-hover:text-[#80d0c7] transition-colors">
+        <h3 className="text-lg font-light tracking-tight text-foreground pr-4 group-hover:text-[#0f766e] transition-colors">
           {question}
         </h3>
         <svg
-          className={`w-5 h-5 text-[#80d0c7] transition-transform flex-shrink-0 ${
+          className={`w-5 h-5 text-[#0f766e] transition-transform flex-shrink-0 ${
             isOpen ? 'rotate-180' : ''
           }`}
           fill="none"

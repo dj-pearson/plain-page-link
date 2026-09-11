@@ -155,8 +155,16 @@ export default function Blog() {
                 />
               </div>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue />
+                {/*
+                  US-208: the same unnamed combobox US-206 fixed in
+                  BlogSection. Two components render this filter and only one of
+                  them was on a page the a11y suite looked at.
+                */}
+                <SelectTrigger
+                  className="w-full sm:w-[200px]"
+                  aria-label="Filter articles by category"
+                >
+                  <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (

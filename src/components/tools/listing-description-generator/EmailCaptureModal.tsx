@@ -206,7 +206,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, listingId }: Emai
 
           <div>
             <Label htmlFor="brokerageName">
-              Brokerage <span className="text-gray-400">(Optional)</span>
+              Brokerage <span className="text-gray-600">(Optional)</span>
             </Label>
             <Input
               id="brokerageName"
@@ -218,7 +218,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, listingId }: Emai
 
           <div>
             <Label htmlFor="phoneNumber">
-              Phone Number <span className="text-gray-400">(Optional)</span>
+              Phone Number <span className="text-gray-600">(Optional)</span>
             </Label>
             <Input
               id="phoneNumber"

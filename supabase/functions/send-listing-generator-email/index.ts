@@ -10,6 +10,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 
+import { HttpError, errorStatus } from '../_shared/http-error.ts';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'noreply@agentbio.net';
 const SITE_URL = getSiteUrl();
@@ -28,7 +29,10 @@ serve(async (req) => {
     const { email, firstName, propertyDetails, descriptions, listingId } = await req.json();
 
     if (!email || !firstName) {
-      throw new Error('Email and firstName are required');
+      // US-204: this was a bare Error, and the catch below answers 500 — so a
+      // form submitted without an email was reported as a server fault and
+      // retried by anything that retries 5xx.
+      throw new HttpError('Email and firstName are required', 400, 'REQUEST_VALIDATION_FAILED');
     }
 
     // Create Supabase client
@@ -90,7 +94,7 @@ serve(async (req) => {
         error: error.message || 'Failed to send email',
       }),
       {
-        status: 500,
+        status: errorStatus(error),
         headers: {
           'Content-Type': 'application/json',
           ...getCorsHeaders(origin),

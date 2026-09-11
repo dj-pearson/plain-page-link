@@ -38,12 +38,28 @@
     <link rel="dns-prefetch" href="https://www.google-analytics.com">
     <link rel="dns-prefetch" href="https://static.cloudflareinsights.com">
 
-    <!-- Preconnect for Supabase (critical for app functionality) -->
-    <link rel="preconnect" href="https://supabase.co" crossorigin>
+    <!--
+      US-211: a preconnect to https://supabase.co stood here, described as
+      "critical for app functionality". This is a self-hosted Supabase —
+      VITE_SUPABASE_URL is https://api.agentbio.net — so the browser was opening
+      a DNS lookup, TCP connection and TLS handshake to a host the application
+      never contacts, on every page load. Removed rather than repointed: the
+      origin is a build-time value and hard-coding one here is how this went
+      wrong in the first place.
 
-    <!-- Prefetch likely next pages for faster navigation -->
-    <link rel="prefetch" href="/auth/login" as="document">
-    <link rel="prefetch" href="/auth/register" as="document">
+      Two <link rel="prefetch" as="document"> for /auth/login and /auth/register
+      stood here too. They are SPA routes, so each one fetches index.html in
+      full, and Chromium then re-fetches the entry graph the prefetched document
+      declares — measured as a second copy of index, react-vendor, supabase,
+      state-vendor and the stylesheet on EVERY page.
+
+      Including the public profile. US-195 moved Login and Register out of the
+      entry graph specifically so that "a visitor to agentbio.net/janedoe, opened
+      on a phone, by someone who will never sign in" would not pay for them, and
+      left prefetchAuthPages() to warm those chunks only where a Sign in link is
+      actually rendered. This markup handed the cost back, to every page, in a
+      heavier form — a whole document rather than a chunk.
+    -->
 
     <!-- Google Analytics - Deferred loading via external script (CSP compliant) -->
     <!-- Filled in from VITE_GA_MEASUREMENT_ID at build time. Empty means no
