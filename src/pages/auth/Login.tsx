@@ -358,7 +358,10 @@ export default function Login() {
 
             {/* Error message */}
             {error && !isThrottled && (
-              <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <div
+                role="alert"
+                className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3"
+              >
                 <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-red-800">Login Failed</p>

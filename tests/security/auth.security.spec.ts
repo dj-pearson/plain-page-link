@@ -6,12 +6,11 @@
  */
 
 import { test, expect } from '../support/consent';
-import {
-  testAuthBypass,
-  testRateLimiting,
-  testCookieSecurity,
-  SQL_INJECTION_PAYLOADS,
-} from './security-utils';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { testCookieSecurity, SQL_INJECTION_PAYLOADS } from './security-utils';
+
+const FUNCTIONS = join(process.cwd(), 'supabase/functions');
 
 test.describe('Authentication Security', () => {
   test.describe('Login Security', () => {
@@ -37,43 +36,108 @@ test.describe('Authentication Security', () => {
       }
     });
 
-    test('should implement login rate limiting', async ({ request }) => {
-      const result = await testRateLimiting(request, '/auth/login', 'POST', 20);
+    /**
+     * The origin under test serves static files and a client-side router. It
+     * has no `POST /auth/login` and no `/api/auth/reset-password`, which is
+     * what this test and its password-reset twin used to probe for a 429. A
+     * path that does not exist cannot be rate limited, so
+     * `expect(rateLimited).toBe(true)` could only fail — and did, on every run
+     * since US-205 made this suite blocking.
+     *
+     * The limiter is real, it is just not on this origin: auth-sensitive
+     * traffic goes to the login-security edge function, which calls
+     * checkRateLimitDb before it branches on the action. These are SOURCE
+     * assertions for the same reason edge-authz.security.spec.ts's are — no
+     * Deno runtime and no Supabase instance in CI, so what is checkable is
+     * that the guard is still in the file.
+     */
+    test('login-security rate limits before it branches on the action', () => {
+      const source = readFileSync(join(FUNCTIONS, 'login-security/index.ts'), 'utf8');
 
-      // Should have rate limiting
-      expect(result.rateLimited).toBe(true);
-      expect(result.requestsBeforeLimit).toBeLessThanOrEqual(10);
+      const limiterAt = source.indexOf('checkRateLimitDb(');
+      const switchAt = source.indexOf('switch (body.action)');
+
+      expect(limiterAt).toBeGreaterThan(-1);
+      expect(switchAt).toBeGreaterThan(-1);
+      expect(limiterAt).toBeLessThan(switchAt);
+
+      expect(source).toContain('RATE_LIMITS.auth');
+      expect(source).toMatch(/status:\s*429/);
+      expect(source).toContain("'Retry-After'");
     });
 
-    test('should not expose user existence on login failure', async ({ page }) => {
-      await page.goto('/auth/login');
+    test('the auth rate limit is strict and fails closed', () => {
+      const source = readFileSync(join(FUNCTIONS, '_shared/rate-limiter.ts'), 'utf8');
 
-      // Test with non-existent email
-      await page.fill('input[type="email"], input[name="email"]', 'nonexistent@test.com');
-      await page.fill('input[type="password"]', 'wrongpassword');
-      await page.click('button[type="submit"]');
+      const auth = /auth:\s*\{([^}]*)\}/.exec(source)?.[1] ?? '';
 
-      const errorMessage1 =
-        (await page.textContent('[role="alert"], .error-message, .toast-error')) || '';
+      // Five per minute. Loose enough for a typo, useless for a script.
+      expect(auth).toMatch(/maxRequests:\s*([1-9]|10)\b/);
+      // An unavailable limiter must refuse, not wave traffic through.
+      expect(auth).toContain('failClosed: true');
+    });
 
-      await page.goto('/auth/login');
+    /**
+     * User enumeration on the login form.
+     *
+     * There is no auth backend behind a dev server, so this used to submit two
+     * addresses at a VITE_SUPABASE_URL pointing back at the dev origin, read
+     * whatever the failed fetch produced, and assert one of the two strings
+     * contained "invalid", "incorrect" or "failed". What it actually measured
+     * was the shape of a network error.
+     *
+     * Stubbing GoTrue makes the question answerable: give the two addresses
+     * DIFFERENT upstream errors — one naming the address, as a real
+     * "User not found" would — and require the page to render the same thing
+     * for both. That is the property, and Login.tsx holds it by rendering a
+     * constant rather than the error it caught.
+     */
+    test('renders the same failure whatever the auth backend says', async ({ page }) => {
+      const seen: string[] = [];
 
-      // Test with potentially existing email
-      await page.fill('input[type="email"], input[name="email"]', 'admin@agentbio.net');
-      await page.fill('input[type="password"]', 'wrongpassword');
-      await page.click('button[type="submit"]');
+      await page.route('**/functions/v1/login-security', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            blocked: false,
+            attemptsRemaining: 5,
+            blockedUntil: null,
+            reason: null,
+          }),
+        })
+      );
 
-      const errorMessage2 =
-        (await page.textContent('[role="alert"], .error-message, .toast-error')) || '';
+      for (const [email, upstream] of [
+        ['nonexistent@example.test', 'User not found: nonexistent@example.test'],
+        ['admin@agentbio.net', 'Invalid login credentials'],
+      ] as const) {
+        await page.route('**/auth/v1/token**', (route) =>
+          route.fulfill({
+            status: 400,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'invalid_grant', error_description: upstream }),
+          })
+        );
 
-      // Error messages should be identical to prevent user enumeration
-      // Or both should be generic
-      const isGenericError = (msg: string) =>
-        msg.toLowerCase().includes('invalid') ||
-        msg.toLowerCase().includes('incorrect') ||
-        msg.toLowerCase().includes('failed');
+        await page.goto('/auth/login');
+        await page.fill('input[type="email"], input[name="email"]', email);
+        await page.fill('input[type="password"]', 'wrong-password-for-this-test');
+        await page.click('button[type="submit"]');
 
-      expect(isGenericError(errorMessage1) || isGenericError(errorMessage2)).toBe(true);
+        const alert = page.getByRole('alert').filter({ hasText: 'Login Failed' });
+        await expect(alert).toBeVisible({ timeout: 15000 });
+        seen.push(((await alert.textContent()) ?? '').replace(/\s+/g, ' ').trim());
+
+        await page.unroute('**/auth/v1/token**');
+      }
+
+      expect(seen).toHaveLength(2);
+      expect(seen[0]).toBe(seen[1]);
+      // And it must not be the upstream message, which named the address.
+      expect(seen[0]).not.toContain('nonexistent@example.test');
+      expect(seen[0].toLowerCase()).toContain('invalid email or password');
     });
 
     test('should enforce password complexity requirements', async ({ page }) => {
@@ -152,13 +216,32 @@ test.describe('Authentication Security', () => {
   });
 
   test.describe('Protected Routes', () => {
-    test('should reject unauthenticated access to protected API', async ({ request }) => {
-      const protectedEndpoints = ['/api/profile', '/api/leads', '/api/listings', '/api/analytics'];
+    /**
+     * This platform has no REST API. App.tsx routes no `/api/*` path and the
+     * string `/api/` appears nowhere in src/ — data goes to Supabase
+     * PostgREST under RLS and to /functions/v1/* edge functions.
+     *
+     * So the previous version of this test probed /api/profile, /api/leads,
+     * /api/listings and /api/analytics, got the SPA fallback (200, the app
+     * shell) for each, and reported `vulnerable: true` four times: a security
+     * suite raising unauthenticated-data-access findings against endpoints
+     * that do not exist.
+     *
+     * What is worth holding is that it stays that way. If an /api/* path ever
+     * answers with JSON it is a data endpoint nobody wrote a policy for. The
+     * guards on the surface that does exist are in
+     * edge-authz.security.spec.ts and scripts/verify-schema.mjs.
+     */
+    test('no /api/* path serves data', async ({ request }) => {
+      const endpoints = ['/api/profile', '/api/leads', '/api/listings', '/api/analytics'];
 
-      for (const endpoint of protectedEndpoints) {
-        const result = await testAuthBypass(request, endpoint);
+      for (const endpoint of endpoints) {
+        const response = await request.get(endpoint, { failOnStatusCode: false });
+        const contentType = response.headers()['content-type'] ?? '';
 
-        expect(result.vulnerable).toBe(false);
+        expect(contentType, `${endpoint} answered with ${contentType}`).not.toContain(
+          'application/json'
+        );
       }
     });
 
@@ -178,28 +261,49 @@ test.describe('Authentication Security', () => {
   });
 
   test.describe('Password Reset Security', () => {
-    test('should rate limit password reset requests', async ({ request }) => {
-      const result = await testRateLimiting(request, '/api/auth/reset-password', 'POST', 10);
+    /**
+     * Password reset is GoTrue's `/auth/v1/recover`, not an endpoint of this
+     * app — there has never been an `/api/auth/reset-password` here. Its rate
+     * limit is GoTrue's own, configured on the Supabase instance, and is not
+     * reachable from a dev server. The limit this repository owns and can
+     * assert is the one above.
+     */
 
-      // Should have strict rate limiting for password reset
-      expect(result.rateLimited).toBe(true);
-      expect(result.requestsBeforeLimit).toBeLessThanOrEqual(5);
-    });
+    /**
+     * Same question as the login form, and until this story the answer was
+     * worse: ForgotPassword.tsx rendered `error.message` from GoTrue straight
+     * into the page. "User not found" is a message GoTrue will produce, and it
+     * answers the one question a password-reset form must never answer.
+     *
+     * The old test could not have caught it. It typed one address, read
+     * `.success-message, [role="alert"]` — neither of which the page had — got
+     * '' from a form that had not submitted anywhere real, and asserted that
+     * the empty string does not contain "not found".
+     */
+    test('does not echo the auth backend when a reset fails', async ({ page }) => {
+      await page.route('**/auth/v1/recover**', (route) =>
+        route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'user_not_found',
+            msg: 'User not found: random@example.test',
+          }),
+        })
+      );
 
-    test('should not confirm email existence in password reset', async ({ page }) => {
       await page.goto('/auth/forgot-password');
-
-      // Test with random email
-      await page.fill('input[type="email"]', 'random@nonexistent.com');
+      await page.fill('input[type="email"]', 'random@example.test');
       await page.click('button[type="submit"]');
 
-      // Wait for response
-      await page.waitForLoadState('networkidle');
+      const alert = page.getByRole('alert');
+      await expect(alert).toBeVisible({ timeout: 15000 });
 
-      // Message should be generic
-      const successMessage = (await page.textContent('.success-message, [role="alert"]')) || '';
-      expect(successMessage.toLowerCase()).not.toContain('not found');
-      expect(successMessage.toLowerCase()).not.toContain("doesn't exist");
+      const message = ((await alert.textContent()) ?? '').toLowerCase();
+      expect(message).not.toContain('not found');
+      expect(message).not.toContain("doesn't exist");
+      expect(message).not.toContain('random@example.test');
+      expect(message).toContain("couldn't send that email");
     });
   });
 

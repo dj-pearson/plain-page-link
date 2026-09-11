@@ -311,8 +311,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      # Chromium AND WebKit. playwright.config.ts's security-mobile project is
+      # devices['iPhone 13'], whose defaultBrowserType is webkit, so with only
+      # the Chromium bundle installed every one of its 31 page tests failed at
+      # browserType.launch — reported as 31 application defects, and the reason
+      # this job's failure list was three times longer than security-chrome's.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run security tests
         run: npm run test:security
