@@ -106,7 +106,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
           <div className="space-y-4">
             <div>
               <Label htmlFor="instagramHandle">
-                Instagram Handle <span className="text-gray-400">(Optional)</span>
+                Instagram Handle <span className="text-gray-600">(Optional)</span>
               </Label>
               <Input
                 id="instagramHandle"
@@ -145,7 +145,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
                 Current Link Situation <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value: any) => setValue('linkSituation', value)}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="linkSituation" className="mt-1">
                   <SelectValue placeholder="Select your current link setup" />
                 </SelectTrigger>
                 <SelectContent>
@@ -163,7 +163,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
                 Profile Picture Quality <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value: any) => setValue('profilePicture', value)}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="profilePicture" className="mt-1">
                   <SelectValue placeholder="Describe your profile picture" />
                 </SelectTrigger>
                 <SelectContent>
@@ -274,7 +274,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
                 Years of Experience <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value: any) => setValue('yearsExperience', value)}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="yearsExperience" className="mt-1">
                   <SelectValue placeholder="Select experience level" />
                 </SelectTrigger>
                 <SelectContent>
@@ -292,7 +292,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
                 Current Follower Count <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value: any) => setValue('followerCount', value)}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="followerCount" className="mt-1">
                   <SelectValue placeholder="Select follower range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -310,7 +310,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
                 Monthly Leads from Instagram <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value: any) => setValue('monthlyLeads', value)}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="monthlyLeads" className="mt-1">
                   <SelectValue placeholder="Average monthly leads" />
                 </SelectTrigger>
                 <SelectContent>

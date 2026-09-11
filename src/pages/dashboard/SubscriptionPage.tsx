@@ -332,7 +332,7 @@ export default function SubscriptionPage() {
                       href={inv.hosted_invoice_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                      className="inline-flex items-center gap-1 text-primary underline hover:no-underline"
                     >
                       View <ExternalLink className="h-3 w-3" />
                     </a>

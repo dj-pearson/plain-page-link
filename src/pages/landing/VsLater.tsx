@@ -230,7 +230,7 @@ export default function VsLater() {
                     <span>Calendar booking integration</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <X className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+                    <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
                     <span>No social media scheduling</span>
                   </li>
                 </ul>
@@ -274,11 +274,11 @@ export default function VsLater() {
                     <span>Analytics for posts</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <X className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+                    <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
                     <span>No property listing features</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <X className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+                    <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
                     <span>No CRM integration</span>
                   </li>
                 </ul>
@@ -467,7 +467,7 @@ export default function VsLater() {
                   Instagram bio link.
                 </p>
                 <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                  <p className="font-semibold text-green-600">✓ Use Both Platforms</p>
+                  <p className="font-semibold text-green-700">✓ Use Both Platforms</p>
                   <p className="text-sm mt-1">
                     Later schedules the posts; AgentBio is what the link in them points at. They
                     solve different halves of the same problem, and plenty of agents pay for both.
@@ -685,23 +685,32 @@ export default function VsLater() {
               Explore more comparisons and features:
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <Link to="/vs/linktree" className="text-primary hover:underline">
+              <Link to="/vs/linktree" className="text-primary underline hover:no-underline">
                 AgentBio vs Linktree
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/vs/beacons" className="text-primary hover:underline">
+              <Link to="/vs/beacons" className="text-primary underline hover:no-underline">
                 AgentBio vs Beacons
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/features/property-listings" className="text-primary hover:underline">
+              <Link
+                to="/features/property-listings"
+                className="text-primary underline hover:no-underline"
+              >
                 Property Listing Features
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/features/lead-capture" className="text-primary hover:underline">
+              <Link
+                to="/features/lead-capture"
+                className="text-primary underline hover:no-underline"
+              >
                 Lead Capture Forms
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/for-real-estate-agents" className="text-primary hover:underline">
+              <Link
+                to="/for-real-estate-agents"
+                className="text-primary underline hover:no-underline"
+              >
                 For Real Estate Agents
               </Link>
             </div>
@@ -735,7 +744,7 @@ function ComparisonRow({
           agentbio ? (
             <Check className="h-5 w-5 text-green-500 mx-auto" />
           ) : (
-            <X className="h-5 w-5 text-red-400 mx-auto" />
+            <X className="h-5 w-5 text-red-700 mx-auto" />
           )
         ) : (
           <span className="text-sm">{agentbio}</span>
@@ -746,7 +755,7 @@ function ComparisonRow({
           later ? (
             <Check className="h-5 w-5 text-green-500 mx-auto" />
           ) : (
-            <X className="h-5 w-5 text-red-400 mx-auto" />
+            <X className="h-5 w-5 text-red-700 mx-auto" />
           )
         ) : (
           <span className="text-sm">{later}</span>

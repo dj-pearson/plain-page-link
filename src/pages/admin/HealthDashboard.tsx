@@ -206,7 +206,7 @@ export default function HealthDashboard() {
   return (
     <div className="mx-auto max-w-7xl p-6">
       <div className="mb-6">
-        <Link to="/admin" className="text-sm text-primary hover:underline">
+        <Link to="/admin" className="text-sm text-primary underline hover:no-underline">
           ← Back to Admin
         </Link>
         <h1 className="text-2xl font-bold text-foreground">Platform Health</h1>

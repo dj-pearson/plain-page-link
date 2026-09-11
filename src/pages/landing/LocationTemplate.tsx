@@ -663,30 +663,39 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
               Explore more resources for real estate agents:
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <Link to="/for-real-estate-agents" className="text-primary hover:underline">
+              <Link
+                to="/for-real-estate-agents"
+                className="text-primary underline hover:no-underline"
+              >
                 For Real Estate Agents
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/instagram-bio-for-realtors" className="text-primary hover:underline">
+              <Link
+                to="/instagram-bio-for-realtors"
+                className="text-primary underline hover:no-underline"
+              >
                 Instagram Bio Tips
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/tools/instagram-bio-analyzer" className="text-primary hover:underline">
+              <Link
+                to="/tools/instagram-bio-analyzer"
+                className="text-primary underline hover:no-underline"
+              >
                 Free Bio Analyzer
               </Link>
               <span className="text-muted-foreground">•</span>
               <Link
                 to="/tools/listing-description-generator"
-                className="text-primary hover:underline"
+                className="text-primary underline hover:no-underline"
               >
                 Listing Generator
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/vs/linktree" className="text-primary hover:underline">
+              <Link to="/vs/linktree" className="text-primary underline hover:no-underline">
                 vs Linktree
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link to="/blog" className="text-primary hover:underline">
+              <Link to="/blog" className="text-primary underline hover:no-underline">
                 Real Estate Blog
               </Link>
             </div>

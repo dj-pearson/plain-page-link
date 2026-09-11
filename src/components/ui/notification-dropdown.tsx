@@ -56,7 +56,7 @@ export function NotificationDropdown({
         {unreadCount > 0 && (
           <button
             onClick={onMarkAllAsRead}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-primary underline hover:no-underline"
           >
             <CheckCheck className="h-3.5 w-3.5" /> Mark all read
           </button>

@@ -113,7 +113,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
                 Property Type <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value: PropertyType) => setValue('propertyType', value)}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="propertyType" className="mt-1">
                   <SelectValue placeholder="Select property type" />
                 </SelectTrigger>
                 <SelectContent>

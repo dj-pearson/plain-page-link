@@ -204,12 +204,63 @@ async function analyze(page: Page) {
   return { blocking, total: results.violations.length };
 }
 
+/**
+ * US-208: this list was five pages. The public site has twenty-four routes, and
+ * running axe over all of them found 14 critical/serious violations on 12 of
+ * the 19 the suite could not see — including three more unnamed comboboxes, the
+ * same CRITICAL button-name defect US-206 had just fixed on the landing page.
+ *
+ * That is the US-186 shape again: the guard was correct, and it was pointed at
+ * the wrong pages. A sampled suite measures the sample.
+ *
+ * Every public route is here now. Adding a route to App.tsx and not to this list
+ * is what the route-coverage test below is for.
+ */
 const PAGES: { name: string; path: string }[] = [
-  { name: 'landing', path: '/' },
+  // Authenticated and profile surfaces, which need the mocked session.
   { name: 'login', path: '/auth/login' },
   { name: 'register', path: '/auth/register' },
   { name: 'dashboard', path: '/dashboard' },
   { name: 'public profile', path: '/demo' },
+
+  // The public marketing, legal, blog and free-tool surface.
+  { name: 'landing', path: '/' },
+  { name: 'pricing', path: '/pricing' },
+  { name: 'press', path: '/press' },
+  { name: 'privacy', path: '/privacy' },
+  { name: 'terms', path: '/terms' },
+  { name: 'dmca', path: '/dmca' },
+  { name: 'acceptable use', path: '/acceptable-use' },
+  { name: 'accessibility statement', path: '/accessibility' },
+  { name: 'cookies', path: '/cookies' },
+  { name: 'privacy choices', path: '/privacy-choices' },
+  { name: 'blog', path: '/blog' },
+  { name: 'for real estate agents', path: '/for-real-estate-agents' },
+  { name: 'instagram bio for realtors', path: '/instagram-bio-for-realtors' },
+  { name: 'vs linktree', path: '/vs/linktree' },
+  { name: 'vs beacons', path: '/vs/beacons' },
+  { name: 'vs later', path: '/vs/later' },
+  { name: 'feature: property listings', path: '/features/property-listings' },
+  { name: 'feature: lead capture', path: '/features/lead-capture' },
+  { name: 'feature: calendar booking', path: '/features/calendar-booking' },
+  { name: 'feature: testimonials', path: '/features/testimonials' },
+  { name: 'feature: analytics', path: '/features/analytics' },
+  { name: 'tools index', path: '/tools' },
+  { name: 'instagram bio analyzer', path: '/tools/instagram-bio-analyzer' },
+  { name: 'listing description generator', path: '/tools/listing-description-generator' },
+  { name: 'agent bio generator', path: '/tools/real-estate-agent-bio-generator' },
+  { name: 'not found', path: '/404' },
+
+  // The rest of the auth and onboarding surface. The route-coverage test in
+  // src/browser-suites.test.ts is what found these: the list above was written
+  // from a sweep of the routes someone remembered, and it missed two free tools
+  // and six auth screens.
+  { name: 'forgot password', path: '/auth/forgot-password' },
+  { name: 'reset password', path: '/auth/reset-password' },
+  { name: 'mfa', path: '/auth/mfa' },
+  { name: 'auth callback', path: '/auth/callback' },
+  { name: 'sso callback', path: '/auth/sso/callback' },
+  { name: 'onboarding wizard', path: '/onboarding/wizard' },
 ];
 
 test.describe('Accessibility (axe-core)', () => {

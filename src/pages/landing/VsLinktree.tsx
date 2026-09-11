@@ -146,7 +146,7 @@ export default function VsLinktree() {
                     <th className="text-left p-6 glass-body font-light text-lg">Feature</th>
                     <th className="text-center p-6 glass-body font-light text-lg">
                       <div className="flex flex-col items-center gap-2">
-                        <span className="text-[#80d0c7]">AgentBio</span>
+                        <span className="text-[#0f766e]">AgentBio</span>
                         <span className="text-sm text-muted-foreground">Real Estate Platform</span>
                       </div>
                     </th>
@@ -263,17 +263,17 @@ export default function VsLinktree() {
                         {typeof row.agentbio === 'boolean' ? (
                           row.agentbio ? (
                             <div className="flex items-center justify-center gap-2">
-                              <Check className="h-6 w-6 text-green-400" />
-                              <span className="text-sm glass-body text-green-400">Yes</span>
+                              <Check className="h-6 w-6 text-green-700" />
+                              <span className="text-sm glass-body text-green-700">Yes</span>
                             </div>
                           ) : (
                             <div className="flex items-center justify-center gap-2">
-                              <X className="h-6 w-6 text-red-400" />
-                              <span className="text-sm glass-body text-red-400">No</span>
+                              <X className="h-6 w-6 text-red-700" />
+                              <span className="text-sm glass-body text-red-700">No</span>
                             </div>
                           )
                         ) : (
-                          <span className="glass-body font-light text-[#80d0c7]">
+                          <span className="glass-body font-light text-[#0f766e]">
                             {row.agentbio}
                           </span>
                         )}
@@ -282,13 +282,13 @@ export default function VsLinktree() {
                         {typeof row.linktree === 'boolean' ? (
                           row.linktree ? (
                             <div className="flex items-center justify-center gap-2">
-                              <Check className="h-6 w-6 text-green-400" />
-                              <span className="text-sm glass-body text-green-400">Yes</span>
+                              <Check className="h-6 w-6 text-green-700" />
+                              <span className="text-sm glass-body text-green-700">Yes</span>
                             </div>
                           ) : (
                             <div className="flex items-center justify-center gap-2">
-                              <X className="h-6 w-6 text-red-400" />
-                              <span className="text-sm glass-body text-red-400">No</span>
+                              <X className="h-6 w-6 text-red-700" />
+                              <span className="text-sm glass-body text-red-700">No</span>
                             </div>
                           )
                         ) : (
@@ -376,7 +376,7 @@ export default function VsLinktree() {
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-green-500/20">
-                  <h3 className="text-xl font-light text-green-400 mb-4">
+                  <h3 className="text-xl font-light text-green-700 mb-4">
                     ✓ Linktree Works If You...
                   </h3>
                   <ul className="space-y-3">
@@ -388,7 +388,7 @@ export default function VsLinktree() {
                 </div>
 
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-red-500/20">
-                  <h3 className="text-xl font-light text-red-400 mb-4">
+                  <h3 className="text-xl font-light text-red-700 mb-4">
                     ✗ Linktree Fails If You...
                   </h3>
                   <ul className="space-y-3">
@@ -484,7 +484,7 @@ function ReasonCard({
   return (
     <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
       <div className="flex items-start gap-4 mb-4">
-        <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#80d0c7]">
+        <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
           {React.cloneElement(icon as React.ReactElement, { className: 'h-6 w-6' })}
         </div>
         <div>

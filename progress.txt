@@ -4073,3 +4073,77 @@ VERIFICATION
 NOTED, unrelated and already fine — npm run size-check is green
 (211 chunks within budget, one documented exception for the lazy Three.js
 vendor chunk). A previous loop recorded it red on main; it is not red now.
+
+### Iteration 11/15 — US-208: the suite measured five pages of a thirty-five page site
+
+Iteration 9 drove the a11y baseline to zero. On the five pages the suite looks
+at. The site has 24 static public routes.
+
+Running axe over all of them:
+
+    14 critical/serious violations on 12 of the 19 pages the suite could not see
+
+Including three more unnamed Radix comboboxes — the same CRITICAL button-name
+defect US-206 had just fixed on the landing page, sitting on /blog and the
+Instagram bio analyzer. The fix was one iteration old and already incomplete,
+because two components render that category filter and only one of them was on
+a measured page.
+
+That is the US-186 shape, one loop later and in a different subsystem: the
+guard was correct, and it was pointed at the wrong pages.
+
+WHAT WAS THERE
+
+  button-name [CRITICAL], 3 nodes
+      /blog renders its own copy of the category filter, not BlogSection's.
+      The Instagram bio analyzer had two: each field has a
+      <Label htmlFor="linkSituation"> pointing at an id no element carries,
+      because Radix's trigger is a button and nothing set the id. Giving the
+      trigger the id its Label already named fixes the dangling htmlFor and
+      names the control in one move — better than bolting on an aria-label
+      that duplicates the visible text.
+
+  color-contrast, 9 pages
+      text-green-400 at 1.66:1, text-red-400 at 2.59:1, text-blue-400 at
+      2.27:1, and a brand teal #80d0c7 at 1.78:1 — as headings, as the ✓/✗
+      marks on every comparison table, and as the "Active Listings" / "Sold
+      Properties" labels on the property-listings feature page. 97 replacements
+      across 10 files, all to the 700 step of the same hue.
+
+  link-in-text-block, 3 legal pages
+      `text-primary hover:underline`. An underline that appears on hover is not
+      a non-colour distinction — the link is indistinguishable at rest, at
+      1.12:1 against the prose around it. 32 links now underlined at rest,
+      un-underlined on hover.
+
+AND THEN THE GUARD FOUND EIGHT MORE ROUTES. The list above came from sweeping
+the routes I could see; src/browser-suites.test.ts now derives them from
+App.tsx instead, and immediately reported eight the sweep had missed —
+including TWO free tools nobody had named: /tools/listing-description-generator
+and /tools/real-estate-agent-bio-generator. A whole lead-generation funnel that
+no browser test has ever loaded.
+
+All eight were already clean. That is the point of deriving the list rather
+than writing it: the question "have we looked at everything" should not be
+answered from memory.
+
+  /admin/* is excluded, with the reason stated in the test: setupMocks grants a
+  session but no user_roles row, so ProtectedRoute redirects and axe would
+  measure the redirect target. A green result that means nothing is worse than
+  an absent one. US-209 holds it.
+
+VERIFICATION
+  - 24 routes measured: 14 violations -> 0, in four rounds, each one re-measured
+    rather than assumed.
+  - The a11y suite is 37 tests now (was 6) and passes in 1.2 minutes.
+  - The route-coverage guard reports 31 uncovered routes against the spec as it
+    was before this change.
+  - E2E still 22/22; tsc clean; npm run test:run 94 files, 851 passed.
+
+A NOTE ON US-207, tested and answered. Last iteration suggested that typing the
+edge-function supabase client with Database would let tsc catch column reads.
+It does not: with `createClient<Database>(...)` in place, deno check still
+accepted a deliberately misspelled column in an .update(), because
+supabase/functions/deno.json sets strict:false and the rows are `any`. The
+regex checker in src/schema-references.test.ts is the mechanism, not a stopgap.
+US-207 is updated with that result so nobody repeats the experiment.

@@ -114,6 +114,33 @@ describe('browser test suites (US-205)', () => {
     expect(warnOnly).toEqual([]);
   });
 
+  it('covers every static public route with the a11y suite', () => {
+    // US-208: the a11y suite listed five pages while App.tsx declares
+    // twenty-four static public routes, and 12 of the 19 it could not see had
+    // critical or serious violations. A sampled suite measures the sample.
+    //
+    // Parameterised routes (/:username, /blog/:slug, /for/:slug) are excluded:
+    // there is no generic value to visit them with. The public profile is
+    // covered separately in the spec, against a mocked profile.
+    const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf-8');
+    const declared = [...app.matchAll(/<Route\s+path="([^"]+)"/g)]
+      .map((m) => m[1])
+      .filter((path) => path.startsWith('/') && !path.includes(':') && !path.includes('*'))
+      // /admin/* needs an admin role. The a11y suite's mocks grant a session but
+      // no user_roles row, so visiting these measures the redirect target rather
+      // than the page — a green result that means nothing. US-209 covers giving
+      // the suite an admin session so they can be measured for real.
+      .filter((path) => !path.startsWith('/admin'));
+
+    expect(declared.length, 'should have found the routes in App.tsx').toBeGreaterThan(20);
+
+    const spec = readFileSync(join(ROOT, 'tests/a11y/accessibility.spec.ts'), 'utf-8');
+    const covered = new Set([...spec.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1]));
+
+    const uncovered = declared.filter((path) => !covered.has(path));
+    expect(uncovered).toEqual([]);
+  });
+
   it('each suite has specs to run', () => {
     // The mirror of the above: a job that runs a config whose testDir is empty
     // is green for the wrong reason.

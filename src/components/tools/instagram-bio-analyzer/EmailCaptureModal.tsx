@@ -212,7 +212,7 @@ export function EmailCaptureModal({ isOpen, onClose, onSubmit, analysisId }: Ema
 
           <div>
             <Label htmlFor="brokerage">
-              Brokerage <span className="text-gray-400">(Optional)</span>
+              Brokerage <span className="text-gray-600">(Optional)</span>
             </Label>
             <Input
               id="brokerage"

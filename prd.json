@@ -3271,7 +3271,36 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "NOTED IN ITERATION 10, NOT FIXED. US-200's checker covers filters, write keys and relation names — the places a column name is a STRING. It cannot see the other half: post.meta_description, post.featured_image, post.published and post.categories in analyze-blog-posts-seo, none of which are columns on `articles` (they are seo_description, featured_image_url, status, and category/tags). The row comes back from .select('*') typed as `any`, so these were undefined rather than errors, and every article analysed was told it was missing a meta description, missing a featured image, unpublished and uncategorised — the score was effectively a constant. Fixed by hand in iteration 10; the class is not guarded. This is harder than the string case and may not be worth a bespoke checker: typing the supabase client with Database in edge functions would let tsc do it, which is the better fix if the deno-check gate can carry it."
+      "notes": "NOTED IN ITERATION 10, NOT FIXED. US-200's checker covers filters, write keys and relation names — the places a column name is a STRING. It cannot see the other half: post.meta_description, post.featured_image, post.published and post.categories in analyze-blog-posts-seo, none of which are columns on `articles` (they are seo_description, featured_image_url, status, and category/tags). The row comes back from .select('*') typed as `any`, so these were undefined rather than errors, and every article analysed was told it was missing a meta description, missing a featured image, unpublished and uncategorised — the score was effectively a constant. Fixed by hand in iteration 10; the class is not guarded. This is harder than the string case and may not be worth a bespoke checker: typing the supabase client with Database in edge functions would let tsc do it, which is the better fix if the deno-check gate can carry it. TESTED IN ITERATION 11 AND RULED OUT: typing the client does not help. With `createClient<Database>(...)` and `import type { Database }` in analyze-blog-posts-seo, deno check still accepted a deliberately misspelled column in an .update() — supabase/functions/deno.json sets strict:false and the rows are `any`, so the generic buys nothing. Extending the regex checker in src/schema-references.test.ts to property reads is the remaining option, and it is harder than the string case because a row's provenance has to be tracked across an alias and a loop."
+    },
+    {
+      "id": "US-208",
+      "title": "The a11y suite measured five pages of a thirty-five page site",
+      "description": "As a visitor using assistive technology, I need every page of this site to meet WCAG AA, not the five that happen to be in a test list.",
+      "acceptanceCriteria": [
+        "Running axe over every static public route finds zero critical/serious violations",
+        "The a11y suite's PAGES list covers every static route App.tsx declares, not a sample",
+        "src/browser-suites.test.ts fails when a route is added to App.tsx and not to that list",
+        "/admin/* is excluded with its reason stated: the suite's mocks grant no admin role, so visiting them measures a redirect",
+        "37 a11y tests pass; the E2E suite still passes; tsc and the unit suite are clean"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 11, one iteration after US-206 drove the baseline to zero — on the five pages the suite looked at. Running axe over all 24 public routes found 14 critical/serious violations on 12 of the 19 it could not see: three more unnamed Radix comboboxes (button-name, CRITICAL) on /blog and the Instagram bio analyzer; 400-level text tokens on light surfaces across every feature and comparison page, down to 1.59:1; and link-in-text-block on the legal pages, where `text-primary hover:underline` gives an in-prose link 1.12:1 against its surroundings and no underline until you hover. Exactly the US-186 shape: the guard was correct and pointed at the wrong pages. The combobox fix on the tools forms is the interesting one — each had a <Label htmlFor=\"x\"> whose id no element carried, because Radix's trigger is a button; giving the trigger that id fixes the dangling htmlFor and names the control at once. Then the route-coverage guard found eight more routes nobody had listed, including TWO free tools (/tools/listing-description-generator, /tools/real-estate-agent-bio-generator) — a whole lead-generation funnel that no browser test had ever loaded. All eight were already clean. 97 colour replacements across 10 pages, 32 links underlined at rest, 7 comboboxes named."
+    },
+    {
+      "id": "US-209",
+      "title": "The admin surface has never been measured for accessibility",
+      "description": "As an operator using the admin console daily, I need it held to the same accessibility standard as the marketing pages.",
+      "acceptanceCriteria": [
+        "The a11y suite's mocks can grant an admin session (a user_roles row, and has_role returning true)",
+        "/admin, /admin/seo, /admin/audit-log, /admin/health and /admin/search-analytics are measured",
+        "The /admin exclusion is removed from the route-coverage test in src/browser-suites.test.ts",
+        "Whatever is found is fixed, or recorded with the argument for accepting it"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "NOTED IN ITERATION 11. Five admin routes are excluded from the route-coverage guard because the a11y suite's setupMocks grants a session but no user_roles row, so ProtectedRoute redirects and axe would measure the redirect target — a green result that means nothing. Worth doing, but it needs the mock to model an admin, which is a different piece of work from listing routes. The dashboard is already covered, so this is the last unmeasured surface."
     }
   ]
 }

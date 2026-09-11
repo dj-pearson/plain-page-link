@@ -94,7 +94,7 @@ export default function AuditLogPage() {
     <div className="mx-auto max-w-7xl p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <Link to="/admin" className="text-sm text-primary hover:underline">
+          <Link to="/admin" className="text-sm text-primary underline hover:no-underline">
             ← Back to Admin
           </Link>
           <h1 className="text-2xl font-bold text-foreground">Audit Log</h1>
@@ -202,7 +202,7 @@ export default function AuditLogPage() {
                     <td className="p-3">
                       {log.user_id ? (
                         <button
-                          className="font-mono text-xs text-primary hover:underline"
+                          className="font-mono text-xs text-primary underline hover:no-underline"
                           onClick={(e) => {
                             e.stopPropagation();
                             updateFilter('userId', log.user_id ?? '');

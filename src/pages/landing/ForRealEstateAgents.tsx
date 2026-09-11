@@ -114,7 +114,7 @@ export default function ForRealEstateAgents() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="flex items-start gap-4 mb-4">
-                    <X className="h-6 w-6 text-red-400 flex-shrink-0 mt-1" />
+                    <X className="h-6 w-6 text-red-700 flex-shrink-0 mt-1" />
                     <div>
                       <h3 className="text-xl font-light text-foreground mb-2">
                         No Property Showcase
@@ -130,7 +130,7 @@ export default function ForRealEstateAgents() {
 
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="flex items-start gap-4 mb-4">
-                    <X className="h-6 w-6 text-red-400 flex-shrink-0 mt-1" />
+                    <X className="h-6 w-6 text-red-700 flex-shrink-0 mt-1" />
                     <div>
                       <h3 className="text-xl font-light text-foreground mb-2">
                         Basic Lead Capture
@@ -145,7 +145,7 @@ export default function ForRealEstateAgents() {
 
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="flex items-start gap-4 mb-4">
-                    <X className="h-6 w-6 text-red-400 flex-shrink-0 mt-1" />
+                    <X className="h-6 w-6 text-red-700 flex-shrink-0 mt-1" />
                     <div>
                       <h3 className="text-xl font-light text-foreground mb-2">
                         No Appointment Booking
@@ -160,7 +160,7 @@ export default function ForRealEstateAgents() {
 
                 <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                   <div className="flex items-start gap-4 mb-4">
-                    <X className="h-6 w-6 text-red-400 flex-shrink-0 mt-1" />
+                    <X className="h-6 w-6 text-red-700 flex-shrink-0 mt-1" />
                     <div>
                       <h3 className="text-xl font-light text-foreground mb-2">No Social Proof</h3>
                       <p className="glass-body">
@@ -290,9 +290,9 @@ export default function ForRealEstateAgents() {
                       <td className="text-center p-4">
                         {typeof row.agentbio === 'boolean' ? (
                           row.agentbio ? (
-                            <Check className="h-5 w-5 text-green-400 mx-auto" />
+                            <Check className="h-5 w-5 text-green-700 mx-auto" />
                           ) : (
-                            <X className="h-5 w-5 text-red-400 mx-auto" />
+                            <X className="h-5 w-5 text-red-700 mx-auto" />
                           )
                         ) : (
                           <span className="glass-body">{row.agentbio}</span>
@@ -301,9 +301,9 @@ export default function ForRealEstateAgents() {
                       <td className="text-center p-4">
                         {typeof row.linktree === 'boolean' ? (
                           row.linktree ? (
-                            <Check className="h-5 w-5 text-green-400 mx-auto" />
+                            <Check className="h-5 w-5 text-green-700 mx-auto" />
                           ) : (
-                            <X className="h-5 w-5 text-red-400 mx-auto" />
+                            <X className="h-5 w-5 text-red-700 mx-auto" />
                           )
                         ) : (
                           <span className="glass-body text-muted-foreground">{row.linktree}</span>
@@ -312,9 +312,9 @@ export default function ForRealEstateAgents() {
                       <td className="text-center p-4">
                         {typeof row.beacons === 'boolean' ? (
                           row.beacons ? (
-                            <Check className="h-5 w-5 text-green-400 mx-auto" />
+                            <Check className="h-5 w-5 text-green-700 mx-auto" />
                           ) : (
-                            <X className="h-5 w-5 text-red-400 mx-auto" />
+                            <X className="h-5 w-5 text-red-700 mx-auto" />
                           )
                         ) : (
                           <span className="glass-body text-muted-foreground">{row.beacons}</span>
@@ -368,7 +368,7 @@ function FeatureCard({
 }) {
   return (
     <div className="flex items-start gap-6 p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border hover:border-[#80d0c7] transition-all">
-      <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#80d0c7]">
+      <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
         {React.cloneElement(icon as React.ReactElement, { className: 'h-6 w-6' })}
       </div>
       <div>

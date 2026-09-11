@@ -85,63 +85,63 @@ export default function CalendarBooking() {
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="p-6 rounded-xl bg-red-500/5 border border-red-500/20">
-                  <h3 className="text-xl font-light text-red-400 mb-4">
+                  <h3 className="text-xl font-light text-red-700 mb-4">
                     ❌ Without Automated Booking:
                   </h3>
                   <ul className="space-y-3 text-sm glass-body">
                     <li className="flex items-start gap-2">
-                      <span className="text-red-400 flex-shrink-0">1.</span>
+                      <span className="text-red-700 flex-shrink-0">1.</span>
                       <span>Buyer sees listing, calls/texts to schedule</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-red-400 flex-shrink-0">2.</span>
+                      <span className="text-red-700 flex-shrink-0">2.</span>
                       <span>You're showing another property, miss the call</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-red-400 flex-shrink-0">3.</span>
+                      <span className="text-red-700 flex-shrink-0">3.</span>
                       <span>You call back 2 hours later, they don't answer</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-red-400 flex-shrink-0">4.</span>
+                      <span className="text-red-700 flex-shrink-0">4.</span>
                       <span>Back-and-forth texts trying to find a time</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-red-400 flex-shrink-0">5.</span>
+                      <span className="text-red-700 flex-shrink-0">5.</span>
                       <span>By the time you connect, they've moved on</span>
                     </li>
                   </ul>
-                  <p className="text-sm text-red-400 mt-6 font-light">
+                  <p className="text-sm text-red-700 mt-6 font-light">
                     Result: Lost showing, lost sale
                   </p>
                 </div>
 
                 <div className="p-6 rounded-xl bg-green-500/5 border border-green-500/20">
-                  <h3 className="text-xl font-light text-green-400 mb-4">
+                  <h3 className="text-xl font-light text-green-700 mb-4">
                     ✓ With AgentBio Calendar Booking:
                   </h3>
                   <ul className="space-y-3 text-sm glass-body">
                     <li className="flex items-start gap-2">
-                      <span className="text-green-400 flex-shrink-0">1.</span>
+                      <span className="text-green-700 flex-shrink-0">1.</span>
                       <span>Buyer sees listing, clicks "Schedule Showing"</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-400 flex-shrink-0">2.</span>
+                      <span className="text-green-700 flex-shrink-0">2.</span>
                       <span>Your available times appear instantly</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-400 flex-shrink-0">3.</span>
+                      <span className="text-green-700 flex-shrink-0">3.</span>
                       <span>They book a time that works for both of you</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-400 flex-shrink-0">4.</span>
+                      <span className="text-green-700 flex-shrink-0">4.</span>
                       <span>Confirmation email sent to both parties</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-400 flex-shrink-0">5.</span>
+                      <span className="text-green-700 flex-shrink-0">5.</span>
                       <span>Showing booked—you get notification with details</span>
                     </li>
                   </ul>
-                  <p className="text-sm text-green-400 mt-6 font-light">
+                  <p className="text-sm text-green-700 mt-6 font-light">
                     Result: Showing booked in 60 seconds
                   </p>
                 </div>
@@ -243,7 +243,7 @@ export default function CalendarBooking() {
                   className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#80d0c7]">
+                    <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
                       {React.cloneElement(feature.icon as React.ReactElement, {
                         className: 'h-5 w-5',
                       })}
@@ -273,7 +273,7 @@ export default function CalendarBooking() {
             <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
               <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                 <div className="mb-6">
-                  <Calendar className="h-12 w-12 text-[#80d0c7] mb-4" />
+                  <Calendar className="h-12 w-12 text-[#0f766e] mb-4" />
                   <h3 className="text-2xl font-light text-foreground mb-2">Calendly Integration</h3>
                   <p className="glass-body text-muted-foreground">
                     Already use Calendly? Connect your account in one click. Your existing
@@ -282,15 +282,15 @@ export default function CalendarBooking() {
                 </div>
                 <ul className="space-y-2">
                   <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="text-sm glass-body">One-click connection</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="text-sm glass-body">Syncs both ways</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="text-sm glass-body">All Calendly features work</span>
                   </li>
                 </ul>
@@ -298,7 +298,7 @@ export default function CalendarBooking() {
 
               <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
                 <div className="mb-6">
-                  <Calendar className="h-12 w-12 text-[#80d0c7] mb-4" />
+                  <Calendar className="h-12 w-12 text-[#0f766e] mb-4" />
                   <h3 className="text-2xl font-light text-foreground mb-2">
                     Google Calendar Integration
                   </h3>
@@ -309,15 +309,15 @@ export default function CalendarBooking() {
                 </div>
                 <ul className="space-y-2">
                   <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="text-sm glass-body">OAuth secure connection</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="text-sm glass-body">Respects existing appointments</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
                     <span className="text-sm glass-body">Mobile & desktop sync</span>
                   </li>
                 </ul>
