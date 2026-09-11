@@ -3849,3 +3849,70 @@ VERIFICATION
     than none; this one was flaky for about four minutes.
   - deno check over all 104 files on Deno 2.1.4: exit 0.
   - tsc --noEmit clean; npm run test:run 93 files, 845 passed, 0 failed.
+
+### Iteration 8/15 — US-205: 141 browser tests, of which CI ran 6 and let those fail
+
+Seven iterations of backend. The same lens turned on the frontend, and the first
+thing to check was not the app but whether anyone had ever looked at it.
+
+    tests/e2e/        6 specs, 22 tests    no workflow runs it
+    tests/security/   4 specs, 113 tests   no workflow runs it
+    tests/a11y/       1 spec,  6 tests     runs, continue-on-error: true
+
+135 of 141 browser tests had never been executed by CI, and the other 6 could
+not block a merge. The a11y job's comment reads "Warn-only initially: surfaces
+a11y regressions without blocking merges" — initially has lasted.
+
+These are not placeholder specs. tests/e2e covers the login and registration
+flows, the onboarding wizard, public profile visibility including the sold-
+properties toggle, listing deep links and the Back button, analytics
+throttling, and the page-builder surface. tests/security covers SQL injection
+in the login form, XSS through inputs, query parameters, path parameters,
+redirect URLs and hash fragments, CSP, cookie flags, stack traces in error
+pages, and edge-function authorization. Someone wrote all of it carefully.
+
+The e2e config even carries the comment "CI sets no env for this job", which is
+someone reasoning about a job that does not exist.
+
+RUN BEFORE WIRED UP, because a suite nobody has run is a suite that does not
+work until proven otherwise:
+
+    tests/e2e         22 passed              27.4s
+    tests/security   113 passed, 3 skipped    5.1m
+    tests/a11y         6 passed              16.0s
+
+All of them pass. Nothing had to be fixed — only turned on. That is what makes
+this the cheap kind of gap, and also the easy kind to reintroduce: a fourth
+suite next month is one npm script and no job.
+
+They are hermetic, which is why they can be a gate at all. The e2e config
+intercepts every /rest/v1, /auth/v1 and /functions/v1 call and supplies the
+VITE_SUPABASE_* values that src/integrations/supabase/client.ts throws without,
+so nothing reaches a database. Retries on CI are already configured in all three
+configs (2, 2 and 1), so flake was budgeted for before this.
+
+WHAT CHANGED
+  - ci.yml gains an End-to-End job and a Security job, each uploading its
+    Playwright report on failure.
+  - The accessibility job loses continue-on-error. It has been passing 6/6
+    against an explicit baseline in tests/a11y; the baseline is what keeps it
+    honest, not the escape hatch.
+  - src/browser-suites.test.ts reads the configs, package.json and the
+    workflows: a playwright-*.config.ts with no npm script, an npm script no CI
+    job runs, a job carrying continue-on-error, or a config whose testDir holds
+    no specs, all fail the unit suite.
+
+A NOTE ON THE GUARD. The first version parsed the workflows with js-yaml, which
+is in node_modules only as somebody else's transitive dependency — a guard that
+breaks when an unrelated package is hoisted away is not a guard. It splits jobs
+by indentation instead, which is all it needs to know.
+
+VERIFICATION
+  - The guard was run against ci.yml as of 24c5ca6 and fails there, naming
+    playwright-e2e.config.ts, playwright.config.ts and ci.yml:accessibility.
+  - tsc --noEmit clean; npm run test:run 94 files, 850 passed, 0 failed.
+
+NOTED — running the suites here needed PW_CHROMIUM_PATH, because the sandbox
+ships chromium-1194 and this Playwright expects 1200. All three configs already
+support that variable, which is the only reason this iteration could run them
+at all.

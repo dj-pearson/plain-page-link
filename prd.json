@@ -3223,6 +3223,23 @@
       "priority": 1,
       "passes": true,
       "notes": "Fixed in iteration 7. _shared/http-error.ts adds an HttpError that carries its own status, and requireAuth/requireAdmin/requireOwnership and the two webhook-auth throw sites raise it instead of a bare Error. BOTH error frameworks were taught to recognise it — handleUnexpectedError in _shared/response.ts and handleError in _shared/errors.ts, which google-indexing uses and which had the identical hole. 25 functions hand-roll their own catch block rather than calling either, so `status: 500` in those became `status: errorStatus(error)`, which preserves each function's response envelope (its callers parse it) while fixing the status. send-listing-generator-email threw a bare Error for a missing email, which the same catch turned into a 500; it now throws a 400. Measured, not argued: the same unauthenticated sweep over all 84 functions went from 24 x 401 and 20 x 5xx to 39 x 401 and 5 x 5xx, and the five that remain are honest — three missing a server-side API key, health-check correctly reporting 503 with no database, and google-indexing now 401. scripts/smoke-edge-functions.mjs makes the sweep repeatable (npm run smoke:functions) and it is now a CI job in verify-backend.yml. Run against bef2983 it reports 16 functions and exits 1; against this tree it exits 0. It also asserts the router SURVIVES the sweep, because US-199's crash returned a 500 for the request that caused it and then killed the process — a per-request check alone would have passed. edge-functions-server.ts now honours PORT so the smoke run does not collide with a development router."
+    },
+    {
+      "id": "US-205",
+      "title": "141 browser tests, of which CI ran 6 and let those fail",
+      "description": "As a developer, I need every browser suite in this repository to run in CI and to be able to fail, so that a test written to protect something actually protects it.",
+      "acceptanceCriteria": [
+        "ci.yml runs npm run test:e2e in its own job",
+        "ci.yml runs npm run test:security in its own job",
+        "The accessibility job loses continue-on-error",
+        "Both new jobs upload their Playwright report on failure",
+        "All three suites were RUN before being wired up, and pass: 22, 113 (+3 skipped), 6",
+        "src/browser-suites.test.ts reads the configs, package.json and the workflows, so a fourth suite added without a job fails the unit suite",
+        "The guard does not depend on js-yaml, which is only present transitively"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 8 by applying the same 'run it' lens to the frontend. tests/e2e (6 specs, 22 tests: auth, onboarding, public profile visibility, listing deep links, analytics, page builder) and tests/security (4 specs, 113 tests: auth, XSS, security headers, edge-function authz) were committed and no workflow had ever run them. tests/a11y ran, but under continue-on-error: true with the comment 'Warn-only initially', so it could not block a merge. 135 of 141 browser tests were never executed by CI and the other 6 could not fail. All three suites pass as they stand — e2e in 27s, a11y in 16s, security in 5.1 minutes — so nothing had to be fixed, only turned on, which is what makes this the cheap kind of gap and also the easy kind to reintroduce. The suites are hermetic: the e2e config intercepts every /rest/v1, /auth/v1 and /functions/v1 call and supplies the VITE_SUPABASE_* values the client throws without, so no database is involved. Running them locally needed PW_CHROMIUM_PATH, which all three configs already support."
     }
   ]
 }
