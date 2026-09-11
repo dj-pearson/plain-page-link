@@ -33,6 +33,26 @@ const PRIMARY_FOCUS_OPTIONS = [
   { value: 'investment', label: 'Investment Properties' },
 ];
 
+/**
+ * Which step each validated field lives on.
+ *
+ * US-210: every required field here is registered on step 1 or 2, and its error
+ * message renders inside that step's JSX. `handleSubmit` refuses to call the
+ * submit handler while any of them is empty — and on the last step the JSX
+ * holding the message is unmounted, so the refusal is completely silent. The
+ * visitor clicks the button, nothing happens, and nothing ever will.
+ *
+ * Two changes, and the first is the one that matters: Next now validates the
+ * step it is leaving, so an empty required field is caught where the field is.
+ * The second is the backstop — if a submit is somehow refused anyway, jump to
+ * the step holding the first error rather than doing nothing.
+ */
+const STEP_FIELDS: Record<number, (keyof BioAnalysisInput)[]> = {
+  1: ['currentBio'],
+  2: ['city', 'state', 'location'],
+  3: ['primaryGoal'],
+};
+
 export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps) {
   const [step, setStep] = useState(1);
   const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
@@ -42,22 +62,39 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { errors },
   } = useForm<BioAnalysisInput>();
 
   const totalSteps = 3;
   const progress = (step / totalSteps) * 100;
 
-  const nextStep = () => {
-    const newStep = Math.min(step + 1, totalSteps);
+  const goToStep = (newStep: number) => {
     setStep(newStep);
     onStepChange?.(newStep);
   };
 
-  const prevStep = () => {
-    const newStep = Math.max(step - 1, 1);
-    setStep(newStep);
-    onStepChange?.(newStep);
+  const nextStep = async () => {
+    // Validate what this step owns before leaving it. Without this the visitor
+    // reaches the last step with required fields empty and no way to find out.
+    if (!(await trigger(STEP_FIELDS[step] ?? []))) return;
+    goToStep(Math.min(step + 1, totalSteps));
+  };
+
+  const prevStep = () => goToStep(Math.max(step - 1, 1));
+
+  /**
+   * A refused submit must never be silent. Send the visitor to the step holding
+   * the first error, where the message they need is rendered.
+   */
+  const handleInvalid = (formErrors: Record<string, unknown>) => {
+    const firstBadStep = Object.entries(STEP_FIELDS)
+      .map(([stepNumber, fields]) => ({
+        stepNumber: Number(stepNumber),
+        hasError: fields.some((field) => field in formErrors),
+      }))
+      .find((entry) => entry.hasError)?.stepNumber;
+    if (firstBadStep && firstBadStep !== step) goToStep(firstBadStep);
   };
 
   const handleFormSubmit = (data: BioAnalysisInput) => {
@@ -75,7 +112,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
+    <form onSubmit={handleSubmit(handleFormSubmit, handleInvalid)} className="space-y-8">
       {/* Progress Bar */}
       <div className="space-y-2">
         <div className="flex justify-between text-sm text-gray-600">
@@ -391,7 +428,7 @@ export function BioAnalyzerForm({ onSubmit, onStepChange }: BioAnalyzerFormProps
         {step < totalSteps ? (
           <Button
             type="button"
-            onClick={nextStep}
+            onClick={() => void nextStep()}
             className="gap-2 bg-gradient-to-r from-teal-500 to-teal-500 hover:from-teal-600 hover:to-teal-600"
           >
             Next

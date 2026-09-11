@@ -3301,6 +3301,21 @@
       "priority": 3,
       "passes": false,
       "notes": "NOTED IN ITERATION 11. Five admin routes are excluded from the route-coverage guard because the a11y suite's setupMocks grants a session but no user_roles row, so ProtectedRoute redirects and axe would measure the redirect target — a green result that means nothing. Worth doing, but it needs the mock to model an admin, which is a different piece of work from listing routes. The dashboard is already covered, so this is the last unmeasured surface."
+    },
+    {
+      "id": "US-210",
+      "title": "Both free tools ended at a submit button that did nothing",
+      "description": "As an agent trying a free tool, I need the form to tell me what is missing, so that I am not left pressing a button that will never respond.",
+      "acceptanceCriteria": [
+        "Next validates the fields the current step owns and refuses to advance while one is invalid",
+        "A refused submit moves the visitor to the step holding the first error, as a backstop",
+        "Both tools: a visitor who fills nothing is stopped on the step with the missing field, and sees its message",
+        "tests/e2e/free-tool-funnels.spec.ts covers both, and fails against the forms as they were",
+        "The E2E suite, the a11y suite, tsc and the unit suite all stay green"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 12 by driving the tools in a browser — US-208 had just discovered that two of them had never been loaded by any test. Both are multi-step react-hook-form forms whose required fields are registered on the early steps, with the submit button on the last. handleSubmit refuses to call the submit handler while any registered field is invalid, and renders each message inside the step that owns the field — which is unmounted by then. Measured before the fix: a visitor filling nothing walked to 'Step 3 of 3' (bio analyzer) and 'Step 4 of 4' (listing generator) with ZERO error messages on the page, and the button there produced no state change, no toast, no console warning and no network request across repeated clicks. These are the lead-generation funnels; the whole purpose of the free tools is capturing an agent's email at the end of one. The bio analyzer requires currentBio (step 1) and city/state/location (step 2) with submit on step 3; the listing generator requires bedrooms/bathrooms/squareFeet/price (step 1) and city/state (step 2) with submit on step 4. Both now validate per step via trigger(), and both send a refused submit back to the offending step."
     }
   ]
 }

@@ -27,6 +27,22 @@ interface PropertyDetailsFormProps {
   onStepChange?: (step: number) => void;
 }
 
+/**
+ * Which step each validated field lives on.
+ *
+ * US-210: the same defect as the Instagram bio analyzer, and one step worse.
+ * bedrooms, bathrooms, squareFeet and price are required on step 1, city and
+ * state on step 2, and the submit button is on step 4 — where none of those
+ * error messages are mounted. `handleSubmit` refuses silently, so "Generate
+ * Descriptions" does nothing, with the reason three steps behind the visitor.
+ */
+const STEP_FIELDS: Record<number, (keyof PropertyDetails)[]> = {
+  1: ['bedrooms', 'bathrooms', 'squareFeet', 'price'],
+  2: ['city', 'state'],
+  3: [],
+  4: ['targetBuyer'],
+};
+
 export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsFormProps) {
   const [step, setStep] = useState(1);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
@@ -36,6 +52,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { errors },
   } = useForm<PropertyDetails>({
     defaultValues: {
@@ -46,16 +63,28 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
   const totalSteps = 4;
   const progress = (step / totalSteps) * 100;
 
-  const nextStep = () => {
-    const newStep = Math.min(step + 1, totalSteps);
+  const goToStep = (newStep: number) => {
     setStep(newStep);
     onStepChange?.(newStep);
   };
 
-  const prevStep = () => {
-    const newStep = Math.max(step - 1, 1);
-    setStep(newStep);
-    onStepChange?.(newStep);
+  const nextStep = async () => {
+    // Validate what this step owns before leaving it.
+    if (!(await trigger(STEP_FIELDS[step] ?? []))) return;
+    goToStep(Math.min(step + 1, totalSteps));
+  };
+
+  const prevStep = () => goToStep(Math.max(step - 1, 1));
+
+  /** A refused submit sends the visitor to the step holding the first error. */
+  const handleInvalid = (formErrors: Record<string, unknown>) => {
+    const firstBadStep = Object.entries(STEP_FIELDS)
+      .map(([stepNumber, fields]) => ({
+        stepNumber: Number(stepNumber),
+        hasError: fields.some((field) => field in formErrors),
+      }))
+      .find((entry) => entry.hasError)?.stepNumber;
+    if (firstBadStep && firstBadStep !== step) goToStep(firstBadStep);
   };
 
   const handleFormSubmit = (data: PropertyDetails) => {
@@ -79,7 +108,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
+    <form onSubmit={handleSubmit(handleFormSubmit, handleInvalid)} className="space-y-8">
       {/* Progress Bar */}
       <div className="space-y-2">
         <div className="flex justify-between text-sm text-gray-600">
@@ -542,7 +571,7 @@ export function PropertyDetailsForm({ onSubmit, onStepChange }: PropertyDetailsF
         {step < totalSteps ? (
           <Button
             type="button"
-            onClick={nextStep}
+            onClick={() => void nextStep()}
             className="gap-2 bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
           >
             Next

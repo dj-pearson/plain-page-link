@@ -4147,3 +4147,61 @@ accepted a deliberately misspelled column in an .update(), because
 supabase/functions/deno.json sets strict:false and the rows are `any`. The
 regex checker in src/schema-references.test.ts is the mechanism, not a stopgap.
 US-207 is updated with that result so nobody repeats the experiment.
+
+### Iteration 12/15 — US-210: both free tools ended at a button that did nothing
+
+US-208 found two free tools no browser test had ever loaded. This iteration
+loaded them and used them.
+
+    /tools/instagram-bio-analyzer     fill nothing, click Next, Next
+    -> "Step 3 of 3", press "Analyze My Bio"
+    -> nothing. Four clicks, no state change, no error, no toast, no console
+       warning, no network request.
+
+    /tools/listing-description-generator
+    -> "Step 4 of 4", press "Generate Descriptions"
+    -> the same nothing.
+
+WHY. Both are multi-step react-hook-form forms. The required fields are
+registered on the early steps:
+
+    bio analyzer     currentBio (1), city / state / location (2)   submit on 3
+    listing gen      bedrooms / bathrooms / squareFeet / price (1),
+                     city / state (2)                             submit on 4
+
+`handleSubmit` will not call the submit handler while any registered field
+fails, and it renders each message inside the JSX of the step that owns the
+field. On the last step that JSX is unmounted. So the refusal is not merely
+unhelpful — it is invisible. Nothing on the page changes, and nothing ever will,
+however many times the button is pressed.
+
+Neither form validated on Next either, so the natural path — skim through to see
+what the tool does before committing to typing — leads directly to the dead end.
+Measured against the code as it shipped: the skimmer advanced 2 steps and 3
+steps respectively, ending on the final step of each with ZERO error messages
+rendered.
+
+These are the lead-generation funnels. The entire purpose of the free tools is
+to capture an agent's email at the end of one.
+
+WHAT CHANGED
+  - A STEP_FIELDS map in each form, and `Next` now awaits
+    `trigger(STEP_FIELDS[step])` and refuses to advance while the step it is
+    leaving is invalid. The error appears next to the field, which is where the
+    person is looking.
+  - `handleSubmit(onValid, onInvalid)`: if a submit is refused anyway, jump to
+    the step holding the first error. A backstop, not the main fix — but the
+    failure mode here was specifically "silent", so it is worth closing twice.
+
+VERIFICATION, measured in a browser in both directions:
+  - After: the skimmer is stopped on "Step 2 of 3" with "City is required" and
+    on "Step 1 of 4" with "Bedrooms is required".
+  - Before: "Step 3 of 3" and "Step 4 of 4", errors: [].
+  - tests/e2e/free-tool-funnels.spec.ts, 4 tests, run against
+    src/components/tools/ as it was at fdf0d6e: all 4 fail. All 4 pass after.
+    Its second assertion is the general one — if a submit button is reachable,
+    pressing it must produce either progress or a message.
+  - E2E 26/26 (was 22), a11y 37/37, tsc clean, 851 unit tests pass.
+
+Nothing in the spec is mocked. Neither tool calls Supabase to produce its
+result, which is what makes the funnels cheap to hold to this.
