@@ -144,10 +144,16 @@ function writtenKeys(chain: string): string[] {
 
   // Depth-1, start-of-line keys only. A key written mid-line is almost always
   // the `: null` of a ternary rather than a column.
+  //
+  // Shorthand counts: `{ url, device, lcp }` is three columns, and a scanner
+  // that only reads `name:` misses them. seo_link_analysis was written with a
+  // shorthand `url` for a table whose column is `page_url`, and the first
+  // version of this test did not see it.
   const keys: string[] = [];
   depth = 0;
   for (const line of chain.slice(open, close + 1).split('\n')) {
-    const key = /^\s*([a-z_][a-z_0-9]*)\s*:/.exec(line);
+    const key =
+      /^\s*([a-z_][a-z_0-9]*)\s*:/.exec(line) ?? /^\s*([a-z_][a-z_0-9]*)\s*,?\s*$/.exec(line);
     if (depth === 1 && key) keys.push(key[1]);
     for (const char of line) {
       if (char === '{' || char === '[') depth++;
@@ -205,9 +211,6 @@ const describeRef = (r: Reference) => `${r.relation}.${r.column} (${r.file}:${r.
  */
 const KNOWN_BROKEN_WRITES: Record<string, string[]> = {
   articles: ['last_seo_check', 'seo_issues', 'seo_recommendations', 'seo_score'],
-  gsc_keyword_performance: ['keyword', 'platform', 'property_url', 'user_id'],
-  gsc_page_performance: ['page_url', 'platform', 'property_url', 'user_id'],
-  gsc_properties: ['last_sync_at', 'site_url'],
   seo_alerts: ['metadata', 'notification_sent', 'notified_at', 'related_url', 'rule_id'],
   seo_content_optimization: [
     'issues_count',
@@ -217,27 +220,6 @@ const KNOWN_BROKEN_WRITES: Record<string, string[]> = {
     'overall_score',
     'recommendations',
     'title',
-  ],
-  seo_core_web_vitals: [
-    'checked_by',
-    'cls_passed',
-    'cls_value',
-    'collection_period_end',
-    'collection_period_start',
-    'fcp_value',
-    'fid_passed',
-    'fid_value',
-    'inp_value',
-    'lcp_passed',
-    'lcp_value',
-    'ttfb_value',
-  ],
-  seo_link_analysis: [
-    'analyzed_by',
-    'issues_count',
-    'total_external_links',
-    'total_internal_links',
-    'unique_internal_pages',
   ],
   seo_monitoring_log: [
     'check_type',

@@ -3501,3 +3501,88 @@ before this iteration's changes: newer @types/node types Buffer.equals's
 parameter as Uint8Array<ArrayBuffer>, which a Buffer no longer satisfies. The
 PNG signature is compared as hex now. `npm run build:check` runs tsc, so this
 was a broken build gate, not a cosmetic warning.
+
+### Iteration 4/15 — US-201 (part 1): the Search Console integration was dead end to end
+
+Iteration 3 froze 59 write-column mismatches in a ratchet and said each needed a
+decision that must not be guessed at. This iteration took the Google Search
+Console half of that list — four tables, 22 entries — and the decision turned
+out to be easy, because the schema says plainly what each column is called and
+one of the two Core Web Vitals writers already gets it right.
+
+What was not easy to see is what the four defects add up to.
+
+    gsc-fetch-properties    upsert sent site_url (a duplicate of property_url
+                            under a name the table lacks) and last_sync_at (the
+                            column is last_synced_at). PostgREST rejects the
+                            STATEMENT, not the unknown keys — so no property was
+                            ever saved.
+
+    gsc-sync-data           therefore always answered "No verified GSC property
+                            found" and returned 400. If it had got past that, its
+                            own inserts named user_id, property_url, keyword,
+                            page_url and platform on two tables that key on
+                            property_id, query and url. Not one row would have
+                            landed either.
+
+So the integration has never worked, at any step, and every failure was logged
+and swallowed: `if (!insertError) keywordsSaved++` counts to zero and reports
+`keywordsSynced: 0`, which reads like an account with no search traffic rather
+than like a broken write.
+
+    gsc-fetch-core-web-vitals   twelve keys: lcp_value/lcp_passed for lcp and
+                                lcp_pass, and so on. check-core-web-vitals writes
+                                the same table correctly, so the right shape was
+                                already in the repo, eight files away.
+
+    analyze-internal-links      sent `url` for a page_url NOT NULL column. This
+                                insert could not have succeeded even by accident.
+
+WHAT CHANGED, beyond the renames — three things that would have been new defects
+if only the column names had been corrected:
+
+  - gsc-sync-data now resolves the property ROW and uses its id. It previously
+    selected only property_url, because it was writing a URL where a uuid
+    belongs. Passing propertyUrl explicitly is now checked against the account
+    rather than trusted.
+  - The day is deleted before it is inserted. The unique constraint is
+    (property_id, query, url, date, device, country) and the request asks GSC for
+    neither device nor country, so those arrive NULL — and NULLs do not conflict
+    in Postgres, which means an upsert would have silently duplicated every row
+    on a re-sync. Making a broken write work is where duplicate-on-retry
+    defects are born.
+  - One insert instead of one per row. That loop was up to 1000 sequential round
+    trips per sync.
+  - gsc-fetch-core-web-vitals writes data_source 'crux', not the column default
+    'pagespeed'. This is field data from real visitors and the CHECK constraint
+    has always allowed 'crux'.
+  - analyze-internal-links now stores `issues` and `recommendations` themselves.
+    seo_link_analysis has jsonb columns for both, and writing `issues.length`
+    into a column called issues_count threw away the only part an operator can
+    act on.
+
+A GAP IN THE CHECKER, found by this work rather than by review. US-200's scanner
+read `name: value` and missed shorthand: `{ url, device, lcp }` is three columns,
+and `seo_link_analysis.url` — the NOT NULL violation above — was invisible to it.
+Shorthand is matched now, and re-running the scanner found exactly that one new
+reference and no others, so the gap was narrow but it was hiding the worst entry
+on the list.
+
+VERIFICATION
+  - The checker was run against the four functions as they were at f014bc6:
+    28 references reported. Zero after.
+  - KNOWN_BROKEN_WRITES is down from 59 to 32, and the stale-entry test is what
+    forced each removal — the list cannot describe work that is already done.
+  - deno check --config supabase/functions/deno.json clean on all four.
+  - tsc --noEmit clean; npm run test:run 93 files, 844 passed, 0 failed.
+
+REMAINING, for the next iteration — 32 entries across six tables. Two of them
+look like genuinely missing columns rather than renames: seo_monitoring_log has
+7 columns and the code writes 6 more, and articles is written with seo_score,
+seo_issues, seo_recommendations and last_seo_check. Those need a migration and a
+types regeneration, which is a different kind of change from this one.
+
+NOT DONE, and recorded — seo_core_web_vitals has no `inp` column. The table
+predates INP replacing FID as a Core Web Vital. INP and the CrUX collection
+period go into the field_data jsonb for now, which is the column that exists for
+exactly that; promoting inp to a real column needs a migration.

@@ -109,13 +109,18 @@ serve(async (req) => {
     for (const property of properties) {
       const { error: upsertError } = await supabase
         .from('gsc_properties')
+        // US-201: this upsert also sent `site_url` (a duplicate of
+        // property_url under a name the table does not have) and
+        // `last_sync_at` (the column is last_synced_at, and discovering a
+        // property is not a data sync anyway). PostgREST rejected the whole
+        // statement, so gsc-fetch-properties has never saved a property — which
+        // is why gsc-sync-data always answered "No verified GSC property
+        // found". The Search Console integration was dead end to end.
         .upsert({
           user_id: userId,
           property_url: property.siteUrl,
           permission_level: property.permissionLevel,
-          site_url: property.siteUrl,
           is_verified: property.permissionLevel !== 'siteUnverifiedUser',
-          last_sync_at: new Date().toISOString(),
         }, {
           onConflict: 'user_id,property_url',
         });

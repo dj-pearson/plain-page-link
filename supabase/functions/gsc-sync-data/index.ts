@@ -9,6 +9,15 @@ import { requireAuth } from '../_shared/auth.ts';
  * Fetches keyword and page performance data from GSC and stores in database
  */
 
+/** One row of a Search Console searchAnalytics/query response. */
+interface GSCRow {
+  keys: string[];
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
 interface GSCSyncRequest {
   propertyUrl?: string;
   startDate?: string;  // YYYY-MM-DD
@@ -79,26 +88,35 @@ serve(async (req) => {
       );
     }
 
-    // Get property URL if not provided
-    let siteUrl = propertyUrl;
-    if (!siteUrl) {
-      const { data: property } = await supabase
-        .from('gsc_properties')
-        .select('property_url')
-        .eq('user_id', userId)
-        .eq('is_verified', true)
-        .limit(1)
-        .maybeSingle();
+    // Resolve the property ROW, not just its URL.
+    //
+    // US-201: gsc_keyword_performance and gsc_page_performance key on
+    // property_id (uuid), not on a user_id/property_url pair — neither column
+    // exists on either table. Every insert below was rejected by PostgREST with
+    // 400, counted as a failure, and reported to the caller as
+    // `keywordsSynced: 0`. The sync has never stored a row.
+    const propertyQuery = supabase
+      .from('gsc_properties')
+      .select('id, property_url')
+      .eq('user_id', userId);
 
-      if (!property) {
-        return new Response(
-          JSON.stringify({ error: 'No verified GSC property found' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    const { data: property } = await (propertyUrl
+      ? propertyQuery.eq('property_url', propertyUrl).maybeSingle()
+      : propertyQuery.eq('is_verified', true).limit(1).maybeSingle());
 
-      siteUrl = property.property_url;
+    if (!property) {
+      return new Response(
+        JSON.stringify({
+          error: propertyUrl
+            ? 'That Search Console property is not connected to this account'
+            : 'No verified GSC property found',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    const propertyId = property.id;
+    const siteUrl = property.property_url;
 
     console.log(`Fetching data for property: ${siteUrl}`);
 
@@ -132,27 +150,40 @@ serve(async (req) => {
 
     console.log(`Fetched ${keywords.length} keywords`);
 
-    // Save keyword performance data
+    // Save keyword performance data.
+    //
+    // Replace the day rather than appending to it. The unique constraint is
+    // (property_id, query, url, date, device, country) and this request asks
+    // GSC for neither device nor country, so those arrive NULL — and NULLs do
+    // not conflict in Postgres, which means an upsert would silently duplicate
+    // every row on a re-sync. Deleting the day first is idempotent whatever the
+    // dimensions are.
+    //
+    // One insert, not one per row: this loop was 1000 sequential round trips.
     let keywordsSaved = 0;
-    for (const row of keywords) {
-      const { error: insertError } = await supabase
+    if (keywords.length > 0) {
+      await supabase
         .from('gsc_keyword_performance')
-        .insert({
-          user_id: userId,
-          property_url: siteUrl,
-          keyword: row.keys[0],
+        .delete()
+        .eq('property_id', propertyId)
+        .eq('date', endDate);
+
+      const { error: insertError } = await supabase.from('gsc_keyword_performance').insert(
+        keywords.map((row: GSCRow) => ({
+          property_id: propertyId,
+          query: row.keys[0],
           clicks: row.clicks,
           impressions: row.impressions,
           ctr: row.ctr,
           position: row.position,
           date: endDate,
-          platform: 'google',
-        });
+        }))
+      );
 
-      if (!insertError) {
-        keywordsSaved++;
+      if (insertError) {
+        console.error('Error saving keywords:', insertError);
       } else {
-        console.error('Error saving keyword:', insertError);
+        keywordsSaved = keywords.length;
       }
     }
 
@@ -182,34 +213,44 @@ serve(async (req) => {
 
       console.log(`Fetched ${pages.length} pages`);
 
-      // Save page performance data
-      for (const row of pages) {
-        const { error: insertError } = await supabase
+      // Save page performance data. Same shape as the keywords above: the
+      // column is `url`, not `page_url`, and the day is replaced rather than
+      // appended to.
+      if (pages.length > 0) {
+        await supabase
           .from('gsc_page_performance')
-          .insert({
-            user_id: userId,
-            property_url: siteUrl,
-            page_url: row.keys[0],
+          .delete()
+          .eq('property_id', propertyId)
+          .eq('date', endDate);
+
+        const { error: insertError } = await supabase.from('gsc_page_performance').insert(
+          pages.map((row: GSCRow) => ({
+            property_id: propertyId,
+            url: row.keys[0],
             clicks: row.clicks,
             impressions: row.impressions,
             ctr: row.ctr,
             position: row.position,
             date: endDate,
-            platform: 'google',
-          });
+          }))
+        );
 
-        if (!insertError) {
-          pagesSaved++;
+        if (insertError) {
+          console.error('Error saving pages:', insertError);
+        } else {
+          pagesSaved = pages.length;
         }
       }
     }
 
-    // Update last sync time
+    // Update last sync time. US-201: the column is last_synced_at; `last_sync_at`
+    // does not exist, so this update 400'd and the dashboard's "last synced"
+    // has always been empty. sync_status is set for the same reason — it
+    // defaults to 'pending' and nothing ever moved it off.
     await supabase
       .from('gsc_properties')
-      .update({ last_sync_at: new Date().toISOString() })
-      .eq('user_id', userId)
-      .eq('property_url', siteUrl);
+      .update({ last_synced_at: new Date().toISOString(), sync_status: 'completed' })
+      .eq('id', propertyId);
 
     return new Response(
       JSON.stringify({
