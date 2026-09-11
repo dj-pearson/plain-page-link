@@ -193,6 +193,32 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
+      // `upgrade-insecure-requests` is right in production and fatal on the dev
+      // server. index.html's meta CSP carries it, and over http://127.0.0.1
+      // WebKit honours it — every subresource is re-requested as https, the
+      // dev server speaks plain http, and each one dies on the TLS handshake.
+      // /src/main.tsx is one of them, so the SPA never mounts: #root stays
+      // empty and every locator in a browser test times out waiting for a form
+      // that was never rendered.
+      //
+      // Chromium exempts loopback as a potentially-trustworthy origin and does
+      // not upgrade, which is why this was invisible until the security suite's
+      // iPhone 13 project (WebKit) was actually able to run — it accounted for
+      // all 10 of its remaining failures. Anyone opening `npm run dev` in
+      // Safari has been getting a blank page for the same reason.
+      //
+      // Removed only when serving. The built index.html is untouched, and the
+      // deployed CSP in public/_headers keeps the directive.
+      {
+        name: 'csp-no-upgrade-in-dev',
+        apply: 'serve' as const,
+        transformIndexHtml: {
+          order: 'pre' as const,
+          handler(html: string) {
+            return html.replace(/\s*upgrade-insecure-requests;/, '');
+          },
+        },
+      },
       // Security headers plugin for development
       {
         name: 'security-headers',

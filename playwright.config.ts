@@ -89,6 +89,13 @@ export default defineConfig({
     // Chromium bundle installed. Left as-is deliberately: pointing a WebKit
     // launch at a Chromium binary makes every spec fail instantly, which reads
     // as an application defect rather than a missing browser.
+    //
+    // Which is exactly what CI did. The security job installed `chromium`
+    // alone, so all 31 page tests here failed at browserType.launch and were
+    // counted among the job's failures. It now installs `chromium webkit`;
+    // a sandbox with only the Chromium bundle still cannot run this project,
+    // so `--project=security-chrome --project=security-api` is the local
+    // invocation.
     {
       name: 'security-mobile',
       use: { ...devices['iPhone 13'] },

@@ -1,25 +1,38 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Home, Mail, ArrowLeft, Check, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Home, Mail, ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setError('');
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
     });
 
     if (error) {
-      setError(error.message);
+      /**
+       * GoTrue's message, not ours. It is written for whoever is holding the
+       * keys — "User not found", "For security purposes, you can only request
+       * this after 51 seconds", a Postgres error on a bad trigger — and this
+       * form rendered it verbatim to an anonymous visitor who typed in any
+       * address. The first of those answers the one question a password-reset
+       * form must never answer.
+       *
+       * The real reason still goes to the logger, where an operator can read
+       * it; the visitor gets one sentence that is true whatever went wrong.
+       */
+      logger.error('Password reset request failed', error, { action: 'reset_password' });
+      setError("We couldn't send that email. Please check the address and try again.");
     } else {
       setSent(true);
     }
@@ -32,7 +45,10 @@ export default function ForgotPassword() {
         {/* Header */}
         <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
           <div className="container mx-auto px-4 py-3">
-            <Link to="/" className="flex items-center gap-2 text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
+            <Link
+              to="/"
+              className="flex items-center gap-2 text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
+            >
               <Home className="h-6 w-6 text-blue-600" />
               AgentBio.net
             </Link>
@@ -69,7 +85,10 @@ export default function ForgotPassword() {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
         <div className="container mx-auto px-4 py-3">
-          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
+          >
             <Home className="h-6 w-6 text-blue-600" />
             AgentBio.net
           </Link>
@@ -79,9 +98,7 @@ export default function ForgotPassword() {
       <div className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Reset Your Password
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Your Password</h1>
             <p className="text-gray-600">
               Enter your email and we'll send you instructions to reset your password
             </p>
@@ -90,7 +107,7 @@ export default function ForgotPassword() {
           <div className="bg-white rounded-lg shadow-lg p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-600">{error}</p>
                 </div>
               )}
@@ -123,7 +140,7 @@ export default function ForgotPassword() {
                     Sending...
                   </>
                 ) : (
-                  "Send Reset Instructions"
+                  'Send Reset Instructions'
                 )}
               </button>
             </form>

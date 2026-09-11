@@ -5,7 +5,7 @@
  * Covers various OWASP recommendations for secure headers.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/consent';
 import { testSecurityHeaders, SECURITY_HEADERS } from './security-utils';
 
 test.describe('Security Headers', () => {
@@ -160,7 +160,7 @@ test.describe('Security Headers', () => {
       const response = await request.fetch('/', {
         method: 'OPTIONS',
         headers: {
-          'Origin': 'https://malicious-site.com',
+          Origin: 'https://malicious-site.com',
           'Access-Control-Request-Method': 'POST',
         },
       });
@@ -175,7 +175,7 @@ test.describe('Security Headers', () => {
       const response = await request.fetch('/', {
         method: 'OPTIONS',
         headers: {
-          'Origin': 'https://agentbio.net',
+          Origin: 'https://agentbio.net',
           'Access-Control-Request-Method': 'DELETE',
         },
       });
@@ -197,16 +197,22 @@ test.describe('Security Headers', () => {
       expect(contentType).toContain('text/html');
     });
 
+    /**
+     * `/api/health` does not exist — this platform has no REST API at all, and
+     * the health probe it was reaching for is the health-check edge function
+     * at /functions/v1/health-check. The request fell through to the SPA and
+     * came back as text/html, which the `if (status === 200)` guard turned
+     * into a failed assertion rather than the silent pass it looks like.
+     *
+     * /manifest.json is the JSON document this origin actually serves, and
+     * index.html links it as rel="manifest". A browser that is handed it as
+     * text/html will not install the PWA.
+     */
     test('should serve JSON with correct content type', async ({ request }) => {
-      // Test an API endpoint that returns JSON
-      const response = await request.get('/api/health', {
-        failOnStatusCode: false,
-      });
+      const response = await request.get('/manifest.json');
 
-      if (response.status() === 200) {
-        const contentType = response.headers()['content-type'];
-        expect(contentType).toContain('application/json');
-      }
+      expect(response.status()).toBe(200);
+      expect(response.headers()['content-type']).toContain('application/json');
     });
 
     test('should serve JavaScript with correct content type', async ({ request }) => {
@@ -238,9 +244,11 @@ test.describe('Security Headers', () => {
       const cookies = await page.context().cookies();
 
       for (const cookie of cookies) {
-        if (cookie.name.toLowerCase().includes('session') ||
-            cookie.name.toLowerCase().includes('token') ||
-            cookie.name.toLowerCase().includes('auth')) {
+        if (
+          cookie.name.toLowerCase().includes('session') ||
+          cookie.name.toLowerCase().includes('token') ||
+          cookie.name.toLowerCase().includes('auth')
+        ) {
           expect(cookie.httpOnly).toBe(true);
         }
       }
@@ -271,10 +279,29 @@ test.describe('Security Headers', () => {
       expect(content).not.toContain('.tsx:');
     });
 
-    test('should return appropriate error status codes', async ({ request }) => {
-      const response = await request.get('/this-page-does-not-exist-404');
+    /**
+     * This asked a dev server for an HTTP 404 and got the SPA fallback's 200.
+     * Two things were wrong with it. A Vite dev server answers every unmatched
+     * GET with index.html by design, so the status this asserted is not the
+     * status the deployment returns; and the path it chose was a single
+     * segment, which `public/_redirects` deliberately routes to the app as a
+     * possible username, so even Cloudflare Pages answers it 200.
+     *
+     * The status contract belongs to _redirects and is held by
+     * src/spa-routes.test.ts. What is testable through a browser, and is the
+     * thing a visitor sees either way, is that an unknown path renders the 404
+     * page rather than some other page's content under a different URL.
+     */
+    test('renders the not-found page for an unknown path', async ({ page }) => {
+      // Two segments, matching no route in App.tsx. A single segment is the
+      // /:username rule and /blog/<anything> is the BlogArticle route, which
+      // renders its own "Article Not Found" — neither is an unknown path.
+      await page.goto('/no-such-section/no-such-page-404');
 
-      expect(response.status()).toBe(404);
+      await expect(page.getByRole('heading', { name: 'Page Not Found' })).toBeVisible({
+        timeout: 15000,
+      });
+      await expect(page).toHaveTitle(/not found/i);
     });
 
     test('should not expose sensitive info in 500 errors', async ({ request }) => {

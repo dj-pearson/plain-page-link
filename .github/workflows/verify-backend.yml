@@ -140,6 +140,15 @@ jobs:
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
 
+      # verify-schema.mjs has no dependencies, so this job ran without one for
+      # as long as it has existed and looked fine. gen-supabase-types.mjs does:
+      # its format() shells out to node_modules/prettier/bin/prettier.cjs. The
+      # --check step below has therefore never once run — every invocation died
+      # with MODULE_NOT_FOUND, which reads as "types.ts has drifted" and is not
+      # that at all.
+      - name: Install dependencies
+        run: npm ci
+
       - name: Create the Supabase objects migrations depend on
         # auth.users, auth.uid(), storage.*, the anon/authenticated/service_role
         # roles, and the default privileges that hosted Supabase grants.

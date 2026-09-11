@@ -53,6 +53,7 @@ const BASELINE: Record<string, number> = {
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+import { TEST_EMAIL, TEST_PASSWORD } from '../support/credentials';
 const SERIOUS = ['critical', 'serious'];
 
 /**
@@ -204,8 +205,8 @@ async function setupMocks(page: Page) {
  */
 async function signIn(page: Page) {
   await page.goto('/auth/login', { waitUntil: 'domcontentloaded' });
-  await page.fill('input[type="email"]', 'a11y@example.com');
-  await page.fill('input[type="password"]', 'A11yP@ssw0rd!');
+  await page.fill('input[type="email"]', TEST_EMAIL);
+  await page.fill('input[type="password"]', TEST_PASSWORD);
   await page.click('button[type="submit"]');
   await page.waitForURL((url) => !url.pathname.startsWith('/auth/login'), { timeout: 20000 });
 }
