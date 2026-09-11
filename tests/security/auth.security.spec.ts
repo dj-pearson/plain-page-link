@@ -5,7 +5,7 @@
  * Covers OWASP A07:2021 - Identification and Authentication Failures
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/consent';
 import {
   testAuthBypass,
   testRateLimiting,
@@ -38,12 +38,7 @@ test.describe('Authentication Security', () => {
     });
 
     test('should implement login rate limiting', async ({ request }) => {
-      const result = await testRateLimiting(
-        request,
-        '/auth/login',
-        'POST',
-        20
-      );
+      const result = await testRateLimiting(request, '/auth/login', 'POST', 20);
 
       // Should have rate limiting
       expect(result.rateLimited).toBe(true);
@@ -58,7 +53,8 @@ test.describe('Authentication Security', () => {
       await page.fill('input[type="password"]', 'wrongpassword');
       await page.click('button[type="submit"]');
 
-      const errorMessage1 = await page.textContent('[role="alert"], .error-message, .toast-error') || '';
+      const errorMessage1 =
+        (await page.textContent('[role="alert"], .error-message, .toast-error')) || '';
 
       await page.goto('/auth/login');
 
@@ -67,7 +63,8 @@ test.describe('Authentication Security', () => {
       await page.fill('input[type="password"]', 'wrongpassword');
       await page.click('button[type="submit"]');
 
-      const errorMessage2 = await page.textContent('[role="alert"], .error-message, .toast-error') || '';
+      const errorMessage2 =
+        (await page.textContent('[role="alert"], .error-message, .toast-error')) || '';
 
       // Error messages should be identical to prevent user enumeration
       // Or both should be generic
@@ -89,8 +86,11 @@ test.describe('Authentication Security', () => {
         await page.fill('input[name="password"]', weakPassword);
 
         // Look for password strength indicator or error
-        const hasError = await page.locator('[data-password-error], .password-error, [aria-invalid="true"]').count() > 0 ||
-          await page.locator('text=/too weak|too short|must contain/i').count() > 0;
+        const hasError =
+          (await page
+            .locator('[data-password-error], .password-error, [aria-invalid="true"]')
+            .count()) > 0 ||
+          (await page.locator('text=/too weak|too short|must contain/i').count()) > 0;
 
         // Password should be rejected or flagged as weak
         // (Exact behavior depends on implementation)
@@ -119,14 +119,16 @@ test.describe('Authentication Security', () => {
 
       // Get initial cookies
       const cookiesBefore = await context.cookies();
-      const sessionCookie = cookiesBefore.find(c =>
-        c.name.includes('session') || c.name.includes('token')
+      const sessionCookie = cookiesBefore.find(
+        (c) => c.name.includes('session') || c.name.includes('token')
       );
 
       // Logout
       await page.goto('/dashboard');
-      const logoutButton = page.locator('button:has-text("Logout"), a:has-text("Logout"), [data-logout]');
-      if (await logoutButton.count() > 0) {
+      const logoutButton = page.locator(
+        'button:has-text("Logout"), a:has-text("Logout"), [data-logout]'
+      );
+      if ((await logoutButton.count()) > 0) {
         await logoutButton.click();
         await page.waitForURL(/\/(auth\/login)?$/);
       }
@@ -142,7 +144,7 @@ test.describe('Authentication Security', () => {
       // Get session ID before login
       await page.goto('/auth/login');
       const cookiesBefore = await context.cookies();
-      const sessionBefore = cookiesBefore.find(c => c.name.includes('session'));
+      const sessionBefore = cookiesBefore.find((c) => c.name.includes('session'));
 
       // Perform login (if session exists, it should change)
       // The session ID should change after authentication
@@ -151,12 +153,7 @@ test.describe('Authentication Security', () => {
 
   test.describe('Protected Routes', () => {
     test('should reject unauthenticated access to protected API', async ({ request }) => {
-      const protectedEndpoints = [
-        '/api/profile',
-        '/api/leads',
-        '/api/listings',
-        '/api/analytics',
-      ];
+      const protectedEndpoints = ['/api/profile', '/api/leads', '/api/listings', '/api/analytics'];
 
       for (const endpoint of protectedEndpoints) {
         const result = await testAuthBypass(request, endpoint);
@@ -182,12 +179,7 @@ test.describe('Authentication Security', () => {
 
   test.describe('Password Reset Security', () => {
     test('should rate limit password reset requests', async ({ request }) => {
-      const result = await testRateLimiting(
-        request,
-        '/api/auth/reset-password',
-        'POST',
-        10
-      );
+      const result = await testRateLimiting(request, '/api/auth/reset-password', 'POST', 10);
 
       // Should have strict rate limiting for password reset
       expect(result.rateLimited).toBe(true);
@@ -205,9 +197,9 @@ test.describe('Authentication Security', () => {
       await page.waitForLoadState('networkidle');
 
       // Message should be generic
-      const successMessage = await page.textContent('.success-message, [role="alert"]') || '';
+      const successMessage = (await page.textContent('.success-message, [role="alert"]')) || '';
       expect(successMessage.toLowerCase()).not.toContain('not found');
-      expect(successMessage.toLowerCase()).not.toContain('doesn\'t exist');
+      expect(successMessage.toLowerCase()).not.toContain("doesn't exist");
     });
   });
 
@@ -225,7 +217,9 @@ test.describe('Authentication Security', () => {
       expect(url).not.toMatch(/access_token=/i);
     });
 
-    test('should not expose tokens in response body to non-authenticated requests', async ({ request }) => {
+    test('should not expose tokens in response body to non-authenticated requests', async ({
+      request,
+    }) => {
       const response = await request.get('/');
       const body = await response.text();
 

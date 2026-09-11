@@ -5,7 +5,7 @@
  * Covers various OWASP recommendations for secure headers.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/consent';
 import { testSecurityHeaders, SECURITY_HEADERS } from './security-utils';
 
 test.describe('Security Headers', () => {
@@ -160,7 +160,7 @@ test.describe('Security Headers', () => {
       const response = await request.fetch('/', {
         method: 'OPTIONS',
         headers: {
-          'Origin': 'https://malicious-site.com',
+          Origin: 'https://malicious-site.com',
           'Access-Control-Request-Method': 'POST',
         },
       });
@@ -175,7 +175,7 @@ test.describe('Security Headers', () => {
       const response = await request.fetch('/', {
         method: 'OPTIONS',
         headers: {
-          'Origin': 'https://agentbio.net',
+          Origin: 'https://agentbio.net',
           'Access-Control-Request-Method': 'DELETE',
         },
       });
@@ -238,9 +238,11 @@ test.describe('Security Headers', () => {
       const cookies = await page.context().cookies();
 
       for (const cookie of cookies) {
-        if (cookie.name.toLowerCase().includes('session') ||
-            cookie.name.toLowerCase().includes('token') ||
-            cookie.name.toLowerCase().includes('auth')) {
+        if (
+          cookie.name.toLowerCase().includes('session') ||
+          cookie.name.toLowerCase().includes('token') ||
+          cookie.name.toLowerCase().includes('auth')
+        ) {
           expect(cookie.httpOnly).toBe(true);
         }
       }
