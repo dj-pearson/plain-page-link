@@ -3117,8 +3117,27 @@
         "npm run test:run is green on main"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "NOTED IN ITERATION 1, NOT FIXED — hit this next. src/repo-hygiene.test.ts > 'has no competing edge-function build configurations' fails on main and failed before this iteration's change: it bans Dockerfile and edge-functions-server.ts at the repo root, and ce75af6 put both back on purpose. So either the restore was right and the test encodes a decision that was reversed, or the restore reintroduced what US-122 removed and the four other deleted configurations are the next thing to come back. This needs the deployment question answered before the test is touched — changing the assertion to match the tree would be recording the outcome rather than deciding it, which is why it is a story and not a one-line edit."
+      "passes": true,
+      "notes": "Answered in iteration 2 by reading ce75af6, which settled it by measurement rather than inference: functions.agentbio.net is Traefik-routed to Coolify application isswgo8w4gs44ogk48wgsc88, which runs the root Dockerfile and edge-functions-server.ts; the Supabase edge runtime named as the replacement holds only main/ and hello/ and answers everything else with 500 InvalidWorkerCreation. The router IS production, so the test was banning the deploy path. It now bans only the four configurations that were genuinely redundant, and a mirror test asserts the two that ship are still present, so a future cleanup repeats the discovery rather than the outage. The 15-of-86 problem that motivated the deletion was real and is fixed at the router in US-199."
+    },
+    {
+      "id": "US-199",
+      "title": "One POST to the public lead form took down all 84 edge functions",
+      "description": "As the operator of a platform whose entire backend runs in one edge-functions container, I need that container to serve every function the app calls and to survive any single one of them failing, so that a visitor filling in a contact form cannot take the backend offline.",
+      "acceptanceCriteria": [
+        "edge-functions-server.ts discovers functions by reading supabase/functions/ at startup; no literal FUNCTIONS_MAP",
+        "A function that registers its handler with top-level serve() is invoked without trying to bind the router's port",
+        "Deno.serve is intercepted for the duration of an import and restored afterwards",
+        "export default is still honoured, for the 5 functions written against the old router",
+        "An unhandled rejection is logged, not fatal",
+        "The shim and the import map are copied into the image, and --import-map is passed to both deno cache and deno run",
+        "Verified on Deno 1.42.0 (the pinned version) against the image's layout: POST /submit-lead returns the function's own response and /health still answers 200 afterwards",
+        "src/edge-function-routing.test.ts fails against the shipped router: 5 of its 8 tests",
+        "npm run test:run green, including the repo-hygiene test that was red on main"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 2 while answering US-198. Two defects in the one file that serves production. (1) The router carried a hand-written map of 15 names; the app calls 40, so 29 answered 404 'Function not found' — gdpr-export and gdpr-deletion (GDPR subject access and erasure), create-portal-session/create-stripe-customer/report-stripe-usage (billing), verify-mfa/disable-mfa/login-security/get-sessions/revoke-session (account security), sso-initiate/sso-callback, submit-review, teams, api-keys, send-welcome-email. One mapped name, submit-contact, has no directory. (2) Far worse: it invoked module.default(req), but only 5 of 84 functions export a default and 79 call serve() at module top level. Importing one inside the process that already holds port 8000 raised AddrInUse from an unawaited promise, and an unhandled rejection ends a Deno process. Reproduced on Deno 1.42.0: POST /submit-lead returned 'TypeError: module.default is not a function' as a 500 and then killed the server — /health went from 200 to connection refused. That is an unauthenticated denial of service on the whole backend, reachable from the public lead form, and it would recur on every restart. docs/deploy/edge-functions.md had flagged both as 'worth fixing' and 'verify before building on the current design'; this verified and fixed them."
     }
   ]
 }

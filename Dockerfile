@@ -9,9 +9,14 @@ WORKDIR /app
 COPY supabase/functions ./functions
 COPY supabase/config.toml ./config.toml
 COPY edge-functions-server.ts ./server.ts
+# US-199: the shim stands in for std@0.168.0/http/server.ts so a function's
+# top-level serve() hands its handler to the router instead of trying to bind
+# port 8000, which the router already holds.
+COPY edge-functions-serve-shim.ts ./serve-shim.ts
+COPY edge-functions-import-map.json ./import_map.json
 
 # Cache dependencies by running deno cache
-RUN deno cache server.ts
+RUN deno cache --import-map=./import_map.json server.ts
 
 # Expose port 8000 for the edge functions server
 EXPOSE 8000
@@ -21,5 +26,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD deno eval "fetch('http://localhost:8000/health').then(r => r.ok ? Deno.exit(0) : Deno.exit(1))"
 
 # Run the server with necessary permissions
-CMD ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "server.ts"]
+CMD ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "--import-map=./import_map.json", "server.ts"]
 

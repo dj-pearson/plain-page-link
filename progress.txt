@@ -3285,3 +3285,115 @@ decision that has since been reversed, or the restore reintroduced what US-122
 removed. That is a question about how this platform deploys, not a failing
 assertion to edit into agreement with the tree, so it is a story for the next
 iteration rather than a line changed here.
+
+### Iteration 2/15 — US-199 (and US-198): one POST to the lead form took the backend down
+
+US-198 asked which deployment path is real. ce75af6 had already answered it by
+measurement: functions.agentbio.net is Traefik-routed to Coolify application
+isswgo8w4gs44ogk48wgsc88, which runs edge-functions-server.ts from the root
+Dockerfile, and the Supabase edge runtime named as its replacement holds only
+main/ and hello/. The router is production. So repo-hygiene was banning the
+deploy path, and that is a two-line fix — ban the four genuinely redundant
+configurations, and assert the two that ship are still there so the next
+cleanup repeats the discovery rather than the outage.
+
+Reading that file to answer the question is where the iteration actually went.
+
+WHAT IT SERVES. The router carried a literal FUNCTIONS_MAP of 15 names. The app
+calls 40. Twenty-nine answered 404 "Function not found":
+
+    gdpr-export, gdpr-deletion          subject access and erasure — the
+                                        compliance obligations
+    create-portal-session               "Manage billing" went nowhere
+    create-stripe-customer, report-stripe-usage
+    verify-mfa, disable-mfa, get-sessions, revoke-session, login-security
+                                        the entire account-security surface
+    sso-initiate, sso-callback          SSO login
+    submit-review                       the /:username/review page
+    teams, api-keys, audit-log, send-welcome-email, optimize-image,
+    health-check, pii-crypto, trigger-rebuild, and eight more
+
+One mapped name, submit-contact, has no directory in the repo at all.
+
+Until yesterday every one of those failures reached the user as the string
+"[object Object]" — iteration 1's defect and this one compose, which is why the
+404s could sit there. The router's 404 body is {"error": "Function not found"},
+a string, so US-197 now surfaces it. Two independent bugs, and the second was
+the reason nobody could see the first.
+
+WHAT IS WORSE THAN A 404. The router invoked each module as module.default(req).
+Five of the 84 functions export a default — check-username, generate-article,
+oauth-proxy, publish-article-to-social, pii-crypto, and oauth-proxy even carries
+the comment "Export handler for edge-functions-server (NOT Deno.serve)", so
+someone adapted exactly five. The other 79 call serve() at module top level,
+which is what Supabase's own runtime expects.
+
+This was reproduced rather than reasoned about. Deno 1.42.0 — the version the
+Dockerfile pins — was fetched, the image's layout recreated (COPY supabase/
+functions ./functions, edge-functions-server.ts ./server.ts), and the server
+started with the same CMD. POST /submit-lead:
+
+    Error executing function submit-lead: TypeError: module.default is not a function
+        at Server.handler (.../server.ts:87:42)
+    error: Uncaught (in promise) AddrInUse: Address already in use (os error 98)
+        at Server.listenAndServe (https://deno.land/std@0.168.0/http/server.ts:182:27)
+        at serve (https://deno.land/std@0.168.0/http/server.ts:605:20)
+        at .../functions/submit-lead/index.ts:59:1
+
+    $ curl /health  ->  exit 7, connection refused
+
+The 500 is returned, and then the process dies. The import ran the module's
+top-level serve(), which tried to bind port 8000 — the port the router is
+holding — and the unawaited promise rejected. Deno treats an unhandled rejection
+as fatal.
+
+So: an unauthenticated POST to the public lead-capture form takes down all 84
+edge functions, and does it again to the restarted container on the next
+submission. That is the platform's revenue path shooting the platform.
+
+WHAT CHANGED
+  - edge-functions-server.ts discovers functions from disk with Deno.readDir.
+    A directory under supabase/functions/ with an index.ts is a function — the
+    same rule the real runtime uses. 15 -> 84. The defect was never the fifteen
+    names; it was that a person had to remember the sixteenth.
+  - edge-functions-serve-shim.ts stands in for std@0.168.0/http/server.ts via
+    edge-functions-import-map.json. Its serve() records the handler instead of
+    listening, which is the same contract the runtime offers a function.
+  - Deno.serve is intercepted for the duration of each import and restored in a
+    finally, covering google-indexing and trigger-rebuild.
+  - export default still wins if the other two produced nothing, so the five
+    functions written against the old router keep working.
+  - Imports are serialised: the shim's capture slot is process-wide, and two
+    concurrent first-time requests could otherwise take each other's handler.
+  - An unhandledrejection listener makes the class of crash survivable, not
+    just the one cause of it.
+  - The function's own CORS headers now win over the router's '*'. getCorsHeaders
+    in _shared checks the origin against an allowlist; overwriting it with '*'
+    silently widened every function that bothered.
+  - /functions/v1/<name> is accepted alongside /functions/<name> and /<name>.
+
+VERIFICATION, on Deno 1.42.0 against the image layout, not by reasoning:
+  - /health: 84 functions discovered.
+  - POST /submit-lead returns submit-lead's OWN response
+    ({"success":false,"error":{"code":"INTERNAL_SERVER_ERROR",...}} — there is
+    no Supabase in the sandbox), and /health still answers 200 afterwards. That
+    is the whole fix in one request.
+  - Ten functions exercised across all three registration shapes, every response
+    the function's own: trigger-rebuild 401 (Deno.serve), create-portal-session
+    400, sso-initiate 400, report-stripe-usage 400 (top-level serve),
+    check-username (export default), gdpr-export "supabaseUrl is required".
+    Nine of the ten were unreachable before.
+  - Zero "Error executing function" and zero unhandled rejections in the log.
+  - src/edge-function-routing.test.ts run against the shipped router: 5 of its
+    8 tests fail there. The reachability test parses FUNCTIONS_MAP out of the
+    router when one is present rather than reading disk — reading disk would
+    have made it pass against the very implementation it was written to catch.
+  - tsc --noEmit clean, eslint clean, deno check clean on the new server.
+  - npm run test:run: 92 files, 839 passed, 0 failed. The repo-hygiene failure
+    noted in iteration 1 is gone, and it was fixed by deciding the question
+    rather than by editing the assertion to match the tree.
+
+NOT TOUCHED — CI type-checks functions against supabase/functions/deno.json,
+which is a different import map. The shim must not apply there: a function
+should type-check against the real module it will be given at runtime by
+Supabase's runtime if this ever moves back to it.
