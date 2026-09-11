@@ -3316,6 +3316,37 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 12 by driving the tools in a browser — US-208 had just discovered that two of them had never been loaded by any test. Both are multi-step react-hook-form forms whose required fields are registered on the early steps, with the submit button on the last. handleSubmit refuses to call the submit handler while any registered field is invalid, and renders each message inside the step that owns the field — which is unmounted by then. Measured before the fix: a visitor filling nothing walked to 'Step 3 of 3' (bio analyzer) and 'Step 4 of 4' (listing generator) with ZERO error messages on the page, and the button there produced no state change, no toast, no console warning and no network request across repeated clicks. These are the lead-generation funnels; the whole purpose of the free tools is capturing an agent's email at the end of one. The bio analyzer requires currentBio (step 1) and city/state/location (step 2) with submit on step 3; the listing generator requires bedrooms/bathrooms/squareFeet/price (step 1) and city/state (step 2) with submit on step 4. Both now validate per step via trigger(), and both send a refused submit back to the offending step."
+    },
+    {
+      "id": "US-211",
+      "title": "Every first-time visitor downloaded the whole application twice",
+      "description": "As a visitor opening an agent's page from an Instagram bio on a phone, I need to download the application once.",
+      "acceptanceCriteria": [
+        "The service worker reloads only when the visitor accepted the update toast, not on first control",
+        "index.html no longer prefetches /auth/login and /auth/register as documents",
+        "index.html no longer preconnects to a Supabase host this deployment does not use",
+        "Measured on a production build with real cache headers and the service worker ALLOWED: no repeated request on any page",
+        "src/lib/register-sw.test.ts fails against the previous behaviour",
+        "The E2E, a11y and unit suites all stay green"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 13 by serving dist/ with production cache headers and counting what a browser actually downloads per route — nothing measures that; check-bundle-size.mjs weighs chunks in isolation. Every page fetched its own document, its stylesheet and every entry chunk (index, react-vendor, supabase, state-vendor, ui-vendor) TWICE. Two independent causes. (1) register-sw.ts reloaded on workbox's `controlling` event, which fires when a service worker takes control — including the first registration on a first visit, not only an update. So a first-time visitor loaded the page, registered the worker, and immediately reloaded the whole thing. It now reloads only when the Refresh action on the update toast set updateRequested, which is the one case the reload was written for. (2) index.html carried <link rel=\"prefetch\" as=\"document\"> for /auth/login and /auth/register; they are SPA routes, so each fetched index.html in full. That directly undid US-195, which moved Login and Register out of the entry graph so a public profile would not pay for them, and handed the cost back to every page in a heavier form. Also removed a preconnect to https://supabase.co: this is a self-hosted Supabase at api.agentbio.net, so it was a DNS lookup, TCP connection and TLS handshake to a host the app never contacts. Measured with the service worker allowed: landing 2109 KB / 57 requests -> 1232 KB / 36; public profile 2274 KB / 80 -> 1397 KB / 65; pricing 1913 KB / 49 -> 1035 KB / 28."
+    },
+    {
+      "id": "US-212",
+      "title": "Nothing measures what a page costs the visitor who opens it",
+      "description": "As a developer, I need a per-route download budget in CI, so that a change which doubles what a visitor fetches fails a build instead of being noticed a year later.",
+      "acceptanceCriteria": [
+        "A script serves dist/ with the same cache headers as public/_headers and loads each key route in Chromium",
+        "It asserts a byte and request budget per route, and fails on any URL fetched more than once",
+        "The service worker is ALLOWED, because the defect US-211 found only exists on that path",
+        "It runs in CI after the build job",
+        "Verified against the tree as of 6d5029b, where it fails"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "NOTED IN ITERATION 13, NOT FIXED. scripts/check-bundle-size.mjs weighs chunks in isolation and checks the entry graph; nothing measures what a browser actually downloads for a route, which is the number a visitor experiences. The throwaway harness that found US-211 is the shape of it: a static server over dist/ with public/_headers' cache policy, Chromium, count bytes and requests per route, and fail on a repeated URL — the duplicate-request check is what made a 90% overhead obvious in one line. Current numbers to budget against: landing 1232 KB / 36 requests, public profile 1397 KB / 65, pricing 1035 KB / 28. Worth noting for whoever writes it: the public profile pulls 65 requests, and every page loads the 171 KB supabase chunk whether or not it queries anything."
     }
   ]
 }

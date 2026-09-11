@@ -4205,3 +4205,84 @@ VERIFICATION, measured in a browser in both directions:
 
 Nothing in the spec is mocked. Neither tool calls Supabase to produce its
 result, which is what makes the funnels cheap to hold to this.
+
+### Iteration 13/15 — US-211: every first-time visitor downloaded the app twice
+
+Nothing in this repository measures what a browser actually downloads for a
+route. check-bundle-size.mjs weighs chunks in isolation and checks which ones
+are on the entry graph; neither is the number a visitor experiences. So: serve
+dist/ with the cache headers public/_headers declares, open each route in
+Chromium, count.
+
+    landing          2109 KB over 57 requests
+    public profile   2274 KB over 80 requests
+    pricing          1913 KB over 49 requests
+
+And on every one of them, the same URLs twice: the document itself, the
+stylesheet, and every entry chunk — index, react-vendor, supabase,
+state-vendor, ui-vendor.
+
+Two independent causes, and the second only became visible once the first was
+removed.
+
+ONE — index.html carried two static prefetches:
+
+    <link rel="prefetch" href="/auth/login" as="document">
+    <link rel="prefetch" href="/auth/register" as="document">
+
+These are SPA routes. Each one fetches index.html in full, and Chromium then
+re-fetches the entry graph the prefetched document declares.
+
+It is in the shell, so it is on every page — including the public profile.
+US-195 made Login and Register lazy *specifically* so that "a visitor to
+agentbio.net/janedoe, opened on a phone, by someone who will never sign in"
+would not pay for them, and left prefetchAuthPages() to warm those chunks only
+where a Sign in link is rendered. This markup handed the cost straight back, to
+every page, in a heavier form: a whole document rather than a chunk. Two
+optimisations, written months apart, cancelling each other out.
+
+TWO — src/lib/register-sw.ts:
+
+    wb.addEventListener('controlling', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+
+`controlling` fires whenever a service worker takes control of the page. That
+includes the FIRST registration, on a first visit — not only an update the
+visitor asked for. So every first-time visitor loaded the page, registered the
+worker, and immediately reloaded the whole thing.
+
+Isolated by measurement rather than by reading: blocking the service worker
+dropped the landing page from 2109 KB to 1232 KB and made every repeated URL
+disappear. The reload is right for exactly one case — the visitor pressed
+Refresh on the update toast — and that case now sets a flag the handler checks.
+
+ALSO REMOVED — `<link rel="preconnect" href="https://supabase.co">`, commented
+"critical for app functionality". This is a self-hosted Supabase;
+VITE_SUPABASE_URL is https://api.agentbio.net. The browser was opening a DNS
+lookup, TCP connection and TLS handshake to a host the application never
+contacts, on every page load. Not repointed: the origin is a build-time value,
+and hard-coding one in the shell is how this went wrong.
+
+MEASURED, with the service worker ALLOWED — the real first-visit path, not the
+convenient one:
+
+                      before              after
+    landing        2109 KB / 57       1232 KB / 36
+    public profile 2274 KB / 80       1397 KB / 65
+    pricing        1913 KB / 49       1035 KB / 28
+    repeated URLs  8 per page         none
+
+VERIFICATION
+  - src/lib/register-sw.test.ts, 4 tests, run against src/lib/register-sw.ts as
+    it was at 6d5029b: 2 fail there, both on the first-visit case.
+  - E2E 26/26, a11y 37/37, tsc clean, 855 unit tests pass.
+
+NOTED — US-212. The harness that found this was a throwaway script, and it
+should not be. A per-route budget in CI is the thing that would have caught a
+90% overhead in the year it existed, and the duplicate-URL check is what made
+it obvious in one line. Recorded with the numbers to budget against, and with
+the observation that every page still loads the 171 KB supabase chunk whether
+or not it queries anything.
