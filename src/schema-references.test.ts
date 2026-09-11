@@ -196,26 +196,22 @@ function scan(kind: 'filter' | 'write'): Reference[] {
 const describeRef = (r: Reference) => `${r.relation}.${r.column} (${r.file}:${r.line})`;
 
 /**
- * Writes to columns that do not exist, frozen until they can be fixed.
+ * Writes to columns that do not exist. Empty, and it stays empty.
  *
  * This began at 59 entries across 11 tables — the whole SEO and Search Console
  * subsystem computing results and then discarding them, because PostgREST
- * rejects a statement naming an unknown column and every one of those call
- * sites logged the error and carried on.
+ * rejects a statement naming an unknown column and every one of those call sites
+ * logged the error and carried on.
  *
- * US-201 emptied ten of the eleven tables by mapping each value onto the column
- * that already existed for it. What is left is the case that cannot be fixed
- * that way: `articles` genuinely has no SEO-score columns, so
- * analyze-blog-posts-seo needs a migration and a regenerated types.ts, not a
- * rename. US-202 covers that.
+ * US-201 closed 55 by naming the column that already existed. US-202 closed the
+ * last four with a migration, once a real Postgres was available to regenerate
+ * types.ts against rather than hand-editing it.
  *
- * This is a ratchet, not an exemption. The list may shrink and may never grow,
- * and an entry that no longer matches anything fails the suite — so fixing one
- * forces deleting it from here.
+ * Anything added back here is an accepted defect, and needs the argument for it
+ * written down. The stale-entry test below means an entry can never outlive the
+ * problem it describes.
  */
-const KNOWN_BROKEN_WRITES: Record<string, string[]> = {
-  articles: ['last_seo_check', 'seo_issues', 'seo_recommendations', 'seo_score'],
-};
+const KNOWN_BROKEN_WRITES: Record<string, string[]> = {};
 
 describe('schema references (US-200)', () => {
   it('parsed the generated types at all', () => {

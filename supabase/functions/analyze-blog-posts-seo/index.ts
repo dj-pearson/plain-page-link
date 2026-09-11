@@ -117,6 +117,18 @@ serve(async (req) => {
   }
 });
 
+/**
+ * US-202: this read post.meta_description, post.featured_image, post.published
+ * and post.categories. None of them are columns on `articles` — they are
+ * seo_description, featured_image_url, status and category/tags. The row comes
+ * back from `.select('*')`, so the reads were undefined rather than errors, and
+ * every article scored was told it was missing a meta description, missing a
+ * featured image, unpublished and uncategorised. The score was a constant.
+ *
+ * The schema-reference checker in src/schema-references.test.ts cannot see this
+ * class: it checks filters, write keys and relation names, not property reads
+ * on a row. Noted in US-207.
+ */
 async function analyzeBlogPostSEO(post: any): Promise<any> {
   const issues: string[] = [];
   const recommendations: string[] = [];
@@ -140,12 +152,12 @@ async function analyzeBlogPostSEO(post: any): Promise<any> {
   }
 
   // Meta description analysis
-  if (!post.meta_description || post.meta_description.length === 0) {
+  if (!post.seo_description || post.seo_description.length === 0) {
     issues.push('Missing meta description');
     recommendations.push('Add a compelling meta description (150-160 characters)');
     score -= 15;
   } else {
-    const descLength = post.meta_description.length;
+    const descLength = post.seo_description.length;
     if (descLength < 120) {
       issues.push('Meta description too short (< 120 characters)');
       recommendations.push('Expand meta description to 150-160 characters');
@@ -189,23 +201,25 @@ async function analyzeBlogPostSEO(post: any): Promise<any> {
   }
 
   // Image analysis
-  if (!post.featured_image) {
+  if (!post.featured_image_url) {
     issues.push('Missing featured image');
     recommendations.push('Add a featured image for better engagement and social sharing');
     score -= 10;
   }
 
   // Published status
-  if (!post.published) {
+  if (post.status !== 'published') {
     issues.push('Post is not published');
     score -= 5;
   }
 
-  // Category/tag analysis
-  const categories = post.categories || [];
+  // Category/tag analysis. US-202: `post.categories` is not a column — articles
+  // has `category` (one text value) and `tags` (text[]). Every article was
+  // therefore scored as having no categories, and told to add some.
+  const categories = [post.category, ...(post.tags ?? [])].filter(Boolean);
   if (categories.length === 0) {
-    issues.push('No categories assigned');
-    recommendations.push('Add relevant categories to improve content organization');
+    issues.push('No categories or tags assigned');
+    recommendations.push('Add a category and relevant tags to improve content organization');
     score -= 5;
   }
 
@@ -230,9 +244,9 @@ async function analyzeBlogPostSEO(post: any): Promise<any> {
     issues,
     recommendations,
     titleLength: post.title?.length || 0,
-    descriptionLength: post.meta_description?.length || 0,
-    hasImage: !!post.featured_image,
-    published: post.published,
+    descriptionLength: post.seo_description?.length || 0,
+    hasImage: !!post.featured_image_url,
+    published: post.status === 'published',
     categoryCount: categories.length,
     analyzedAt: new Date().toISOString(),
   };

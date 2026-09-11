@@ -3188,8 +3188,8 @@
         "The KNOWN_BROKEN_WRITES exception is deleted from src/schema-references.test.ts"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "NOTED IN ITERATIONS 4 AND 5, NOT FIXED. Everything in US-200/US-201 that could be fixed by naming the column that already existed has been. What is left needs the schema to change, which needs a migration AND a types regeneration — and types:generate reads a live database over psql, so it cannot be done from a sandbox without one. Hand-editing types.ts would work and would pass types:check only if the migration is exactly right, which is precisely the kind of guess this whole line of stories exists to stop. The specific items: articles has none of seo_score/seo_issues/seo_recommendations/last_seo_check (the last 4 ratchet entries); seo_core_web_vitals has no `inp` column because the table predates INP replacing FID as a Core Web Vital, so gsc-fetch-core-web-vitals now parks it in the field_data jsonb; seo_content_optimization stores page_title but has no meta_description, and has no home for an analyzer's issues or recommendations even though seo_link_analysis has jsonb columns for both."
+      "passes": true,
+      "notes": "Fixed in iteration 10, once a real Postgres turned out to be available: psql was on PATH and /usr/lib/postgresql/16/bin had the server binaries, so a cluster could be initialised and every migration applied exactly as .github/workflows/verify-backend.yml does. That unblocked the one thing this story was waiting for — regenerating types.ts with npm run types:generate against the applied schema instead of hand-editing a generated file. 20260911000001_seo_analysis_columns.sql adds articles.seo_score / seo_issues / seo_recommendations / last_seo_check (articles already carries seo_title, seo_description and seo_keywords, so SEO metadata lives on the article by convention), seo_core_web_vitals.inp and inp_pass (the table predates INP replacing FID as a Core Web Vital, and US-201 had parked it in field_data), and seo_content_optimization.meta_description / issues / recommendations (it stored page_title but not the description, and had meta_description_suggestions — what to change it TO — with nowhere to record what it IS). KNOWN_BROKEN_WRITES is now empty: 59 -> 0."
     },
     {
       "id": "US-203",
@@ -3257,6 +3257,21 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 9. US-205 made the a11y job blocking; the baseline it was blocking against was landing 3, login 1, register 1, dashboard 1, public profile 1, modal 1 — eight accepted violations covering roughly 35 elements, with the spec's own comment saying 'Drive these numbers down over time'. What they meant in practice: the blog category filter on the landing page is a Radix SelectTrigger that takes its accessible name from the value it displays, and SelectValue had no placeholder — with no articles loaded there is no matching item, so a screen reader announced 'button', in the empty state every first visitor sees. On the public profile, the listing status badges were white on 500-level fills (Active 2.27:1, Pending 1.9:1) and the bd/ba/sqft unit labels were gray-400 at 2.53:1. In the sticky action bar, Text and Schedule were green-600 and orange-600 — 3.30:1 and 3.56:1 — while Call, Email and Home Value were already fine, because green and orange are the two hues whose 600 step is not dark enough. The footer's legal links were blue-400 in gray-500 prose at 1.9:1 with nothing but colour marking them; they are underlined now. The three copies of the status colour map are gone: LISTING_STATUSES gains a `badge` field, and it also covers off_market, which none of the three maps had — that status rendered an unstyled badge. --muted-foreground moved from 46.9% to 43% lightness because it cleared 4.5:1 on white (4.75) but not on --muted (4.43), the tinted surface it is mostly used against."
+    },
+    {
+      "id": "US-207",
+      "title": "The schema checker cannot see a property read on a returned row",
+      "description": "As a developer, I need a query that reads a column that does not exist to fail a check, not to read undefined, so that a feature scoring against absent fields is caught the way a bad filter already is.",
+      "acceptanceCriteria": [
+        "Decide whether this is checkable statically: a row from .select('*') is typed `any` in most edge functions, so tsc cannot help",
+        "Where a function selects specific columns, the returned row's property reads can be checked against that list",
+        "Where it selects '*', check reads against the table's Row type instead",
+        "Report the same way src/schema-references.test.ts does, with file and line",
+        "Verified against analyze-blog-posts-seo as it was at f21f5b0: four reads reported"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "NOTED IN ITERATION 10, NOT FIXED. US-200's checker covers filters, write keys and relation names — the places a column name is a STRING. It cannot see the other half: post.meta_description, post.featured_image, post.published and post.categories in analyze-blog-posts-seo, none of which are columns on `articles` (they are seo_description, featured_image_url, status, and category/tags). The row comes back from .select('*') typed as `any`, so these were undefined rather than errors, and every article analysed was told it was missing a meta description, missing a featured image, unpublished and uncategorised — the score was effectively a constant. Fixed by hand in iteration 10; the class is not guarded. This is harder than the string case and may not be worth a bespoke checker: typing the supabase client with Database in edge functions would let tsc do it, which is the better fix if the deno-check gate can carry it."
     }
   ]
 }

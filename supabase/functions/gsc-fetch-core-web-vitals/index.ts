@@ -227,9 +227,12 @@ serve(async (req) => {
           cls_pass: clsValue <= 0.1,
           fcp: fcp?.percentiles?.p75,
           ttfb: ttfb?.percentiles?.p75,
+          // US-202 gave INP a real column; it was parked in field_data only
+          // because the table predates INP replacing FID as a Core Web Vital.
+          inp: inp?.percentiles?.p75,
+          inp_pass: inp?.percentiles?.p75 !== undefined ? inp.percentiles.p75 <= 200 : null,
           data_source: 'crux',
           field_data: {
-            inp: inp?.percentiles?.p75,
             collectionPeriodStart: formatCruxDate(cruxData.record.collectionPeriod.firstDate),
             collectionPeriodEnd: formatCruxDate(cruxData.record.collectionPeriod.lastDate),
             requestedBy: userId,

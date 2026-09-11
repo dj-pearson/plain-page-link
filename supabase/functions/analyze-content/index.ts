@@ -317,9 +317,11 @@ serve(async (req) => {
         // The booleans it already computes have real columns and were not being
         // written at all, so they are now.
         //
-        // meta_description, issues_count and recommendations have no column on
-        // this table; all three are in the response `result` above, and US-202
-        // covers whether they should have one.
+        // US-202 gave meta_description, issues and recommendations real
+        // columns — the table stored page_title but not the description, and
+        // had nowhere for findings even though seo_link_analysis has jsonb for
+        // both. Storing `issues.length` under a name the table did not have was
+        // throwing away the part an operator can act on.
         .insert({
           url,
           word_count: wordCount,
@@ -331,7 +333,10 @@ serve(async (req) => {
           keyword_in_title: keywordInTitle,
           keyword_in_h1: keywordInH1,
           page_title: pageTitle,
+          meta_description: metaDescription,
           h1_count: h1Count,
+          issues,
+          recommendations,
           analyzed_by: userId,
         });
 

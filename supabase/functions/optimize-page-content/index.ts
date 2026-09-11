@@ -219,13 +219,13 @@ Format your response as JSON with this structure:
         // stores meta_description_suggestions). The AI response this function
         // pays a model to produce was discarded on every run.
         //
-        // The current meta description has nowhere to go and is dropped rather
-        // than misfiled; it is in the response `result` above. US-202 covers
-        // giving it a column.
+        // US-202 gave the current meta description a column, next to the
+        // meta_description_suggestions that say what to change it to.
         .insert({
           url,
           target_keyword: targetKeyword,
           page_title: pageTitle,
+          meta_description: metaDescription,
           ai_suggestions: aiResponse,
           optimization_score: aiResponse.overallScore || 0,
           analyzed_by: userId,

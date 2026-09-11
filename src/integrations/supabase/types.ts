@@ -547,9 +547,13 @@ export type Database = {
           generated_from_suggestion_id: string | null;
           id: string;
           keyword_id: string | null;
+          last_seo_check: string | null;
           published_at: string | null;
           seo_description: string | null;
+          seo_issues: Json | null;
           seo_keywords: string[] | null;
+          seo_recommendations: Json | null;
+          seo_score: number | null;
           seo_title: string | null;
           slug: string;
           status: string | null;
@@ -568,9 +572,13 @@ export type Database = {
           generated_from_suggestion_id?: string | null;
           id?: string;
           keyword_id?: string | null;
+          last_seo_check?: string | null;
           published_at?: string | null;
           seo_description?: string | null;
+          seo_issues?: Json | null;
           seo_keywords?: string[] | null;
+          seo_recommendations?: Json | null;
+          seo_score?: number | null;
           seo_title?: string | null;
           slug: string;
           status?: string | null;
@@ -589,9 +597,13 @@ export type Database = {
           generated_from_suggestion_id?: string | null;
           id?: string;
           keyword_id?: string | null;
+          last_seo_check?: string | null;
           published_at?: string | null;
           seo_description?: string | null;
+          seo_issues?: Json | null;
           seo_keywords?: string[] | null;
+          seo_recommendations?: Json | null;
+          seo_score?: number | null;
           seo_title?: string | null;
           slug?: string;
           status?: string | null;
@@ -4570,6 +4582,7 @@ export type Database = {
           id: string;
           image_suggestions: string[] | null;
           infographic_topics: string[] | null;
+          issues: Json | null;
           keyword_count: number | null;
           keyword_density: number | null;
           keyword_in_first_paragraph: boolean | null;
@@ -4581,6 +4594,7 @@ export type Database = {
           lsi_keywords: string[] | null;
           lsi_keywords_found: number | null;
           lsi_keywords_recommended: string[] | null;
+          meta_description: string | null;
           meta_description_suggestions: string[] | null;
           missing_topics: string[] | null;
           optimization_level: string | null;
@@ -4590,6 +4604,7 @@ export type Database = {
           paragraph_count: number | null;
           readability_level: string | null;
           readability_score: number | null;
+          recommendations: Json | null;
           recommended_internal_links: Json | null;
           sentence_count: number | null;
           status: string | null;
@@ -4629,6 +4644,7 @@ export type Database = {
           id?: string;
           image_suggestions?: string[] | null;
           infographic_topics?: string[] | null;
+          issues?: Json | null;
           keyword_count?: number | null;
           keyword_density?: number | null;
           keyword_in_first_paragraph?: boolean | null;
@@ -4640,6 +4656,7 @@ export type Database = {
           lsi_keywords?: string[] | null;
           lsi_keywords_found?: number | null;
           lsi_keywords_recommended?: string[] | null;
+          meta_description?: string | null;
           meta_description_suggestions?: string[] | null;
           missing_topics?: string[] | null;
           optimization_level?: string | null;
@@ -4649,6 +4666,7 @@ export type Database = {
           paragraph_count?: number | null;
           readability_level?: string | null;
           readability_score?: number | null;
+          recommendations?: Json | null;
           recommended_internal_links?: Json | null;
           sentence_count?: number | null;
           status?: string | null;
@@ -4688,6 +4706,7 @@ export type Database = {
           id?: string;
           image_suggestions?: string[] | null;
           infographic_topics?: string[] | null;
+          issues?: Json | null;
           keyword_count?: number | null;
           keyword_density?: number | null;
           keyword_in_first_paragraph?: boolean | null;
@@ -4699,6 +4718,7 @@ export type Database = {
           lsi_keywords?: string[] | null;
           lsi_keywords_found?: number | null;
           lsi_keywords_recommended?: string[] | null;
+          meta_description?: string | null;
           meta_description_suggestions?: string[] | null;
           missing_topics?: string[] | null;
           optimization_level?: string | null;
@@ -4708,6 +4728,7 @@ export type Database = {
           paragraph_count?: number | null;
           readability_level?: string | null;
           readability_score?: number | null;
+          recommendations?: Json | null;
           recommended_internal_links?: Json | null;
           sentence_count?: number | null;
           status?: string | null;
@@ -4744,6 +4765,8 @@ export type Database = {
           fid_pass: boolean | null;
           field_data: Json | null;
           id: string;
+          inp: number | null;
+          inp_pass: boolean | null;
           lab_data: Json | null;
           lcp: number | null;
           lcp_pass: boolean | null;
@@ -4770,6 +4793,8 @@ export type Database = {
           fid_pass?: boolean | null;
           field_data?: Json | null;
           id?: string;
+          inp?: number | null;
+          inp_pass?: boolean | null;
           lab_data?: Json | null;
           lcp?: number | null;
           lcp_pass?: boolean | null;
@@ -4796,6 +4821,8 @@ export type Database = {
           fid_pass?: boolean | null;
           field_data?: Json | null;
           id?: string;
+          inp?: number | null;
+          inp_pass?: boolean | null;
           lab_data?: Json | null;
           lcp?: number | null;
           lcp_pass?: boolean | null;
