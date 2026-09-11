@@ -68,6 +68,30 @@ jobs:
           # still caught).
           deno check --config supabase/functions/deno.json --node-modules-dir=auto "${FILES[@]}"
 
+  smoke-functions:
+    name: Edge Functions (smoke)
+    runs-on: ubuntu-latest
+    # US-204. `deno check` is a type check; it cannot see a function that fails
+    # at import, registers no handler, or blames the caller's missing
+    # credentials on itself. Running them found all three — see
+    # scripts/smoke-edge-functions.mjs for what each assertion is standing in
+    # for. No database is needed: a function that reaches its own auth or
+    # validation check has already proved it loads and answers.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Smoke every edge function
+        run: npm run smoke:functions
+
   migrations:
     name: SQL Migrations (structural lint)
     runs-on: ubuntu-latest

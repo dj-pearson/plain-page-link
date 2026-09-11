@@ -3768,3 +3768,84 @@ cron where 401 is not, so an unauthenticated caller becomes a retry storm — an
 every auth failure looks like a crash, so a real outage cannot be seen against
 the noise. The sweep itself should become a CI job: US-199's AddrInUse crash is
 the proof that running a function finds what deno check cannot.
+
+### Iteration 7/15 — US-204: telling a caller "you are not logged in" with a 500
+
+requireAuth throws before it ever touches Supabase:
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error('Unauthorized: No authorization header');
+
+A bare Error. Every function catches it in the same `catch` that guards against
+genuine faults, and answers 500. The unauthenticated sweep from iteration 6
+measured the result: of 84 functions, 24 answered 401 and 20 answered 5xx, at
+least 14 of them for this reason.
+
+Two things that costs, and neither is cosmetic:
+
+  - 5xx is retried. Browsers, CDNs, cron runners and webhook senders all treat
+    it as "the server is having a moment" and come back. 401 they do not. An
+    expired session became a retry loop against a function that was working
+    perfectly.
+  - Every auth failure looks like a crash. The logs fill with [UnexpectedError]
+    for requests that were simply unauthenticated, and a platform that cannot
+    see a real outage against that noise has wired up health-check and Sentry
+    for nothing.
+
+WHAT CHANGED
+  - _shared/http-error.ts: an HttpError carrying its own status and code, with
+    unauthorized() and forbidden() constructors. The decision stays where the
+    knowledge is — requireAuth knows it is a 401, and the error handler should
+    not have to infer that from a message string.
+  - requireAuth, requireAdmin, requireOwnership and the two webhook-auth throw
+    sites raise it.
+  - BOTH error frameworks learned to recognise it. handleUnexpectedError in
+    _shared/response.ts was the obvious one; _shared/errors.ts has a second,
+    older handleError with its own AppError hierarchy, which google-indexing
+    uses and which had the identical hole. Fixing one would have left the other.
+  - 25 functions hand-roll their catch rather than calling either, so
+    `status: 500` became `status: errorStatus(error)`. Rewriting them to the
+    standard envelope would change what their callers parse; changing the status
+    alone fixes the defect without touching the contract.
+  - send-listing-generator-email threw a bare Error for a missing email address,
+    which the same catch turned into a 500. A form submitted without an email
+    was reported as a server fault and retried. Now 400.
+
+MEASURED, not argued — the same sweep, before and after:
+
+                       before      after
+      401                 24         39
+      400                 29         29
+      429                  9          9
+      5xx                 20          5
+
+The five remaining are honest: three want a server-side API key that is genuinely
+absent, health-check correctly answers 503 with no database behind it, and
+google-indexing now answers 401.
+
+THE DURABLE PART. scripts/smoke-edge-functions.mjs makes the sweep repeatable —
+`npm run smoke:functions` — and it is a CI job now. Its three assertions are the
+three findings of this loop, in order:
+
+    the router must discover the full set        US-199, the 15-of-84 map
+    no function may answer 5xx unauthenticated   US-204, this story
+    the router must survive the sweep            US-199, the AddrInUse crash
+
+The third matters more than it looks. US-199's crash returned a 500 for the
+request that caused it and THEN killed the process, so a check that only looked
+at each response would have passed it.
+
+No database is needed for any of this: a function that reaches its own auth or
+validation check has already proved it imports, registers a handler and returns
+a Response — which is exactly what deno check cannot tell you.
+
+VERIFICATION
+  - Against supabase/functions as of bef2983 the script names 16 functions and
+    exits 1. Against this tree it exits 0.
+  - A first draft used process.exit(1) on the failure path, which races the
+    cleanup and leaves a router holding the port — so the NEXT run failed with
+    "the router did not survive the sweep" on a tree that was fine. It sets
+    exitCode and lets the finally reap the child instead. A flaky guard is worse
+    than none; this one was flaky for about four minutes.
+  - deno check over all 104 files on Deno 2.1.4: exit 0.
+  - tsc --noEmit clean; npm run test:run 93 files, 845 passed, 0 failed.

@@ -31,6 +31,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const FUNCTIONS_DIR = './functions';
 
 /**
+ * The Coolify application publishes 8000, so that stays the default. PORT is
+ * honoured so scripts/smoke-edge-functions.mjs can run this router beside a
+ * development one without a collision.
+ */
+const PORT = Number(Deno.env.get('PORT') ?? 8000);
+
+/**
  * Every function on disk, discovered at startup.
  *
  * Discovery rather than a literal map is the point of US-199: a map a person
@@ -100,7 +107,7 @@ async function resolveHandler(name: string): Promise<Handler> {
         shutdown: () => Promise.resolve(),
         ref: () => {},
         unref: () => {},
-        addr: { transport: 'tcp', hostname: '0.0.0.0', port: 8000 },
+        addr: { transport: 'tcp', hostname: '0.0.0.0', port: PORT },
       };
     };
 
@@ -222,8 +229,8 @@ globalThis.addEventListener('unhandledrejection', (event) => {
   console.error('[edge-functions] unhandled rejection (suppressed):', event.reason);
 });
 
-console.log(`🚀 Edge Functions Server starting on port 8000...`);
+console.log(`🚀 Edge Functions Server starting on port ${PORT}...`);
 console.log(`📦 Discovered ${AVAILABLE.size} functions in ${FUNCTIONS_DIR}`);
 console.log(`🔗 Supabase URL: ${SUPABASE_URL}`);
 
-serve(handler, { port: 8000 });
+serve(handler, { port: PORT });

@@ -4,6 +4,7 @@
  */
 
 import { getCorsHeaders } from './cors.ts';
+import { isHttpError } from './http-error.ts';
 
 /**
  * Application error with user-friendly message
@@ -88,6 +89,17 @@ export function handleError(error: unknown, req: Request): Response {
     stack: error instanceof Error ? error.stack : undefined,
     timestamp: new Date().toISOString(),
   });
+
+  // US-204: _shared/auth.ts throws an HttpError, not an AppError, so a missing
+  // Authorization header fell through to the 500 below. This is the second of
+  // the two error frameworks in supabase/functions — handleUnexpectedError in
+  // response.ts is the other — and both had the same hole.
+  if (isHttpError(error)) {
+    return new Response(JSON.stringify({ error: error.message, code: error.code }), {
+      status: error.status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   // Return user-friendly error
   if (error instanceof AppError) {

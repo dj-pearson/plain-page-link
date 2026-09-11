@@ -3,6 +3,7 @@ import { requireAdmin } from '../_shared/auth.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getPagespeedApiKey } from '../_shared/env.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 /**
  * Thresholds for the three metrics seo_performance_budget has no column for.
@@ -268,7 +269,7 @@ serve(async (req) => {
     console.error('Error monitoring performance budget:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: errorStatus(error), headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

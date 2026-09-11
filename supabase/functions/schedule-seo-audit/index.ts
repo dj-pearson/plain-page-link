@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAdmin } from '../_shared/auth.ts';
 import { getSiteUrl } from '../_shared/env.ts';
+import { errorStatus } from '../_shared/http-error.ts';
 
 interface AuditSchedule {
   id: string
@@ -179,7 +180,7 @@ serve(async (req) => {
       JSON.stringify({ error: error.message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: errorStatus(error),
       }
     )
   }

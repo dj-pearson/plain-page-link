@@ -7,6 +7,7 @@
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { hashApiKey } from './api-auth.ts';
+import { unauthorized } from './http-error.ts';
 
 /**
  * Validate API key from request headers
@@ -65,7 +66,7 @@ export async function validateApiKey(
     };
   } catch (error) {
     console.error('API key validation failed:', error);
-    throw new Error('Unauthorized: Invalid API key');
+    throw unauthorized('Unauthorized: Invalid API key', 'AUTH_SESSION_INVALID');
   }
 }
 
@@ -125,7 +126,7 @@ export async function requireFlexibleAuth(
   const userId = await flexibleAuth(req, supabase);
   
   if (!userId) {
-    throw new Error('Unauthorized: Valid JWT token or API key required');
+    throw unauthorized('Unauthorized: Valid JWT token or API key required', 'AUTH_TOKEN_MISSING');
   }
 
   return userId;
