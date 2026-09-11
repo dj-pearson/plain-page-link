@@ -11,10 +11,11 @@
 
 import { test, expect, type Page } from '@playwright/test';
 
+import { TEST_PASSWORD } from '../support/credentials';
 const TEST_USER = {
   id: '00000000-0000-4000-8000-000000000001',
   email: 'e2e-user@example.com',
-  password: 'E2eP@ssw0rd!',
+  password: TEST_PASSWORD,
   username: 'e2euser',
   fullName: 'E2E User',
 };

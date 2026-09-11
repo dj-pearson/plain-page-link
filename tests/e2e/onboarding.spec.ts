@@ -18,6 +18,7 @@
 
 import { test, expect, type Page, type Request } from '@playwright/test';
 
+import { TEST_PASSWORD } from '../support/credentials';
 const TEST_USER = {
   id: '00000000-0000-4000-8000-000000000002',
   email: 'e2e-onboarding@example.com',
@@ -147,7 +148,7 @@ async function setupMocks(page: Page, profilePatches: Request[]) {
 async function signIn(page: Page) {
   await page.goto('/auth/login');
   await page.fill('input[type="email"]', TEST_USER.email);
-  await page.fill('input[type="password"]', 'E2eP@ssw0rd!');
+  await page.fill('input[type="password"]', TEST_PASSWORD);
   await page.click('button[type="submit"]');
 }
 
