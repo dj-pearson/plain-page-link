@@ -122,14 +122,22 @@ serve(async (req) => {
       if (positionChange && positionChange < -5) {
         await supabase
           .from('seo_alerts')
+          // US-201: related_url is affected_url, there is no metadata column,
+          // status 'active' is not in the CHECK constraint's allowed set
+          // (open / acknowledged / resolved / ignored), and `title` is NOT NULL
+          // and was missing. Four reasons this insert could never have landed,
+          // so a keyword that dropped ten positions raised nothing.
+          //
+          // The numbers that were in `metadata` are in the message, which is
+          // where a person reads them.
           .insert({
             user_id: targetKeyword.user_id,
             alert_type: 'keyword_ranking',
             severity: positionChange < -10 ? 'high' : 'medium',
+            title: `Ranking drop: "${targetKeyword.keyword}"`,
             message: `Keyword "${targetKeyword.keyword}" dropped from position ${previousPosition} to ${position}`,
-            related_url: targetKeyword.target_url,
-            metadata: { keyword: targetKeyword.keyword, positionChange, position },
-            status: 'active',
+            affected_url: targetKeyword.target_url,
+            status: 'open',
           });
       }
     }

@@ -3586,3 +3586,95 @@ NOT DONE, and recorded — seo_core_web_vitals has no `inp` column. The table
 predates INP replacing FID as a Core Web Vital. INP and the CrUX collection
 period go into the field_data jsonb for now, which is the column that exists for
 exactly that; promoting inp to a real column needs a migration.
+
+### Iteration 5/15 — US-201 (part 2): a scheduled audit that died four different ways
+
+The ratchet is down from 59 entries across 11 tables to 4 across one. What is
+left is `articles`, which genuinely has no SEO-score columns — a migration, not
+a rename, and that is US-202.
+
+The interesting one was run-scheduled-audit, because it is broken at four
+independent levels and any one of them alone would have been enough.
+
+  1. The seo_monitoring_log insert sent user_id and check_type. Neither is a
+     column — the table is a deliberately slim log (schedule_id, status,
+     results_summary, started_at, completed_at) and both of those facts live on
+     the schedule row it points at. PostgREST rejected it, `logEntry` came back
+     undefined, and the very next statement reads `logEntry.id`. Every scheduled
+     audit died with a TypeError seconds after starting.
+
+  2. If it had got past that: all six audit helpers read
+     `schedule.target_urls`. The schedule has `target_url` (NOT NULL, one) and
+     `additional_urls` (text[]). `urls` was always [], so every loop body ran
+     zero times and an audit that started would have produced no audits.
+
+  3. If it had produced any: the alert insert used rule_id, related_url and
+     metadata (none of them columns), status 'active' (the CHECK constraint
+     allows open / acknowledged / resolved / ignored), and no value at all for
+     `title`, which is NOT NULL. The rule's own fields were invented to match —
+     seo_alert_rules has name, rule_type and conditions, not rule_name,
+     alert_type and notification_enabled.
+
+  4. And if an alert had been written: `if (rule.notification_enabled)` reads a
+     field that does not exist, so it is undefined and no alert has ever
+     notified anyone.
+
+Four layers, and the outermost one made the other three unobservable. That is
+what this whole line of stories keeps finding: the failure is never where the
+symptom is, because there is no symptom.
+
+THE REST, six more functions:
+
+  send-seo-notification     wrote notified_at and notification_sent, which are
+                            not columns, so an alert stayed 'open' however many
+                            times it had been sent — and this function has no
+                            idempotency of its own, so a retry re-notified every
+                            channel. seo_alerts tracks this in `status`; a
+                            notified alert is now 'acknowledged', and only
+                            'open' ones are moved, so a human who already
+                            resolved one does not have it reopened by a late
+                            notification.
+
+  check-keyword-positions   four reasons its alert insert could not land. A
+                            keyword that dropped ten places raised nothing.
+
+  monitor-performance-budget  six bad keys, plus `onConflict: 'page_url'` — not
+                            a column, and url_pattern has no unique constraint
+                            either, so there was no conflict target to upsert on
+                            at all. Now an update by primary key or an insert.
+                            Separately: FCP, TTFB and TTI were compared against
+                            max_fcp_ms / max_ttfb_ms / max_tti_ms, which the
+                            table does not have. `if (check.budget && ...)`
+                            counts an undefined budget as a pass, so three of
+                            eleven checks always passed and every compliance
+                            score was inflated by up to 27 points.
+
+  analyze-content           seven of thirteen keys wrong. It already computed
+                            keyword_in_title and keyword_in_h1, which ARE
+                            columns, and was not writing them; it does now.
+
+  optimize-page-content     the AI response it pays a model to produce was
+                            discarded on every run.
+
+  analyze-semantic-keywords two independent reasons to fail: four wrong keys and
+                            a missing NOT NULL primary_topic. Two values found
+                            better homes than they had names for — the LSI
+                            suggestions are literally co-occurrence data, so they
+                            go in keyword_co_occurrence, and tf_idf_keywords was
+                            computed and then never persisted at all.
+
+A NOTE ON WHAT WAS NOT DONE. Several values have no column anywhere: the current
+meta description, an analyzer's issues and recommendations, INP. The temptation
+is to add columns and hand-edit src/integrations/supabase/types.ts to match.
+types:generate reads a live database over psql and there is none here, so a
+hand-edit would be a guess about generated output — which is the exact failure
+mode this line of stories exists to stop. They are recorded in US-202 with the
+decision each one needs, and the values stay in the response payload meanwhile.
+
+VERIFICATION
+  - The checker run against supabase/functions as of 7a09779: 35 references
+    reported. Zero after.
+  - KNOWN_BROKEN_WRITES: 32 -> 4, each removal forced by the stale-entry test.
+  - deno check --config supabase/functions/deno.json clean on all seven
+    modified functions.
+  - tsc --noEmit clean; npm run test:run 93 files, 844 passed, 0 failed.

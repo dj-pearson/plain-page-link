@@ -309,19 +309,29 @@ serve(async (req) => {
     if (saveResults && userId) {
       const { error: insertError } = await supabase
         .from('seo_content_optimization')
+        // US-201: seven of these thirteen keys named columns that do not
+        // exist, so nothing this analyzer computed was ever stored.
+        //
+        // keyword -> target_keyword, title -> page_title,
+        // keyword_prominence -> keyword_prominence_score (an integer column).
+        // The booleans it already computes have real columns and were not being
+        // written at all, so they are now.
+        //
+        // meta_description, issues_count and recommendations have no column on
+        // this table; all three are in the response `result` above, and US-202
+        // covers whether they should have one.
         .insert({
           url,
           word_count: wordCount,
           flesch_reading_ease: Math.round(fleschScore),
           flesch_kincaid_grade: Math.round(fkGradeLevel * 10) / 10,
-          keyword: targetKeyword,
+          target_keyword: targetKeyword,
           keyword_density: keywordDensity,
-          keyword_prominence: keywordProminence,
-          title: pageTitle,
-          meta_description: metaDescription,
+          keyword_prominence_score: Math.round(keywordProminence),
+          keyword_in_title: keywordInTitle,
+          keyword_in_h1: keywordInH1,
+          page_title: pageTitle,
           h1_count: h1Count,
-          issues_count: issues.length,
-          recommendations: recommendations,
           analyzed_by: userId,
         });
 

@@ -212,13 +212,21 @@ Format your response as JSON with this structure:
     if (saveResults && userId) {
       const { error: insertError } = await supabase
         .from('seo_content_optimization')
+        // US-201: keyword, title, meta_description and overall_score are not
+        // columns — the table calls them target_keyword, page_title and
+        // optimization_score, and has no plain meta_description at all (it
+        // stores meta_description_suggestions). The AI response this function
+        // pays a model to produce was discarded on every run.
+        //
+        // The current meta description has nowhere to go and is dropped rather
+        // than misfiled; it is in the response `result` above. US-202 covers
+        // giving it a column.
         .insert({
           url,
-          keyword: targetKeyword,
-          title: pageTitle,
-          meta_description: metaDescription,
+          target_keyword: targetKeyword,
+          page_title: pageTitle,
           ai_suggestions: aiResponse,
-          overall_score: aiResponse.overallScore || 0,
+          optimization_score: aiResponse.overallScore || 0,
           analyzed_by: userId,
         });
 

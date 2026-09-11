@@ -4,6 +4,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getPagespeedApiKey } from '../_shared/env.ts';
 
+/**
+ * Thresholds for the three metrics seo_performance_budget has no column for.
+ * Same values the fallback budget below has always used.
+ */
+const DEFAULT_FCP_MS = 1800;
+const DEFAULT_TTFB_MS = 600;
+const DEFAULT_TTI_MS = 3800;
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   if (req.method === 'OPTIONS') {
@@ -58,13 +66,13 @@ serve(async (req) => {
     if (!budget) {
       // Create default budget
       budget = {
+        // `name` is NOT NULL, and was not here — so even once the column names
+        // were right, persisting a fallback budget would still have failed.
+        name: `Default budget for ${url}`,
         url_pattern: url,
         max_lcp_ms: 2500,
         max_fid_ms: 100,
-        max_cls_score: 0.1,
-        max_fcp_ms: 1800,
-        max_ttfb_ms: 600,
-        max_tti_ms: 3800,
+        max_cls: 0.1,
         max_page_size_kb: 1500,
         max_requests: 50,
         max_js_size_kb: 500,
@@ -115,10 +123,17 @@ serve(async (req) => {
     const checks = [
       { name: 'LCP', current: currentMetrics.lcp, budget: budget.max_lcp_ms, unit: 'ms' },
       { name: 'FID', current: currentMetrics.fid, budget: budget.max_fid_ms, unit: 'ms' },
-      { name: 'CLS', current: currentMetrics.cls, budget: budget.max_cls_score, unit: '' },
-      { name: 'FCP', current: currentMetrics.fcp, budget: budget.max_fcp_ms, unit: 'ms' },
-      { name: 'TTFB', current: currentMetrics.ttfb, budget: budget.max_ttfb_ms, unit: 'ms' },
-      { name: 'TTI', current: currentMetrics.tti, budget: budget.max_tti_ms, unit: 'ms' },
+      { name: 'CLS', current: currentMetrics.cls, budget: budget.max_cls, unit: '' },
+      // US-201: these three read max_fcp_ms / max_ttfb_ms / max_tti_ms, which
+      // are not columns — the table budgets LCP, FID, CLS, page size, requests
+      // and the four asset sizes, and nothing else. On a stored budget they were
+      // undefined, and `if (check.budget && ...)` counts an undefined budget as
+      // a pass, so three of eleven checks silently inflated every compliance
+      // score. They measure against platform defaults now, which is what the
+      // fallback budget already used.
+      { name: 'FCP', current: currentMetrics.fcp, budget: DEFAULT_FCP_MS, unit: 'ms' },
+      { name: 'TTFB', current: currentMetrics.ttfb, budget: DEFAULT_TTFB_MS, unit: 'ms' },
+      { name: 'TTI', current: currentMetrics.tti, budget: DEFAULT_TTI_MS, unit: 'ms' },
       { name: 'Page Size', current: currentMetrics.pageSize, budget: budget.max_page_size_kb, unit: 'KB' },
       { name: 'Requests', current: currentMetrics.requests, budget: budget.max_requests, unit: '' },
       { name: 'JS Size', current: currentMetrics.jsSize, budget: budget.max_js_size_kb, unit: 'KB' },
@@ -157,10 +172,10 @@ serve(async (req) => {
       budgetLimits: {
         maxLcpMs: budget.max_lcp_ms,
         maxFidMs: budget.max_fid_ms,
-        maxClsScore: budget.max_cls_score,
-        maxFcpMs: budget.max_fcp_ms,
-        maxTtfbMs: budget.max_ttfb_ms,
-        maxTtiMs: budget.max_tti_ms,
+        maxClsScore: budget.max_cls,
+        maxFcpMs: DEFAULT_FCP_MS,
+        maxTtfbMs: DEFAULT_TTFB_MS,
+        maxTtiMs: DEFAULT_TTI_MS,
         maxPageSizeKb: budget.max_page_size_kb,
         maxRequests: budget.max_requests,
         maxJsSizeKb: budget.max_js_size_kb,
@@ -175,20 +190,45 @@ serve(async (req) => {
     };
 
     if (saveResults) {
-      // Update or create budget record with latest check
-      await supabase
-        .from('seo_performance_budget')
-        .upsert({
-          ...budget,
-          last_check_at: new Date().toISOString(),
-          last_check_status: analysis.status,
-          violations_detected: violationCount,
-          compliance_score: complianceScore,
-          latest_metrics: currentMetrics,
-          latest_violations: violations,
-        }, {
-          onConflict: budget.id ? 'id' : 'page_url',
-        });
+      // Record the check against the budget row.
+      //
+      // US-201: this upserted six keys the table does not have (last_check_at,
+      // last_check_status, violations_detected, compliance_score,
+      // latest_metrics, latest_violations) and spread `...budget`, which on the
+      // fallback path carried three more. It also declared
+      // `onConflict: 'page_url'` — not a column, and url_pattern has no unique
+      // constraint either, so there was no conflict target to upsert on at all.
+      //
+      // The table already has somewhere for every one of these: last_checked_at,
+      // is_within_budget, violation_count, violations, and a current_* column
+      // per metric. complianceScore is derived from violationCount, so it stays
+      // in the response rather than being stored.
+      const checkResult = {
+        last_checked_at: new Date().toISOString(),
+        is_within_budget: violationCount === 0,
+        violation_count: violationCount,
+        violations,
+        current_lcp_ms: Math.round(currentMetrics.lcp),
+        current_fid_ms: Math.round(currentMetrics.fid),
+        current_cls: currentMetrics.cls,
+        current_load_time_ms: Math.round(currentMetrics.tti),
+        current_page_size_kb: currentMetrics.pageSize,
+        current_requests: currentMetrics.requests,
+        current_js_size_kb: currentMetrics.jsSize,
+        current_css_size_kb: currentMetrics.cssSize,
+        current_image_size_kb: currentMetrics.imageSize,
+        ...(violationCount > 0 && { last_violation_at: new Date().toISOString() }),
+      };
+
+      // Update by primary key when the budget is a stored row; insert when this
+      // URL had none.
+      const { error: saveError } = budget.id
+        ? await supabase.from('seo_performance_budget').update(checkResult).eq('id', budget.id)
+        : await supabase.from('seo_performance_budget').insert({ ...budget, ...checkResult });
+
+      if (saveError) {
+        console.error('Error saving performance budget check:', saveError);
+      }
 
       // Create alert if violations found
       if (violationCount > 0 && budget.alert_on_violation) {
@@ -202,14 +242,17 @@ serve(async (req) => {
 
         await supabase
           .from('seo_alerts')
+          // US-201: seo_performance_budget has created_by, not user_id; and
+          // seo_alerts has affected_url rather than related_url, has no metadata
+          // column, forbids status 'active', and requires a title.
           .insert({
-            user_id: budget.user_id,
+            user_id: budget.created_by ?? null,
             alert_type: 'performance_budget',
             severity,
-            message: `Performance budget exceeded: ${violationCount} violation(s) detected`,
-            related_url: targetUrl,
-            metadata: { violations, complianceScore },
-            status: 'active',
+            title: `Performance budget exceeded for ${targetUrl}`,
+            message: `Performance budget exceeded: ${violationCount} violation(s) detected (compliance ${complianceScore}%)`,
+            affected_url: targetUrl,
+            status: 'open',
           });
       }
     }

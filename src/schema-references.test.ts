@@ -196,48 +196,25 @@ function scan(kind: 'filter' | 'write'): Reference[] {
 const describeRef = (r: Reference) => `${r.relation}.${r.column} (${r.file}:${r.line})`;
 
 /**
- * Writes to columns that do not exist, frozen as they were found.
+ * Writes to columns that do not exist, frozen until they can be fixed.
  *
- * These are 59 real defects in one subsystem — the SEO and Search Console
- * tooling — and each needs a decision this test cannot make: whether the code
- * is naming the wrong column (seo_core_web_vitals stores `lcp` and `lcp_pass`,
- * the code writes `lcp_value` and `lcp_passed`) or whether the table is missing
- * a column the feature needs (seo_monitoring_log has 7 columns and the code
- * writes 6 more). Some need a migration; none should be guessed at.
+ * This began at 59 entries across 11 tables — the whole SEO and Search Console
+ * subsystem computing results and then discarding them, because PostgREST
+ * rejects a statement naming an unknown column and every one of those call
+ * sites logged the error and carried on.
  *
- * So this is a ratchet, not an exemption. The list may shrink and may never
- * grow, and an entry that no longer matches anything must be deleted — which
- * makes fixing one of them force its removal from here. US-200 tracks the work.
+ * US-201 emptied ten of the eleven tables by mapping each value onto the column
+ * that already existed for it. What is left is the case that cannot be fixed
+ * that way: `articles` genuinely has no SEO-score columns, so
+ * analyze-blog-posts-seo needs a migration and a regenerated types.ts, not a
+ * rename. US-202 covers that.
+ *
+ * This is a ratchet, not an exemption. The list may shrink and may never grow,
+ * and an entry that no longer matches anything fails the suite — so fixing one
+ * forces deleting it from here.
  */
 const KNOWN_BROKEN_WRITES: Record<string, string[]> = {
   articles: ['last_seo_check', 'seo_issues', 'seo_recommendations', 'seo_score'],
-  seo_alerts: ['metadata', 'notification_sent', 'notified_at', 'related_url', 'rule_id'],
-  seo_content_optimization: [
-    'issues_count',
-    'keyword',
-    'keyword_prominence',
-    'meta_description',
-    'overall_score',
-    'recommendations',
-    'title',
-  ],
-  seo_monitoring_log: [
-    'check_type',
-    'checks_performed',
-    'duration_ms',
-    'error_message',
-    'issues_found',
-    'user_id',
-  ],
-  seo_performance_budget: [
-    'compliance_score',
-    'last_check_at',
-    'last_check_status',
-    'latest_metrics',
-    'latest_violations',
-    'violations_detected',
-  ],
-  seo_semantic_analysis: ['lsi_keywords', 'top_keywords', 'total_words', 'unique_words'],
 };
 
 describe('schema references (US-200)', () => {
