@@ -94,6 +94,41 @@ async function indexDefaultTitle(): Promise<string> {
 }
 
 /**
+ * The modulepreload hints Vite emitted into dist/index.html, and only those.
+ *
+ * Read before anything is written to dist/, so this is the build's own output
+ * rather than a previous prerender's.
+ *
+ * US-195 made Login and Register lazy so that form-vendor — react-hook-form,
+ * zod, @hookform/resolvers — left the entry graph. prefetchAuthPages() then
+ * warms those chunks in idle time from any page showing a Sign in link, which
+ * is the right trade for a real visitor. Under the prerenderer it is not:
+ * __vitePreload appends a <link rel="modulepreload" as="script"> for every
+ * chunk it fetches, the idle callback fires while the page is being rendered,
+ * and those links are in the DOM by the time it is serialised. dist/index.html
+ * went from 4 preload hints to 30 — Login, Register, form-vendor and the whole
+ * auth form graph, frozen into the homepage and 29 other prerendered pages.
+ * Every visitor to a prerendered page downloaded them before first paint,
+ * which is exactly what US-195 removed, and scripts/check-bundle-size.mjs is
+ * what noticed.
+ *
+ * So the rule is: a prerendered page keeps the hints the build put there and
+ * drops the ones the running app added. That holds for any idle-time dynamic
+ * import, not just this one. (Vite's runtime-added links happen to carry
+ * as="script" and the build's do not, but that is a detail of __vitePreload,
+ * not a contract.)
+ */
+async function buildEmittedPreloads(): Promise<string[]> {
+  const html = await readFile(join(DIST, 'index.html'), 'utf8');
+  return [...html.matchAll(/<link\b[^>]*\brel="modulepreload"[^>]*>/gi)]
+    .map((m) => /\bhref="([^"]*)"/i.exec(m[0])?.[1])
+    .filter((href): href is string => !!href);
+}
+
+/** Set once in main(), before any route is rendered. */
+let buildPreloads: string[] = [];
+
+/**
  * Take the DOM as the browser has it, minus the things that should not be
  * frozen into a static file.
  *
@@ -134,6 +169,12 @@ const SERIALISE_EXPR = `(() => {
       if (managed.has(keyOf(el))) el.remove();
     }
   };
+
+  // Hints the running app added after load; see buildEmittedPreloads().
+  const emitted = new Set(window.__BUILD_PRELOADS__ || []);
+  for (const el of Array.from(doc.head.querySelectorAll('link[rel="modulepreload"]'))) {
+    if (!emitted.has(el.getAttribute('href'))) el.remove();
+  }
 
   dedupe('meta[name]', (el) => 'name:' + el.getAttribute('name'));
   dedupe('meta[property]', (el) => 'prop:' + el.getAttribute('property'));
@@ -191,6 +232,7 @@ async function renderRoute(
 
     await page.waitForTimeout(SETTLE_MS);
 
+    await page.evaluate(`window.__BUILD_PRELOADS__ = ${JSON.stringify(buildPreloads)}`);
     const result = (await page.evaluate(SERIALISE_EXPR)) as Snapshot;
 
     if (result.rootLength < MIN_ROOT_HTML) {
@@ -610,6 +652,7 @@ async function main() {
 
   const routes = allPrerenderRoutes(blog);
   const defaultTitle = await indexDefaultTitle();
+  buildPreloads = await buildEmittedPreloads();
   console.log(`[prerender] ${routes.length} routes, ${CONCURRENCY} at a time`);
 
   let server: PreviewServer | undefined;
