@@ -3397,3 +3397,107 @@ NOT TOUCHED — CI type-checks functions against supabase/functions/deno.json,
 which is a different import map. The shim must not apply there: a function
 should type-check against the real module it will be given at runtime by
 Supabase's runtime if this ever moves back to it.
+
+### Iteration 3/15 — US-200: columns that do not exist, checked without a database
+
+CLAUDE.md opens its schema section by saying not to guess a column name, and
+gives the reason: gdpr-export queried a `blog_posts` table that has never
+existed, coalesced the failure with `|| []`, and returned zero articles on every
+subject access request without ever erroring.
+
+That is the mechanism, and it generalises. PostgREST answers an unknown column
+with 400. Almost every call site in this repo writes `const { data } = await ...`
+and drops `error`. So the query does not throw — it returns undefined, and the
+code carries on with an empty result as though the table were empty. A feature
+built this way looks like a feature with no data in it.
+
+`npm run verify:schema` catches this, but it needs a real Postgres and runs only
+in CI. src/integrations/supabase/types.ts is generated from the applied schema
+and is committed, so the same class can be caught in the unit suite in
+milliseconds. That is what src/schema-references.test.ts now does: it parses the
+Row shape of all 148 relations out of the generated types and checks every
+`.from(...)` chain in src/ and supabase/functions/ — filters, write keys and
+relation names.
+
+FIVE LIVE FILTER DEFECTS, all in edge functions, all fixed:
+
+  profiles.email            teams/index.ts
+      The invite flow looked the invitee up by email to link an existing
+      account. `profiles` has no email column — the account address is in
+      auth.users, which is the entire reason _shared/agent-contact.ts exists
+      (US-070). 400, error dropped, `existing` always undefined. Removed: the
+      'accept' action already links the row by email, which is the only moment
+      the invitee is present to be linked.
+
+  articles.published        analyze-blog-posts-seo/index.ts
+      The column is `status`. `data` was null, `posts` became [], and the
+      function threw "No blog posts found to analyze" for every account that
+      had articles. -> .eq('status', 'published')
+
+  ai_models.model_type      optimize-page-content/index.ts
+      No such column; the table has provider, model_id, model_name, is_active,
+      supports_vision. aiConfig was always null, and the function's own error
+      message is "No AI model configured. Please configure an AI model in the
+      admin panel" — told to an admin who had configured one.
+
+  seo_alert_rules.user_id   run-scheduled-audit/index.ts
+      The table is global: conditions, rule_type, severity, is_active. No
+      user_id. `rules` was undefined, so a scheduled audit never alerted on
+      anything.
+
+  seo_performance_budget.page_url   monitor-performance-budget/index.ts
+      The column is `url_pattern`. No configured budget was ever found, so every
+      check silently ran against the hardcoded defaults instead.
+
+A DETAIL THAT MATTERS about writing this kind of checker: the first run reported
+three of the five as still broken after they were fixed. Each fix leaves a
+comment quoting the call it replaced — `.eq('published', true)` — and a scanner
+that reads comments reports the explanation as the defect. It also invented a
+sixth, profiles.user_id in pii-crypto, from a comment 45 lines below the query
+that says why `.eq('user_id', user.id)` is needed. Comments are stripped first
+now, replaced with spaces so line numbers survive. A checker that cannot tell
+code from prose about code will be turned off within a week.
+
+WHAT IT ALSO FOUND, AND WHAT IS DONE ABOUT IT — 59 write-key mismatches across
+11 tables, every one in the SEO and Search Console subsystem:
+
+    seo_core_web_vitals     12   stores lcp/lcp_pass; code writes lcp_value/lcp_passed
+    seo_content_optimization 7
+    seo_monitoring_log       6   has 7 columns; code writes 6 more
+    seo_performance_budget   6
+    seo_alerts               5
+    seo_link_analysis        5
+    gsc_keyword_performance  4   keys on property_id/query; code writes user_id/property_url/keyword
+    gsc_page_performance     4
+    articles                 4
+    seo_semantic_analysis    4
+    gsc_properties           2
+
+Each is an insert or update PostgREST rejects, so these features compute their
+results and throw them away. Telling a rename from a missing column needs the
+table's intent, and some need a migration — that is US-201, not this iteration,
+and it must not be guessed at.
+
+So they are frozen in KNOWN_BROKEN_WRITES as a RATCHET, not an exemption: the
+list may shrink and may never grow, and a fourth test fails on any entry that no
+longer matches anything. Fixing one forces deleting it from the list. The debt is
+enumerated in the suite rather than described in a document.
+
+src/ has ZERO mismatches of either kind. The whole defect is on the edge-function
+side — the side that never typechecked against the Database types.
+
+VERIFICATION
+  - The checker was run against the unfixed functions: all five filter defects
+    reported, with file and line. Zero after.
+  - Sanity assertions guard against the scanner silently matching nothing:
+    148 relations parsed, leads has lead_type and not type, profiles has no
+    email, 500+ sources scanned.
+  - deno check --config supabase/functions/deno.json clean on all five modified
+    functions.
+  - npm run test:run: 93 files, 844 passed, 0 failed.
+
+ALSO FIXED, incidental — tsc --noEmit was failing on src/config/og-image.test.ts
+before this iteration's changes: newer @types/node types Buffer.equals's
+parameter as Uint8Array<ArrayBuffer>, which a Buffer no longer satisfies. The
+PNG signature is compared as hex now. `npm run build:check` runs tsc, so this
+was a broken build gate, not a cosmetic warning.

@@ -3138,6 +3138,41 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 2 while answering US-198. Two defects in the one file that serves production. (1) The router carried a hand-written map of 15 names; the app calls 40, so 29 answered 404 'Function not found' — gdpr-export and gdpr-deletion (GDPR subject access and erasure), create-portal-session/create-stripe-customer/report-stripe-usage (billing), verify-mfa/disable-mfa/login-security/get-sessions/revoke-session (account security), sso-initiate/sso-callback, submit-review, teams, api-keys, send-welcome-email. One mapped name, submit-contact, has no directory. (2) Far worse: it invoked module.default(req), but only 5 of 84 functions export a default and 79 call serve() at module top level. Importing one inside the process that already holds port 8000 raised AddrInUse from an unawaited promise, and an unhandled rejection ends a Deno process. Reproduced on Deno 1.42.0: POST /submit-lead returned 'TypeError: module.default is not a function' as a 500 and then killed the server — /health went from 200 to connection refused. That is an unauthenticated denial of service on the whole backend, reachable from the public lead form, and it would recur on every restart. docs/deploy/edge-functions.md had flagged both as 'worth fixing' and 'verify before building on the current design'; this verified and fixed them."
+    },
+    {
+      "id": "US-200",
+      "title": "Columns that do not exist, checked without a database",
+      "description": "As a developer, I need every table and column this codebase names to be checked against the generated schema on every commit, so that a query naming a column that is not there fails a test rather than returning an empty result in production.",
+      "acceptanceCriteria": [
+        "src/schema-references.test.ts parses src/integrations/supabase/types.ts and checks every .from(...) chain",
+        "Comments are stripped before scanning: a fix that quotes the broken call must not be reported as the defect",
+        "Filters (.eq/.neq/.in/.order/...) reference only columns that exist — zero exceptions",
+        "Writes (.insert/.update/.upsert) are checked too, with the 59 pre-existing failures frozen in KNOWN_BROKEN_WRITES",
+        "The frozen list is a ratchet: it may not grow, and a stale entry fails the suite, so fixing one forces removing it",
+        "Every relation named is a real table or view; storage.from() buckets are excluded",
+        "The five live filter defects are fixed and the test is verified against the unfixed code: all five reported",
+        "deno check clean on every modified function; tsc --noEmit clean; npm run test:run green"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 3. PostgREST answers an unknown column with 400, and nearly every call site here destructures { data } without error — so the query does not throw, it returns undefined and the code proceeds as though the table were empty. Exactly the blog_posts/gdpr-export failure CLAUDE.md opens its schema section with. Five live filter defects fixed: profiles.email in teams (profiles has no email; the address is in auth.users — every invite silently failed to link an existing account), articles.published in analyze-blog-posts-seo (the column is status; the function threw 'No blog posts found to analyze' for every account that had articles), ai_models.model_type in optimize-page-content (no such column; admins who HAD configured a model were told to configure one), seo_alert_rules.user_id in run-scheduled-audit (the table is global and has no user_id; scheduled audits never alerted on anything), seo_performance_budget.page_url in monitor-performance-budget (the column is url_pattern; no configured budget was ever found). Incidentally fixed a pre-existing tsc failure in src/config/og-image.test.ts from @types/node narrowing Buffer.equals."
+    },
+    {
+      "id": "US-201",
+      "title": "The SEO and Search Console subsystem writes 59 columns that do not exist",
+      "description": "As an operator, I need the SEO and Search Console tooling to actually persist what it computes, so that a feature that appears to run is not discarding every row it writes.",
+      "acceptanceCriteria": [
+        "For each of the 59 entries in KNOWN_BROKEN_WRITES, decide: wrong column name, or missing column",
+        "Rename where the column exists under another name (seo_core_web_vitals stores lcp/lcp_pass; the code writes lcp_value/lcp_passed)",
+        "Add a migration where the feature genuinely needs a column the table lacks (seo_monitoring_log has 7 columns and the code writes 6 more)",
+        "gsc_keyword_performance and gsc_page_performance: the code writes user_id/property_url/keyword/platform; the tables key on property_id and query",
+        "Every fixed entry is deleted from KNOWN_BROKEN_WRITES; the stale-entry test enforces this",
+        "npm run verify:schema passes against a real Postgres",
+        "KNOWN_BROKEN_WRITES is empty and the exception is removed from the test"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "NOTED IN ITERATION 3, NOT FIXED — hit this next. The checker built in US-200 found 59 distinct table.column write mismatches across 11 tables, every one of them in the SEO/Search Console subsystem: articles (4), gsc_keyword_performance (4), gsc_page_performance (4), gsc_properties (2), seo_alerts (5), seo_content_optimization (7), seo_core_web_vitals (12), seo_link_analysis (5), seo_monitoring_log (6), seo_performance_budget (6), seo_semantic_analysis (4). Each is an insert or update PostgREST rejects with 400, so these features compute their results and then throw them away. This is not one iteration's work and must not be guessed at: some are renames and some need migrations, and telling them apart needs the table's intent. src/ has ZERO mismatches — the whole defect is on the edge-function side, which is consistent with it being the side nothing typechecked against Database types."
     }
   ]
 }

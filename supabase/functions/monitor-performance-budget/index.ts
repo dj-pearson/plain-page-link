@@ -44,11 +44,13 @@ serve(async (req) => {
         .single();
       budget = data;
     } else {
-      // Try to find budget for URL
+      // Try to find budget for URL. US-200: the column is url_pattern, not
+      // page_url; the old filter 400'd, so no configured budget was ever found
+      // and every check ran against the hardcoded defaults below instead.
       const { data } = await supabase
         .from('seo_performance_budget')
         .select('*')
-        .eq('page_url', url)
+        .eq('url_pattern', url)
         .single();
       budget = data;
     }
@@ -56,7 +58,7 @@ serve(async (req) => {
     if (!budget) {
       // Create default budget
       budget = {
-        page_url: url,
+        url_pattern: url,
         max_lcp_ms: 2500,
         max_fid_ms: 100,
         max_cls_score: 0.1,
@@ -71,7 +73,7 @@ serve(async (req) => {
       };
     }
 
-    const targetUrl = budget.page_url || url;
+    const targetUrl = budget.url_pattern || url;
 
     // Fetch PageSpeed Insights data
     const apiUrl = new URL('https://www.googleapis.com/pagespeedonline/v5/runPagespeed');

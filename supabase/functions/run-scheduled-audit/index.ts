@@ -311,10 +311,13 @@ async function checkAlertRules(supabase: any, schedule: any, results: any): Prom
   const alerts = [];
 
   // Get alert rules for this user
+  // US-200: `.eq('user_id', schedule.user_id)` was here. seo_alert_rules has
+  // no user_id — it is a global rule table (conditions, rule_type, severity,
+  // is_active). The filter 400'd, `rules` was undefined, and the function
+  // returned no alerts at all, so a scheduled audit never alerted on anything.
   const { data: rules } = await supabase
     .from('seo_alert_rules')
     .select('*')
-    .eq('user_id', schedule.user_id)
     .eq('is_active', true);
 
   if (!rules || rules.length === 0) return alerts;

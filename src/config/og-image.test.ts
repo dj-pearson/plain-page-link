@@ -18,8 +18,11 @@ const PUBLIC = join(process.cwd(), 'public');
 /** Width and height from a PNG's IHDR chunk. */
 function pngSize(file: string): { width: number; height: number } {
   const buffer = readFileSync(file);
-  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  expect(buffer.subarray(0, 8).equals(signature), `${file} is not a PNG`).toBe(true);
+  // Compared as hex rather than with Buffer.equals(): newer @types/node types
+  // that parameter as Uint8Array<ArrayBuffer>, which a Buffer no longer
+  // satisfies, and tsc --noEmit is part of `npm run build:check`.
+  const signature = '89504e470d0a1a0a';
+  expect(buffer.subarray(0, 8).toString('hex'), `${file} is not a PNG`).toBe(signature);
   expect(buffer.subarray(12, 16).toString('ascii'), 'first chunk should be IHDR').toBe('IHDR');
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }

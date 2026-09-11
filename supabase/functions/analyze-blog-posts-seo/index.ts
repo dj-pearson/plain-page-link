@@ -34,7 +34,11 @@ serve(async (req) => {
       const { data } = await supabase
         .from('articles')
         .select('*')
-        .eq('published', true)
+        // US-200: `.eq('published', true)` — articles has no `published`
+        // column, it has `status`. PostgREST answered 400, `data` was null,
+        // `posts` became [] and the function threw "No blog posts found to
+        // analyze" for every account that had articles.
+        .eq('status', 'published')
         .order('created_at', { ascending: false });
       posts = data || [];
     } else {

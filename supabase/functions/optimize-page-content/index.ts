@@ -80,8 +80,13 @@ serve(async (req) => {
     const { data: aiConfig } = await supabase
       .from('ai_models')
       .select('*')
+      // US-200: `.eq('model_type', 'content_generation')` was here. ai_models
+      // has no model_type column — it has provider, model_id, model_name,
+      // is_active, supports_vision — so the filter 400'd and aiConfig was
+      // always null, which this function reports to the caller as "No AI model
+      // configured. Please configure an AI model in the admin panel." An admin
+      // who had configured one was told they had not.
       .eq('is_active', true)
-      .eq('model_type', 'content_generation')
       .limit(1)
       .maybeSingle();
 
