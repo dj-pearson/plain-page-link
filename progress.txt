@@ -4286,3 +4286,45 @@ should not be. A per-route budget in CI is the thing that would have caught a
 it obvious in one line. Recorded with the numbers to budget against, and with
 the observation that every page still loads the 171 KB supabase chunk whether
 or not it queries anything.
+
+### Iteration 14/15 — US-212: a budget for what a page costs the visitor
+
+US-211 was found with a throwaway script. This makes it a gate.
+
+scripts/check-route-weight.mjs serves dist/ the way Cloudflare Pages does,
+opens four routes in Chromium, and asserts a byte budget, a request budget, and
+— the one that matters — that nothing is fetched twice.
+
+TWO DECISIONS, both learned the hard way one iteration ago:
+
+  The cache policy is PARSED from public/_headers, not copied into the script.
+  The first run of the harness that found US-211 reported /pricing at 1914 KB
+  purely because its own server sent no Cache-Control; the real figure is 1035.
+  That is 88% of the size of the defect being measured, invented by the
+  measurement. The script now refuses to run at all if _headers stops marking
+  hashed assets immutable, rather than printing confident fiction.
+
+  Service workers are ALLOWED. Blocking them is the convenient thing to do in a
+  browser test — they cause flake, they are irrelevant to most assertions — and
+  it would have hidden US-211 completely, because that reload fired from the
+  worker's own `controlling` event. A check written for convenience would have
+  been green through the whole year the defect existed.
+
+THE REPEATED-URL ASSERTION is the useful half. Every individual chunk was
+within budget while this was broken, and the entry graph was correct, so
+check-bundle-size.mjs had nothing to say. "This page fetched 23 URLs more than
+once" needs no budget to interpret, and no baseline to drift.
+
+VERIFICATION, against the tree as it was at 6d5029b:
+
+                    before US-211          after
+    landing      2107 KB / 61, 23 dupes   1232 KB / 36, none
+    pricing      1927 KB / 49, 19 dupes   1035 KB / 28, none
+    exit                      1                        0
+
+It runs in the existing Build job, which already installs Chromium and produces
+a dist — no new job, about twenty seconds.
+
+src/route-weight.test.ts guards the parser itself: the _headers matcher, the
+later-rule-wins merge, and that `npm run route-weight` is actually in ci.yml.
+The last one is US-205's lesson written down — a budget nobody runs is a file.

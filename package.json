@@ -33,7 +33,8 @@
     "prerender": "tsx scripts/prerender.mts",
     "articles:snapshot": "tsx scripts/snapshot-articles.mts",
     "verify:seo": "node scripts/verify-seo.mjs",
-    "smoke:functions": "node scripts/smoke-edge-functions.mjs"
+    "smoke:functions": "node scripts/smoke-edge-functions.mjs",
+    "route-weight": "node scripts/check-route-weight.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

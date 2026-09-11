@@ -3345,8 +3345,8 @@
         "Verified against the tree as of 6d5029b, where it fails"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "NOTED IN ITERATION 13, NOT FIXED. scripts/check-bundle-size.mjs weighs chunks in isolation and checks the entry graph; nothing measures what a browser actually downloads for a route, which is the number a visitor experiences. The throwaway harness that found US-211 is the shape of it: a static server over dist/ with public/_headers' cache policy, Chromium, count bytes and requests per route, and fail on a repeated URL — the duplicate-request check is what made a 90% overhead obvious in one line. Current numbers to budget against: landing 1232 KB / 36 requests, public profile 1397 KB / 65, pricing 1035 KB / 28. Worth noting for whoever writes it: the public profile pulls 65 requests, and every page loads the 171 KB supabase chunk whether or not it queries anything."
+      "passes": true,
+      "notes": "Fixed in iteration 14. scripts/check-route-weight.mjs serves dist/ with the cache policy PARSED FROM public/_headers — not copied — opens each of four routes in Chromium with service workers ALLOWED, and asserts a byte and request budget plus zero repeated URLs. Both choices are load-bearing and both were learned the hard way in iteration 13: a weight measured without `immutable` on hashed assets reported /pricing at 1914 KB when the real figure is 1035, and blocking service workers — the convenient thing to do in a test — hides US-211 entirely, because that reload fired from the worker's `controlling` event. The script refuses to run at all if _headers stops marking assets immutable, rather than printing confident fiction. Verified against the tree at 6d5029b, before US-211: landing 2107 KB / 61 with 23 repeated URLs, pricing 1927 KB / 49 with 19, exit 1. After: 1232 KB / 36 and 1035 KB / 28, nothing fetched twice, exit 0. Runs in the existing Build job, which already has Chromium and a built dist. src/route-weight.test.ts guards the parser and the CI wiring — a matcher that silently stopped matching would put the budget back to measuring the harness."
     }
   ]
 }

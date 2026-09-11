@@ -121,6 +121,16 @@ jobs:
           # The Cloudflare Pages deploy must NOT set this (US-148).
           PRERENDER_ALLOW_NO_ARTICLES: '1'
 
+      - name: Check what each route costs a visitor
+        # US-212. The bundle-size job weighs chunks in isolation and checks the
+        # entry graph; neither is what a visitor downloads. US-211 lived in that
+        # gap: every page fetched its document, its stylesheet and every entry
+        # chunk twice, while every individual chunk was within budget and the
+        # entry graph was correct. This serves dist/ with public/_headers' own
+        # cache policy, opens each route in Chromium with service workers
+        # allowed, and fails on a repeated URL.
+        run: npm run route-weight
+
       - name: Verify prerendered pages
         # 44 URLs shipped for a year sharing one <title> because nothing
         # compared them. This is what compares them (US-150), and it has grown:
