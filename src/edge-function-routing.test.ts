@@ -148,6 +148,30 @@ describe('edge-function routing (US-199)', () => {
     expect(router).toMatch(/unhandledrejection/);
   });
 
+  it('type-checks the functions rather than aborting on a vitest import', () => {
+    // US-203: .github/workflows/verify-backend.yml globbed
+    // `find supabase/functions -name '*.ts'`, which swept up the seven vitest
+    // specs in _shared/. They `import { describe } from 'vitest'` — a bare
+    // specifier Deno cannot resolve — so `deno check` failed module-graph
+    // resolution BEFORE type-checking anything and exited 1. The job called
+    // itself blocking with a cleared baseline, and had never looked at a
+    // function. It was hiding 14 genuine type errors.
+    const workflow = readFileSync(join(ROOT, '.github/workflows/verify-backend.yml'), 'utf-8');
+    const denoCheckGlob = /find supabase\/functions -name '\*\.ts'[^\n]*/.exec(workflow);
+    expect(denoCheckGlob, 'the deno check file list should still be a find').not.toBeNull();
+    expect(denoCheckGlob![0]).toContain("! -name '*.test.ts'");
+
+    // The exclusion is only load-bearing while such files exist. If the specs
+    // move elsewhere, this test should be deleted rather than quietly passing.
+    const specs = readdirSync(join(FUNCTIONS_DIR, '_shared')).filter((f) => f.endsWith('.test.ts'));
+    expect(specs.length).toBeGreaterThan(0);
+    for (const spec of specs) {
+      expect(readFileSync(join(FUNCTIONS_DIR, '_shared', spec), 'utf-8')).toMatch(
+        /from ['"]vitest['"]/
+      );
+    }
+  });
+
   it('ships the shim and the import map into the image', () => {
     const dockerfile = readFileSync(join(ROOT, 'Dockerfile'), 'utf-8');
     expect(dockerfile).toMatch(/COPY edge-functions-serve-shim\.ts \.\/serve-shim\.ts/);

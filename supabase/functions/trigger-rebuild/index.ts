@@ -66,7 +66,10 @@ Deno.serve(async (req: Request) => {
       // Deliberately does not echo hookUrl or the body, either of which can
       // carry the token.
       console.error(`[trigger-rebuild] deploy hook answered ${response.status}`);
-      return errorResponse('Deploy hook rejected the request', req, 502);
+      // US-203: this was `errorResponse('...', req, 502)` — req in the `code`
+      // slot and 502 in the `req` slot, so the 502 path called
+      // (502).headers.get('origin') and threw instead of answering.
+      return errorResponse('Deploy hook rejected the request', 'DEPLOY_HOOK_FAILED', req, 502);
     }
 
     console.log('[trigger-rebuild] Cloudflare Pages build requested');

@@ -3190,6 +3190,39 @@
       "priority": 2,
       "passes": false,
       "notes": "NOTED IN ITERATIONS 4 AND 5, NOT FIXED. Everything in US-200/US-201 that could be fixed by naming the column that already existed has been. What is left needs the schema to change, which needs a migration AND a types regeneration — and types:generate reads a live database over psql, so it cannot be done from a sandbox without one. Hand-editing types.ts would work and would pass types:check only if the migration is exactly right, which is precisely the kind of guess this whole line of stories exists to stop. The specific items: articles has none of seo_score/seo_issues/seo_recommendations/last_seo_check (the last 4 ratchet entries); seo_core_web_vitals has no `inp` column because the table predates INP replacing FID as a Core Web Vital, so gsc-fetch-core-web-vitals now parks it in the field_data jsonb; seo_content_optimization stores page_title but has no meta_description, and has no home for an analyzer's issues or recommendations even though seo_link_analysis has jsonb columns for both."
+    },
+    {
+      "id": "US-203",
+      "title": "The blocking edge-function type-check had never type-checked a function",
+      "description": "As a developer, I need the CI gate that claims to type-check all 84 edge functions to actually do it, so that a type error in a payment webhook or a PII backfill fails a build instead of shipping.",
+      "acceptanceCriteria": [
+        "verify-backend.yml excludes supabase/functions/**/*.test.ts from the deno check file list",
+        "The list also excludes node_modules, which --node-modules-dir=auto creates under supabase/functions",
+        "The job fails loudly if the exclusion ever matches nearly everything",
+        "All 14 type errors the gate was hiding are fixed",
+        "backfill-lead-pii answers an unauthenticated POST with 401 rather than a router-level 500, verified by running it",
+        "deno check over all 103 function files exits 0 on Deno 2.1.4, the major version CI uses",
+        "A unit test asserts the exclusion is present and that the vitest specs it excludes still exist"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 6 by RUNNING the functions rather than reading them — the axis CI has never had. The gate globbed `find supabase/functions -name '*.ts'`, which swept up seven vitest specs in _shared/ that `import { describe } from 'vitest'`. Deno cannot resolve a bare specifier, so `deno check` failed module-graph resolution BEFORE type-checking anything, printed one error about an import path, and exited 1. The job's own comment calls it blocking with a cleared 114 -> 0 baseline. Excluding the specs exposed 14 real errors in 3 functions. backfill-lead-pii (7): getCorsHeaders takes an origin, not a Request, and every _shared/response.ts call passed corsHeaders where the Request belongs — including errorResponse('Admin role required', 403, corsHeaders), which puts a number in the code slot. So the function could not return ANY response: each helper called req.headers.get('origin') on a headers bag, threw, and the catch called handleUnexpectedError which threw the same TypeError again. This is the US-086 PII backfill, the prerequisite for the migration that drops the plaintext email and phone columns. trigger-rebuild (1): errorResponse('...', req, 502) with req in the code slot and 502 in the req slot, so the 502 path threw instead of answering. stripe-webhook (6): three helpers typed their client as ReturnType<typeof createClient>, which is the DEFAULT generic instantiation, not what createClient(url, key) infers."
+    },
+    {
+      "id": "US-204",
+      "title": "Edge functions answer \"you are not logged in\" with HTTP 500",
+      "description": "As an operator, I need a caller's missing credentials to be reported as 401, so that client errors are not retried like server faults and a real outage is visible against them.",
+      "acceptanceCriteria": [
+        "requireAuth/requireAdmin/requireOwnership throw a typed error carrying 401 or 403 instead of a bare Error",
+        "handleUnexpectedError recognises it and answers 401/403, not 500",
+        "The body names the cause, so a client can tell 'log in again' from 'the server broke'",
+        "Functions that hand-roll a 500 from a caught auth error are fixed too",
+        "Re-running the smoke sweep, no function answers an unauthenticated POST with 5xx for an auth reason",
+        "A smoke job in CI boots the router and asserts it: deno check cannot see this, and US-199 proves running them finds what type-checking cannot"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "NOTED IN ITERATION 6, NOT FIXED — hit this next. Smoke-testing all 84 functions with an unauthenticated POST: 24 answered 401 correctly, but 20 answered 5xx, and for at least 14 of those the cause is the caller's own missing credentials. requireAuth throws a plain Error('Unauthorized: No authorization header') BEFORE it touches Supabase, and the catch hands it to handleUnexpectedError, which logs '[UnexpectedError]' and returns 500 INTERNAL_SERVER_ERROR. Six functions surface the message verbatim with a 500 status (analyze-blog-posts-seo, apply-seo-autofix, generate-content-suggestions, schedule-seo-audit, test-social-webhook, and others); the rest return a generic 'An unexpected error occurred' that does not even tell the client it was an auth problem. Two consequences: 5xx is retried by clients, CDNs and cron where 401 is not, so an unauthenticated caller becomes a retry storm; and every auth failure looks like a crash in monitoring, so a real outage cannot be seen against the noise. send-listing-generator-email returns 500 for 'Email and firstName are required', which is the same mistake on the validation side. The smoke sweep that found this should become a CI job — US-199's AddrInUse crash is proof that running a function finds what deno check cannot."
     }
   ]
 }

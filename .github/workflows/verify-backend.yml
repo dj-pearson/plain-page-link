@@ -35,10 +35,29 @@ jobs:
       - name: Type-check edge functions
         run: |
           set -o pipefail
-          # Check every TypeScript file under supabase/functions. Function
-          # entrypoints transitively pull in the _shared utilities.
-          mapfile -t FILES < <(find supabase/functions -name '*.ts' | sort)
+          # Check every TypeScript file under supabase/functions EXCEPT the
+          # vitest specs. Function entrypoints transitively pull in the _shared
+          # utilities.
+          #
+          # US-203: the exclusion is the whole point. supabase/functions/_shared
+          # holds seven *.test.ts files that run under vitest and `import
+          # { describe } from 'vitest'` — a bare specifier Deno cannot resolve.
+          # `deno check` fails module-graph resolution BEFORE type-checking
+          # anything and exits 1, so this job reported one error about an import
+          # path and never once looked at a function. It was hiding 14 genuine
+          # type errors, including a function whose every response path passed a
+          # headers bag where a Request belongs and could therefore not answer a
+          # request at all.
+          # -not -path node_modules because --node-modules-dir=auto creates one
+          # under supabase/functions; harmless on a clean checkout, wrong on a
+          # cached or re-run job.
+          mapfile -t FILES < <(find supabase/functions -name '*.ts' ! -name '*.test.ts' -not -path '*/node_modules/*' | sort)
           echo "Found ${#FILES[@]} edge-function TypeScript files."
+          # Fail loudly if the exclusion ever matches everything.
+          if [ "${#FILES[@]}" -lt 90 ]; then
+            echo "::error::Expected at least 90 edge-function files, found ${#FILES[@]}."
+            exit 1
+          fi
           # --node-modules-dir=auto lets Deno resolve npm: specifiers that some
           # functions pull in transitively (e.g. optimize-image ->
           # imagemagick_deno -> npm:@imagemagick/magick-wasm). Without it,

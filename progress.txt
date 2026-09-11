@@ -3678,3 +3678,93 @@ VERIFICATION
   - deno check --config supabase/functions/deno.json clean on all seven
     modified functions.
   - tsc --noEmit clean; npm run test:run 93 files, 844 passed, 0 failed.
+
+### Iteration 6/15 — US-203: the blocking type-check had never type-checked a function
+
+A new axis. Five iterations have read this code; CI has type-checked it. Nobody
+has RUN it. Deno 1.42.0 — the version the Dockerfile pins — plus the router from
+US-199 makes that a twenty-line script: start the server, POST `{}` to all 84
+functions, see what comes back and whether the process survives.
+
+The first thing it found was not in a function.
+
+    $ find supabase/functions -name '*.ts' | wc -l        # what CI checks
+    110
+    $ deno check --config supabase/functions/deno.json ...
+    error: Relative import path "vitest" not prefixed with / or ./ or ../
+        at supabase/functions/_shared/cors.test.ts:14:49
+    exit=1
+
+There are seven vitest specs under supabase/functions/_shared/. They
+`import { describe } from 'vitest'`, a bare specifier Deno cannot resolve, and
+`deno check` fails MODULE-GRAPH RESOLUTION before type-checking anything. One
+error about an import path, exit 1, and not one function looked at.
+
+The job's own comment reads: "Blocking: the deno-check baseline has been cleared
+(114 -> 0). New genuine type errors in edge functions now fail CI."
+
+Excluding the specs, on Deno 2.1.4 — the major version CI installs:
+
+    Found 14 errors.
+      7  backfill-lead-pii/index.ts
+      6  stripe-webhook/index.ts
+      1  trigger-rebuild/index.ts
+
+WHAT WAS BEHIND THE GATE
+
+  backfill-lead-pii — every response path. `getCorsHeaders(req)` takes an
+  ORIGIN, not a Request, and the same confusion runs through the file: the
+  _shared/response.ts helpers take the Request and derive CORS themselves, and
+  every call here passed `corsHeaders` in that slot instead. Including
+  `errorResponse('Admin role required', 403, corsHeaders)`, which puts a number
+  where the error code goes.
+
+  So the function could not return ANY response. Success, admin-denied, error —
+  each helper calls req.headers.get('origin') on a headers bag, throws a
+  TypeError, and the catch calls handleUnexpectedError, which throws the same
+  TypeError again. Confirmed by running it: the caller got the router's own
+  "Function execution failed", and the stack was inside errorResponse.
+
+  This is the US-086 PII backfill: the one-off that encrypts the plaintext email
+  and phone on `leads`, which 20260901000001_leads_drop_plaintext_pii.sql refuses
+  to run until it has completed. It has never been able to complete.
+
+  trigger-rebuild — `errorResponse('Deploy hook rejected the request', req, 502)`.
+  req in the code slot, 502 in the req slot. The failure path threw instead of
+  reporting the failure.
+
+  stripe-webhook — three helpers typed their client `ReturnType<typeof
+  createClient>`, which is createClient's DEFAULT generic instantiation,
+  SupabaseClient<unknown, never, GenericSchema>. What they are handed is what
+  `createClient(url, key)` infers: SupabaseClient<any, "public", any>. Six call
+  sites, all in the paths that resolve a plan from a Stripe price and load its
+  limits.
+
+WHAT CHANGED
+  - The glob excludes *.test.ts, and node_modules, which --node-modules-dir=auto
+    creates under supabase/functions and which would otherwise make a re-run
+    check 198 files instead of 103.
+  - The job fails loudly if the exclusion ever matches nearly everything, so
+    "checked 0 files, exit 0" cannot become the new way to be green.
+  - All 14 errors fixed.
+
+VERIFICATION
+  - deno check over all 103 files on Deno 2.1.4: exit 0. First time.
+  - Runtime, not just types: POST /backfill-lead-pii now answers
+    {"code":"AUTH_TOKEN_MISSING"} with 401, where before it produced a
+    router-level 500 with a TypeError inside errorResponse.
+  - The guard was run against the workflow as it was at 356b7da and fails there.
+  - tsc --noEmit clean; npm run test:run 93 files, 845 passed, 0 failed.
+
+NOTED, NOT FIXED — US-204, and it is the larger half of what the sweep found.
+Of 84 functions given an unauthenticated POST, 24 answered 401 correctly and 20
+answered 5xx — and for at least 14 of those the cause is the CALLER's missing
+credentials. requireAuth throws a plain Error before it ever touches Supabase;
+the catch hands it to handleUnexpectedError, which logs "[UnexpectedError]" and
+returns 500. Six functions print "Unauthorized: No authorization header" with a
+500 status; the rest return "An unexpected error occurred", which does not tell
+the client it was an auth problem at all. 5xx is retried by clients, CDNs and
+cron where 401 is not, so an unauthenticated caller becomes a retry storm — and
+every auth failure looks like a crash, so a real outage cannot be seen against
+the noise. The sweep itself should become a CI job: US-199's AddrInUse crash is
+the proof that running a function finds what deno check cannot.

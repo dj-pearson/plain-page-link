@@ -18,7 +18,14 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+// US-203: the three helpers below typed their client as
+// `ReturnType<typeof createClient>`, which is createClient's DEFAULT generic
+// instantiation — SupabaseClient<unknown, never, GenericSchema>. The client
+// they are actually handed comes from `createClient(url, key)`, which infers
+// SupabaseClient<any, "public", any>, so all six call sites were type errors.
+// `SupabaseClient` bare is the same shape the call sites produce, and is what
+// _shared/auth.ts already uses.
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { sendEmail } from '../_shared/email.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
 import { statusToStore } from '../_shared/subscription-entitlement.ts';
@@ -44,7 +51,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
  * Returns true when this call claimed the event and should process it.
  */
 async function claimEvent(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   eventId: string,
   eventType: string
 ): Promise<boolean> {
@@ -80,7 +87,7 @@ async function claimEvent(
  * entitlements.
  */
 async function resolvePlanFromPriceId(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   priceId: string | undefined
 ): Promise<{ name: string; id: string | null }> {
   if (!priceId) {
@@ -164,7 +171,7 @@ const FALLBACK_LIMITS: FlatPlanLimits = {
  * its jsonb onto the flat columns `subscriptions` actually has.
  */
 async function loadPlanLimits(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   planName: string
 ): Promise<FlatPlanLimits> {
   const { data, error } = await supabase
