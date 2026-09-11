@@ -95,8 +95,20 @@ export function BlogSection({
             )}
             {showFilters && (
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue />
+                {/*
+                  US-206: this was the one CRITICAL axe violation on the landing
+                  page. A Radix SelectTrigger takes its accessible name from the
+                  value it is showing, and SelectValue with no placeholder shows
+                  nothing when the selected value has no matching item — which is
+                  the state a visitor lands in whenever the article list is
+                  empty. A screen reader announced "button", with no indication
+                  of what it filters.
+                */}
+                <SelectTrigger
+                  className="w-full sm:w-[200px]"
+                  aria-label="Filter articles by category"
+                >
+                  <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (

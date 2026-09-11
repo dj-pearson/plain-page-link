@@ -6,37 +6,85 @@
  * hermetic (no live backend), matching the E2E approach.
  *
  * Baseline (initial run, 2026) — count of distinct critical/serious axe rules
- * per page. To avoid blocking on the pre-existing baseline (per the story:
- * "warn but not fail initially"), each test fails only when critical/serious
- * violations EXCEED this baseline — i.e. it's a regression guard. Drive these
- * numbers down over time; the CI job is also configured warn-only.
+ * per page. The baseline is now ZERO everywhere: each of these pages had
+ * critical/serious violations accepted as pre-existing, and US-206 fixed them
+ * rather than continuing to grade against them.
  *
- *   landing        : 3  (button-name [critical], color-contrast, link-in-text-block)
- *   login          : 1  (color-contrast)
- *   register       : 1  (color-contrast)
- *   dashboard      : 1  (color-contrast)
- *   public profile : 1  (color-contrast)
+ * What was accepted, and what it actually meant to a user:
+ *
+ *   landing (3)
+ *     button-name [critical] — the blog category filter is a Radix
+ *       SelectTrigger whose accessible name comes from the value it shows, and
+ *       SelectValue had no placeholder. With no articles loaded there is no
+ *       matching item, so it showed nothing and a screen reader announced
+ *       "button". The empty state is the one every first visitor sees.
+ *     color-contrast — white on bg-red-500 (3.76) and bg-green-500 (2.27) in
+ *       the before/after badges; text-red-400 on a red-500/10 wash (2.42) and
+ *       text-green-400 on green-500/10 (1.59) in the Problem/Solution pills.
+ *     link-in-text-block — the footer's legal links were blue-400 inside
+ *       gray-500 prose at 1.9:1, with nothing but colour to mark them.
+ *
+ *   login (1), register (1) — gray-400 on white for the "or" divider (2.53)
+ *     and the username hint, and white on the 500-level avatar fills at 10px
+ *     bold (2.42-4.23).
+ *
+ *   dashboard (1) — reached only behind the mocked session; kept at 0 with the
+ *     rest, since the shared components it renders are the ones that changed.
  *
  * US-113 added the listing-modal case. ListingDetailModal was a hand-rolled
  * overlay — no role=dialog, no aria-modal, no focus trap, no focus restore,
  * and unlabelled icon buttons — so the modal state was exactly the state the
  * suite never looked at. It now uses the Radix Dialog the rest of the page
  * uses, and this holds it there.
+ *
+ * A number above zero here is an accepted defect. Add one only with the
+ * argument for it written down.
  */
 
 const BASELINE: Record<string, number> = {
-  landing: 3,
-  login: 1,
-  register: 1,
-  dashboard: 1,
-  'public profile': 1,
-  'public profile with a listing modal open': 1,
+  landing: 0,
+  login: 0,
+  register: 0,
+  dashboard: 0,
+  'public profile': 0,
+  'public profile with a listing modal open': 0,
 };
 
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const SERIOUS = ['critical', 'serious'];
+
+/**
+ * What failed, and on which element.
+ *
+ * "1 color-contrast violation" tells the next person a number and nothing they
+ * can act on — axe groups every node under one rule, so a violation can be one
+ * span or forty. US-206 spent its first twenty minutes rebuilding this by hand
+ * in a scratch script; the measured ratio and the element are what make the
+ * failure self-explanatory.
+ */
+function describe(
+  violations: Array<{
+    id: string;
+    impact?: string | null;
+    nodes: Array<{ html: string; failureSummary?: string }>;
+  }>
+): string {
+  return violations
+    .map((v) => {
+      const nodes = v.nodes
+        .slice(0, 4)
+        .map((n) => {
+          const ratio = /contrast of ([\d.]+)/.exec(n.failureSummary ?? '')?.[1];
+          return `      ${ratio ? `${ratio}:1  ` : ''}${n.html.replace(/\s+/g, ' ').slice(0, 140)}`;
+        })
+        .join('\n');
+      const more = v.nodes.length > 4 ? `\n      ... +${v.nodes.length - 4} more` : '';
+      return `  ${v.id} (${v.impact}) x${v.nodes.length}\n${nodes}${more}`;
+    })
+    .join('\n');
+}
 
 async function setupMocks(page: Page) {
   // Pre-seed cookie consent so the banner doesn't overlay/serialize into a11y noise.
@@ -177,14 +225,13 @@ test.describe('Accessibility (axe-core)', () => {
       if (blocking.length > 0) {
         console.log(
           `[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`,
-          blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+          describe(blocking)
         );
       }
       const baseline = BASELINE[name] ?? 0;
       expect(
         blocking.length,
-        `New critical/serious a11y violations on ${name} (baseline ${baseline}): ` +
-          blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+        `New critical/serious a11y violations on ${name} (baseline ${baseline}):\n${describe(blocking)}`
       ).toBeLessThanOrEqual(baseline);
     });
   }
@@ -210,14 +257,13 @@ test.describe('Accessibility (axe-core)', () => {
     if (blocking.length > 0) {
       console.log(
         `[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`,
-        blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+        describe(blocking)
       );
     }
     const baseline = BASELINE[name] ?? 0;
     expect(
       blocking.length,
-      `New critical/serious a11y violations on ${name} (baseline ${baseline}): ` +
-        blocking.map((v) => `${v.id} (${v.impact})`).join(', ')
+      `New critical/serious a11y violations on ${name} (baseline ${baseline}):\n${describe(blocking)}`
     ).toBeLessThanOrEqual(baseline);
   });
 });

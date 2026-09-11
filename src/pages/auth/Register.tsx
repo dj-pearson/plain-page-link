@@ -307,7 +307,9 @@ export default function Register() {
                     key={initials}
                     className="w-8 h-8 rounded-full border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold text-white"
                     style={{
-                      background: ['#3B82F6', '#8B5CF6', '#06B6D4', '#10B981'][i],
+                      // US-206: the 500-level shades gave white 10px bold text 2.42-4.23:1.
+                      // These are the 600/700 steps of the same hues, all >= 4.9:1.
+                      background: ['#2563EB', '#7C3AED', '#0E7490', '#047857'][i],
                     }}
                   >
                     {initials}
@@ -491,7 +493,7 @@ export default function Register() {
                     <div className="w-full border-t border-gray-200" />
                   </div>
                   <div className="relative flex justify-center text-xs">
-                    <span className="px-3 bg-white text-gray-400 uppercase tracking-wider">or</span>
+                    <span className="px-3 bg-white text-gray-500 uppercase tracking-wider">or</span>
                   </div>
                 </div>
 
@@ -555,7 +557,7 @@ export default function Register() {
                     {!errors.username && usernameTouched && isAvailable && !isChecking && (
                       <p className="mt-1 text-xs text-green-600">Username is available</p>
                     )}
-                    <p className="mt-1 text-[11px] text-gray-400">
+                    <p className="mt-1 text-[11px] text-gray-500">
                       agentbio.net/{usernameValue || 'username'}
                     </p>
                   </div>

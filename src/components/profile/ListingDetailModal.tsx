@@ -28,6 +28,7 @@ import type { PublicProfileListing } from '@/types';
 import { realEstateListingSchema } from '@/lib/structured-data';
 import { currentListingShareUrl } from '@/lib/listingShare';
 
+import { listingStatusBadgeClass } from '@/lib/listingStatus';
 interface ListingDetailModalProps {
   listing: PublicProfileListing;
   isOpen: boolean;
@@ -42,14 +43,6 @@ interface ListingDetailModalProps {
    */
   onRequestShowing?: (listing: PublicProfileListing) => void;
 }
-
-const statusColors: Record<string, string> = {
-  active: 'bg-green-500 text-white',
-  pending: 'bg-yellow-500 text-white',
-  under_contract: 'bg-orange-500 text-white',
-  sold: 'bg-blue-500 text-white',
-  draft: 'bg-gray-500 text-white',
-};
 
 const statusLabels: Record<string, string> = {
   active: 'Active',
@@ -240,7 +233,7 @@ export default function ListingDetailModal({
               <span
                 className={cn(
                   'px-2.5 py-1 rounded-full text-xs font-semibold',
-                  statusColors[listing.status ?? 'active'] || 'bg-gray-500 text-white'
+                  listingStatusBadgeClass(listing.status)
                 )}
               >
                 {statusLabels[listing.status ?? 'active'] || listing.status}

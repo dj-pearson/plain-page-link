@@ -3240,6 +3240,23 @@
       "priority": 1,
       "passes": true,
       "notes": "Found in iteration 8 by applying the same 'run it' lens to the frontend. tests/e2e (6 specs, 22 tests: auth, onboarding, public profile visibility, listing deep links, analytics, page builder) and tests/security (4 specs, 113 tests: auth, XSS, security headers, edge-function authz) were committed and no workflow had ever run them. tests/a11y ran, but under continue-on-error: true with the comment 'Warn-only initially', so it could not block a merge. 135 of 141 browser tests were never executed by CI and the other 6 could not fail. All three suites pass as they stand — e2e in 27s, a11y in 16s, security in 5.1 minutes — so nothing had to be fixed, only turned on, which is what makes this the cheap kind of gap and also the easy kind to reintroduce. The suites are hermetic: the e2e config intercepts every /rest/v1, /auth/v1 and /functions/v1 call and supplies the VITE_SUPABASE_* values the client throws without, so no database is involved. Running them locally needed PW_CHROMIUM_PATH, which all three configs already support."
+    },
+    {
+      "id": "US-206",
+      "title": "The accessibility baseline was a list of accepted defects",
+      "description": "As a visitor with low vision or a screen reader, I need the pages this platform is built to be read on to meet WCAG AA, so that an agent's listings and contact buttons are usable rather than merely present.",
+      "acceptanceCriteria": [
+        "Every BASELINE entry in tests/a11y/accessibility.spec.ts is 0",
+        "The one critical violation — an unnamed Radix combobox on the landing page — is fixed with an aria-label and a SelectValue placeholder",
+        "Colour contrast reaches 4.5:1 on the landing page, login, register, the dashboard and the public profile, including with the listing modal open",
+        "The three duplicated listing status colour maps are replaced by one field on LISTING_STATUSES, which already existed as the single source (US-107)",
+        "--muted-foreground clears 4.5:1 against --muted, not only against white",
+        "The a11y failure message names the element and its measured ratio, not just a count",
+        "6/6 a11y tests pass at baseline 0; the E2E suite still passes; tsc and the unit suite are clean"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found in iteration 9. US-205 made the a11y job blocking; the baseline it was blocking against was landing 3, login 1, register 1, dashboard 1, public profile 1, modal 1 — eight accepted violations covering roughly 35 elements, with the spec's own comment saying 'Drive these numbers down over time'. What they meant in practice: the blog category filter on the landing page is a Radix SelectTrigger that takes its accessible name from the value it displays, and SelectValue had no placeholder — with no articles loaded there is no matching item, so a screen reader announced 'button', in the empty state every first visitor sees. On the public profile, the listing status badges were white on 500-level fills (Active 2.27:1, Pending 1.9:1) and the bd/ba/sqft unit labels were gray-400 at 2.53:1. In the sticky action bar, Text and Schedule were green-600 and orange-600 — 3.30:1 and 3.56:1 — while Call, Email and Home Value were already fine, because green and orange are the two hues whose 600 step is not dark enough. The footer's legal links were blue-400 in gray-500 prose at 1.9:1 with nothing but colour marking them; they are underlined now. The three copies of the status colour map are gone: LISTING_STATUSES gains a `badge` field, and it also covers off_market, which none of the three maps had — that status rendered an unstyled badge. --muted-foreground moved from 46.9% to 43% lightness because it cleared 4.5:1 on white (4.75) but not on --muted (4.43), the tinted surface it is mostly used against."
     }
   ]
 }

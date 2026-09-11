@@ -3916,3 +3916,79 @@ NOTED — running the suites here needed PW_CHROMIUM_PATH, because the sandbox
 ships chromium-1194 and this Playwright expects 1200. All three configs already
 support that variable, which is the only reason this iteration could run them
 at all.
+
+### Iteration 9/15 — US-206: the accessibility baseline was a list of accepted defects
+
+US-205 made the a11y job blocking. This is what it was blocking against:
+
+    landing        3    login 1    register 1
+    dashboard      1    public profile 1    + listing modal 1
+
+Eight accepted violations over roughly 35 elements, with the spec's own comment
+reading "Drive these numbers down over time". Turning a warn-only job into a
+gate and leaving the baseline where it is just moves the acceptance from the
+workflow file into the test file.
+
+WHAT THE NUMBERS WERE. Every one was measured in a browser rather than reasoned
+about, by running axe directly and printing the failing nodes:
+
+  landing, button-name [CRITICAL]
+      The blog category filter is a Radix SelectTrigger. Its accessible name
+      comes from the value it is showing, and SelectValue had no placeholder —
+      so with no articles loaded there is no matching item, it renders nothing,
+      and a screen reader announces "button". That is the empty state every
+      first visitor sees.
+
+  public profile, colour contrast, 11 nodes
+      The listing status badges are white on 500-level fills: Active 2.27:1,
+      Pending 1.9:1. The bd / ba / sqft unit labels under every property were
+      gray-400 at 2.53:1. This is the page the agent's clients actually read.
+
+  sticky action bar
+      Text and Schedule were green-600 and orange-600 — 3.30:1 and 3.56:1 —
+      while Call, Email and Home Value were already above 4.5:1 on their own
+      600 shades. Green and orange are simply the two hues whose 600 step is not
+      dark enough, which is why only one of the five ever appeared in a report.
+
+  landing, colour contrast + link-in-text-block
+      White on bg-red-500 (3.76) and bg-green-500 (2.27) in the before/after
+      badges; text-red-400 on a red-500/10 wash (2.42) and text-green-400 on
+      green-500/10 (1.59) — which is the "gray text on coloured surfaces" tell
+      CLAUDE.md names, arrived at from the other direction. The footer's legal
+      links were blue-400 inside gray-500 prose at 1.9:1, distinguishable only
+      by colour; they are underlined now.
+
+  login / register
+      gray-400 on white for the "or" divider (2.53) and the username hint, and
+      white on the 500-level avatar fills at 10px bold (2.42-4.23).
+
+THE ONE THAT WAS NOT JUST A COLOUR. ListingCard, FeaturedListingsCarousel and
+ListingDetailModal each carried their own copy of the status colour map. Three
+copies is how a colour decision stops being one. src/lib/listingStatus.ts has
+been the single source since US-107 — it now carries a `badge` field and all
+three read it. It also covers off_market, which none of the three maps had, so
+that status rendered an unstyled badge: text on whatever the card's own
+background is.
+
+--muted-foreground moved from 46.9% to 43% lightness. It clears 4.5:1 on pure
+white (4.75) and fails on --muted (4.43), which is the tinted surface it is
+mostly used against — a token measured against the wrong background.
+
+A DIAGNOSTIC, not just a fix. The suite reported "1 color-contrast violation".
+axe groups every node under one rule, so a violation is one span or forty, and
+the number is not actionable. Reconstructing which elements they were took the
+first twenty minutes of this iteration in a scratch script. The failure message
+now prints the measured ratio and the element for each node, so the next person
+starts where this iteration ended.
+
+VERIFICATION
+  - 6/6 a11y tests pass with every baseline at 0. The public profile went 11
+    nodes -> 6 -> 1 -> 0 across four measured rounds; nothing was assumed.
+  - The E2E suite still passes 22/22 — these are shared components, and the
+    public-profile specs assert on them.
+  - tsc --noEmit clean; npm run test:run 94 files, 850 passed.
+  - npx impeccable detect on the changed landing, footer and action-bar files:
+    no findings.
+
+A number above zero in that BASELINE map is an accepted defect. It is documented
+as such now, so adding one takes an argument.

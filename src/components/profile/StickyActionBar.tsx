@@ -42,7 +42,13 @@ export function StickyActionBar({
     }
   };
 
-  // Define available actions based on profile
+  // Define available actions based on profile.
+  //
+  // US-206: Text and Schedule were bg-green-600 and bg-orange-600, which give
+  // white label text 3.30:1 and 3.56:1. Call, Email and Home Value were already
+  // above 4.5:1 on their 600 shades — green and orange are simply the two hues
+  // where the 600 step is not dark enough, which is why only one of the five
+  // ever showed up in a report.
   const actions = [
     profile.phone && {
       id: 'phone',
@@ -58,8 +64,8 @@ export function StickyActionBar({
         label: 'Text',
         icon: MessageSquare,
         action: () => handleAction('sms', profile.phone ?? ''),
-        color: 'bg-green-600 hover:bg-green-700',
-        mobileColor: 'bg-green-600',
+        color: 'bg-green-700 hover:bg-green-800',
+        mobileColor: 'bg-green-700',
       },
     profile.email_display && {
       id: 'email',
@@ -74,8 +80,8 @@ export function StickyActionBar({
       label: 'Schedule',
       icon: Calendar,
       action: () => handleAction('schedule'),
-      color: 'bg-orange-600 hover:bg-orange-700',
-      mobileColor: 'bg-orange-600',
+      color: 'bg-orange-700 hover:bg-orange-800',
+      mobileColor: 'bg-orange-700',
     },
     onGetHomeValue && {
       id: 'valuation',
