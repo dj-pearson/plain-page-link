@@ -24,7 +24,8 @@ export function toastSaveError(
       ? (error as { message: string }).message
       : 'Your plan limit has been reached.';
   toast.error(message, {
-    description: upgradePitch(key, planName) ?? undefined,
+    // Without the plan name a pitch could name the plan the agent is already on.
+    description: planName ? (upgradePitch(key, planName) ?? undefined) : undefined,
     action: {
       label: 'See plans',
       onClick: () => window.location.assign(UPGRADE_PATH),

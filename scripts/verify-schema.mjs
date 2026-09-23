@@ -1525,18 +1525,53 @@ check('plan limits are enforced for every metered table', () => {
     const client = attempt(`INSERT INTO public.contacts (user_id, first_name) VALUES ('${uid}', 'One too many');`);
     if (client !== 'blocked:contacts') out.push(`free plan: a 51st client was "${client}"`);
 
-    // Free: no open houses.
+    // Free: one open house a month, counted by the month it happens in.
     const openHouse = (when) =>
       `INSERT INTO public.open_houses (user_id, listing_id, starts_at, ends_at)
          VALUES ('${uid}', '00000000-dead-beef-0000-0000000f1003', ${when}, ${when} + interval '2 hours');`;
-    const freeOh = attempt(openHouse(`date_trunc('month', now()) + interval '40 days'`));
-    if (freeOh !== 'blocked:open_houses_per_month') out.push(`free plan: an open house was "${freeOh}"`);
+    const freeMonth = `date_trunc('month', now()) + interval '1 month 3 days'`;
+    const freeOh = attempt(openHouse(freeMonth));
+    if (freeOh !== 'ok') out.push(`free plan: the one open house a month was "${freeOh}"`);
+    const freeOh2 = attempt(openHouse(`${freeMonth} + interval '5 hours'`));
+    if (freeOh2 !== 'blocked:open_houses_per_month') out.push(`free plan: a 2nd open house in a month was "${freeOh2}"`);
+
+    // Free: no follow-up workflows switched on.
+    const freeWorkflow = attempt(
+      `INSERT INTO public.workflows (user_id, name, is_active) VALUES ('${uid}', 'Nurture', true);`
+    );
+    if (freeWorkflow !== 'blocked:workflows') out.push(`free plan: an active workflow was "${freeWorkflow}"`);
+
+    // Free: a custom domain is not included.
+    const freeDomain = attempt(
+      `UPDATE public.profiles SET custom_domain = 'homes.example.test' WHERE id = '${uid}';`
+    );
+    if (!freeDomain.startsWith('error:') || !/custom domain/i.test(freeDomain)) {
+      out.push(`free plan: setting a custom domain was "${freeDomain}"`);
+    }
+
+    // Free: 10 leads a month. All twelve are stored; the last two are locked.
+    q(`INSERT INTO public.leads (user_id, lead_type, name, created_at)
+         SELECT '${uid}', 'buyer', 'Lead ' || g, date_trunc('month', now()) + make_interval(mins => g)
+           FROM generate_series(1, 12) g;`);
+    const [lockedCount] = q(`
+      SELECT count(*) FROM public.locked_lead_ids('${uid}',
+        ARRAY(SELECT id FROM public.leads WHERE user_id = '${uid}'));`);
+    if (lockedCount !== '2') out.push(`free plan: ${lockedCount} of 12 leads locked; expected the 2 past the allowance`);
+    const [firstLocked] = q(`
+      SELECT count(*) FROM public.locked_lead_ids('${uid}',
+        ARRAY(SELECT id FROM public.leads WHERE user_id = '${uid}' AND name = 'Lead 1'));`);
+    if (firstLocked !== '0') out.push('free plan: the first lead of the month is locked');
 
     // Starter: five open houses a month, counted by the month they happen in.
     q(`INSERT INTO public.user_subscriptions (user_id, plan_id, status, current_period_end)
          SELECT '${uid}', id, 'active', now() + interval '20 days'
            FROM public.subscription_plans WHERE name = 'starter';`);
-    const nextMonth = `date_trunc('month', now()) + interval '1 month 3 days'`;
+    const [unlocked] = q(`
+      SELECT count(*) FROM public.locked_lead_ids('${uid}',
+        ARRAY(SELECT id FROM public.leads WHERE user_id = '${uid}'));`);
+    if (unlocked !== '0') out.push(`starter: ${unlocked} leads still locked after upgrading`);
+
+    const nextMonth = `date_trunc('month', now()) + interval '2 months 3 days'`;
     for (let n = 1; n <= 5; n++) {
       const r = attempt(openHouse(`${nextMonth} + interval '${n} hours'`));
       if (r !== 'ok') out.push(`starter: open house ${n} of 5 was refused (${r})`);
@@ -1545,6 +1580,32 @@ check('plan limits are enforced for every metered table', () => {
     if (sixth !== 'blocked:open_houses_per_month') out.push(`starter: a 6th open house in one month was "${sixth}"`);
     const otherMonth = attempt(openHouse(`${nextMonth} + interval '1 month'`));
     if (otherMonth !== 'ok') out.push(`starter: an open house the month after was "${otherMonth}"`);
+
+    // Starter: three active workflows.
+    for (let n = 1; n <= 3; n++) {
+      const r = attempt(`INSERT INTO public.workflows (user_id, name, is_active) VALUES ('${uid}', 'W${n}', true);`);
+      if (r !== 'ok') out.push(`starter: active workflow ${n} of 3 was refused (${r})`);
+    }
+    const fourthWorkflow = attempt(`INSERT INTO public.workflows (user_id, name, is_active) VALUES ('${uid}', 'W4', true);`);
+    if (fourthWorkflow !== 'blocked:workflows') out.push(`starter: a 4th active workflow was "${fourthWorkflow}"`);
+    const draftWorkflow = attempt(`INSERT INTO public.workflows (user_id, name, is_active) VALUES ('${uid}', 'Draft', false);`);
+    if (draftWorkflow !== 'ok') out.push(`starter: saving an inactive workflow at the limit was "${draftWorkflow}"`);
+
+    // Starter: ten AI descriptions a month, charged at the moment of use.
+    const [tenth] = q(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month', 10) ->> 'allowed';`);
+    if (tenth !== 'true') out.push('starter: the 10 included AI descriptions were refused');
+    const [eleventh] = q(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month') ->> 'allowed';`);
+    if (eleventh !== 'false') out.push('starter: an 11th AI description was allowed');
+    q(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month', -1);`);
+    const [refunded] = q(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month') ->> 'allowed';`);
+    if (refunded !== 'true') out.push('starter: a refunded AI description was not available again');
+    try {
+      asAgent(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month', -100);`);
+      out.push('consume_plan_quota is callable by agents; they could refund their own usage');
+    } catch {
+      /* expected: service role only */
+    }
+
     const starterListing = attempt(listing(6));
     if (starterListing !== 'ok') out.push(`starter: a 4th active listing was "${starterListing}"`);
 
@@ -1600,6 +1661,9 @@ check('plan limits are enforced for every metered table', () => {
     try {
       q(`RESET ROLE;
          DELETE FROM public.open_houses WHERE user_id = '${uid}';
+         DELETE FROM public.workflows WHERE user_id = '${uid}';
+         DELETE FROM public.feature_usage WHERE user_id = '${uid}';
+         DELETE FROM public.leads WHERE user_id = '${uid}';
          DELETE FROM public.contacts WHERE user_id = '${uid}';
          DELETE FROM public.testimonials WHERE user_id = '${uid}';
          DELETE FROM public.analytics_views WHERE user_id = '${uid}';

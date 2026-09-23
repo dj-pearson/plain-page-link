@@ -41,6 +41,9 @@ export function AddLeadToClientsButton({ lead }: { lead: Lead }) {
   });
 
   if (existing.isLoading) return null;
+  // A locked lead has no contact details to carry across; converting it now
+  // would create a client with none, which an upgrade would not fill in.
+  if (lead.contact_locked && !existing.data) return null;
 
   if (existing.data) {
     return (

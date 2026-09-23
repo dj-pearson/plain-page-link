@@ -1,3 +1,4 @@
+import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkflowBuilderStore } from '@/stores/useWorkflowBuilderStore';
@@ -123,6 +124,10 @@ export const WorkflowsListPage = () => {
           Create Workflow
         </Button>
       </div>
+
+      {/* Drafts are free; switching one on counts against the plan's
+          active-workflow allowance (20260923000003). */}
+      <PlanLimitNotice limitKey="workflows" className="mb-6" />
 
       {/* Filters */}
       <div className="flex items-center gap-4 mb-6">

@@ -7,6 +7,7 @@
  * every 30 seconds (useOpenHouseVisitors), so an agent can leave it open on a
  * phone during the event.
  */
+import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { Download, Loader2, Mail, Phone } from 'lucide-react';
@@ -183,6 +184,7 @@ export function OpenHouseVisitorsDialog({ openHouse, onOpenChange }: OpenHouseVi
                       </time>
                     )}
                   </div>
+                  {v.contact_locked && <LockedLeadDetails className="mt-1" />}
                   <div className="flex flex-wrap gap-x-4 text-sm">
                     {v.email && (
                       <a

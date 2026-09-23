@@ -338,7 +338,7 @@ export default function Pricing() {
                               <span className="text-sm">
                                 {plan.limits.open_houses_per_month === -1
                                   ? 'Unlimited open houses'
-                                  : `${plan.limits.open_houses_per_month} open houses a month`}{' '}
+                                  : `${plan.limits.open_houses_per_month} open house${plan.limits.open_houses_per_month === 1 ? '' : 's'} a month`}{' '}
                                 with sign-in kiosk
                               </span>
                             </li>

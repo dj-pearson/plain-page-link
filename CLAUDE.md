@@ -724,8 +724,21 @@ the free tools (`instagram_bio_*`, `listing_*`).
 - A refusal is `check_violation` with DETAIL `plan_limit:<key>` and a message
   written for the agent; `planLimitKeyFromError` in `src/lib/planLimits.ts`
   recognises it.
-- `leads_per_month` is deliberately **not** enforced — a visitor's enquiry is
-  never refused. It only drives a nudge.
+- `leads_per_month`: a visitor's enquiry is never refused. Leads past the
+  monthly allowance are stored but **locked** (20260923000003):
+  `locked_lead_ids()` is asked by pii-crypto (returns no email/phone,
+  `locked: true`), notify-lead (email without contact details) and submit-lead
+  (no Zapier hand-off). The dashboard blurs them (`LockedLeadDetails`).
+  Upgrading unlocks every locked lead at once.
+- Metered monthly quotas (`*_per_month` in `feature_usage`) are charged at the
+  moment of use by `consume_plan_quota(user, key, n)` — service role only, a
+  negative `n` refunds. Wired: AI listing descriptions (signed-in callers of
+  generate-listing-description) and workflow email steps. The quotas for market
+  reports, CMA reports, virtual staging, video tours and SMS exist; those
+  features do not yet — a new one must call `consume_plan_quota` before doing
+  the work.
+- Also enforced by trigger: active `workflows` (on switching one on) and
+  `profiles.custom_domain` (plan feature `customDomain`).
 - The frontend reads everything through `get_plan_usage()` (`usePlanUsage`).
   A new limit needs: a key in `subscription_plans.limits`, a branch in
   `plan_usage`, a trigger, an entry in `LIMIT_META`, and the matching number

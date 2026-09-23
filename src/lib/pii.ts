@@ -82,6 +82,8 @@ export interface DecryptedLeadContact {
   id: string;
   email: string | null;
   phone: string | null;
+  /** Past the plan's monthly lead allowance: no details were returned. */
+  locked?: boolean;
 }
 
 /**

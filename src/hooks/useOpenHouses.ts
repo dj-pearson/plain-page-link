@@ -205,6 +205,7 @@ export function useOpenHouseVisitors(openHouseId: string | null | undefined) {
         ...rest,
         email: details.get(rest.id)?.email ?? null,
         phone: details.get(rest.id)?.phone ?? null,
+        contact_locked: details.get(rest.id)?.locked === true,
       }));
     },
     enabled: !!user?.id && !!openHouseId,

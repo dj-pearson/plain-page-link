@@ -46,7 +46,7 @@ UPDATE public.subscription_plans p
        features = p.features || v.features,
        updated_at = now()
   FROM (VALUES
-    ('free',         '{"contacts": 50,   "open_houses_per_month": 0}'::jsonb,  '{"openHouseManagement": false}'::jsonb),
+    ('free',         '{"contacts": 50,   "open_houses_per_month": 1}'::jsonb,  '{"openHouseManagement": true}'::jsonb),
     ('starter',      '{"contacts": 500,  "open_houses_per_month": 5}'::jsonb,  '{"openHouseManagement": true}'::jsonb),
     ('professional', '{"contacts": 2500, "open_houses_per_month": 15}'::jsonb, '{"openHouseManagement": true}'::jsonb),
     ('team',         '{"contacts": -1,   "open_houses_per_month": -1}'::jsonb, '{"openHouseManagement": true}'::jsonb),

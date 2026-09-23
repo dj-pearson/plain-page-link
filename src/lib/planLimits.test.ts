@@ -42,6 +42,7 @@ describe('nextPlanFor', () => {
       plan: { id: 'starter' },
       limit: 5,
     });
+    expect(describeLimit('open_houses_per_month', 1)).toBe('1 open house a month');
     expect(nextPlanFor('links', 'starter')).toMatchObject({
       plan: { id: 'professional' },
       limit: -1,
@@ -120,6 +121,43 @@ describe('the enforcement migration matches the pricing config', () => {
       expect(Number(row![2])).toBe(plan.limits.contacts);
       expect(Number(row![3])).toBe(plan.limits.openHousesPerMonth);
       expect(row![4] === 'true').toBe(plan.features.openHouseManagement);
+    });
+  }
+});
+
+/** Same guard for the quotas 20260923000003 adds. */
+describe('the quota migration matches the pricing config', () => {
+  const sql = readFileSync(
+    join(process.cwd(), 'supabase/migrations/20260923000003_plan_quotas_and_lead_allowance.sql'),
+    'utf8'
+  );
+  const rows = new Map<string, Record<string, number>>();
+  for (const m of sql.matchAll(/\('(\w+)',\s*'(\{"workflows"[^']*\})'::jsonb\)/g)) {
+    rows.set(m[1], JSON.parse(m[2]) as Record<string, number>);
+  }
+
+  it('parses a row for every plan', () => {
+    expect([...rows.keys()].sort()).toEqual(PRICING_PLANS.map((p) => p.id).sort());
+  });
+
+  const pairs: [string, keyof (typeof PRICING_PLANS)[number]['limits']][] = [
+    ['workflows', 'followUpSequences'],
+    ['ai_listing_descriptions_per_month', 'aiListingDescriptions'],
+    ['emails_per_month', 'emailsPerMonth'],
+    ['sms_per_month', 'smsPerMonth'],
+    ['market_reports_per_month', 'marketReports'],
+    ['cma_reports_per_month', 'cmaReports'],
+    ['virtual_staging_photos_per_month', 'virtualStagingPhotos'],
+    ['video_tours_per_month', 'videoTours'],
+  ];
+
+  for (const plan of PRICING_PLANS) {
+    it(`${plan.id}: every quota agrees with the pricing page`, () => {
+      const row = rows.get(plan.id);
+      expect(row, plan.id).toBeDefined();
+      for (const [dbKey, configKey] of pairs) {
+        expect(row![dbKey], `${plan.id}.${dbKey}`).toBe(plan.limits[configKey]);
+      }
     });
   }
 });

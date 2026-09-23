@@ -44,11 +44,15 @@ export function PlanLimitNotice({ limitKey, className }: PlanLimitNoticeProps) {
       : !enforced && s.level === 'over'
         ? `${s.used} ${label} this month — more than the ${s.limit} your plan includes`
         : blocking
-          ? `You've used all ${s.limit} ${label}${monthly ? ' for this month' : ''}`
+          ? s.limit === 1
+            ? `You've used your ${LIMIT_META[limitKey].singular ?? label}${monthly ? ' for this month' : ''}`
+            : `You've used all ${s.limit} ${label}${monthly ? ' for this month' : ''}`
           : `${s.used} of ${describeLimit(limitKey, s.limit)} used`;
 
   const detail = !enforced
-    ? 'Every lead is still delivered. Upgrading keeps you inside your plan as you grow.'
+    ? s.level === 'over'
+      ? `Every lead is still saved, but the ${s.used - s.limit} past your allowance show their contact details only after you upgrade.`
+      : 'Every lead is still saved. Past the allowance, contact details stay locked until you upgrade or the month turns.'
     : blocking
       ? monthly
         ? 'You can add more next month, or upgrade now.'

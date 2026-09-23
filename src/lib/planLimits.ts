@@ -20,11 +20,21 @@ export type PlanLimitKey =
   | 'contacts'
   | 'open_houses_per_month'
   | 'leads_per_month'
-  | 'analytics_days';
+  | 'analytics_days'
+  | 'workflows'
+  | 'ai_listing_descriptions_per_month'
+  | 'emails_per_month'
+  | 'sms_per_month'
+  | 'market_reports_per_month'
+  | 'cma_reports_per_month'
+  | 'virtual_staging_photos_per_month'
+  | 'video_tours_per_month';
 
 interface LimitMeta {
   /** Plural noun: "active listings". */
   label: string;
+  /** Singular noun, for a limit of 1: "open house". Defaults to label. */
+  singular?: string;
   /** Resets each calendar month. */
   monthly: boolean;
   /** Blocked in the database at the limit, or only nudged. */
@@ -51,18 +61,78 @@ export const LIMIT_META: Record<PlanLimitKey, LimitMeta> = {
   contacts: { label: 'clients', monthly: false, enforced: true, configKey: 'contacts' },
   open_houses_per_month: {
     label: 'open houses',
+    singular: 'open house',
     monthly: true,
     enforced: true,
     configKey: 'openHousesPerMonth',
   },
-  // Leads are never refused — a visitor's enquiry always lands. The limit
-  // drives a nudge, not a block.
+  // Leads are never refused — a visitor's enquiry always lands. Past the
+  // allowance their contact details stay locked (pii-crypto will not open
+  // them) until the agent upgrades; `enforced: false` means "not refused".
   leads_per_month: { label: 'leads', monthly: true, enforced: false, configKey: 'leadsPerMonth' },
   analytics_days: {
     label: 'days of analytics',
     monthly: false,
     enforced: true,
     configKey: 'analyticsRetentionDays',
+  },
+  workflows: {
+    label: 'active follow-up workflows',
+    singular: 'active follow-up workflow',
+    monthly: false,
+    enforced: true,
+    configKey: 'followUpSequences',
+  },
+  // Charged at the moment of use by the edge function doing the work
+  // (consume_plan_quota, 20260923000003).
+  ai_listing_descriptions_per_month: {
+    label: 'AI listing descriptions',
+    singular: 'AI listing description',
+    monthly: true,
+    enforced: true,
+    configKey: 'aiListingDescriptions',
+  },
+  emails_per_month: {
+    label: 'automated emails',
+    singular: 'automated email',
+    monthly: true,
+    enforced: true,
+    configKey: 'emailsPerMonth',
+  },
+  sms_per_month: {
+    label: 'automated texts',
+    singular: 'automated text',
+    monthly: true,
+    enforced: true,
+    configKey: 'smsPerMonth',
+  },
+  market_reports_per_month: {
+    label: 'market reports',
+    singular: 'market report',
+    monthly: true,
+    enforced: true,
+    configKey: 'marketReports',
+  },
+  cma_reports_per_month: {
+    label: 'CMA reports',
+    singular: 'CMA report',
+    monthly: true,
+    enforced: true,
+    configKey: 'cmaReports',
+  },
+  virtual_staging_photos_per_month: {
+    label: 'virtually staged photos',
+    singular: 'virtually staged photo',
+    monthly: true,
+    enforced: true,
+    configKey: 'virtualStagingPhotos',
+  },
+  video_tours_per_month: {
+    label: 'video tours',
+    singular: 'video tour',
+    monthly: true,
+    enforced: true,
+    configKey: 'videoTours',
   },
 };
 
@@ -75,6 +145,9 @@ export const METERED_KEYS: PlanLimitKey[] = [
   'links',
   'testimonials',
   'sold_properties',
+  'workflows',
+  'ai_listing_descriptions_per_month',
+  'emails_per_month',
 ];
 
 /** The share of a limit at which the dashboard starts nudging. */
@@ -127,12 +200,13 @@ export function shouldNudge(status: LimitStatus): boolean {
 
 /** "10 active listings", "Unlimited clients", "5 open houses a month". */
 export function describeLimit(key: PlanLimitKey, limit: number): string {
-  const { label, monthly } = LIMIT_META[key];
+  const { label, singular, monthly } = LIMIT_META[key];
   if (key === 'analytics_days') {
     return limit === -1 ? 'Unlimited analytics history' : `${limit} days of analytics`;
   }
   if (limit === -1) return `Unlimited ${label}`;
-  return `${limit.toLocaleString()} ${label}${monthly ? ' a month' : ''}`;
+  const noun = limit === 1 && singular ? singular : label;
+  return `${limit.toLocaleString()} ${noun}${monthly ? ' a month' : ''}`;
 }
 
 /** The plan's own tier, from get_plan_usage's plan_name. Unknown → free. */

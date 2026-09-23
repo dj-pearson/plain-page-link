@@ -34,6 +34,12 @@ export type LeadRow = Database['public']['Tables']['leads']['Row'];
 export type Lead = Omit<LeadRow, 'encrypted_email' | 'encrypted_phone'> & {
   email: string | null;
   phone: string | null;
+  /**
+   * Past the plan's monthly lead allowance (20260923000003). pii-crypto
+   * returned no email or phone for it; the UI blurs the lead's details and
+   * offers the upgrade that unlocks them.
+   */
+  contact_locked?: boolean;
 };
 
 // Legacy Lead type for compatibility

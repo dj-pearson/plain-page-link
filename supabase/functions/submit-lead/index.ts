@@ -199,8 +199,17 @@ serve(async (req) => {
     const agentName = agentContact?.fullName || 'Your Real Estate Agent'
     const zapierWebhookUrl = agentContact?.zapierWebhookUrl
 
+    // A lead past the agent's monthly allowance is stored but its contact
+    // details are not handed on (20260923000003). Zapier would otherwise be a
+    // way round the lock — it receives the plaintext.
+    const { data: lockedIds } = await supabase.rpc('locked_lead_ids', {
+      _user_id: leadData.user_id,
+      _lead_ids: [lead.id],
+    })
+    const leadLocked = Array.isArray(lockedIds) && lockedIds.includes(lead.id)
+
     // Send lead to Zapier webhook if configured
-    if (zapierWebhookUrl) {
+    if (zapierWebhookUrl && !leadLocked) {
       try {
         const zapierPayload = {
           lead_id: lead.id,

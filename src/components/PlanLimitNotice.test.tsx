@@ -54,16 +54,24 @@ describe('PlanLimitNotice', () => {
     );
   });
 
-  it('tells a free agent open houses start on a paid plan', () => {
+  it('tells an agent when a feature is not in their plan at all', () => {
     usage.used = { open_houses_per_month: [0, 0] };
     renderNotice('open_houses_per_month');
     expect(screen.getByText("Open houses aren't included in the Free plan")).toBeInTheDocument();
   });
 
-  it('never implies a lead was lost', () => {
+  it('counts the one free open house a month', () => {
+    usage.used = { open_houses_per_month: [1, 1] };
+    renderNotice('open_houses_per_month');
+    expect(screen.getByText("You've used your open house for this month")).toBeInTheDocument();
+  });
+
+  it('says the leads are saved and how many are locked', () => {
     usage.used = { leads_per_month: [14, 10] };
     renderNotice('leads_per_month');
-    expect(screen.getByText(/Every lead is still delivered/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Every lead is still saved, but the 4 past your allowance/)
+    ).toBeInTheDocument();
   });
 
   it('has nothing to sell on the top tier', () => {

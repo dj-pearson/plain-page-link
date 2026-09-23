@@ -96,7 +96,7 @@ export const PRICING_PLANS: PricingTier[] = [
       virtualStaging: false,
       predictiveAnalytics: false,
       videoTours: false,
-      openHouseManagement: false,
+      openHouseManagement: true, // one a month, to try the sign-in kiosk
       mortgageCalculator: true, // Free tool
       cmaGenerator: false,
     },
@@ -113,7 +113,7 @@ export const PRICING_PLANS: PricingTier[] = [
       followUpSequences: 0,
       emailsPerMonth: 0,
       smsPerMonth: 0,
-      openHousesPerMonth: 0,
+      openHousesPerMonth: 1,
       contacts: 50,
       analyticsRetentionDays: 30,
       leadsPerMonth: 10,

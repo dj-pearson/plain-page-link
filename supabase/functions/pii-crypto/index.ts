@@ -203,12 +203,37 @@ export default async (req: Request) => {
         }
       };
 
+      // Leads past the plan's monthly allowance are captured but not opened
+      // (20260923000003): their contact details stay sealed until the agent
+      // upgrades or the month turns. This is the gate — the dashboard only
+      // draws the blur. Contacts are the agent's own entries and never lock.
+      let locked = new Set<string>();
+      if (op === 'decrypt_leads' && (rows ?? []).length > 0) {
+        const { data: lockedIds, error: lockError } = await supabase.rpc('locked_lead_ids', {
+          _user_id: user.id,
+          _lead_ids: (rows ?? []).map((row) => row.id as string),
+        });
+        if (lockError) {
+          // Fail open: a transient database error must not blank every lead
+          // an agent has. The allowance is a paywall, not a security boundary.
+          console.error('[pii-crypto] locked_lead_ids failed; returning details unlocked', lockError);
+        } else {
+          locked = new Set((lockedIds ?? []) as string[]);
+        }
+      }
+
       const decrypted = await Promise.all(
-        (rows ?? []).map(async (row) => ({
-          id: row.id as string,
-          email: await decryptOne(row.encrypted_email as string | null),
-          phone: await decryptOne(row.encrypted_phone as string | null),
-        }))
+        (rows ?? []).map(async (row) => {
+          const id = row.id as string;
+          if (locked.has(id)) {
+            return { id, email: null, phone: null, locked: true };
+          }
+          return {
+            id,
+            email: await decryptOne(row.encrypted_email as string | null),
+            phone: await decryptOne(row.encrypted_phone as string | null),
+          };
+        })
       );
 
       // Ids the caller does not own are simply absent from the result. The

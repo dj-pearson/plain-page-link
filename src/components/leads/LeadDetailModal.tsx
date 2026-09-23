@@ -56,6 +56,7 @@ import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
 import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButton';
+import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
 
 /**
  * Lead plus the one field the modal shows that is not a column.
@@ -340,7 +341,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
             </div>
           </div>
 
-          {nextStep && (
+          {nextStep && !lead.contact_locked && (
             <div className="mt-3 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium uppercase tracking-wide text-primary">
@@ -443,43 +444,47 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
             <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
               Contact Information
             </h3>
-            <div className="space-y-2">
-              <a
-                href={`mailto:${lead.email}`}
-                onClick={() => void handleContactAction('email')}
-                className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
-              >
-                <Mail className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                <span className="flex-1 text-sm">{lead.email}</span>
-                <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
-              {lead.phone && (
+            {lead.contact_locked ? (
+              <LockedLeadDetails />
+            ) : (
+              <div className="space-y-2">
                 <a
-                  href={`tel:${lead.phone}`}
-                  onClick={() => void handleContactAction('call')}
+                  href={`mailto:${lead.email}`}
+                  onClick={() => void handleContactAction('email')}
                   className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
                 >
-                  <Phone className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span className="flex-1 text-sm">{lead.phone}</span>
-                  <Phone className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
-              )}
-              {lead.phone && (
-                <a
-                  href={`sms:${lead.phone}`}
-                  onClick={() => void handleContactAction('sms')}
-                  className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
-                >
-                  <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span className="flex-1 text-sm">Send SMS</span>
+                  <Mail className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span className="flex-1 text-sm">{lead.email}</span>
                   <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                 </a>
-              )}
-            </div>
+                {lead.phone && (
+                  <a
+                    href={`tel:${lead.phone}`}
+                    onClick={() => void handleContactAction('call')}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
+                  >
+                    <Phone className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                    <span className="flex-1 text-sm">{lead.phone}</span>
+                    <Phone className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                )}
+                {lead.phone && (
+                  <a
+                    href={`sms:${lead.phone}`}
+                    onClick={() => void handleContactAction('sms')}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
+                  >
+                    <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                    <span className="flex-1 text-sm">Send SMS</span>
+                    <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Message */}
-          {lead.message && (
+          {lead.message && !lead.contact_locked && (
             <div className="space-y-2">
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
                 Message

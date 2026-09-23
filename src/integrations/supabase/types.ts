@@ -9055,6 +9055,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      consume_plan_quota: {
+        Args: { _count?: number; _key: string; _user_id: string };
+        Returns: Json;
+      };
       decrement_profile_leads: {
         Args: { _profile_id: string };
         Returns: undefined;
@@ -9213,6 +9217,10 @@ export type Database = {
       list_public_open_houses: {
         Args: { _user_id: string };
         Returns: Record<string, unknown>[];
+      };
+      locked_lead_ids: {
+        Args: { _lead_ids: string[]; _user_id: string };
+        Returns: string[];
       };
       log_admin_action: {
         Args: {

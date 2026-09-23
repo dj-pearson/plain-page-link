@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Sparkles, ArrowLeft, FileText, TrendingUp, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastSaveError } from '@/lib/planLimitToast';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { edgeFunctions } from '@/lib/edgeFunctions';
@@ -127,7 +128,8 @@ export default function ListingDescriptionGenerator() {
       toast.success('Descriptions generated successfully!');
     } catch (error) {
       logger.error('Generation error', error as Error);
-      toast.error('Failed to generate descriptions. Please try again.');
+      // Signed-in agents are metered against their plan (20260923000003).
+      toastSaveError(error, 'Failed to generate descriptions. Please try again.');
       setCurrentStep('form');
     }
   };
