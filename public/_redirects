@@ -65,6 +65,10 @@
 # Page-builder pages, one per tenant row.
 /p/*            /index.html 200
 
+# The open house sign-in kiosk (/open-house/<id>). Never prerendered: every id
+# is a different event, and the page is noindex.
+/open-house/*   /index.html 200
+
 # A public profile: /:username, and its review form. One path segment, which is
 # indistinguishable from a typo without a database lookup — so this rule keeps
 # every single-segment URL answering 200, and functions/[username].ts is what

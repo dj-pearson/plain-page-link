@@ -38,13 +38,15 @@ describe('dashboard navigation', () => {
     expect(routes.length).toBeGreaterThan(10);
   });
 
-  it('offers seven primary destinations, in the order the story sets', () => {
+  it('offers nine primary destinations, in the order the story sets', () => {
     expect(PRIMARY_NAV.map((item) => item.label)).toEqual([
       'Overview',
       'Profile',
       'Links',
       'Listings',
+      'Open Houses',
       'Leads',
+      'Clients',
       'Analytics',
       'Settings',
     ]);

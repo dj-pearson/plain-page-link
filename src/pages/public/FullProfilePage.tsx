@@ -20,6 +20,7 @@ import { HomeValuationForm } from '@/components/forms/HomeValuationForm';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
+import { UpcomingOpenHouses } from '@/components/profile/UpcomingOpenHouses';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
 import { trackContactTap } from '@/lib/analyticsEvents';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
@@ -534,6 +535,19 @@ export default function FullProfilePage() {
                   onListingClick={(listing) => setSelectedListing(listing)}
                 />
               </section>
+            )}
+
+            {/* Upcoming open houses. Renders nothing when there are none. */}
+            {settings?.show_listings !== false && (
+              <UpcomingOpenHouses
+                agentId={profile.id}
+                agentName={profile.full_name || profile.username}
+                profileUrl={currentUrl}
+                onViewListing={(listingId) => {
+                  const listing = activeListings.find((l) => l.id === listingId);
+                  if (listing) setSelectedListing(listing);
+                }}
+              />
             )}
 
             {/* Lead Capture CTAs */}

@@ -23,6 +23,7 @@ import NotFound from './pages/public/NotFound';
 
 // Lazy load public review page
 const SubmitReview = lazy(() => import('./pages/public/SubmitReview'));
+const OpenHouseSignIn = lazy(() => import('./pages/public/OpenHouseSignIn'));
 
 /**
  * Auth pages, lazy like every other route (US-195).
@@ -96,6 +97,8 @@ const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout')
 const Overview = lazy(() => import('./pages/dashboard/Overview'));
 const Listings = lazy(() => import('./pages/dashboard/Listings'));
 const Leads = lazy(() => import('./pages/dashboard/Leads'));
+const Clients = lazy(() => import('./pages/dashboard/Clients'));
+const OpenHouses = lazy(() => import('./pages/dashboard/OpenHouses'));
 const Profile = lazy(() => import('./pages/dashboard/Profile'));
 const Theme = lazy(() => import('./pages/dashboard/Theme'));
 const Links = lazy(() => import('./pages/dashboard/Links'));
@@ -322,6 +325,8 @@ function App() {
 
               {/* User profiles. Last, so a real route always wins over the
                   username catch-all. */}
+              {/* Open house sign-in kiosk. Before the username catch-all. */}
+              <Route path="/open-house/:openHouseId" element={<OpenHouseSignIn />} />
               <Route path="/:username/review" element={<SubmitReview />} />
               <Route path="/:slug" element={<ProfilePage />} />
             </Route>
@@ -356,6 +361,8 @@ function App() {
                 <Route path="listings" element={<Listings />} />
                 <Route path="quick-actions" element={<QuickActionsDashboard />} />
                 <Route path="leads" element={<Leads />} />
+                <Route path="clients" element={<Clients />} />
+                <Route path="open-houses" element={<OpenHouses />} />
                 <Route path="page-builder" element={<PageBuilderEditor />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="theme" element={<Theme />} />

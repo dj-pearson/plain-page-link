@@ -7,12 +7,16 @@
  * own billing. The sidebar carried fifteen entries for a link-in-bio product
  * aimed at people who are not technical.
  *
- * Seven primary destinations, and everything else reachable from Settings.
+ * Nine primary destinations, and everything else reachable from Settings.
+ * Open Houses and Clients joined the original seven when the product grew from
+ * a link-in-bio page into the thing a solo agent runs their business from.
  * Both navs render from this file, and a test asserts they cover the same set.
  */
 import {
   BarChart3,
   Building2,
+  DoorOpen,
+  HeartHandshake,
   CreditCard,
   FileText,
   KeyRound,
@@ -38,16 +42,18 @@ export interface NavDestination {
 }
 
 /**
- * The dashboard's own navigation. Seven entries, in the order an agent works:
- * see the numbers, edit who they are, then the things on their page, then the
- * people it produced.
+ * The dashboard's own navigation, in the order an agent works: see the day,
+ * edit who they are, then the things on their page and the events around
+ * them, then the people — new leads, and the clients they became.
  */
 export const PRIMARY_NAV: NavDestination[] = [
   { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Profile', href: '/dashboard/profile', icon: User },
   { label: 'Links', href: '/dashboard/links', icon: LinkIcon },
   { label: 'Listings', href: '/dashboard/listings', icon: Building2 },
+  { label: 'Open Houses', href: '/dashboard/open-houses', icon: DoorOpen },
   { label: 'Leads', href: '/dashboard/leads', icon: Users },
+  { label: 'Clients', href: '/dashboard/clients', icon: HeartHandshake },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
