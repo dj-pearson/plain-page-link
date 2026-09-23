@@ -22,6 +22,11 @@ interface ExportData {
   settings: Record<string, unknown> | null;
   listings: unknown[];
   leads: unknown[];
+  /** The agent's client sphere, with contact details decrypted like leads. */
+  contacts: unknown[];
+  contactKeyDates: unknown[];
+  contactInteractions: unknown[];
+  openHouses: unknown[];
   testimonials: unknown[];
   links: unknown[];
   blogPosts: unknown[];
@@ -139,6 +144,10 @@ serve(async (req: Request) => {
         mfaSettingsResult,
         auditLogsResult,
         gdprRequestsResult,
+        contactsResult,
+        contactKeyDatesResult,
+        contactInteractionsResult,
+        openHousesResult,
       ] = await Promise.all([
         serviceSupabase.from('profiles').select('*').eq('id', user.id).single(),
         serviceSupabase.from('user_settings').select('*').eq('user_id', user.id).single(),
@@ -158,6 +167,10 @@ serve(async (req: Request) => {
         serviceSupabase.from('user_mfa_settings').select('id, mfa_enabled, mfa_method, verified_at, created_at').eq('user_id', user.id).single(),
         serviceSupabase.from('audit_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(500),
         serviceSupabase.from('gdpr_data_requests').select('*').eq('user_id', user.id),
+        serviceSupabase.from('contacts').select('*').eq('user_id', user.id),
+        serviceSupabase.from('contact_key_dates').select('*').eq('user_id', user.id),
+        serviceSupabase.from('contact_interactions').select('*').eq('user_id', user.id),
+        serviceSupabase.from('open_houses').select('*').eq('user_id', user.id),
       ]);
 
       // Decrypt the lead PII for the subject's own copy. encrypted_* are the
@@ -167,6 +180,17 @@ serve(async (req: Request) => {
       const decryptedLeads = await Promise.all(
         (leadsResult.data || []).map(async (lead) => {
           const { encrypted_phone, encrypted_email, ...rest } = lead as Record<string, unknown>;
+          const [email, phone] = await Promise.all([
+            decryptSecret(encrypted_email as string | null),
+            decryptSecret(encrypted_phone as string | null),
+          ]);
+          return { ...rest, email: email ?? null, phone: phone ?? null };
+        })
+      );
+
+      const decryptedContacts = await Promise.all(
+        (contactsResult.data || []).map(async (contact) => {
+          const { encrypted_phone, encrypted_email, ...rest } = contact as Record<string, unknown>;
           const [email, phone] = await Promise.all([
             decryptSecret(encrypted_email as string | null),
             decryptSecret(encrypted_phone as string | null),
@@ -193,6 +217,10 @@ serve(async (req: Request) => {
         // stripping them — a subject access request that returned ciphertext
         // would not be an export at all.
         leads: decryptedLeads,
+        contacts: decryptedContacts,
+        contactKeyDates: contactKeyDatesResult.data || [],
+        contactInteractions: contactInteractionsResult.data || [],
+        openHouses: openHousesResult.data || [],
         testimonials: testimonialsResult.data || [],
         links: linksResult.data || [],
         blogPosts: blogPostsResult.data || [],

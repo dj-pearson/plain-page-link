@@ -877,6 +877,216 @@ export type Database = {
           },
         ];
       };
+      contact_interactions: {
+        Row: {
+          contact_id: string;
+          created_at: string;
+          id: string;
+          kind: string;
+          occurred_at: string;
+          summary: string | null;
+          user_id: string;
+        };
+        Insert: {
+          contact_id: string;
+          created_at?: string;
+          id?: string;
+          kind: string;
+          occurred_at?: string;
+          summary?: string | null;
+          user_id: string;
+        };
+        Update: {
+          contact_id?: string;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          occurred_at?: string;
+          summary?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'contact_interactions_contact_id_fkey';
+            columns: ['contact_id'];
+            isOneToOne: false;
+            referencedRelation: 'contacts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'contact_interactions_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      contact_key_dates: {
+        Row: {
+          contact_id: string;
+          created_at: string;
+          event_date: string;
+          id: string;
+          kind: string;
+          label: string;
+          notes: string | null;
+          person_name: string | null;
+          recurs_annually: boolean;
+          remind_days_before: number;
+          updated_at: string;
+          user_id: string;
+          year_known: boolean;
+        };
+        Insert: {
+          contact_id: string;
+          created_at?: string;
+          event_date: string;
+          id?: string;
+          kind?: string;
+          label: string;
+          notes?: string | null;
+          person_name?: string | null;
+          recurs_annually?: boolean;
+          remind_days_before?: number;
+          updated_at?: string;
+          user_id: string;
+          year_known?: boolean;
+        };
+        Update: {
+          contact_id?: string;
+          created_at?: string;
+          event_date?: string;
+          id?: string;
+          kind?: string;
+          label?: string;
+          notes?: string | null;
+          person_name?: string | null;
+          recurs_annually?: boolean;
+          remind_days_before?: number;
+          updated_at?: string;
+          user_id?: string;
+          year_known?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'contact_key_dates_contact_id_fkey';
+            columns: ['contact_id'];
+            isOneToOne: false;
+            referencedRelation: 'contacts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'contact_key_dates_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      contacts: {
+        Row: {
+          address: string | null;
+          city: string | null;
+          created_at: string;
+          employer: string | null;
+          encrypted_email: string | null;
+          encrypted_phone: string | null;
+          first_name: string;
+          household: Json;
+          id: string;
+          interests: string[];
+          last_contacted_at: string | null;
+          last_name: string | null;
+          lead_id: string | null;
+          next_touch_at: string | null;
+          notes: string | null;
+          occupation: string | null;
+          preferred_contact: string | null;
+          referred_by: string | null;
+          relationship: string;
+          source: string | null;
+          state: string | null;
+          tags: string[];
+          touch_frequency_days: number | null;
+          updated_at: string;
+          user_id: string;
+          zip_code: string | null;
+        };
+        Insert: {
+          address?: string | null;
+          city?: string | null;
+          created_at?: string;
+          employer?: string | null;
+          encrypted_email?: string | null;
+          encrypted_phone?: string | null;
+          first_name: string;
+          household?: Json;
+          id?: string;
+          interests?: string[];
+          last_contacted_at?: string | null;
+          last_name?: string | null;
+          lead_id?: string | null;
+          next_touch_at?: string | null;
+          notes?: string | null;
+          occupation?: string | null;
+          preferred_contact?: string | null;
+          referred_by?: string | null;
+          relationship?: string;
+          source?: string | null;
+          state?: string | null;
+          tags?: string[];
+          touch_frequency_days?: number | null;
+          updated_at?: string;
+          user_id: string;
+          zip_code?: string | null;
+        };
+        Update: {
+          address?: string | null;
+          city?: string | null;
+          created_at?: string;
+          employer?: string | null;
+          encrypted_email?: string | null;
+          encrypted_phone?: string | null;
+          first_name?: string;
+          household?: Json;
+          id?: string;
+          interests?: string[];
+          last_contacted_at?: string | null;
+          last_name?: string | null;
+          lead_id?: string | null;
+          next_touch_at?: string | null;
+          notes?: string | null;
+          occupation?: string | null;
+          preferred_contact?: string | null;
+          referred_by?: string | null;
+          relationship?: string;
+          source?: string | null;
+          state?: string | null;
+          tags?: string[];
+          touch_frequency_days?: number | null;
+          updated_at?: string;
+          user_id?: string;
+          zip_code?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'contacts_lead_id_fkey';
+            columns: ['lead_id'];
+            isOneToOne: false;
+            referencedRelation: 'leads';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'contacts_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       content_suggestions: {
         Row: {
           category: string | null;
@@ -2441,6 +2651,7 @@ export type Database = {
           message: string | null;
           name: string;
           notes: string | null;
+          open_house_id: string | null;
           preapproved: boolean | null;
           price_range: string | null;
           property_address: string | null;
@@ -2471,6 +2682,7 @@ export type Database = {
           message?: string | null;
           name: string;
           notes?: string | null;
+          open_house_id?: string | null;
           preapproved?: boolean | null;
           price_range?: string | null;
           property_address?: string | null;
@@ -2501,6 +2713,7 @@ export type Database = {
           message?: string | null;
           name?: string;
           notes?: string | null;
+          open_house_id?: string | null;
           preapproved?: boolean | null;
           price_range?: string | null;
           property_address?: string | null;
@@ -2527,6 +2740,13 @@ export type Database = {
             columns: ['listing_id'];
             isOneToOne: false;
             referencedRelation: 'listings';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'leads_open_house_id_fkey';
+            columns: ['open_house_id'];
+            isOneToOne: false;
+            referencedRelation: 'open_houses';
             referencedColumns: ['id'];
           },
           {
@@ -3364,6 +3584,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'notifications_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      open_houses: {
+        Row: {
+          created_at: string;
+          ends_at: string;
+          id: string;
+          is_public: boolean;
+          listing_id: string;
+          private_notes: string | null;
+          public_notes: string | null;
+          starts_at: string;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          ends_at: string;
+          id?: string;
+          is_public?: boolean;
+          listing_id: string;
+          private_notes?: string | null;
+          public_notes?: string | null;
+          starts_at: string;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          ends_at?: string;
+          id?: string;
+          is_public?: boolean;
+          listing_id?: string;
+          private_notes?: string | null;
+          public_notes?: string | null;
+          starts_at?: string;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'open_houses_listing_id_fkey';
+            columns: ['listing_id'];
+            isOneToOne: false;
+            referencedRelation: 'listings';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'open_houses_user_id_fkey';
             columns: ['user_id'];
             isOneToOne: false;
             referencedRelation: 'users';
@@ -8854,6 +9131,10 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: Record<string, unknown>[];
       };
+      get_public_open_house: {
+        Args: { _open_house_id: string };
+        Returns: Record<string, unknown>[];
+      };
       get_scheduled_workflows: {
         Args: { p_limit?: number };
         Returns: Record<string, unknown>[];
@@ -8919,6 +9200,10 @@ export type Database = {
       is_team_member: {
         Args: { p_team_id: string; p_user_id: string };
         Returns: boolean;
+      };
+      list_public_open_houses: {
+        Args: { _user_id: string };
+        Returns: Record<string, unknown>[];
       };
       log_admin_action: {
         Args: {

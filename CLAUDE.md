@@ -240,6 +240,7 @@ plain-page-link/
 - `/auth/*` - Authentication flows
 - `/dashboard/*` - Protected dashboard routes
 - `/:username` - Public user profiles
+- `/open-house/:openHouseId` - Public open house sign-in kiosk
 - `/blog/*` - Blog and content
 - `/features/*` - Feature showcase pages
 - `/for/*` - Location-specific landing pages
@@ -642,6 +643,32 @@ created_at, updated_at
 `SECURITY DEFINER` function. There is deliberately no UPDATE policy on `links`
 for anonymous visitors — the one that used to exist let any visitor rewrite any
 profile's link targets. Do not add one back.
+
+**contacts** — the agent's client sphere (past clients, active buyers/sellers,
+referral partners). Email and phone are ciphertext, like `leads`; decrypt with
+pii-crypto's `decrypt_contacts` op (`decryptContactDetails` in `src/lib/pii.ts`).
+```
+id, user_id (NOT NULL), lead_id (the lead it came from), first_name (NOT NULL), last_name
+encrypted_email, encrypted_phone, relationship (NOT NULL, checked list), preferred_contact
+address, city, state, zip_code, occupation, employer, referred_by, source
+household (jsonb array of {name, relation, notes}), interests / tags (text[]), notes
+touch_frequency_days (int), last_contacted_at, next_touch_at (trigger-derived; do not write)
+created_at, updated_at
+```
+**contact_key_dates** — birthdays, anniversaries, closing/move-in dates, parties.
+`event_date` is a `date`; when `year_known` is false its year is a placeholder
+(2000). Upcoming dates are computed client-side by `src/lib/keyDates.ts`.
+**contact_interactions** — the touch log. An insert (any kind but `note`)
+moves `contacts.last_contacted_at` forward via trigger.
+
+**open_houses** — per listing: `starts_at`, `ends_at`, `status`
+('scheduled' | 'completed' | 'cancelled'), `is_public`, `public_notes`,
+`private_notes`. There is deliberately **no public SELECT policy**:
+`private_notes` holds lockbox codes. Visitors read through
+`list_public_open_houses(_user_id)` and `get_public_open_house(_open_house_id)`.
+Kiosk sign-ins are leads (`lead_type = 'open_house'`, `leads.open_house_id`)
+submitted through `submit-lead`. `listings.open_house_date` /
+`open_house_end_date` are superseded and no longer written.
 
 **articles** — the blog. This is the table; `blog_posts` does not exist.
 ```

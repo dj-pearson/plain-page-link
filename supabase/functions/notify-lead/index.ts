@@ -124,7 +124,9 @@ serve(async (req) => {
           ? 'selling a property'
           : lead.lead_type === 'buyer'
             ? 'buying a home'
-            : undefined;
+            : lead.lead_type === 'open_house'
+              ? 'your open house (signed in at the door)'
+              : undefined;
 
     // The contact details are the point of the email. They live only as
     // ciphertext since US-086, and this function passed lead.email / lead.phone

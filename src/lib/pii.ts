@@ -123,6 +123,36 @@ export async function decryptLeadContacts(
   return out;
 }
 
+/** A sphere contact's details, as pii-crypto returns them. */
+export type DecryptedContactDetails = DecryptedLeadContact;
+
+/**
+ * Decrypts the email and phone of contacts (the agent's sphere) the caller
+ * owns, addressed by id. Same contract as decryptLeadContacts: never throws,
+ * and an id the caller does not own is simply absent from the map.
+ */
+export async function decryptContactDetails(
+  contactIds: string[]
+): Promise<Map<string, DecryptedContactDetails>> {
+  const out = new Map<string, DecryptedContactDetails>();
+  const ids = Array.from(new Set(contactIds.filter((id): id is string => !!id)));
+  if (ids.length === 0) return out;
+
+  // pii-crypto takes at most 100 ids a call.
+  for (let i = 0; i < ids.length; i += 100) {
+    try {
+      const { data, error } = await supabase.functions.invoke<{
+        contacts: DecryptedContactDetails[];
+      }>('pii-crypto', { body: { op: 'decrypt_contacts', contactIds: ids.slice(i, i + 100) } });
+      if (error || !data?.contacts) continue;
+      for (const contact of data.contacts) out.set(contact.id, contact);
+    } catch {
+      // Leave these rows without details rather than failing the list render.
+    }
+  }
+  return out;
+}
+
 /**
  * Decrypts the caller's own profile phone number.
  *

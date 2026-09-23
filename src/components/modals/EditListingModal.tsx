@@ -36,7 +36,6 @@ export interface EditListingFormData {
   zip_code?: string;
   lot_size_acres?: number;
   virtual_tour_url?: string;
-  open_house_date?: string;
   highlights?: string;
   is_featured?: boolean;
 }
@@ -263,16 +262,6 @@ export function EditListingModal({
                     lot_size_acres: e.target.value ? Number(e.target.value) : undefined,
                   })
                 }
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="open_house_date">Open House</Label>
-              <Input
-                id="open_house_date"
-                type="date"
-                value={formData.open_house_date || ''}
-                onChange={(e) => setFormData({ ...formData, open_house_date: e.target.value })}
               />
             </div>
 

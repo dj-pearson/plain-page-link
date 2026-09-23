@@ -95,6 +95,8 @@ export function LeadsTable({ leads, onLeadClick }: LeadsTableProps) {
         return 'Valuation';
       case 'contact':
         return 'Contact';
+      case 'open_house':
+        return 'Open house';
       default:
         return type;
     }

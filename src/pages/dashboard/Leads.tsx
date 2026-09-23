@@ -21,6 +21,7 @@ import {
   Clock,
   AlertTriangle,
   Home,
+  DoorOpen,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -401,6 +402,8 @@ export default function Leads() {
         return <Phone className="h-4 w-4" />;
       case 'valuation':
         return <Mail className="h-4 w-4" />;
+      case 'open_house':
+        return <DoorOpen className="h-4 w-4" />;
       default:
         return <MessageSquare className="h-4 w-4" />;
     }
@@ -613,6 +616,7 @@ export default function Leads() {
               <SelectItem value="seller">Seller</SelectItem>
               <SelectItem value="valuation">Valuation</SelectItem>
               <SelectItem value="contact">Contact</SelectItem>
+              <SelectItem value="open_house">Open house</SelectItem>
             </SelectContent>
           </Select>
           <Button

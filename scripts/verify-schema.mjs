@@ -1340,6 +1340,125 @@ check('lead insert pipeline works end to end', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 7b. The client sphere and open houses (20260923000001).
+//
+//     Contacts hold the most personal data in the product — children's names,
+//     birthdays, what a family is going through — so the isolation between
+//     agents is asserted, not assumed. The open house public reads go through
+//     SECURITY DEFINER functions precisely so private_notes (lockbox codes)
+//     never reaches a visitor; that is asserted too, along with the touch
+//     cadence the dashboard's "due for a touch" list is built on.
+// ---------------------------------------------------------------------------
+check('client sphere is per-agent and open houses hide private notes', () => {
+  const out = [];
+  const a = '00000000-dead-beef-0000-00000000c0a1';
+  const b = '00000000-dead-beef-0000-00000000c0b2';
+  const contact = '00000000-dead-beef-0000-00000000c0c3';
+  const listing = '00000000-dead-beef-0000-00000000c0d4';
+  const oh = '00000000-dead-beef-0000-00000000c0e5';
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES
+        ('${a}', 'sphere-a@example.test'), ('${b}', 'sphere-b@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name, is_published) VALUES
+        ('${a}', 'verifysphere-a', 'Sphere A', true),
+        ('${b}', 'verifysphere-b', 'Sphere B', true)
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.listings (id, user_id, address, city, price, status)
+        VALUES ('${listing}', '${a}', '1 Verify Way', 'Testville', '500000', 'active');
+      INSERT INTO public.contacts (id, user_id, first_name, touch_frequency_days, created_at)
+        VALUES ('${contact}', '${a}', 'Pat', 30, '2026-01-01T00:00:00Z');
+      INSERT INTO public.open_houses (id, user_id, listing_id, starts_at, ends_at, private_notes)
+        VALUES ('${oh}', '${a}', '${listing}', now() + interval '1 day',
+                now() + interval '1 day 2 hours', 'lockbox 4321');
+    `);
+
+    const [firstDue] = q(`SELECT next_touch_at::date::text FROM public.contacts WHERE id = '${contact}';`);
+    if (firstDue !== '2026-01-31') {
+      out.push(`next_touch_at is ${firstDue} for a 30-day cadence from 2026-01-01; expected 2026-01-31`);
+    }
+
+    // A logged call moves the touch forward; back-filling an older one must not
+    // move it back, and a note is not a touch.
+    q(`
+      INSERT INTO public.contact_interactions (user_id, contact_id, kind, occurred_at)
+        VALUES ('${a}', '${contact}', 'call', '2026-03-01T00:00:00Z');
+      INSERT INTO public.contact_interactions (user_id, contact_id, kind, occurred_at)
+        VALUES ('${a}', '${contact}', 'text', '2026-02-01T00:00:00Z');
+      INSERT INTO public.contact_interactions (user_id, contact_id, kind, occurred_at)
+        VALUES ('${a}', '${contact}', 'note', '2026-04-01T00:00:00Z');
+    `);
+    const [touched] = q(
+      `SELECT last_contacted_at::date::text || ' ' || next_touch_at::date::text
+         FROM public.contacts WHERE id = '${contact}';`
+    );
+    if (touched !== '2026-03-01 2026-03-31') {
+      out.push(`after a call on 03-01, an older text and a later note, contact reads "${touched}"; expected "2026-03-01 2026-03-31"`);
+    }
+
+    // Agent B sees none of agent A's sphere, and cannot hang a date off it.
+    const [seen] = q(`
+      SET ROLE authenticated; SET request.jwt.claim.sub = '${b}';
+      SELECT (SELECT count(*) FROM public.contacts)
+           + (SELECT count(*) FROM public.contact_interactions)
+           + (SELECT count(*) FROM public.open_houses);
+    `);
+    if (seen !== '0') out.push(`another agent can read ${seen} of this agent's sphere/open house rows`);
+    try {
+      q(`
+        SET ROLE authenticated; SET request.jwt.claim.sub = '${b}';
+        INSERT INTO public.contact_key_dates (user_id, contact_id, label, event_date)
+          VALUES ('${b}', '${contact}', 'Hijack', '2026-05-05');
+      `);
+      out.push("another agent could attach a key date to this agent's contact");
+    } catch {
+      /* expected: the WITH CHECK refuses it */
+    }
+
+    // Visitors get the open house, never its private notes.
+    const [publicRow] = q(`
+      SET ROLE anon;
+      SELECT count(*) || ':' || coalesce(string_agg(address, ''), '')
+        FROM public.list_public_open_houses('${a}');
+    `);
+    if (publicRow !== '1:1 Verify Way') {
+      out.push(`list_public_open_houses returned "${publicRow}"; expected the one scheduled open house`);
+    }
+    const leaked = q(`
+      SELECT proname FROM pg_proc
+       WHERE proname IN ('list_public_open_houses', 'get_public_open_house')
+         AND pg_get_function_result(oid) ILIKE '%private_notes%';
+    `);
+    for (const fn of leaked) out.push(`${fn}() returns private_notes to visitors`);
+    const [direct] = q(`SET ROLE anon; SELECT count(*) FROM public.open_houses;`);
+    if (direct !== '0') out.push(`anon can select ${direct} open_houses rows directly, private_notes included`);
+
+    q(`UPDATE public.open_houses SET status = 'cancelled' WHERE id = '${oh}';`);
+    const [cancelled] = q(`SET ROLE anon; SELECT count(*) FROM public.get_public_open_house('${oh}');`);
+    if (cancelled !== '0') out.push('get_public_open_house still serves a cancelled open house');
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'client sphere check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.contacts WHERE user_id IN ('${a}', '${b}');
+         DELETE FROM public.open_houses WHERE user_id IN ('${a}', '${b}');
+         DELETE FROM public.listings WHERE id = '${listing}';
+         DELETE FROM public.profiles WHERE id IN ('${a}', '${b}');
+         DELETE FROM auth.users WHERE id IN ('${a}', '${b}');`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 8. Every SECURITY DEFINER function must pin search_path. Such a function runs
 //    with its owner's privileges, so if the caller controls how unqualified
 //    names inside it resolve, the caller controls what it operates on. Postgres

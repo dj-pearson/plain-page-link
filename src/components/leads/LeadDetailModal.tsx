@@ -55,6 +55,7 @@ import { getLeadNextStep } from '@/lib/leadNextStep';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
+import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButton';
 
 /**
  * Lead plus the one field the modal shows that is not a column.
@@ -328,11 +329,14 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                 <DialogTitle className="text-xl">{lead.name}</DialogTitle>
                 <DialogDescription className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className="capitalize">
-                    {lead.lead_type}
+                    {lead.lead_type.replace('_', ' ')}
                   </Badge>
                   <span className="text-xs text-muted-foreground">{timeAgo}</span>
                 </DialogDescription>
               </div>
+            </div>
+            <div className="mr-6 flex-shrink-0">
+              <AddLeadToClientsButton lead={lead} />
             </div>
           </div>
 

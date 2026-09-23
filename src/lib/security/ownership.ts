@@ -46,6 +46,10 @@ const OWNER_FIELD: Record<string, string> = {
   testimonials: 'user_id',
   user_sessions: 'user_id',
   user_mfa_settings: 'user_id',
+  contacts: 'user_id',
+  contact_key_dates: 'user_id',
+  contact_interactions: 'user_id',
+  open_houses: 'user_id',
 };
 
 // ============================================================
