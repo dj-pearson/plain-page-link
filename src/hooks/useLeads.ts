@@ -24,6 +24,7 @@ async function decryptLeadRows(rows: LeadRow[]): Promise<Lead[]> {
     ...rest,
     email: contacts.get(rest.id)?.email ?? null,
     phone: contacts.get(rest.id)?.phone ?? null,
+    contact_locked: contacts.get(rest.id)?.locked === true,
   }));
 }
 

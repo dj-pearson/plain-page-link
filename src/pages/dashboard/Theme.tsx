@@ -22,6 +22,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { logger } from '@/lib/logger';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
+import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { UpgradeModal } from '@/components/UpgradeModal';
 
 const AVAILABLE_FONTS = [
@@ -48,6 +49,7 @@ export default function Theme() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
   const { subscription } = useSubscriptionLimits();
+  const { hasFeature } = usePlanUsage();
 
   // Load saved theme from database
   useEffect(() => {
@@ -100,7 +102,9 @@ export default function Theme() {
 
   const handleThemeSelect = async (theme: ThemeConfig) => {
     // Check if theme is premium and user doesn't have access
-    if (theme.isPremium && subscription?.plan_name === 'free') {
+    // The plan's customThemes feature decides, not its name: a paid plan
+    // without it (or a lapsed one) used to pass because it was not 'free'.
+    if (theme.isPremium && !hasFeature('customThemes')) {
       setShowUpgradeModal(true);
       return;
     }

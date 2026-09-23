@@ -21,6 +21,7 @@ import {
   Clock,
   AlertTriangle,
   Home,
+  DoorOpen,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +33,8 @@ import { useLeadContactAction } from '@/hooks/useLeadContactAction';
 import { useLeadsActivitySummaries } from '@/hooks/useLeadActivities';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
+import { PlanLimitNotice } from '@/components/PlanLimitNotice';
+import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
@@ -401,6 +404,8 @@ export default function Leads() {
         return <Phone className="h-4 w-4" />;
       case 'valuation':
         return <Mail className="h-4 w-4" />;
+      case 'open_house':
+        return <DoorOpen className="h-4 w-4" />;
       default:
         return <MessageSquare className="h-4 w-4" />;
     }
@@ -498,6 +503,9 @@ export default function Leads() {
         </div>
       </div>
 
+      {/* Leads are never refused; past the plan's monthly allowance this
+          only nudges (20260923000002). */}
+      <PlanLimitNotice limitKey="leads_per_month" />
       {/* Stats - Mobile optimized grid */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 sm:gap-4">
         <Card className="hover:shadow-md transition-shadow">
@@ -613,6 +621,7 @@ export default function Leads() {
               <SelectItem value="seller">Seller</SelectItem>
               <SelectItem value="valuation">Valuation</SelectItem>
               <SelectItem value="contact">Contact</SelectItem>
+              <SelectItem value="open_house">Open house</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -810,36 +819,42 @@ export default function Leads() {
                       </div>
 
                       <div className="space-y-1.5 text-xs sm:text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2 min-h-[32px]">
-                          <Mail className="h-3 w-3 flex-shrink-0" />
-                          <a
-                            href={`mailto:${lead.email}`}
-                            onClick={(e) => {
-                              // Without this the click also bubbles to the
-                              // card and opens the detail modal behind the
-                              // mail client.
-                              e.stopPropagation();
-                              void recordContact(lead, 'email').then(() => refetch());
-                            }}
-                            className="hover:text-primary active:text-primary-dark break-all"
-                          >
-                            {lead.email}
-                          </a>
-                        </div>
-                        {lead.phone && (
-                          <div className="flex items-center gap-2 min-h-[32px]">
-                            <Phone className="h-3 w-3 flex-shrink-0" />
-                            <a
-                              href={`tel:${lead.phone}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void recordContact(lead, 'call').then(() => refetch());
-                              }}
-                              className="hover:text-primary active:text-primary-dark"
-                            >
-                              {lead.phone}
-                            </a>
-                          </div>
+                        {lead.contact_locked ? (
+                          <LockedLeadDetails withMessage={!!lead.message} />
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 min-h-[32px]">
+                              <Mail className="h-3 w-3 flex-shrink-0" />
+                              <a
+                                href={`mailto:${lead.email}`}
+                                onClick={(e) => {
+                                  // Without this the click also bubbles to the
+                                  // card and opens the detail modal behind the
+                                  // mail client.
+                                  e.stopPropagation();
+                                  void recordContact(lead, 'email').then(() => refetch());
+                                }}
+                                className="hover:text-primary active:text-primary-dark break-all"
+                              >
+                                {lead.email}
+                              </a>
+                            </div>
+                            {lead.phone && (
+                              <div className="flex items-center gap-2 min-h-[32px]">
+                                <Phone className="h-3 w-3 flex-shrink-0" />
+                                <a
+                                  href={`tel:${lead.phone}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void recordContact(lead, 'call').then(() => refetch());
+                                  }}
+                                  className="hover:text-primary active:text-primary-dark"
+                                >
+                                  {lead.phone}
+                                </a>
+                              </div>
+                            )}
+                          </>
                         )}
                         {lastContactByLead.has(lead.id) && (
                           <div className="flex items-center gap-2 min-h-[32px]">
@@ -858,7 +873,7 @@ export default function Leads() {
                             <span className="truncate">{lead.property_address}</span>
                           </div>
                         )}
-                        {lead.message && (
+                        {lead.message && !lead.contact_locked && (
                           <p className="mt-2 text-foreground line-clamp-2 text-xs sm:text-sm leading-relaxed">
                             {lead.message}
                           </p>

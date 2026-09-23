@@ -18,6 +18,8 @@ interface LeadData {
   lead_type: string
   source?: string
   listing_id?: string
+  /** Set by the open house sign-in kiosk; checked against user_id below. */
+  open_house_id?: string
   price_range?: string
   timeline?: string
   property_address?: string
@@ -78,7 +80,24 @@ serve(async (req) => {
     const clientIP = getClientIP(req);
     const rateIdentifier =
       clientIP !== 'unknown' ? clientIP : `target:${rawData?.user_id ?? 'anon'}`;
-    const rateLimit = await checkRateLimitDb(supabase, rateIdentifier, 'submit-lead', RATE_LIMITS.submission);
+    //
+    // An open house kiosk is one tablet on one connection, so every visitor
+    // shares an IP; five a minute would turn away a family signing in one after
+    // another. Kiosk sign-ins get their own, wider bucket per open house. A
+    // made-up open_house_id buys a fresh bucket but no lead: the ownership
+    // check below refuses it before anything is written.
+    const kioskOpenHouseId =
+      rawData?.lead_type === 'open_house' && typeof rawData?.open_house_id === 'string'
+        ? rawData.open_house_id.slice(0, 36)
+        : null;
+    const rateLimit = kioskOpenHouseId
+      ? await checkRateLimitDb(
+          supabase,
+          `${rateIdentifier}:open-house:${kioskOpenHouseId}`,
+          'submit-lead-open-house',
+          { ...RATE_LIMITS.submission, maxRequests: 20 }
+        )
+      : await checkRateLimitDb(supabase, rateIdentifier, 'submit-lead', RATE_LIMITS.submission);
 
     if (!rateLimit.allowed) {
       console.warn(`Rate limit exceeded for identifier: ${rateIdentifier}`);
@@ -102,6 +121,7 @@ serve(async (req) => {
       lead_type: rawData.lead_type,
       source: rawData.source ? sanitizeString(rawData.source) : 'website',
       listing_id: rawData.listing_id,
+      open_house_id: rawData.open_house_id,
       price_range: rawData.price_range ? sanitizeString(rawData.price_range) : undefined,
       timeline: rawData.timeline ? sanitizeString(rawData.timeline) : undefined,
       property_address: rawData.property_address ? sanitizeString(rawData.property_address) : undefined,
@@ -113,6 +133,26 @@ serve(async (req) => {
       device: rawData.device ? sanitizeString(rawData.device) : undefined,
       form_data: sanitizeFormData(rawData.form_data),
     };
+
+    // An open house sign-in must belong to the agent it is filed under, and it
+    // is filed against the open house's listing whatever the request said. The
+    // kiosk is a public page, so both ids arrive from a visitor's browser; the
+    // service-role insert below would otherwise attach a sign-in to any open
+    // house id it was handed.
+    if (leadData.open_house_id) {
+      const { data: openHouse, error: openHouseError } = await supabase
+        .from('open_houses')
+        .select('id, user_id, listing_id, status')
+        .eq('id', leadData.open_house_id)
+        .maybeSingle()
+
+      if (openHouseError) throw openHouseError
+      if (!openHouse || openHouse.user_id !== leadData.user_id || openHouse.status === 'cancelled') {
+        return validationError(['That open house is not taking sign-ins'], req)
+      }
+      leadData.listing_id = openHouse.listing_id
+      leadData.source = 'open_house'
+    }
 
     // US-086: encrypt the PII before it is stored. This path — the one every
     // public capture form uses — wrote no ciphertext at all, so coverage was
@@ -159,8 +199,17 @@ serve(async (req) => {
     const agentName = agentContact?.fullName || 'Your Real Estate Agent'
     const zapierWebhookUrl = agentContact?.zapierWebhookUrl
 
+    // A lead past the agent's monthly allowance is stored but its contact
+    // details are not handed on (20260923000003). Zapier would otherwise be a
+    // way round the lock — it receives the plaintext.
+    const { data: lockedIds } = await supabase.rpc('locked_lead_ids', {
+      _user_id: leadData.user_id,
+      _lead_ids: [lead.id],
+    })
+    const leadLocked = Array.isArray(lockedIds) && lockedIds.includes(lead.id)
+
     // Send lead to Zapier webhook if configured
-    if (zapierWebhookUrl) {
+    if (zapierWebhookUrl && !leadLocked) {
       try {
         const zapierPayload = {
           lead_id: lead.id,
@@ -217,7 +266,8 @@ serve(async (req) => {
       buyer: 'buying inquiry',
       seller: 'selling inquiry',
       valuation: 'home valuation request',
-      contact: 'message'
+      contact: 'message',
+      open_house: 'visit to the open house',
     }
 
     await sendEmail({
@@ -225,7 +275,9 @@ serve(async (req) => {
       subject: `Thank you for your ${leadTypeLabels[leadData.lead_type] || 'inquiry'}`,
       body: `Hi ${leadData.name},
 
-Thank you for reaching out! I have received your ${leadTypeLabels[leadData.lead_type] || 'inquiry'} and will get back to you as soon as possible.
+${leadData.lead_type === 'open_house'
+  ? `Thank you for stopping by the open house today! If you would like a second look, the disclosures, or a list of similar homes, just reply to this email.`
+  : `Thank you for reaching out! I have received your ${leadTypeLabels[leadData.lead_type] || 'inquiry'} and will get back to you as soon as possible.`}
 
 ${leadData.lead_type === 'buyer' ? `I'm excited to help you find your perfect home!` : ''}
 ${leadData.lead_type === 'seller' ? `I look forward to discussing how I can help you sell your property.` : ''}
@@ -251,11 +303,13 @@ ${agentName}`,
 <body>
   <div class="container">
     <div class="header">
-      <h1 style="margin: 0;">Thank You for Reaching Out!</h1>
+      <h1 style="margin: 0;">${leadData.lead_type === 'open_house' ? 'Thanks for Visiting!' : 'Thank You for Reaching Out!'}</h1>
     </div>
     <div class="content">
       <p>Hi ${leadData.name},</p>
-      <p>Thank you for your <strong>${leadTypeLabels[leadData.lead_type] || 'inquiry'}</strong>! I have received your message and will get back to you as soon as possible.</p>
+      ${leadData.lead_type === 'open_house'
+        ? `<p>Thank you for stopping by the open house today! If you would like a second look, the disclosures, or a list of similar homes, just reply to this email.</p>`
+        : `<p>Thank you for your <strong>${leadTypeLabels[leadData.lead_type] || 'inquiry'}</strong>! I have received your message and will get back to you as soon as possible.</p>`}
 
       ${leadData.lead_type === 'buyer' ? `<div class="highlight"><p><strong>🏡 Looking for your dream home?</strong><br>I'm excited to help you find the perfect property that meets your needs!</p></div>` : ''}
       ${leadData.lead_type === 'seller' ? `<div class="highlight"><p><strong>🏠 Ready to sell?</strong><br>I look forward to discussing how I can help you get the best value for your property!</p></div>` : ''}

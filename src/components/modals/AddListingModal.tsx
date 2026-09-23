@@ -72,8 +72,6 @@ const listingSchema = z.object({
   // property", only one had a column, and the form dropped whatever went in
   // this one. Removed rather than given a second column (US-106).
   virtualTourUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  openHouseDate: z.string().optional(),
-  openHouseEndDate: z.string().optional(),
   isFeatured: z.boolean().optional(),
 });
 
@@ -137,8 +135,6 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
       garage: '',
       images: [],
       virtualTourUrl: '',
-      openHouseDate: '',
-      openHouseEndDate: '',
       isFeatured: false,
     },
   });
@@ -666,30 +662,13 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                       <p className="text-sm text-red-600 mt-1">{errors.virtualTourUrl.message}</p>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="openHouseDate" className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" /> Open House Start
-                      </Label>
-                      <Input
-                        id="openHouseDate"
-                        type="datetime-local"
-                        {...register('openHouseDate')}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="openHouseEndDate" className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" /> Open House End
-                      </Label>
-                      <Input
-                        id="openHouseEndDate"
-                        type="datetime-local"
-                        {...register('openHouseEndDate')}
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
+                  {/* Open houses are scheduled on their own page now (20260923000001):
+                      a listing can have many, each with a sign-in kiosk. */}
+                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Calendar className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                    Planning an open house? Schedule it from Open Houses once the listing is saved.
+                    Visitors can sign in on a tablet and land straight in your leads.
+                  </p>
                 </div>
                 <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-sm font-medium text-green-800">

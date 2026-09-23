@@ -41,7 +41,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
-import { LimitBanner } from '@/components/LimitBanner';
+import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { SocialShareDialog } from '@/components/listings/SocialShareDialog';
 import { useProfile } from '@/hooks/useProfile';
 import { KeyboardShortcutsHelper } from '@/components/dashboard/KeyboardShortcutsHelper';
@@ -74,7 +74,7 @@ export default function Listings() {
   const { listings, isLoading, isError, error, refetch, addListing, updateListing, deleteListing } =
     useListings();
   const { uploadListingImages } = useListingImageUpload();
-  const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
+  const { subscription, canAdd } = useSubscriptionLimits();
   const { profile } = useProfile();
   const navigate = useNavigate();
 
@@ -175,10 +175,6 @@ export default function Listings() {
         lot_size_acres: data.lotSize ? parseFloat(data.lotSize) : null,
         virtual_tour_url: data.virtualTourUrl || null,
         is_featured: data.isFeatured || false,
-        open_house_date: data.openHouseDate || null,
-        // Collected by the form since it was written, and discarded until
-        // 20260902000007 added the columns (US-106).
-        open_house_end_date: data.openHouseEndDate || null,
         year_built: data.yearBuilt ? Number(data.yearBuilt) : null,
         stories: data.stories ? Number(data.stories) : null,
         garage_spaces: data.garage ? Number(data.garage) : null,
@@ -379,7 +375,6 @@ export default function Listings() {
         zip_code: data.zip_code || null,
         lot_size_acres: data.lot_size_acres ?? null,
         virtual_tour_url: data.virtual_tour_url || null,
-        open_house_date: data.open_house_date || null,
         is_featured: data.is_featured ?? false,
         highlights: data.highlights
           ? data.highlights
@@ -495,13 +490,7 @@ export default function Listings() {
       </div>
 
       {/* Limit Banner */}
-      {subscription && getLimit('listings') !== Infinity && (
-        <LimitBanner
-          feature="listings"
-          current={getUsage('listings')}
-          limit={getLimit('listings')}
-        />
-      )}
+      <PlanLimitNotice limitKey="listings" />
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
@@ -936,7 +925,6 @@ export default function Listings() {
             zip_code: editingListing.zip_code ?? undefined,
             lot_size_acres: editingListing.lot_size_acres ?? undefined,
             virtual_tour_url: editingListing.virtual_tour_url ?? undefined,
-            open_house_date: editingListing.open_house_date ?? undefined,
             highlights: Array.isArray(editingListing.highlights)
               ? (editingListing.highlights as string[]).join(', ')
               : undefined,

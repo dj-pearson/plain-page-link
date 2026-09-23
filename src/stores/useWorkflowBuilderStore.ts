@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { toastSaveError } from '@/lib/planLimitToast';
 import type { Database, Json } from '@/integrations/supabase/types';
 import type {
   Workflow,
@@ -632,7 +633,9 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
       toast.success('Workflow saved');
     } catch (error) {
       logger.error('Failed to save workflow', error as Error);
-      toast.error('Failed to save workflow');
+      // Switching a workflow on past the plan's allowance is refused by the
+      // database (20260923000003); say so rather than "failed to save".
+      toastSaveError(error, 'Failed to save workflow');
       throw error;
     } finally {
       set({ isSaving: false });
@@ -669,7 +672,14 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
       },
     });
 
-    await saveWorkflow();
+    try {
+      await saveWorkflow();
+    } catch {
+      // Refused (most often by the plan's active-workflow limit): put the
+      // toggle back so the builder does not show a state the database rejected.
+      set({ workflow: { ...workflow, isActive: !active } });
+      return;
+    }
     toast.success(active ? 'Workflow activated' : 'Workflow deactivated');
   },
 

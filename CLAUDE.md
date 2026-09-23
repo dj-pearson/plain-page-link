@@ -240,6 +240,7 @@ plain-page-link/
 - `/auth/*` - Authentication flows
 - `/dashboard/*` - Protected dashboard routes
 - `/:username` - Public user profiles
+- `/open-house/:openHouseId` - Public open house sign-in kiosk
 - `/blog/*` - Blog and content
 - `/features/*` - Feature showcase pages
 - `/for/*` - Location-specific landing pages
@@ -643,6 +644,32 @@ created_at, updated_at
 for anonymous visitors — the one that used to exist let any visitor rewrite any
 profile's link targets. Do not add one back.
 
+**contacts** — the agent's client sphere (past clients, active buyers/sellers,
+referral partners). Email and phone are ciphertext, like `leads`; decrypt with
+pii-crypto's `decrypt_contacts` op (`decryptContactDetails` in `src/lib/pii.ts`).
+```
+id, user_id (NOT NULL), lead_id (the lead it came from), first_name (NOT NULL), last_name
+encrypted_email, encrypted_phone, relationship (NOT NULL, checked list), preferred_contact
+address, city, state, zip_code, occupation, employer, referred_by, source
+household (jsonb array of {name, relation, notes}), interests / tags (text[]), notes
+touch_frequency_days (int), last_contacted_at, next_touch_at (trigger-derived; do not write)
+created_at, updated_at
+```
+**contact_key_dates** — birthdays, anniversaries, closing/move-in dates, parties.
+`event_date` is a `date`; when `year_known` is false its year is a placeholder
+(2000). Upcoming dates are computed client-side by `src/lib/keyDates.ts`.
+**contact_interactions** — the touch log. An insert (any kind but `note`)
+moves `contacts.last_contacted_at` forward via trigger.
+
+**open_houses** — per listing: `starts_at`, `ends_at`, `status`
+('scheduled' | 'completed' | 'cancelled'), `is_public`, `public_notes`,
+`private_notes`. There is deliberately **no public SELECT policy**:
+`private_notes` holds lockbox codes. Visitors read through
+`list_public_open_houses(_user_id)` and `get_public_open_house(_open_house_id)`.
+Kiosk sign-ins are leads (`lead_type = 'open_house'`, `leads.open_house_id`)
+submitted through `submit-lead`. `listings.open_house_date` /
+`open_house_end_date` are superseded and no longer written.
+
 **articles** — the blog. This is the table; `blog_posts` does not exist.
 ```
 id, title (NOT NULL), slug (NOT NULL), content (NOT NULL), excerpt
@@ -684,6 +711,38 @@ the free tools (`instagram_bio_*`, `listing_*`).
   owner privileges — a temp table can shadow a real one. Enforced by
   `verify:schema`; `extensions` is where pgcrypto lives, `pg_temp` is named last
   so it is searched last rather than first.
+
+**Plan limits (20260923000002):**
+- `get_user_plan()` is the one authority for what an agent's plan allows
+  (it applies the cancellation and failed-payment grace rules).
+  `plan_limit(user, key)` and `plan_usage(user, key)` answer from it; the flat
+  `subscriptions` table is a copy for admin screens, not an authority.
+- Enforced by BEFORE triggers on `listings` (active vs. sold buckets), `links`,
+  `testimonials`, `contacts` and `open_houses` (per calendar month), and by RLS
+  on `analytics_views` / `analytics_events` (history window). Only the owner's
+  own writes are metered; anon (a visitor's review) and service role pass.
+- A refusal is `check_violation` with DETAIL `plan_limit:<key>` and a message
+  written for the agent; `planLimitKeyFromError` in `src/lib/planLimits.ts`
+  recognises it.
+- `leads_per_month`: a visitor's enquiry is never refused. Leads past the
+  monthly allowance are stored but **locked** (20260923000003):
+  `locked_lead_ids()` is asked by pii-crypto (returns no email/phone,
+  `locked: true`), notify-lead (email without contact details) and submit-lead
+  (no Zapier hand-off). The dashboard blurs them (`LockedLeadDetails`).
+  Upgrading unlocks every locked lead at once.
+- Metered monthly quotas (`*_per_month` in `feature_usage`) are charged at the
+  moment of use by `consume_plan_quota(user, key, n)` — service role only, a
+  negative `n` refunds. Wired: AI listing descriptions (signed-in callers of
+  generate-listing-description) and workflow email steps. The quotas for market
+  reports, CMA reports, virtual staging, video tours and SMS exist; those
+  features do not yet — a new one must call `consume_plan_quota` before doing
+  the work.
+- Also enforced by trigger: active `workflows` (on switching one on) and
+  `profiles.custom_domain` (plan feature `customDomain`).
+- The frontend reads everything through `get_plan_usage()` (`usePlanUsage`).
+  A new limit needs: a key in `subscription_plans.limits`, a branch in
+  `plan_usage`, a trigger, an entry in `LIMIT_META`, and the matching number
+  in `src/config/pricing-plans.ts` (a test holds the two together).
 
 **Soft deletes:**
 - Effectively unused: exactly one table carries `deleted_at`. There is no

@@ -107,7 +107,17 @@ export function createLeadNotificationEmail(data: {
   sourcePage?: string
   leadScore?: number | null
   dashboardUrl?: string
+  /**
+   * The lead is past the plan's monthly allowance (20260923000003): say a lead
+   * arrived and who, but not how to reach them. Contact details and message
+   * are dropped here, not merely hidden, so the email cannot leak them.
+   */
+  locked?: boolean
+  upgradeUrl?: string
 }): EmailOptions {
+  if (data.locked) {
+    data = { ...data, email: '', phone: undefined, message: undefined }
+  }
   const listing = data.listing || 'your services'
   const dashboardUrl =
     data.dashboardUrl ||
@@ -117,6 +127,10 @@ export function createLeadNotificationEmail(data: {
       ? `<span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:600;">Lead score: ${data.leadScore}</span>`
       : ''
 
+  const upgradeUrl = data.upgradeUrl || `${getSiteUrl()}/dashboard/subscription`
+  const lockedNotice = data.locked
+    ? `You've reached this month's lead allowance on your plan. ${data.name}'s enquiry is saved, and their contact details unlock as soon as you upgrade (or when your allowance resets next month).`
+    : ''
   const rows: Array<[string, string | undefined]> = [
     ['Name', data.name],
     ['Email', data.email],
@@ -134,9 +148,11 @@ export function createLeadNotificationEmail(data: {
 
   return {
     to: data.agentEmail,
-    subject: `New Lead: ${data.name} is interested in ${listing}`,
+    subject: data.locked
+      ? `New Lead: ${data.name} — upgrade to see their contact details`
+      : `New Lead: ${data.name} is interested in ${listing}`,
     body: `New lead captured on AgentBio:
-
+${lockedNotice ? `\n${lockedNotice}\nUpgrade: ${upgradeUrl}\n` : ''}
 Name: ${data.name}
 Email: ${data.email}
 ${data.phone ? `Phone: ${data.phone}\n` : ''}${data.listing ? `Interested in: ${data.listing}\n` : ''}${data.sourcePage ? `Source page: ${data.sourcePage}\n` : ''}${typeof data.leadScore === 'number' ? `Lead score: ${data.leadScore}\n` : ''}${data.message ? `\nMessage:\n${data.message}\n` : ''}
@@ -154,6 +170,11 @@ View this lead: ${dashboardUrl}
     </div>
     <div style="background:#fff;padding:30px;">
       ${scoreBadge ? `<p style="margin:0 0 16px;">${scoreBadge}</p>` : ''}
+      ${
+        lockedNotice
+          ? `<div style="margin:0 0 20px;padding:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;"><p style="margin:0 0 12px;color:#78350f;font-size:14px;">${escapeHtml(lockedNotice)}</p><a href="${upgradeUrl}" style="display:inline-block;background:#1f2937;color:#fff;padding:10px 20px;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">See plans</a></div>`
+          : ''
+      }
       <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
       ${
         data.message

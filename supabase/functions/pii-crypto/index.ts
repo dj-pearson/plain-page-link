@@ -61,7 +61,7 @@ const MAX_ROWS = 100;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type Op = 'encrypt' | 'decrypt_leads' | 'decrypt_profile';
+type Op = 'encrypt' | 'decrypt_leads' | 'decrypt_contacts' | 'decrypt_profile';
 
 export default async (req: Request) => {
   const origin = req.headers.get('origin');
@@ -108,12 +108,18 @@ export default async (req: Request) => {
       op?: Op;
       values?: unknown;
       leadIds?: unknown;
+      contactIds?: unknown;
     };
     const op = body.op;
 
-    if (op !== 'encrypt' && op !== 'decrypt_leads' && op !== 'decrypt_profile') {
+    if (
+      op !== 'encrypt' &&
+      op !== 'decrypt_leads' &&
+      op !== 'decrypt_contacts' &&
+      op !== 'decrypt_profile'
+    ) {
       return errorResponse(
-        "op must be 'encrypt', 'decrypt_leads' or 'decrypt_profile'",
+        "op must be 'encrypt', 'decrypt_leads', 'decrypt_contacts' or 'decrypt_profile'",
         'REQUEST_VALIDATION_FAILED',
         req,
         400
@@ -146,40 +152,47 @@ export default async (req: Request) => {
     }
 
     // ---------------------------------------------------------------------
-    // decrypt_leads — by id, filtered to rows the caller owns.
+    // decrypt_leads / decrypt_contacts — by id, filtered to rows the caller
+    // owns. Contacts (the agent's sphere) follow the leads model exactly: the
+    // same two encrypted columns, the same ownership filter.
     // ---------------------------------------------------------------------
-    if (op === 'decrypt_leads') {
-      if (!Array.isArray(body.leadIds)) {
-        return errorResponse('leadIds must be an array', 'REQUEST_VALIDATION_FAILED', req, 400);
+    if (op === 'decrypt_leads' || op === 'decrypt_contacts') {
+      const idsField = op === 'decrypt_leads' ? 'leadIds' : 'contactIds';
+      const table = op === 'decrypt_leads' ? 'leads' : 'contacts';
+      const resultKey = op === 'decrypt_leads' ? 'leads' : 'contacts';
+      const requested = op === 'decrypt_leads' ? body.leadIds : body.contactIds;
+
+      if (!Array.isArray(requested)) {
+        return errorResponse(`${idsField} must be an array`, 'REQUEST_VALIDATION_FAILED', req, 400);
       }
-      if (body.leadIds.length > MAX_ROWS) {
+      if (requested.length > MAX_ROWS) {
         return errorResponse(
-          `leadIds may contain at most ${MAX_ROWS} entries`,
+          `${idsField} may contain at most ${MAX_ROWS} entries`,
           'REQUEST_VALIDATION_FAILED',
           req,
           400
         );
       }
-      if (!body.leadIds.every((id) => typeof id === 'string' && UUID_RE.test(id))) {
-        return errorResponse('leadIds must be uuids', 'REQUEST_VALIDATION_FAILED', req, 400);
+      if (!requested.every((id) => typeof id === 'string' && UUID_RE.test(id))) {
+        return errorResponse(`${idsField} must be uuids`, 'REQUEST_VALIDATION_FAILED', req, 400);
       }
 
-      const leadIds = body.leadIds as string[];
-      if (leadIds.length === 0) {
-        return successResponse({ leads: [] }, req);
+      const rowIds = requested as string[];
+      if (rowIds.length === 0) {
+        return successResponse({ [resultKey]: [] }, req);
       }
 
       // The ownership filter is the control. The service-role client bypasses
       // RLS, so without `.eq('user_id', user.id)` this would open any row whose
       // id the caller could guess or read from an audit entry.
       const { data: rows, error } = await supabase
-        .from('leads')
+        .from(table)
         .select('id, encrypted_email, encrypted_phone')
-        .in('id', leadIds)
+        .in('id', rowIds)
         .eq('user_id', user.id);
 
       if (error) {
-        return errorResponse('Could not read those leads', 'LEAD_READ_FAILED', req, 502);
+        return errorResponse(`Could not read those ${table}`, 'LEAD_READ_FAILED', req, 502);
       }
 
       const decryptOne = async (value: string | null) => {
@@ -190,18 +203,43 @@ export default async (req: Request) => {
         }
       };
 
-      const leads = await Promise.all(
-        (rows ?? []).map(async (row) => ({
-          id: row.id as string,
-          email: await decryptOne(row.encrypted_email as string | null),
-          phone: await decryptOne(row.encrypted_phone as string | null),
-        }))
+      // Leads past the plan's monthly allowance are captured but not opened
+      // (20260923000003): their contact details stay sealed until the agent
+      // upgrades or the month turns. This is the gate — the dashboard only
+      // draws the blur. Contacts are the agent's own entries and never lock.
+      let locked = new Set<string>();
+      if (op === 'decrypt_leads' && (rows ?? []).length > 0) {
+        const { data: lockedIds, error: lockError } = await supabase.rpc('locked_lead_ids', {
+          _user_id: user.id,
+          _lead_ids: (rows ?? []).map((row) => row.id as string),
+        });
+        if (lockError) {
+          // Fail open: a transient database error must not blank every lead
+          // an agent has. The allowance is a paywall, not a security boundary.
+          console.error('[pii-crypto] locked_lead_ids failed; returning details unlocked', lockError);
+        } else {
+          locked = new Set((lockedIds ?? []) as string[]);
+        }
+      }
+
+      const decrypted = await Promise.all(
+        (rows ?? []).map(async (row) => {
+          const id = row.id as string;
+          if (locked.has(id)) {
+            return { id, email: null, phone: null, locked: true };
+          }
+          return {
+            id,
+            email: await decryptOne(row.encrypted_email as string | null),
+            phone: await decryptOne(row.encrypted_phone as string | null),
+          };
+        })
       );
 
       // Ids the caller does not own are simply absent from the result. The
       // client zips by id, so a missing row reads as "no contact details"
       // rather than shifting anything.
-      return successResponse({ leads }, req);
+      return successResponse({ [resultKey]: decrypted }, req);
     }
 
     // ---------------------------------------------------------------------

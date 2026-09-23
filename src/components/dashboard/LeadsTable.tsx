@@ -1,3 +1,4 @@
+import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -95,6 +96,8 @@ export function LeadsTable({ leads, onLeadClick }: LeadsTableProps) {
         return 'Valuation';
       case 'contact':
         return 'Contact';
+      case 'open_house':
+        return 'Open house';
       default:
         return type;
     }
@@ -176,26 +179,30 @@ export function LeadsTable({ leads, onLeadClick }: LeadsTableProps) {
                   >
                     <TableCell className="font-medium">{lead.name}</TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1 text-sm">
-                        <a
-                          href={`mailto:${lead.email}`}
-                          className="flex items-center text-blue-600 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Mail className="w-3 h-3 mr-1" />
-                          {lead.email}
-                        </a>
-                        {lead.phone && (
+                      {lead.contact_locked ? (
+                        <LockedLeadDetails />
+                      ) : (
+                        <div className="flex flex-col gap-1 text-sm">
                           <a
-                            href={`tel:${lead.phone}`}
+                            href={`mailto:${lead.email}`}
                             className="flex items-center text-blue-600 hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <Phone className="w-3 h-3 mr-1" />
-                            {lead.phone}
+                            <Mail className="w-3 h-3 mr-1" />
+                            {lead.email}
                           </a>
-                        )}
-                      </div>
+                          {lead.phone && (
+                            <a
+                              href={`tel:${lead.phone}`}
+                              className="flex items-center text-blue-600 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Phone className="w-3 h-3 mr-1" />
+                              {lead.phone}
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{getLeadTypeLabel(lead.lead_type)}</Badge>

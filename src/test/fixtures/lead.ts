@@ -23,6 +23,7 @@ export const mockLead: Lead = {
 
   assigned_to: null,
   listing_id: null,
+  open_house_id: null,
   price_range: '400000-450000',
   timeline: '3_months',
   property_address: null,

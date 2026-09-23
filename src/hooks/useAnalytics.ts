@@ -78,6 +78,8 @@ export type RecentLead = Pick<
 > & {
   email: string | null;
   phone: string | null;
+  /** Past the plan's monthly lead allowance; see Lead.contact_locked. */
+  contact_locked?: boolean;
 };
 
 type EncryptedLeadRow = Pick<
@@ -111,6 +113,7 @@ async function decryptRecentLeads(rows: EncryptedLeadRow[]): Promise<RecentLead[
     ...rest,
     email: contacts.get(rest.id)?.email ?? null,
     phone: contacts.get(rest.id)?.phone ?? null,
+    contact_locked: contacts.get(rest.id)?.locked === true,
   }));
 }
 

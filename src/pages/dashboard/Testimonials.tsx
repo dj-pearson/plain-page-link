@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTestimonials, type Testimonial } from '@/hooks/useTestimonials';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
-import { LimitBanner } from '@/components/LimitBanner';
+import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { RequestTestimonialModal } from '@/components/testimonials/RequestTestimonialModal';
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,7 @@ export default function Testimonials() {
     deleteTestimonial,
     setTestimonialPublished,
   } = useTestimonials();
-  const { subscription, canAdd, getLimit, getUsage } = useSubscriptionLimits();
+  const { subscription, canAdd } = useSubscriptionLimits();
   const { profile } = useProfile();
 
   const handleAddClick = () => {
@@ -178,13 +178,7 @@ export default function Testimonials() {
       </div>
 
       {/* Limit Banner */}
-      {subscription && getLimit('testimonials') !== Infinity && (
-        <LimitBanner
-          feature="testimonials"
-          current={getUsage('testimonials')}
-          limit={getLimit('testimonials')}
-        />
-      )}
+      <PlanLimitNotice limitKey="testimonials" />
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

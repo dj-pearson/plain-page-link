@@ -124,16 +124,30 @@ serve(async (req) => {
           ? 'selling a property'
           : lead.lead_type === 'buyer'
             ? 'buying a home'
-            : undefined;
+            : lead.lead_type === 'open_house'
+              ? 'your open house (signed in at the door)'
+              : undefined;
 
     // The contact details are the point of the email. They live only as
     // ciphertext since US-086, and this function passed lead.email / lead.phone
     // — columns that no longer exist — so the agent received a New Lead alert
     // reading "Email: undefined" with no way to reply (US-099).
-    const [leadEmail, leadPhone] = await Promise.all([
-      decryptSecret(lead.encrypted_email),
-      decryptSecret(lead.encrypted_phone),
-    ]);
+    //
+    // A lead past the plan's monthly allowance is announced without its
+    // contact details (20260923000003): the email is the one place those
+    // details would otherwise reach the agent without pii-crypto's gate.
+    const { data: lockedIds } = await supabase.rpc('locked_lead_ids', {
+      _user_id: lead.user_id,
+      _lead_ids: [lead.id],
+    });
+    const locked = Array.isArray(lockedIds) && lockedIds.includes(lead.id);
+
+    const [leadEmail, leadPhone] = locked
+      ? [null, null]
+      : await Promise.all([
+          decryptSecret(lead.encrypted_email),
+          decryptSecret(lead.encrypted_phone),
+        ]);
 
     // The score badge read lead.score ?? lead.lead_score. `leads` has neither
     // column — scores live in lead_scores, one row per lead — so the badge
@@ -156,6 +170,8 @@ serve(async (req) => {
       sourcePage: lead.referrer_url ?? undefined,
       leadScore: leadScore,
       dashboardUrl: `${siteUrl}/dashboard/leads`,
+      locked,
+      upgradeUrl: `${siteUrl}/dashboard/subscription`,
     });
 
     // sendEmail never throws, but it now reports what happened. This used to

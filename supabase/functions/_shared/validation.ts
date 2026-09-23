@@ -188,7 +188,10 @@ export function validateLeadData(data: any): ValidationResult {
     errors.push('Invalid email address');
   }
   
-  if (!data.lead_type || !['buyer', 'seller', 'valuation', 'contact'].includes(data.lead_type)) {
+  if (
+    !data.lead_type ||
+    !['buyer', 'seller', 'valuation', 'contact', 'open_house'].includes(data.lead_type)
+  ) {
     errors.push('Invalid lead type');
   }
   
@@ -234,6 +237,14 @@ export function validateLeadData(data: any): ValidationResult {
   // insert, for the same reason.
   if (data.listing_id !== undefined && !validateUuid(data.listing_id)) {
     errors.push('Invalid listing ID');
+  }
+
+  // An open house sign-in names the open house it came from; nothing else may.
+  if (data.open_house_id !== undefined && !validateUuid(data.open_house_id)) {
+    errors.push('Invalid open house ID');
+  }
+  if (data.lead_type === 'open_house' && data.open_house_id === undefined) {
+    errors.push('An open house sign-in must name its open house');
   }
 
   return {

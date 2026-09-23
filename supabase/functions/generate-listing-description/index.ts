@@ -95,6 +95,10 @@ serve(async (req) => {
     return handleCorsPreFlight(origin);
   }
 
+  // Declared outside the try so the catch can refund a charge whose
+  // generation then failed.
+  let refund: (() => Promise<void>) | null = null;
+
   try {
     // US-078: public by design (the free tool has no session), but it spends
     // OpenAI credits on every call, so it needs the same DB-backed limiter the
@@ -126,6 +130,54 @@ serve(async (req) => {
       throw new Error('Property details are required');
     }
 
+    // A signed-in agent is charged against their plan's AI description quota
+    // (20260923000003). The public free tool at /tools is anonymous and stays
+    // on the per-IP limiter above — it is the lead-generation funnel. The
+    // charge is taken before OpenAI is called, so two tabs cannot both spend
+    // the last one, and refunded if generation fails.
+    const bearer = req.headers.get('Authorization')?.replace('Bearer ', '');
+    if (bearer) {
+      const { data: userData } = await rateClient.auth.getUser(bearer);
+      if (userData?.user) {
+        const { data: quota, error: quotaError } = await rateClient.rpc('consume_plan_quota', {
+          _user_id: userData.user.id,
+          _key: 'ai_listing_descriptions_per_month',
+          _count: 1,
+        });
+        if (quotaError) throw quotaError;
+        const q = quota as { allowed: boolean; used: number; limit?: number };
+        if (!q.allowed) {
+          return new Response(
+            // The { error: { code, message, details } } shape is what the
+            // client's EdgeFunctionError parser reads details from, and
+            // planLimitKeyFromError looks for plan_limit:<key> in details.
+            JSON.stringify({
+              error: {
+                code: 'PLAN_LIMIT',
+                message:
+                  q.limit === 0
+                    ? 'AI listing descriptions are not included in your plan. Upgrade to use them.'
+                    : `You have used all ${q.limit} AI listing descriptions for this month. Upgrade for more.`,
+                details: 'plan_limit:ai_listing_descriptions_per_month',
+              },
+            }),
+            {
+              status: 402,
+              headers: { ...getCorsHeaders(origin), 'Content-Type': 'application/json' },
+            }
+          );
+        }
+        const chargedUserId = userData.user.id;
+        refund = async () => {
+          await rateClient.rpc('consume_plan_quota', {
+            _user_id: chargedUserId,
+            _key: 'ai_listing_descriptions_per_month',
+            _count: -1,
+          });
+        };
+      }
+    }
+
     // Generate descriptions for all 3 styles
     const styles: Array<'luxury' | 'family-friendly' | 'investment'> = [
       'luxury',
@@ -155,6 +207,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Error generating listing description:', error);
+    if (refund) await refund().catch(() => undefined);
 
     return new Response(
       JSON.stringify({

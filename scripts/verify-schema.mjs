@@ -1340,6 +1340,345 @@ check('lead insert pipeline works end to end', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 7b. The client sphere and open houses (20260923000001).
+//
+//     Contacts hold the most personal data in the product — children's names,
+//     birthdays, what a family is going through — so the isolation between
+//     agents is asserted, not assumed. The open house public reads go through
+//     SECURITY DEFINER functions precisely so private_notes (lockbox codes)
+//     never reaches a visitor; that is asserted too, along with the touch
+//     cadence the dashboard's "due for a touch" list is built on.
+// ---------------------------------------------------------------------------
+check('client sphere is per-agent and open houses hide private notes', () => {
+  const out = [];
+  const a = '00000000-dead-beef-0000-00000000c0a1';
+  const b = '00000000-dead-beef-0000-00000000c0b2';
+  const contact = '00000000-dead-beef-0000-00000000c0c3';
+  const listing = '00000000-dead-beef-0000-00000000c0d4';
+  const oh = '00000000-dead-beef-0000-00000000c0e5';
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES
+        ('${a}', 'sphere-a@example.test'), ('${b}', 'sphere-b@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name, is_published) VALUES
+        ('${a}', 'verifysphere-a', 'Sphere A', true),
+        ('${b}', 'verifysphere-b', 'Sphere B', true)
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.listings (id, user_id, address, city, price, status)
+        VALUES ('${listing}', '${a}', '1 Verify Way', 'Testville', '500000', 'active');
+      INSERT INTO public.contacts (id, user_id, first_name, touch_frequency_days, created_at)
+        VALUES ('${contact}', '${a}', 'Pat', 30, '2026-01-01T00:00:00Z');
+      INSERT INTO public.open_houses (id, user_id, listing_id, starts_at, ends_at, private_notes)
+        VALUES ('${oh}', '${a}', '${listing}', now() + interval '1 day',
+                now() + interval '1 day 2 hours', 'lockbox 4321');
+    `);
+
+    const [firstDue] = q(`SELECT next_touch_at::date::text FROM public.contacts WHERE id = '${contact}';`);
+    if (firstDue !== '2026-01-31') {
+      out.push(`next_touch_at is ${firstDue} for a 30-day cadence from 2026-01-01; expected 2026-01-31`);
+    }
+
+    // A logged call moves the touch forward; back-filling an older one must not
+    // move it back, and a note is not a touch.
+    q(`
+      INSERT INTO public.contact_interactions (user_id, contact_id, kind, occurred_at)
+        VALUES ('${a}', '${contact}', 'call', '2026-03-01T00:00:00Z');
+      INSERT INTO public.contact_interactions (user_id, contact_id, kind, occurred_at)
+        VALUES ('${a}', '${contact}', 'text', '2026-02-01T00:00:00Z');
+      INSERT INTO public.contact_interactions (user_id, contact_id, kind, occurred_at)
+        VALUES ('${a}', '${contact}', 'note', '2026-04-01T00:00:00Z');
+    `);
+    const [touched] = q(
+      `SELECT last_contacted_at::date::text || ' ' || next_touch_at::date::text
+         FROM public.contacts WHERE id = '${contact}';`
+    );
+    if (touched !== '2026-03-01 2026-03-31') {
+      out.push(`after a call on 03-01, an older text and a later note, contact reads "${touched}"; expected "2026-03-01 2026-03-31"`);
+    }
+
+    // Agent B sees none of agent A's sphere, and cannot hang a date off it.
+    const [seen] = q(`
+      SET ROLE authenticated; SET request.jwt.claim.sub = '${b}';
+      SELECT (SELECT count(*) FROM public.contacts)
+           + (SELECT count(*) FROM public.contact_interactions)
+           + (SELECT count(*) FROM public.open_houses);
+    `);
+    if (seen !== '0') out.push(`another agent can read ${seen} of this agent's sphere/open house rows`);
+    try {
+      q(`
+        SET ROLE authenticated; SET request.jwt.claim.sub = '${b}';
+        INSERT INTO public.contact_key_dates (user_id, contact_id, label, event_date)
+          VALUES ('${b}', '${contact}', 'Hijack', '2026-05-05');
+      `);
+      out.push("another agent could attach a key date to this agent's contact");
+    } catch {
+      /* expected: the WITH CHECK refuses it */
+    }
+
+    // Visitors get the open house, never its private notes.
+    const [publicRow] = q(`
+      SET ROLE anon;
+      SELECT count(*) || ':' || coalesce(string_agg(address, ''), '')
+        FROM public.list_public_open_houses('${a}');
+    `);
+    if (publicRow !== '1:1 Verify Way') {
+      out.push(`list_public_open_houses returned "${publicRow}"; expected the one scheduled open house`);
+    }
+    const leaked = q(`
+      SELECT proname FROM pg_proc
+       WHERE proname IN ('list_public_open_houses', 'get_public_open_house')
+         AND pg_get_function_result(oid) ILIKE '%private_notes%';
+    `);
+    for (const fn of leaked) out.push(`${fn}() returns private_notes to visitors`);
+    const [direct] = q(`SET ROLE anon; SELECT count(*) FROM public.open_houses;`);
+    if (direct !== '0') out.push(`anon can select ${direct} open_houses rows directly, private_notes included`);
+
+    q(`UPDATE public.open_houses SET status = 'cancelled' WHERE id = '${oh}';`);
+    const [cancelled] = q(`SET ROLE anon; SELECT count(*) FROM public.get_public_open_house('${oh}');`);
+    if (cancelled !== '0') out.push('get_public_open_house still serves a cancelled open house');
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'client sphere check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.contacts WHERE user_id IN ('${a}', '${b}');
+         DELETE FROM public.open_houses WHERE user_id IN ('${a}', '${b}');
+         DELETE FROM public.listings WHERE id = '${listing}';
+         DELETE FROM public.profiles WHERE id IN ('${a}', '${b}');
+         DELETE FROM auth.users WHERE id IN ('${a}', '${b}');`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// 7c. Plan limits hold (20260923000002).
+//
+//     A tier is only real if the database refuses the thing the tier does not
+//     include. This drives each metered table up to its free-plan limit as the
+//     agent, asserts the next write is refused with the plan_limit DETAIL the
+//     app recognises, and that paying (and a lapsed payment) moves the line.
+// ---------------------------------------------------------------------------
+check('plan limits are enforced for every metered table', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-00000000f1a7';
+  const asAgent = (sql) =>
+    q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${uid}'; ${sql}`);
+  /** Runs sql as the agent and reports what happened: 'ok' or the plan_limit key. */
+  const attempt = (sql) => {
+    try {
+      asAgent(sql);
+      return 'ok';
+    } catch (e) {
+      const text = String(e.stderr || e.message);
+      const key = /plan_limit:(\w+)/.exec(text);
+      return key ? `blocked:${key[1]}` : `error:${text.split('\n').find((l) => l.includes('ERROR'))}`;
+    }
+  };
+  const listing = (n, status = 'active') =>
+    `INSERT INTO public.listings (id, user_id, address, city, price, status)
+       VALUES ('00000000-dead-beef-0000-0000000f1${String(n).padStart(3, '0')}', '${uid}',
+               '${n} Limit St', 'Testville', '1', '${status}');`;
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'limits@example.test') ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username, full_name, is_published)
+        VALUES ('${uid}', 'verifylimits', 'Verify Limits', true) ON CONFLICT (id) DO NOTHING;
+      DELETE FROM public.user_subscriptions WHERE user_id = '${uid}';
+    `);
+
+    // Free: 3 active listings.
+    for (let n = 1; n <= 3; n++) {
+      const r = attempt(listing(n));
+      if (r !== 'ok') out.push(`free plan: active listing ${n} of 3 was refused (${r})`);
+    }
+    const fourth = attempt(listing(4));
+    if (fourth !== 'blocked:listings') out.push(`free plan: a 4th active listing was "${fourth}", not blocked`);
+
+    // Marking one sold moves it to the sold bucket, which frees an active slot.
+    const sold = attempt(
+      `UPDATE public.listings SET status = 'sold' WHERE id = '00000000-dead-beef-0000-0000000f1001';`
+    );
+    if (sold !== 'ok') out.push(`free plan: marking a listing sold was "${sold}"`);
+    const refill = attempt(listing(5));
+    if (refill !== 'ok') out.push(`free plan: after one sold, a new active listing was "${refill}"`);
+    // Editing a listing that stays active costs nothing at the limit.
+    const edit = attempt(
+      `UPDATE public.listings SET status = 'pending' WHERE id = '00000000-dead-beef-0000-0000000f1002';`
+    );
+    if (edit !== 'ok') out.push(`free plan: moving active → pending at the limit was "${edit}"`);
+    // Re-listing a sold home needs an active slot.
+    const relist = attempt(
+      `UPDATE public.listings SET status = 'active' WHERE id = '00000000-dead-beef-0000-0000000f1001';`
+    );
+    if (relist !== 'blocked:listings') out.push(`free plan: re-listing a sold home at the limit was "${relist}"`);
+
+    // Free: 50 clients.
+    q(`INSERT INTO public.contacts (user_id, first_name) SELECT '${uid}', 'C' || g FROM generate_series(1, 50) g;`);
+    const client = attempt(`INSERT INTO public.contacts (user_id, first_name) VALUES ('${uid}', 'One too many');`);
+    if (client !== 'blocked:contacts') out.push(`free plan: a 51st client was "${client}"`);
+
+    // Free: one open house a month, counted by the month it happens in.
+    const openHouse = (when) =>
+      `INSERT INTO public.open_houses (user_id, listing_id, starts_at, ends_at)
+         VALUES ('${uid}', '00000000-dead-beef-0000-0000000f1003', ${when}, ${when} + interval '2 hours');`;
+    const freeMonth = `date_trunc('month', now()) + interval '1 month 3 days'`;
+    const freeOh = attempt(openHouse(freeMonth));
+    if (freeOh !== 'ok') out.push(`free plan: the one open house a month was "${freeOh}"`);
+    const freeOh2 = attempt(openHouse(`${freeMonth} + interval '5 hours'`));
+    if (freeOh2 !== 'blocked:open_houses_per_month') out.push(`free plan: a 2nd open house in a month was "${freeOh2}"`);
+
+    // Free: no follow-up workflows switched on.
+    const freeWorkflow = attempt(
+      `INSERT INTO public.workflows (user_id, name, is_active) VALUES ('${uid}', 'Nurture', true);`
+    );
+    if (freeWorkflow !== 'blocked:workflows') out.push(`free plan: an active workflow was "${freeWorkflow}"`);
+
+    // Free: a custom domain is not included.
+    const freeDomain = attempt(
+      `UPDATE public.profiles SET custom_domain = 'homes.example.test' WHERE id = '${uid}';`
+    );
+    if (!freeDomain.startsWith('error:') || !/custom domain/i.test(freeDomain)) {
+      out.push(`free plan: setting a custom domain was "${freeDomain}"`);
+    }
+
+    // Free: 10 leads a month. All twelve are stored; the last two are locked.
+    q(`INSERT INTO public.leads (user_id, lead_type, name, created_at)
+         SELECT '${uid}', 'buyer', 'Lead ' || g, date_trunc('month', now()) + make_interval(mins => g)
+           FROM generate_series(1, 12) g;`);
+    const [lockedCount] = q(`
+      SELECT count(*) FROM public.locked_lead_ids('${uid}',
+        ARRAY(SELECT id FROM public.leads WHERE user_id = '${uid}'));`);
+    if (lockedCount !== '2') out.push(`free plan: ${lockedCount} of 12 leads locked; expected the 2 past the allowance`);
+    const [firstLocked] = q(`
+      SELECT count(*) FROM public.locked_lead_ids('${uid}',
+        ARRAY(SELECT id FROM public.leads WHERE user_id = '${uid}' AND name = 'Lead 1'));`);
+    if (firstLocked !== '0') out.push('free plan: the first lead of the month is locked');
+
+    // Starter: five open houses a month, counted by the month they happen in.
+    q(`INSERT INTO public.user_subscriptions (user_id, plan_id, status, current_period_end)
+         SELECT '${uid}', id, 'active', now() + interval '20 days'
+           FROM public.subscription_plans WHERE name = 'starter';`);
+    const [unlocked] = q(`
+      SELECT count(*) FROM public.locked_lead_ids('${uid}',
+        ARRAY(SELECT id FROM public.leads WHERE user_id = '${uid}'));`);
+    if (unlocked !== '0') out.push(`starter: ${unlocked} leads still locked after upgrading`);
+
+    const nextMonth = `date_trunc('month', now()) + interval '2 months 3 days'`;
+    for (let n = 1; n <= 5; n++) {
+      const r = attempt(openHouse(`${nextMonth} + interval '${n} hours'`));
+      if (r !== 'ok') out.push(`starter: open house ${n} of 5 was refused (${r})`);
+    }
+    const sixth = attempt(openHouse(`${nextMonth} + interval '9 hours'`));
+    if (sixth !== 'blocked:open_houses_per_month') out.push(`starter: a 6th open house in one month was "${sixth}"`);
+    const otherMonth = attempt(openHouse(`${nextMonth} + interval '1 month'`));
+    if (otherMonth !== 'ok') out.push(`starter: an open house the month after was "${otherMonth}"`);
+
+    // Starter: three active workflows.
+    for (let n = 1; n <= 3; n++) {
+      const r = attempt(`INSERT INTO public.workflows (user_id, name, is_active) VALUES ('${uid}', 'W${n}', true);`);
+      if (r !== 'ok') out.push(`starter: active workflow ${n} of 3 was refused (${r})`);
+    }
+    const fourthWorkflow = attempt(`INSERT INTO public.workflows (user_id, name, is_active) VALUES ('${uid}', 'W4', true);`);
+    if (fourthWorkflow !== 'blocked:workflows') out.push(`starter: a 4th active workflow was "${fourthWorkflow}"`);
+    const draftWorkflow = attempt(`INSERT INTO public.workflows (user_id, name, is_active) VALUES ('${uid}', 'Draft', false);`);
+    if (draftWorkflow !== 'ok') out.push(`starter: saving an inactive workflow at the limit was "${draftWorkflow}"`);
+
+    // Starter: ten AI descriptions a month, charged at the moment of use.
+    const [tenth] = q(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month', 10) ->> 'allowed';`);
+    if (tenth !== 'true') out.push('starter: the 10 included AI descriptions were refused');
+    const [eleventh] = q(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month') ->> 'allowed';`);
+    if (eleventh !== 'false') out.push('starter: an 11th AI description was allowed');
+    q(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month', -1);`);
+    const [refunded] = q(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month') ->> 'allowed';`);
+    if (refunded !== 'true') out.push('starter: a refunded AI description was not available again');
+    try {
+      asAgent(`SELECT public.consume_plan_quota('${uid}', 'ai_listing_descriptions_per_month', -100);`);
+      out.push('consume_plan_quota is callable by agents; they could refund their own usage');
+    } catch {
+      /* expected: service role only */
+    }
+
+    const starterListing = attempt(listing(6));
+    if (starterListing !== 'ok') out.push(`starter: a 4th active listing was "${starterListing}"`);
+
+    // The meter reads the same numbers the trigger does.
+    const [meter] = asAgent(
+      `SELECT (public.get_plan_usage() -> 'usage' ->> 'listings') || '/' || (public.get_plan_usage() -> 'limits' ->> 'listings');`
+    );
+    if (meter !== '4/10') out.push(`get_plan_usage reports listings ${meter}; expected 4/10`);
+
+    // A cancelled plan that has run out is the free plan again, limits and all.
+    q(`UPDATE public.user_subscriptions SET status = 'canceled', current_period_end = now() - interval '1 day'
+         WHERE user_id = '${uid}';`);
+    const lapsed = attempt(listing(7));
+    if (lapsed !== 'blocked:listings') out.push(`a lapsed starter plan still allowed a 5th active listing ("${lapsed}")`);
+
+    // Analytics history follows the plan: free reads back 30 days.
+    q(`INSERT INTO public.analytics_views (user_id, viewed_at) VALUES
+         ('${uid}', now() - interval '5 days'), ('${uid}', now() - interval '60 days');`);
+    const [visible] = asAgent(`SELECT count(*) FROM public.analytics_views WHERE user_id = '${uid}';`);
+    if (visible !== '1') out.push(`free plan reads ${visible} analytics rows; only the one inside 30 days should show`);
+
+    // Branding shows on free, and the internal helpers are not callable directly.
+    const [branding] = q(`SET ROLE anon; SELECT public.profile_shows_branding('${uid}')::text;`);
+    if (branding !== 'true') out.push('a free profile does not show AgentBio branding');
+    try {
+      asAgent(`SELECT public.plan_limit('${uid}', 'listings');`);
+      out.push('plan_limit is callable by authenticated users; it should be internal');
+    } catch {
+      /* expected: EXECUTE revoked */
+    }
+
+    // Visitors are never metered: a review lands even when the agent is at the limit.
+    q(`INSERT INTO public.testimonials (user_id, client_name, review, rating, is_published)
+         SELECT '${uid}', 'T' || g, 'Great', 5, true FROM generate_series(1, 3) g;`);
+    const own = attempt(
+      `INSERT INTO public.testimonials (user_id, client_name, review, rating) VALUES ('${uid}', 'Fourth', 'Great', 5);`
+    );
+    if (own !== 'blocked:testimonials') out.push(`free plan: the agent's own 4th testimonial was "${own}"`);
+    try {
+      q(`SET ROLE anon;
+         INSERT INTO public.testimonials (user_id, client_name, review, rating, is_published)
+           VALUES ('${uid}', 'A visitor', 'Lovely to work with', 5, false);`);
+    } catch (e) {
+      out.push(`a visitor's review was refused because the agent is at their limit: ${String(e.stderr || e.message).split('\n')[0]}`);
+    }
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'plan limit check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.open_houses WHERE user_id = '${uid}';
+         DELETE FROM public.workflows WHERE user_id = '${uid}';
+         DELETE FROM public.feature_usage WHERE user_id = '${uid}';
+         DELETE FROM public.leads WHERE user_id = '${uid}';
+         DELETE FROM public.contacts WHERE user_id = '${uid}';
+         DELETE FROM public.testimonials WHERE user_id = '${uid}';
+         DELETE FROM public.analytics_views WHERE user_id = '${uid}';
+         DELETE FROM public.listings WHERE user_id = '${uid}';
+         DELETE FROM public.user_subscriptions WHERE user_id = '${uid}';
+         DELETE FROM public.profiles WHERE id = '${uid}';
+         DELETE FROM auth.users WHERE id = '${uid}';`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 8. Every SECURITY DEFINER function must pin search_path. Such a function runs
 //    with its owner's privileges, so if the caller controls how unqualified
 //    names inside it resolve, the caller controls what it operates on. Postgres

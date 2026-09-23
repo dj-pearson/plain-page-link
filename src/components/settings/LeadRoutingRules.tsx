@@ -32,7 +32,7 @@ interface LeadRoutingRulesProps {
   members: Member[];
 }
 
-const LEAD_TYPES = ['any', 'buyer', 'seller', 'valuation', 'contact'];
+const LEAD_TYPES = ['any', 'buyer', 'seller', 'valuation', 'contact', 'open_house'];
 
 export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
   const { rules, isLoading, createRule, toggleRule, deleteRule } = useLeadRouting(teamId);
@@ -118,7 +118,7 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
             <SelectContent>
               {LEAD_TYPES.map((t) => (
                 <SelectItem key={t} value={t}>
-                  {t === 'any' ? 'Any type' : t}
+                  {t === 'any' ? 'Any type' : t.replace('_', ' ')}
                 </SelectItem>
               ))}
             </SelectContent>
