@@ -33,6 +33,7 @@ import { useLeadContactAction } from '@/hooks/useLeadContactAction';
 import { useLeadsActivitySummaries } from '@/hooks/useLeadActivities';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
+import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
@@ -501,6 +502,9 @@ export default function Leads() {
         </div>
       </div>
 
+      {/* Leads are never refused; past the plan's monthly allowance this
+          only nudges (20260923000002). */}
+      <PlanLimitNotice limitKey="leads_per_month" />
       {/* Stats - Mobile optimized grid */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 sm:gap-4">
         <Card className="hover:shadow-md transition-shadow">

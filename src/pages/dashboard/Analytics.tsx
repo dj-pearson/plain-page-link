@@ -44,9 +44,14 @@ import {
   type AnalyticsData,
 } from '@/lib/analytics';
 import { logger } from '@/lib/logger';
+import { usePlanUsage } from '@/hooks/usePlanUsage';
+import { UpgradeModal } from '@/components/UpgradeModal';
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState<TimeRange>('30d');
+  const [analyticsUpgradeOpen, setAnalyticsUpgradeOpen] = useState(false);
+  const { status: planStatus, planName } = usePlanUsage();
+  const analyticsDays = planStatus('analytics_days').limit;
   const {
     stats,
     previousStats,
@@ -340,7 +345,20 @@ export default function Analytics() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setDateRange('7d')}>Last 7 days</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setDateRange('30d')}>Last 30 days</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDateRange('90d')}>Last 90 days</DropdownMenuItem>
+              {/* The database only returns as much history as the plan
+                  includes (analytics_visible_since, 20260923000002), so a
+                  range past it would chart an empty tail. Offer the upgrade
+                  instead. */}
+              {analyticsDays !== -1 && analyticsDays < 90 ? (
+                <DropdownMenuItem onClick={() => setAnalyticsUpgradeOpen(true)}>
+                  Last 90 days
+                  <span className="ml-2 text-xs text-muted-foreground">Upgrade</span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => setDateRange('90d')}>
+                  Last 90 days
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
@@ -623,6 +641,12 @@ export default function Analytics() {
           <ReportBuilder onGenerateReport={handleGenerateReport} />
         </TabsContent>
       </Tabs>
+      <UpgradeModal
+        open={analyticsUpgradeOpen}
+        onOpenChange={setAnalyticsUpgradeOpen}
+        feature="analytics"
+        currentPlan={planName}
+      />
     </div>
   );
 }

@@ -320,6 +320,39 @@ export default function Pricing() {
                             </span>
                           </li>
                         )}
+                        {plan.limits.contacts !== undefined && (
+                          <li className="flex items-start gap-2">
+                            <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                            <span className="text-sm">
+                              {plan.limits.contacts === -1
+                                ? 'Unlimited'
+                                : plan.limits.contacts.toLocaleString()}{' '}
+                              clients with key dates
+                            </span>
+                          </li>
+                        )}
+                        {plan.limits.open_houses_per_month !== undefined &&
+                          plan.limits.open_houses_per_month !== 0 && (
+                            <li className="flex items-start gap-2">
+                              <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                              <span className="text-sm">
+                                {plan.limits.open_houses_per_month === -1
+                                  ? 'Unlimited open houses'
+                                  : `${plan.limits.open_houses_per_month} open houses a month`}{' '}
+                                with sign-in kiosk
+                              </span>
+                            </li>
+                          )}
+                        {plan.limits.leads_per_month !== undefined && (
+                          <li className="flex items-start gap-2">
+                            <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                            <span className="text-sm">
+                              {plan.limits.leads_per_month === -1
+                                ? 'Unlimited leads'
+                                : `${plan.limits.leads_per_month} leads a month`}
+                            </span>
+                          </li>
+                        )}
                         {plan.limits.links !== undefined && (
                           <li className="flex items-start gap-2">
                             <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
@@ -352,7 +385,8 @@ export default function Pricing() {
                           </li>
                         )}
                         {Object.entries(plan.features).map(([key, value]) =>
-                          value ? (
+                          // Open houses are listed with their monthly count above.
+                          value && key !== 'openHouseManagement' ? (
                             <li key={key} className="flex items-start gap-2">
                               <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                               <span className="text-sm capitalize">{key.replace(/_/g, ' ')}</span>

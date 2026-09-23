@@ -712,6 +712,25 @@ the free tools (`instagram_bio_*`, `listing_*`).
   `verify:schema`; `extensions` is where pgcrypto lives, `pg_temp` is named last
   so it is searched last rather than first.
 
+**Plan limits (20260923000002):**
+- `get_user_plan()` is the one authority for what an agent's plan allows
+  (it applies the cancellation and failed-payment grace rules).
+  `plan_limit(user, key)` and `plan_usage(user, key)` answer from it; the flat
+  `subscriptions` table is a copy for admin screens, not an authority.
+- Enforced by BEFORE triggers on `listings` (active vs. sold buckets), `links`,
+  `testimonials`, `contacts` and `open_houses` (per calendar month), and by RLS
+  on `analytics_views` / `analytics_events` (history window). Only the owner's
+  own writes are metered; anon (a visitor's review) and service role pass.
+- A refusal is `check_violation` with DETAIL `plan_limit:<key>` and a message
+  written for the agent; `planLimitKeyFromError` in `src/lib/planLimits.ts`
+  recognises it.
+- `leads_per_month` is deliberately **not** enforced — a visitor's enquiry is
+  never refused. It only drives a nudge.
+- The frontend reads everything through `get_plan_usage()` (`usePlanUsage`).
+  A new limit needs: a key in `subscription_plans.limits`, a branch in
+  `plan_usage`, a trigger, an entry in `LIMIT_META`, and the matching number
+  in `src/config/pricing-plans.ts` (a test holds the two together).
+
 **Soft deletes:**
 - Effectively unused: exactly one table carries `deleted_at`. There is no
   `usesSoftDelete` hook, despite what this document used to claim.

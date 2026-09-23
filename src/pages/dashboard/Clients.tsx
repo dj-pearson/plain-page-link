@@ -16,6 +16,9 @@ import {
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ContactFormDialog } from '@/components/clients/ContactFormDialog';
 import { ContactDetail } from '@/components/clients/ContactDetail';
+import { PlanLimitNotice } from '@/components/PlanLimitNotice';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import { usePlanUsage } from '@/hooks/usePlanUsage';
 import {
   RELATIONSHIPS,
   contactName,
@@ -71,6 +74,15 @@ export default function Clients() {
   const [relationship, setRelationship] = useState<string>(ALL);
   const [dueOnly, setDueOnly] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { canAdd, planName } = usePlanUsage();
+
+  // The database refuses a client past the plan's limit; asking first means
+  // the agent meets the upgrade prompt before filling in a long form, not after.
+  const startAdding = () => {
+    if (canAdd('contacts')) setAdding(true);
+    else setUpgradeOpen(true);
+  };
 
   // The open contact lives in the URL so the Overview widget can deep-link to it.
   const selectedId = searchParams.get('client');
@@ -116,11 +128,13 @@ export default function Clients() {
             checked in.
           </p>
         </div>
-        <Button onClick={() => setAdding(true)} className="self-start sm:self-auto">
+        <Button onClick={startAdding} className="self-start sm:self-auto">
           <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
           Add client
         </Button>
       </div>
+
+      <PlanLimitNotice limitKey="contacts" />
 
       {isLoading ? (
         <div className="flex justify-center py-16">
@@ -149,7 +163,7 @@ export default function Clients() {
             birthdays and home anniversaries worth a card, and how often you want to check in. We
             will tell you when someone is due.
           </p>
-          <Button className="mt-6" onClick={() => setAdding(true)}>
+          <Button className="mt-6" onClick={startAdding}>
             <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
             Add your first client
           </Button>
@@ -268,6 +282,12 @@ export default function Clients() {
       )}
 
       <ContactFormDialog open={adding} onOpenChange={setAdding} onSaved={openContact} />
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        feature="contacts"
+        currentPlan={planName}
+      />
 
       {selectedId && (
         <ContactDetail

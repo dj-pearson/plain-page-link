@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
@@ -22,7 +22,16 @@ initSentry();
 // is read once here, at the landing URL, and kept for the session (US-188).
 captureAttribution();
 
-const queryClient = new QueryClient({
+const queryClient: QueryClient = new QueryClient({
+  // Any successful write may have moved a plan meter (a listing added, a
+  // client removed, an open house cancelled). Refreshing the one small
+  // get_plan_usage read after every mutation keeps meters and upgrade nudges
+  // truthful without each hook having to remember to (20260923000002).
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['plan-usage'] });
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes - reduces unnecessary refetches

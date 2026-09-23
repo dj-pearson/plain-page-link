@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastSaveError } from '@/lib/planLimitToast';
+import { usePlanUsage } from '@/hooks/usePlanUsage';
 import {
   Dialog,
   DialogContent,
@@ -222,6 +224,7 @@ interface ContactFormProps {
 
 function ContactForm({ contact, initial, onSaved, onClose }: ContactFormProps) {
   const { createContact, updateContact } = useContacts();
+  const { planName } = usePlanUsage();
   const isEdit = !!contact;
   const leadId = contact?.lead_id ?? initial?.lead_id ?? null;
 
@@ -250,10 +253,11 @@ function ContactForm({ contact, initial, onSaved, onClose }: ContactFormProps) {
         onSaved?.(id);
       }
       onClose();
-    } catch {
+    } catch (error) {
       // Email and phone are encrypted before they are written; if that step
       // fails the save fails as a whole, so there is no partial record to explain.
-      toast.error('Could not save. Please try again.');
+      // A plan's client limit is the other refusal, and gets its own message.
+      toastSaveError(error, 'Could not save. Please try again.', planName);
     }
   };
 

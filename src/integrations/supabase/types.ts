@@ -8970,6 +8970,14 @@ export type Database = {
       };
     };
     Functions: {
+      analytics_visible_since: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      assert_within_plan: {
+        Args: { _at?: string; _key: string; _user_id: string };
+        Returns: undefined;
+      };
       calculate_content_freshness_score: {
         Args: { p_analyzed_at: string };
         Returns: number;
@@ -9131,6 +9139,7 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: Record<string, unknown>[];
       };
+      get_plan_usage: { Args: Record<PropertyKey, never>; Returns: Json };
       get_public_open_house: {
         Args: { _open_house_id: string };
         Returns: Record<string, unknown>[];
@@ -9310,10 +9319,17 @@ export type Database = {
         };
         Returns: string;
       };
+      plan_limit: { Args: { _key: string; _user_id: string }; Returns: number };
+      plan_limit_label: { Args: { _key: string }; Returns: string };
+      plan_usage: {
+        Args: { _at?: string; _key: string; _user_id: string };
+        Returns: number;
+      };
       process_scheduled_account_deletions: {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
+      profile_shows_branding: { Args: { _user_id: string }; Returns: boolean };
       public_agent_response_hours: {
         Args: { _user_id: string };
         Returns: number;

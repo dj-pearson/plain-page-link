@@ -12,6 +12,9 @@ export interface PlanLimits {
   testimonials?: number;
   analytics_days?: number;
   themes?: number;
+  contacts?: number;
+  open_houses_per_month?: number;
+  leads_per_month?: number;
 }
 
 /**

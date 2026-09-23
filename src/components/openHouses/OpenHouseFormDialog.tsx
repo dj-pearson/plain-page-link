@@ -12,6 +12,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isSaturday, nextSaturday } from 'date-fns';
 import { toast } from 'sonner';
+import { toastSaveError } from '@/lib/planLimitToast';
+import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -108,6 +110,7 @@ export function OpenHouseFormDialog({
   const isEditing = !!openHouse;
   const { listings, isLoading: listingsLoading } = useListings();
   const { createOpenHouse, updateOpenHouse } = useOpenHouses();
+  const { planName } = usePlanUsage();
 
   const {
     control,
@@ -162,11 +165,15 @@ export function OpenHouseFormDialog({
         });
       }
       onOpenChange(false);
-    } catch {
-      toast.error(
+    } catch (error) {
+      // A month already at the plan's open-house allowance is refused by the
+      // database; say that, not "try again".
+      toastSaveError(
+        error,
         openHouse
           ? "Couldn't update the open house. Please try again."
-          : "Couldn't schedule the open house. Please try again."
+          : "Couldn't schedule the open house. Please try again.",
+        planName
       );
     }
   };

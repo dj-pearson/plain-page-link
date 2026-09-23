@@ -15,12 +15,15 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useContacts } from '@/hooks/useContacts';
+import { usePlanUsage } from '@/hooks/usePlanUsage';
+import { toastSaveError } from '@/lib/planLimitToast';
 import { relationshipForLead, splitName } from '@/lib/leadToClient';
 import type { Lead } from '@/types/lead';
 
 export function AddLeadToClientsButton({ lead }: { lead: Lead }) {
   const { user } = useAuthStore();
   const { createContact } = useContacts();
+  const { planName } = usePlanUsage();
 
   const existing = useQuery({
     queryKey: ['contacts', 'by-lead', lead.id],
@@ -65,8 +68,8 @@ export function AddLeadToClientsButton({ lead }: { lead: Lead }) {
       toast.success(`${lead.name} added to your clients`, {
         description: 'Add their family, birthdays and key dates from Clients.',
       });
-    } catch {
-      toast.error('Could not add to clients. Please try again.');
+    } catch (error) {
+      toastSaveError(error, 'Could not add to clients. Please try again.', planName);
     }
   };
 

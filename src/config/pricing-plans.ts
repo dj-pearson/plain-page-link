@@ -66,6 +66,9 @@ export interface PlanLimits {
   // Open house
   openHousesPerMonth: number;
 
+  // Client sphere (contacts, their families and key dates)
+  contacts: number;
+
   // Analytics
   analyticsRetentionDays: number;
 
@@ -111,6 +114,7 @@ export const PRICING_PLANS: PricingTier[] = [
       emailsPerMonth: 0,
       smsPerMonth: 0,
       openHousesPerMonth: 0,
+      contacts: 50,
       analyticsRetentionDays: 30,
       leadsPerMonth: 10,
     },
@@ -153,6 +157,7 @@ export const PRICING_PLANS: PricingTier[] = [
       emailsPerMonth: 500,
       smsPerMonth: 0, // SMS add-on
       openHousesPerMonth: 5,
+      contacts: 500,
       analyticsRetentionDays: 90,
       leadsPerMonth: 100,
     },
@@ -196,6 +201,7 @@ export const PRICING_PLANS: PricingTier[] = [
       emailsPerMonth: 2000,
       smsPerMonth: 500, // Included
       openHousesPerMonth: 15,
+      contacts: 2500,
       analyticsRetentionDays: 365,
       leadsPerMonth: -1, // unlimited
     },
@@ -238,6 +244,7 @@ export const PRICING_PLANS: PricingTier[] = [
       emailsPerMonth: 10000,
       smsPerMonth: 2000,
       openHousesPerMonth: -1,
+      contacts: -1,
       analyticsRetentionDays: 730, // 2 years
       leadsPerMonth: -1,
     },
@@ -280,6 +287,7 @@ export const PRICING_PLANS: PricingTier[] = [
       emailsPerMonth: -1,
       smsPerMonth: -1,
       openHousesPerMonth: -1,
+      contacts: -1,
       analyticsRetentionDays: -1, // forever
       leadsPerMonth: -1,
     },

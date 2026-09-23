@@ -21,6 +21,7 @@ import { QuickActionsWidget } from '@/components/dashboard/QuickActionsWidget';
 import { ConversionFunnel } from '@/components/dashboard/ConversionFunnel';
 import { DueFollowUps } from '@/components/dashboard/DueFollowUps';
 import { ComingUp } from '@/components/dashboard/ComingUp';
+import { PlanUsageCard } from '@/components/dashboard/PlanUsageCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getPlanById } from '@/config/pricing-plans';
 import {
@@ -155,6 +156,8 @@ export default function Overview() {
       <DueFollowUps />
 
       <ComingUp />
+
+      <PlanUsageCard />
 
       {/* Conversion Funnel */}
       <ConversionFunnel />

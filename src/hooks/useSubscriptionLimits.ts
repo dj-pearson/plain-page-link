@@ -1,17 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
-
-export interface SubscriptionLimits {
-  plan_name: string;
-  max_listings: number;
-  max_links: number;
-  max_testimonials: number;
-  analytics_history_days: number;
-  custom_domain_enabled: boolean;
-  remove_branding: boolean;
-  priority_support: boolean;
-}
+/**
+ * Listings, links and testimonials limits, for the pages that gate on them.
+ *
+ * This used to read the flat `subscriptions` copy that stripe-webhook writes,
+ * and count rows itself — a second answer that could disagree with the plan
+ * the database enforces (and did: it never lapsed with a cancelled plan, and
+ * its counts included sample data the triggers exclude). It is now a thin view
+ * over usePlanUsage, keeping the shape its callers already use.
+ */
+import { usePlanUsage } from '@/hooks/usePlanUsage';
 
 export interface UsageCounts {
   listings: number;
@@ -20,85 +16,38 @@ export interface UsageCounts {
 }
 
 export function useSubscriptionLimits() {
-  const { user } = useAuthStore();
+  const { plan, isLoading, status, hasFeature } = usePlanUsage();
 
-  const { data: subscription, isLoading: subscriptionLoading } = useQuery({
-    queryKey: ["subscription", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
+  const subscription = plan
+    ? {
+        plan_name: plan.plan_name,
+        custom_domain_enabled: plan.features.customDomain === true,
+        remove_branding: plan.features.removeBranding === true,
+        priority_support: plan.features.prioritySupport === true,
+      }
+    : null;
 
-      const { data, error } = await supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      if (error) throw error;
-      return data as SubscriptionLimits;
-    },
-    enabled: !!user?.id,
-  });
-
-  const { data: usage, isLoading: usageLoading } = useQuery({
-    queryKey: ["usage", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return { listings: 0, links: 0, testimonials: 0 };
-
-      const [listings, links, testimonials] = await Promise.all([
-        supabase.from("listings").select("id", { count: "exact" }).eq("user_id", user.id),
-        supabase.from("links").select("id", { count: "exact" }).eq("user_id", user.id),
-        supabase.from("testimonials").select("id", { count: "exact" }).eq("user_id", user.id),
-      ]);
-
-      return {
-        listings: listings.count || 0,
-        links: links.count || 0,
-        testimonials: testimonials.count || 0,
-      };
-    },
-    enabled: !!user?.id,
-  });
-
-  const canAdd = (feature: keyof UsageCounts) => {
-    if (!subscription || !usage) return false;
-    
-    const limit = subscription[`max_${feature}` as keyof SubscriptionLimits] as number;
-    const current = usage[feature];
-    
-    // -1 means unlimited
-    if (limit === -1) return true;
-    
-    return current < limit;
-  };
-
-  const hasFeature = (feature: keyof Pick<SubscriptionLimits, 'custom_domain_enabled' | 'remove_branding' | 'priority_support'>) => {
-    return subscription?.[feature] || false;
-  };
+  const usage: UsageCounts | undefined = plan
+    ? {
+        listings: plan.usage.listings ?? 0,
+        links: plan.usage.links ?? 0,
+        testimonials: plan.usage.testimonials ?? 0,
+      }
+    : undefined;
 
   const getLimit = (feature: keyof UsageCounts) => {
-    if (!subscription) return 0;
-    const limit = subscription[`max_${feature}` as keyof SubscriptionLimits] as number;
+    const { limit } = status(feature);
     return limit === -1 ? Infinity : limit;
-  };
-
-  const getUsage = (feature: keyof UsageCounts) => {
-    return usage?.[feature] || 0;
-  };
-
-  const getRemainingCount = (feature: keyof UsageCounts) => {
-    const limit = getLimit(feature);
-    const current = getUsage(feature);
-    return limit === Infinity ? Infinity : Math.max(0, limit - current);
   };
 
   return {
     subscription,
     usage,
-    isLoading: subscriptionLoading || usageLoading,
-    canAdd,
+    isLoading,
+    canAdd: (feature: keyof UsageCounts) => status(feature).canAdd,
     hasFeature,
     getLimit,
-    getUsage,
-    getRemainingCount,
+    getUsage: (feature: keyof UsageCounts) => usage?.[feature] ?? 0,
+    getRemainingCount: (feature: keyof UsageCounts) => status(feature).remaining,
   };
 }

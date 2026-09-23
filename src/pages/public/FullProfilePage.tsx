@@ -24,6 +24,7 @@ import { UpcomingOpenHouses } from '@/components/profile/UpcomingOpenHouses';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
 import { trackContactTap } from '@/lib/analyticsEvents';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
+import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
 import { SEOHead } from '@/components/SEOHead';
 import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
 import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
@@ -102,6 +103,8 @@ export default function FullProfilePage() {
   // and the page their visitors actually saw tracked nothing at all. There is
   // no redirect any more (US-116): the blocks render below, on this page.
   useProfileTracking(data?.profile?.id, slug || '');
+  // Plans with removeBranding hide "Powered by AgentBio" (20260923000002).
+  const showBranding = useProfileShowsBranding(data?.profile?.id);
 
   // Apply theme when profile loads - IMPORTANT: All hooks must be before conditional returns
   useEffect(() => {
@@ -691,17 +694,19 @@ export default function FullProfilePage() {
                   © {new Date().getFullYear()} {profile.full_name || profile.username}. All rights
                   reserved.
                 </p>
-                <p className="text-xs text-gray-600 mt-1 sm:mt-2">
-                  Powered by{' '}
-                  <a
-                    href="https://agentbio.net"
-                    className="hover:text-blue-600 active:text-blue-700 hover:underline"
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    AgentBio.net
-                  </a>
-                </p>
+                {showBranding && (
+                  <p className="text-xs text-gray-600 mt-1 sm:mt-2">
+                    Powered by{' '}
+                    <a
+                      href="https://agentbio.net"
+                      className="hover:text-blue-600 active:text-blue-700 hover:underline"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      AgentBio.net
+                    </a>
+                  </p>
+                )}
               </div>
             </footer>
           </div>

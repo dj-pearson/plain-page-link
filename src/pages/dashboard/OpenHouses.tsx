@@ -51,6 +51,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { OpenHouseFormDialog } from '@/components/openHouses/OpenHouseFormDialog';
 import { OpenHouseVisitorsDialog } from '@/components/openHouses/OpenHouseVisitorsDialog';
+import { PlanLimitNotice } from '@/components/PlanLimitNotice';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { formatOpenHouseAddress, useOpenHouses, type OpenHouse } from '@/hooks/useOpenHouses';
 import { useListings } from '@/hooks/useListings';
 import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
@@ -231,6 +234,8 @@ export default function OpenHouses() {
   const [visitorsFor, setVisitorsFor] = useState<OpenHouse | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [showCancelled, setShowCancelled] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { status, planName } = usePlanUsage();
 
   const { upcoming, past, cancelled } = useMemo(() => {
     const now = Date.now();
@@ -252,7 +257,15 @@ export default function OpenHouses() {
 
   const hasListings = listings.length > 0;
 
+  // Free has no open houses and paid plans a monthly allowance. The allowance
+  // is per month and the month is only known once a date is picked, so a full
+  // month is refused by the database on save (with its own upgrade message).
+  // Here the agent is stopped only when the plan has no open houses at all.
   const openCreate = () => {
+    if (status('open_houses_per_month').level === 'locked') {
+      setUpgradeOpen(true);
+      return;
+    }
     setEditing(null);
     setFormOpen(true);
   };
@@ -335,6 +348,8 @@ export default function OpenHouses() {
           Schedule open house
         </Button>
       </div>
+
+      <PlanLimitNotice limitKey="open_houses_per_month" />
 
       {isLoading && (
         <div className="space-y-4" aria-busy="true" aria-label="Loading open houses">
@@ -486,6 +501,12 @@ export default function OpenHouses() {
       )}
 
       <OpenHouseFormDialog open={formOpen} onOpenChange={setFormOpen} openHouse={editing} />
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        feature="open_houses_per_month"
+        currentPlan={planName}
+      />
 
       <OpenHouseVisitorsDialog
         openHouse={visitorsFor}
