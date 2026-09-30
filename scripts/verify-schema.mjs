@@ -1949,6 +1949,45 @@ check('lead_stats counts every lead the caller owns, and only those', () => {
   return out;
 });
 
+check('a routed lead reaches the accepted teammate, who can read it and is notified', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-00000007ea01';
+  const mate = '00000000-dead-beef-0000-00000007ea02';
+  const team = '00000000-dead-beef-0000-00000007ea03';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${owner}', 'owner@example.test'), ('${mate}', 'mate@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.teams (id, name, owner_id) VALUES ('${team}', 'Verify Team', '${owner}');
+       INSERT INTO public.team_members (team_id, user_id, email, role, accepted_at)
+         VALUES ('${team}', '${mate}', 'mate@example.test', 'member', now());`);
+    // The owner's own row is left out on purpose: round robin then has one member.
+    q(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email)
+         VALUES ('${owner}', 'buyer', 'Routed Lead', 'enc');`);
+    const [assigned] = q(`SELECT assigned_to FROM public.leads WHERE user_id = '${owner}' AND name = 'Routed Lead';`);
+    if (assigned !== mate) out.push(`the lead was assigned to "${assigned}", expected the accepted teammate`);
+    const [visible] = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${mate}';
+      SELECT count(*) FROM public.leads WHERE user_id = '${owner}';`);
+    if (visible !== '1') out.push(`the teammate can read ${visible} of the owner's leads, expected the 1 assigned`);
+    const [notified] = q(`SELECT count(*) FROM public.notifications WHERE user_id = '${mate}' AND type = 'lead_assigned';`);
+    if (notified !== '1') out.push(`the teammate has ${notified} lead_assigned notifications, expected 1`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}');
+         DELETE FROM public.leads WHERE user_id = '${owner}';
+         DELETE FROM public.team_round_robin WHERE team_id = '${team}';
+         DELETE FROM public.team_members WHERE team_id = '${team}';
+         DELETE FROM public.teams WHERE id = '${team}';
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // 9. Every column named in a .select('...') list must exist on the target table.
 //    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and

@@ -38,6 +38,8 @@ export interface LeadFilters {
   leadType?: string;
   /** Matched against the name in SQL. Email cannot be searched — it is ciphertext. */
   search?: string;
+  /** Only leads a teammate's routing assigned to me (US-226). */
+  assignedToMe?: boolean;
 }
 
 /**
@@ -47,8 +49,16 @@ export interface LeadFilters {
  * minutes their staleTime allows (US-104).
  */
 /** The list's filters as a query; shared by the paged list and the export. */
-function leadsQuery(userId: string, filters: { status?: string; leadType?: string; search?: string }) {
-  let query = supabase.from('leads').select('*').eq('user_id', userId);
+function leadsQuery(
+  userId: string,
+  filters: { status?: string; leadType?: string; search?: string; assignedToMe?: boolean }
+) {
+  // US-226: my leads AND the ones assigned to me. RLS always allowed the
+  // assignee to read them; this query filtered on user_id alone, so a lead the
+  // team's routing handed to a member never appeared anywhere they could see.
+  // userId is the session's own id, safe in the filter string.
+  let query = supabase.from('leads').select('*').or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
+  if (filters.assignedToMe) query = query.eq('assigned_to', userId);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.leadType) query = query.eq('lead_type', filters.leadType);
   // Name only: email and phone are ciphertext since US-086, so an ilike
@@ -77,6 +87,7 @@ export async function fetchAllLeads(
     status: filters.status && filters.status !== 'all' ? filters.status : undefined,
     leadType: filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined,
     search: filters.search?.trim() || undefined,
+    assignedToMe: filters.assignedToMe,
   };
   const out: Lead[] = [];
   for (let from = 0; from < EXPORT_MAX_LEADS; from += EXPORT_BATCH) {
@@ -98,6 +109,7 @@ export function useLeads(filters: LeadFilters = {}) {
   const status = filters.status && filters.status !== 'all' ? filters.status : undefined;
   const leadType = filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined;
   const search = filters.search?.trim() || undefined;
+  const assignedToMe = filters.assignedToMe || undefined;
 
   const {
     data,
@@ -109,7 +121,7 @@ export function useLeads(filters: LeadFilters = {}) {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['leads', user?.id, { status, leadType, search }],
+    queryKey: ['leads', user?.id, { status, leadType, search, assignedToMe }],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       if (!user?.id) return [];
@@ -119,7 +131,7 @@ export function useLeads(filters: LeadFilters = {}) {
       // also meant decryptLeadRows sent every ciphertext to pii-crypto on each
       // visit (US-104).
       const from = (pageParam as number) * LEADS_PAGE_SIZE;
-      const { data, error } = await leadsQuery(user.id, { status, leadType, search }).range(
+      const { data, error } = await leadsQuery(user.id, { status, leadType, search, assignedToMe }).range(
         from,
         from + LEADS_PAGE_SIZE - 1
       );

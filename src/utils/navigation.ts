@@ -11,6 +11,8 @@ import { logger } from "@/lib/logger";
  */
 const ALLOWED_REDIRECT_PATHS = [
   '/dashboard',
+  // US-226: a team invite link survives the trip through login.
+  '/team/accept',
   '/profile',
   '/listings',
   '/leads',

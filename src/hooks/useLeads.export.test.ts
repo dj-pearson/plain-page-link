@@ -10,6 +10,7 @@ vi.mock('@/integrations/supabase/client', () => {
   const builder = {
     select: () => builder,
     eq: () => builder,
+    or: () => builder,
     ilike: () => builder,
     order: () => builder,
     range: async (from: number, to: number) => {

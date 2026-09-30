@@ -3,12 +3,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { sendEmail, escapeHtml } from '../_shared/email.ts';
+import { getSiteUrl } from '../_shared/env.ts';
+import { generateInviteToken, hashInviteToken, inviteAcceptUrl, INVITE_TOKEN_RE } from './invites.ts';
 
 /**
  * Teams CRUD + membership.
  *   POST { action: 'create', name }
  *   POST { action: 'invite', teamId, email, role? }
- *   POST { action: 'accept', teamId }
+ *   POST { action: 'accept', teamId, token }   (token from the emailed link, US-226)
  *   POST { action: 'remove', teamId, memberId }
  *   POST { action: 'updateRole', teamId, memberId, role }
  *
@@ -91,29 +94,59 @@ serve(async (req) => {
       // Nothing is lost by removing it: the 'accept' action below links the row
       // by email (`user_id.eq.<id>,email.eq.<address>`), which is the only
       // moment the invitee is actually present to be linked.
+      // US-226: the invite used to stop here — a row nobody was told about and
+      // no page could accept. It now carries a one-time token (stored hashed)
+      // and the invitee gets a link to /team/accept.
+      const token = generateInviteToken();
+      const inviteEmail = String(email).trim().toLowerCase();
       const { data: member, error } = await service
         .from('team_members')
         .insert({
           team_id: teamId,
           user_id: null,
-          email: String(email).toLowerCase(),
+          email: inviteEmail,
           role: role === 'admin' ? 'admin' : 'member',
+          invite_token_hash: await hashInviteToken(token),
+          invite_sent_at: new Date().toISOString(),
         })
-        .select('*')
+        .select('id, team_id, email, role, invited_at, accepted_at')
         .single();
       if (error) throw error;
-      return successResponse({ member }, req);
+
+      const { data: teamRow } = await service.from('teams').select('name').eq('id', teamId).maybeSingle();
+      const teamName = (teamRow?.name as string | undefined) ?? 'their team';
+      const link = inviteAcceptUrl(getSiteUrl(), teamId, token);
+      const sent = await sendEmail({
+        to: inviteEmail,
+        subject: `You're invited to join ${teamName} on AgentBio`,
+        body: `${user.email} invited you to join ${teamName} on AgentBio.\n\nAccept the invitation: ${link}\n\nIf you weren't expecting this, you can ignore it.`,
+        html: `<p>${escapeHtml(user.email ?? 'A teammate')} invited you to join <strong>${escapeHtml(teamName)}</strong> on AgentBio.</p><p><a href="${escapeHtml(link)}">Accept the invitation</a></p><p>If you weren't expecting this, you can ignore it.</p>`,
+      });
+      if (!sent.ok) console.error(`[teams] invite email to ${inviteEmail} failed: ${sent.error}`);
+
+      return successResponse({ member, emailed: sent.ok }, req);
     }
 
     if (action === 'accept') {
-      const { teamId } = body;
-      if (!teamId) return errorResponse('teamId is required', 'REQUEST_VALIDATION_FAILED', req);
-      const { error } = await service
+      // US-226: by token. This matched on the caller's email instead,
+      // interpolated into a PostgREST filter string, so anyone able to sign up
+      // under an invited address could take the seat.
+      const { teamId, token } = body;
+      if (!teamId || typeof token !== 'string' || !INVITE_TOKEN_RE.test(token)) {
+        return errorResponse('teamId and token are required', 'REQUEST_VALIDATION_FAILED', req);
+      }
+      const { data: accepted, error } = await service
         .from('team_members')
-        .update({ user_id: user.id, accepted_at: new Date().toISOString() })
+        .update({ user_id: user.id, accepted_at: new Date().toISOString(), invite_token_hash: null })
         .eq('team_id', teamId)
-        .or(`user_id.eq.${user.id},email.eq.${String(user.email).toLowerCase()}`);
+        .eq('invite_token_hash', await hashInviteToken(token))
+        .is('accepted_at', null)
+        .select('id')
+        .maybeSingle();
       if (error) throw error;
+      if (!accepted) {
+        return errorResponse('This invitation is invalid or has already been used', 'NOT_FOUND', req, 404);
+      }
       return successResponse({ accepted: true }, req);
     }
 

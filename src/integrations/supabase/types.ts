@@ -7515,6 +7515,8 @@ export type Database = {
           accepted_at: string | null;
           email: string | null;
           id: string;
+          invite_sent_at: string | null;
+          invite_token_hash: string | null;
           invited_at: string;
           role: string;
           team_id: string;
@@ -7524,6 +7526,8 @@ export type Database = {
           accepted_at?: string | null;
           email?: string | null;
           id?: string;
+          invite_sent_at?: string | null;
+          invite_token_hash?: string | null;
           invited_at?: string;
           role?: string;
           team_id: string;
@@ -7533,6 +7537,8 @@ export type Database = {
           accepted_at?: string | null;
           email?: string | null;
           id?: string;
+          invite_sent_at?: string | null;
+          invite_token_hash?: string | null;
           invited_at?: string;
           role?: string;
           team_id?: string;

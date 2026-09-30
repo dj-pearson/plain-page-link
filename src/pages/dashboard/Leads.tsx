@@ -26,6 +26,8 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useLeads, fetchAllLeads } from '@/hooks/useLeads';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { exportToCSV } from '@/lib/exportUtils';
@@ -81,8 +83,9 @@ export default function Leads() {
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = searchParams.get('status') ?? 'all';
   const typeFilter = searchParams.get('type') ?? 'all';
+  const assignedToMe = searchParams.get('assigned') === 'me';
 
-  const setFilter = (key: 'status' | 'type', value: string) => {
+  const setFilter = (key: 'status' | 'type' | 'assigned', value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value === 'all') next.delete(key);
     else next.set(key, value);
@@ -112,7 +115,22 @@ export default function Leads() {
     isFetchingNextPage,
     bulkUpdateStatus,
     bulkDelete,
-  } = useLeads({ status: statusFilter, leadType: typeFilter, search: searchQuery });
+  } = useLeads({ status: statusFilter, leadType: typeFilter, search: searchQuery, assignedToMe });
+
+  // Only teammates have leads assigned to them; the filter shows for them.
+  const { data: assignedCount = 0 } = useQuery({
+    queryKey: ['leads-assigned-count', user?.id],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('assigned_to', user!.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
 
   // Tapping a lead's email or phone number on the card records the response,
   // the same way the detail modal does (US-101).
@@ -347,7 +365,12 @@ export default function Leads() {
     let exportLeads: Lead[];
     let truncated = false;
     try {
-      const all = await fetchAllLeads(user.id, { status: statusFilter, leadType: typeFilter, search: searchQuery });
+      const all = await fetchAllLeads(user.id, {
+        status: statusFilter,
+        leadType: typeFilter,
+        search: searchQuery,
+        assignedToMe,
+      });
       truncated = all.truncated;
       exportLeads = needsAttentionOnly ? all.leads.filter(isNeedsAttention) : all.leads;
     } catch (err) {
@@ -682,6 +705,16 @@ export default function Leads() {
                 (US-105). It is a rules-based priority, and it says so. */}
             <span className="hidden sm:inline">{sortBy === 'score' ? 'Priority' : 'Recent'}</span>
           </Button>
+          {(assignedCount > 0 || assignedToMe) && (
+            <Button
+              variant={assignedToMe ? 'default' : 'outline'}
+              onClick={() => setFilter('assigned', assignedToMe ? 'all' : 'me')}
+              className="min-h-[44px] flex-shrink-0"
+              aria-pressed={assignedToMe}
+            >
+              Assigned to me
+            </Button>
+          )}
           <Button
             variant={needsAttentionOnly ? 'default' : 'outline'}
             onClick={() => setNeedsAttentionOnly((v) => !v)}

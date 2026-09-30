@@ -3569,8 +3569,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "teams/index.ts:67-105 inserts user_id null and sends nothing; accept at :108-118 has no caller; routing needs accepted_at (20260902000006:85); useLeads.ts:78 filters user_id only; pii-crypto:192. Production is also missing teams tables (US-146)."
+      "passes": true,
+      "notes": "teams/index.ts:67-105 inserts user_id null and sends nothing; accept at :108-118 has no caller; routing needs accepted_at (20260902000006:85); useLeads.ts:78 filters user_id only; pii-crypto:192. Production is also missing teams tables (US-146). DONE: teams invite generates a 256-bit token, stores only its SHA-256 (team_members.invite_token_hash — the roster is readable by every member) and emails /team/accept?team=&token= (teams/invites.ts, unit-tested); accept redeems by token, once, and no longer matches on the caller's email interpolated into a PostgREST .or() string (which let anyone who could register an invited address take the seat). New /team/accept page inside RequireAuth; /team/accept added to the login redirect allowlist, exempted from the first-run onboarding redirect, given a _redirects rule and an a11y-suite entry. useLeads/fetchAllLeads read user_id OR assigned_to, with an 'Assigned to me' filter (URL assigned=me; button shown only when you have assigned leads). pii-crypto decrypts assigned leads too and checks the lock against each lead's OWNER. New AFTER INSERT/UPDATE OF assigned_to trigger notify_lead_assignee writes a notifications row (migration 20260930000006). verify-schema: routed lead → accepted teammate can read it and has a lead_assigned notification (fails without the migration). TeamPage says whether the email went. Note: production lacks teams/team_members/notifications (US-146) — apply migrations there first."
     },
     {
       "id": "US-227",
