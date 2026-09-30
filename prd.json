@@ -3519,8 +3519,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Measured 2026-09-30: npm audit high exits 1 (axios, brace-expansion); 677 ESLint warnings hidden by --max-warnings=-1. Overlaps open US-124/US-125 — close whichever criteria this satisfies."
+      "passes": true,
+      "notes": "Measured 2026-09-30: npm audit high exits 1 (axios, brace-expansion); 677 ESLint warnings hidden by --max-warnings=-1. Overlaps open US-124/US-125 — close whichever criteria this satisfies. DONE: removed axios, jsonwebtoken, workbox-build/-precaching/-routing/-strategies (zero imports; workbox-window is used and kept) and the unreferenced Hero3D.tsx / Hero3DPhone.tsx. `npm audit fix` crashes on an npm bug (edgesOut null), so advisories were fixed individually: dompurify to latest, react-router-dom 6.30.6, brace-expansion/fflate/postcss-selector-parser updated. `npm audit --audit-level=high` (CI's exact command, dev deps included) now exits 0: 0 high, 0 critical, 6 moderate. react-router's GHSA-wrjc-x8rr-h8h6 is only fixed in v7 (a major migration, not done): the one untrusted navigate() (Login ?redirect=) already goes through an allowlist, and validateRedirectPath now also refuses any backslash, with a new test. ESLint in ci.yml: --max-warnings=675 (today's count) in both jobs instead of -1. NOT done: making react-hooks/exhaustive-deps an error (19 call sites need individual review — left for the ratchet). vite build passes; route-weight not runnable here (Playwright/Chromium version mismatch), CI runs it."
     },
     {
       "id": "US-224",

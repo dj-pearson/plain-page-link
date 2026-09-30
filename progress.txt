@@ -4565,3 +4565,11 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - health-check: unauthenticated liveness {ok} for uptime monitors.
 - Owner: set SENTRY_DSN (Coolify) + VITE_SENTRY_DSN (Pages build + runtime),
   add two uptime monitors.
+
+## Roadmap loop — iteration 11/20 — US-223: a red security job
+
+- Six unused packages and two dead 3D components removed; remaining
+  advisories fixed one by one (npm audit fix crashes). High/critical: 0.
+- react-router open redirect needs v7; mitigated at the only untrusted
+  navigate (backslash refused, tested).
+- Lint can fail again: --max-warnings=675, lower as warnings go.
