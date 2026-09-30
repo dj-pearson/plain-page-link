@@ -4494,3 +4494,13 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
   Now one implementation, rightmost-hop, configurable. Four Stripe functions
   had their own copy of the leftmost read; they use the shared one.
 - Sandbox cannot reach esm.sh, so full `deno check` / smoke run only in CI.
+
+## Roadmap loop — iteration 3/20 — US-215: the paywall had an off switch
+
+- Agents could write is_sample; every limit trigger and the lead lock skip
+  sample rows. Now only an admin or the service role can set/change it
+  (invoker trigger), sample rows are hidden from visitors, and the link /
+  testimonial limit triggers also run when a sample becomes real.
+- Kept the admin SampleDataManager path instead of an RPC (noted in prd).
+- Guard reproduces insert-as-sample, flip-to-sample and public visibility;
+  4 failures before, clean after.

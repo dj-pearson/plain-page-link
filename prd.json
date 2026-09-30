@@ -3393,8 +3393,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Reproduced by the backend audit. Limit triggers return early on NEW.is_sample (20260923000002:269,290); locked_lead_ids skips samples (20260923000003:242)."
+      "passes": true,
+      "notes": "Reproduced by the backend audit. Limit triggers return early on NEW.is_sample (20260923000002:269,290); locked_lead_ids skips samples (20260923000003:242). DONE: migration 20260930000002. guard_is_sample (SECURITY INVOKER so current_user is the caller) on leads/links/listings/testimonials refuses anon/authenticated setting or changing is_sample unless has_role admin; service role passes. Deviation from the criterion: seeding was NOT moved to an RPC — the only writer is the admin SampleDataManager (and sample leads need client-side pii-crypto encryption), so restricting the flag to admins closes the hole with less churn. Public SELECT policies on listings/links/testimonials add AND NOT is_sample. Link and testimonial limit triggers fire on UPDATE OF is_sample too. verify-schema check reproduces the bypasses: 4 failures on the pre-fix tree, passes after. Note: leads has no plaintext email column (US-086) and listings.beds/baths are generated — CLAUDE.md's schema section is stale on both."
     },
     {
       "id": "US-216",

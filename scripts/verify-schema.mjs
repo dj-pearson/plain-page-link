@@ -1844,6 +1844,73 @@ check('account deletion and session reads are refused for another user', () => {
   return out;
 });
 
+check('is_sample cannot be written by an agent, and samples are never public', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-0000005a3b1e';
+  const admin = '00000000-dead-beef-0000-0000005a3b1f';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'sample@example.test'), ('${admin}', 'admin@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username) VALUES ('${uid}', 'verifysample'), ('${admin}', 'verifyadmin')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.user_roles (user_id, role) VALUES ('${admin}', 'admin') ON CONFLICT DO NOTHING;
+    `);
+
+    // 1. Insert as a sample to dodge the limit.
+    if (!refused(() => as(uid, `INSERT INTO public.links (user_id, title, url, position, is_sample)
+                                VALUES ('${uid}', 'x', 'https://example.test', 1, true);`)))
+      out.push('an agent inserted a link with is_sample = true');
+    if (!refused(() => as(uid, `INSERT INTO public.listings (user_id, address, city, price, status, is_sample)
+                                VALUES ('${uid}', '1 Sample St', 'Testville', '1', 'active', true);`)))
+      out.push('an agent inserted a listing with is_sample = true');
+
+    // 2. Flip a real row to a sample (this is how locked leads were unlocked).
+    q(`INSERT INTO public.leads (id, user_id, lead_type, name, encrypted_email)
+         VALUES ('00000000-dead-beef-0000-0000005a3b20', '${uid}', 'buyer', 'L', 'enc:v1:x');`);
+    if (!refused(() => as(uid, `UPDATE public.leads SET is_sample = true WHERE user_id = '${uid}';`)))
+      out.push('an agent flipped their own lead to is_sample = true');
+
+    // An agent's ordinary edits still work.
+    if (refused(() => as(uid, `UPDATE public.leads SET notes = 'called' WHERE user_id = '${uid}';`)))
+      out.push("an agent could not edit their own lead's notes");
+
+    // The admin tool still seeds samples, and visitors never see them.
+    if (refused(() => as(admin, `INSERT INTO public.listings (user_id, address, city, price, status, is_sample)
+                                 VALUES ('${admin}', '2 Sample St', 'Testville', '1', 'active', true);`)))
+      out.push('an admin could not seed a sample listing');
+    q(`INSERT INTO public.links (user_id, title, url, position, is_active, is_sample)
+         VALUES ('${admin}', 'demo', 'https://example.test', 1, true, true);`);
+    const [pub] = q(`SET ROLE anon;
+      SELECT (SELECT count(*) FROM public.listings WHERE user_id = '${admin}')
+           + (SELECT count(*) FROM public.links WHERE user_id = '${admin}');`);
+    if (pub !== '0') out.push(`visitors can see ${pub} sample rows`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.leads WHERE user_id IN ('${uid}', '${admin}');
+         DELETE FROM public.links WHERE user_id IN ('${uid}', '${admin}');
+         DELETE FROM public.listings WHERE user_id IN ('${uid}', '${admin}');
+         DELETE FROM public.user_roles WHERE user_id = '${admin}';
+         DELETE FROM public.profiles WHERE id IN ('${uid}', '${admin}');
+         DELETE FROM auth.users WHERE id IN ('${uid}', '${admin}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // 9. Every column named in a .select('...') list must exist on the target table.
 //    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and
