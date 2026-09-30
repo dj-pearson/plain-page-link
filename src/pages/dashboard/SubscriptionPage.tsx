@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Loader2, ExternalLink, CreditCard } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription, stripePriceIdFor, type SubscriptionPlan } from '@/hooks/useSubscription';
@@ -63,7 +63,12 @@ export default function SubscriptionPage() {
   const [actionPlan, setActionPlan] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
+  const queryClient = useQueryClient();
   const currentPlanId = (subscription?.plan_name ?? 'free').toLowerCase();
+  const currentPlan = plans.find((p) => p.name === currentPlanId);
+  /** Upgrade or downgrade, by list price against the plan the agent is on. */
+  const changeLabel = (plan: SubscriptionPlan) =>
+    Number(plan.price_monthly) < Number(currentPlan?.price_monthly ?? 0) ? 'Downgrade' : 'Upgrade';
 
   const { data: invoices } = useQuery({
     queryKey: ['billing-invoices', user?.id],
@@ -119,11 +124,27 @@ export default function SubscriptionPage() {
       if (error) throw error;
       if (data?.url) {
         window.location.href = data.url;
+        return;
+      }
+      // Already subscribed: Stripe changed the existing subscription in place
+      // (prorated) instead of opening a second one (US-217). The webhook
+      // records it; refetch shortly so the new plan shows.
+      if (data && 'changed' in data) {
+        toast({
+          title: data.changed ? `Switched to ${plan.name}` : `You're already on ${plan.name}`,
+          description: data.changed
+            ? 'Your subscription was updated. Stripe prorates the difference on your next invoice.'
+            : undefined,
+        });
+        setTimeout(() => {
+          void queryClient.invalidateQueries({ queryKey: ['user-subscription'] });
+          void queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
+        }, 2000);
       }
     } catch {
       toast({
         title: 'Error',
-        description: 'Could not start checkout. Please try again.',
+        description: 'Could not change your plan. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -222,7 +243,7 @@ export default function SubscriptionPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle>Compare Plans</CardTitle>
-              <CardDescription>Upgrade any time — changes are prorated by Stripe</CardDescription>
+              <CardDescription>Change plan any time — Stripe prorates the difference</CardDescription>
             </div>
             {/* Annual prices existed in the plan rows and there was no way to
                 buy one: the upgrade button always sent the monthly id. */}
@@ -281,8 +302,10 @@ export default function SubscriptionPage() {
                         >
                           {actionPlan === plan.name ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
+                          ) : currentPlanId === 'free' ? (
                             'Upgrade'
+                          ) : (
+                            changeLabel(plan)
                           )}
                         </Button>
                       ) : null}

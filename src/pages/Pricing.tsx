@@ -207,7 +207,10 @@ export default function Pricing() {
       });
 
       if (error) throw error;
-      if (data.url) window.location.href = data.url;
+      if (data?.url) window.location.href = data.url;
+      // Already subscribed: the existing subscription was changed in place
+      // rather than a second one opened (US-217).
+      else if (data && 'changed' in data) window.location.href = '/dashboard/subscription';
     } catch (error) {
       toast({
         title: 'Error',

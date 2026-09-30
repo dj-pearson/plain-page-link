@@ -297,16 +297,12 @@ export const EdgeFunctions = {
       auth: false,
     }),
 
-  // Create Stripe checkout session (subscription or one-time)
-  createCheckoutSession: (data: {
-    priceId: string;
-    successUrl: string;
-    cancelUrl: string;
-    mode?: 'subscription' | 'payment';
-    productType?: string;
-    quantity?: number;
-  }) =>
-    callEdgeFunction<{ sessionId: string; url: string }>('create-checkout-session', {
+  // Start a plan purchase. A new subscriber gets a Checkout url; an existing
+  // one has their subscription changed in place and gets { changed } (US-217).
+  createCheckoutSession: (data: { priceId: string; successUrl: string; cancelUrl: string }) =>
+    callEdgeFunction<
+      { sessionId: string; url: string } | { changed: boolean; subscriptionId: string }
+    >('create-checkout-session', {
       body: data,
       auth: true,
     }),

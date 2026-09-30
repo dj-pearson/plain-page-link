@@ -4515,3 +4515,11 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - Found on the way: Stripe statuses outside the enum (unpaid, paused,
   incomplete_expired) — mapped, or checked writes would retry forever.
 - Kept fail-open on an unwritable claim table (prod lacks it, US-146).
+
+## Roadmap loop — iteration 5/20 — US-217: every plan change billed twice
+
+- Existing subscribers now get stripe.subscriptions.update (prorated) instead
+  of a second Checkout. Stripe is the authority for "is this customer live".
+- One-time payment mode refused: it still took money after US-059.
+- Webhook audits any duplicate that still gets through (critical risk).
+- Owner: check Stripe for customers with two live subscriptions and refund.

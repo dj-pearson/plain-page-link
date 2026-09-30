@@ -3424,8 +3424,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "SubscriptionPage.tsx:112-117,276 always calls create-checkout-session; create-checkout-session/index.ts:150-200 never checks existing subs; webhook upserts onConflict user_id (stripe-webhook:292-321), orphaning the old subscription's events. Check Stripe for already-double-billed customers — that part is the owner's."
+      "passes": true,
+      "notes": "SubscriptionPage.tsx:112-117,276 always calls create-checkout-session; create-checkout-session/index.ts:150-200 never checks existing subs; webhook upserts onConflict user_id (stripe-webhook:292-321), orphaning the old subscription's events. Check Stripe for already-double-billed customers — that part is the owner's. DONE: create-checkout-session/plan-change.ts asks STRIPE (not our tables, which drift) for the customer's live subscriptions (active/trialing/past_due/unpaid); if one exists it updates the item's price with proration_behavior create_prorations and cancel_at_period_end false and returns {changed}, or {changed:false} when already on that price; checkout only for customers with none. 5 vitest cases. Also refused one-time `payment` mode — still accepted after US-059 removed its webhook handling, so an add-on could be paid for and never delivered. SubscriptionPage labels Upgrade/Downgrade by list price, toasts the in-place change and refetches; Pricing redirects to the subscription page. Webhook: DEVIATION — a checkout landing while another subscription is live still records the NEW one (it is the one just paid) but logs 'DOUBLE BILLING' and writes a critical audit event (stripe_duplicate_subscription) so it can be refunded. Owner action remains: search Stripe for customers with >1 live subscription."
     },
     {
       "id": "US-218",

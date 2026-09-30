@@ -17,13 +17,16 @@ interface Call {
   filters: [string, unknown][];
 }
 
-function fakeDb(opts: { failOn?: string; failClaim?: 'duplicate' | 'missing'; plans?: Row[]; customers?: Row[] } = {}) {
+function fakeDb(
+  opts: { failOn?: string; failClaim?: 'duplicate' | 'missing'; plans?: Row[]; customers?: Row[]; userSubs?: Row[] } = {}
+) {
+  const rpcs: { name: string; args: Row }[] = [];
   const calls: Call[] = [];
   const plans = opts.plans ?? [
     { id: 'plan-pro', name: 'professional', stripe_price_id_monthly: 'price_pro', limits: { listings: 25 }, features: {} },
     { id: 'plan-free', name: 'free', limits: { listings: 3 }, features: {} },
   ];
-  const userSubs: Row[] = [{ user_id: 'user-1', stripe_subscription_id: 'sub_1' }];
+  const userSubs: Row[] = opts.userSubs ?? [{ user_id: 'user-1', stripe_subscription_id: 'sub_1', status: 'active' }];
 
   const from = (table: string) => {
     const call: Call = { table, op: 'select', filters: [] };
@@ -46,7 +49,13 @@ function fakeDb(opts: { failOn?: string; failClaim?: 'duplicate' | 'missing'; pl
         return { data: (opts.customers ?? []).find((c) => c.stripe_customer_id === eq.stripe_customer_id) ?? null, error: null };
       }
       if (table === 'user_subscriptions') {
-        return { data: userSubs.find((r) => r.stripe_subscription_id === eq.stripe_subscription_id) ?? null, error: null };
+        return {
+          data:
+            userSubs.find((r) =>
+              eq.user_id ? r.user_id === eq.user_id : r.stripe_subscription_id === eq.stripe_subscription_id
+            ) ?? null,
+          error: null,
+        };
       }
       return { data: null, error: null };
     };
@@ -64,8 +73,11 @@ function fakeDb(opts: { failOn?: string; failClaim?: 'duplicate' | 'missing'; pl
     };
     return builder;
   };
-  const db = { from, rpc: () => Promise.resolve({ data: null, error: null }) };
-  return { db, calls };
+  const db = {
+    from,
+    rpc: (name: string, args: Row) => (rpcs.push({ name, args }), Promise.resolve({ data: null, error: null })),
+  };
+  return { db, calls, rpcs };
 }
 
 const subscription = (status = 'active') => ({
@@ -124,6 +136,13 @@ describe('checkout.session.completed', () => {
     const res = await handleStripeEvent(checkout(), deps(db));
     expect(res.status).toBe(500);
     expect(calls.some((c) => c.table === 'user_subscriptions' && c.op === 'upsert')).toBe(false);
+  });
+
+  it('flags a checkout that lands while another subscription is still live (US-217)', async () => {
+    const { db, rpcs } = fakeDb({ userSubs: [{ user_id: 'user-1', stripe_subscription_id: 'sub_old', status: 'active' }] });
+    const res = await handleStripeEvent(checkout(), deps(db));
+    expect(res.status).toBe(200);
+    expect(rpcs.some((r) => r.args.p_action === 'stripe_duplicate_subscription')).toBe(true);
   });
 
   it('falls back to the Stripe customer when metadata has no user_id', async () => {

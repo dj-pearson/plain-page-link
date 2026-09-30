@@ -280,6 +280,41 @@ async function processEvent(event: Stripe.Event, deps: WebhookDeps): Promise<voi
         console.error(`[stripe-webhook] no subscription_plans row matches price ${price?.id}; plan_id will be null`);
       }
 
+      // US-217: a second live subscription for the same agent is double
+      // billing. create-checkout-session now changes the existing one instead,
+      // so this should not happen — but if it does, the new subscription is the
+      // one just paid for and is recorded, and the old one is flagged loudly
+      // for a refund rather than silently orphaned.
+      const { data: previous } = must(
+        await db
+          .from('user_subscriptions')
+          .select('stripe_subscription_id, status')
+          .eq('user_id', userId)
+          .maybeSingle(),
+        'user_subscriptions previous'
+      );
+      if (
+        previous?.stripe_subscription_id &&
+        previous.stripe_subscription_id !== subscriptionId &&
+        ['active', 'trialing', 'past_due'].includes(previous.status as string)
+      ) {
+        console.error(
+          `[stripe-webhook] DOUBLE BILLING: user ${userId} checked out ${subscriptionId} while ${previous.stripe_subscription_id} is still ${previous.status}`
+        );
+        warnIf(
+          await db.rpc('log_audit_event', {
+            p_user_id: userId,
+            p_action: 'stripe_duplicate_subscription',
+            p_status: 'failure',
+            p_resource_type: 'subscription',
+            p_resource_id: previous.stripe_subscription_id,
+            p_details: JSON.stringify({ new_subscription: subscriptionId, old_status: previous.status }),
+            p_risk_level: 'critical',
+          }),
+          'duplicate subscription audit'
+        );
+      }
+
       must(
         await db.from('user_subscriptions').upsert(
           {
