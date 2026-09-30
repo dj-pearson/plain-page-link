@@ -8,6 +8,7 @@ import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { getSiteUrl } from '../_shared/env.ts';
+import { safeHtmlText } from '../_shared/public-email.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'noreply@agentbio.net';
@@ -72,7 +73,7 @@ serve(async (req) => {
         // Send email via Resend
         const emailSent = await sendSequenceEmail({
           email: capture.email,
-          firstName: capture.first_name,
+          firstName: safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
           sequenceNumber: scheduleInfo.dayNumber,
           subject: scheduleInfo.subject,
           captureId: capture.id,

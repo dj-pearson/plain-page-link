@@ -26,12 +26,12 @@ export interface ClientIpOptions {
 }
 
 function envOptions(): ClientIpOptions {
-  // Read lazily and defensively so this module also runs under vitest.
-  const env = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env;
-  const hops = Number.parseInt(env?.get('TRUSTED_PROXY_HOPS') ?? '', 10);
+  // Guarded so this module also runs under vitest, where Deno is undefined.
+  if (typeof Deno === 'undefined') return { trustedProxyHops: 1, trustCfConnectingIp: false };
+  const hops = Number.parseInt(Deno.env.get('TRUSTED_PROXY_HOPS') ?? '', 10);
   return {
     trustedProxyHops: Number.isFinite(hops) && hops > 0 ? hops : 1,
-    trustCfConnectingIp: env?.get('TRUST_CF_CONNECTING_IP') === 'true',
+    trustCfConnectingIp: Deno.env.get('TRUST_CF_CONNECTING_IP') === 'true',
   };
 }
 

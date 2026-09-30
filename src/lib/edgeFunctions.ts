@@ -284,14 +284,15 @@ export const EdgeFunctions = {
     }),
 
   // Send listing generator email
-  sendListingGeneratorEmail: (data: { email: string; description: string; listingData: any }) =>
+  // Only the stored capture's id: the function reads recipient and content (US-219).
+  sendListingGeneratorEmail: (data: { captureId: string }) =>
     callEdgeFunction<{ success: boolean }>('send-listing-generator-email', {
       body: data,
       auth: false,
     }),
 
   // Send bio analyzer email
-  sendBioAnalyzerEmail: (data: { email: string; analysis: any }) =>
+  sendBioAnalyzerEmail: (data: { captureId: string }) =>
     callEdgeFunction<{ success: boolean }>('send-bio-analyzer-email', {
       body: data,
       auth: false,

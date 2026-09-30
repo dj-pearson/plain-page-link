@@ -155,14 +155,10 @@ export default function ListingDescriptionGenerator() {
 
       // Send welcome email via edge function
       try {
+        // Only the capture id: the function reads the address and content from
+        // the rows just stored, and sends once (US-219).
         await edgeFunctions.invoke('send-listing-generator-email', {
-          body: {
-            email: data.email,
-            firstName: data.firstName,
-            propertyDetails,
-            descriptions,
-            listingId,
-          },
+          body: { captureId },
         });
       } catch (emailError) {
         logger.error('Email send error', emailError as Error);

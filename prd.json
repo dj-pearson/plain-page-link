@@ -3455,8 +3455,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "send-listing-generator-email/index.ts:29,124,168-240 sends to any email with unescaped content; send-bio-analyzer-email/index.ts:69-72,83-87. Depends on US-214's getClientIP fix for the per-IP limit."
+      "passes": true,
+      "notes": "send-listing-generator-email/index.ts:29,124,168-240 sends to any email with unescaped content; send-bio-analyzer-email/index.ts:69-72,83-87. Depends on US-214's getClientIP fix for the per-IP limit. DONE: both functions accept only a capture id. The capture is claimed atomically (UPDATE … WHERE last_email_sent_at IS NULL AND created_at within 15 min RETURNING email, …), so each capture sends once, to its stored address; a failed send releases the claim. Content is loaded from listing_descriptions / instagram_bio_analyses — but anon writes those rows too, so every interpolated value goes through _shared/public-email.ts (links and bare domains stripped, HTML-escaped, length-capped; numbers coerced). Limits: per IP (client-ip.ts) plus 3/day per recipient address. The scheduled follow-up senders escape first_name/market as well. Frontend sends {captureId}. Residual: a visitor can still create a capture naming someone else's address and get ONE plain, link-free email sent to it (3/day cap) — closing that fully needs double opt-in. Also removed UPSTASH_* from supabase/functions/.env.example (only the deleted rate-limit function read them) and declared TRUSTED_PROXY_HOPS / TRUST_CF_CONNECTING_IP."
     },
     {
       "id": "US-220",

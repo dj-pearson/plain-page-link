@@ -4531,3 +4531,12 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - publish-article-to-social: admin or service role, rate-limited, published
   articles only.
 - Source-level assertions watched fail on the old index.ts.
+
+## Roadmap loop — iteration 7/20 — US-219: an open relay on the free tools
+
+- Request body no longer chooses recipient or content: capture id only,
+  claimed once, recent, per-IP and per-recipient limits.
+- Stored content is still visitor-written (anon inserts it), so everything
+  interpolated is escaped and link-stripped (_shared/public-email.ts).
+- Residual risk recorded in prd notes: one link-free email per forged
+  capture; double opt-in would close it.

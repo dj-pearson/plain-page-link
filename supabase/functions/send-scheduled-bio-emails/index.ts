@@ -4,6 +4,7 @@ import { getSiteUrl } from '../_shared/env.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { safeHtmlText } from '../_shared/public-email.ts';
 
 /**
  * Cron job to send scheduled Instagram Bio Analyzer emails
@@ -80,8 +81,8 @@ serve(async (req) => {
         try {
           const emailContent = getEmailTemplate(
             sequenceToSend,
-            capture.first_name,
-            capture.market,
+            safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
+            safeHtmlText(capture.market, 100),
             capture.instagram_bio_analyses?.overall_score || 0
           )
 

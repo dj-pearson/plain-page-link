@@ -4,8 +4,9 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
-import { getClientIP } from '../_shared/auth.ts';
+import { checkRateLimitDb, RATE_LIMITS, type RateLimitConfig } from '../_shared/rate-limiter.ts';
+import { getClientIP } from '../_shared/client-ip.ts';
+import { safeHtmlText, safeNumber } from '../_shared/public-email.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { getSiteUrl } from '../_shared/env.ts';
@@ -17,6 +18,12 @@ const SITE_URL = getSiteUrl();
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
+// US-219: one send per capture, to the address stored on it, while it is fresh.
+const CAPTURE_TTL_MINUTES = 15;
+// However many captures name an address, it gets at most this many a day.
+const PER_RECIPIENT_LIMIT: RateLimitConfig = { maxRequests: 3, windowSeconds: 86400, failClosed: true };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 serve(async (req) => {
   const origin = req.headers.get('origin');
 
@@ -25,21 +32,23 @@ serve(async (req) => {
     return handleCorsPreFlight(origin);
   }
 
-  try {
-    const { email, firstName, propertyDetails, descriptions, listingId } = await req.json();
+  const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin), ...extra },
+    });
 
-    if (!email || !firstName) {
-      // US-204: this was a bare Error, and the catch below answers 500 — so a
-      // form submitted without an email was reported as a server fault and
-      // retried by anything that retries 5xx.
-      throw new HttpError('Email and firstName are required', 400, 'REQUEST_VALIDATION_FAILED');
+  try {
+    // US-219: the recipient and every line of content used to come from this
+    // body — an open relay for arbitrary HTML from agentbio.net. Only the id of
+    // the capture the page just stored is accepted now.
+    const { captureId } = await req.json();
+    if (typeof captureId !== 'string' || !UUID_RE.test(captureId)) {
+      throw new HttpError('captureId is required', 400, 'REQUEST_VALIDATION_FAILED');
     }
 
-    // Create Supabase client
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // US-078: public by design (the free tool has no session), so the limiter
-    // is the only thing standing between this and an open email relay.
     const rateLimitResult = await checkRateLimitDb(
       supabase,
       getClientIP(req),
@@ -47,69 +56,99 @@ serve(async (req) => {
       RATE_LIMITS.submission
     );
     if (!rateLimitResult.allowed) {
-      return new Response(
-        JSON.stringify({ error: 'Too many requests. Please try again shortly.' }),
-        {
-          status: 429,
-          headers: {
-            ...getCorsHeaders(req.headers.get('origin')),
-            'Content-Type': 'application/json',
-            'Retry-After': String(rateLimitResult.retryAfterSeconds),
-          },
-        }
+      return json(
+        429,
+        { error: 'Too many requests. Please try again shortly.' },
+        { 'Retry-After': String(rateLimitResult.retryAfterSeconds) }
       );
     }
 
-    // Send welcome email with all 3 styles
+    // Claim the capture: unsent and recent. Atomic, so a replayed request sends
+    // nothing.
+    const { data: capture, error: claimError } = await supabase
+      .from('listing_email_captures')
+      .update({ last_email_sent_at: new Date().toISOString(), email_sequence_started: true })
+      .eq('id', captureId)
+      .is('last_email_sent_at', null)
+      .gte('created_at', new Date(Date.now() - CAPTURE_TTL_MINUTES * 60_000).toISOString())
+      .select('email, first_name, listing_id')
+      .maybeSingle();
+    if (claimError) throw claimError;
+    if (!capture?.email || !capture.listing_id) {
+      throw new HttpError('Nothing to send for this capture', 404, 'NOT_FOUND');
+    }
+
+    const recipientLimit = await checkRateLimitDb(
+      supabase,
+      `recipient:${String(capture.email).toLowerCase()}`,
+      'send-listing-generator-email',
+      PER_RECIPIENT_LIMIT
+    );
+    if (!recipientLimit.allowed) {
+      return json(429, { error: 'This address has received enough email today.' });
+    }
+
+    const { data: listing, error: listingError } = await supabase
+      .from('listing_descriptions')
+      .select('property_details, descriptions')
+      .eq('id', capture.listing_id)
+      .maybeSingle();
+    if (listingError) throw listingError;
+    if (!listing) throw new HttpError('Nothing to send for this capture', 404, 'NOT_FOUND');
+
     const emailSent = await sendWelcomeEmail({
-      email,
-      firstName,
-      propertyDetails,
-      descriptions,
-      listingId,
+      email: capture.email as string,
+      ...safeTemplateData(capture.first_name, listing.property_details, listing.descriptions),
     });
 
     if (!emailSent) {
+      // Give the capture back so a retry can send it.
+      await supabase.from('listing_email_captures').update({ last_email_sent_at: null }).eq('id', captureId);
       throw new Error('Failed to send email via Resend');
     }
 
-    // Mark email sequence as started
-    await supabase
-      .from('listing_email_captures')
-      .update({ email_sequence_started: true })
-      .eq('email', email)
-      .eq('listing_id', listingId);
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: {
-        'Content-Type': 'application/json',
-        ...getCorsHeaders(origin),
-      },
-    });
+    return json(200, { success: true });
   } catch (error) {
     console.error('Error sending listing generator email:', error);
-
-    return new Response(
-      JSON.stringify({
-        error: error.message || 'Failed to send email',
-      }),
-      {
-        status: errorStatus(error),
-        headers: {
-          'Content-Type': 'application/json',
-          ...getCorsHeaders(origin),
-        },
-      }
-    );
+    return json(errorStatus(error), {
+      error: error instanceof HttpError ? error.message : 'Failed to send email',
+    });
   }
 });
+
+/**
+ * Everything the template interpolates, as link-free escaped text (US-219).
+ * The stored rows were written by an anonymous visitor, so they are treated
+ * exactly like request input.
+ */
+function safeTemplateData(firstName: unknown, propertyDetails: unknown, descriptions: unknown) {
+  const pd = (propertyDetails ?? {}) as Record<string, unknown>;
+  const descs = Array.isArray(descriptions) ? (descriptions as Record<string, unknown>[]) : [];
+  return {
+    firstName: safeHtmlText(firstName, 100),
+    propertyDetails: {
+      city: safeHtmlText(pd.city, 100),
+      state: safeHtmlText(pd.state, 50),
+      price: safeNumber(pd.price),
+      bedrooms: safeNumber(pd.bedrooms),
+      bathrooms: safeNumber(pd.bathrooms),
+      squareFeet: safeNumber(pd.squareFeet),
+    },
+    descriptions: descs.slice(0, 3).map((d) => ({
+      style: String(d.style ?? ''),
+      wordCount: safeNumber(d.wordCount),
+      mlsDescription: safeHtmlText(d.mlsDescription, 3000),
+      instagramCaption: safeHtmlText(d.instagramCaption, 2200),
+      facebookPost: safeHtmlText(d.facebookPost, 3000),
+    })),
+  };
+}
 
 async function sendWelcomeEmail(data: {
   email: string;
   firstName: string;
   propertyDetails: any;
   descriptions: any[];
-  listingId: string;
 }): Promise<boolean> {
   try {
     const response = await fetch('https://api.resend.com/emails', {
@@ -142,7 +181,6 @@ function getWelcomeEmailHTML(data: {
   firstName: string;
   propertyDetails: any;
   descriptions: any[];
-  listingId: string;
 }): string {
   const { propertyDetails, descriptions } = data;
 
