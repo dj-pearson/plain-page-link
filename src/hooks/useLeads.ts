@@ -46,7 +46,50 @@ export interface LeadFilters {
  * showing counts the Leads page has already contradicted — for up to the five
  * minutes their staleTime allows (US-104).
  */
-const LEAD_DEPENDENT_KEYS = [['leads'], ['analytics-leads'], ['conversion-funnel']];
+/** The list's filters as a query; shared by the paged list and the export. */
+function leadsQuery(userId: string, filters: { status?: string; leadType?: string; search?: string }) {
+  let query = supabase.from('leads').select('*').eq('user_id', userId);
+  if (filters.status) query = query.eq('status', filters.status);
+  if (filters.leadType) query = query.eq('lead_type', filters.leadType);
+  // Name only: email and phone are ciphertext since US-086, so an ilike
+  // against them would match nothing.
+  if (filters.search) query = query.ilike('name', `%${filters.search}%`);
+  return query.order('created_at', { ascending: false });
+}
+
+/** pii-crypto decrypts at most 100 rows per call (MAX_ROWS). */
+const EXPORT_BATCH = 100;
+/** A ceiling so a runaway export cannot loop forever. */
+export const EXPORT_MAX_LEADS = 10_000;
+
+/**
+ * Every lead matching the filters, decrypted (US-225).
+ *
+ * Export CSV used to write the rows already loaded on the page — the first 50,
+ * or however many the agent had scrolled through — so an agent with 300 leads
+ * silently got 50. This pages through all of them.
+ */
+export async function fetchAllLeads(
+  userId: string,
+  filters: LeadFilters = {}
+): Promise<{ leads: Lead[]; truncated: boolean }> {
+  const normalized = {
+    status: filters.status && filters.status !== 'all' ? filters.status : undefined,
+    leadType: filters.leadType && filters.leadType !== 'all' ? filters.leadType : undefined,
+    search: filters.search?.trim() || undefined,
+  };
+  const out: Lead[] = [];
+  for (let from = 0; from < EXPORT_MAX_LEADS; from += EXPORT_BATCH) {
+    const { data, error } = await leadsQuery(userId, normalized).range(from, from + EXPORT_BATCH - 1);
+    if (error) throw error;
+    const rows = data ?? [];
+    out.push(...(await decryptLeadRows(rows)));
+    if (rows.length < EXPORT_BATCH) return { leads: out, truncated: false };
+  }
+  return { leads: out, truncated: true };
+}
+
+const LEAD_DEPENDENT_KEYS = [['leads'], ['analytics-leads'], ['conversion-funnel'], ['lead-stats']];
 
 export function useLeads(filters: LeadFilters = {}) {
   const { user } = useAuthStore();
@@ -75,18 +118,11 @@ export function useLeads(filters: LeadFilters = {}) {
       // every lead the agent had ever received and filter in JavaScript, which
       // also meant decryptLeadRows sent every ciphertext to pii-crypto on each
       // visit (US-104).
-      let query = supabase.from('leads').select('*').eq('user_id', user.id);
-      if (status) query = query.eq('status', status);
-      if (leadType) query = query.eq('lead_type', leadType);
-      // Name only: email and phone are ciphertext since US-086, so an ilike
-      // against them would match nothing. The page still searches the
-      // decrypted email client-side within the loaded pages.
-      if (search) query = query.ilike('name', `%${search}%`);
-
       const from = (pageParam as number) * LEADS_PAGE_SIZE;
-      const { data, error } = await query
-        .order('created_at', { ascending: false })
-        .range(from, from + LEADS_PAGE_SIZE - 1);
+      const { data, error } = await leadsQuery(user.id, { status, leadType, search }).range(
+        from,
+        from + LEADS_PAGE_SIZE - 1
+      );
 
       if (error) throw error;
       return decryptLeadRows(data ?? []);

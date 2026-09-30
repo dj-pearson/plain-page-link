@@ -4581,3 +4581,9 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - Workflow email step no longer spends the email quota for nothing.
 - New guard scans src + edge functions for the feature claims; each rule is
   self-tested. CLAUDE.md corrected in five places.
+
+## Roadmap loop — iteration 13/20 — US-225: numbers from the first 50 rows
+
+- lead_stats() RPC (invoker) replaces client-side counting on Leads and
+  Analytics; export pages through every matching lead in pii-crypto-sized
+  batches; search debounced and honestly labelled name-only.

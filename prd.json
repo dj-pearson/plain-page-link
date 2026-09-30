@@ -3553,8 +3553,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "useLeads.ts:32 (page size 50), :84 (name-only ilike); Leads.tsx:169-200, 321-358, 450-452, 604; Analytics.tsx:71, 84-120."
+      "passes": true,
+      "notes": "useLeads.ts:32 (page size 50), :84 (name-only ilike); Leads.tsx:169-200, 321-358, 450-452, 604; Analytics.tsx:71, 84-120. DONE: new SECURITY INVOKER RPC lead_stats(p_since, p_sla_hours) → {total, by_status, by_source, avg_response_ms, needs_attention} over the caller's own leads (migration 20260930000005; authenticated only). useLeadStats drives the Leads cards (all but 'hot', which needs the client-side score) and the Analytics funnel, source table and period conversions, range-bound. Export CSV uses fetchAllLeads: same filters, 100-row pages (pii-crypto's MAX_ROWS), 10,000 ceiling with a 'narrow the filters' message; button shows Exporting…. Search is debounced 300 ms (the comment claimed it already was) and the placeholder says 'Search leads by name…' — email search NOT built: email is ciphertext; leads.email_hash (US-220) covers only leads captured via submit-lead after it shipped, so a hashed lookup would silently miss agent-entered and older leads. Tests: fetchAllLeads returns 120 of 120 in two batches; verify-schema checks lead_stats counts 120 across statuses, ignores another agent's leads, refuses anon. Not changed: Analytics' custom report still uses the paged list."
     },
     {
       "id": "US-226",

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useAnalytics, type TimeRange } from '@/hooks/useAnalytics';
 import { useLeads } from '@/hooks/useLeads';
+import { useLeadStats } from '@/hooks/useLeadStats';
 import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import { ConversionFunnel } from '@/components/analytics/ConversionFunnel';
 import { LeadSourceBreakdown } from '@/components/analytics/LeadSourceBreakdown';
@@ -70,6 +71,15 @@ export default function Analytics() {
   } = useAnalytics(dateRange);
   const { leads } = useLeads();
   const { scoreLeadObject } = useMLLeadScoring();
+  // US-225: range-bound totals over ALL of the agent's leads. The funnel and
+  // source table used to count the first page of the paged lead list (the
+  // latest 50 leads of all time) beside visitor numbers bound to the range.
+  const rangeStart = useMemo(
+    () => subDays(new Date(), { '7d': 7, '30d': 30, '90d': 90 }[dateRange]),
+    [dateRange]
+  );
+  const { stats: leadStats } = useLeadStats({ since: rangeStart });
+  const convertedInRange = leadStats?.byStatus.converted ?? 0;
 
   /**
    * The funnel, the source breakdown and the insights, moved here from
@@ -87,25 +97,17 @@ export default function Analytics() {
         visitors: stats.uniqueVisitors,
         engaged: totalContactTaps + totalLinkClicks,
         contacted: stats.totalLeads,
-        qualified: leads.filter((l) => l.status === 'qualified' || l.status === 'converted').length,
-        converted: leads.filter((l) => l.status === 'converted').length,
+        qualified: (leadStats?.byStatus.qualified ?? 0) + convertedInRange,
+        converted: convertedInRange,
       }),
-    [stats, leads, totalContactTaps, totalLinkClicks]
+    [stats, leadStats, convertedInRange, totalContactTaps, totalLinkClicks]
   );
 
   const leadSources = useMemo(() => {
-    const bySource: Record<string, { leads: number; conversions: number }> = {};
-    for (const lead of leads) {
-      const source = lead.source || 'website';
-      bySource[source] ??= { leads: 0, conversions: 0 };
-      bySource[source].leads++;
-      if (lead.status === 'converted') bySource[source].conversions++;
-    }
-
-    const rows = Object.entries(bySource).map(([source, counts]) => ({
+    const rows = (leadStats?.bySource ?? []).map(({ source, leads: count, converted }) => ({
       source,
-      leads: counts.leads,
-      conversions: counts.conversions,
+      leads: count,
+      conversions: converted,
       // Neither is tracked anywhere in the product; they stay zero rather than
       // being invented.
       revenue: 0,
@@ -117,7 +119,7 @@ export default function Analytics() {
         ? rows
         : [{ source: 'website', leads: 0, conversions: 0, revenue: 0, cost: 0 }]
     );
-  }, [leads]);
+  }, [leadStats]);
 
   const insights = useMemo(() => {
     const period: AnalyticsData['period'] =
@@ -130,7 +132,7 @@ export default function Analytics() {
       pageViews: stats.totalViews,
       uniqueVisitors: stats.uniqueVisitors,
       leads: stats.totalLeads,
-      conversions: leads.filter((l) => l.status === 'converted').length,
+      conversions: convertedInRange,
       revenue: 0,
       avgResponseTime: stats.avgResponseMinutes ?? 0,
       period,
@@ -151,7 +153,7 @@ export default function Analytics() {
     };
 
     return generateInsights(current, previous, leadSources);
-  }, [stats, previousStats, leads, leadSources, dateRange]);
+  }, [stats, previousStats, convertedInRange, leadSources, dateRange]);
 
   /** Rows for the report the agent builds. Real lead data, not a sample. */
   const handleGenerateReport = async (config: ReportConfig): Promise<Record<string, unknown>[]> => {

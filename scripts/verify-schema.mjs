@@ -1911,6 +1911,44 @@ check('is_sample cannot be written by an agent, and samples are never public', (
   return out;
 });
 
+check('lead_stats counts every lead the caller owns, and only those', () => {
+  const out = [];
+  const me = '00000000-dead-beef-0000-0000001ead51';
+  const other = '00000000-dead-beef-0000-0000001ead52';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${me}', 'stats1@example.test'), ('${other}', 'stats2@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, status)
+         SELECT '${me}', 'buyer', 'L' || g, 'enc', (ARRAY['new', 'contacted', 'converted'])[1 + g % 3]
+           FROM generate_series(1, 120) g;
+       INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, status)
+         SELECT '${other}', 'buyer', 'O' || g, 'enc', 'new' FROM generate_series(1, 7) g;`);
+    const [raw] = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}'; SELECT public.lead_stats()::text;`);
+    const stats = JSON.parse(raw);
+    if (stats.total !== 120) out.push(`total is ${stats.total}, expected 120 (more than one page of 50)`);
+    for (const s of ['new', 'contacted', 'converted']) {
+      if (stats.by_status?.[s] !== 40) out.push(`by_status.${s} is ${stats.by_status?.[s]}, expected 40`);
+    }
+    try {
+      q(`SET ROLE anon; SELECT public.lead_stats();`);
+      out.push('anon can call lead_stats');
+    } catch {
+      /* expected */
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.leads WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${me}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${me}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // 9. Every column named in a .select('...') list must exist on the target table.
 //    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and
