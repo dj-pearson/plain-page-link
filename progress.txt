@@ -4425,3 +4425,42 @@ route-coverage test that derives its list from App.tsx rather than from memory.
 Each one was run against the commit before its fix and watched to fail. A guard
 that has only ever passed has not been tested — which is, in the end, the same
 sentence as the paragraph above.
+
+---
+
+## Platform Improvement Roadmap — 2026-09-30 (stories US-213 to US-232 added)
+
+Five parallel read-only audits: agent dashboard, visitor conversion, backend
+security, engineering health, growth/billing. Every story cites file:line
+evidence in its notes. Findings marked "reproduced" were run as anon/
+authenticated against a throwaway Postgres built from the migrations.
+
+Loop order = id order. Priority 1 (US-213..219) are security and money bugs and
+go first; US-213 is critical (any account deletable with the anon key).
+
+  P1  US-213  Account deletion RPCs executable by anon (reproduced)
+      US-214  Rate-limit bucket poisoning + spoofable client IP (reproduced)
+      US-215  is_sample bypasses every plan limit and the lead lock (reproduced)
+      US-216  stripe-webhook: async signature check, checked writes, retries
+      US-217  Plan change creates a second subscription (double billing)
+      US-218  execute-workflow SSRF / cross-tenant writes; social publish gate
+      US-219  Free-tool email functions are an open relay
+  P2  US-220  Lead-form bot protection (honeypot, timing, dedupe)
+      US-221  CSP blocks Calendly/video; bookings become leads
+      US-222  Sentry live in prod, edge-function error reporting, public probe
+      US-223  CI audit green (drop axios etc.), lint warning ratchet
+      US-224  Remove claims for features that do not exist
+      US-225  Lead counts/export/analytics cover all leads, not 50
+      US-226  Team invites acceptable; assignees see routed leads
+      US-227  Funnel tracking by campaign source
+  P3  US-228  Two-step lead forms, email OR phone
+      US-229  Auto-reply reply-to and agent details
+      US-230  Daily/weekly digest with tasks and key dates
+      US-231  Admin users panel, true MRR and churn
+      US-232  Pricing → register → checkout intent; badge referral attribution
+
+Deliberately not included (still worth doing): workflow runtime (US-136, open —
+US-218 and US-224 make it safe and honest first), binding PII ciphertext to its
+row (decrypt_contacts oracle), listing pages + agent sitemap (US-141), open
+house guest list and offline kiosk, backups/DR for self-hosted Postgres, reverse
+trial. Owner-only: US-191 key rotation remains open and outranks all of these.
