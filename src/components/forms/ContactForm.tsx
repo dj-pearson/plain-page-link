@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
 import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { useFormOpenTracking } from '@/hooks/useFormOpenTracking';
 import { HoneypotField } from './HoneypotField';
 import { logger } from '@/lib/logger';
 
@@ -40,6 +41,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
   const [error, setError] = useState<string | null>(null);
 
   const { honeypotRef, signals } = useSpamGuard();
+  useFormOpenTracking(agentId, 'contact_form');
   const {
     register,
     handleSubmit,
@@ -77,7 +79,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
         throw new Error(result.error || 'Failed to send message');
       }
 
-      trackFormSubmission('contact_form', true);
+      trackFormSubmission(agentId, 'contact_form', true);
       setIsSuccess(true);
       reset();
 
@@ -87,7 +89,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
       }, 3000);
     } catch (err) {
       logger.error('Error submitting contact form', err as Error);
-      trackFormSubmission('contact_form', false);
+      trackFormSubmission(agentId, 'contact_form', false);
       setError(err instanceof Error ? err.message : 'Failed to send message. Please try again.');
     } finally {
       setIsSubmitting(false);

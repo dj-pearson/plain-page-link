@@ -71,12 +71,22 @@ describe('trackContactTap', () => {
     }
   });
 
-  it('records nothing for a method the CHECK constraint would reject', async () => {
+  it('records the sticky bar\'s other taps as calls to action (US-227)', async () => {
     // StickyActionBar routes 'schedule', 'valuation' and 'contact' through the
-    // same handler; those open a modal and are not contact taps.
-    for (const method of ['schedule', 'valuation', 'contact', '']) {
+    // same handler. They open a modal rather than a phone or mail app, and were
+    // dropped because the CHECK constraint had no type for them; cta_click is
+    // that type now.
+    for (const method of ['schedule', 'valuation', 'contact']) {
       await trackContactTap(AGENT, method);
     }
+    expect(insertMock).toHaveBeenCalledTimes(3);
+    for (const call of insertMock.mock.calls) {
+      expect(call[1]).toMatchObject({ event_type: 'cta_click' });
+    }
+  });
+
+  it('records nothing for an empty method', async () => {
+    await trackContactTap(AGENT, '');
     expect(insertMock).not.toHaveBeenCalled();
   });
 

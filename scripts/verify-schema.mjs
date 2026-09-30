@@ -1988,6 +1988,46 @@ check('a routed lead reaches the accepted teammate, who can read it and is notif
   return out;
 });
 
+check('funnel events are accepted from visitors and campaign_conversion reads them', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-0000000f0e11';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'funnel@example.test') ON CONFLICT (id) DO NOTHING;
+       UPDATE public.profiles SET is_published = true WHERE id = '${agent}';`);
+    for (const type of ['form_open', 'form_submit', 'cta_click', 'social_click', 'listing_view']) {
+      try {
+        q(`SET ROLE anon; INSERT INTO public.analytics_events (user_id, visitor_id, event_type, utm_source)
+             VALUES ('${agent}', 'v-${type}', '${type}', 'instagram');`);
+      } catch (e) {
+        out.push(`a visitor could not record ${type}: ${String(e.stderr || e.message).split('\n')[0]}`);
+      }
+    }
+    q(`SET ROLE anon; INSERT INTO public.analytics_views (user_id, visitor_id, utm_source)
+         VALUES ('${agent}', 'v1', 'instagram'), ('${agent}', 'v2', 'instagram'), ('${agent}', 'v3', NULL);`);
+    q(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, utm_source)
+         VALUES ('${agent}', 'buyer', 'From IG', 'enc', 'instagram');`);
+    const rows = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${agent}';
+      SELECT source || ':' || views || ':' || form_opens || ':' || leads FROM public.campaign_conversion() ORDER BY source;`);
+    const expected = ['direct:1:0:0', 'instagram:2:1:1'];
+    if (JSON.stringify(rows) !== JSON.stringify(expected)) {
+      out.push(`campaign_conversion returned ${JSON.stringify(rows)}, expected ${JSON.stringify(expected)}`);
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.analytics_events WHERE user_id = '${agent}';
+         DELETE FROM public.analytics_views WHERE user_id = '${agent}';
+         DELETE FROM public.leads WHERE user_id = '${agent}';
+         DELETE FROM public.profiles WHERE id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // 9. Every column named in a .select('...') list must exist on the target table.
 //    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and

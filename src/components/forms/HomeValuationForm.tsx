@@ -17,6 +17,7 @@ import {
 import { TrendingUp, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
 import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { useFormOpenTracking } from '@/hooks/useFormOpenTracking';
 import { HoneypotField } from './HoneypotField';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
@@ -49,6 +50,7 @@ export function HomeValuationForm({ agentId, agentName, onSuccess }: HomeValuati
   const { toast } = useToast();
 
   const { honeypotRef, signals } = useSpamGuard();
+  useFormOpenTracking(agentId, 'valuation_request');
   const {
     register,
     handleSubmit,
@@ -83,7 +85,7 @@ export function HomeValuationForm({ agentId, agentName, onSuccess }: HomeValuati
       });
 
       if (result.success) {
-        trackFormSubmission('valuation_request', true);
+        trackFormSubmission(agentId, 'valuation_request', true);
         toast({
           title: 'Valuation Request Submitted!',
           description: `${agentName} will send you a detailed report within 24 hours.`,
@@ -105,7 +107,7 @@ export function HomeValuationForm({ agentId, agentName, onSuccess }: HomeValuati
           ? error.message
           : 'Failed to submit valuation request. Please try again.';
       setError(errorMessage);
-      trackFormSubmission('valuation_request', false);
+      trackFormSubmission(agentId, 'valuation_request', false);
       toast({
         title: 'Submission Failed',
         description: errorMessage,

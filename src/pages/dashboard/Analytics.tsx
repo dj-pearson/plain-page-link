@@ -33,6 +33,7 @@ import {
 import { useAnalytics, type TimeRange } from '@/hooks/useAnalytics';
 import { useLeads } from '@/hooks/useLeads';
 import { useLeadStats } from '@/hooks/useLeadStats';
+import { useCampaignConversion } from '@/hooks/useCampaignConversion';
 import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import { ConversionFunnel } from '@/components/analytics/ConversionFunnel';
 import { LeadSourceBreakdown } from '@/components/analytics/LeadSourceBreakdown';
@@ -79,6 +80,7 @@ export default function Analytics() {
     [dateRange]
   );
   const { stats: leadStats } = useLeadStats({ since: rangeStart });
+  const { rows: campaignRows } = useCampaignConversion(rangeStart);
   const convertedInRange = leadStats?.byStatus.converted ?? 0;
 
   /**
@@ -545,6 +547,51 @@ export default function Analytics() {
               </CardContent>
             </Card>
           </div>
+
+          {/* US-227: views, form opens and leads per campaign source, so an
+              agent can see which post or ad turns visits into enquiries. Views
+              carry utm_source from this release on; older views count as
+              "direct". */}
+          <Card>
+            <CardHeader className="pb-3 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">Which sources convert</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Profile views to leads, by campaign source, for the selected period
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              {campaignRows.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="py-2 pr-4 font-medium">Source</th>
+                      <th className="py-2 pr-4 font-medium text-right">Views</th>
+                      <th className="py-2 pr-4 font-medium text-right">Form opens</th>
+                      <th className="py-2 pr-4 font-medium text-right">Leads</th>
+                      <th className="py-2 font-medium text-right">Views → leads</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaignRows.map((row) => (
+                      <tr key={row.source} className="border-t border-border">
+                        <td className="py-2 pr-4 capitalize text-foreground">{row.source}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{row.views}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{row.formOpens}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{row.leads}</td>
+                        <td className="py-2 text-right tabular-nums font-medium">
+                          {row.rate === null ? '—' : `${(row.rate * 100).toFixed(1)}%`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-xs sm:text-sm text-muted-foreground text-center py-6">
+                  No visits in this period yet. Add ?utm_source=instagram to the link in your bio to see it here.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Taps and clicks.

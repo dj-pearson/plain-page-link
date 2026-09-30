@@ -3586,8 +3586,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "leadSubmission.ts:169-194 posts to an undefined window.analytics; analyticsEvents.ts:23-29,112-113 drops unmapped methods; CHECK at 20260902000012:130."
+      "passes": true,
+      "notes": "leadSubmission.ts:169-194 posts to an undefined window.analytics; analyticsEvents.ts:23-29,112-113 drops unmapped methods; CHECK at 20260902000012:130. DONE: migration 20260930000007 extends analytics_events' CHECK with form_open, form_submit, cta_click, social_click, listing_view; adds utm_source/medium/campaign to analytics_views and utm_source/campaign to analytics_events (length-bounded); adds SECURITY INVOKER campaign_conversion(p_since) → per-source views, form_opens, leads (RLS keeps the plan's history window). Client: trackFormSubmission now records form_submit through recordAnalyticsEvent (window.analytics and the localStorage copy removed) and takes the agent id; useFormOpenTracking on the four forms; sticky-bar schedule/valuation/contact → cta_click; SocialLinks → social_click; listing opens (click or pasted ?listing=) → listing_view; Calendly bookings → form_submit 'calendly_showing'; profile views store utm_*. Analytics page: 'Which sources convert' table with views → leads rate. Tests: toCampaignRows, updated analyticsEvents/ContactForm tests; verify-schema checks anon can write every new type and campaign_conversion returns the expected per-source counts."
     },
     {
       "id": "US-228",

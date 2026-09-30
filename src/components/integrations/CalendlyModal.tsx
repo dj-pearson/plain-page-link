@@ -10,6 +10,7 @@ import { submitLead } from '@/lib/leadSubmission';
 import { useSpamGuard } from '@/hooks/useSpamGuard';
 import { HoneypotField } from '@/components/forms/HoneypotField';
 import { logger } from '@/lib/logger';
+import { trackFormSubmit } from '@/lib/analyticsEvents';
 
 /**
  * Schedule a showing through the agent's Calendly (US-221).
@@ -65,6 +66,8 @@ export function CalendlyModal({
       if (!isCalendlyBooking(event) || recorded.current) return;
       recorded.current = true;
       setBooked(true);
+      // US-227: the booking is the funnel's last stage (deferred from US-221).
+      void trackFormSubmit(agentId, 'calendly_showing');
       void submitLead({
         agentId,
         leadType: listingId ? 'buyer' : 'contact',

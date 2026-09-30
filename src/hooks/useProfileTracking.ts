@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 import { getDeviceClass, getVisitorId, recordAnalyticsEvent } from '@/lib/analyticsEvents';
+import { getLeadAttribution } from '@/lib/attribution';
 
 /**
  * Hook to track profile page views
@@ -20,12 +21,19 @@ export function useProfileTracking(userId: string | undefined, username: string)
         // the anon key could inflate the headline without limit. A trigger on
         // this insert maintains the counter now, which makes the two agree by
         // construction and gives the counter US-092's throttle (US-115).
+        // US-227: the campaign too. Leads have carried utm_* since US-188 and
+        // views did not, so views-to-leads per campaign could not be computed —
+        // and Instagram's and TikTok's in-app browsers send no referrer at all.
+        const { utm_source, utm_medium, utm_campaign } = getLeadAttribution();
         await supabase.from('analytics_views').insert({
           user_id: userId,
           visitor_id: getVisitorId(),
           device: getDeviceClass(),
           source: document.referrer || 'direct',
           location: null, // Could be enhanced with geolocation API
+          utm_source: utm_source?.slice(0, 100) ?? null,
+          utm_medium: utm_medium?.slice(0, 100) ?? null,
+          utm_campaign: utm_campaign?.slice(0, 200) ?? null,
         });
       } catch {
         // Silently ignore tracking errors (table may not exist)

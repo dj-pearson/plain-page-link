@@ -4594,3 +4594,9 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
   accept that no longer trusts the caller's email.
 - Assignees see and can decrypt routed leads; a trigger notifies them.
 - DB check covers routing → visibility → notification.
+
+## Roadmap loop — iteration 15/20 — US-227: a funnel nobody could see
+
+- Five new event types, UTM on views and events, campaign_conversion() RPC,
+  and a "Which sources convert" table. Form submissions stop going to an
+  undefined window.analytics.

@@ -20,6 +20,7 @@ import { callEdgeFunction } from '@/lib/edgeFunctions';
 import { getLeadAttribution } from '@/lib/attribution';
 import { logger } from '@/lib/logger';
 import type { SpamSignals } from '@/hooks/useSpamGuard';
+import { trackFormSubmit } from '@/lib/analyticsEvents';
 
 /** Lead types accepted by the edge function's validateLeadData(). */
 export type LeadType = 'buyer' | 'seller' | 'valuation' | 'contact';
@@ -168,36 +169,13 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
 }
 
 /**
- * Track form submission analytics
+ * Record a form submission for the agent's funnel (US-227).
+ *
+ * This sent the event to `window.analytics`, which nothing in the app defines,
+ * and to the visitor's own localStorage — so no agent ever saw a submission
+ * counted. Successful submissions now go to analytics_events as form_submit;
+ * failures are the visitor's problem to retry, not a funnel stage.
  */
-export function trackFormSubmission(formType: string, success: boolean) {
-  try {
-    // Track with visitor analytics if available
-    if (
-      typeof window !== 'undefined' &&
-      (window as { analytics?: { track: (e: string, p: unknown) => void } }).analytics
-    ) {
-      (
-        window as unknown as { analytics: { track: (e: string, p: unknown) => void } }
-      ).analytics.track('form_submit', {
-        formType,
-        success,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Also track in localStorage for local analytics
-    const storageKey = `analytics_form_submissions`;
-    const existing = localStorage.getItem(storageKey);
-    const submissions = existing ? JSON.parse(existing) : [];
-    submissions.push({
-      formType,
-      success,
-      timestamp: Date.now(),
-    });
-    localStorage.setItem(storageKey, JSON.stringify(submissions));
-  } catch (error) {
-    logger.error('Failed to track form submission:', error as Error);
-    // Don't fail the submission if analytics fails
-  }
+export function trackFormSubmission(agentId: string | undefined, formType: string, success: boolean) {
+  if (success) void trackFormSubmit(agentId, formType);
 }

@@ -22,7 +22,7 @@ import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
 import { UpcomingOpenHouses } from '@/components/profile/UpcomingOpenHouses';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
-import { trackContactTap } from '@/lib/analyticsEvents';
+import { trackContactTap, trackListingView } from '@/lib/analyticsEvents';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
 import { SEOHead } from '@/components/SEOHead';
@@ -73,6 +73,16 @@ export default function FullProfilePage() {
   const selectedListingId = searchParams.get(LISTING_PARAM);
   const selectedListing =
     (selectedListingId && data?.listings?.find((l) => l.id === selectedListingId)) || null;
+
+  // US-227: a listing opened — by click or by a pasted ?listing= link — is a
+  // funnel stage the agent never saw.
+  const profileId = data?.profile?.id;
+  useEffect(() => {
+    if (profileId && selectedListing) {
+      void trackListingView(profileId, selectedListing.id, selectedListing.address);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, selectedListing?.id]);
 
   /**
    * Open or close the detail modal by rewriting the query parameter.

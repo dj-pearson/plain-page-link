@@ -314,6 +314,8 @@ export type Database = {
           target_id: string | null;
           target_label: string | null;
           user_id: string;
+          utm_campaign: string | null;
+          utm_source: string | null;
           visitor_id: string | null;
         };
         Insert: {
@@ -324,6 +326,8 @@ export type Database = {
           target_id?: string | null;
           target_label?: string | null;
           user_id: string;
+          utm_campaign?: string | null;
+          utm_source?: string | null;
           visitor_id?: string | null;
         };
         Update: {
@@ -334,6 +338,8 @@ export type Database = {
           target_id?: string | null;
           target_label?: string | null;
           user_id?: string;
+          utm_campaign?: string | null;
+          utm_source?: string | null;
           visitor_id?: string | null;
         };
         Relationships: [
@@ -353,6 +359,9 @@ export type Database = {
           location: string | null;
           source: string | null;
           user_id: string;
+          utm_campaign: string | null;
+          utm_medium: string | null;
+          utm_source: string | null;
           viewed_at: string | null;
           visitor_id: string | null;
         };
@@ -362,6 +371,9 @@ export type Database = {
           location?: string | null;
           source?: string | null;
           user_id: string;
+          utm_campaign?: string | null;
+          utm_medium?: string | null;
+          utm_source?: string | null;
           viewed_at?: string | null;
           visitor_id?: string | null;
         };
@@ -371,6 +383,9 @@ export type Database = {
           location?: string | null;
           source?: string | null;
           user_id?: string;
+          utm_campaign?: string | null;
+          utm_medium?: string | null;
+          utm_source?: string | null;
           viewed_at?: string | null;
           visitor_id?: string | null;
         };
@@ -9028,6 +9043,10 @@ export type Database = {
       calculate_next_run_time: {
         Args: { p_cron_expression?: string; p_current_time?: string; p_schedule_type: string };
         Returns: string;
+      };
+      campaign_conversion: {
+        Args: { p_since?: string };
+        Returns: Record<string, unknown>[];
       };
       cancel_account_deletion: {
         Args: { p_cancel_reason?: string; p_user_id: string };

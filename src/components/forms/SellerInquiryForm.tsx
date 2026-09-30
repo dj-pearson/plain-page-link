@@ -17,6 +17,7 @@ import {
 import { DollarSign, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
 import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { useFormOpenTracking } from '@/hooks/useFormOpenTracking';
 import { HoneypotField } from './HoneypotField';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
@@ -49,6 +50,7 @@ export function SellerInquiryForm({ agentId, agentName, onSuccess }: SellerInqui
   const { toast } = useToast();
 
   const { honeypotRef, signals } = useSpamGuard();
+  useFormOpenTracking(agentId, 'seller_inquiry');
   const {
     register,
     handleSubmit,
@@ -83,7 +85,7 @@ export function SellerInquiryForm({ agentId, agentName, onSuccess }: SellerInqui
       });
 
       if (result.success) {
-        trackFormSubmission('seller_inquiry', true);
+        trackFormSubmission(agentId, 'seller_inquiry', true);
         toast({
           title: 'Request Submitted!',
           description: `${agentName} will contact you within 24 hours.`,
@@ -103,7 +105,7 @@ export function SellerInquiryForm({ agentId, agentName, onSuccess }: SellerInqui
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to submit request. Please try again.';
       setError(errorMessage);
-      trackFormSubmission('seller_inquiry', false);
+      trackFormSubmission(agentId, 'seller_inquiry', false);
       toast({
         title: 'Submission Failed',
         description: errorMessage,
