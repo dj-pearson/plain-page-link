@@ -2640,6 +2640,7 @@ export type Database = {
           contacted_at: string | null;
           created_at: string | null;
           device: string | null;
+          email_hash: string | null;
           encrypted_email: string | null;
           encrypted_phone: string | null;
           first_responded_at: string | null;
@@ -2671,6 +2672,7 @@ export type Database = {
           contacted_at?: string | null;
           created_at?: string | null;
           device?: string | null;
+          email_hash?: string | null;
           encrypted_email?: string | null;
           encrypted_phone?: string | null;
           first_responded_at?: string | null;
@@ -2702,6 +2704,7 @@ export type Database = {
           contacted_at?: string | null;
           created_at?: string | null;
           device?: string | null;
+          email_hash?: string | null;
           encrypted_email?: string | null;
           encrypted_phone?: string | null;
           first_responded_at?: string | null;

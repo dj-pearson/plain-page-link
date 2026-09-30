@@ -26,6 +26,8 @@ import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { formatNumber, formatPrice, getInitials, parsePrice } from '@/lib/format';
 import { toStringList } from '@/types/profile';
 import { cn } from '@/lib/utils';
+import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { HoneypotField } from '@/components/forms/HoneypotField';
 
 /** How long the thank-you stays up before the form clears for the next visitor. */
 const KIOSK_RESET_MS = 8000;
@@ -202,6 +204,7 @@ export default function OpenHouseSignIn() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { honeypotRef, signals } = useSpamGuard();
   const [submittedName, setSubmittedName] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -249,6 +252,7 @@ export default function OpenHouseSignIn() {
     setSubmitting(true);
     try {
       await submitOpenHouseSignIn({
+        spam: signals(),
         agentId: openHouse.agentId,
         openHouseId: openHouse.id,
         name: parsed.data.name,
@@ -430,6 +434,7 @@ export default function OpenHouseSignIn() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate className="w-full max-w-xl space-y-6">
+            <HoneypotField ref={honeypotRef} />
             <div>
               <h1 className="text-3xl font-semibold">Welcome! Please sign in</h1>
               <p className="mt-2 text-lg text-muted-foreground">It takes about 30 seconds.</p>

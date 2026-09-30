@@ -4540,3 +4540,11 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
   interpolated is escaped and link-stripped (_shared/public-email.ts).
 - Residual risk recorded in prd notes: one link-free email per forged
   capture; double opt-in would close it.
+
+## Roadmap loop — iteration 8/20 — US-220: bots spending the agent's allowance
+
+- Honeypot + time-to-submit on every public lead path; trips get a fake 200.
+- leads.email_hash (keyed HMAC) folds repeat enquiries within 24h into one
+  lead, no second notification/auto-reply/allowance. Also the basis for
+  email search (US-225).
+- 50 auto-replies/day/agent cap bounds mail to strangers.

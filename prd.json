@@ -3472,8 +3472,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Today the only defence is 5 req/min/IP (submit-lead/index.ts:80-100), and each accepted POST emails whatever address was submitted (:273-328)."
+      "passes": true,
+      "notes": "Today the only defence is 5 req/min/IP (submit-lead/index.ts:80-100), and each accepted POST emails whatever address was submitted (:273-328). DONE: useSpamGuard + HoneypotField on all six public lead paths (buyer, seller, valuation, contact forms, page-builder ContactBlock, open-house kiosk) send _hp and _elapsed_ms. submit-lead (_shared/spam-guard.ts): honeypot filled or under 3s → normal success answer, nothing stored/sent. Missing signals are NOT treated as a bot (old pages, direct POSTs). Duplicate check: new leads.email_hash (HMAC-SHA256 of lower(email) keyed from PII_ENCRYPTION_KEY, migration 20260930000003, not backfillable) — same agent+type+address within 24h merges form_data/message into the earlier lead and skips Zapier, notify-lead and the auto-reply, and costs no allowance. Auto-replies capped at 50/day per agent via checkRateLimitDb (leads still stored). Turnstile not added (optional criterion; needs CSP + a site key the owner must create). email_hash also unblocks search-by-email for US-225."
     },
     {
       "id": "US-221",

@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
+import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { HoneypotField } from './HoneypotField';
 import { logger } from '@/lib/logger';
 
 const contactSchema = z.object({
@@ -37,6 +39,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { honeypotRef, signals } = useSpamGuard();
   const {
     register,
     handleSubmit,
@@ -56,6 +59,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
       // every "Send Message" was a 400 the visitor saw as a generic failure
       // (US-095).
       const result = await submitLead({
+        spam: signals(),
         agentId,
         leadType: 'contact',
         name: data.name,
@@ -135,6 +139,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
           </div>
         )}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <HoneypotField ref={honeypotRef} />
           <FormField
             label="Your Name"
             id="name"

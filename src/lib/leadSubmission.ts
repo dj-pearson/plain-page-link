@@ -19,6 +19,7 @@
 import { callEdgeFunction } from '@/lib/edgeFunctions';
 import { getLeadAttribution } from '@/lib/attribution';
 import { logger } from '@/lib/logger';
+import type { SpamSignals } from '@/hooks/useSpamGuard';
 
 /** Lead types accepted by the edge function's validateLeadData(). */
 export type LeadType = 'buyer' | 'seller' | 'valuation' | 'contact';
@@ -39,6 +40,8 @@ export interface LeadSubmissionData {
   listingId?: string;
   source?: string;
   referrer?: string;
+  /** From useSpamGuard().signals() — honeypot and time-to-submit (US-220). */
+  spam?: SpamSignals;
 }
 
 export interface LeadSubmissionResponse {
@@ -148,6 +151,7 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
         ...getLeadAttribution(),
         ...columns,
         form_data: Object.keys(formData).length > 0 ? formData : undefined,
+        ...leadData.spam,
       },
       auth: false, // public capture — visitors are not signed in
     });

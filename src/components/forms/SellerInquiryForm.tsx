@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/select';
 import { DollarSign, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
+import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { HoneypotField } from './HoneypotField';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 
@@ -46,6 +48,7 @@ export function SellerInquiryForm({ agentId, agentName, onSuccess }: SellerInqui
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const { honeypotRef, signals } = useSpamGuard();
   const {
     register,
     handleSubmit,
@@ -62,6 +65,7 @@ export function SellerInquiryForm({ agentId, agentName, onSuccess }: SellerInqui
 
     try {
       const result = await submitLead({
+        spam: signals(),
         agentId,
         leadType: 'seller',
         name: data.name,
@@ -139,6 +143,7 @@ export function SellerInquiryForm({ agentId, agentName, onSuccess }: SellerInqui
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <HoneypotField ref={honeypotRef} />
           {error && (
             <div
               role="alert"

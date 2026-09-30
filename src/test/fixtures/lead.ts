@@ -20,6 +20,7 @@ export const mockLead: Lead = {
   source: 'public_profile',
   notes: null,
   form_data: { listing_id: 1, budget: '400000-450000' },
+  email_hash: null,
 
   assigned_to: null,
   listing_id: null,

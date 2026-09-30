@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { encryptSecret } from '../_shared/encryption.ts'
+import { readSpamSignals, botReason, emailLookupHash } from '../_shared/spam-guard.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl } from '../_shared/validation.ts'
@@ -104,6 +105,14 @@ serve(async (req) => {
       return rateLimitResponse(rateLimit.retryAfterSeconds, req, 'Too many requests. Please try again later.');
     }
 
+    // US-220: invisible bot signals. A trip gets the ordinary success answer
+    // and nothing is stored or sent, so the bot learns nothing.
+    const spamReason = botReason(readSpamSignals(rawData));
+    if (spamReason) {
+      console.warn(`[submit-lead] dropped a submission for ${rawData?.user_id ?? '?'}: ${spamReason}`);
+      return successResponse({ lead_id: null }, req);
+    }
+
     // Validate input data
     const validation = validateLeadData(rawData);
     if (!validation.valid) {
@@ -167,6 +176,38 @@ serve(async (req) => {
 
     const { email: _plaintextEmail, phone: _plaintextPhone, ...storedLead } = leadData
 
+    // US-220: the same person enquiring again within a day — a double submit,
+    // a refresh, or a bot replaying one address — is folded into the lead they
+    // already have: its form answers are merged, and nothing is notified,
+    // auto-replied or counted against the agent's allowance a second time.
+    const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY')
+    const emailHash = hashSecret ? await emailLookupHash(leadData.email, hashSecret) : null
+    if (emailHash) {
+      const { data: earlier, error: earlierError } = await supabase
+        .from('leads')
+        .select('id, form_data, message')
+        .eq('user_id', leadData.user_id)
+        .eq('lead_type', leadData.lead_type)
+        .eq('email_hash', emailHash)
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (earlierError) throw earlierError
+      if (earlier) {
+        const { error: mergeError } = await supabase
+          .from('leads')
+          .update({
+            form_data: { ...(earlier.form_data ?? {}), ...(leadData.form_data ?? {}) },
+            message: leadData.message ?? earlier.message,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', earlier.id)
+        if (mergeError) throw mergeError
+        return successResponse({ lead_id: earlier.id }, req)
+      }
+    }
+
     // Insert lead into database
     const { data: lead, error: insertError } = await supabase
       .from('leads')
@@ -174,6 +215,7 @@ serve(async (req) => {
         ...storedLead,
         encrypted_email: encryptedEmail,
         encrypted_phone: encryptedPhone,
+        email_hash: emailHash,
       })
       .select()
       .single()
@@ -270,7 +312,18 @@ serve(async (req) => {
       open_house: 'visit to the open house',
     }
 
-    await sendEmail({
+    // US-220: however many leads arrive, one agent's form sends at most this
+    // many auto-replies a day — the cap on how much mail a flood through this
+    // endpoint can put in strangers' inboxes. The leads themselves are kept.
+    const autoReplyBudget = await checkRateLimitDb(
+      supabase,
+      `autoreply:${leadData.user_id}`,
+      'submit-lead-autoreply',
+      { maxRequests: 50, windowSeconds: 86400, failClosed: false }
+    )
+    if (!autoReplyBudget.allowed) {
+      console.warn(`[submit-lead] auto-reply cap reached for ${leadData.user_id}; lead ${lead.id} stored without one`)
+    } else await sendEmail({
       to: leadData.email,
       subject: `Thank you for your ${leadTypeLabels[leadData.lead_type] || 'inquiry'}`,
       body: `Hi ${leadData.name},
