@@ -3409,8 +3409,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "stripe-webhook/index.ts: 19 awaited writes, 3 error checks; claimEvent at :52-72 records before work; constructEvent at :224. Related history: US-118, US-146 (stripe_processed_events missing in production)."
+      "passes": true,
+      "notes": "stripe-webhook/index.ts: 19 awaited writes, 3 error checks; claimEvent at :52-72 records before work; constructEvent at :224. Related history: US-118, US-146 (stripe_processed_events missing in production). DONE: logic moved to stripe-webhook/handler.ts (no Deno globals, type-only esm.sh imports) with 19 vitest cases over a fake client. index.ts verifies with constructEventAsync + createSubtleCryptoProvider; a bad signature is the only 400. Every entitlement write goes through must() and throws; a failure releases the stripe_processed_events claim and answers 500 so Stripe's retry runs. A plan-lookup DB error now throws instead of recording 'free'. Missing metadata.user_id falls back to stripe_customers by customer id, else 500. Added toStoredStatus: Stripe's unpaid/paused/incomplete_expired are not subscription_status enum members — that write used to fail silently and would now have failed the event forever. Best-effort writes (audit, notification, invoice copy, email) log and continue. DEVIATION: an unwritable claim table still fails OPEN (processes without idempotency) rather than 500 — stripe_processed_events is missing in production (US-146), and failing closed would stop every payment reaching the plan; all entitlement writes are idempotent. Not verified against live Stripe (no network to Stripe/esm.sh here); deno check runs in CI."
     },
     {
       "id": "US-217",

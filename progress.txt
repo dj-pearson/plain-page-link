@@ -4504,3 +4504,14 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - Kept the admin SampleDataManager path instead of an RPC (noted in prd).
 - Guard reproduces insert-as-sample, flip-to-sample and public visibility;
   4 failures before, clean after.
+
+## Roadmap loop — iteration 4/20 — US-216: a 2xx must mean the plan changed
+
+- Split stripe-webhook into index.ts (signature, deps) and handler.ts (logic,
+  vitest-runnable). constructEventAsync for Deno's SubtleCrypto.
+- Checked writes, claim released on failure, 500 so Stripe retries; plan
+  lookup errors no longer fall through to 'free'; user_id falls back to the
+  Stripe customer mapping.
+- Found on the way: Stripe statuses outside the enum (unpaid, paused,
+  incomplete_expired) — mapped, or checked writes would retry forever.
+- Kept fail-open on an unwritable claim table (prod lacks it, US-146).
