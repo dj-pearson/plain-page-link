@@ -3503,8 +3503,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "src/lib/sentry.ts:54 has no tunnel and no CSP host; 227 console.error calls in edge functions with no sink; health-check/index.ts:33 calls requireAdmin despite its comment saying public."
+      "passes": true,
+      "notes": "src/lib/sentry.ts:54 has no tunnel and no CSP host; 227 console.error calls in edge functions with no sink; health-check/index.ts:33 calls requireAdmin despite its comment saying public. DONE: browser Sentry now uses tunnel '/api/sentry', served by a new Cloudflare Pages Function (functions/api/sentry.ts) that forwards only envelopes for the configured DSN's host+project (403 otherwise, 413 over 5 MB, 404 when unconfigured) — CSP connect-src stays 'self'. Edge functions: _shared/report.ts posts a Sentry envelope (no SDK; no-op without SENTRY_DSN; 2 s timeout; never throws). handleUnexpectedError reports the real error and marks the response; edge-functions-server.ts reports every other 5xx and thrown error, skipping marked ones, and lazy-imports the reporter so it cannot break boot. health-check answers an unauthenticated GET with only {ok} 200/503; admin JWT keeps the detail. MONITORING.md names what to set (VITE_SENTRY_DSN as a build AND Pages runtime var, SENTRY_DSN in Coolify) and where to point an uptime monitor. OWNER ACTION: create the uptime monitors and set the DSNs."
     },
     {
       "id": "US-223",

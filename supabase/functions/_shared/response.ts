@@ -37,6 +37,7 @@
 
 import { getCorsHeaders } from './cors.ts';
 import { isHttpError } from './http-error.ts';
+import { reportError } from './report.ts';
 
 /**
  * Standard API response shape
@@ -215,10 +216,21 @@ export function handleUnexpectedError(error: unknown, req: Request): Response {
     timestamp: new Date().toISOString(),
   });
 
-  return errorResponse(
-    'An unexpected error occurred',
-    'INTERNAL_SERVER_ERROR',
-    req,
-    500
-  );
+  // US-222: to Sentry, with the real error. The header tells the server
+  // wrapper (edge-functions-server.ts) this 500 is already reported, so its
+  // catch-all for other 5xx does not send it again.
+  let path: string | undefined;
+  try {
+    path = new URL(req.url).pathname;
+  } catch {
+    path = undefined;
+  }
+  void reportError(error, { method: req.method, path, status: 500 });
+
+  const response = errorResponse('An unexpected error occurred', 'INTERNAL_SERVER_ERROR', req, 500);
+  response.headers.set(ERROR_REPORTED_HEADER, '1');
+  return response;
 }
+
+/** Set on a response whose error has already gone to Sentry (US-222). */
+export const ERROR_REPORTED_HEADER = 'x-agentbio-error-reported';

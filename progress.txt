@@ -4556,3 +4556,12 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - Widget initialised explicitly (the old DOM-scan only worked on first open).
 - Two-field details step → prefilled Calendly → booking message → one lead
   with listing and campaign attribution.
+
+## Roadmap loop — iteration 10/20 — US-222: errors that went nowhere
+
+- Browser Sentry via a same-origin Pages Function tunnel (project-locked).
+- Edge functions: SDK-free envelope reporter, wired into the shared error
+  handler and the router's 5xx catch-all (deduplicated by a marker header).
+- health-check: unauthenticated liveness {ok} for uptime monitors.
+- Owner: set SENTRY_DSN (Coolify) + VITE_SENTRY_DSN (Pages build + runtime),
+  add two uptime monitors.

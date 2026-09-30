@@ -196,3 +196,16 @@ describe('Content-Security-Policy allows what the public profile embeds', () => 
     });
   }
 });
+
+/**
+ * US-222: Sentry must report through the same-origin tunnel, because the CSP
+ * deliberately has no Sentry host in connect-src.
+ */
+describe('Sentry reaches production', () => {
+  it('src/lib/sentry.ts sends through the tunnel that functions/api/sentry.ts serves', () => {
+    const src = readFileSync(join(ROOT, 'src/lib/sentry.ts'), 'utf8');
+    expect(src).toMatch(/tunnel:\s*SENTRY_TUNNEL/);
+    expect(src).toMatch(/SENTRY_TUNNEL\s*=\s*'\/api\/sentry'/);
+    expect(readFileSync(join(ROOT, 'functions/api/sentry.ts'), 'utf8')).toMatch(/export async function onRequestPost/);
+  });
+});

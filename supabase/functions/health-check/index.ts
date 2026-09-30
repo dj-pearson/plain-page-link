@@ -6,9 +6,13 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 /**
  * Health Check
  *
- * Verifies database connectivity and returns latency. Public (no auth) so it
- * can be used by uptime monitors / load balancers. Returns 200 when healthy,
- * 503 when the database is unreachable.
+ * Two answers (US-222):
+ *   - No Authorization header: a liveness probe for uptime monitors — 200
+ *     {"ok":true} when the database answers, 503 {"ok":false} when it does
+ *     not, and nothing else. The comment here always said it was public, but
+ *     US-078 put requireAdmin in front of everything, so no monitor could use
+ *     it and no outage was ever caught by one.
+ *   - An admin's JWT: the detailed report (latency, error text).
  */
 
 serve(async (req) => {
@@ -16,6 +20,25 @@ serve(async (req) => {
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Liveness: no credentials, no detail.
+  if (!req.headers.get('Authorization')) {
+    let ok = false;
+    try {
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { error: probeError } = await supabase
+        .from('feature_flags')
+        .select('name', { count: 'exact', head: true })
+        .limit(1);
+      ok = !probeError;
+    } catch {
+      ok = false;
+    }
+    return new Response(JSON.stringify({ ok }), {
+      status: ok ? 200 : 503,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
   }
 
   const start = Date.now();

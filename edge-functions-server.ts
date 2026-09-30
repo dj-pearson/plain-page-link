@@ -31,6 +31,26 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const FUNCTIONS_DIR = './functions';
 
 /**
+ * US-222: every function runs through this server, so it is the one place a
+ * 5xx from any of them can be sent to Sentry. Loaded lazily from _shared so a
+ * problem in the reporter can never stop the server booting. A response
+ * carrying ERROR_REPORTED_HEADER was already reported, with the real error,
+ * by _shared/response.ts.
+ */
+const ERROR_REPORTED_HEADER = 'x-agentbio-error-reported';
+type Reporter = (error: unknown, context: Record<string, unknown>) => Promise<void>;
+let reporter: Promise<Reporter | null> | null = null;
+function report(error: unknown, context: Record<string, unknown>): void {
+  reporter ??= import(`${FUNCTIONS_DIR}/_shared/report.ts`)
+    .then((m) => m.reportError as Reporter)
+    .catch((e) => {
+      console.error('[edge-functions] error reporter unavailable:', e);
+      return null;
+    });
+  void reporter.then((fn) => fn?.(error, context));
+}
+
+/**
  * The Coolify application publishes 8000, so that stays the default. PORT is
  * honoured so scripts/smoke-edge-functions.mjs can run this router beside a
  * development one without a collision.
@@ -192,6 +212,15 @@ async function handler(req: Request): Promise<Response> {
     const response = await fn(req);
 
     const headers = new Headers(response.headers);
+    if (response.status >= 500 && !headers.has(ERROR_REPORTED_HEADER)) {
+      report(new Error(`${functionName} answered ${response.status}`), {
+        functionName,
+        status: response.status,
+        method: req.method,
+        path,
+      });
+    }
+    headers.delete(ERROR_REPORTED_HEADER);
     // The function's own CORS headers win: getCorsHeaders() in _shared checks
     // the origin against an allowlist, which '*' would quietly widen.
     for (const [key, value] of Object.entries(corsHeaders)) {
@@ -205,6 +234,7 @@ async function handler(req: Request): Promise<Response> {
     });
   } catch (error) {
     console.error(`Error executing function ${functionName}:`, error);
+    report(error, { functionName, status: 500, method: req.method, path });
     return json(
       {
         error: 'Function execution failed',
