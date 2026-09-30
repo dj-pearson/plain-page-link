@@ -747,9 +747,11 @@ export default function FullProfilePage() {
               setShowingListing(null);
             }}
             calendlyUrl={profile.calendly_url}
+            agentId={profile.id}
             title="Schedule a Showing"
             subtitle="Choose a time that works best for you"
             listingAddress={showingListing?.address}
+            listingId={showingListing?.id}
           />
         )}
 

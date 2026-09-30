@@ -3488,8 +3488,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Blocked by CSP in public/_headers:18 and index.html:10-24; CalendlyEmbed.tsx:20; replaces the lead form at FullProfilePage.tsx:190-194, 773-779."
+      "passes": true,
+      "notes": "Blocked by CSP in public/_headers:18 and index.html:10-24; CalendlyEmbed.tsx:20; replaces the lead form at FullProfilePage.tsx:190-194, 773-779. DONE: both CSPs (public/_headers and the index.html meta) allow assets.calendly.com (script, style) and calendly.com, youtube.com, youtube-nocookie.com, player.vimeo.com (frame); deployed-files.test.ts parses both and fails on the old files. CalendlyEmbed initialises via Calendly.initInlineWidget on every mount (src/lib/calendly.ts loads widget.js once) and shows an open-in-new-tab fallback if the script fails. CalendlyModal asks for name + email first (Calendly's postMessage carries no invitee details), prefills them, adds a1=<listing address> and the visitor's utm_* to the URL, and on a calendly.com event_scheduled message records one lead via submitLead (source calendly_showing, listingId, lead_type buyer for a listing, contact otherwise). Unused CalendlyPopupButton/BadgeWidget/InlineSection removed. DEVIATIONS: the analytics event for the booking is left to US-227 (analytics_events' CHECK allows only 4 types today); the mount check is a vitest component test with Calendly mocked, not Playwright — the real iframe needs network access to calendly.com, which CI and this sandbox should not depend on."
     },
     {
       "id": "US-222",

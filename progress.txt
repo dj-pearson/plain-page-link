@@ -4548,3 +4548,11 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
   lead, no second notification/auto-reply/allowance. Also the basis for
   email search (US-225).
 - 50 auto-replies/day/agent cap bounds mail to strangers.
+
+## Roadmap loop — iteration 9/20 — US-221: the empty scheduler
+
+- CSP (both copies) now allows Calendly and the video hosts; a test parses
+  both and was watched fail on the old files.
+- Widget initialised explicitly (the old DOM-scan only worked on first open).
+- Two-field details step → prefilled Calendly → booking message → one lead
+  with listing and campaign attribution.

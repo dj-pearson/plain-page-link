@@ -1,10 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { loadCalendly } from '@/lib/calendly';
 
 /**
- * CalendlyEmbed Component
- * Embeds Calendly scheduling widget inline
+ * Calendly's inline scheduler.
+ *
+ * US-221: this used to append widget.js and rely on its one-time DOM scan for
+ * `.calendly-inline-widget`. The scan runs once, on load — so a modal opened a
+ * second time, after the script was already there, rendered an empty box. The
+ * widget is now initialised explicitly on every mount.
  */
-
 interface CalendlyEmbedProps {
   url: string;
   minHeight?: string;
@@ -12,139 +16,39 @@ interface CalendlyEmbedProps {
 }
 
 export function CalendlyEmbed({ url, minHeight = '630px', className = '' }: CalendlyEmbedProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+
   useEffect(() => {
-    // Load Calendly widget script if not already loaded
-    const script = document.querySelector('script[src*="calendly.com"]');
-    if (!script) {
-      const newScript = document.createElement('script');
-      newScript.src = 'https://assets.calendly.com/assets/external/widget.js';
-      newScript.async = true;
-      document.body.appendChild(newScript);
-    }
-  }, []);
-
-  return (
-    <div
-      className={`calendly-inline-widget ${className}`}
-      data-url={url}
-      style={{ minWidth: '320px', height: minHeight }}
-    />
-  );
-}
-
-/**
- * CalendlyPopupButton Component
- * Opens Calendly in a popup modal
- */
-
-interface CalendlyPopupButtonProps {
-  url: string;
-  text?: string;
-  className?: string;
-  prefill?: {
-    name?: string;
-    email?: string;
-    customAnswers?: Record<string, string>;
-  };
-}
-
-export function CalendlyPopupButton({
-  url,
-  text = 'Schedule Time',
-  className = '',
-  prefill
-}: CalendlyPopupButtonProps) {
-  useEffect(() => {
-    // Load Calendly popup widget script
-    const script = document.querySelector('script[src*="calendly.com"]');
-    if (!script) {
-      const newScript = document.createElement('script');
-      newScript.src = 'https://assets.calendly.com/assets/external/widget.js';
-      newScript.async = true;
-      document.body.appendChild(newScript);
-    }
-  }, []);
-
-  const handleClick = () => {
-    // @ts-ignore - Calendly is loaded from external script
-    if (window.Calendly) {
-      // @ts-ignore
-      window.Calendly.initPopupWidget({
-        url,
-        prefill: prefill || {}
+    let cancelled = false;
+    setFailed(false);
+    loadCalendly()
+      .then((calendly) => {
+        if (cancelled || !ref.current) return;
+        ref.current.innerHTML = '';
+        calendly.initInlineWidget({ url, parentElement: ref.current });
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
       });
-    }
-  };
-
-  return (
-    <button
-      onClick={handleClick}
-      className={className}
-      type="button"
-    >
-      {text}
-    </button>
-  );
-}
-
-/**
- * CalendlyBadgeWidget Component
- * Floating button that sticks to the bottom of the page
- */
-
-interface CalendlyBadgeWidgetProps {
-  url: string;
-  text?: string;
-  color?: string;
-  textColor?: string;
-}
-
-export function CalendlyBadgeWidget({
-  url,
-  text = 'Schedule time with me',
-  color = '#0069ff',
-  textColor = '#ffffff'
-}: CalendlyBadgeWidgetProps) {
-  useEffect(() => {
-    // Load Calendly badge widget script
-    const script = document.querySelector('script[src*="calendly.com"]');
-    if (!script) {
-      const newScript = document.createElement('script');
-      newScript.src = 'https://assets.calendly.com/assets/external/widget.js';
-      newScript.async = true;
-      document.body.appendChild(newScript);
-    }
-
-    // Initialize badge widget after script loads
-    const initBadge = () => {
-      // @ts-ignore
-      if (window.Calendly) {
-        // @ts-ignore
-        window.Calendly.initBadgeWidget({
-          url,
-          text,
-          color,
-          textColor,
-          branding: false
-        });
-      }
-    };
-
-    // Try to init immediately or wait for script
-    if (document.querySelector('script[src*="calendly.com"]')) {
-      setTimeout(initBadge, 100);
-    } else {
-      document.addEventListener('DOMContentLoaded', initBadge);
-    }
-
     return () => {
-      // Cleanup badge on unmount
-      const badge = document.querySelector('.calendly-badge-widget');
-      if (badge) {
-        badge.remove();
-      }
+      cancelled = true;
     };
-  }, [url, text, color, textColor]);
+  }, [url]);
 
-  return null; // Badge is added to DOM by Calendly script
+  if (failed) {
+    return (
+      <div className={`flex items-center justify-center p-6 text-center ${className}`} style={{ minHeight }}>
+        <p className="text-sm text-muted-foreground">
+          The scheduler could not load.{' '}
+          <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+            Open it in a new tab
+          </a>
+          .
+        </p>
+      </div>
+    );
+  }
+
+  return <div ref={ref} className={className} style={{ minWidth: '320px', height: minHeight }} />;
 }
