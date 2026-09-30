@@ -93,8 +93,9 @@ export default function Overview() {
     if (plan.features.prioritySupport) features.push('Priority support');
     if (plan.features.leadScoring) features.push('Lead scoring');
     if (plan.features.aiListingDescriptions) features.push('AI listing descriptions');
-    if (plan.features.followUpSequences) features.push('Follow-up sequences');
-    if (plan.features.predictiveAnalytics) features.push('Predictive analytics');
+    // US-224: 'Follow-up sequences' (workflows do not run yet, US-136) and
+    // 'Predictive analytics' (no such feature) were listed here as reasons to
+    // upgrade. They come back when they exist.
 
     return features.slice(0, 7); // Return top 7 features
   };

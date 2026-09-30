@@ -1588,6 +1588,35 @@ export type Database = {
           },
         ];
       };
+      feature_waitlist: {
+        Row: {
+          created_at: string;
+          feature: string;
+          id: string;
+          user_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          feature: string;
+          id?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          feature?: string;
+          id?: string;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'feature_waitlist_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       ga4_oauth_credentials: {
         Row: {
           access_token: string;

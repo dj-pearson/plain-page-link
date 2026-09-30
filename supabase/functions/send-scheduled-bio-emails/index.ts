@@ -198,7 +198,7 @@ Pro tip: Track which content drives the most link clicks.
 
 AgentBio shows you exactly which posts convert.
 
-Try AgentBio Free for 14 Days: ${siteUrl}/auth/register
+Start Free on AgentBio: ${siteUrl}/auth/register
 
 To your success,
 The AgentBio Team`,
@@ -239,7 +239,7 @@ Linktree Pro: $9/month
 
 AgentBio: $29/month
 → Built for real estate
-→ MLS integration
+→ Open house sign-in kiosk
 → Lead capture
 → Advanced analytics
 
@@ -272,7 +272,7 @@ SPECIAL OFFER (Expires Tonight):
 → Custom QR code design
 → Priority support
 
-Risk-Free: 14-day free trial, cancel anytime
+Risk-Free: start on the free plan, upgrade only if it pays for itself
 
 Claim Your 20% Discount: ${siteUrl}/auth/register?coupon=BIO20
 

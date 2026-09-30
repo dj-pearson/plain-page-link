@@ -4573,3 +4573,11 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - react-router open redirect needs v7; mitigated at the only untrusted
   navigate (backslash refused, tested).
 - Lint can fail again: --max-warnings=675, lower as warnings go.
+
+## Roadmap loop — iteration 12/20 — US-224: selling what does not exist
+
+- Trial, MLS/CRM/SMS add-ons, predictive AI, property matching, workflow
+  emails: removed, relabelled, or turned into a waitlist that measures demand.
+- Workflow email step no longer spends the email quota for nothing.
+- New guard scans src + edge functions for the feature claims; each rule is
+  self-tested. CLAUDE.md corrected in five places.

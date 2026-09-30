@@ -114,9 +114,18 @@ export const WorkflowsListPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Workflows</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Workflows{' '}
+            <span className="ml-1 align-middle rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+              Beta
+            </span>
+          </h1>
+          {/* US-224: this said "Automate your real estate operations". Nothing
+              starts a workflow when a lead arrives yet, and email steps do not
+              send (US-136) — say so rather than let agents believe leads are
+              being nurtured. */}
           <p className="text-gray-600 mt-1">
-            Automate your real estate operations with visual workflows
+            Design follow-up steps. Workflows run only when you start them, and email steps don&apos;t send yet.
           </p>
         </div>
         <Button onClick={handleCreateNew}>

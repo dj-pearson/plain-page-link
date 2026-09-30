@@ -102,7 +102,7 @@ export const FEATURE_FAQS = {
     {
       question: 'Can I sync my MLS listings with AgentBio?',
       answer:
-        'AgentBio supports manual listing entry with all property details including photos, price, beds/baths, and descriptions. MLS integration varies by market. Contact support for specific MLS availability in your area.',
+        'Not yet. Listings are entered in AgentBio with photos, price, beds/baths and descriptions; MLS sync is on the roadmap, and you can ask to be notified on the pricing page.',
     },
     {
       question: 'Do property listings on AgentBio help with SEO?',

@@ -445,7 +445,7 @@ export default function ListingDescriptionGenerator() {
               trackEvent('trial_clicked');
             }}
           >
-            Start Your Free 14-Day Trial
+            Create Your Free Page
           </Button>
           <p className="text-sm text-gray-600 mt-3">
             No credit card required • Cancel anytime

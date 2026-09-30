@@ -3537,8 +3537,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Evidence: execute-workflow/index.ts:40-72; Pricing.tsx:431-449; Login.tsx:225-236; Settings.tsx:514,531,548; trial copy in InstagramBioAnalyzer.tsx:583, LocationTemplate.tsx, VsLater.tsx:667 and others. Supersedes part of US-143."
+      "passes": true,
+      "notes": "Evidence: execute-workflow/index.ts:40-72; Pricing.tsx:431-449; Login.tsx:225-236; Settings.tsx:514,531,548; trial copy in InstagramBioAnalyzer.tsx:583, LocationTemplate.tsx, VsLater.tsx:667 and others. Supersedes part of US-143. DONE: workflow send_email no longer charges emails_per_month and reports {success:false, skipped:true}; Workflows marked Beta with 'run only when you start them, email steps don't send yet' (list page + nav description); Overview upsell drops Follow-up sequences and Predictive analytics. Every 'free trial' / '14-day' claim replaced (src pages, bio drip templates, four edge-function emails, LocationTemplate FAQ JSON-LD which also falsely said all plans include unlimited listings). Pricing add-ons → AddOnWaitlist 'Notify me' buttons writing to new feature_waitlist (insert-only for anon/authenticated, read by service role; migration 20260930000004). Login: AI claims and the 2x/5+/30% stats replaced — the US-159/US-173 guards missed them because value and label were on separate lines. HeroSection default, VsLater, VsBeacons, faq-schema and link-strategy no longer imply MLS sync / CRM syncing / property matching; test-social-webhook sample dropped a '1,000+ agents' count and a trial. Settings: email_leads/sms_leads/weekly_report toggles removed. CLAUDE.md corrected (workflow emails, FCM, testing state, leads plaintext columns, generated beds/baths, Dockerfile path). Guard: marketing-claims.test.ts 'feature claims' scans src AND supabase/functions for trial, MLS integration, predictive, property matching/market intelligence; self-test proves each rule fires."
     },
     {
       "id": "US-225",

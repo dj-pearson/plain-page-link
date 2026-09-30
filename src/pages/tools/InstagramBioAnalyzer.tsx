@@ -569,7 +569,7 @@ export default function InstagramBioAnalyzer() {
                   window.location.href = '/auth/register';
                 }}
               >
-                Start Your Free 14-Day Trial
+                Create Your Free Page
                 <ArrowRight className="w-5 h-5" />
               </Button>
 

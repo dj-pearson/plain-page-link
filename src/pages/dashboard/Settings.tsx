@@ -40,10 +40,11 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // US-224: email_leads, sms_leads and weekly_report were toggles here that no
+  // code ever read. notify-lead honours LeadNotificationPreferences (below);
+  // there is no SMS provider and no weekly report. They are gone rather than
+  // left to promise something.
   const [notifications, setNotifications] = useState({
-    emailLeads: true,
-    smsLeads: false,
-    weeklyReport: true,
     marketingEmails: false,
   });
 
@@ -173,9 +174,6 @@ export default function Settings() {
   useEffect(() => {
     if (settings) {
       setNotifications({
-        emailLeads: settings.email_leads,
-        smsLeads: settings.sms_leads,
-        weeklyReport: settings.weekly_report,
         marketingEmails: settings.marketing_emails,
       });
       setProfileVisibility({
@@ -192,14 +190,7 @@ export default function Settings() {
     setNotifications((prev) => ({ ...prev, [key]: value }));
 
     // Map frontend keys to database column names
-    const dbKey =
-      key === 'emailLeads'
-        ? 'email_leads'
-        : key === 'smsLeads'
-          ? 'sms_leads'
-          : key === 'weeklyReport'
-            ? 'weekly_report'
-            : 'marketing_emails';
+    const dbKey = { marketingEmails: 'marketing_emails' }[key];
 
     try {
       await updateSettings.mutateAsync({ [dbKey]: value });
@@ -509,57 +500,6 @@ export default function Settings() {
           <h2 className="text-lg font-semibold text-foreground">Notification Preferences</h2>
         </div>
         <div className="space-y-4">
-          <div className="flex items-center justify-between py-3 border-b border-border">
-            <div>
-              <div className="font-medium text-foreground">Email Notifications for New Leads</div>
-              <div className="text-sm text-muted-foreground">
-                Get notified immediately when someone submits a lead form
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifications.emailLeads}
-                onChange={(e) => handleNotificationChange('emailLeads', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-            </label>
-          </div>
-          <div className="flex items-center justify-between py-3 border-b border-border">
-            <div>
-              <div className="font-medium text-foreground">SMS Notifications</div>
-              <div className="text-sm text-muted-foreground">
-                Receive text messages for urgent leads
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifications.smsLeads}
-                onChange={(e) => handleNotificationChange('smsLeads', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-            </label>
-          </div>
-          <div className="flex items-center justify-between py-3 border-b border-border">
-            <div>
-              <div className="font-medium text-foreground">Weekly Performance Report</div>
-              <div className="text-sm text-muted-foreground">
-                Get a summary of your profile analytics every Monday
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifications.weeklyReport}
-                onChange={(e) => handleNotificationChange('weeklyReport', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-            </label>
-          </div>
           <div className="flex items-center justify-between py-3">
             <div>
               <div className="font-medium text-foreground">Marketing Emails</div>

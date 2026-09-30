@@ -207,7 +207,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p style="text-align: center; margin-top: 40px;">
         <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Start Your Free Trial
+          Create Your Free Page
         </a>
       </p>
     </div>`,
@@ -340,7 +340,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p style="text-align: center; margin-top: 40px;">
         <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Start Your Free 14-Day Trial
+          Create Your Free Page
         </a>
       </p>
     </div>`,
@@ -467,7 +467,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p style="text-align: center;">
         <a href="${SITE_URL}/register?coupon=LISTING20" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 18px; font-weight: bold;">
-          Start My 14-Day Free Trial
+          Create My Free Page
         </a>
       </p>
 

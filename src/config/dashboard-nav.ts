@@ -94,7 +94,8 @@ export const SETTINGS_TOOLS: NavDestination[] = [
     label: 'Workflows',
     href: '/dashboard/workflows',
     icon: Workflow,
-    description: 'Automate follow-up when a lead arrives',
+    // US-224: workflows do not run on their own yet (US-136).
+    description: 'Design follow-up steps (beta — manual runs only)',
   },
   {
     label: 'Subscription',

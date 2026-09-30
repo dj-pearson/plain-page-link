@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { useSubscription, stripePriceIdFor } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
+import { AddOnWaitlist } from '@/components/pricing/AddOnWaitlist';
 import { useToast } from '@/hooks/use-toast';
 import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -431,27 +432,10 @@ export default function Pricing() {
                 ))}
               </div>
 
-              <div className="mt-16 text-center">
-                <h3 className="text-2xl font-bold mb-4">Add-Ons Available</h3>
-                <div className="grid md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                  <Card className="p-4">
-                    <p className="font-semibold">Premium Themes</p>
-                    <p className="text-sm text-muted-foreground">$15 one-time</p>
-                  </Card>
-                  <Card className="p-4">
-                    <p className="font-semibold">MLS Integration</p>
-                    <p className="text-sm text-muted-foreground">$25/month</p>
-                  </Card>
-                  <Card className="p-4">
-                    <p className="font-semibold">CRM Connectors</p>
-                    <p className="text-sm text-muted-foreground">$20/month each</p>
-                  </Card>
-                  <Card className="p-4">
-                    <p className="font-semibold">SMS Notifications</p>
-                    <p className="text-sm text-muted-foreground">$15/month</p>
-                  </Card>
-                </div>
-              </div>
+              {/* US-224: these four were sold here with prices — $25/mo MLS
+                  integration, $20/mo CRM connectors, $15/mo SMS, $15 themes —
+                  and none of them exists. Now they measure demand instead. */}
+              <AddOnWaitlist />
 
               {/* FAQ Section */}
               <div className="mt-20">

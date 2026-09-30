@@ -38,39 +38,23 @@ interface ExecutionContext {
 // Node Executors
 const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionContext, supabase: any) => Promise<any>> = {
   // Actions
-  send_email: async (node, context, supabase) => {
-    const { to, subject, body, template } = node.config;
+  send_email: async (node, context) => {
+    const { to, subject } = node.config;
     const resolvedTo = resolveVariables(to, context);
     const resolvedSubject = resolveVariables(subject, context);
-    const resolvedBody = resolveVariables(body, context);
 
-    // Each email is charged to the owner's plan (emails_per_month,
-    // 20260923000003) before it goes out. Over the quota the step fails with
-    // a reason the agent can act on, rather than the workflow carrying on as
-    // if the lead had been emailed.
-    const { data: quota, error: quotaError } = await supabase.rpc('consume_plan_quota', {
-      _user_id: context.ownerId,
-      _key: 'emails_per_month',
-      _count: 1,
-    });
-    if (quotaError) throw quotaError;
-    if (!quota?.allowed) {
-      throw new Error(
-        quota?.limit === 0
-          ? 'Automated emails are not included in your plan. Upgrade to send them.'
-          : `This month's ${quota?.limit} automated emails are used up. Upgrade for more.`
-      );
-    }
-
-    console.log(`Sending email to ${resolvedTo}: ${resolvedSubject}`);
-
-    // In production, this would integrate with an email service
-    // For now, log the action
+    // US-224: this charged the owner's emails_per_month quota and then only
+    // logged the email — agents paid, from a metered allowance, for mail that
+    // was never sent, and the step reported success. Until the workflow runtime
+    // sends mail for real (US-136, which must charge consume_plan_quota when it
+    // does), the step says plainly that it did nothing and costs nothing.
+    console.log(`[execute-workflow] email step skipped (not sending yet): ${resolvedTo}: ${resolvedSubject}`);
     return {
-      success: true,
+      success: false,
+      skipped: true,
+      reason: 'Email steps do not send yet',
       to: resolvedTo,
       subject: resolvedSubject,
-      sentAt: new Date().toISOString(),
     };
   },
 

@@ -202,7 +202,7 @@ AgentBio gives you a professional link-in-bio built specifically for real estate
 → Analytics to track what's working
 → QR codes for your business cards and flyers
 
-Start Your Free 14-Day Trial: ${siteUrl}/auth/register
+Create Your Free Page: ${siteUrl}/auth/register
 
 To your Instagram success,
 The AgentBio Team
@@ -302,7 +302,7 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
           <li>→ QR codes for offline marketing</li>
         </ul>
         <a href="${siteUrl}/auth/register" class="button">
-          Start Your Free 14-Day Trial
+          Create Your Free Page
         </a>
       </div>
 

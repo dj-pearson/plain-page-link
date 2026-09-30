@@ -304,7 +304,7 @@ function getWelcomeEmailHTML(data: {
     </p>
     <a href="${SITE_URL}/register?utm_source=listing-generator&utm_medium=email&utm_campaign=welcome"
        style="display: inline-block; background: white; color: #9333ea; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-      Start Your Free 14-Day Trial →
+      Create Your Free Page →
     </a>
     <p style="color: white; font-size: 12px; margin-top: 15px; margin-bottom: 0;">
       No credit card required • Cancel anytime • 4,200+ agents trust AgentBio
