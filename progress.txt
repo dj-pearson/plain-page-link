@@ -4464,3 +4464,22 @@ US-218 and US-224 make it safe and honest first), binding PII ciphertext to its
 row (decrypt_contacts oracle), listing pages + agent sitemap (US-141), open
 house guest list and offline kiosk, backups/DR for self-hosted Postgres, reverse
 trial. Owner-only: US-191 key rotation remains open and outranks all of these.
+
+---
+
+## Roadmap loop — iteration 1/20 — US-213: any account deletable with the anon key
+
+- Reproduced first: as anon, request_account_deletion(victim, …, -1) then
+  process_scheduled_account_deletions() removed the victim from auth.users.
+- Root cause is general, not one function: Supabase default privileges grant
+  EXECUTE on every public function to anon/authenticated and the baseline has
+  no GRANT/REVOKE, so 93 SECURITY DEFINER functions were anonymous RPCs.
+- Fix: deny-by-default migration (20260930000001), explicit grant-back of 22,
+  assert_caller_is / assert_caller_is_admin guards on the ones taking an id.
+  Also closed on the way: anyone reading anyone's sessions (IP + location),
+  forging admin audit entries, starting other agents' workflows.
+- Guard: verify-schema DEFINER_CALLABLE allowlist + "every browser rpc() is
+  executable" + the exploit itself. Watched fail on the pre-fix tree (84 + 9),
+  pass after. The second check found a browser RPC my grep had missed.
+- Deploy note: apply the migration, then smoke the admin panel (user stats,
+  slow queries, system health) and Settings → Sessions as a real user.

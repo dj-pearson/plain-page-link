@@ -8974,6 +8974,11 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: string;
       };
+      assert_caller_is: { Args: { p_user_id: string }; Returns: undefined };
+      assert_caller_is_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
       assert_within_plan: {
         Args: { _at?: string; _key: string; _user_id: string };
         Returns: undefined;

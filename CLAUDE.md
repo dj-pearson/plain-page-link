@@ -711,6 +711,14 @@ the free tools (`instagram_bio_*`, `listing_*`).
   owner privileges — a temp table can shadow a real one. Enforced by
   `verify:schema`; `extensions` is where pgcrypto lives, `pg_temp` is named last
   so it is searched last rather than first.
+- Are **not executable by `anon`/`authenticated`** unless listed in
+  `DEFINER_CALLABLE` in `scripts/verify-schema.mjs` (US-213). Supabase grants
+  EXECUTE on every new public function to both roles, so a migration that adds
+  one must `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` and
+  `GRANT … TO service_role`, or add it to that list with the reason it is safe.
+  A function the browser calls with a user id argument must start with
+  `PERFORM public.assert_caller_is(p_user_id)` (or `assert_caller_is_admin()`).
+  Before this, `request_account_deletion` let anyone delete any account.
 
 **Plan limits (20260923000002):**
 - `get_user_plan()` is the one authority for what an agent's plan allows

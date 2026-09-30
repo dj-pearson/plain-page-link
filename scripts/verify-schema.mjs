@@ -1705,6 +1705,146 @@ check('SECURITY DEFINER functions pin search_path', () =>
 );
 
 // ---------------------------------------------------------------------------
+// 8b. SECURITY DEFINER functions are not callable by the browser roles unless
+//     listed here. Such a function bypasses RLS, and Supabase's default
+//     privileges grant EXECUTE on every new public function to anon and
+//     authenticated — so until US-213 every one of them was an anonymous RPC.
+//     request_account_deletion(<any id>, …, -1) followed by
+//     process_scheduled_account_deletions() deleted any account with the anon
+//     key alone. Adding a SECURITY DEFINER function now means either revoking
+//     EXECUTE in its migration or adding it here with the reason it is safe.
+// ---------------------------------------------------------------------------
+const DEFINER_CALLABLE = new Map([
+  // anon + authenticated: public by design, or used by RLS policies that are
+  // evaluated for visitors.
+  ['has_role', { anon: true, why: 'RLS policies' }],
+  ['is_team_admin', { anon: true, why: 'RLS policies' }],
+  ['is_team_member', { anon: true, why: 'RLS policies' }],
+  ['check_username_available', { anon: true, why: 'signup form; returns a boolean' }],
+  ['list_public_open_houses', { anon: true, why: 'public profile; omits private_notes' }],
+  ['get_public_open_house', { anon: true, why: 'open house kiosk; omits private_notes' }],
+  ['increment_link_clicks', { anon: true, why: 'the only writer of links.click_count; throttled' }],
+  ['profile_shows_branding', { anon: true, why: 'public profile; returns a boolean' }],
+  ['public_agent_response_hours', { anon: true, why: 'public profile; aggregate only' }],
+  // authenticated only: each checks auth.uid() or admin itself.
+  ['get_plan_usage', { why: 'reads auth.uid() only' }],
+  ['analytics_visible_since', { why: 'reads auth.uid() only' }],
+  ['get_user_plan', { why: 'plan name and limits; no contact data' }],
+  ['get_user_sessions', { why: 'assert_caller_is' }],
+  ['get_connected_search_platforms', { why: 'assert_caller_is' }],
+  ['log_lead_activity', { why: 'checks lead ownership against auth.uid()' }],
+  ['log_lead_call', { why: 'checks lead ownership against auth.uid()' }],
+  ['log_lead_email', { why: 'checks lead ownership against auth.uid()' }],
+  ['start_workflow_execution', { why: 'assert_caller_is on the workflow owner' }],
+  ['get_user_statistics', { why: 'assert_caller_is_admin' }],
+  ['log_admin_action', { why: 'assert_caller_is_admin + assert_caller_is' }],
+  ['top_slow_queries', { why: 'assert_caller_is_admin' }],
+  ['get_system_health_summary', { why: 'assert_caller_is_admin' }],
+]);
+
+check('SECURITY DEFINER functions are not callable by anon/authenticated unless allowed', () => {
+  const out = [];
+  for (const row of q(`
+    SELECT p.proname || '|' || pg_get_function_identity_arguments(p.oid)
+             || '|' || has_function_privilege('anon', p.oid, 'EXECUTE')
+             || '|' || has_function_privilege('authenticated', p.oid, 'EXECUTE')
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.prosecdef
+    ORDER BY 1;
+  `)) {
+    const [name, args, anon, authed] = row.split('|');
+    const allowed = DEFINER_CALLABLE.get(name);
+    if (anon === 'true' && !allowed?.anon) out.push(`${name}(${args}) is executable by anon`);
+    else if (authed === 'true' && !allowed) out.push(`${name}(${args}) is executable by authenticated`);
+  }
+  return out;
+});
+
+check('every rpc() the browser calls is executable by authenticated', () => {
+  const out = [];
+  for (const file of sourceFiles(['src'])) {
+    if (/\.test\.tsx?$/.test(file)) continue;
+    const text = stripComments(readFileSync(file, 'utf8'));
+    for (const m of text.matchAll(/\.rpc\(\s*['"]([a-z0-9_]+)['"]/g)) {
+      const [ok] = q(`
+        SELECT bool_or(has_function_privilege('authenticated', p.oid, 'EXECUTE'))::text
+        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public' AND p.proname = '${m[1]}';
+      `);
+      if (ok !== 'true') out.push(`${m[1]} <- ${file.replace(ROOT + '/', '')}`);
+    }
+  }
+  return [...new Set(out)].sort();
+});
+
+check('account deletion and session reads are refused for another user', () => {
+  const out = [];
+  const victim = '00000000-dead-beef-0000-0000000de1e7';
+  const other = '00000000-dead-beef-0000-0000000de1e8';
+  const as = (role, sub, sql) =>
+    q(`SET ROLE ${role}; ${sub ? `SET request.jwt.claim.sub = '${sub}';` : ''} ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES
+        ('${victim}', 'victim@example.test'), ('${other}', 'other@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username) VALUES
+        ('${victim}', 'verifyvictim'), ('${other}', 'verifyother') ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // The exploit, as a visitor and as another signed-in user.
+    for (const [role, sub] of [['anon', null], ['authenticated', other]]) {
+      if (!refused(() => as(role, sub, `SELECT public.request_account_deletion('${victim}', 'x', NULL, NULL, -1);`)))
+        out.push(`${role} could schedule another user's account deletion`);
+      if (!refused(() => as(role, sub, `SELECT public.process_scheduled_account_deletions();`)))
+        out.push(`${role} could run process_scheduled_account_deletions`);
+      if (!refused(() => as(role, sub, `SELECT public.cancel_account_deletion('${victim}', 'x');`)))
+        out.push(`${role} could cancel another user's account deletion`);
+      if (!refused(() => as(role, sub, `SELECT * FROM public.get_user_sessions('${victim}');`)))
+        out.push(`${role} could read another user's sessions`);
+      if (!refused(() => as(role, sub, `SELECT public.log_admin_action('${victim}', 'forged');`)))
+        out.push(`${role} could write the admin audit log`);
+    }
+    const [present] = q(`SELECT count(*) FROM auth.users WHERE id = '${victim}';`);
+    if (present !== '1') out.push('the victim account was deleted');
+
+    // The owner still reads their own sessions.
+    if (refused(() => as('authenticated', victim, `SELECT * FROM public.get_user_sessions('${victim}');`)))
+      out.push("a user was refused their own sessions");
+
+    // The service role (gdpr-deletion) can still schedule one, but never sooner than 30 days.
+    q(`SET request.jwt.claim.role = 'service_role';
+       SELECT public.request_account_deletion('${victim}', 'x', NULL, NULL, -1);`);
+    const [days] = q(`SELECT floor(extract(epoch FROM scheduled_for - now()) / 86400)::int
+                        FROM public.account_deletion_scheduled WHERE user_id = '${victim}';`);
+    if (!(Number(days) >= 29)) out.push(`a grace period of -1 scheduled the deletion ${days} days out`);
+    q(`SELECT public.process_scheduled_account_deletions();`);
+    const [still] = q(`SELECT count(*) FROM auth.users WHERE id = '${victim}';`);
+    if (still !== '1') out.push('a freshly scheduled deletion was executed immediately');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.account_deletion_scheduled WHERE user_id IN ('${victim}', '${other}');
+         DELETE FROM public.gdpr_data_requests WHERE user_id IN ('${victim}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${victim}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${victim}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 9. Every column named in a .select('...') list must exist on the target table.
 //    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and
 //    that gap is what shipped US-070 and US-083. Five edge functions selected

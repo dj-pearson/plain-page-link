@@ -3361,8 +3361,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Found by the 2026-09-30 backend audit and reproduced in a throwaway Postgres: as anon, request_account_deletion(victim,'x',NULL,NULL,-1) followed by process_scheduled_account_deletions() deleted the victim's auth.users row. Baseline contains 0 GRANT/REVOKE statements; Supabase default privileges grant EXECUTE to anon (see scripts/supabase-prelude.sql:124). Do this first."
+      "passes": true,
+      "notes": "Found by the 2026-09-30 backend audit and reproduced in a throwaway Postgres: as anon, request_account_deletion(victim,'x',NULL,NULL,-1) followed by process_scheduled_account_deletions() deleted the victim's auth.users row. Baseline contains 0 GRANT/REVOKE statements; Supabase default privileges grant EXECUTE to anon (see scripts/supabase-prelude.sql:124). Do this first. DONE: migration 20260930000001 revokes EXECUTE on all SECURITY DEFINER functions in public from PUBLIC/anon/authenticated (service_role keeps it) and grants back 22: 9 public-by-design (incl. has_role/is_team_* for RLS) and 13 browser RPCs for authenticated. New helpers assert_caller_is(uuid) / assert_caller_is_admin() guard get_user_sessions (was: anyone could read anyone's IPs/locations), get_connected_search_platforms, start_workflow_execution (owner check — US-218 criterion), log_admin_action (was forgeable), get_user_statistics, top_slow_queries, get_system_health_summary. request_account_deletion clamps grace to >=30 days. verify-schema gains three checks: DEFINER_CALLABLE allowlist (84 failures on the pre-fix tree), every src rpc() executable by authenticated (caught get_system_health_summary, which a grep missed), and the exploit reproduced as anon and as another user (9 failures pre-fix incl. 'the victim account was deleted'). Default privileges deliberately NOT altered: a new SECURITY INVOKER RPC should keep working; the allowlist check catches new definer functions instead."
     },
     {
       "id": "US-214",
