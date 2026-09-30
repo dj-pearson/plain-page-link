@@ -19,6 +19,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { checkRateLimitDb, getRateLimitHeaders, RATE_LIMITS } from "../_shared/rate-limiter.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { getClientIP } from '../_shared/client-ip.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   apiVersion: '2023-10-16',
@@ -56,7 +57,7 @@ serve(async (req) => {
 
   try {
     // Rate limiting
-    const clientIp = req.headers.get('x-forwarded-for') || 'unknown';
+    const clientIp = getClientIP(req);
     // US-084: was _shared/rateLimit.ts, a module-level Map. Edge isolates are
     // ephemeral and horizontally scaled, so that limiter reset on every cold
     // start and never saw a sibling's counts — the money endpoints had the one

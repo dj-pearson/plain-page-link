@@ -4483,3 +4483,14 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
   pass after. The second check found a browser RPC my grep had missed.
 - Deploy note: apply the migration, then smoke the admin panel (user stats,
   slow queries, system health) and Settings → Sessions as a real user.
+
+## Roadmap loop — iteration 2/20 — US-214: rate limits a stranger could fill
+
+- The DB half landed with US-213 (check_rate_limit is service-role only).
+- The rate-limit edge function had zero callers: deleted.
+- getClientIP took the leftmost X-Forwarded-For (client-written). DNS check:
+  functions.agentbio.net → Contabo IP directly, api.agentbio.net → Cloudflare.
+  So cf-connecting-ip is spoofable on the host the browser actually uses.
+  Now one implementation, rightmost-hop, configurable. Four Stripe functions
+  had their own copy of the leftmost read; they use the shared one.
+- Sandbox cannot reach esm.sh, so full `deno check` / smoke run only in CI.

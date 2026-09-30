@@ -131,3 +131,16 @@ deployed.
 
 `supabase/functions/deno.json` holds the import map. CI type-checks every
 function with `deno check` in `.github/workflows/verify-backend.yml`.
+
+## Client IP and rate limits (US-214)
+
+Every per-IP rate limit keys on `getClientIP()` in
+`supabase/functions/_shared/client-ip.ts`. It trusts the **rightmost**
+`X-Forwarded-For` entry — the one Traefik appends — because the leftmost entry
+and `cf-connecting-ip` are whatever the client sent while
+`functions.agentbio.net` is not behind Cloudflare.
+
+| Env var | Default | Set it when |
+| --- | --- | --- |
+| `TRUSTED_PROXY_HOPS` | `1` | another proxy we run sits between Traefik and the server |
+| `TRUST_CF_CONNECTING_IP` | unset | the functions host is moved behind Cloudflare (orange cloud) |

@@ -3377,8 +3377,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Reproduced: as anon, check_rate_limit('user:<id>','pii-crypto',1000,315360000) creates a 10-year window. Affects pii-crypto, login-security and submit-lead target buckets. ~20 functions use getClientIP."
+      "passes": true,
+      "notes": "Reproduced: as anon, check_rate_limit('user:<id>','pii-crypto',1000,315360000) creates a 10-year window. Affects pii-crypto, login-security and submit-lead target buckets. ~20 functions use getClientIP. DONE: check_rate_limit lost anon/authenticated EXECUTE in US-213's deny-by-default migration (enforced by the DEFINER_CALLABLE check). The rate-limit edge function had no caller anywhere and was deleted rather than patched. New _shared/client-ip.ts is the single getClientIP: rightmost X-Forwarded-For entry (TRUSTED_PROXY_HOPS, default 1 = Traefik), cf-connecting-ip only with TRUST_CF_CONNECTING_IP=true — DNS shows functions.agentbio.net resolves straight to the Contabo host, so the old cf-connecting-ip fallback was client-controlled. validation.ts and auth.ts re-export it; four Stripe functions that read the raw header now use it. client-ip.test.ts covers spoofing and asserts no other edge file reads x-forwarded-for. deno check could not run locally (esm.sh/deno.land blocked by the sandbox network policy); client-ip.ts checked standalone, CI runs the full check."
     },
     {
       "id": "US-215",

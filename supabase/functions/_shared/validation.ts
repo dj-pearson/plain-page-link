@@ -279,12 +279,8 @@ export function validateContactData(data: any): ValidationResult {
   };
 }
 
-// Get client IP from request
-export function getClientIP(req: Request): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0] || 
-         req.headers.get('x-real-ip') || 
-         'unknown';
-}
+// The one implementation lives in client-ip.ts (US-214).
+export { getClientIP } from './client-ip.ts';
 
 /**
  * Public review submission (US-113).
