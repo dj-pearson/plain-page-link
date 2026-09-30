@@ -4523,3 +4523,11 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - One-time payment mode refused: it still took money after US-059.
 - Webhook audits any duplicate that still gets through (critical risk).
 - Owner: check Stripe for customers with two live subscriptions and refund.
+
+## Roadmap loop — iteration 6/20 — US-218: workflows as a proxy into the network
+
+- webhook_call: safeFetch, status only. update_lead / create_task: ownership
+  check before the service-role write, assignee limited.
+- publish-article-to-social: admin or service role, rate-limited, published
+  articles only.
+- Source-level assertions watched fail on the old index.ts.

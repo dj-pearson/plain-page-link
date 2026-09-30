@@ -3440,8 +3440,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "execute-workflow/index.ts:189-202 (plain fetch), :95-101 and :150-175 (service-role writes on any leadId); publish-article-to-social/index.ts:31-39 accepts any JWT. Must land before the workflow runtime (US-136) is built."
+      "passes": true,
+      "notes": "execute-workflow/index.ts:189-202 (plain fetch), :95-101 and :150-175 (service-role writes on any leadId); publish-article-to-social/index.ts:31-39 accepts any JWT. Must land before the workflow runtime (US-136) is built. DONE: execute-workflow webhook_call uses safeFetch (private/internal targets refused on every redirect hop) and keeps only the status — the response body is no longer stored or returned. update_lead and create_task call assertLeadOwnedBy (execute-workflow/ownership.ts) before any service-role write; create_task's assignee is limited to the owner or the lead's current assignee. start_workflow_execution's owner check landed in US-213. publish-article-to-social: service role or admin only (403 otherwise), 10/hour per admin before the Claude call, drafts refused. Did not add isValidWebhookUrl's Zapier/Make allowlist to workflow webhooks: agents legitimately call their own endpoints; safeFetch's private-address block is the SSRF control. ownership.test.ts: unit tests plus source assertions (no bare fetch, both steps check ownership) that fail on the pre-fix index.ts."
     },
     {
       "id": "US-219",

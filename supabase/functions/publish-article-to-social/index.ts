@@ -4,6 +4,11 @@ import { isServiceRoleRequest, getAuthenticatedUser } from '../_shared/service-a
 import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { isValidWebhookUrl } from '../_shared/validation.ts';
 import { getSiteUrl } from '../_shared/env.ts';
+import { checkRateLimitDb, type RateLimitConfig } from '../_shared/rate-limiter.ts';
+
+// Each call spends a Claude request per webhook; generate-article publishes one
+// article at a time, and an admin re-publishing by hand needs a handful.
+const PUBLISH_LIMIT: RateLimitConfig = { maxRequests: 10, windowSeconds: 3600, failClosed: true };
 
 export default async (req: Request) => {
   console.log('[publish-article-to-social] Function invoked');
@@ -26,14 +31,35 @@ export default async (req: Request) => {
     });
 
     // verify_jwt is disabled, but this is invoked both by generate-article
-    // (service role) and by the admin UI (user JWT). Accept either, but reject
-    // anonymous/anon-key callers so arbitrary article IDs can't be published to
-    // all configured webhooks at the attacker's whim (also spends the AI budget).
-    if (!isServiceRoleRequest(req)) {
+    // (service role) and by the admin UI (user JWT). US-218: any signed-up
+    // account used to be enough — a free user could push any article, published
+    // or not, to the admin's social webhooks and spend the Claude budget doing
+    // it. Now: the service role, or an admin, rate-limited.
+    const serviceCall = isServiceRoleRequest(req);
+    if (!serviceCall) {
       const userId = await getAuthenticatedUser(req, supabase);
       if (!userId) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
           status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: adminRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .maybeSingle();
+      if (!adminRole) {
+        return new Response(JSON.stringify({ error: 'Admin only' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const limit = await checkRateLimitDb(supabase, `user:${userId}`, 'publish-article-to-social', PUBLISH_LIMIT);
+      if (!limit.allowed) {
+        return new Response(JSON.stringify({ error: 'Too many publishes. Try again later.' }), {
+          status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -58,6 +84,14 @@ export default async (req: Request) => {
 
     if (articleError || !article) {
       throw new Error('Article not found: ' + articleError?.message);
+    }
+
+    // A draft is not announced to the world.
+    if (article.status !== 'published') {
+      return new Response(JSON.stringify({ error: 'Only published articles can be shared' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('Article fetched:', article.title);
