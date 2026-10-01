@@ -4651,3 +4651,28 @@ that was run against the tree before its fix and watched to fail. Owner
 actions are listed in the prd notes: apply migrations 20260930000001–10, set
 SENTRY_DSN / VITE_SENTRY_DSN, add uptime monitors, and check Stripe for
 customers already holding two live subscriptions.
+
+---
+
+## Accessibility deep dive — 2026-10-01 (stories US-233 to US-249 added)
+
+Scope: web + PWA. There is no native iOS/Android app, so "mobile compliance"
+means the site and installed PWA in Safari/VoiceOver and Chrome/TalkBack —
+WCAG 2.2 AA applied at phone widths.
+
+Evidence: an axe scan with WCAG 2.0/2.1/2.2 + best-practice tags across 61
+routes × 3 devices (desktop, iPhone 13, Pixel 7 emulation) = 183 runs, plus
+three code audits (keyboard/screen reader, mobile/PWA, content/UGC/legal).
+The green CI a11y job runs desktop only, WCAG 2.0 tags only, and never visits
+dashboard sub-routes; the wider scan found 6 critical/serious rules it misses,
+including an unnamed button on the public profile at phone width only.
+
+Order: P1 is what renders on agents' public pages (ADA Title III demand-letter
+exposure, Fair Housing angle) plus the accessibility statement's false claims;
+P2 the dashboard and mobile; P3 charts/exports, content language and the ACR.
+US-248 (widen CI) lands after the fixes so CI is not red in between.
+
+Legal posture (not legal advice — counsel to confirm): ADA Title III applies
+and is the main exposure (WCAG 2.1 AA de facto; target 2.2 AA). Fair Housing
+Act relevant to listing information. EU EAA probably not applicable (US, B2B,
+microenterprise). UK/AODA/ACA/508 not applicable today.

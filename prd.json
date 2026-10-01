@@ -3668,6 +3668,275 @@
       "priority": 3,
       "passes": true,
       "notes": "Pricing.tsx:187-198; FullProfilePage.tsx:699-706. A reward (Stripe coupon for both agents) is a follow-up once attribution data exists. DONE: src/lib/signupIntent.ts keeps the plan chosen on /pricing (localStorage — email verification opens a new tab; 7 days) and the first-touch ?ref= (30 days). Logged-out Subscribe → /auth/register?plan=&interval= (Register shows 'You picked X — checkout opens right after'); onboarding completion → /dashboard/subscription?checkout=<plan>&interval=, which opens checkout once (through US-217's change-or-checkout path) and clears the intent. The 'Powered by' badge links https://agentbio.net/?utm_source=profile_badge&utm_medium=referral&ref=<username>. signUp passes ref and signup_source; handle_new_user records profiles.referred_by only when the ref names a real profile, plus signup_source (migration 20260930000010); a trigger stops agents rewriting either later. Health dashboard: 'Signups by referrer (30d)'. Tests: signupIntent unit tests (register URL, intent survives, first-touch referral, badge URL); verify-schema check (signup records referrer; agent cannot rewrite it). DEVIATION: no Playwright spec — covered by unit tests. Reward (coupon for both agents) left as the noted follow-up."
+    },
+    {
+      "id": "US-233",
+      "title": "Agents' public pages have blocks a keyboard cannot reach and buttons with no name",
+      "description": "As a visitor using a keyboard, screen reader or switch, I need every control on an agent's public page to be reachable and named, so that I can contact the agent and browse listings.",
+      "acceptanceCriteria": [
+        "Page-builder LinkBlock (card/minimal) and linked ImageBlock render <a href> instead of <div onClick> with window.location",
+        "GalleryBlock thumbnails are buttons; its lightbox is rebuilt on the Radix Dialog (role=dialog, Escape, focus trap, focus return) with named close/previous/next",
+        "Named: VideoBlock play button, ListingDetailModal previous/next photo and thumbnails ('Show photo 3 of 12'), TestimonialSection mobile previous/next, and the mobile-only action buttons axe found on /demo at phone width",
+        "StickyActionBar FAB accessible name starts with its visible text (2.5.3 Label in Name)",
+        "Public sort menu (ListingGallery) uses the Radix DropdownMenu",
+        "The a11y suite gains a phone-viewport run of /demo and the gallery-lightbox state, both at zero critical/serious",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Evidence 2026-10-01: axe at iPhone/Pixel width found button-name [critical] on /demo (.px-3.5.py-2.5.min-h-[44px]) — invisible to CI, which scans desktop only. Code audit: LinkBlock.tsx:51-53,74-76; ImageBlock.tsx:60; GalleryBlock.tsx:74-79,101-125; VideoBlock.tsx:101; ListingDetailModal.tsx:298-334; TestimonialSection.tsx:143-148; StickyActionBar.tsx:172; ListingGallery.tsx:146-160. SC 2.1.1, 2.1.2, 4.1.2, 2.5.3. Highest exposure: these render on every agent's /:username, the pages ADA demand-letter scans target."
+    },
+    {
+      "id": "US-234",
+      "title": "Theme colours, including the presets, put white text on buttons at 1.7:1",
+      "description": "As a visitor with low vision, I need text on an agent's page to meet contrast minimums whatever theme the agent picked, and as an agent I need the editor to stop me publishing an unreadable page.",
+      "acceptanceCriteria": [
+        "src/lib/wcagContrast.ts: WCAG relative luminance + contrast ratio, unit-tested against known pairs (replaces the unused, wrong getContrastingColor)",
+        "ContactButtons, CTABlock and every element that puts text on --theme-primary choose black or white text from the primary automatically",
+        "Every built-in preset passes 4.5:1 for text and 3:1 for UI components (Luxe, emerald, pink, sunset, forest, ocean currently fail); a test iterates all presets",
+        "Theme editor shows the live ratio for text/background and button pairs, and refuses to save a pair under 4.5:1 (with a 'use nearest passing colour' action)",
+        "The new-lead email button and header meet 4.5:1, and every HTML email template sets <html lang=\"en\"",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Evidence: ContactButtons.tsx:34-37, CTABlock.tsx:33,47,64 hard-code white on hsl(var(--theme-primary)); default primary #3b82f6 = 3.68:1; themes.ts:169 #fbbf24 1.67:1, :229 2.54:1, :189 3.53:1, :351 2.80:1, :368 3.77:1, :334 3.68:1; Theme.tsx:389-417 accepts any colours; getContrastingColor (themes.ts:501) unused and uses the wrong formula. Emails: email.ts:191 #667eea 3.66:1; none of 7 templates set lang. SC 1.4.3, 1.4.11, 3.1.1. Contrast is the #1 thing automated demand-letter scans flag."
+    },
+    {
+      "id": "US-235",
+      "title": "Agents have nowhere to write alt text for listing photos",
+      "description": "As a blind home-buyer, I need listing photos described, and as an agent I need a place to describe them, so that the listing is usable and the accessibility statement's advice is possible to follow.",
+      "acceptanceCriteria": [
+        "listings.photos accepts {url, alt} objects alongside legacy strings (migration + a normaliser used everywhere photos are read; existing rows keep working)",
+        "ListingPhotoManager shows an alt-text input per photo, with an optional 'Suggest' that drafts alt from the listing details via the existing AI function",
+        "Every renderer (ListingCard, ListingDetailModal, FeaturedListingsCarousel, UpcomingOpenHouses, SocialShareDialog) uses the photo's alt, falling back to '<address> — photo N of M'",
+        "Page-builder ImageBlock/GalleryBlock: alt is required unless 'decorative' is ticked (renders alt=\"\"); the 'Gallery image' default is removed",
+        "Unit tests for the normaliser and the fallback text",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Evidence: photos is jsonb string[] (types.ts:3115); ListingPhotoManager.tsx:106 stores URLs only; alt={address} at ListingCard.tsx:113, ListingDetailModal.tsx:285, FeaturedListingsCarousel.tsx:207, UpcomingOpenHouses.tsx:133, SocialShareDialog.tsx:153; BlockSettings.tsx:822 'Gallery image' default; AccessibilityStatement.tsx:235-237 tells agents to add alt they cannot add. SC 1.1.1. Fair Housing Act relevance: inaccessible listing information is the hook in housing-website claims (lawyer to confirm)."
+    },
+    {
+      "id": "US-236",
+      "title": "3D theme backgrounds and the hero shimmer never stop moving",
+      "description": "As a visitor with a vestibular or attention disorder, I need moving content to respect my reduced-motion setting and to be pausable, so that the page is usable.",
+      "acceptanceCriteria": [
+        "ThreeDBackground, GradientMesh and FloatingGeometry render a static frame (or nothing) when prefers-reduced-motion is set or the a11y widget's reduced-motion is on, via the existing useMotionPreference",
+        "Public profiles with an animated theme show a visible Pause animation control",
+        "HeroSection's GSAP shimmer stops after 5 s and is skipped under reduced motion; mouse parallax off under reduced motion",
+        "FeaturedListingsCarousel gets a visible Pause/Play button",
+        "VideoBlock forces muted whenever autoplay is on (1.4.2)",
+        "Component tests with matchMedia('(prefers-reduced-motion: reduce)') mocked",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Evidence: index.css:298 rule only stops CSS animation; useFrame loops in src/components/theme/*; FullProfilePage.tsx:441-478 mounts them for premium themes; HeroSection.tsx:127-132 repeat:-1; useMotionPreference has no consumer; FeaturedListingsCarousel.tsx:96-103 no pause control; VideoBlock.tsx:37-50 autoplay independent of muted. SC 2.2.2, 2.3.3, 1.4.2. The statement claims 'Animations can be paused or disabled' (l.152)."
+    },
+    {
+      "id": "US-237",
+      "title": "Video blocks cannot carry captions or a transcript",
+      "description": "As a deaf visitor, I need captions or a transcript for video on an agent's page.",
+      "acceptanceCriteria": [
+        "VideoBlockConfig gains captionsUrl (WebVTT) and transcript fields in the editor",
+        "Direct video files render as <video controls playsinline> with <track kind=\"captions\" default> when captionsUrl is set (not an <iframe>)",
+        "YouTube embeds add cc_load_policy=1; iframe title uses the block's title, not 'Video'",
+        "A transcript, when present, renders below the video behind a 'Show transcript' disclosure",
+        "Editor shows a 'Add captions or a transcript' notice when neither is set",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Evidence: types/pageBuilder.ts:140-147 has no caption fields; VideoBlock.tsx:57-58,108-115 iframes direct files; title falls back to 'Video'. SC 1.2.2, 1.2.5, 4.1.2."
+    },
+    {
+      "id": "US-238",
+      "title": "The two-step lead form drops focus, and auth errors are not announced",
+      "description": "As a screen-reader user, I need to know where I am and what went wrong when I submit a lead form or sign in.",
+      "acceptanceCriteria": [
+        "TwoStepLeadForm: on step change focus the step-2 heading (tabIndex -1); on validation failure focus the first invalid field; success text goes into a live region that exists before it is filled; the form no longer auto-closes after 3 s; an enrichment failure stays visible",
+        "Login, Register, ForgotPassword, ResetPassword use FormField (aria-invalid + aria-describedby) and focus the first error; ResetPassword sets autocomplete=new-password, ForgotPassword autocomplete=email",
+        "MFA code input strips non-digits before the 6-character limit so a pasted '123 456' works (3.3.8)",
+        "Destructive toasts stay until dismissed and have a close button",
+        "Component tests for focus after step change and after a failed submit",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Evidence: TwoStepLeadForm.tsx:83,97,121,136-137,144; Login.tsx:394-442; Register.tsx:566-751; ResetPassword.tsx:133,164; ForgotPassword.tsx:121; NativeMFAVerification.tsx:195-197; use-toast.ts:39-42. SC 2.4.3, 3.3.1, 4.1.3, 1.3.5, 3.3.8, 2.2.1. Lead forms are on every public profile."
+    },
+    {
+      "id": "US-239",
+      "title": "The accessibility statement claims things the product does not do",
+      "description": "As the owner, I need the public accessibility statement and terms to be accurate and to divide responsibility with agents, so that the statement reduces legal risk instead of adding a deceptive-claims one.",
+      "acceptanceCriteria": [
+        "AccessibilityStatement: 'partially conformant' with WCAG 2.2 AA (W3C wording), dated with ISO dateModified, naming who assessed it and how (automated axe across 61 routes at desktop and phone widths + manual code review), not 'comprehensive audit'",
+        "Remove or correct: contrast claim, 'alt text for all meaningful images', 'animations can be paused', 'keyboard shortcuts', 'older PDF documents', 'blog posts created by users' — each either made true by US-233–238 or moved to Known limitations",
+        "Scope section: marketing site, dashboard, agents' public pages, PWA, emails, exports; what AgentBio is responsible for (templates) vs. agents (their photos' alt text, video captions, colour choices)",
+        "Known limitations with planned fix dates: third-party Calendly and Stripe, untagged PDF exports, charts, anything still open",
+        "Contact: email + accessible web form + postal address; 5-business-day response kept; offer of listing information in an alternative format on request",
+        "TermsOfService gains an accessibility clause: agents keep their content accessible using the provided tools; AgentBio maintains template accessibility",
+        "A short agent guide page ('Making your page accessible') linked from the statement, ToS and the Theme/Listings editors",
+        "The accessibility widget is described as a preference tool, never as making the site compliant",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Evidence: AccessibilityStatement.tsx l.7 (Jan 2026), l.94 'substantially conformant', l.103, l.118-122, l.131, l.139/481, l.152, l.235-248, l.336; TermsOfService.tsx §3 silent on accessibility. Overlay note: FTC v. accessiBe (Jan 2025, $1M) over compliance claims. OWNER/LAWYER: have counsel review the final wording; this is not legal advice."
+    },
+    {
+      "id": "US-240",
+      "title": "Core dashboard actions only work with a mouse",
+      "description": "As an agent who uses a keyboard or screen reader, I need to open leads, select listings and use menus and dialogs without a mouse.",
+      "acceptanceCriteria": [
+        "Leads: the lead name is a <button> opening the detail (Card onClick stays as a convenience); LeadsTable rows get a real button/link",
+        "QuickStatusDashboard/KeyboardShortcutsHelper single-key shortcuts (s/p/a) require a modifier or can be turned off, and ignore select/contenteditable; listing selection is a real checkbox",
+        "EditListingModal, EditTestimonialModal and KeyboardShortcutsHelper move to the Radix Dialog; the dashboard Add menu moves to the Radix DropdownMenu",
+        "Hover-only Edit/Delete on listing cards and page-builder blocks also show on focus-within and always below md; title-only names become aria-label",
+        "a11y suite: dashboard sub-routes at zero critical/serious",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Evidence: Leads.tsx:857-860; LeadsTable.tsx:175-178; QuickStatusDashboard.tsx:118-140,339; KeyboardShortcutsHelper.tsx:30-56,105; EditListingModal.tsx:73-79; EditTestimonialModal.tsx:39-48; Listings.tsx:439,677; PageBuilder.tsx:548. SC 2.1.1, 2.1.4, 2.1.2, 2.4.3, 2.4.7, 4.1.2. Section 508/enterprise buyers and ADA employment context (agents with disabilities)."
+    },
+    {
+      "id": "US-241",
+      "title": "Reordering listings and page blocks needs a drag",
+      "description": "As an agent who cannot drag (keyboard, tremor, head pointer, touch with assistive tech), I need another way to reorder listings and page-builder blocks and to build workflows.",
+      "acceptanceCriteria": [
+        "Listings grid and PageBuilder blocks get Move up / Move down buttons (pattern from Links.tsx:324-339), announced via a live region ('Moved to position 3 of 8')",
+        "Workflow node palette items have an 'Add to canvas' button; node connections can be made from a keyboard-operable menu on the node",
+        "Component tests for move-up/move-down ordering",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Evidence: Listings.tsx:641-651; PageBuilder.tsx:534-554; WorkflowNodePalette.tsx:175-178; WorkflowCanvas.tsx:188; WorkflowNode.tsx:107-187. SC 2.1.1, 2.5.7 (WCAG 2.2), 2.5.1."
+    },
+    {
+      "id": "US-242",
+      "title": "Unnamed buttons, unlabelled fields and missing alt on dashboard pages",
+      "description": "As a screen-reader agent, I need every dashboard control named and every field labelled.",
+      "acceptanceCriteria": [
+        "Fix every critical/serious axe finding on the dashboard sub-routes from the 2026-10-01 scan: button-name (listings, profile, quick-actions, settings, workflows, admin seo), label (profile full_name; settings checkboxes), image-alt (settings), color-contrast (listings badges, quick-actions orange pulse)",
+        "BlockSettings trash buttons get names",
+        "scrollable-region-focusable: horizontally scrolling regions on vs-pages, for-real-estate-agents and admin tables get tabIndex=0 + an accessible name",
+        "admin audit log table header cells have text (sr-only)",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Evidence: /var/tmp scan 2026-10-01 (183 page×device runs, axe tags wcag2a–wcag22aa + best-practice): button-name 85 nodes on 7 pages; label 21 nodes; image-alt 3; color-contrast 14; scrollable-region-focusable 9 nodes on phone width only. SC 4.1.2, 1.1.1, 1.4.3, 2.1.1."
+    },
+    {
+      "id": "US-243",
+      "title": "Touch targets under 24px across auth and the dashboard",
+      "description": "As a user with limited dexterity, especially on a phone, I need targets at least 24×24 CSS px or adequately spaced.",
+      "acceptanceCriteria": [
+        "Every target-size violation from the scan (21 pages: login, register, reset-password show-password toggles; dashboard 'more options' menus; etc.) is ≥24px or spaced",
+        "Links.tsx move up/down ≥24px with ≥4px gap; BlockSettings trash ≥24px; carousel and testimonial dots get a 24px hit area around the visible dot",
+        "The a11y suite runs axe with the wcag22aa tag so target-size is enforced",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Evidence: axe target-size [serious, wcag258] on 21 pages / 37 nodes, e.g. button[aria-label='Open menu with more options'], Show password toggles; Links.tsx:324-339 22px with 2px gap; BlockSettings.tsx:437,760,891 20px; FeaturedListingsCarousel.tsx:368-376 and TestimonialSection.tsx:122,157 8px dots 16px apart. SC 2.5.8 (WCAG 2.2)."
+    },
+    {
+      "id": "US-244",
+      "title": "Installed app is locked to portrait, and fixed bars hide focus on phones",
+      "description": "As a mobile user (Safari/VoiceOver, Chrome/TalkBack, installed PWA), I need the app to rotate, reflow and keep the focused element visible.",
+      "acceptanceCriteria": [
+        "public/manifest.json: remove orientation 'portrait'; name 'AgentBio' (not 'AgentBio Admin')",
+        "html scroll-padding-top/bottom matching the sticky header and bottom nav; MobileNav stays visible while focus is inside it",
+        "Cookie banner (manage mode) and Quick Actions sheet get max-h + overflow-y-auto so their buttons stay reachable at 320×256",
+        "FeaturedListingsCarousel uses min-h instead of a fixed h-[400px] for overlaid text",
+        "DescriptionDisplay tab bar (and the two admin ones) reflow at 320px; Button allows wrapping where labels vary",
+        "Textarea and Select use text-base on mobile (iOS focus zoom); auth/error screens use min-h-[100dvh]",
+        "Playwright check at 320px width: no horizontal scroll on public pages and the lead form",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Evidence: manifest.json:2,9; MobileNav.tsx:70-72; StickyActionBar.tsx:121-124,165; QuickNav.tsx:58,125; cookie-consent.tsx:49-52; no scroll-padding in src; FeaturedListingsCarousel.tsx:182; DescriptionDisplay.tsx:118; tabs.tsx:31; button.tsx:8,24; textarea.tsx:13; select.tsx:19. SC 1.3.4, 2.4.11, 1.4.10, 1.4.12. Already fine: pinch zoom allowed (index.html:75), 44px base Button/Input, offline page, SW update toast."
+    },
+    {
+      "id": "US-245",
+      "title": "Every dashboard and auth page has the landing page's title, and route changes lose focus",
+      "description": "As a screen-reader user, I need each page to have its own title and focus to land on the new page's content after navigating.",
+      "acceptanceCriteria": [
+        "usePageTitle driven by route-announcer's route map, applied in DashboardLayout, the auth pages, admin pages and SubmitReview",
+        "id=main-content tabIndex=-1 on OpenHouseSignIn, ForgotPassword, ResetPassword, MFAChallenge, AuthCallback, SubmitReview and every admin page",
+        "RouteAnnouncer retries focusing #main-content once lazy routes resolve (not a fixed 100 ms)",
+        "Landmarks/headings from the scan: one <main> (no nested/duplicate on legal pages), banner/contentinfo top-level on marketing pages, an <h1> on register/mfa/sso-callback, heading order on dashboard cards",
+        "Unit test: titles differ per route; browser test: focus lands on main content after navigation",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Evidence: no Helmet in src/pages/dashboard/* or DashboardLayout; auth pages set none; route-announcer.tsx:119-127; scan: page-has-heading-one (5 pages), landmark-no-duplicate-main / landmark-main-is-top-level (cookies, accessibility statement), landmark-banner/contentinfo-is-top-level (12 marketing pages), heading-order (18 pages). SC 2.4.2, 2.4.3, 1.3.1, 2.4.1."
+    },
+    {
+      "id": "US-246",
+      "title": "Charts and exports have no accessible alternative",
+      "description": "As a screen-reader agent, I need my analytics as text and my exports in a form assistive tech can read.",
+      "acceptanceCriteria": [
+        "Each Recharts chart (AnalyticsChart, admin AnalyticsCharts, MLLeadScoringDashboard, SystemHealthMonitor, Health dashboard) has an aria-label summary and a 'View as table' toggle rendering the same data in a <table> with headers",
+        "CSV exports put the header row first (title line removed)",
+        "jsPDF exports set title, language and author metadata; the statement lists PDFs as untagged and offers CSV/HTML instead",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Evidence: AnalyticsChart.tsx:158-166 and admin charts; exportUtils.ts:52-53,106-151. SC 1.1.1, 1.3.1. Agent/admin facing — lower public exposure."
+    },
+    {
+      "id": "US-247",
+      "title": "Agent content in other languages is read with English pronunciation",
+      "description": "As a Spanish-speaking visitor using a screen reader, I need an agent's Spanish bio read in Spanish.",
+      "acceptanceCriteria": [
+        "profiles.language (BCP-47, default 'en') with a selector in Profile settings; the public profile <main> gets lang={language}",
+        "Per-block language override in the page builder for mixed-language pages",
+        "Test: lang attribute present on the profile main",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Evidence: index.html:2 lang=en; no lang anywhere in src; no profile language field. SC 3.1.1/3.1.2. Many US agents market bilingually."
+    },
+    {
+      "id": "US-248",
+      "title": "The a11y suite checked desktop only, WCAG 2.0 rules only, and none of the dashboard",
+      "description": "As the owner, I need CI to fail on the accessibility failures this audit found, so that fixes stay fixed.",
+      "acceptanceCriteria": [
+        "axe runs with tags wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa (target-size, autocomplete, orientation now covered)",
+        "Projects for desktop Chrome plus phone viewports (iPhone 13 and Pixel 7 emulation); the /demo mobile button-name failure would have failed it",
+        "Route coverage includes nested routes (dashboard sub-routes), derived from App.tsx like the existing coverage test, which today drops relative paths",
+        "Extra states: listing modal, gallery lightbox, two-step form step 2, a dark/animated theme preset",
+        "A unit test asserts every theme preset passes contrast (from US-234)",
+        "Watched to fail on the pre-fix tree; baseline at zero critical/serious",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Evidence: playwright-a11y.config.ts runs Desktop Chrome only; analyze() uses withTags(['wcag2a','wcag2aa']); browser-suites.test.ts filters path.startsWith('/') so <Route path=\"leads\"> etc. are never scanned. The 2026-10-01 local scan with this configuration found 6 critical/serious rules the green CI job did not. Lands after US-233–245 so CI is not red in between."
+    },
+    {
+      "id": "US-249",
+      "title": "No VPAT/ACR for brokerages and teams that ask",
+      "description": "As the owner selling Team and Enterprise plans, I need an Accessibility Conformance Report so procurement questionnaires can be answered truthfully.",
+      "acceptanceCriteria": [
+        "docs/legal/ACR-VPAT-2.5-WCAG.md (or .pdf): VPAT 2.5 WCAG edition, every WCAG 2.2 A/AA criterion marked Supports / Partially Supports / Does Not Support / N/A with remarks, evaluation methods, date, product version",
+        "Linked from the accessibility statement as 'available on request' or published",
+        "Re-dated whenever US-233–248 status changes",
+        "Typecheck passes and the existing unit, a11y and e2e suites still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Do last: an ACR written before the fixes would record the failures. EAA note: probably not applicable (US-focused, B2B, microenterprise exemption likely) — if EU consumers are targeted later, an EN 301 549-based statement and authority contact are required. OWNER/LAWYER confirm."
     }
   ]
 }
