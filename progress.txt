@@ -4742,3 +4742,13 @@ microenterprise). UK/AODA/ACA/508 not applicable today.
 - Accessible-name gotcha in jsdom: "Pause<span class=sr-only> slideshow</span>"
   computed as "Pauseslideshow". Visible "Pause slideshow" was clearer anyway.
 - Autoplay now implies muted (1.4.2).
+
+---
+
+## Iteration — US-237: video captions and transcripts
+
+- Direct files were iframed (no controls, no <track>). Now native <video> with a
+  captions track; YouTube gets cc_load_policy=1; transcripts in <details>.
+- Gotcha worth remembering: a cross-origin <track> needs crossorigin on the
+  <video>, which then needs CORS on the video too. Supabase storage sends it;
+  the help text says so rather than pretending any host works.

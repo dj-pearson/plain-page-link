@@ -353,6 +353,37 @@ function VideoSettings({ config, onUpdate }: any) {
                     Supports YouTube, Vimeo, and direct video URLs
                 </p>
             </div>
+            {/* US-237: nowhere to put captions or a transcript before. */}
+            <div className="space-y-2">
+                <Label htmlFor="video-captions">Captions file (WebVTT, for direct video URLs)</Label>
+                <Input
+                    id="video-captions"
+                    type="url"
+                    value={config.captionsUrl || ""}
+                    onChange={(e) => onUpdate({ captionsUrl: e.target.value })}
+                    placeholder="https://…/captions.vtt"
+                    aria-describedby="video-captions-help"
+                />
+                <p id="video-captions-help" className="text-xs text-muted-foreground">
+                    For YouTube or Vimeo, add captions on that site; YouTube captions are switched on for visitors.
+                    Host the file somewhere that allows cross-origin requests (your AgentBio uploads do).
+                </p>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="video-transcript">Transcript (optional)</Label>
+                <Textarea
+                    id="video-transcript"
+                    value={config.transcript || ""}
+                    onChange={(e) => onUpdate({ transcript: e.target.value })}
+                    rows={5}
+                    placeholder="What is said in the video, and anything important that is only shown."
+                />
+            </div>
+            {!config.transcript?.trim() && !config.captionsUrl?.trim() && (
+                <p role="note" className="rounded-md bg-amber-50 p-3 text-xs text-amber-900">
+                    Add captions or a transcript so visitors who are deaf or hard of hearing can follow this video.
+                </p>
+            )}
             <div className="flex items-center justify-between">
                 <Label htmlFor="video-autoplay">Autoplay</Label>
                 <Switch

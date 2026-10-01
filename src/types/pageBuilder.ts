@@ -144,6 +144,10 @@ export interface VideoBlockConfig {
     thumbnail?: string;
     autoplay: boolean;
     muted: boolean;
+    /** WebVTT file for a direct video (US-237). YouTube and Vimeo host their own. */
+    captionsUrl?: string;
+    /** Plain text, shown under the video behind "Show transcript" (US-237). */
+    transcript?: string;
 }
 
 // Testimonial Block

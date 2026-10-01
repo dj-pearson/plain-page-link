@@ -3748,8 +3748,8 @@
         "Typecheck passes and the existing unit, a11y and e2e suites still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Evidence: types/pageBuilder.ts:140-147 has no caption fields; VideoBlock.tsx:57-58,108-115 iframes direct files; title falls back to 'Video'. SC 1.2.2, 1.2.5, 4.1.2."
+      "passes": true,
+      "notes": "Evidence: types/pageBuilder.ts:140-147 has no caption fields; VideoBlock.tsx:57-58,108-115 iframes direct files; title falls back to 'Video'. SC 1.2.2, 1.2.5, 4.1.2. DONE 2026-10-01: VideoBlockConfig gains captionsUrl (WebVTT) and transcript; the settings panel has both fields, explains that YouTube/Vimeo captions are added on those sites, and shows an 'Add captions or a transcript' note when neither is set (the block preview shows it too while editing). Direct https files render as <video controls playsInline preload=metadata> with the thumbnail as poster and <track kind=captions srcLang=en default> (sanitised URL; crossOrigin=anonymous when a track is present, since a cross-origin track loads only in CORS mode — help text says to host it where CORS is allowed). YouTube embeds add cc_load_policy=1. The iframe title is 'Video: <block title>', else 'YouTube video'/'Vimeo video', never bare 'Video'. A transcript renders under the video in <details><summary>Show transcript</summary> (text, React-escaped, whitespace preserved). VideoBlock.test now 9 cases (sound, captions track, javascript: track dropped, title, transcript disclosure, editor prompt). tsc clean; vitest 1211 pass; a11y 45/45; e2e page-builder 4/4."
     },
     {
       "id": "US-238",
