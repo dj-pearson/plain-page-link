@@ -3617,8 +3617,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "_shared/email.ts:6-12,71-74 (no reply_to); submit-lead/index.ts:273-328 says 'call me' without a number."
+      "passes": true,
+      "notes": "_shared/email.ts:6-12,71-74 (no reply_to); submit-lead/index.ts:273-328 says 'call me' without a number. DONE: EmailOptions.replyTo → Resend reply_to. New createLeadAutoReply (replaces the unused createAutoResponseEmail): reply-to = agent's email_display or account email; body and HTML include the agent's phone (tel: link), photo, Calendly button, profile link and, for a listing enquiry, the address and its ?listing= link; plain warm template instead of the purple gradient; everything escaped and only http(s) links kept. submit-lead uses it (one extra profiles read and, for listing leads, one listings read), and a failed send is logged and sent to Sentry via _shared/report.ts. Tests: reply_to reaches Resend; template with/without optional fields; escaping and javascript: links dropped."
     },
     {
       "id": "US-230",

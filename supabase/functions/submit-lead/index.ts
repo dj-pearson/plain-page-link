@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
-import { sendEmail } from '../_shared/email.ts'
+import { sendEmail, createLeadAutoReply } from '../_shared/email.ts'
+import { reportError } from '../_shared/report.ts'
+import { getSiteUrl } from '../_shared/env.ts'
 import { encryptSecret } from '../_shared/encryption.ts'
 import { readSpamSignals, botReason, emailLookupHash } from '../_shared/spam-guard.ts'
 import {
@@ -369,15 +371,10 @@ serve(async (req) => {
       }
     }
 
-    // Send auto-response email to lead
-    const leadTypeLabels: Record<string, string> = {
-      buyer: 'buying inquiry',
-      seller: 'selling inquiry',
-      valuation: 'home valuation request',
-      contact: 'message',
-      open_house: 'visit to the open house',
-    }
-
+    // Auto-reply to the lead (US-229: from the shared template, with a
+    // reply-to that reaches the agent and their phone, photo, booking link and
+    // the listing).
+    //
     // US-220: however many leads arrive, one agent's form sends at most this
     // many auto-replies a day — the cap on how much mail a flood through this
     // endpoint can put in strangers' inboxes. The leads themselves are kept.
@@ -391,62 +388,44 @@ serve(async (req) => {
       // A phone-only lead (US-228) has nowhere to send an auto-reply.
     } else if (!autoReplyBudget.allowed) {
       console.warn(`[submit-lead] auto-reply cap reached for ${leadData.user_id}; lead ${lead.id} stored without one`)
-    } else await sendEmail({
-      to: leadData.email,
-      subject: `Thank you for your ${leadTypeLabels[leadData.lead_type] || 'inquiry'}`,
-      body: `Hi ${leadData.name},
+    } else {
+      const { data: agentProfile } = await supabase
+        .from('profiles')
+        .select('username, avatar_url, calendly_url')
+        .eq('id', leadData.user_id)
+        .maybeSingle()
+      const { data: listingRow } = leadData.listing_id
+        ? await supabase.from('listings').select('address').eq('id', leadData.listing_id).maybeSingle()
+        : { data: null }
+      const siteUrl = getSiteUrl()
+      const profileUrl = agentProfile?.username ? `${siteUrl}/${agentProfile.username}` : null
 
-${leadData.lead_type === 'open_house'
-  ? `Thank you for stopping by the open house today! If you would like a second look, the disclosures, or a list of similar homes, just reply to this email.`
-  : `Thank you for reaching out! I have received your ${leadTypeLabels[leadData.lead_type] || 'inquiry'} and will get back to you as soon as possible.`}
-
-${leadData.lead_type === 'buyer' ? `I'm excited to help you find your perfect home!` : ''}
-${leadData.lead_type === 'seller' ? `I look forward to discussing how I can help you sell your property.` : ''}
-${leadData.lead_type === 'valuation' ? `I'll prepare a comprehensive market analysis for your property.` : ''}
-
-In the meantime, feel free to call me if you have any urgent questions.
-
-Best regards,
-${agentName}`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
-    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-    .footer { text-center; margin-top: 20px; font-size: 12px; color: #666; }
-    .highlight { background: #eef2ff; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1 style="margin: 0;">${leadData.lead_type === 'open_house' ? 'Thanks for Visiting!' : 'Thank You for Reaching Out!'}</h1>
-    </div>
-    <div class="content">
-      <p>Hi ${leadData.name},</p>
-      ${leadData.lead_type === 'open_house'
-        ? `<p>Thank you for stopping by the open house today! If you would like a second look, the disclosures, or a list of similar homes, just reply to this email.</p>`
-        : `<p>Thank you for your <strong>${leadTypeLabels[leadData.lead_type] || 'inquiry'}</strong>! I have received your message and will get back to you as soon as possible.</p>`}
-
-      ${leadData.lead_type === 'buyer' ? `<div class="highlight"><p><strong>🏡 Looking for your dream home?</strong><br>I'm excited to help you find the perfect property that meets your needs!</p></div>` : ''}
-      ${leadData.lead_type === 'seller' ? `<div class="highlight"><p><strong>🏠 Ready to sell?</strong><br>I look forward to discussing how I can help you get the best value for your property!</p></div>` : ''}
-      ${leadData.lead_type === 'valuation' ? `<div class="highlight"><p><strong>📊 Home valuation request received!</strong><br>I'll prepare a comprehensive market analysis for your property.</p></div>` : ''}
-
-      <p>In the meantime, feel free to reach out if you have any urgent questions.</p>
-
-      <p>Best regards,<br><strong>${agentName}</strong></p>
-    </div>
-    <div class="footer">
-      <p>This email was sent from AgentBio.net</p>
-    </div>
-  </div>
-</body>
-</html>`
-    })
+      const reply = await sendEmail(
+        createLeadAutoReply({
+          to: leadData.email,
+          leadName: leadData.name,
+          leadType: leadData.lead_type,
+          agent: {
+            name: agentName,
+            replyTo: agentContact?.emailDisplay || agentContact?.email || null,
+            phone: agentContact?.phone ?? null,
+            photoUrl: agentProfile?.avatar_url ?? null,
+            calendlyUrl: agentProfile?.calendly_url ?? null,
+            profileUrl,
+          },
+          listing: listingRow?.address
+            ? {
+                address: listingRow.address as string,
+                url: profileUrl && leadData.listing_id ? `${profileUrl}?listing=${leadData.listing_id}` : null,
+              }
+            : null,
+        })
+      )
+      if (!reply.ok) {
+        console.error(`[submit-lead] auto-reply for lead ${lead.id} failed: ${reply.error}`)
+        void reportError(new Error(`auto-reply failed: ${reply.error}`), { functionName: 'submit-lead' })
+      }
+    }
 
     // Notify the agent through notify-lead, the one notification path.
     //

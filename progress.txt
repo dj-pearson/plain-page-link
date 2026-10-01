@@ -4606,3 +4606,8 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - Two steps: contact first (email OR phone), qualifiers optional after, via
   a single-use enrichment token. Contact form and kiosk accept phone-only.
 - Found: submitLead never returned the lead id (lead_id vs leadId).
+
+## Roadmap loop — iteration 17/20 — US-229: replies to noreply
+
+- Auto-reply now has a reply-to that reaches the agent, their number, photo,
+  booking link and the listing; failed sends reach Sentry.
