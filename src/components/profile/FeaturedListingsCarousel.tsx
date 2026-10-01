@@ -10,7 +10,10 @@ import {
   Maximize,
   MapPin,
   Share2,
+  Pause,
+  Play,
 } from 'lucide-react';
+import { useMotionPreference } from '@/hooks/useMotionPreference';
 import { formatPrice, parsePrice } from '@/lib/format';
 import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { cn } from '@/lib/utils';
@@ -71,6 +74,10 @@ export function FeaturedListingsCarousel({
 }: FeaturedListingsCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  // US-236: hover and focus pause it only while they last. A visitor needs a
+  // pause that stays paused (SC 2.2.2), so the explicit one is separate.
+  const [userPaused, setUserPaused] = useState(false);
+  const { shouldAnimate } = useMotionPreference();
   const [savedListings, setSavedListings] = useState<string[]>([]);
 
   // Load saved listings on mount
@@ -90,18 +97,16 @@ export function FeaturedListingsCarousel({
     // an auto-rotating carousel anyway (US-113). Honouring it here leaves the
     // arrows and dots, so nothing becomes unreachable — it only stops moving
     // on its own.
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-    if (!autoRotate || isPaused || reduceMotion || featuredListings.length <= 1) return;
+    // useMotionPreference also follows the site's accessibility widget, which
+    // a direct matchMedia read did not (US-236).
+    if (!autoRotate || isPaused || userPaused || !shouldAnimate || featuredListings.length <= 1) return;
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % featuredListings.length);
     }, interval);
 
     return () => clearInterval(timer);
-  }, [autoRotate, isPaused, featuredListings.length, interval]);
+  }, [autoRotate, isPaused, userPaused, shouldAnimate, featuredListings.length, interval]);
 
   // If no featured listings, don't render
   if (featuredListings.length === 0) {
@@ -198,10 +203,10 @@ export function FeaturedListingsCarousel({
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
-          initial={{ opacity: 0, x: 100 }}
+          initial={shouldAnimate ? { opacity: 0, x: 100 } : { opacity: 0 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          exit={shouldAnimate ? { opacity: 0, x: -100 } : { opacity: 0 }}
+          transition={{ duration: shouldAnimate ? 0.5 : 0.15, ease: 'easeInOut' }}
           className="absolute inset-0"
         >
           {/* Background Image */}
@@ -381,10 +386,22 @@ export function FeaturedListingsCarousel({
         </div>
       )}
 
-      {/* Property Counter */}
+      {/* Property Counter, and the pause control while it rotates on its own */}
       {featuredListings.length > 1 && (
-        <div className="absolute top-6 right-6 px-3 py-1.5 bg-black/50 backdrop-blur-md rounded-full text-white text-sm font-medium">
-          {currentIndex + 1} / {featuredListings.length}
+        <div className="absolute top-6 right-6 z-10 flex items-center gap-2">
+          {autoRotate && shouldAnimate && (
+            <button
+              type="button"
+              onClick={() => setUserPaused((p) => !p)}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-black/60 px-3 text-sm font-medium text-white backdrop-blur-md hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              {userPaused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
+              {userPaused ? 'Play slideshow' : 'Pause slideshow'}
+            </button>
+          )}
+          <div className="px-3 py-1.5 bg-black/50 backdrop-blur-md rounded-full text-white text-sm font-medium">
+            {currentIndex + 1} / {featuredListings.length}
+          </div>
         </div>
       )}
     </div>

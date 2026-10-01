@@ -365,10 +365,17 @@ function VideoSettings({ config, onUpdate }: any) {
                 <Label htmlFor="video-muted">Start Muted</Label>
                 <Switch
                     id="video-muted"
-                    checked={config.muted}
+                    checked={config.autoplay || config.muted}
+                    disabled={config.autoplay}
+                    aria-describedby={config.autoplay ? "video-muted-help" : undefined}
                     onCheckedChange={(checked) => onUpdate({ muted: checked })}
                 />
             </div>
+            {config.autoplay && (
+                <p id="video-muted-help" className="text-xs text-muted-foreground">
+                    Autoplaying videos always start muted, so the page never plays sound unasked.
+                </p>
+            )}
         </div>
     );
 }

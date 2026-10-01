@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { CheckCircle2, TrendingUp, Home, Star } from 'lucide-react';
+import { useMotionPreference } from '@/hooks/useMotionPreference';
 
 interface Hero3DShowpieceProps {
   className?: string;
@@ -8,10 +9,12 @@ interface Hero3DShowpieceProps {
 
 export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShowpieceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { prefersReducedMotion } = useMotionPreference();
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    // US-236: no mouse-driven tilt for a visitor who asked for less motion.
+    if (!container || prefersReducedMotion) return;
 
     const handleMouseMove = (e: MouseEvent) => {
       const rect = container.getBoundingClientRect();
@@ -24,7 +27,7 @@ export function Hero3DShowpiece({ className = '', height = '600px' }: Hero3DShow
 
     container.addEventListener('mousemove', handleMouseMove);
     return () => container.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <div

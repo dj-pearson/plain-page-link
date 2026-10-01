@@ -8,25 +8,28 @@ const GradientMeshCore = lazy(() => import('./GradientMesh').then(module => ({
 interface GradientMeshProps {
   color1?: string;
   color2?: string;
+  /** false: one still frame (US-236). */
+  animate?: boolean;
 }
 
 /**
  * Lazy-loaded Gradient Mesh component
  * Only loads Three.js when component is rendered
  */
-export function GradientMesh({ color1 = '#6366f1', color2 = '#8b5cf6' }: GradientMeshProps) {
+export function GradientMesh({ color1 = '#6366f1', color2 = '#8b5cf6', animate = true }: GradientMeshProps) {
   return (
     <Suspense
       fallback={
         <div
           className="fixed inset-0 -z-10 opacity-20"
+          aria-hidden="true"
           style={{
             background: `radial-gradient(circle at 50% 50%, ${color1}20 0%, ${color2}10 50%, transparent 100%)`
           }}
         />
       }
     >
-      <GradientMeshCore color1={color1} color2={color2} />
+      <GradientMeshCore color1={color1} color2={color2} animate={animate} />
     </Suspense>
   );
 }

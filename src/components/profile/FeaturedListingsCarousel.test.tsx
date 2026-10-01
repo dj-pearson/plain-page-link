@@ -108,4 +108,31 @@ describe('FeaturedListingsCarousel auto-rotation', () => {
     advance(20000);
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
   });
+
+  // US-236: hover/focus pauses end when the pointer or focus leaves. SC 2.2.2
+  // needs a pause the visitor controls.
+  it('has a visible Pause that stays paused after focus leaves, and Play resumes', () => {
+    const { container } = renderCarousel();
+    fireEvent.click(screen.getByRole('button', { name: 'Pause slideshow' }));
+    fireEvent.blur(container.firstElementChild as Element);
+    fireEvent.mouseLeave(container.firstElementChild as Element);
+    advance(20000);
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play slideshow' }));
+    advance(4000);
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+  });
+
+  it("stops for the site's accessibility widget too, and offers no Pause when it is not moving", () => {
+    document.documentElement.classList.add('a11y-reduced-motion');
+    try {
+      renderCarousel();
+      advance(20000);
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /slideshow/ })).toBeNull();
+    } finally {
+      document.documentElement.classList.remove('a11y-reduced-motion');
+    }
+  });
 });

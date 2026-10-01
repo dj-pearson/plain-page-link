@@ -15,6 +15,10 @@ interface VideoBlockProps {
 
 export function VideoBlock({ config, isEditing = false }: VideoBlockProps) {
     const [isPlaying, setIsPlaying] = useState(false);
+    // US-236 (SC 1.4.2): sound that starts on its own must be off. Autoplay
+    // and "start muted" were independent switches, so an agent could ship a
+    // page that talked at every visitor the moment it loaded.
+    const muted = config.autoplay || config.muted;
 
     // Extract video ID from URL and return safe embed URL
     const getVideoEmbedUrl = (): string => {
@@ -36,7 +40,7 @@ export function VideoBlock({ config, isEditing = false }: VideoBlockProps) {
             if (videoId && /^[\w-]+$/.test(videoId)) {
                 return `https://www.youtube.com/embed/${videoId}?autoplay=${
                     config.autoplay ? "1" : "0"
-                }&mute=${config.muted ? "1" : "0"}`;
+                }&mute=${muted ? "1" : "0"}`;
             }
             return "";
         }
@@ -48,7 +52,7 @@ export function VideoBlock({ config, isEditing = false }: VideoBlockProps) {
             if (videoId && /^\d+$/.test(videoId)) {
                 return `https://player.vimeo.com/video/${videoId}?autoplay=${
                     config.autoplay ? "1" : "0"
-                }&muted=${config.muted ? "1" : "0"}`;
+                }&muted=${muted ? "1" : "0"}`;
             }
             return "";
         }

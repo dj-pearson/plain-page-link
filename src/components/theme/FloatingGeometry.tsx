@@ -23,9 +23,14 @@ function FloatingCube({ position, color }: { position: [number, number, number];
 
 interface FloatingGeometryProps {
   color?: string;
+  /**
+   * false draws one still frame and stops (US-236). The caller passes
+   * useMotionPreference().shouldAnimate combined with the page's Pause control.
+   */
+  animate?: boolean;
 }
 
-export function FloatingGeometry({ color = '#f59e0b' }: FloatingGeometryProps) {
+export function FloatingGeometry({ color = '#f59e0b', animate = true }: FloatingGeometryProps) {
   const cubes = [
     [-2, 0, -2],
     [2, 0, -2],
@@ -35,8 +40,8 @@ export function FloatingGeometry({ color = '#f59e0b' }: FloatingGeometryProps) {
   ] as [number, number, number][];
 
   return (
-    <div className="fixed inset-0 -z-10 opacity-25">
-      <Canvas camera={{ position: [0, 0, 8], fov: 75 }}>
+    <div className="fixed inset-0 -z-10 opacity-25" aria-hidden="true">
+      <Canvas frameloop={animate ? "always" : "demand"} camera={{ position: [0, 0, 8], fov: 75 }}>
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={1} />
         {cubes.map((pos, i) => (

@@ -5,6 +5,7 @@ import { Hero3D } from './Hero3DLazy';
 import gsap from 'gsap';
 import { TextPlugin } from 'gsap/TextPlugin';
 import { useGSAP } from '@gsap/react';
+import { useMotionPreference } from '@/hooks/useMotionPreference';
 
 gsap.registerPlugin(TextPlugin);
 
@@ -67,9 +68,27 @@ export function HeroSection({
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
   const badgeRef = useRef<HTMLDivElement>(null);
+  const { prefersReducedMotion } = useMotionPreference();
 
   useGSAP(
     () => {
+      // US-236: the gradient on the highlight is styling, kept either way.
+      const highlightStyle = {
+        backgroundImage: 'linear-gradient(to right, #2563eb, #14b8a6, #2563eb)',
+        backgroundSize: '200% auto',
+        color: 'transparent',
+        backgroundClip: 'text',
+        WebkitBackgroundClip: 'text',
+      };
+
+      // Under reduced motion: no blur-in, no shimmer, no parallax — the text
+      // is simply there. The shimmer used to loop forever (repeat: -1) and the
+      // headline followed the mouse, both regardless of the visitor's setting.
+      if (prefersReducedMotion) {
+        gsap.set(highlightTextRef.current, highlightStyle);
+        return;
+      }
+
       const tl = gsap.timeline();
 
       // 1. Initial Setups
@@ -77,11 +96,7 @@ export function HeroSection({
       gsap.set(highlightTextRef.current, {
         scale: 1.1,
         clipPath: 'polygon(0 0, 0% 0, 0% 100%, 0 100%)',
-        backgroundImage: 'linear-gradient(to right, #2563eb, #14b8a6, #2563eb)',
-        backgroundSize: '200% auto',
-        color: 'transparent',
-        backgroundClip: 'text',
-        WebkitBackgroundClip: 'text',
+        ...highlightStyle,
       });
       gsap.set([subheadlineRef.current, descriptionRef.current, ctaRef.current, badgeRef.current], {
         opacity: 0,
@@ -123,11 +138,13 @@ export function HeroSection({
         )
         .to(ctaRef.current, { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out' }, '-=0.6');
 
-      // 3. Continuous Shimmer for Highlight Text
+      // 3. Shimmer for the highlight: two passes, 5 s, then still. Motion that
+      // lasts more than five seconds needs a pause control (SC 2.2.2); this
+      // simply ends instead.
       gsap.to(highlightTextRef.current, {
         backgroundPosition: '200% center',
-        duration: 4,
-        repeat: -1,
+        duration: 2.5,
+        repeat: 1,
         ease: 'linear',
       });
 
@@ -161,7 +178,7 @@ export function HeroSection({
         window.removeEventListener('mousemove', handleMouseMove);
       };
     },
-    { scope: containerRef }
+    { scope: containerRef, dependencies: [prefersReducedMotion], revertOnUpdate: true }
   );
 
   return (

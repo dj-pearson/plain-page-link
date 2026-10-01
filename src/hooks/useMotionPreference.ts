@@ -14,23 +14,37 @@ interface MotionPreferenceResult {
   shouldAnimate: boolean;
 }
 
+/** The accessibility widget's own switch (accessibility-widget.tsx). */
+const WIDGET_CLASS = 'a11y-reduced-motion';
+
+function osPrefersReduced(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
+function widgetPrefersReduced(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains(WIDGET_CLASS);
+}
+
 /**
- * Hook to detect user's motion preference
- * Returns whether animations should be reduced for accessibility
+ * Whether to animate: no if the OS asks for reduced motion OR the site's
+ * accessibility widget does.
+ *
+ * US-236: this hook existed with no consumer, and it watched only the media
+ * query — so the widget's "Reduce motion" switch stopped CSS animations (the
+ * index.css rule) and nothing driven by JavaScript: the WebGL theme
+ * backgrounds, the GSAP shimmer, the carousel. Both sources are observed now.
  */
 export function useMotionPreference(): MotionPreferenceResult {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  });
+  const [os, setOs] = useState<boolean>(osPrefersReduced);
+  const [widget, setWidget] = useState<boolean>(widgetPrefersReduced);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !window.matchMedia) return;
 
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     const handleChange = (event: MediaQueryListEvent) => {
-      setPrefersReducedMotion(event.matches);
+      setOs(event.matches);
     };
 
     // Modern browsers
@@ -44,6 +58,14 @@ export function useMotionPreference(): MotionPreferenceResult {
     return () => mediaQuery.removeListener(handleChange);
   }, []);
 
+  useEffect(() => {
+    if (typeof MutationObserver === 'undefined') return;
+    const observer = new MutationObserver(() => setWidget(widgetPrefersReduced()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const prefersReducedMotion = os || widget;
   return {
     prefersReducedMotion,
     motionPreference: prefersReducedMotion ? 'reduce' : 'no-preference',

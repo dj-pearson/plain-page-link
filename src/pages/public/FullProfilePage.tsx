@@ -28,6 +28,8 @@ import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
 import { SEOHead } from '@/components/SEOHead';
 import { applyTheme, getCurrentTheme, type ThemeConfig } from '@/lib/themes';
+import { useMotionPreference } from '@/hooks/useMotionPreference';
+import { Pause, Play } from 'lucide-react';
 import { selectAvailableListings, selectSoldListings } from '@/lib/publicListingVisibility';
 import { formatResponseTime } from '@/lib/responseTime';
 import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
@@ -47,6 +49,10 @@ export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTheme, setActiveTheme] = useState<ThemeConfig | null>(null);
+  // US-236: the WebGL theme backgrounds looped forever, whatever the visitor's
+  // reduced-motion setting, with no way to stop them (SC 2.2.2, 2.3.3).
+  const { shouldAnimate } = useMotionPreference();
+  const [backgroundPaused, setBackgroundPaused] = useState(false);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
   // The property a showing was requested for, if any. Kept separate from
@@ -444,14 +450,15 @@ export default function FullProfilePage() {
 
     const primaryColor = activeTheme.colors?.primary || '#2563eb';
     const secondaryColor = activeTheme.colors?.secondary || '#10b981';
+    const animate = shouldAnimate && !backgroundPaused;
 
     switch (activeTheme.threeDEffect) {
       case '3d-particles':
-        return <ThreeDBackground variant="particles" color={primaryColor} />;
+        return <ThreeDBackground variant="particles" color={primaryColor} animate={animate} />;
       case '3d-mesh':
-        return <GradientMesh color1={primaryColor} color2={secondaryColor} />;
+        return <GradientMesh color1={primaryColor} color2={secondaryColor} animate={animate} />;
       case '3d-floating':
-        return <FloatingGeometry color={primaryColor} />;
+        return <FloatingGeometry color={primaryColor} animate={animate} />;
       default:
         return null;
     }
@@ -476,6 +483,18 @@ export default function FullProfilePage() {
         schema={personSchema}
       />
       {render3DBackground()}
+      {/* Only offered while the background could move: under reduced motion
+          it is already a still frame. */}
+      {activeTheme?.has3D && activeTheme.threeDEffect && shouldAnimate && (
+        <button
+          type="button"
+          onClick={() => setBackgroundPaused((p) => !p)}
+          className="fixed bottom-6 left-4 z-40 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-white/90 px-4 text-sm font-medium text-gray-900 shadow-md backdrop-blur hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+        >
+          {backgroundPaused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
+          {backgroundPaused ? 'Play animation' : 'Pause animation'}
+        </button>
+      )}
       <QuickNav hasListings={activeListings.length > 0} hasTestimonials={testimonials.length > 0} />
       <main
         id="main-content"

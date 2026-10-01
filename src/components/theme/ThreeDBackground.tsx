@@ -48,12 +48,17 @@ function Particles({ count, color }: ParticlesProps) {
 interface ThreeDBackgroundProps {
   variant: 'particles' | 'waves' | 'spiral';
   color?: string;
+  /**
+   * false draws one still frame and stops (US-236). The caller passes
+   * useMotionPreference().shouldAnimate combined with the page's Pause control.
+   */
+  animate?: boolean;
 }
 
-export function ThreeDBackground({ variant, color = '#2563eb' }: ThreeDBackgroundProps) {
+export function ThreeDBackground({ variant, color = '#2563eb', animate = true }: ThreeDBackgroundProps) {
   return (
-    <div className="fixed inset-0 -z-10 opacity-30">
-      <Canvas camera={{ position: [0, 0, 5], fov: 75 }}>
+    <div className="fixed inset-0 -z-10 opacity-30" aria-hidden="true">
+      <Canvas frameloop={animate ? "always" : "demand"} camera={{ position: [0, 0, 5], fov: 75 }}>
         <ambientLight intensity={0.5} />
         {variant === 'particles' && <Particles count={3000} color={color} />}
       </Canvas>

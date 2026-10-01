@@ -4728,3 +4728,17 @@ microenterprise). UK/AODA/ACA/508 not applicable today.
   every image is described or marked decorative.
 - Local PG16 recipe: initdb under /var/lib/postgresql as postgres (the scratchpad
   is not readable by that user), port 55432, socket /tmp.
+
+---
+
+## Iteration — US-236: motion
+
+- The site already had a reduced-motion switch in its a11y widget, but it only
+  added a class that a CSS rule used — nothing JS-driven listened. The hook now
+  watches both the media query and that class; everything animated reads the hook.
+- R3F: frameloop="demand" is the cheap "static frame" — renders once, then idles.
+- Two kinds of pause: hover/focus (transient, ends on leave) and the visitor's
+  explicit Pause (persists). Conflating them is why focus-pause was not enough.
+- Accessible-name gotcha in jsdom: "Pause<span class=sr-only> slideshow</span>"
+  computed as "Pauseslideshow". Visible "Pause slideshow" was clearer anyway.
+- Autoplay now implies muted (1.4.2).
