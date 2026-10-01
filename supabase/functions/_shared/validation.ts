@@ -184,8 +184,13 @@ export function validateLeadData(data: any): ValidationResult {
     errors.push('Name must be between 1 and 100 characters');
   }
   
-  if (!data.email || !validateEmail(data.email)) {
-    errors.push('Invalid email address');
+  // US-228: an email OR a phone. Requiring an email made a phone-only lead
+  // impossible — including at the open house kiosk, where a visitor happy to
+  // leave a number was turned away.
+  if (data.email) {
+    if (!validateEmail(data.email)) errors.push('Invalid email address');
+  } else if (!data.phone) {
+    errors.push('Please give an email address or a phone number');
   }
   
   if (

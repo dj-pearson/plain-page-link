@@ -2704,6 +2704,8 @@ export type Database = {
           source: string | null;
           status: string | null;
           timeline: string | null;
+          update_token_expires_at: string | null;
+          update_token_hash: string | null;
           updated_at: string | null;
           user_id: string;
           utm_campaign: string | null;
@@ -2736,6 +2738,8 @@ export type Database = {
           source?: string | null;
           status?: string | null;
           timeline?: string | null;
+          update_token_expires_at?: string | null;
+          update_token_hash?: string | null;
           updated_at?: string | null;
           user_id: string;
           utm_campaign?: string | null;
@@ -2768,6 +2772,8 @@ export type Database = {
           source?: string | null;
           status?: string | null;
           timeline?: string | null;
+          update_token_expires_at?: string | null;
+          update_token_hash?: string | null;
           updated_at?: string | null;
           user_id?: string;
           utm_campaign?: string | null;

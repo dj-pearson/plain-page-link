@@ -4600,3 +4600,9 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - Five new event types, UTM on views and events, campaign_conversion() RPC,
   and a "Which sources convert" table. Form submissions stop going to an
   undefined window.analytics.
+
+## Roadmap loop — iteration 16/20 — US-228: nine required fields before a lead
+
+- Two steps: contact first (email OR phone), qualifiers optional after, via
+  a single-use enrichment token. Contact form and kiosk accept phone-only.
+- Found: submitLead never returned the lead id (lead_id vs leadId).

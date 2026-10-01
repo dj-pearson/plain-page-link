@@ -21,6 +21,8 @@ export const mockLead: Lead = {
   notes: null,
   form_data: { listing_id: 1, budget: '400000-450000' },
   email_hash: null,
+  update_token_hash: null,
+  update_token_expires_at: null,
 
   assigned_to: null,
   listing_id: null,

@@ -117,11 +117,18 @@ function formatWindow(startsAt: string, endsAt: string): string {
   return `${format(s, 'EEEE, MMMM d')} · ${time}`;
 }
 
-const signInSchema = z.object({
-  name: z.string().trim().min(1, 'Please enter your name').max(100, 'That name is too long'),
-  email: z.string().trim().email('Please enter a valid email address'),
-  phone: z.string().trim().max(30, 'That phone number is too long'),
-});
+// US-228: an email or a phone. A visitor happy to leave a number but not an
+// address was turned away at the door.
+const signInSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Please enter your name').max(100, 'That name is too long'),
+    email: z.union([z.literal(''), z.string().trim().email('Please enter a valid email address')]),
+    phone: z.string().trim().max(30, 'That phone number is too long'),
+  })
+  .refine((d) => d.email.trim() !== '' || d.phone.trim() !== '', {
+    message: 'Please give an email or a phone number',
+    path: ['email'],
+  });
 
 type FieldErrors = Partial<Record<'name' | 'email' | 'phone', string>>;
 
@@ -256,7 +263,7 @@ export default function OpenHouseSignIn() {
         agentId: openHouse.agentId,
         openHouseId: openHouse.id,
         name: parsed.data.name,
-        email: parsed.data.email,
+        email: parsed.data.email.trim() || undefined,
         phone: parsed.data.phone || undefined,
         hasAgent: form.hasAgent === null ? undefined : form.hasAgent === 'yes',
         preapproved: form.preapproval === null ? undefined : form.preapproval === 'yes',
@@ -464,7 +471,7 @@ export default function OpenHouseSignIn() {
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <label htmlFor="oh-email" className="mb-2 block text-base font-medium">
-                  Email <span className="text-muted-foreground">(required)</span>
+                  Email <span className="text-muted-foreground">(or phone)</span>
                 </label>
                 <input
                   id="oh-email"

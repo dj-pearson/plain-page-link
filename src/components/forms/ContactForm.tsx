@@ -13,12 +13,20 @@ import { useFormOpenTracking } from '@/hooks/useFormOpenTracking';
 import { HoneypotField } from './HoneypotField';
 import { logger } from '@/lib/logger';
 
-const contactSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email address'),
-  phone: z.string().min(10, 'Please enter a valid phone number'),
-  message: z.string().min(10, 'Message must be at least 10 characters'),
-});
+// US-228: an email OR a phone, and no minimum message length. "Message must
+// be at least 10 characters" stood between a visitor typing "Call me" and a
+// lead, and a phone number alone could not be sent at all.
+const contactSchema = z
+  .object({
+    name: z.string().min(2, 'Name must be at least 2 characters'),
+    email: z.union([z.literal(''), z.string().email('Please enter a valid email address')]),
+    phone: z.union([z.literal(''), z.string().min(7, 'Please enter a valid phone number')]),
+    message: z.string().max(2000).optional(),
+  })
+  .refine((d) => d.email !== '' || d.phone !== '', {
+    message: 'Please give an email or a phone number',
+    path: ['email'],
+  });
 
 type ContactFormData = z.infer<typeof contactSchema>;
 
@@ -65,8 +73,8 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
         agentId,
         leadType: 'contact',
         name: data.name,
-        email: data.email,
-        phone: data.phone,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
         listingId: listing?.id,
         data: {
           message: data.message,
@@ -157,7 +165,6 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
             type="email"
             placeholder="john@example.com"
             error={errors.email?.message}
-            required
             {...register('email')}
           />
 
@@ -167,7 +174,6 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
             type="tel"
             placeholder="(555) 123-4567"
             error={errors.phone?.message}
-            required
             {...register('phone')}
           />
 
@@ -181,7 +187,6 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
             }
             rows={4}
             error={errors.message?.message}
-            required
             {...register('message')}
           />
 

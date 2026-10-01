@@ -3602,8 +3602,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "BuyerInquiryForm.tsx:22-32 (8 required), SellerInquiryForm.tsx:22-33, HomeValuationForm.tsx:22-33, ContactForm.tsx:13-18; server requires email at _shared/validation.ts:187. Land after US-220 so the relaxed form is not a spam gift."
+      "passes": true,
+      "notes": "BuyerInquiryForm.tsx:22-32 (8 required), SellerInquiryForm.tsx:22-33, HomeValuationForm.tsx:22-33, ContactForm.tsx:13-18; server requires email at _shared/validation.ts:187. Land after US-220 so the relaxed form is not a spam gift. DONE: new TwoStepLeadForm; Buyer, Seller and HomeValuation forms are now configs over it (same exports/props; ~1,100 lines → ~350). Step 1: name + email OR phone (+ address for seller/valuation) creates the lead; step 2: the old qualifiers as optional native selects (native pickers on phones), 'Add these details' or 'Skip'. ContactForm stays one step: email or phone, message optional with no minimum. Kiosk accepts phone-only. Server: validateLeadData takes email or phone; submit-lead returns a single-use 30-minute update_token (hash in leads.update_token_hash, migration 20260930000008) and an action:'enrich' path that may write only price_range/timeline/property_address/message/preapproved and merge form_data (_shared/lead-enrichment.ts, unit-tested); phone-only leads skip the auto-reply and the email dedupe. Found on the way: submitLead read result.leadId but the server sends lead_id, so no caller had ever received the lead id. Tests: validation (email/phone), enrichment builder, TwoStepLeadForm component flow (phone-only → enrich; skip; valuation requirements). DEVIATION: no Playwright spec — the component test covers the flow without a live backend. Known gap: notify-lead and Zapier fire at step 1, so they carry only step-1 fields; the qualifiers appear on the lead in the dashboard."
     },
     {
       "id": "US-229",

@@ -3,6 +3,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { encryptSecret } from '../_shared/encryption.ts'
 import { readSpamSignals, botReason, emailLookupHash } from '../_shared/spam-guard.ts'
+import {
+  buildEnrichment,
+  generateEnrichToken,
+  hashEnrichToken,
+  ENRICH_TOKEN_RE,
+  ENRICH_TOKEN_TTL_MINUTES,
+} from '../_shared/lead-enrichment.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl } from '../_shared/validation.ts'
@@ -13,7 +20,7 @@ import { successResponse, validationError, rateLimitResponse, handleUnexpectedEr
 interface LeadData {
   user_id: string
   name: string
-  email: string
+  email?: string
   phone?: string
   message?: string
   lead_type: string
@@ -57,6 +64,30 @@ function sanitizeFormData(raw: unknown): Record<string, unknown> | undefined {
     }
   }
   return Object.keys(out).length > 0 ? out : undefined
+}
+
+/**
+ * A single-use token for step two of the form (US-228), valid for
+ * ENRICH_TOKEN_TTL_MINUTES. Only its hash is stored. Best effort: a lead
+ * without one is still a lead, the visitor just cannot add details to it.
+ */
+async function issueEnrichToken(leadId: string): Promise<string | null> {
+  try {
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const token = generateEnrichToken()
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        update_token_hash: await hashEnrichToken(token),
+        update_token_expires_at: new Date(Date.now() + ENRICH_TOKEN_TTL_MINUTES * 60_000).toISOString(),
+      })
+      .eq('id', leadId)
+    if (error) throw error
+    return token
+  } catch (e) {
+    console.error(`[submit-lead] could not issue a step-two token for ${leadId}:`, e)
+    return null
+  }
 }
 
 serve(async (req) => {
@@ -113,6 +144,40 @@ serve(async (req) => {
       return successResponse({ lead_id: null }, req);
     }
 
+    // US-228: step two of a form — the qualifiers, added to the lead step one
+    // created, authorised by the single-use token step one returned.
+    if (rawData?.action === 'enrich') {
+      const token = rawData.update_token
+      if (typeof rawData.lead_id !== 'string' || typeof token !== 'string' || !ENRICH_TOKEN_RE.test(token)) {
+        return validationError(['lead_id and update_token are required'], req)
+      }
+      const enrichment = buildEnrichment(rawData)
+      if (enrichment.errors.length > 0) return validationError(enrichment.errors, req)
+
+      const { data: target, error: targetError } = await supabase
+        .from('leads')
+        .select('id, form_data')
+        .eq('id', rawData.lead_id)
+        .eq('update_token_hash', await hashEnrichToken(token))
+        .gt('update_token_expires_at', new Date().toISOString())
+        .maybeSingle()
+      if (targetError) throw targetError
+      if (!target) return validationError(['This form has expired. Your details were already sent.'], req)
+
+      const { error: enrichError } = await supabase
+        .from('leads')
+        .update({
+          ...enrichment.columns,
+          form_data: { ...(target.form_data ?? {}), ...enrichment.formData },
+          update_token_hash: null,
+          update_token_expires_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', target.id)
+      if (enrichError) throw enrichError
+      return successResponse({ lead_id: target.id }, req)
+    }
+
     // Validate input data
     const validation = validateLeadData(rawData);
     if (!validation.valid) {
@@ -124,7 +189,8 @@ serve(async (req) => {
     const leadData: LeadData = {
       user_id: rawData.user_id,
       name: sanitizeString(rawData.name),
-      email: rawData.email.trim().toLowerCase(),
+      // US-228: optional when a phone is given.
+      email: rawData.email ? String(rawData.email).trim().toLowerCase() : undefined,
       phone: rawData.phone ? sanitizeString(rawData.phone) : undefined,
       message: rawData.message ? sanitizeString(rawData.message) : undefined,
       lead_type: rawData.lead_type,
@@ -181,7 +247,7 @@ serve(async (req) => {
     // already have: its form answers are merged, and nothing is notified,
     // auto-replied or counted against the agent's allowance a second time.
     const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY')
-    const emailHash = hashSecret ? await emailLookupHash(leadData.email, hashSecret) : null
+    const emailHash = hashSecret && leadData.email ? await emailLookupHash(leadData.email, hashSecret) : null
     if (emailHash) {
       const { data: earlier, error: earlierError } = await supabase
         .from('leads')
@@ -204,7 +270,7 @@ serve(async (req) => {
           })
           .eq('id', earlier.id)
         if (mergeError) throw mergeError
-        return successResponse({ lead_id: earlier.id }, req)
+        return successResponse({ lead_id: earlier.id, update_token: await issueEnrichToken(earlier.id) }, req)
       }
     }
 
@@ -321,7 +387,9 @@ serve(async (req) => {
       'submit-lead-autoreply',
       { maxRequests: 50, windowSeconds: 86400, failClosed: false }
     )
-    if (!autoReplyBudget.allowed) {
+    if (!leadData.email) {
+      // A phone-only lead (US-228) has nowhere to send an auto-reply.
+    } else if (!autoReplyBudget.allowed) {
       console.warn(`[submit-lead] auto-reply cap reached for ${leadData.user_id}; lead ${lead.id} stored without one`)
     } else await sendEmail({
       to: leadData.email,
@@ -411,7 +479,7 @@ ${agentName}`,
       console.error(`Could not reach notify-lead for lead ${lead.id}:`, notifyError)
     }
 
-    return successResponse({ lead_id: lead.id }, req)
+    return successResponse({ lead_id: lead.id, update_token: await issueEnrichToken(lead.id) }, req)
 
   } catch (error) {
     console.error('Error in submit-lead function:', error)

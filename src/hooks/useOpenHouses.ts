@@ -255,7 +255,7 @@ export interface OpenHouseSignIn {
   agentId: string;
   openHouseId: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   /** Already working with a buyer's agent. */
   hasAgent?: boolean;
