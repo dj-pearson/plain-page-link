@@ -58,12 +58,13 @@ export function ImageBlock({ config, isEditing = false }: ImageBlockProps) {
                     rel="noopener noreferrer"
                     className="block rounded-lg overflow-hidden hover:opacity-90 transition-opacity focus-visible:ring-2 focus-visible:ring-primary"
                 >
+                    {/* A link's name is its image's alt, so a linked image is never decorative. */}
                     <img src={safeImageUrl} alt={config.alt} className="w-full h-auto" />
                     <span className="sr-only"> (opens in a new tab)</span>
                 </a>
             ) : (
                 <div className="rounded-lg overflow-hidden">
-                    <img src={safeImageUrl} alt={config.alt} className="w-full h-auto" />
+                    <img src={safeImageUrl} alt={config.decorative ? "" : config.alt} className="w-full h-auto" />
                 </div>
             )}
 

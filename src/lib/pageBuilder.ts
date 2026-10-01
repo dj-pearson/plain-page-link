@@ -372,7 +372,9 @@ class PageBuilderEngine {
         defaultConfig: {
           type: 'image',
           imageUrl: '',
-          alt: 'Image',
+          // US-235: empty, not 'Image'. A placeholder that reads as alt text
+          // let a page publish with every image announced as "Image".
+          alt: '',
           size: 'medium',
         },
       },

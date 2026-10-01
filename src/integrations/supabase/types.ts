@@ -9325,6 +9325,7 @@ export type Database = {
         Args: { _user_id: string };
         Returns: Record<string, unknown>[];
       };
+      listing_photos_valid: { Args: { p: Json }; Returns: boolean };
       locked_lead_ids: {
         Args: { _lead_ids: string[]; _user_id: string };
         Returns: string[];

@@ -174,6 +174,8 @@ export interface ImageBlockConfig {
     type: "image";
     imageUrl: string;
     alt: string;
+    /** Purely visual: rendered alt="" and exempt from the alt requirement (US-235). */
+    decorative?: boolean;
     caption?: string;
     link?: string;
     size: "small" | "medium" | "large" | "full";
@@ -230,6 +232,8 @@ export interface GalleryImage {
     id: string;
     url: string;
     alt: string;
+    /** Purely visual: rendered alt="" and exempt from the alt requirement (US-235). */
+    decorative?: boolean;
     caption?: string;
 }
 

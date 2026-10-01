@@ -1,6 +1,7 @@
 import type { PublicProfile } from '@/types/profile';
 import type { PublicProfileListing } from '@/types/listing';
 import { toStringList } from '@/types/profile';
+import { normalizePhotos } from '@/lib/listingPhotos';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeUsername } from '@/lib/username';
@@ -216,8 +217,8 @@ export const usePublicProfile = (rawUsername: string) => {
         bedrooms: l.bedrooms,
         bathrooms: l.bathrooms,
         square_feet: l.square_feet,
-        // photos is jsonb; every consumer treats it as a URL list.
-        photos: toStringList(l.photos),
+        // photos is jsonb: URL strings or {url, alt} (US-235).
+        photos: normalizePhotos(l.photos),
       }));
 
       // specialties/certifications/service_* are jsonb. Every consumer maps

@@ -8,19 +8,52 @@
  * `photos` is the gallery and `image` is the card thumbnail, so the two must
  * agree: the caller writes image = photos[0], and reordering is therefore how
  * the cover photo is chosen.
+ *
+ * US-235: each photo carries alt text. Before, there was nowhere to write it,
+ * and every renderer announced the street address for every photo.
+ *
+ * "Suggest" drafts from the listing details, deliberately without AI: no model
+ * here can see the photo, and a text model asked to describe one it cannot see
+ * invents a kitchen that is not there. The draft says what is known and the
+ * agent adds what the photo shows.
  */
 import { useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Loader2, Star, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Sparkles, Star, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useListingImageUpload } from '@/hooks/useListingImageUpload';
+import type { ListingPhoto } from '@/lib/listingPhotos';
 
-interface ListingPhotoManagerProps {
-  photos: string[];
-  onChange: (photos: string[]) => void;
-  listingId?: string;
+export interface PhotoSuggestContext {
+  address?: string;
+  propertyType?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
 }
 
-export function ListingPhotoManager({ photos, onChange, listingId }: ListingPhotoManagerProps) {
+interface ListingPhotoManagerProps {
+  photos: ListingPhoto[];
+  onChange: (photos: ListingPhoto[]) => void;
+  listingId?: string;
+  /** What "Suggest" drafts from. */
+  details?: PhotoSuggestContext;
+}
+
+/** A starting point the agent finishes; see the header for why not AI. */
+export function draftAltText(details: PhotoSuggestContext | undefined, index: number): string {
+  const kind = details?.propertyType?.trim() || 'Home';
+  const rooms = [
+    details?.bedrooms ? `${details.bedrooms}-bedroom` : '',
+    details?.bathrooms ? `${details.bathrooms}-bathroom` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const at = details?.address?.trim() ? ` at ${details.address.trim()}` : '';
+  const subject = rooms ? `${rooms} ${kind.toLowerCase()}` : kind;
+  return index === 0 ? `${subject[0].toUpperCase()}${subject.slice(1)}${at}: ` : `${kind}${at}, photo ${index + 1}: `;
+}
+
+export function ListingPhotoManager({ photos, onChange, listingId, details }: ListingPhotoManagerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadListingImages, uploading, progress } = useListingImageUpload();
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +65,7 @@ export function ListingPhotoManager({ photos, onChange, listingId }: ListingPhot
       // Throws since US-107, so a rejected file leaves the existing photos
       // untouched rather than silently returning an empty list.
       const urls = await uploadListingImages(Array.from(files), listingId);
-      onChange([...photos, ...urls]);
+      onChange([...photos, ...urls.map((url) => ({ url, alt: '' }))]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Those photos could not be uploaded');
     } finally {
@@ -49,6 +82,8 @@ export function ListingPhotoManager({ photos, onChange, listingId }: ListingPhot
   };
 
   const remove = (index: number) => onChange(photos.filter((_, i) => i !== index));
+  const setAlt = (index: number, alt: string) =>
+    onChange(photos.map((p, i) => (i === index ? { ...p, alt } : p)));
 
   return (
     <div className="space-y-3">
@@ -97,13 +132,16 @@ export function ListingPhotoManager({ photos, onChange, listingId }: ListingPhot
           No photos yet. The first photo you add becomes the listing card image.
         </p>
       ) : (
-        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {photos.map((url, index) => (
-            <li
-              key={url}
-              className="group relative aspect-square overflow-hidden rounded-lg border"
-            >
-              <img src={url} alt={`Photo ${index + 1}`} className="h-full w-full object-cover" />
+        <>
+        <p id="photo-alt-help" className="text-xs text-muted-foreground">
+          Describe each photo for visitors who use a screen reader — what it shows, not that it is a photo.
+          For example: “Kitchen with white cabinets, quartz island and pendant lights.”
+        </p>
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {photos.map((photo, index) => (
+            <li key={photo.url} className="space-y-1.5">
+            <div className="group relative aspect-square overflow-hidden rounded-lg border">
+              <img src={photo.url} alt="" className="h-full w-full object-cover" />
               {index === 0 && (
                 <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
                   <Star className="h-3 w-3 fill-current" /> Cover
@@ -137,9 +175,39 @@ export function ListingPhotoManager({ photos, onChange, listingId }: ListingPhot
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
+            </div>
+              <label htmlFor={`photo-alt-${index}`} className="sr-only">
+                Description of photo {index + 1}
+              </label>
+              <div className="flex gap-1">
+                <Input
+                  id={`photo-alt-${index}`}
+                  value={photo.alt}
+                  onChange={(e) => setAlt(index, e.target.value)}
+                  placeholder={`Describe photo ${index + 1}`}
+                  aria-describedby="photo-alt-help"
+                  maxLength={250}
+                  className="min-h-[44px] text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="min-h-[44px] min-w-[44px] shrink-0"
+                  aria-label={`Suggest a description for photo ${index + 1}`}
+                  title="Suggest a starting description"
+                  onClick={() => {
+                    if (!photo.alt.trim()) setAlt(index, draftAltText(details, index));
+                    document.getElementById(`photo-alt-${index}`)?.focus();
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </div>
             </li>
           ))}
         </ul>
+        </>
       )}
     </div>
   );

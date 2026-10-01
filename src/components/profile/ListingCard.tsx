@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
 import { currentListingShareUrl } from '@/lib/listingShare';
+import { photoAlt, primaryPhoto } from '@/lib/listingPhotos';
 
 import { listingStatusBadgeClass } from '@/lib/listingStatus';
 interface ListingCardProps {
@@ -39,7 +40,10 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   const isFeatured = listing.is_featured;
   const photoCount = listing.photos?.length || 1;
 
-  const primaryImage = getImageUrl(listing.image || listing.photos?.[0]);
+  const primary = primaryPhoto(listing.photos, listing.image);
+  const primaryImage = getImageUrl(primary?.url);
+  // US-235: the agent's description, not the address on every photo.
+  const primaryAlt = photoAlt(primary, address, 0, photoCount);
 
   useEffect(() => {
     try {
@@ -110,7 +114,7 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
         {!imageLoaded && <div className="absolute inset-0 bg-gray-200 animate-pulse" />}
         <img
           src={primaryImage}
-          alt={address}
+          alt={primaryAlt}
           className={cn(
             'w-full h-full object-cover transition-transform duration-700 group-hover:scale-110',
             imageLoaded ? 'opacity-100' : 'opacity-0'

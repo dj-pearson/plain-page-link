@@ -56,6 +56,7 @@ import {
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { getThemedStyles, preloadThemeFonts } from '@/lib/themeUtils';
+import { missingAltText } from '@/lib/pageBuilderAlt';
 import type { BlockStyle } from '@/types/pageBuilder';
 
 const blockIcons: Record<string, React.ReactNode> = {
@@ -184,6 +185,14 @@ export default function PageBuilderEditor() {
   const handlePublish = async () => {
     if (!slugCheck.valid) {
       toast.error(slugCheck.error ?? 'Fix the page address before publishing');
+      return;
+    }
+    // US-235: alt text is required to publish (saving a draft still works).
+    const missingAlt = page ? missingAltText(page.blocks) : [];
+    if (missingAlt.length > 0) {
+      toast.error('Describe your images before publishing', {
+        description: `${missingAlt.slice(0, 3).join('. ')}${missingAlt.length > 3 ? ` (+${missingAlt.length - 3} more)` : ''}. Or mark an image decorative.`,
+      });
       return;
     }
     try {

@@ -1,3 +1,4 @@
+import type { ListingPhoto } from '@/lib/listingPhotos';
 import type { Database } from '@/integrations/supabase/types';
 
 export type ListingStatus = 'active' | 'pending' | 'under_contract' | 'sold' | 'draft';
@@ -48,8 +49,8 @@ export type PublicListing = Omit<
   Database['public']['Tables']['listings']['Row'],
   'photos' | 'user_id'
 > & {
-  /** jsonb in the schema; every reader treats it as a URL list. */
-  photos: string[] | null;
+  /** jsonb in the schema: URL strings or {url, alt} (US-235), via normalizePhotos. */
+  photos: ListingPhoto[] | null;
 };
 
 export interface ListingUpdateData extends Partial<PublicListing> {

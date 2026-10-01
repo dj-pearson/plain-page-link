@@ -22,7 +22,7 @@ import { formatOpenHouseAddress, usePublicOpenHouses } from '@/hooks/useOpenHous
 import { downloadIcs, googleCalendarUrl, type CalendarEvent } from '@/lib/openHouseCalendar';
 import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { formatPrice, parsePrice } from '@/lib/format';
-import { toStringList } from '@/types/profile';
+import { normalizePhotos, photoAlt, photoUrls } from '@/lib/listingPhotos';
 
 interface UpcomingOpenHousesProps {
   agentId: string;
@@ -41,6 +41,7 @@ interface UpcomingOpenHouse {
   fullAddress: string;
   price: string | null;
   photo: string;
+  photoAlt: string;
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null);
@@ -67,7 +68,8 @@ function toUpcoming(row: Record<string, unknown>): UpcomingOpenHouse | null {
       zip_code: str(row.zip_code),
     }),
     price: numericPrice > 0 ? formatPrice(numericPrice) : rawPrice,
-    photo: getImageUrl(toStringList(row.photos)[0] ?? str(row.image)),
+    photo: getImageUrl(photoUrls(row.photos)[0] ?? str(row.image)),
+    photoAlt: photoAlt(normalizePhotos(row.photos)[0], address, 0, normalizePhotos(row.photos).length || 1),
   };
 }
 
@@ -130,7 +132,7 @@ export function UpcomingOpenHouses({
           >
             <img
               src={oh.photo}
-              alt={oh.address}
+              alt={oh.photoAlt}
               loading="lazy"
               className="h-44 w-full object-cover sm:h-auto sm:w-56 sm:shrink-0"
               onError={(e) => {

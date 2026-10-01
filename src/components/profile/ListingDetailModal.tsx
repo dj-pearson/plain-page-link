@@ -29,6 +29,7 @@ import { realEstateListingSchema } from '@/lib/structured-data';
 import { currentListingShareUrl } from '@/lib/listingShare';
 
 import { listingStatusBadgeClass } from '@/lib/listingStatus';
+import { photoAlt } from '@/lib/listingPhotos';
 interface ListingDetailModalProps {
   listing: PublicProfileListing;
   isOpen: boolean;
@@ -81,9 +82,12 @@ export default function ListingDetailModal({
   // single-image listing therefore showed the grey placeholder in the modal
   // while ListingCard, which checks `listing.image || listing.photos?.[0]`,
   // showed the photo. Same listing, two answers (US-112).
-  const photos = getImageUrls(
-    listing.photos?.length ? listing.photos : listing.image ? [listing.image] : null
-  );
+  const photoList = listing.photos?.length
+    ? listing.photos
+    : listing.image
+      ? [{ url: listing.image, alt: '' }]
+      : [];
+  const photos = getImageUrls(photoList.map((p) => p.url));
 
   const address = listing.address || '';
   const city = listing.city || '';
@@ -282,7 +286,9 @@ export default function ListingDetailModal({
                 <motion.img
                   key={currentImageIndex}
                   src={photos[currentImageIndex]}
-                  alt={`${address} - Photo ${currentImageIndex + 1}`}
+                  // US-235: the agent's description of this photo, else
+                  // "<address> — photo 3 of 12".
+                  alt={photoAlt(photoList[currentImageIndex], address, currentImageIndex, photos.length)}
                   className="w-full h-full object-cover"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

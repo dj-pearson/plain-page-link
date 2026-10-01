@@ -14,6 +14,7 @@ import {
 import { parseSquareFeet } from '@/lib/format';
 import { LISTING_STATUSES } from '@/lib/listingStatus';
 import { ListingPhotoManager } from '@/components/listings/ListingPhotoManager';
+import type { ListingPhoto } from '@/lib/listingPhotos';
 
 export interface EditListingFormData {
   address: string;
@@ -25,8 +26,8 @@ export interface EditListingFormData {
   bathrooms: number;
   square_feet?: number;
   status: string;
-  /** The gallery. `image` is derived from photos[0] by the caller. */
-  photos: string[];
+  /** The gallery, with alt text (US-235). `image` is photos[0].url. */
+  photos: ListingPhoto[];
   description?: string;
   mls_number?: string;
   property_type?: string;
@@ -225,6 +226,12 @@ export function EditListingModal({
                 photos={formData.photos}
                 onChange={(photos) => setFormData({ ...formData, photos })}
                 listingId={listingId}
+                details={{
+                  address: formData.address,
+                  propertyType: formData.property_type,
+                  bedrooms: formData.bedrooms,
+                  bathrooms: formData.bathrooms,
+                }}
               />
             </div>
 

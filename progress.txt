@@ -4710,3 +4710,21 @@ microenterprise). UK/AODA/ACA/508 not applicable today.
 - Learned: two theme systems coexist — applyTheme writes HSL triplets on :root
   (consumed as hsl(var())), themeUtils writes raw hex on the builder container
   (consumed as var()). Any new variable must be set in both formats.
+
+---
+
+## Iteration — US-235: alt text for listing photos
+
+- photos elements may be {url, alt}; migration adds a NOT VALID shape CHECK.
+  Gotcha caught by probing the function by hand: NOT EXISTS (... WHERE NOT (x))
+  passes when x is NULL — wrap in COALESCE(x, false). Now a verify:schema check.
+- The landmine: toStringList (used to read photos in 6 places) silently drops
+  non-string elements, so the first photo with alt text would have vanished from
+  the public page. Every photo reader now goes through normalizePhotos.
+- Writes keep alt-less photos as bare strings (old readers still see URLs).
+- "Suggest" is deterministic by design: no vision model is wired, and asking a
+  text model to describe a photo it cannot see produces confident fiction.
+- Page builder: no more "Image"/"Gallery image" defaults; publish blocked until
+  every image is described or marked decorative.
+- Local PG16 recipe: initdb under /var/lib/postgresql as postgres (the scratchpad
+  is not readable by that user), port 55432, socket /tmp.

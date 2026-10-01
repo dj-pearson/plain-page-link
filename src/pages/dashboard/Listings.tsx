@@ -50,6 +50,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { parsePrice, formatPrice } from '@/lib/format';
 import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
+import { serializePhotos } from '@/lib/listingPhotos';
 
 type ViewMode = 'grid' | 'list';
 type StatusFilter = 'all' | (typeof LISTING_STATUSES)[number]['value'];
@@ -168,7 +169,11 @@ export default function Listings() {
         // counts from, and sold_date is set on the transition below (US-107).
         listed_date: new Date().toISOString().slice(0, 10),
         image: imageUrls[0] || null,
-        photos: imageUrls.length > 0 ? imageUrls : null,
+        // US-235: with the alt text typed beside each photo, same order.
+        photos:
+          imageUrls.length > 0
+            ? serializePhotos(imageUrls.map((url, i) => ({ url, alt: data.imageAlts?.[i] ?? '' })))
+            : null,
         description: data.description || null,
         mls_number: data.mlsNumber || null,
         property_type: data.propertyType || null,
@@ -199,6 +204,7 @@ export default function Listings() {
         sqft: parseSquareFeet(data.sqft) ?? undefined,
         property_type: data.propertyType,
         image: imageUrls[0] || undefined,
+        imageAlt: data.imageAlts?.[0],
       });
 
       toast({
@@ -366,8 +372,8 @@ export default function Listings() {
           : null,
         // `photos` is the gallery and `image` is the card thumbnail; they must
         // agree, so the cover is always photos[0] (US-107).
-        photos: data.photos,
-        image: data.photos[0] ?? null,
+        photos: serializePhotos(data.photos),
+        image: data.photos[0]?.url ?? null,
         description: data.description,
         mls_number: data.mls_number,
         property_type: data.property_type,
@@ -653,8 +659,9 @@ export default function Listings() {
             >
               <div className="relative h-48 sm:h-52 overflow-hidden">
                 <img
-                  src={getImageUrl(listing.image || listing.photos?.[0])}
-                  alt={listing.address}
+                  src={getImageUrl(listing.image || listing.photos?.[0]?.url)}
+                  // The address is the card's heading; repeating it is noise.
+                  alt=""
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   loading="lazy"
                   onError={(e) => {
@@ -771,8 +778,8 @@ export default function Listings() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <img
-                        src={getImageUrl(listing.image || listing.photos?.[0])}
-                        alt={listing.address}
+                        src={getImageUrl(listing.image || listing.photos?.[0]?.url)}
+                        alt=""
                         className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                         onError={(e) => {
                           e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
@@ -916,10 +923,10 @@ export default function Listings() {
             bathrooms: editingListing.bathrooms,
             square_feet: editingListing.square_feet ?? undefined,
             status: editingListing.status ?? 'active',
-            photos: Array.isArray(editingListing.photos)
-              ? (editingListing.photos as string[])
+            photos: editingListing.photos?.length
+              ? editingListing.photos
               : editingListing.image
-                ? [editingListing.image]
+                ? [{ url: editingListing.image, alt: '' }]
                 : [],
             state: editingListing.state ?? undefined,
             zip_code: editingListing.zip_code ?? undefined,

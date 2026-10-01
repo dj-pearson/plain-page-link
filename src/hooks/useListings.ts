@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
-import { toStringList } from '@/types/profile';
+import { normalizePhotos, type ListingPhoto } from '@/lib/listingPhotos';
 import type { Database } from '@/integrations/supabase/types';
 
 type ListingRow = Database['public']['Tables']['listings']['Row'];
@@ -19,7 +19,7 @@ type ListingRow = Database['public']['Tables']['listings']['Row'];
  * `photos` is jsonb; every consumer treats it as a URL list, so it is narrowed
  * at the read boundary the same way usePublicProfile does.
  */
-export type Listing = Omit<ListingRow, 'photos'> & { photos: string[] | null };
+export type Listing = Omit<ListingRow, 'photos'> & { photos: ListingPhoto[] | null };
 
 /**
  * The columns a caller may supply when creating a listing.
@@ -61,7 +61,7 @@ export function useListings() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data ?? []).map((row): Listing => ({ ...row, photos: toStringList(row.photos) }));
+      return (data ?? []).map((row): Listing => ({ ...row, photos: normalizePhotos(row.photos) }));
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh

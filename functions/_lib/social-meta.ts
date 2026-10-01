@@ -150,8 +150,11 @@ function summarise(text: string, max = 200): string {
 
 function firstPhoto(listing: ListingMeta): string | null {
   if (listing.image) return listing.image;
-  if (Array.isArray(listing.photos) && typeof listing.photos[0] === 'string') {
-    return listing.photos[0];
+  // US-235: an element is a URL string or {url, alt}.
+  const first: unknown = Array.isArray(listing.photos) ? listing.photos[0] : null;
+  if (typeof first === 'string') return first;
+  if (first && typeof first === 'object' && typeof (first as { url?: unknown }).url === 'string') {
+    return (first as { url: string }).url;
   }
   return null;
 }

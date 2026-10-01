@@ -78,4 +78,22 @@ describe('ListingCard', () => {
     // And a keyboard user must not be tabbing through invisible controls.
     expect(actions.className).toContain('md:focus-within:opacity-100');
   });
+
+  // US-235: every photo used to be announced as the street address.
+  it("uses the agent's alt text for the cover photo, else address and position", () => {
+    const withAlt = {
+      ...listing,
+      photos: [
+        { url: '/front.jpg', alt: 'Brick bungalow with a deep front porch' },
+        { url: '/kitchen.jpg', alt: '' },
+      ],
+    } as unknown as PublicProfileListing;
+    const { unmount } = render(<ListingCard listing={withAlt} />);
+    expect(screen.getByAltText('Brick bungalow with a deep front porch')).toBeInTheDocument();
+    unmount();
+
+    const noAlt = { ...listing, photos: [{ url: '/a.jpg', alt: '' }, { url: '/b.jpg', alt: '' }] } as unknown as PublicProfileListing;
+    render(<ListingCard listing={noAlt} />);
+    expect(screen.getByAltText('412 Maple Avenue — photo 1 of 2')).toBeInTheDocument();
+  });
 });

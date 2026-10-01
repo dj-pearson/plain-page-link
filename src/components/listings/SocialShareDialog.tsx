@@ -36,6 +36,8 @@ export interface SharedListing {
   sqft?: number | null;
   property_type?: string | null;
   image?: string | null;
+  /** The agent's alt text for that image (US-235). */
+  imageAlt?: string | null;
 }
 
 interface SocialShareDialogProps {
@@ -150,7 +152,7 @@ export function SocialShareDialog({ open, onOpenChange, listing }: SocialShareDi
           {/* Preview Card */}
           {listing.image && (
             <div className="relative rounded-lg overflow-hidden border border-border">
-              <img src={listing.image} alt={listing.address} className="w-full h-48 object-cover" />
+              <img src={listing.image} alt={listing.imageAlt?.trim() || `${listing.address} — listing photo`} className="w-full h-48 object-cover" />
               <div className="absolute top-2 right-2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-bold">
                 NEW
               </div>

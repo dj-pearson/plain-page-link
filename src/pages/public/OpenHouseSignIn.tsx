@@ -24,10 +24,10 @@ import {
 import { EdgeFunctionError } from '@/lib/edgeFunctions';
 import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { formatNumber, formatPrice, getInitials, parsePrice } from '@/lib/format';
-import { toStringList } from '@/types/profile';
 import { cn } from '@/lib/utils';
 import { useSpamGuard } from '@/hooks/useSpamGuard';
 import { HoneypotField } from '@/components/forms/HoneypotField';
+import { normalizePhotos } from '@/lib/listingPhotos';
 
 /** How long the thank-you stays up before the form clears for the next visitor. */
 const KIOSK_RESET_MS = 8000;
@@ -59,6 +59,8 @@ interface KioskOpenHouse {
   baths: number | null;
   sqft: number | null;
   photo: string;
+  /** The agent's alt text for the cover photo, '' if none (US-235). */
+  photoDescription: string;
   agentUsername: string | null;
   agentName: string | null;
   agentAvatar: string | null;
@@ -77,7 +79,7 @@ function toKioskOpenHouse(row: Record<string, unknown>): KioskOpenHouse | null {
   const endsAt = str(row.ends_at);
   const address = str(row.address);
   if (!id || !agentId || !startsAt || !endsAt || !address) return null;
-  const photos = toStringList(row.photos);
+  const photos = normalizePhotos(row.photos);
   return {
     id,
     agentId,
@@ -92,7 +94,9 @@ function toKioskOpenHouse(row: Record<string, unknown>): KioskOpenHouse | null {
     beds: num(row.beds),
     baths: num(row.baths),
     sqft: num(row.sqft),
-    photo: getImageUrl(photos[0] ?? str(row.image)),
+    photo: getImageUrl(photos[0]?.url ?? str(row.image)),
+    // US-235: the agent's description; this used to assume "Front of …".
+    photoDescription: photos[0]?.alt.trim() ?? '',
     agentUsername: str(row.agent_username),
     agentName: str(row.agent_full_name),
     agentAvatar: str(row.agent_avatar_url),
@@ -341,7 +345,7 @@ export default function OpenHouseSignIn() {
       <section aria-label="About this home" className="bg-muted/40 lg:min-h-screen">
         <img
           src={openHouse.photo}
-          alt={`Front of ${fullAddress}`}
+          alt={openHouse.photoDescription || `${fullAddress} — listing photo`}
           className="h-56 w-full object-cover sm:h-72 lg:h-[45vh]"
           onError={(e) => {
             if (!e.currentTarget.src.endsWith(PLACEHOLDER_PROPERTY_IMAGE)) {

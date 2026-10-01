@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 import type { Database } from '@/integrations/supabase/types';
 import { formatPrice, parsePrice } from '@/lib/format';
-import { toStringList } from '@/types/profile';
+import { normalizePhotos, photoAlt, type ListingPhoto } from '@/lib/listingPhotos';
 
 interface ListingsBlockProps {
   config: ListingsBlockConfig;
@@ -31,7 +31,7 @@ interface ListingsBlockProps {
  * `state` non-nullable and omitted every other column.
  */
 type Listing = Omit<Database['public']['Tables']['listings']['Row'], 'photos'> & {
-  photos: string[] | null;
+  photos: ListingPhoto[] | null;
 };
 
 export function ListingsBlock({ config, isEditing = false, userId }: ListingsBlockProps) {
@@ -68,7 +68,7 @@ export function ListingsBlock({ config, isEditing = false, userId }: ListingsBlo
 
         if (error) throw error;
 
-        setListings((data ?? []).map((row) => ({ ...row, photos: toStringList(row.photos) })));
+        setListings((data ?? []).map((row) => ({ ...row, photos: normalizePhotos(row.photos) })));
       } catch (error) {
         logger.error('Error fetching listings', error as Error);
         setListings([]);
@@ -94,7 +94,7 @@ export function ListingsBlock({ config, isEditing = false, userId }: ListingsBlo
 
   const getPhotoUrl = (listing: Listing) => {
     if (listing.photos && Array.isArray(listing.photos) && listing.photos.length > 0) {
-      return listing.photos[0];
+      return listing.photos[0].url;
     }
     // Default placeholder image
     return 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800';
@@ -131,7 +131,7 @@ export function ListingsBlock({ config, isEditing = false, userId }: ListingsBlo
             <div className="relative aspect-video">
               <img
                 src={getPhotoUrl(listing)}
-                alt={formatAddress(listing)}
+                alt={photoAlt(listing.photos?.[0], formatAddress(listing), 0, listing.photos?.length || 1)}
                 className="w-full h-full object-cover"
               />
               {config.showStatus && (

@@ -40,8 +40,8 @@ export const mockListing: PublicListing = {
   mls_number: 'MLS123456',
   image: 'https://example.com/listings/1/primary.jpg',
   photos: [
-    'https://example.com/listings/1/photo1.jpg',
-    'https://example.com/listings/1/photo2.jpg',
+    { url: 'https://example.com/listings/1/photo1.jpg', alt: 'Front of the house with a red door' },
+    { url: 'https://example.com/listings/1/photo2.jpg', alt: '' },
   ],
   virtual_tour_url: null,
   open_house_date: null,

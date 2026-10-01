@@ -19,6 +19,7 @@ import type { PublicProfileListing } from '@/types';
 import { currentListingShareUrl } from '@/lib/listingShare';
 
 import { listingStatusBadgeClass } from '@/lib/listingStatus';
+import { photoAlt, primaryPhoto } from '@/lib/listingPhotos';
 interface FeaturedListingsCarouselProps {
   listings: PublicProfileListing[];
   onViewDetails?: (listing: PublicProfileListing) => void;
@@ -177,7 +178,9 @@ export function FeaturedListingsCarousel({
     setCurrentIndex(index);
   };
 
-  const primaryPhoto = getImageUrl(currentListing.image || currentListing.photos?.[0]);
+  const heroPhoto = primaryPhoto(currentListing.photos, currentListing.image);
+  const heroSrc = getImageUrl(heroPhoto?.url);
+  const heroAlt = photoAlt(heroPhoto, currentListing.address || 'Featured property', 0, currentListing.photos?.length || 1);
 
   return (
     <div
@@ -203,8 +206,8 @@ export function FeaturedListingsCarousel({
         >
           {/* Background Image */}
           <img
-            src={primaryPhoto}
-            alt={currentListing.address || 'Featured Property'}
+            src={heroSrc}
+            alt={heroAlt}
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;

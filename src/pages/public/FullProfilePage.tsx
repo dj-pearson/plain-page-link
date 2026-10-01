@@ -168,7 +168,7 @@ export default function FullProfilePage() {
     // hand-written annotations disagreed with it (is_featured is nullable).
     const featured = data.listings?.filter((l) => l.is_featured) || [];
     featured.slice(0, 5).forEach((listing) => {
-      const imgSrc = getImageUrl(listing.image || listing.photos?.[0]);
+      const imgSrc = getImageUrl(listing.image || listing.photos?.[0]?.url);
       if (imgSrc && imgSrc !== PLACEHOLDER_PROPERTY_IMAGE) {
         imagesToPreload.push(imgSrc);
       }

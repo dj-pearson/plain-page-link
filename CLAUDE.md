@@ -615,7 +615,7 @@ no `title` or `images` column.
 id, user_id (NOT NULL), address (NOT NULL), city (NOT NULL), price (text, NOT NULL)
 beds, baths (int, GENERATED — never write them), sqft (int)
 bedrooms / bathrooms (numeric), square_feet (int), lot_size_acres (numeric)
-image (single, legacy), photos (jsonb, the real gallery), virtual_tour_url
+image (single, legacy), photos (jsonb gallery: URL strings or {url, alt} — read via normalizePhotos), virtual_tour_url
 status ('active' | 'sold' | 'pending'), property_type, description, mls_number
 listed_date, sold_date (date), days_on_market (int), is_featured (bool), sort_order (int)
 created_at, updated_at

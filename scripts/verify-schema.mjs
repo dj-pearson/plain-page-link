@@ -2057,6 +2057,28 @@ check('a signup records who referred it, and the agent cannot rewrite it', () =>
   return out;
 });
 
+// US-235: photos may be URL strings or {url, alt}. The first draft of the
+// shape check passed {"alt": "x"} — a missing url made jsonb_typeof NULL and a
+// NULL WHERE dropped the row from NOT EXISTS. Hold both directions.
+check('listings.photos accepts URL strings and {url, alt}, and nothing else', () => {
+  const out = [];
+  const cases = [
+    [`'["/a.jpg", {"url": "/b.jpg", "alt": "Pool at dusk"}, {"url": "/c.jpg"}]'`, 't'],
+    [`'"[]"'`, 't'],
+    [`'[{"alt": "no url"}]'`, 'f'],
+    [`'[{"url": "/a.jpg", "alt": 3}]'`, 'f'],
+    [`'[42]'`, 'f'],
+    [`'{}'`, 'f'],
+  ];
+  for (const [value, expected] of cases) {
+    const [got] = q(`SELECT public.listing_photos_valid(${value}::jsonb);`);
+    if (got !== expected) out.push(`listing_photos_valid(${value}) = ${got}, expected ${expected}`);
+  }
+  const [con] = q(`SELECT count(*) FROM pg_constraint WHERE conname = 'listings_photos_shape' AND conrelid = 'public.listings'::regclass;`);
+  if (con !== '1') out.push('listings_photos_shape constraint is missing');
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // 9. Every column named in a .select('...') list must exist on the target table.
 //    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and

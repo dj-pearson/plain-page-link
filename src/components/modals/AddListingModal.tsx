@@ -68,6 +68,8 @@ const listingSchema = z.object({
   description: z.string().optional(),
   highlights: z.string().optional(),
   images: z.array(z.instanceof(File)).max(25, 'Maximum 25 images'),
+  /** Alt text per image, same order (US-235). */
+  imageAlts: z.array(z.string().max(250)).optional(),
   // `videoUrl` stood here beside virtualTourUrl. Both meant "a video of the
   // property", only one had a column, and the form dropped whatever went in
   // this one. Removed rather than given a second column (US-106).
@@ -134,12 +136,14 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
       stories: '',
       garage: '',
       images: [],
+      imageAlts: [],
       virtualTourUrl: '',
       isFeatured: false,
     },
   });
 
   const images = watch('images');
+  const imageAlts = watch('imageAlts') ?? [];
   const isFeatured = watch('isFeatured');
 
   /**
@@ -177,15 +181,13 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
       if (kept.length === 0) return;
 
       setValue('images', [...currentImages, ...kept]);
-      kept.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreviews((prev) => [...prev, reader.result as string].slice(0, MAX_IMAGES));
-        };
-        reader.readAsDataURL(file);
-      });
+      setValue('imageAlts', [...(imageAlts ?? []), ...kept.map(() => '')]);
+      // Synchronous object URLs, not FileReader: readers finish in any order,
+      // so preview i was not always file i — harmless until each preview
+      // carried the alt text for its file (US-235).
+      setImagePreviews((prev) => [...prev, ...kept.map((file) => URL.createObjectURL(file))].slice(0, MAX_IMAGES));
     },
-    [images, setValue]
+    [images, imageAlts, setValue]
   );
 
   const handleImageUpload = useCallback(
@@ -203,9 +205,13 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
         'images',
         currentImages.filter((_, i) => i !== index)
       );
+      setValue(
+        'imageAlts',
+        imageAlts.filter((_, i) => i !== index)
+      );
       setImagePreviews((prev) => prev.filter((_, i) => i !== index));
     },
-    [images, setValue]
+    [images, imageAlts, setValue]
   );
 
   const handleDrop = useCallback(
@@ -612,12 +618,17 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                     <p className="text-sm font-medium mb-2">
                       {imagePreviews.length} photo{imagePreviews.length !== 1 ? 's' : ''} selected
                     </p>
-                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                    <p id="add-photo-alt-help" className="text-xs text-muted-foreground mb-2">
+                      Describe each photo for visitors who use a screen reader, e.g. “Kitchen with
+                      white cabinets and a quartz island.”
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {imagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group aspect-square">
+                        <div key={index} className="space-y-1.5">
+                        <div className="relative group aspect-square">
                           <img
                             src={preview}
-                            alt={`Preview ${index + 1}`}
+                            alt=""
                             className="w-full h-full object-cover rounded-lg"
                           />
                           {index === 0 && (
@@ -628,10 +639,29 @@ export function AddListingModal({ open, onOpenChange, onSave }: AddListingModalP
                           <button
                             type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                            aria-label={`Remove photo ${index + 1}`}
+                            className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity shadow"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-3 w-3" aria-hidden="true" />
                           </button>
+                        </div>
+                          <label htmlFor={`add-photo-alt-${index}`} className="sr-only">
+                            Description of photo {index + 1}
+                          </label>
+                          <Input
+                            id={`add-photo-alt-${index}`}
+                            value={imageAlts[index] ?? ''}
+                            onChange={(e) =>
+                              setValue(
+                                'imageAlts',
+                                imagePreviews.map((_, i) => (i === index ? e.target.value : (imageAlts[i] ?? '')))
+                              )
+                            }
+                            placeholder={`Describe photo ${index + 1}`}
+                            aria-describedby="add-photo-alt-help"
+                            maxLength={250}
+                            className="min-h-[44px] text-sm"
+                          />
                         </div>
                       ))}
                     </div>

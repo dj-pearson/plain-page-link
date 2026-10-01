@@ -520,13 +520,32 @@ function ImageSettings({ config, onUpdate }: any) {
                 />
             </div>
             <div className="space-y-2">
-                <Label htmlFor="image-alt">Alt Text</Label>
+                <Label htmlFor="image-alt">Description (alt text)</Label>
                 <Input
                     id="image-alt"
                     value={config.alt}
                     onChange={(e) => onUpdate({ alt: e.target.value })}
-                    placeholder="Describe the image"
+                    placeholder="What the image shows"
+                    disabled={!!config.decorative && !config.link}
+                    aria-describedby="image-alt-help"
+                    aria-invalid={!config.decorative && !config.alt?.trim() && !!config.imageUrl}
                 />
+                <p id="image-alt-help" className="text-xs text-muted-foreground">
+                    Read aloud to visitors who use a screen reader. Required to publish
+                    {config.link ? " — a linked image is the link's name." : ", unless the image is decorative."}
+                </p>
+                {!config.link && (
+                    <div className="flex items-center gap-2">
+                        <Switch
+                            id="image-decorative"
+                            checked={!!config.decorative}
+                            onCheckedChange={(checked) => onUpdate({ decorative: checked })}
+                        />
+                        <Label htmlFor="image-decorative" className="font-normal">
+                            Decorative only (screen readers skip it)
+                        </Label>
+                    </div>
+                )}
             </div>
             <div className="space-y-2">
                 <Label htmlFor="image-caption">Caption (Optional)</Label>
@@ -819,7 +838,9 @@ function GallerySettings({ config, onUpdate }: any) {
         const newImage = {
             id: `img_${Date.now()}`,
             url: "",
-            alt: "Gallery image",
+            // US-235: was "Gallery image", which passed for alt text and was
+            // announced for every photo of every gallery nobody edited.
+            alt: "",
             caption: "",
         };
         onUpdate({ images: [...(config.images || []), newImage] });
@@ -827,6 +848,12 @@ function GallerySettings({ config, onUpdate }: any) {
 
     const removeImage = (id: string) => {
         onUpdate({ images: config.images.filter((i: any) => i.id !== id) });
+    };
+
+    const updateImageFlag = (id: string, decorative: boolean) => {
+        onUpdate({
+            images: config.images.map((i: any) => (i.id === id ? { ...i, decorative } : i)),
+        });
     };
 
     const updateImage = (id: string, field: string, value: string) => {
@@ -902,9 +929,20 @@ function GallerySettings({ config, onUpdate }: any) {
                         <Input
                             value={img.alt}
                             onChange={(e) => updateImage(img.id, "alt", e.target.value)}
-                            placeholder="Alt text"
+                            placeholder="Description (required unless decorative)"
+                            aria-label="Image description (alt text)"
+                            aria-invalid={!img.decorative && !img.alt?.trim() && !!img.url}
+                            disabled={!!img.decorative}
                             className="h-8 text-sm"
                         />
+                        <label className="flex items-center gap-2 text-xs text-gray-600">
+                            <input
+                                type="checkbox"
+                                checked={!!img.decorative}
+                                onChange={(e) => updateImageFlag(img.id, e.target.checked)}
+                            />
+                            Decorative only
+                        </label>
                         <Input
                             value={img.caption || ""}
                             onChange={(e) => updateImage(img.id, "caption", e.target.value)}

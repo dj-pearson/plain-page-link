@@ -85,7 +85,7 @@ export function GalleryBlock({ config, isEditing = false }: GalleryBlockProps) {
                     }`;
                     const overlay = (
                         <>
-                            <img src={image.url} alt={image.alt} className={imgClass} />
+                            <img src={image.url} alt={image.decorative ? "" : image.alt} className={imgClass} />
                             <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300" aria-hidden="true" />
                             {image.caption && (
                                 <span className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
@@ -108,7 +108,7 @@ export function GalleryBlock({ config, isEditing = false }: GalleryBlockProps) {
                                     type="button"
                                     onClick={() => openLightbox(index)}
                                     className="relative block w-full text-left focus-visible:ring-2 focus-visible:ring-primary"
-                                    aria-label={`View larger: ${image.alt || `photo ${index + 1}`} (${index + 1} of ${config.images.length})`}
+                                    aria-label={`View larger: ${(!image.decorative && image.alt) || `photo ${index + 1}`} (${index + 1} of ${config.images.length})`}
                                 >
                                     {overlay}
                                 </button>
@@ -143,7 +143,7 @@ export function GalleryBlock({ config, isEditing = false }: GalleryBlockProps) {
                             <div className="relative flex items-center justify-center">
                                 <img
                                     src={config.images[lightboxIndex].url}
-                                    alt={config.images[lightboxIndex].alt}
+                                    alt={config.images[lightboxIndex].decorative ? "" : config.images[lightboxIndex].alt}
                                     className="max-w-full max-h-[75vh] object-contain"
                                 />
                                 {config.images.length > 1 && (

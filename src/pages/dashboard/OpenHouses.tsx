@@ -57,8 +57,8 @@ import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { formatOpenHouseAddress, useOpenHouses, type OpenHouse } from '@/hooks/useOpenHouses';
 import { useListings } from '@/hooks/useListings';
 import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
-import { toStringList } from '@/types/profile';
 import { cn } from '@/lib/utils';
+import { photoUrls } from '@/lib/listingPhotos';
 
 type Confirm = { kind: 'cancel' | 'delete'; openHouse: OpenHouse } | null;
 
@@ -81,7 +81,7 @@ function formatWhen(startsAt: string, endsAt: string): string {
 function photoOf(oh: OpenHouse): string {
   const l = oh.listings;
   if (!l) return PLACEHOLDER_PROPERTY_IMAGE;
-  return getImageUrl(toStringList(l.photos)[0] ?? l.image);
+  return getImageUrl(photoUrls(l.photos)[0] ?? l.image);
 }
 
 function addressOf(oh: OpenHouse): string {
