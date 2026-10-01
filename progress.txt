@@ -4764,3 +4764,16 @@ microenterprise). UK/AODA/ACA/508 not applicable today.
   the auth gap was the aria wiring and the non-RHF password pages.
 - maxLength is applied before onChange: a pasted "123 456" became "123 45".
 - Sonner error toasts made persistent once, centrally, rather than at 35 sites.
+
+---
+
+## Iteration — US-239: an accurate accessibility statement
+
+- Rewrote the statement to claim only what US-233–238 made true; gaps listed
+  with target dates. A test bans the old overclaims from returning.
+- Feedback form + edge function so reporting needs neither email nor account.
+- ToS §3.6 splits responsibility; ToS "Last updated" was new Date() — fixed.
+- Gotchas: a new route needs a prerender/_redirects entry (spa-routes test);
+  a new Deno.env.get needs .env.example (env-example test). And never wait on
+  `pgrep -f "<pattern>"` from a shell whose own command line contains it.
+- Owner: postal address, target dates, counsel review, ToS notice.
