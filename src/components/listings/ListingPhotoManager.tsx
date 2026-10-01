@@ -137,6 +137,11 @@ export function ListingPhotoManager({ photos, onChange, listingId, details }: Li
           Describe each photo for visitors who use a screen reader — what it shows, not that it is a photo.
           For example: “Kitchen with white cabinets, quartz island and pendant lights.”
         </p>
+        <p className="text-xs text-muted-foreground">
+          <a href="/accessibility/agents#photos" target="_blank" rel="noopener noreferrer" className="underline">
+            How to write a good description<span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </p>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {photos.map((photo, index) => (
             <li key={photo.url} className="space-y-1.5">

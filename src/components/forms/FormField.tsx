@@ -127,7 +127,7 @@ export const TextareaField = forwardRef<
                     className
                 )}
                 aria-invalid={error ? "true" : "false"}
-                aria-describedby={error ? errorId : undefined}
+                aria-describedby={error ? errorId : helperText ? `${fieldId}-help` : undefined}
                 {...props}
             />
             {error && (
@@ -140,7 +140,7 @@ export const TextareaField = forwardRef<
                 </p>
             )}
             {helperText && !error && (
-                <p className="text-sm text-muted-foreground">{helperText}</p>
+                <p id={`${fieldId}-help`} className="text-sm text-muted-foreground">{helperText}</p>
             )}
         </div>
     );

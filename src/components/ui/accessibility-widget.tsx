@@ -225,6 +225,17 @@ export function AccessibilityWidget() {
             </button>
           </div>
 
+          {/* US-239: a preference tool, never presented as making the site
+              conform. Claims like that are what the FTC fined an overlay
+              vendor for in 2025. */}
+          <p className="mb-4 text-xs text-gray-600 dark:text-gray-400">
+            Adjust how this site looks for you. Your device’s own accessibility settings still apply and take
+            priority.{' '}
+            <a href="/accessibility" className="underline">
+              Accessibility statement
+            </a>
+          </p>
+
           <div className="space-y-4">
             {/* Text Size */}
             <div className="space-y-2">

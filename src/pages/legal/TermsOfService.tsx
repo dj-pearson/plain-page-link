@@ -1,9 +1,12 @@
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { SEOHead } from "@/components/SEOHead";
+import { Link } from 'react-router-dom';
 
 export default function TermsOfService() {
-  const lastUpdated = new Date().toLocaleDateString();
+  // A fixed date, not new Date(): the page claimed the Terms changed on every
+  // visit. Update this when the text changes (US-239 added §3.6).
+  const lastUpdated = '2026-10-01';
 
   const schema = {
     "@context": "https://schema.org",
@@ -139,6 +142,26 @@ export default function TermsOfService() {
               <li>Obtaining all necessary permissions, licenses, and authorizations</li>
               <li>Any harm, damages, or legal consequences arising from your content</li>
             </ul>
+
+            {/* US-239: accessibility is shared — templates are ours, content is the
+                agent's. Draft wording; counsel to review. */}
+            <h3 id="accessibility" className="text-xl font-semibold mt-6 mb-3">3.6 Accessibility of Your Content</h3>
+            <p className="mb-4">
+              AgentBio maintains the accessibility of the templates, themes, and components your pages are built from, as described in our{' '}
+              <Link to="/accessibility" className="text-primary underline hover:no-underline">Accessibility Statement</Link>.
+              You are responsible for the accessibility of the content you add. You agree to use the tools the Platform provides to do so, including by:
+            </p>
+            <ul className="list-disc pl-6 mb-4 space-y-2">
+              <li>writing descriptions (alt text) for listing photos and other meaningful images;</li>
+              <li>providing captions or a transcript for videos you publish;</li>
+              <li>choosing colours that pass the Platform's readability check;</li>
+              <li>responding promptly to a request for listing information in an alternative format.</li>
+            </ul>
+            <p className="mb-4">
+              Our guide{' '}
+              <Link to="/accessibility/agents" className="text-primary underline hover:no-underline">Making your page accessible</Link>{' '}
+              explains each of these.
+            </p>
           </section>
 
           <section>

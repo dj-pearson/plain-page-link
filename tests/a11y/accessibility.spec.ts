@@ -294,6 +294,7 @@ const PAGES: { name: string; path: string; authenticated?: boolean }[] = [
   { name: 'dmca', path: '/dmca' },
   { name: 'acceptable use', path: '/acceptable-use' },
   { name: 'accessibility statement', path: '/accessibility' },
+  { name: 'accessibility guide for agents', path: '/accessibility/agents' },
   { name: 'cookies', path: '/cookies' },
   { name: 'privacy choices', path: '/privacy-choices' },
   { name: 'blog', path: '/blog' },

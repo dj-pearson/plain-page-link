@@ -25,7 +25,10 @@ export function ContrastPanel({ checks, onFix, onFixAll }: ContrastPanelProps) {
         <CardTitle className="text-base sm:text-lg">Readability</CardTitle>
         <CardDescription className="text-xs sm:text-sm">
           Text needs a contrast of at least 4.5:1 to be readable by visitors with low vision
-          (WCAG&nbsp;2.2&nbsp;AA). A theme that falls short cannot be saved.
+          (WCAG&nbsp;2.2&nbsp;AA). A theme that falls short cannot be saved.{' '}
+          <a href="/accessibility/agents#colours" target="_blank" rel="noopener noreferrer" className="underline">
+            Why this matters<span className="sr-only"> (opens in a new tab)</span>
+          </a>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

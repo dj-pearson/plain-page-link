@@ -1,11 +1,90 @@
+import { Link } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
 import { SkipNavContent } from '@/components/ui/skip-nav';
+import { AccessibilityFeedbackForm } from '@/components/legal/AccessibilityFeedbackForm';
+
+/**
+ * US-239: this page used to say "substantially conformant with WCAG 2.1 AA",
+ * cite a "comprehensive accessibility audit", and list features the product did
+ * not have — keyboard shortcuts, alt text on all meaningful images, compliant
+ * contrast, pausable animation. An accessibility statement that overclaims is
+ * not a shield; it is a second, deceptive-claims exposure (the FTC's 2025 order
+ * against accessiBe was over exactly this kind of claim).
+ *
+ * Every claim below is one the code supports, scoped to where it is true, with
+ * the gaps listed as known limitations with target dates. When a limitation is
+ * fixed, move it; when something regresses, add it. Wording to be reviewed by
+ * counsel — this is not legal advice.
+ */
+
+// Update both when the content changes. ISO date for schema.org.
+const DATE_MODIFIED = '2026-10-01';
+const DATE_LABEL = 'October 1, 2026';
+
+interface Limitation {
+  area: string;
+  detail: string;
+  workaround?: string;
+  target: string;
+}
+
+const LIMITATIONS: Limitation[] = [
+  {
+    area: 'Dashboard actions that need a mouse',
+    detail:
+      'Some dashboard actions are reached through hover-only menus or custom controls a keyboard cannot operate.',
+    workaround: 'Email accessibility@agentbio.net and we will make the change for you.',
+    target: 'December 2026',
+  },
+  {
+    area: 'Reordering by drag',
+    detail: 'Listings and page-builder blocks can only be reordered by dragging.',
+    workaround: 'Ask us and we will reorder them for you.',
+    target: 'December 2026',
+  },
+  {
+    area: 'Dashboard labels and touch targets',
+    detail:
+      'Some dashboard and sign-in screens have buttons without names, fields without labels, and controls smaller than 24 × 24 pixels.',
+    target: 'December 2026',
+  },
+  {
+    area: 'Installed app (PWA)',
+    detail:
+      'The installed app is locked to portrait orientation, and fixed bars can cover the focused element on small screens.',
+    target: 'December 2026',
+  },
+  {
+    area: 'Page titles and focus on navigation',
+    detail:
+      'Dashboard and sign-in pages share one page title, and focus is not moved when you navigate between them.',
+    target: 'December 2026',
+  },
+  {
+    area: 'Charts and exports',
+    detail: 'Analytics charts have no table alternative, and exported PDFs are not tagged.',
+    workaround: 'We can send the underlying numbers as a spreadsheet on request.',
+    target: 'March 2027',
+  },
+  {
+    area: 'Content in other languages',
+    detail:
+      "Text an agent writes in a language other than English is not marked as such, so screen readers may read it with English pronunciation.",
+    target: 'March 2027',
+  },
+  {
+    area: 'Scheduling and payments (third parties)',
+    detail:
+      'Appointment booking is provided by Calendly and payments by Stripe. Their accessibility is theirs; we link to their statements and do not control their pages.',
+    workaround:
+      'You can always contact an agent by phone, email or the contact form on their page instead of booking online, and billing can be handled by email.',
+    target: 'Ongoing — we choose accessible providers and report problems to them',
+  },
+];
 
 export default function AccessibilityStatement() {
-  const lastUpdated = 'January 12, 2026';
-
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
@@ -13,478 +92,242 @@ export default function AccessibilityStatement() {
     url: 'https://agentbio.net/accessibility',
     name: 'Accessibility Statement - AgentBio',
     description:
-      "AgentBio's commitment to digital accessibility. Learn about our WCAG 2.1 AA conformance, accessibility features, and how to report accessibility issues.",
-    isPartOf: {
-      '@id': 'https://agentbio.net/#website',
-    },
-    about: {
-      '@type': 'Thing',
-      name: 'Accessibility Statement',
-    },
+      "AgentBio's accessibility statement: partial conformance with WCAG 2.2 Level AA, how it was assessed, known limitations, and how to report a barrier.",
+    isPartOf: { '@id': 'https://agentbio.net/#website' },
+    about: { '@type': 'Thing', name: 'Accessibility Statement' },
     datePublished: '2026-01-12',
-    dateModified: lastUpdated,
+    dateModified: DATE_MODIFIED,
     inLanguage: 'en-US',
   };
+
+  const linkClass = 'text-primary underline hover:no-underline';
 
   return (
     <>
       <SEOHead
-        title="Accessibility Statement - AgentBio | WCAG 2.1 AA Conformance"
-        description="AgentBio is committed to digital accessibility. Learn about our WCAG 2.1 Level AA conformance, accessibility features, assistive technology support, and how to report accessibility issues."
-        keywords={[
-          'accessibility statement',
-          'WCAG 2.1',
-          'ADA compliance',
-          'digital accessibility',
-          'screen reader support',
-          'keyboard navigation',
-          'accessible real estate platform',
-        ]}
+        title="Accessibility Statement - AgentBio"
+        description="AgentBio's accessibility statement: partial conformance with WCAG 2.2 Level AA, how we assessed it, known limitations with target dates, and how to report a barrier."
+        keywords={['accessibility statement', 'WCAG 2.2', 'digital accessibility', 'accessible real estate website']}
         canonicalUrl="https://agentbio.net/accessibility"
         schema={schema}
       />
       <PublicHeader />
       <SkipNavContent>
         <main id="main-content" className="min-h-screen bg-background py-12 px-4" tabIndex={-1}>
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl font-bold mb-8">Accessibility Statement</h1>
+          <div className="max-w-3xl mx-auto">
+            <h1 className="text-4xl font-bold mb-4">Accessibility Statement</h1>
+            <p className="text-muted-foreground mb-10">
+              Last updated: <time dateTime={DATE_MODIFIED}>{DATE_LABEL}</time>
+            </p>
 
-            <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
-              <p className="text-muted-foreground mb-6">Last updated: {lastUpdated}</p>
-
-              {/* Commitment Section */}
+            <div className="prose prose-slate dark:prose-invert max-w-none space-y-10">
               <section aria-labelledby="commitment-heading">
                 <h2 id="commitment-heading" className="text-2xl font-semibold mb-4">
-                  Our Commitment to Accessibility
+                  Our commitment
                 </h2>
-                <p className="mb-4">
-                  AgentBio.net is committed to ensuring digital accessibility for people with
-                  disabilities. We are continually improving the user experience for everyone and
-                  applying the relevant accessibility standards to ensure we provide equal access to
-                  all users.
-                </p>
-                <p className="mb-4">
-                  We believe that the internet should be available and accessible to anyone, and are
-                  committed to providing a website that is accessible to the widest possible
-                  audience, regardless of circumstance and ability.
+                <p>
+                  AgentBio wants everyone to be able to use the pages agents build with us — home buyers and
+                  sellers who use a screen reader, a keyboard, voice control, magnification or captions, and
+                  agents who do. This statement says where we are, honestly, including what does not work yet.
                 </p>
               </section>
 
-              {/* Conformance Status */}
               <section aria-labelledby="conformance-heading">
                 <h2 id="conformance-heading" className="text-2xl font-semibold mb-4">
-                  Conformance Status
+                  Conformance status
                 </h2>
-                <p className="mb-4">
-                  The{' '}
-                  <a
-                    href="https://www.w3.org/WAI/standards-guidelines/wcag/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary underline hover:no-underline"
-                  >
-                    Web Content Accessibility Guidelines (WCAG)
+                <p>
+                  We measure against the{' '}
+                  <a href="https://www.w3.org/TR/WCAG22/" target="_blank" rel="noopener noreferrer" className={linkClass}>
+                    Web Content Accessibility Guidelines (WCAG) 2.2
                   </a>{' '}
-                  defines requirements for designers and developers to improve accessibility for
-                  people with disabilities. It defines three levels of conformance: Level A, Level
-                  AA, and Level AAA.
+                  at Level AA.
                 </p>
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
-                  <p className="font-semibold text-green-900 dark:text-green-100">
-                    AgentBio.net is substantially conformant with WCAG 2.1 Level AA.
-                  </p>
-                  <p className="text-sm text-green-800 dark:text-green-200 mt-2">
-                    "Substantially conformant" means that while we have made significant efforts to
-                    meet WCAG 2.1 Level AA standards, some parts of the content may not yet fully
-                    conform.
-                  </p>
-                </div>
-                <p className="mb-4">
-                  We have undertaken a comprehensive accessibility audit and are actively working to
-                  remediate any identified issues. Our goal is full conformance with WCAG 2.1 Level
-                  AA.
+                <p className="font-semibold">AgentBio is partially conformant with WCAG 2.2 Level AA.</p>
+                <p>
+                  <em>Partially conformant</em> means that some parts of the content do not fully conform to the
+                  accessibility standard. The parts that do not are listed under{' '}
+                  <a href="#limitations-heading" className={linkClass}>
+                    Known limitations
+                  </a>
+                  .
                 </p>
               </section>
 
-              {/* Accessibility Features */}
-              <section aria-labelledby="features-heading">
-                <h2 id="features-heading" className="text-2xl font-semibold mb-4">
-                  Accessibility Features
-                </h2>
-                <p className="mb-4">AgentBio.net includes the following accessibility features:</p>
-
-                <h3 className="text-xl font-semibold mt-6 mb-3">Keyboard Navigation</h3>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>All interactive elements are accessible via keyboard navigation</li>
-                  <li>Skip navigation links allow users to bypass repetitive content</li>
-                  <li>Focus indicators are visible on all interactive elements</li>
-                  <li>Logical tab order throughout the application</li>
-                  <li>Keyboard shortcuts for common actions</li>
-                </ul>
-
-                <h3 className="text-xl font-semibold mt-6 mb-3">Screen Reader Support</h3>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>Semantic HTML structure for proper content hierarchy</li>
-                  <li>ARIA landmarks to identify page regions</li>
-                  <li>ARIA labels for icons and non-text elements</li>
-                  <li>Live regions for dynamic content updates</li>
-                  <li>Descriptive alt text for all meaningful images</li>
-                  <li>Form labels properly associated with input fields</li>
-                  <li>Error messages announced to assistive technologies</li>
-                </ul>
-
-                <h3 className="text-xl font-semibold mt-6 mb-3">Visual Accessibility</h3>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>
-                    Color contrast ratios meet WCAG 2.1 AA requirements (4.5:1 for normal text, 3:1
-                    for large text)
-                  </li>
-                  <li>Text can be resized up to 200% without loss of functionality</li>
-                  <li>Content does not rely solely on color to convey information</li>
-                  <li>Dark mode support for reduced eye strain</li>
-                  <li>Consistent layout and navigation across all pages</li>
-                </ul>
-
-                <h3 className="text-xl font-semibold mt-6 mb-3">Motion and Animation</h3>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>Respects user's "prefers-reduced-motion" system setting</li>
-                  <li>No content flashes more than three times per second</li>
-                  <li>Animations can be paused or disabled</li>
-                </ul>
-
-                <h3 className="text-xl font-semibold mt-6 mb-3">Mobile Accessibility</h3>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>Touch targets are at least 44x44 pixels for easy interaction</li>
-                  <li>Responsive design works on all screen sizes</li>
-                  <li>Content is scrollable and zoomable</li>
-                  <li>Compatible with mobile screen readers (VoiceOver, TalkBack)</li>
-                </ul>
-
-                <h3 className="text-xl font-semibold mt-6 mb-3">Forms and Input</h3>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>All form fields have visible labels</li>
-                  <li>Required fields are clearly indicated</li>
-                  <li>Error messages are clear and specific</li>
-                  <li>Form validation errors are associated with their fields</li>
-                  <li>Input fields have appropriate autocomplete attributes</li>
-                </ul>
-              </section>
-
-              {/* Assistive Technologies */}
-              <section aria-labelledby="technologies-heading">
-                <h2 id="technologies-heading" className="text-2xl font-semibold mb-4">
-                  Compatibility with Assistive Technologies
-                </h2>
-                <p className="mb-4">
-                  AgentBio.net is designed to be compatible with the following assistive
-                  technologies:
-                </p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>
-                    <strong>Screen Readers:</strong> NVDA (Windows), JAWS (Windows), VoiceOver
-                    (macOS/iOS), TalkBack (Android)
-                  </li>
-                  <li>
-                    <strong>Voice Control:</strong> Dragon NaturallySpeaking, Windows Speech
-                    Recognition, Voice Control (macOS)
-                  </li>
-                  <li>
-                    <strong>Magnification Software:</strong> ZoomText, Windows Magnifier, macOS Zoom
-                  </li>
-                  <li>
-                    <strong>Switch Access:</strong> Compatible with switch navigation devices
-                  </li>
-                  <li>
-                    <strong>Keyboard-Only Navigation:</strong> Full functionality available without
-                    a mouse
-                  </li>
-                </ul>
-                <p className="mb-4">
-                  We recommend using the latest versions of assistive technologies and browsers for
-                  the best experience.
-                </p>
-              </section>
-
-              {/* Browser Support */}
-              <section aria-labelledby="browsers-heading">
-                <h2 id="browsers-heading" className="text-2xl font-semibold mb-4">
-                  Supported Browsers
-                </h2>
-                <p className="mb-4">
-                  For the best accessible experience, we recommend using the following browsers:
-                </p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>Google Chrome (latest two versions)</li>
-                  <li>Mozilla Firefox (latest two versions)</li>
-                  <li>Apple Safari (latest two versions)</li>
-                  <li>Microsoft Edge (latest two versions)</li>
-                </ul>
-              </section>
-
-              {/* Known Limitations */}
-              <section aria-labelledby="limitations-heading">
-                <h2 id="limitations-heading" className="text-2xl font-semibold mb-4">
-                  Known Limitations
-                </h2>
-                <p className="mb-4">
-                  Despite our best efforts to ensure accessibility of AgentBio.net, there may be
-                  some limitations. Below is a description of known limitations:
-                </p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>
-                    <strong>Third-Party Content:</strong> Some property images and content uploaded
-                    by real estate agents may not include appropriate alt text. We encourage all
-                    agents to add descriptive alt text to their images.
-                  </li>
-                  <li>
-                    <strong>PDF Documents:</strong> Some older PDF documents may not be fully
-                    accessible. We are working to remediate these documents.
-                  </li>
-                  <li>
-                    <strong>Embedded Maps:</strong> Interactive maps from third-party providers may
-                    have limited accessibility. Alternative address information is always provided.
-                  </li>
-                  <li>
-                    <strong>User-Generated Content:</strong> Blog posts and content created by users
-                    may not always meet accessibility standards. We provide guidelines to encourage
-                    accessible content creation.
-                  </li>
-                </ul>
-                <p className="mb-4">
-                  We are continuously working to identify and address accessibility barriers. If you
-                  encounter any issues not listed here, please contact us.
-                </p>
-              </section>
-
-              {/* Technical Specifications */}
-              <section aria-labelledby="technical-heading">
-                <h2 id="technical-heading" className="text-2xl font-semibold mb-4">
-                  Technical Specifications
-                </h2>
-                <p className="mb-4">
-                  Accessibility of AgentBio.net relies on the following technologies to work with
-                  the particular combination of web browser and any assistive technologies or
-                  plugins installed on your computer:
-                </p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>HTML5</li>
-                  <li>WAI-ARIA 1.2</li>
-                  <li>CSS3</li>
-                  <li>JavaScript (ES6+)</li>
-                </ul>
-                <p className="mb-4">
-                  These technologies are relied upon for conformance with the accessibility
-                  standards used.
-                </p>
-              </section>
-
-              {/* Assessment Methods */}
               <section aria-labelledby="assessment-heading">
                 <h2 id="assessment-heading" className="text-2xl font-semibold mb-4">
-                  Assessment Methods
+                  How we assessed it
                 </h2>
-                <p className="mb-4">
-                  AgentBio.net assesses the accessibility of our platform through the following
-                  methods:
+                <p>
+                  This is a self-assessment by the AgentBio team, not a third-party audit. In October 2026 we:
                 </p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
+                <ul className="list-disc pl-6 space-y-2">
                   <li>
-                    <strong>Self-Assessment:</strong> Regular internal audits using automated
-                    accessibility testing tools
+                    ran automated checks (axe-core, WCAG 2.0, 2.1 and 2.2 A and AA rules) on 61 pages, each at
+                    desktop width and at iPhone and Android phone widths;
                   </li>
                   <li>
-                    <strong>Automated Testing:</strong> Integration of accessibility testing in our
-                    development workflow
+                    reviewed the code of agents’ public pages, the lead forms, sign-in and the dashboard by hand for
+                    keyboard access, screen-reader names and announcements, form errors, motion, and phone layout;
+                  </li>
+                  <li>fixed what we found on agents’ public pages first, since that is where visitors arrive.</li>
+                </ul>
+                <p>
+                  Automated accessibility checks run on every code change. Automated tools find only part of what
+                  matters, which is why the manual review — and your reports — count.
+                </p>
+              </section>
+
+              <section aria-labelledby="scope-heading">
+                <h2 id="scope-heading" className="text-2xl font-semibold mb-4">
+                  What this covers, and who is responsible for what
+                </h2>
+                <p>
+                  This statement covers agentbio.net: the marketing site, the agent dashboard, agents’ public pages,
+                  the installable app (PWA), the emails we send, and the files you can export.
+                </p>
+                <p>An agent’s page is built by two parties, so responsibility is shared:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>
+                    <strong>AgentBio is responsible for</strong> the templates, themes and components every page is
+                    built from, and for giving agents the tools to make their own content accessible.
                   </li>
                   <li>
-                    <strong>Manual Testing:</strong> Keyboard navigation testing and screen reader
-                    testing
+                    <strong>Agents are responsible for</strong> the content they add: describing their photos,
+                    captioning or transcribing their videos, the colours they choose, and the text they write.
+                  </li>
+                </ul>
+                <p>
+                  Agents: our guide{' '}
+                  <Link to="/accessibility/agents" className={linkClass}>
+                    Making your page accessible
+                  </Link>{' '}
+                  explains each of these in a few minutes.
+                </p>
+              </section>
+
+              <section aria-labelledby="features-heading">
+                <h2 id="features-heading" className="text-2xl font-semibold mb-4">
+                  What is in place
+                </h2>
+                <h3 className="text-xl font-semibold mt-6 mb-3">On agents’ public pages</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Every link, button, photo gallery and form can be reached and used with a keyboard.</li>
+                  <li>Icon-only buttons have names a screen reader announces.</li>
+                  <li>
+                    Agents can write a description (alt text) for every listing photo; a photo without one is read
+                    as its address and position, e.g. “12 Oak Lane — photo 3 of 12”.
                   </li>
                   <li>
-                    <strong>User Feedback:</strong> Ongoing collection and review of accessibility
-                    feedback from users
+                    Button text is chosen automatically to stay readable on the agent’s brand colour, built-in
+                    themes meet WCAG contrast, and the theme editor will not save colours that fall below it.
                   </li>
+                  <li>
+                    Animated theme backgrounds and the featured-listing slideshow stop when your device asks for
+                    reduced motion, and have a visible pause button otherwise.
+                  </li>
+                  <li>
+                    Videos can carry captions and a transcript, and a video that starts on its own starts muted.
+                  </li>
+                  <li>
+                    Lead forms move focus to what happens next, focus the first field that needs attention, and
+                    announce the result.
+                  </li>
+                </ul>
+                <h3 className="text-xl font-semibold mt-6 mb-3">Across the site</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>A skip link at the top of each page goes straight to the main content.</li>
+                  <li>Sign-in and password forms link each error to its field and move focus to it.</li>
+                  <li>Error messages stay on screen until you dismiss them.</li>
+                  <li>Pages reflow to a phone’s width, and you can zoom.</li>
+                  <li>Emails declare their language so screen readers pronounce them correctly.</li>
+                </ul>
+                <h3 className="text-xl font-semibold mt-6 mb-3">The accessibility preferences button</h3>
+                <p>
+                  The floating accessibility button lets you enlarge text, raise contrast, underline links,
+                  strengthen focus outlines and reduce motion on this site. It is a convenience for your
+                  preferences. It does not make the site conform, and it is not a substitute for the work described
+                  here — your own browser and assistive technology settings always come first.
+                </p>
+              </section>
+
+              <section aria-labelledby="limitations-heading">
+                <h2 id="limitations-heading" className="text-2xl font-semibold mb-4">
+                  Known limitations
+                </h2>
+                <p>These are the problems we know about, and when we expect to have fixed them.</p>
+                <ul className="list-none pl-0 space-y-5">
+                  {LIMITATIONS.map((l) => (
+                    <li key={l.area}>
+                      <h3 className="text-lg font-semibold">{l.area}</h3>
+                      <p className="mt-1">{l.detail}</p>
+                      {l.workaround && <p className="mt-1">Until then: {l.workaround}</p>}
+                      <p className="mt-1 text-sm text-muted-foreground">Target: {l.target}</p>
+                    </li>
+                  ))}
                 </ul>
               </section>
 
-              {/* Feedback and Contact */}
+              <section aria-labelledby="alternative-heading">
+                <h2 id="alternative-heading" className="text-2xl font-semibold mb-4">
+                  Listing information in another format
+                </h2>
+                <p>
+                  If any part of a listing or an agent’s page is not accessible to you, tell us and we will get you
+                  the information another way — read to you by phone, as plain text by email, or in large print —
+                  usually within 5 business days, and sooner when a showing or deadline depends on it.
+                </p>
+              </section>
+
               <section aria-labelledby="feedback-heading">
                 <h2 id="feedback-heading" className="text-2xl font-semibold mb-4">
-                  Feedback and Contact Information
+                  Report a barrier
                 </h2>
-                <p className="mb-4">
-                  We welcome your feedback on the accessibility of AgentBio.net. If you encounter
-                  accessibility barriers or have suggestions for improvement, please let us know:
+                <p>
+                  We aim to reply within 5 business days. Use whichever way suits you:
                 </p>
-                <div className="bg-muted p-4 rounded-md mb-4">
-                  <p className="font-mono text-sm">
-                    <strong>Accessibility Feedback:</strong>
-                    <br />
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>
+                    The form below, which works with a keyboard and screen reader and needs no account.
+                  </li>
+                  <li>
                     Email:{' '}
-                    <a
-                      href="mailto:accessibility@agentbio.net"
-                      className="text-primary underline hover:no-underline"
-                    >
+                    <a href="mailto:accessibility@agentbio.net" className={linkClass}>
                       accessibility@agentbio.net
                     </a>
-                    <br />
-                    Subject: Accessibility Feedback
-                    <br />
-                    <br />
-                    <strong>Response Time:</strong>
-                    <br />
-                    We aim to respond to accessibility feedback within 5 business days.
-                    <br />
-                    <br />
-                    <strong>General Support:</strong>
-                    <br />
-                    Email:{' '}
-                    <a
-                      href="mailto:support@agentbio.net"
-                      className="text-primary underline hover:no-underline"
-                    >
-                      support@agentbio.net
-                    </a>
-                    <br />
-                    <br />
-                    <strong>Mailing Address:</strong>
-                    <br />
-                    AgentBio.net Accessibility Team
-                    <br />
-                    Des Moines, IA
-                  </p>
-                </div>
-                <p className="mb-4">When reporting accessibility issues, please include:</p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>The URL of the page where you experienced the issue</li>
-                  <li>A description of the accessibility barrier you encountered</li>
-                  <li>The assistive technology you were using (if applicable)</li>
-                  <li>Your browser and operating system</li>
-                  <li>Your contact information (optional, but helpful for follow-up)</li>
+                  </li>
+                  <li>
+                    Post: AgentBio Accessibility, Des Moines, IA, United States
+                  </li>
                 </ul>
+                <p>It helps to know the page, what happened, and the device or assistive technology you use — but
+                  send what you have; none of it is required except a description.</p>
+                <AccessibilityFeedbackForm />
               </section>
 
-              {/* Enforcement Procedure */}
-              <section aria-labelledby="enforcement-heading">
-                <h2 id="enforcement-heading" className="text-2xl font-semibold mb-4">
-                  Enforcement Procedure
+              <section aria-labelledby="escalation-heading">
+                <h2 id="escalation-heading" className="text-2xl font-semibold mb-4">
+                  If you are not satisfied
                 </h2>
-                <p className="mb-4">
-                  If you are not satisfied with our response to your accessibility feedback, you may
-                  escalate the issue through the following channels:
+                <p>
+                  Write to{' '}
+                  <a href="mailto:legal@agentbio.net" className={linkClass}>
+                    legal@agentbio.net
+                  </a>{' '}
+                  and a member of management will review the response. You may also contact the{' '}
+                  <a href="https://www.ada.gov/file-a-complaint/" target="_blank" rel="noopener noreferrer" className={linkClass}>
+                    U.S. Department of Justice
+                  </a>{' '}
+                  or your state attorney general.
                 </p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>
-                    <strong>Internal Escalation:</strong> Contact our management team at{' '}
-                    <a
-                      href="mailto:legal@agentbio.net"
-                      className="text-primary underline hover:no-underline"
-                    >
-                      legal@agentbio.net
-                    </a>
-                  </li>
-                  <li>
-                    <strong>External Resources:</strong> You may file a complaint with the{' '}
-                    <a
-                      href="https://www.ada.gov/file-a-complaint/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline hover:no-underline"
-                    >
-                      U.S. Department of Justice
-                    </a>{' '}
-                    or your state's attorney general office
-                  </li>
-                </ul>
               </section>
 
-              {/* Continuous Improvement */}
-              <section aria-labelledby="improvement-heading">
-                <h2 id="improvement-heading" className="text-2xl font-semibold mb-4">
-                  Continuous Improvement
+              <section aria-labelledby="technical-heading">
+                <h2 id="technical-heading" className="text-2xl font-semibold mb-4">
+                  Technologies relied upon
                 </h2>
-                <p className="mb-4">
-                  We are committed to continuously improving the accessibility of AgentBio.net. Our
-                  ongoing efforts include:
-                </p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>Regular accessibility audits and testing</li>
-                  <li>Training our development team on accessibility best practices</li>
-                  <li>Including accessibility requirements in our development process</li>
-                  <li>Engaging with users with disabilities to gather feedback</li>
-                  <li>
-                    Monitoring changes in accessibility guidelines and updating our practices
-                    accordingly
-                  </li>
-                </ul>
+                <p>HTML, WAI-ARIA, CSS and JavaScript. We test in current versions of Chrome, Safari, Firefox and Edge.</p>
               </section>
-
-              {/* Related Resources */}
-              <section aria-labelledby="resources-heading">
-                <h2 id="resources-heading" className="text-2xl font-semibold mb-4">
-                  Related Resources
-                </h2>
-                <p className="mb-4">Learn more about web accessibility:</p>
-                <ul className="list-disc pl-6 mb-4 space-y-2">
-                  <li>
-                    <a
-                      href="https://www.w3.org/WAI/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline hover:no-underline"
-                    >
-                      W3C Web Accessibility Initiative (WAI)
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href="https://www.ada.gov/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline hover:no-underline"
-                    >
-                      Americans with Disabilities Act (ADA)
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href="https://www.section508.gov/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline hover:no-underline"
-                    >
-                      Section 508 Accessibility
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href="https://webaim.org/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline hover:no-underline"
-                    >
-                      WebAIM - Web Accessibility in Mind
-                    </a>
-                  </li>
-                </ul>
-              </section>
-
-              {/* Summary Box */}
-              <div className="mt-12 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <h3 className="text-xl font-semibold mb-3 text-blue-900 dark:text-blue-100">
-                  Accessibility Commitment Summary
-                </h3>
-                <ul className="list-disc pl-6 space-y-1 text-blue-900 dark:text-blue-100">
-                  <li>We strive for WCAG 2.1 Level AA conformance</li>
-                  <li>Full keyboard navigation support</li>
-                  <li>Compatible with major screen readers and assistive technologies</li>
-                  <li>Color contrast meets WCAG requirements</li>
-                  <li>Respects user motion preferences</li>
-                  <li>Mobile-accessible with appropriate touch targets</li>
-                  <li>Regular accessibility audits and improvements</li>
-                  <li>Dedicated accessibility feedback email: accessibility@agentbio.net</li>
-                </ul>
-              </div>
             </div>
           </div>
         </main>
