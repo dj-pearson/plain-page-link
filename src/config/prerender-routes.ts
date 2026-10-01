@@ -103,6 +103,7 @@ export const STATIC_ROUTES: readonly PrerenderRoute[] = [
   { path: '/cookies', kind: 'legal' },
   { path: '/privacy-choices', kind: 'legal' },
   { path: '/accessibility', kind: 'legal' },
+  { path: '/accessibility/agents', kind: 'legal' },
 
   // Prerendered so the noindex directive is in the served HTML rather than only
   // after hydration, and kept out of the sitemap. robots.txt no longer
