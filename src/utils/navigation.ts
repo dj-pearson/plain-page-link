@@ -11,6 +11,8 @@ import { logger } from "@/lib/logger";
  */
 const ALLOWED_REDIRECT_PATHS = [
   '/dashboard',
+  // US-226: a team invite link survives the trip through login.
+  '/team/accept',
   '/profile',
   '/listings',
   '/leads',
@@ -54,8 +56,10 @@ export function validateRedirectPath(
   const [pathWithQuery, hash] = path.split('#');
   const [cleanPath, queryString] = pathWithQuery.split('?');
 
-  // Must start with / and not with //
-  if (!cleanPath.startsWith('/') || cleanPath.startsWith('//')) {
+  // Must start with / and not with //. A backslash is refused anywhere:
+  // browsers treat "/\\evil.example" as "//evil.example", which is the
+  // react-router open redirect GHSA-wrjc-x8rr-h8h6, unfixed on 6.x (US-223).
+  if (!cleanPath.startsWith('/') || cleanPath.startsWith('//') || path.includes('\\')) {
     logger.warn('Invalid redirect path blocked', { path });
     return defaultPath;
   }

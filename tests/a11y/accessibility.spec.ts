@@ -280,6 +280,7 @@ const PAGES: { name: string; path: string; authenticated?: boolean }[] = [
   { name: 'login', path: '/auth/login' },
   { name: 'register', path: '/auth/register' },
   { name: 'dashboard', path: '/dashboard', authenticated: true },
+  { name: 'team invite', path: '/team/accept', authenticated: true },
   { name: 'public profile', path: '/demo' },
 
   // The public marketing, legal, blog and free-tool surface.

@@ -125,6 +125,8 @@ describe('OpenHouseSignIn', () => {
       preapproved: true,
       timeline: '0-3 months',
       heardFrom: 'Sign',
+      // US-220: an empty honeypot and the time the form was open.
+      spam: { _hp: '', _elapsed_ms: expect.any(Number) },
     });
   });
 

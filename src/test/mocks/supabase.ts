@@ -37,6 +37,7 @@ export const createQueryBuilder = <T = unknown>(
     'range',
     'filter',
     'match',
+    'or',
   ];
   for (const method of chainable) {
     builder[method] = vi.fn(() => builder);

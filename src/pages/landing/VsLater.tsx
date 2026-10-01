@@ -610,7 +610,7 @@ export default function VsLater() {
                 </h3>
                 <p className="text-muted-foreground">
                   Yes, but Later's link in bio feature lacks real estate-specific capabilities like
-                  property listing cards, MLS integration, buyer/seller forms, and CRM syncing. Most
+                  property listing cards, buyer/seller forms, and a built-in lead inbox. Most
                   real estate agents find they need additional tools to capture and convert leads
                   effectively.
                 </p>
@@ -664,7 +664,7 @@ export default function VsLater() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button asChild size="lg" className="text-lg px-8">
                 <Link to="/auth/register">
-                  Start Free Trial
+                  Start Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>

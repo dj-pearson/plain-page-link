@@ -22,7 +22,8 @@ import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
 import { UpcomingOpenHouses } from '@/components/profile/UpcomingOpenHouses';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
-import { trackContactTap } from '@/lib/analyticsEvents';
+import { trackContactTap, trackListingView } from '@/lib/analyticsEvents';
+import { poweredByUrl } from '@/lib/signupIntent';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
 import { SEOHead } from '@/components/SEOHead';
@@ -73,6 +74,16 @@ export default function FullProfilePage() {
   const selectedListingId = searchParams.get(LISTING_PARAM);
   const selectedListing =
     (selectedListingId && data?.listings?.find((l) => l.id === selectedListingId)) || null;
+
+  // US-227: a listing opened — by click or by a pasted ?listing= link — is a
+  // funnel stage the agent never saw.
+  const profileId = data?.profile?.id;
+  useEffect(() => {
+    if (profileId && selectedListing) {
+      void trackListingView(profileId, selectedListing.id, selectedListing.address);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, selectedListing?.id]);
 
   /**
    * Open or close the detail modal by rewriting the query parameter.
@@ -697,8 +708,10 @@ export default function FullProfilePage() {
                 {showBranding && (
                   <p className="text-xs text-gray-600 mt-1 sm:mt-2">
                     Powered by{' '}
+                    {/* US-232: attributed to this profile, so the signups it
+                        brings can be counted (profiles.referred_by). */}
                     <a
-                      href="https://agentbio.net"
+                      href={poweredByUrl(profile.username)}
                       className="hover:text-blue-600 active:text-blue-700 hover:underline"
                       target="_blank"
                       rel="noopener"
@@ -747,9 +760,11 @@ export default function FullProfilePage() {
               setShowingListing(null);
             }}
             calendlyUrl={profile.calendly_url}
+            agentId={profile.id}
             title="Schedule a Showing"
             subtitle="Choose a time that works best for you"
             listingAddress={showingListing?.address}
+            listingId={showingListing?.id}
           />
         )}
 

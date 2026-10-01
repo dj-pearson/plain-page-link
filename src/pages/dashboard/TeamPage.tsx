@@ -91,15 +91,25 @@ export default function TeamPage() {
 
   const invite = useMutation({
     mutationFn: async (email: string) => {
-      const { error } = await edgeFunctions.invoke('teams', {
+      const { data, error } = await edgeFunctions.invoke('teams', {
         body: { action: 'invite', teamId: team!.id, email },
       });
       if (error) throw new Error(error.message);
+      // US-226: the invite is emailed with an accept link now; say if it failed.
+      return (data as { data?: { emailed?: boolean } } | null)?.data?.emailed !== false;
     },
-    onSuccess: () => {
+    onSuccess: (emailed) => {
       setInviteEmail('');
       queryClient.invalidateQueries({ queryKey: ['team-members', team?.id] });
-      toast({ title: 'Invitation sent' });
+      toast(
+        emailed
+          ? { title: 'Invitation emailed', description: 'They join once they open the link and sign in.' }
+          : {
+              title: 'Invite saved, but the email did not send',
+              description: 'Remove and re-invite them in a moment.',
+              variant: 'destructive',
+            }
+      );
     },
     onError: (e) =>
       toast({

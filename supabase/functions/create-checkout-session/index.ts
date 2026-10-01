@@ -1,11 +1,12 @@
 /**
  * Create Stripe Checkout Session Edge Function
  *
- * Creates Stripe checkout sessions for both subscriptions and one-time purchases.
+ * Starts a plan purchase: a Checkout session for a new subscriber, or an
+ * in-place price change for an existing one (US-217, see plan-change.ts).
  *
- * Supports:
- * - Subscription mode: Recurring billing for plans
- * - Payment mode: One-time purchases for add-ons
+ * Subscriptions only. One-time `payment` mode was still accepted here after
+ * US-059 removed its handling from the webhook, so an add-on could be paid for
+ * and never delivered; it is refused now.
  *
  * Security:
  * - Requires authentication
@@ -19,6 +20,8 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { checkRateLimitDb, getRateLimitHeaders, RATE_LIMITS } from "../_shared/rate-limiter.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { getClientIP } from '../_shared/client-ip.ts';
+import { changePlanIfSubscribed, type StripeSubscriptionsApi } from './plan-change.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   apiVersion: '2023-10-16',
@@ -32,12 +35,9 @@ const ALLOWED_PRICE_PATTERNS = [
   /^price_/,  // All Stripe price IDs start with price_
 ];
 
-// One-time purchase product types (add-ons)
-const ONE_TIME_PRODUCTS: Record<string, { name: string; description: string }> = {
-  'premium_theme': { name: 'Premium Theme', description: 'Unlock premium portfolio themes' },
-  'extra_listings': { name: 'Extra Listings Pack', description: '10 additional listing slots' },
-  'sms_pack': { name: 'SMS Credits Pack', description: '500 SMS message credits' },
-  'virtual_staging': { name: 'Virtual Staging Credits', description: '10 virtual staging credits' },
+const subscriptionsApi: StripeSubscriptionsApi = {
+  list: (params) => stripe.subscriptions.list(params),
+  update: (id, params) => stripe.subscriptions.update(id, params),
 };
 
 /**
@@ -56,7 +56,7 @@ serve(async (req) => {
 
   try {
     // Rate limiting
-    const clientIp = req.headers.get('x-forwarded-for') || 'unknown';
+    const clientIp = getClientIP(req);
     // US-084: was _shared/rateLimit.ts, a module-level Map. Edge isolates are
     // ephemeral and horizontally scaled, so that limiter reset on every cold
     // start and never saw a sibling's counts — the money endpoints had the one
@@ -78,14 +78,14 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const {
-      priceId,
-      successUrl,
-      cancelUrl,
-      mode = 'subscription', // 'subscription' or 'payment'
-      productType,           // For one-time purchases
-      quantity = 1,          // For one-time purchases
-    } = await req.json();
+    const { priceId, successUrl, cancelUrl, mode = 'subscription' } = await req.json();
+
+    if (mode !== 'subscription') {
+      return new Response(
+        JSON.stringify({ error: 'Only subscriptions can be purchased' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate required fields
     if (!priceId) {
@@ -137,10 +137,6 @@ serve(async (req) => {
       user_id: user.id,
     };
 
-    if (mode === 'payment' && productType) {
-      metadata.product_type = productType;
-    }
-
     // Check for existing Stripe customer
     const supabaseService = createClient(
       supabaseUrl,
@@ -154,7 +150,7 @@ serve(async (req) => {
       .from('stripe_customers')
       .select('stripe_customer_id')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (stripeCustomer) {
       customerId = stripeCustomer.stripe_customer_id;
@@ -164,11 +160,24 @@ serve(async (req) => {
         .from('user_subscriptions')
         .select('stripe_customer_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (subscription?.stripe_customer_id) {
         customerId = subscription.stripe_customer_id;
       }
+    }
+
+    // Already subscribed: change that subscription instead of opening a
+    // second one. The webhook's customer.subscription.updated records it.
+    const change = await changePlanIfSubscribed(subscriptionsApi, customerId, priceId);
+    if (change.action !== 'checkout') {
+      return new Response(
+        JSON.stringify({ changed: change.action === 'updated', subscriptionId: change.subscriptionId }),
+        {
+          headers: { ...corsHeaders, ...getRateLimitHeaders(rateLimit), 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
 
     // Build checkout session options
@@ -177,13 +186,15 @@ serve(async (req) => {
       line_items: [
         {
           price: priceId,
-          quantity: mode === 'payment' ? quantity : 1,
+          quantity: 1,
         },
       ],
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata,
-      mode: mode as 'subscription' | 'payment',
+      mode: 'subscription',
+      allow_promotion_codes: true,
+      billing_address_collection: 'auto',
     };
 
     // Use existing customer or customer_email
@@ -191,17 +202,6 @@ serve(async (req) => {
       sessionOptions.customer = customerId;
     } else {
       sessionOptions.customer_email = user.email;
-    }
-
-    // For subscriptions, allow promotion codes
-    if (mode === 'subscription') {
-      sessionOptions.allow_promotion_codes = true;
-      sessionOptions.billing_address_collection = 'auto';
-    }
-
-    // For one-time payments, add product info to metadata
-    if (mode === 'payment' && productType && ONE_TIME_PRODUCTS[productType]) {
-      sessionOptions.metadata!.product_name = ONE_TIME_PRODUCTS[productType].name;
     }
 
     // Create the checkout session

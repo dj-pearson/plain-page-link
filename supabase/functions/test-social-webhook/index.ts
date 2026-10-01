@@ -59,7 +59,7 @@ Here's what you get:
 
 Stop losing leads to a messy social media profile. Your competition isn't—and they're already using platforms like AgentBio to stay ahead.
 
-👉 Join 1,000+ agents who've transformed their social presence. Start your free trial today at agentbio.net
+👉 Build your free agent page at agentbio.net
 
 #RealEstateMarketing #AgentSuccess #LeadGeneration #RealEstateTech`,
       shortFormPost: `95% of your social traffic vanishes. AgentBio turns followers into leads. Try it free → agentbio.net 🏡 #RealEstate`,

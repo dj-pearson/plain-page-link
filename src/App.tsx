@@ -24,6 +24,7 @@ import NotFound from './pages/public/NotFound';
 // Lazy load public review page
 const SubmitReview = lazy(() => import('./pages/public/SubmitReview'));
 const OpenHouseSignIn = lazy(() => import('./pages/public/OpenHouseSignIn'));
+const TeamAccept = lazy(() => import('./pages/team/TeamAccept'));
 
 /**
  * Auth pages, lazy like every other route (US-195).
@@ -336,6 +337,8 @@ function App() {
                 with different state machines writing the same
                 lastVisitedRoute key. */}
             <Route element={<RequireAuth />}>
+              {/* US-226: where a team invite email lands. */}
+              <Route path="/team/accept" element={<TeamAccept />} />
               <Route
                 path="/onboarding/wizard"
                 element={

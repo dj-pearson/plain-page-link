@@ -75,7 +75,7 @@ AgentBio Intelligence is an AI-powered real estate platform that transforms agen
 - **Hosting**: Cloudflare Pages
 - **Edge Functions**: Supabase Edge Functions
 - **Analytics**: Google Analytics
-- **Push Notifications**: Firebase Cloud Messaging (FCM)
+- **Push Notifications**: client-side FCM token registration only — there is no server-side sender yet
 - **CDN**: Cloudflare
 
 ### Development Tools
@@ -613,7 +613,7 @@ created_at, updated_at
 no `title` or `images` column.
 ```
 id, user_id (NOT NULL), address (NOT NULL), city (NOT NULL), price (text, NOT NULL)
-beds (int, NOT NULL), baths (int, NOT NULL), sqft (int)
+beds, baths (int, GENERATED — never write them), sqft (int)
 bedrooms / bathrooms (numeric), square_feet (int), lot_size_acres (numeric)
 image (single, legacy), photos (jsonb, the real gallery), virtual_tour_url
 status ('active' | 'sold' | 'pending'), property_type, description, mls_number
@@ -624,8 +624,9 @@ created_at, updated_at
 **leads** — captured leads. The type column is `lead_type`, **not** `type`; a
 trigger referencing `NEW.type` once aborted every insert.
 ```
-id, user_id (NOT NULL), lead_type (NOT NULL), name (NOT NULL), email (NOT NULL), phone
-encrypted_email, encrypted_phone   -- US-016 dual-write; plaintext still populated
+id, user_id (NOT NULL), lead_type (NOT NULL), name (NOT NULL)
+encrypted_email, encrypted_phone   -- the ONLY copy; plaintext email/phone columns were dropped (US-086)
+email_hash                         -- keyed HMAC of lower(email) for duplicate lookup (US-220)
 message, notes, status, source, form_data (jsonb)
 assigned_to, listing_id, price_range, timeline, property_address, preapproved (bool)
 first_responded_at, contacted_at, closed_at
@@ -711,6 +712,14 @@ the free tools (`instagram_bio_*`, `listing_*`).
   owner privileges — a temp table can shadow a real one. Enforced by
   `verify:schema`; `extensions` is where pgcrypto lives, `pg_temp` is named last
   so it is searched last rather than first.
+- Are **not executable by `anon`/`authenticated`** unless listed in
+  `DEFINER_CALLABLE` in `scripts/verify-schema.mjs` (US-213). Supabase grants
+  EXECUTE on every new public function to both roles, so a migration that adds
+  one must `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` and
+  `GRANT … TO service_role`, or add it to that list with the reason it is safe.
+  A function the browser calls with a user id argument must start with
+  `PERFORM public.assert_caller_is(p_user_id)` (or `assert_caller_is_admin()`).
+  Before this, `request_account_deletion` let anyone delete any account.
 
 **Plan limits (20260923000002):**
 - `get_user_plan()` is the one authority for what an agent's plan allows
@@ -733,7 +742,9 @@ the free tools (`instagram_bio_*`, `listing_*`).
 - Metered monthly quotas (`*_per_month` in `feature_usage`) are charged at the
   moment of use by `consume_plan_quota(user, key, n)` — service role only, a
   negative `n` refunds. Wired: AI listing descriptions (signed-in callers of
-  generate-listing-description) and workflow email steps. The quotas for market
+  generate-listing-description). Workflow email steps do NOT send yet and are
+  NOT charged (US-224) — the runtime that sends them (US-136) must call
+  `consume_plan_quota` when it does. The quotas for market
   reports, CMA reports, virtual staging, video tours and SMS exist; those
   features do not yet — a new one must call `consume_plan_quota` before doing
   the work.
@@ -893,14 +904,12 @@ the free tools (`instagram_bio_*`, `listing_*`).
    supabase functions deploy my-function
    ```
 
-   There is one deployment path and it is documented in
-   `docs/deploy/edge-functions.md`. Self-hosted Supabase's own edge runtime
-   serves everything under `supabase/functions/` at `/functions/v1/<name>`.
-   US-122 deleted four competing build configurations (`Dockerfile`,
-   `edge-functions.Dockerfile`, `Dockerfile.gitclone`,
-   `docker-compose.edge-functions.yml`, `nixpacks.toml`) that all shipped a
-   hand-written router listing 15 of the 86 functions — the app calls 34, and
-   25 of those were absent from it.
+   The deployment path is documented in `docs/deploy/edge-functions.md`:
+   `functions.agentbio.net` is the Coolify application built from the root
+   `Dockerfile`, running `edge-functions-server.ts`, which serves every
+   directory under `supabase/functions/` (US-122 deleted it; US-199 restored
+   it, because it is what production runs). `supabase functions deploy`
+   targets the self-hosted edge runtime, which nothing public routes to.
 
 ---
 
@@ -997,8 +1006,11 @@ useQuery({
 
 ### Current State
 
-- **No automated tests yet** - Tests should be added progressively
-- Manual testing workflow in place
+- **Vitest**: ~1,000 unit/component tests (`npm run test:run`), including
+  edge-function logic that has been extracted from Deno globals
+  (`supabase/functions/**/*.test.ts`) and Pages Functions (`functions/**`)
+- **verify:schema** against a real Postgres, **Playwright** e2e, security and
+  a11y suites, a route-weight budget — all run in CI
 
 ### Recommended Testing Approach
 

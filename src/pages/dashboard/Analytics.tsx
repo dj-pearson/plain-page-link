@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 import { useAnalytics, type TimeRange } from '@/hooks/useAnalytics';
 import { useLeads } from '@/hooks/useLeads';
+import { useLeadStats } from '@/hooks/useLeadStats';
+import { useCampaignConversion } from '@/hooks/useCampaignConversion';
 import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import { ConversionFunnel } from '@/components/analytics/ConversionFunnel';
 import { LeadSourceBreakdown } from '@/components/analytics/LeadSourceBreakdown';
@@ -70,6 +72,16 @@ export default function Analytics() {
   } = useAnalytics(dateRange);
   const { leads } = useLeads();
   const { scoreLeadObject } = useMLLeadScoring();
+  // US-225: range-bound totals over ALL of the agent's leads. The funnel and
+  // source table used to count the first page of the paged lead list (the
+  // latest 50 leads of all time) beside visitor numbers bound to the range.
+  const rangeStart = useMemo(
+    () => subDays(new Date(), { '7d': 7, '30d': 30, '90d': 90 }[dateRange]),
+    [dateRange]
+  );
+  const { stats: leadStats } = useLeadStats({ since: rangeStart });
+  const { rows: campaignRows } = useCampaignConversion(rangeStart);
+  const convertedInRange = leadStats?.byStatus.converted ?? 0;
 
   /**
    * The funnel, the source breakdown and the insights, moved here from
@@ -87,25 +99,17 @@ export default function Analytics() {
         visitors: stats.uniqueVisitors,
         engaged: totalContactTaps + totalLinkClicks,
         contacted: stats.totalLeads,
-        qualified: leads.filter((l) => l.status === 'qualified' || l.status === 'converted').length,
-        converted: leads.filter((l) => l.status === 'converted').length,
+        qualified: (leadStats?.byStatus.qualified ?? 0) + convertedInRange,
+        converted: convertedInRange,
       }),
-    [stats, leads, totalContactTaps, totalLinkClicks]
+    [stats, leadStats, convertedInRange, totalContactTaps, totalLinkClicks]
   );
 
   const leadSources = useMemo(() => {
-    const bySource: Record<string, { leads: number; conversions: number }> = {};
-    for (const lead of leads) {
-      const source = lead.source || 'website';
-      bySource[source] ??= { leads: 0, conversions: 0 };
-      bySource[source].leads++;
-      if (lead.status === 'converted') bySource[source].conversions++;
-    }
-
-    const rows = Object.entries(bySource).map(([source, counts]) => ({
+    const rows = (leadStats?.bySource ?? []).map(({ source, leads: count, converted }) => ({
       source,
-      leads: counts.leads,
-      conversions: counts.conversions,
+      leads: count,
+      conversions: converted,
       // Neither is tracked anywhere in the product; they stay zero rather than
       // being invented.
       revenue: 0,
@@ -117,7 +121,7 @@ export default function Analytics() {
         ? rows
         : [{ source: 'website', leads: 0, conversions: 0, revenue: 0, cost: 0 }]
     );
-  }, [leads]);
+  }, [leadStats]);
 
   const insights = useMemo(() => {
     const period: AnalyticsData['period'] =
@@ -130,7 +134,7 @@ export default function Analytics() {
       pageViews: stats.totalViews,
       uniqueVisitors: stats.uniqueVisitors,
       leads: stats.totalLeads,
-      conversions: leads.filter((l) => l.status === 'converted').length,
+      conversions: convertedInRange,
       revenue: 0,
       avgResponseTime: stats.avgResponseMinutes ?? 0,
       period,
@@ -151,7 +155,7 @@ export default function Analytics() {
     };
 
     return generateInsights(current, previous, leadSources);
-  }, [stats, previousStats, leads, leadSources, dateRange]);
+  }, [stats, previousStats, convertedInRange, leadSources, dateRange]);
 
   /** Rows for the report the agent builds. Real lead data, not a sample. */
   const handleGenerateReport = async (config: ReportConfig): Promise<Record<string, unknown>[]> => {
@@ -543,6 +547,51 @@ export default function Analytics() {
               </CardContent>
             </Card>
           </div>
+
+          {/* US-227: views, form opens and leads per campaign source, so an
+              agent can see which post or ad turns visits into enquiries. Views
+              carry utm_source from this release on; older views count as
+              "direct". */}
+          <Card>
+            <CardHeader className="pb-3 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">Which sources convert</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Profile views to leads, by campaign source, for the selected period
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              {campaignRows.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="py-2 pr-4 font-medium">Source</th>
+                      <th className="py-2 pr-4 font-medium text-right">Views</th>
+                      <th className="py-2 pr-4 font-medium text-right">Form opens</th>
+                      <th className="py-2 pr-4 font-medium text-right">Leads</th>
+                      <th className="py-2 font-medium text-right">Views → leads</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaignRows.map((row) => (
+                      <tr key={row.source} className="border-t border-border">
+                        <td className="py-2 pr-4 capitalize text-foreground">{row.source}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{row.views}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{row.formOpens}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{row.leads}</td>
+                        <td className="py-2 text-right tabular-nums font-medium">
+                          {row.rate === null ? '—' : `${(row.rate * 100).toFixed(1)}%`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-xs sm:text-sm text-muted-foreground text-center py-6">
+                  No visits in this period yet. Add ?utm_source=instagram to the link in your bio to see it here.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Taps and clicks.

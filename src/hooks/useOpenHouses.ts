@@ -12,6 +12,7 @@
  * same validation, rate limiting, encryption, routing and notification.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { SpamSignals } from '@/hooks/useSpamGuard';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -254,7 +255,7 @@ export interface OpenHouseSignIn {
   agentId: string;
   openHouseId: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   /** Already working with a buyer's agent. */
   hasAgent?: boolean;
@@ -263,6 +264,8 @@ export interface OpenHouseSignIn {
   /** How they heard about it. */
   heardFrom?: string;
   message?: string;
+  /** useSpamGuard().signals() (US-220). */
+  spam?: SpamSignals;
 }
 
 /** Sends one kiosk sign-in through submit-lead. Throws with a readable message. */
@@ -286,6 +289,7 @@ export async function submitOpenHouseSignIn(signIn: OpenHouseSignIn): Promise<vo
       ...getLeadAttribution(),
       device: 'open_house_kiosk',
       form_data: Object.keys(formData).length > 0 ? formData : undefined,
+      ...signIn.spam,
     },
     auth: false,
   });

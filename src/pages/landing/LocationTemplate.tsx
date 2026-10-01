@@ -160,7 +160,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
             name: `How much does AgentBio cost for ${city} agents?`,
             acceptedAnswer: {
               '@type': 'Answer',
-              text: `AgentBio pricing starts at $${SEO_CONFIG.pricing.startingPrice}/month with a free trial. All plans include unlimited property listings, lead capture forms, calendar booking, and analytics—perfect for growing ${city} real estate businesses.`,
+              text: `AgentBio has a free plan with 3 active listings, lead capture forms and analytics. Paid plans start at $${SEO_CONFIG.pricing.startingPrice}/month and add more listings, a custom domain and a longer analytics history—perfect for growing ${city} real estate businesses.`,
             },
           },
           {
@@ -269,7 +269,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               <Button asChild size="lg" className="text-lg px-8">
                 <Link to="/auth/register">
-                  Start Free Trial
+                  Start Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
@@ -618,7 +618,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button asChild size="lg" className="text-lg px-8">
                 <Link to="/auth/register">
-                  Start Free Trial
+                  Start Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>

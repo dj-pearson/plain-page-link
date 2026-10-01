@@ -43,7 +43,10 @@ export function HeroSection({
   // hours per week. Close deals 30% faster." — three measurements of a product
   // nobody has measured, sitting in a component default one prop away from any
   // page that forgets to pass its own (US-173).
-  description = 'AI-powered platform that predicts which leads will convert, automatically matches properties to qualified buyers, and accelerates deals with market intelligence.',
+  // US-224: was "predicts which leads will convert, automatically matches
+  // properties to qualified buyers, and accelerates deals with market
+  // intelligence" — property matching and market intelligence do not exist.
+  description = 'Your listings, lead forms and client follow-up behind one link, with every lead scored the moment it arrives.',
   primaryCta = {
     text: 'Start Building Your Data Moat',
     href: '/auth/register',

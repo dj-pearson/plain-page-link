@@ -3,11 +3,16 @@
 
 import { getSiteUrl } from './env.ts';
 
-interface EmailOptions {
+export interface EmailOptions {
   to: string
   subject: string
   body: string
   html?: string
+  /**
+   * Where a reply goes (US-229). Mail is sent from noreply@; without this a
+   * lead answering the auto-reply wrote to nobody.
+   */
+  replyTo?: string
 }
 
 // Escape user-controlled values before interpolating them into HTML email
@@ -75,6 +80,7 @@ export async function sendEmail(options: EmailOptions): Promise<SendEmailResult>
         // When no explicit HTML is supplied, escape the plaintext body before
         // wrapping it so user-controlled content can't inject markup.
         html: options.html || `<p>${escapeHtml(options.body).replace(/\n/g, '<br>')}</p>`,
+        ...(options.replyTo ? { reply_to: options.replyTo } : {}),
       }),
     })
 
@@ -194,24 +200,96 @@ View this lead: ${dashboardUrl}
   }
 }
 
-// Template for lead auto-response email
-export function createAutoResponseEmail(
-  recipientEmail: string,
-  name: string
-): EmailOptions {
+export interface LeadAutoReplyData {
+  to: string
+  leadName: string
+  leadType: string
+  agent: {
+    name: string
+    /** Where the lead's reply should land: the agent's display or account email. */
+    replyTo?: string | null
+    phone?: string | null
+    photoUrl?: string | null
+    calendlyUrl?: string | null
+    profileUrl?: string | null
+  }
+  listing?: { address: string; url?: string | null } | null
+}
+
+const LEAD_TYPE_LABEL: Record<string, string> = {
+  buyer: 'home search',
+  seller: 'plans to sell',
+  valuation: 'home valuation request',
+  contact: 'message',
+  open_house: 'visit to the open house',
+}
+
+/**
+ * The auto-reply a lead receives (US-229).
+ *
+ * The first touch after an enquiry is the warmest one, and it used to be a
+ * dead end: sent from noreply@ with no reply-to, saying "feel free to call me"
+ * with no number, signed with a name only, in a purple-gradient template. Now
+ * a reply reaches the agent, and the email carries their phone, photo, booking
+ * link and — for a listing enquiry — the listing.
+ *
+ * Every interpolated value is either visitor- or agent-supplied, so all of it
+ * is escaped; links are only ever http(s).
+ */
+export function createLeadAutoReply(data: LeadAutoReplyData): EmailOptions {
+  const { agent, listing } = data
+  const label = LEAD_TYPE_LABEL[data.leadType] ?? 'enquiry'
+  const safeUrl = (u?: string | null) => (u && /^https?:\/\//i.test(u) ? u : null)
+  const calendly = safeUrl(agent.calendlyUrl)
+  const profile = safeUrl(agent.profileUrl)
+  const listingUrl = safeUrl(listing?.url)
+  const photo = safeUrl(agent.photoUrl)
+
+  const opener =
+    data.leadType === 'open_house'
+      ? 'Thanks for stopping by the open house today. If you would like a second look, the disclosures, or a list of similar homes, just reply to this email.'
+      : listing
+        ? `Thanks for asking about ${listing.address}. I have your ${label} and will be in touch shortly.`
+        : `Thanks for reaching out — I have your ${label} and will be in touch shortly.`
+
+  const lines = [
+    `Hi ${data.leadName},`,
+    '',
+    opener,
+    '',
+    'You can reply to this email to reach me directly.',
+    agent.phone ? `Or call or text me at ${agent.phone}.` : '',
+    calendly ? `Prefer to pick a time? ${calendly}` : '',
+    listingUrl ? `The listing: ${listingUrl}` : '',
+    '',
+    agent.name,
+    profile ?? '',
+  ].filter((line, i, all) => line !== '' || (all[i - 1] ?? '') !== '')
+
+  const e = escapeHtml
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f6f5f2;font-family:Georgia,'Times New Roman',serif;color:#1f2933;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;">
+    <p style="margin:0 0 16px;font-size:16px;">Hi ${e(data.leadName)},</p>
+    <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">${e(opener)}</p>
+    ${listing ? `<p style="margin:0 0 16px;font-size:15px;"><strong>${e(listing.address)}</strong>${listingUrl ? ` &middot; <a href="${e(listingUrl)}" style="color:#1d4ed8;">View the listing</a>` : ''}</p>` : ''}
+    <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">Reply to this email to reach me directly${agent.phone ? `, or call or text <a href="tel:${e(agent.phone.replace(/[^0-9+]/g, ''))}" style="color:#1d4ed8;">${e(agent.phone)}</a>` : ''}.</p>
+    ${calendly ? `<p style="margin:16px 0;"><a href="${e(calendly)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#1f2933;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-size:15px;">Pick a time to talk</a></p>` : ''}
+    <table role="presentation" style="margin-top:24px;border-top:1px solid #e5e7eb;padding-top:16px;width:100%;"><tr>
+      ${photo ? `<td style="width:56px;vertical-align:top;"><img src="${e(photo)}" alt="" width="48" height="48" style="border-radius:50%;display:block;"></td>` : ''}
+      <td style="vertical-align:top;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;">
+        <strong>${e(agent.name)}</strong>${agent.phone ? `<br>${e(agent.phone)}` : ''}${profile ? `<br><a href="${e(profile)}" style="color:#1d4ed8;">${e(profile.replace(/^https?:\/\//, ''))}</a>` : ''}
+      </td>
+    </tr></table>
+  </div>
+</body></html>`
+
   return {
-    to: recipientEmail,
-    subject: 'Thank you for contacting us',
-    body: `
-Hi ${name},
-
-Thank you for reaching out! We have received your message and one of our team members will get back to you shortly.
-
-In the meantime, feel free to browse our website or follow us on social media for the latest updates.
-
-Best regards,
-The AgentBio Team
-    `.trim(),
+    to: data.to,
+    subject: data.leadType === 'open_house' ? 'Thanks for visiting today' : `Thanks for your ${label}`,
+    body: lines.join('\n'),
+    html,
+    replyTo: agent.replyTo || undefined,
   }
 }
 

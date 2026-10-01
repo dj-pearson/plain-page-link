@@ -2,14 +2,14 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
-import { validateEmail, sanitizeString } from '../_shared/validation.ts'
-import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
+import { validateEmail } from '../_shared/validation.ts'
+import { checkRateLimitDb, RATE_LIMITS, type RateLimitConfig } from '../_shared/rate-limiter.ts'
+import { getClientIP } from '../_shared/client-ip.ts'
+import { stripLinks, safeHtmlText, safeNumber } from '../_shared/public-email.ts'
 import { getErrorMessage } from '../_shared/errorHelpers.ts'
 import { getSiteUrl } from '../_shared/env.ts';
 
 interface BioAnalyzerEmailData {
-  analysisId: string
-  email: string
   firstName: string
   market: string
   brokerage?: string
@@ -17,8 +17,15 @@ interface BioAnalyzerEmailData {
   bioRewrites: string[]
 }
 
+// US-219: one send per capture, to the address stored on it, while it is fresh.
+const CAPTURE_TTL_MINUTES = 15
+const PER_RECIPIENT_LIMIT: RateLimitConfig = { maxRequests: 3, windowSeconds: 86400, failClosed: true }
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -26,116 +33,102 @@ serve(async (req) => {
   }
 
   try {
-    const data: BioAnalyzerEmailData = await req.json()
-
-    // Validate required fields
-    if (!data.email || !data.firstName || !data.analysisId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // US-219: this took the recipient, name, score and bio text from the body
+    // and rate-limited per recipient address only — so anyone could mail any
+    // text to any inbox from agentbio.net, one fresh address at a time. Only
+    // the capture id is accepted now (still sent as `analysisId` by older
+    // pages; both names are read).
+    const body = await req.json()
+    const captureId = body.captureId ?? body.analysisId
+    if (typeof captureId !== 'string' || !UUID_RE.test(captureId)) {
+      return json(400, { error: 'captureId is required' })
     }
 
-    // Validate email format
-    if (!validateEmail(data.email)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid email address' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Validate field lengths
-    if (data.firstName.length > 100 || data.market.length > 100) {
-      return new Response(
-        JSON.stringify({ error: 'Field values too long' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Sanitize inputs
-    const sanitizedFirstName = sanitizeString(data.firstName)
-    const sanitizedMarket = sanitizeString(data.market)
-    const sanitizedBrokerage = data.brokerage ? sanitizeString(data.brokerage) : undefined
-
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Rate limiting - 5 requests per minute
-    // US-078/US-084: was _shared/rateLimit.ts, a module-level Map — useless
-    // across ephemeral, horizontally-scaled isolates. The DB-backed limiter
-    // is the one that actually holds.
-    const rateLimitResult = await checkRateLimitDb(
-      supabase,
-      `bio_email_${data.email}`,
-      'send-bio-analyzer-email',
-      RATE_LIMITS.submission
-    );
-    if (!rateLimitResult.allowed) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const ipLimit = await checkRateLimitDb(supabase, getClientIP(req), 'send-bio-analyzer-email', RATE_LIMITS.submission)
+    if (!ipLimit.allowed) {
+      return json(429, { error: 'Rate limit exceeded. Please try again later.' })
     }
 
-    // Verify analysis ID exists
-    const { data: analysis, error: analysisError } = await supabase
+    // Claim: unsent and recent, atomically.
+    const { data: capture, error: claimError } = await supabase
       .from('instagram_bio_email_captures')
-      .select('id')
-      .eq('id', data.analysisId)
-      .single()
-
-    if (analysisError || !analysis) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid analysis ID' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      .update({ last_email_sent_at: new Date().toISOString() })
+      .eq('id', captureId)
+      .is('last_email_sent_at', null)
+      .gte('created_at', new Date(Date.now() - CAPTURE_TTL_MINUTES * 60_000).toISOString())
+      .select('email, first_name, market, brokerage, analysis_id')
+      .maybeSingle()
+    if (claimError) throw claimError
+    if (!capture?.email || !validateEmail(capture.email)) {
+      return json(404, { error: 'Nothing to send for this capture' })
     }
 
-    // Use sanitized data for email
-    const emailData = {
-      ...data,
-      firstName: sanitizedFirstName,
-      market: sanitizedMarket,
-      brokerage: sanitizedBrokerage
+    const recipientLimit = await checkRateLimitDb(
+      supabase,
+      `recipient:${String(capture.email).toLowerCase()}`,
+      'send-bio-analyzer-email',
+      PER_RECIPIENT_LIMIT
+    )
+    if (!recipientLimit.allowed) {
+      return json(429, { error: 'This address has received enough email today.' })
     }
 
-    // Send Email #1 - Immediate delivery with bio rewrites
-    await sendEmail({
-      to: data.email,
-      subject: `${sanitizedFirstName}, Your 3 Optimized Instagram Bios + Action Plan Inside`,
-      body: getEmail1PlainText(emailData),
-      html: getEmail1HTML(emailData)
+    const { data: analysis } = capture.analysis_id
+      ? await supabase.from('instagram_bio_analyses').select('result_data').eq('id', capture.analysis_id).maybeSingle()
+      : { data: null }
+    const result = (analysis?.result_data ?? {}) as { overallScore?: unknown; rewrittenBios?: { bio?: unknown }[] }
+    const bios = Array.isArray(result.rewrittenBios) ? result.rewrittenBios.slice(0, 3).map((b) => b?.bio) : []
+    const score = Math.max(0, Math.min(100, safeNumber(result.overallScore)))
+
+    // Visitor-written text either way: link-free, and escaped for HTML.
+    const plainData: BioAnalyzerEmailData = {
+      firstName: stripLinks(capture.first_name, 100),
+      market: stripLinks(capture.market, 100),
+      brokerage: capture.brokerage ? stripLinks(capture.brokerage, 100) : undefined,
+      score,
+      bioRewrites: bios.map((b) => stripLinks(b, 300)),
+    }
+    const htmlData: BioAnalyzerEmailData = {
+      firstName: safeHtmlText(capture.first_name, 100),
+      market: safeHtmlText(capture.market, 100),
+      brokerage: capture.brokerage ? safeHtmlText(capture.brokerage, 100) : undefined,
+      score,
+      bioRewrites: bios.map((b) => safeHtmlText(b, 300)),
+    }
+    const subject = `${plainData.firstName}, Your 3 Optimized Instagram Bios + Action Plan Inside`
+
+    const sent = await sendEmail({
+      to: capture.email,
+      subject,
+      body: getEmail1PlainText(plainData),
+      html: getEmail1HTML(htmlData),
     })
+    if (!sent.ok) {
+      await supabase.from('instagram_bio_email_captures').update({ last_email_sent_at: null }).eq('id', captureId)
+      return json(502, { error: 'Failed to send email' })
+    }
 
-    // Record email sent
     await supabase
       .from('instagram_bio_email_sequences')
       .insert({
-        email_capture_id: data.analysisId,
+        email_capture_id: captureId,
         sequence_number: 1,
-        email_subject: `${data.firstName}, Your 3 Optimized Instagram Bios + Action Plan Inside`,
+        email_subject: subject,
         sent_at: new Date().toISOString()
       })
 
     // Schedule remaining emails (will be picked up by cron job)
-    await scheduleEmailSequence(supabase, data.analysisId, data.email, sanitizedFirstName, sanitizedMarket, data.score)
+    await scheduleEmailSequence(supabase, captureId, capture.email, plainData.firstName, plainData.market, score)
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Initial email sent and sequence scheduled'
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return json(200, { success: true, message: 'Initial email sent and sequence scheduled' })
 
   } catch (error) {
-    console.error('Error in send-bio-analyzer-email function:', error)
-    return new Response(
-      JSON.stringify({ error: getErrorMessage(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('Error in send-bio-analyzer-email function:', getErrorMessage(error))
+    return json(500, { error: 'Failed to send email' })
   }
 })
 
@@ -209,7 +202,7 @@ AgentBio gives you a professional link-in-bio built specifically for real estate
 → Analytics to track what's working
 → QR codes for your business cards and flyers
 
-Start Your Free 14-Day Trial: ${siteUrl}/auth/register
+Create Your Free Page: ${siteUrl}/auth/register
 
 To your Instagram success,
 The AgentBio Team
@@ -309,7 +302,7 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
           <li>→ QR codes for offline marketing</li>
         </ul>
         <a href="${siteUrl}/auth/register" class="button">
-          Start Your Free 14-Day Trial
+          Create Your Free Page
         </a>
       </div>
 

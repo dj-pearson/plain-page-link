@@ -3005,8 +3005,8 @@
         "Decide whether to purge 908a2c1 from history; note that rotation makes the published value worthless either way, and rewriting public history breaks every existing clone"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "OWNER'S CALL — NOT AN AGENT TASK. Found in iteration 4 while carrying out US-170's third acceptance criterion. The key value is deliberately not recorded here or in any commit message; it is at docs/setup/SUPABASE_KEYS_GUIDE.md as of commit 908a2c1. A repository-wide scan after redaction found no remaining service_role JWT in the working tree; the anon keys still present in docs/setup/AUTH_SETUP_DOCUMENTATION.md, docs/deploy/COOLIFY_EDGE_FUNCTIONS_SETUP.md and docs/deploy/SSL_MIGRATION_COMPLETE.md are public by design (the anon key ships in the frontend bundle) but will also be invalidated by the rotation and should be replaced with references, not values."
+      "passes": true,
+      "notes": "OWNER'S CALL — NOT AN AGENT TASK. Found in iteration 4 while carrying out US-170's third acceptance criterion. The key value is deliberately not recorded here or in any commit message; it is at docs/setup/SUPABASE_KEYS_GUIDE.md as of commit 908a2c1. A repository-wide scan after redaction found no remaining service_role JWT in the working tree; the anon keys still present in docs/setup/AUTH_SETUP_DOCUMENTATION.md, docs/deploy/COOLIFY_EDGE_FUNCTIONS_SETUP.md and docs/deploy/SSL_MIGRATION_COMPLETE.md are public by design (the anon key ships in the frontend bundle) but will also be invalidated by the rotation and should be replaced with references, not values. CLOSED 2026-09-30: owner confirmed the self-hosted JWT secret was regenerated after 2026-09-04 (so both keys published in 908a2c1 are invalid) and the GitHub Actions secret for scheduled-maintenance.yml holds the new service-role key. Full JWT values remaining in docs/ (SSL_MIGRATION_COMPLETE, COOLIFY_EDGE_FUNCTIONS_SETUP, AUTH_SETUP_DOCUMENTATION, SUPABASE_KEYS_GUIDE, SUPABASE_KEYS_QUICK_ANSWER) were replaced with a reference to the Coolify env vars; values were not inspected. History not rewritten — rotation makes the published value worthless."
     },
     {
       "id": "US-192",
@@ -3347,6 +3347,327 @@
       "priority": 2,
       "passes": true,
       "notes": "Fixed in iteration 14. scripts/check-route-weight.mjs serves dist/ with the cache policy PARSED FROM public/_headers — not copied — opens each of four routes in Chromium with service workers ALLOWED, and asserts a byte and request budget plus zero repeated URLs. Both choices are load-bearing and both were learned the hard way in iteration 13: a weight measured without `immutable` on hashed assets reported /pricing at 1914 KB when the real figure is 1035, and blocking service workers — the convenient thing to do in a test — hides US-211 entirely, because that reload fired from the worker's `controlling` event. The script refuses to run at all if _headers stops marking assets immutable, rather than printing confident fiction. Verified against the tree at 6d5029b, before US-211: landing 2107 KB / 61 with 23 repeated URLs, pricing 1927 KB / 49 with 19, exit 1. After: 1232 KB / 36 and 1035 KB / 28, nothing fetched twice, exit 0. Runs in the existing Build job, which already has Chromium and a built dist. src/route-weight.test.ts guards the parser and the CI wiring — a matcher that silently stopped matching would put the budget back to measuring the harness."
+    },
+    {
+      "id": "US-213",
+      "title": "Anyone with the anon key can delete any account",
+      "description": "As an agent, I need my account to be deletable only by me, so that a stranger holding the public anon key cannot erase it.",
+      "acceptanceCriteria": [
+        "New migration: REVOKE EXECUTE ON request_account_deletion, cancel_account_deletion, process_scheduled_account_deletions, request_gdpr_data_export and log_audit_event FROM PUBLIC, anon, authenticated; GRANT to service_role (or keep authenticated only where the body checks auth.uid() = p_user_id)",
+        "request_account_deletion clamps p_grace_period_days to a minimum of 30 and refuses a p_user_id other than auth.uid() for non-service callers",
+        "Sweep: ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated; re-GRANT explicitly every RPC the app calls (derive the list from supabase.rpc( calls in src/ and supabase/functions/)",
+        "verify:schema gains a rule: every function executable by anon/authenticated is either on an explicit allowlist or does not take a user id argument; the rule is run against the tree before the fix and fails",
+        "verify:schema reproduces the exploit as anon (request with grace -1, then process) and asserts it is now refused",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Found by the 2026-09-30 backend audit and reproduced in a throwaway Postgres: as anon, request_account_deletion(victim,'x',NULL,NULL,-1) followed by process_scheduled_account_deletions() deleted the victim's auth.users row. Baseline contains 0 GRANT/REVOKE statements; Supabase default privileges grant EXECUTE to anon (see scripts/supabase-prelude.sql:124). Do this first. DONE: migration 20260930000001 revokes EXECUTE on all SECURITY DEFINER functions in public from PUBLIC/anon/authenticated (service_role keeps it) and grants back 22: 9 public-by-design (incl. has_role/is_team_* for RLS) and 13 browser RPCs for authenticated. New helpers assert_caller_is(uuid) / assert_caller_is_admin() guard get_user_sessions (was: anyone could read anyone's IPs/locations), get_connected_search_platforms, start_workflow_execution (owner check — US-218 criterion), log_admin_action (was forgeable), get_user_statistics, top_slow_queries, get_system_health_summary. request_account_deletion clamps grace to >=30 days. verify-schema gains three checks: DEFINER_CALLABLE allowlist (84 failures on the pre-fix tree), every src rpc() executable by authenticated (caught get_system_health_summary, which a grep missed), and the exploit reproduced as anon and as another user (9 failures pre-fix incl. 'the victim account was deleted'). Default privileges deliberately NOT altered: a new SECURITY INVOKER RPC should keep working; the allowlist check catches new definer functions instead."
+    },
+    {
+      "id": "US-214",
+      "title": "A stranger can rate-limit any agent out of their own leads for ten years",
+      "description": "As an agent, I need rate limits that only my own traffic can exhaust, so that nobody can lock me out of pii-crypto, login or my lead form.",
+      "acceptanceCriteria": [
+        "check_rate_limit is no longer executable by anon/authenticated (service_role only)",
+        "The rate-limit edge function ignores client-supplied identifier/limitType (or namespaces them under 'client:'), and caps windowSeconds at 3600 — or is deleted if nothing calls it",
+        "getClientIP (_shared/validation.ts, _shared/auth.ts) prefers cf-connecting-ip, else the rightmost trusted X-Forwarded-For hop; never the leftmost client-supplied entry",
+        "Unit test: a spoofed X-Forwarded-For does not change the resolved IP",
+        "verify:schema asserts anon cannot call check_rate_limit",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Reproduced: as anon, check_rate_limit('user:<id>','pii-crypto',1000,315360000) creates a 10-year window. Affects pii-crypto, login-security and submit-lead target buckets. ~20 functions use getClientIP. DONE: check_rate_limit lost anon/authenticated EXECUTE in US-213's deny-by-default migration (enforced by the DEFINER_CALLABLE check). The rate-limit edge function had no caller anywhere and was deleted rather than patched. New _shared/client-ip.ts is the single getClientIP: rightmost X-Forwarded-For entry (TRUSTED_PROXY_HOPS, default 1 = Traefik), cf-connecting-ip only with TRUST_CF_CONNECTING_IP=true — DNS shows functions.agentbio.net resolves straight to the Contabo host, so the old cf-connecting-ip fallback was client-controlled. validation.ts and auth.ts re-export it; four Stripe functions that read the raw header now use it. client-ip.test.ts covers spoofing and asserts no other edge file reads x-forwarded-for. deno check could not run locally (esm.sh/deno.land blocked by the sandbox network policy); client-ip.ts checked standalone, CI runs the full check."
+    },
+    {
+      "id": "US-215",
+      "title": "The is_sample flag switches off the whole paywall",
+      "description": "As the operator, I need plan limits that the client cannot opt out of, so that a free agent cannot hold 40 links, 30 public listings and unlock every locked lead with one UPDATE.",
+      "acceptanceCriteria": [
+        "A BEFORE INSERT OR UPDATE trigger on every table with is_sample refuses authenticated callers setting or changing is_sample",
+        "Sample seeding (src/lib/sample-data-service.ts) moves to a SECURITY DEFINER RPC that only inserts the fixed sample set for auth.uid()",
+        "Public read policies on listings (and any other public table with is_sample) add AND NOT is_sample",
+        "The links plan-limit trigger fires on UPDATE as well as INSERT",
+        "verify:schema reproduces the three bypasses (insert-as-sample-then-flip, public sample listings, UPDATE leads SET is_sample to unlock) and asserts each is refused",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Reproduced by the backend audit. Limit triggers return early on NEW.is_sample (20260923000002:269,290); locked_lead_ids skips samples (20260923000003:242). DONE: migration 20260930000002. guard_is_sample (SECURITY INVOKER so current_user is the caller) on leads/links/listings/testimonials refuses anon/authenticated setting or changing is_sample unless has_role admin; service role passes. Deviation from the criterion: seeding was NOT moved to an RPC — the only writer is the admin SampleDataManager (and sample leads need client-side pii-crypto encryption), so restricting the flag to admins closes the hole with less churn. Public SELECT policies on listings/links/testimonials add AND NOT is_sample. Link and testimonial limit triggers fire on UPDATE OF is_sample too. verify-schema check reproduces the bypasses: 4 failures on the pre-fix tree, passes after. Note: leads has no plaintext email column (US-086) and listings.beds/baths are generated — CLAUDE.md's schema section is stale on both."
+    },
+    {
+      "id": "US-216",
+      "title": "A paying agent can stay on the free plan and Stripe will never retry",
+      "description": "As a paying agent, I need my payment to change my plan every time, so that I never pay for Professional and get Free.",
+      "acceptanceCriteria": [
+        "stripe-webhook verifies with await stripe.webhooks.constructEventAsync(..., Stripe.createSubtleCryptoProvider()) — the sync constructEvent fails under esm.sh's worker build in Deno",
+        "Every database write checks its error and throws; a thrown error returns 500 so Stripe retries",
+        "The idempotency claim is released (or marked done only at the end) when processing fails, so a retry is not skipped as duplicate; a missing stripe_processed_events table fails loudly instead of open",
+        "A missing user_id in metadata is a 500 with a logged reason, not a silent 200",
+        "Handler logic is extracted to a Deno-global-free module and covered by vitest for checkout.session.completed, customer.subscription.updated/deleted and invoice.payment_failed with a mocked client, including a failed-write case that must not return 2xx",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "stripe-webhook/index.ts: 19 awaited writes, 3 error checks; claimEvent at :52-72 records before work; constructEvent at :224. Related history: US-118, US-146 (stripe_processed_events missing in production). DONE: logic moved to stripe-webhook/handler.ts (no Deno globals, type-only esm.sh imports) with 19 vitest cases over a fake client. index.ts verifies with constructEventAsync + createSubtleCryptoProvider; a bad signature is the only 400. Every entitlement write goes through must() and throws; a failure releases the stripe_processed_events claim and answers 500 so Stripe's retry runs. A plan-lookup DB error now throws instead of recording 'free'. Missing metadata.user_id falls back to stripe_customers by customer id, else 500. Added toStoredStatus: Stripe's unpaid/paused/incomplete_expired are not subscription_status enum members — that write used to fail silently and would now have failed the event forever. Best-effort writes (audit, notification, invoice copy, email) log and continue. DEVIATION: an unwritable claim table still fails OPEN (processes without idempotency) rather than 500 — stripe_processed_events is missing in production (US-146), and failing closed would stop every payment reaching the plan; all entitlement writes are idempotent. Not verified against live Stripe (no network to Stripe/esm.sh here); deno check runs in CI."
+    },
+    {
+      "id": "US-217",
+      "title": "Changing plan opens a second subscription and bills the agent twice",
+      "description": "As a subscribed agent, I need upgrading or downgrading to change my existing subscription, so that I am never charged for two plans.",
+      "acceptanceCriteria": [
+        "create-checkout-session detects an active/trialing/past_due subscription for the user and, instead of a new Checkout session, updates it via stripe.subscriptions.update with the new price and proration_behavior 'create_prorations' (or returns a Billing Portal subscription_update flow URL)",
+        "SubscriptionPage labels a lower plan 'Switch to X' / 'Downgrade', not 'Upgrade'",
+        "stripe-webhook never overwrites a stored stripe_subscription_id with a different one while the old one is still active; if it sees that, it logs and alerts",
+        "Unit test covers: no subscription → checkout; existing subscription → update, no new checkout",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "SubscriptionPage.tsx:112-117,276 always calls create-checkout-session; create-checkout-session/index.ts:150-200 never checks existing subs; webhook upserts onConflict user_id (stripe-webhook:292-321), orphaning the old subscription's events. Check Stripe for already-double-billed customers — that part is the owner's. DONE: create-checkout-session/plan-change.ts asks STRIPE (not our tables, which drift) for the customer's live subscriptions (active/trialing/past_due/unpaid); if one exists it updates the item's price with proration_behavior create_prorations and cancel_at_period_end false and returns {changed}, or {changed:false} when already on that price; checkout only for customers with none. 5 vitest cases. Also refused one-time `payment` mode — still accepted after US-059 removed its webhook handling, so an add-on could be paid for and never delivered. SubscriptionPage labels Upgrade/Downgrade by list price, toasts the in-place change and refetches; Pricing redirects to the subscription page. Webhook: DEVIATION — a checkout landing while another subscription is live still records the NEW one (it is the one just paid) but logs 'DOUBLE BILLING' and writes a critical audit event (stripe_duplicate_subscription) so it can be refunded. Owner action remains: search Stripe for customers with >1 live subscription."
+    },
+    {
+      "id": "US-218",
+      "title": "Workflows can fetch the internal network and edit other agents' leads",
+      "description": "As an agent, I need automation and admin tools that cannot reach other tenants or the internal network, so that my leads stay mine.",
+      "acceptanceCriteria": [
+        "execute-workflow webhook_call uses isValidWebhookUrl + safeFetch (as submit-lead's Zapier hand-off does) and does not store or return the response body",
+        "execute-workflow update_lead and create_task refuse a leadId whose user_id is not the workflow owner",
+        "start_workflow_execution checks the workflow belongs to auth.uid() and is not executable by anon",
+        "publish-article-to-social requires requireAdmin (or service role), refuses unpublished articles, and is rate-limited before the Claude call",
+        "Unit tests for the ownership checks and the SSRF guard on the webhook node",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "execute-workflow/index.ts:189-202 (plain fetch), :95-101 and :150-175 (service-role writes on any leadId); publish-article-to-social/index.ts:31-39 accepts any JWT. Must land before the workflow runtime (US-136) is built. DONE: execute-workflow webhook_call uses safeFetch (private/internal targets refused on every redirect hop) and keeps only the status — the response body is no longer stored or returned. update_lead and create_task call assertLeadOwnedBy (execute-workflow/ownership.ts) before any service-role write; create_task's assignee is limited to the owner or the lead's current assignee. start_workflow_execution's owner check landed in US-213. publish-article-to-social: service role or admin only (403 otherwise), 10/hour per admin before the Claude call, drafts refused. Did not add isValidWebhookUrl's Zapier/Make allowlist to workflow webhooks: agents legitimately call their own endpoints; safeFetch's private-address block is the SSRF control. ownership.test.ts: unit tests plus source assertions (no bare fetch, both steps check ownership) that fail on the pre-fix index.ts."
+    },
+    {
+      "id": "US-219",
+      "title": "Two free-tool email functions will mail anything to anyone from our domain",
+      "description": "As the operator, I need public email endpoints to send only what we wrote to the address we stored, so that agentbio.net cannot be used for phishing and lead notifications keep reaching inboxes.",
+      "acceptanceCriteria": [
+        "send-listing-generator-email and send-bio-analyzer-email take only a capture/analysis id; recipient address and content are loaded server-side from the stored row",
+        "Every interpolated value in those templates is HTML-escaped (shared escapeHtml helper, unit-tested)",
+        "Rate limit per IP and per stored capture, not per recipient address",
+        "A request whose id does not match a stored capture is refused without sending",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "send-listing-generator-email/index.ts:29,124,168-240 sends to any email with unescaped content; send-bio-analyzer-email/index.ts:69-72,83-87. Depends on US-214's getClientIP fix for the per-IP limit. DONE: both functions accept only a capture id. The capture is claimed atomically (UPDATE … WHERE last_email_sent_at IS NULL AND created_at within 15 min RETURNING email, …), so each capture sends once, to its stored address; a failed send releases the claim. Content is loaded from listing_descriptions / instagram_bio_analyses — but anon writes those rows too, so every interpolated value goes through _shared/public-email.ts (links and bare domains stripped, HTML-escaped, length-capped; numbers coerced). Limits: per IP (client-ip.ts) plus 3/day per recipient address. The scheduled follow-up senders escape first_name/market as well. Frontend sends {captureId}. Residual: a visitor can still create a capture naming someone else's address and get ONE plain, link-free email sent to it (3/day cap) — closing that fully needs double opt-in. Also removed UPSTASH_* from supabase/functions/.env.example (only the deleted rate-limit function read them) and declared TRUSTED_PROXY_HOPS / TRUST_CF_CONNECTING_IP."
+    },
+    {
+      "id": "US-220",
+      "title": "The public lead form has no bot protection and spends the agent's lead quota",
+      "description": "As an agent, I need spam kept out of my leads, so that bots neither bury real enquiries nor use up the monthly allowance that locks real leads.",
+      "acceptanceCriteria": [
+        "Every public lead form and the open-house kiosk send a hidden honeypot field and a form-rendered timestamp",
+        "submit-lead: honeypot filled or fill time under 3s → return the normal success response, store nothing, send nothing",
+        "submit-lead dedupes the same email+agent+lead_type within 24h (update the existing lead's form_data instead of inserting)",
+        "A per-agent daily cap on auto-reply emails; the auto-reply is skipped for suspected spam",
+        "Optional, behind an env flag: Cloudflare Turnstile verified server-side (requires the CSP change in US-221)",
+        "Unit tests for the honeypot, timing and dedupe paths in validateLeadData / submit-lead",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Today the only defence is 5 req/min/IP (submit-lead/index.ts:80-100), and each accepted POST emails whatever address was submitted (:273-328). DONE: useSpamGuard + HoneypotField on all six public lead paths (buyer, seller, valuation, contact forms, page-builder ContactBlock, open-house kiosk) send _hp and _elapsed_ms. submit-lead (_shared/spam-guard.ts): honeypot filled or under 3s → normal success answer, nothing stored/sent. Missing signals are NOT treated as a bot (old pages, direct POSTs). Duplicate check: new leads.email_hash (HMAC-SHA256 of lower(email) keyed from PII_ENCRYPTION_KEY, migration 20260930000003, not backfillable) — same agent+type+address within 24h merges form_data/message into the earlier lead and skips Zapier, notify-lead and the auto-reply, and costs no allowance. Auto-replies capped at 50/day per agent via checkRateLimitDb (leads still stored). Turnstile not added (optional criterion; needs CSP + a site key the owner must create). email_hash also unblocks search-by-email for US-225."
+    },
+    {
+      "id": "US-221",
+      "title": "Schedule a Showing opens an empty box, and a booking never becomes a lead",
+      "description": "As an agent with Calendly connected, I need the showing scheduler to load and every booking to land in my CRM, so that my highest-intent visitors are captured.",
+      "acceptanceCriteria": [
+        "public/_headers and the index.html meta CSP allow https://assets.calendly.com in script-src and https://calendly.com, https://www.youtube-nocookie.com, https://player.vimeo.com in frame-src (and https://www.youtube.com if VideoBlock uses it)",
+        "CalendlyEmbed calls Calendly.initInlineWidget so reopening the modal after the script loaded still renders",
+        "The Calendly URL carries a1=<listing address> and the visitor's utm_* values",
+        "A calendly.event_scheduled postMessage listener creates a lead through submitLead (source 'calendly_showing', listingId, attribution) and records an analytics event",
+        "src/deployed-files.test.ts asserts the CSP hosts; a Playwright test asserts the Calendly iframe mounts on a profile with calendly_url",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Blocked by CSP in public/_headers:18 and index.html:10-24; CalendlyEmbed.tsx:20; replaces the lead form at FullProfilePage.tsx:190-194, 773-779. DONE: both CSPs (public/_headers and the index.html meta) allow assets.calendly.com (script, style) and calendly.com, youtube.com, youtube-nocookie.com, player.vimeo.com (frame); deployed-files.test.ts parses both and fails on the old files. CalendlyEmbed initialises via Calendly.initInlineWidget on every mount (src/lib/calendly.ts loads widget.js once) and shows an open-in-new-tab fallback if the script fails. CalendlyModal asks for name + email first (Calendly's postMessage carries no invitee details), prefills them, adds a1=<listing address> and the visitor's utm_* to the URL, and on a calendly.com event_scheduled message records one lead via submitLead (source calendly_showing, listingId, lead_type buyer for a listing, contact otherwise). Unused CalendlyPopupButton/BadgeWidget/InlineSection removed. DEVIATIONS: the analytics event for the booking is left to US-227 (analytics_events' CHECK allows only 4 types today); the mount check is a vitest component test with Calendly mocked, not Playwright — the real iframe needs network access to calendly.com, which CI and this sandbox should not depend on."
+    },
+    {
+      "id": "US-222",
+      "title": "Production errors go nowhere, and the health check needs an admin login",
+      "description": "As the operator, I need browser and edge-function errors reported and a public liveness probe, so that outages are found by alerts instead of agents.",
+      "acceptanceCriteria": [
+        "Sentry works in production: either the Sentry ingest host is in connect-src in both CSPs, or sentry.ts uses tunnel '/api/sentry' served by a Cloudflare Pages Function; deployed-files.test.ts asserts it",
+        "supabase/functions/_shared/report.ts sends unhandled 5xx errors from edge functions to Sentry (envelope POST, no-op when SENTRY_DSN is unset), and the shared handler wrapper uses it",
+        "health-check has an unauthenticated mode returning only {ok} / 503 with no detail; the detailed report stays admin-only",
+        "docs/deploy/MONITORING.md names the uptime monitor to point at the probe and the site",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "src/lib/sentry.ts:54 has no tunnel and no CSP host; 227 console.error calls in edge functions with no sink; health-check/index.ts:33 calls requireAdmin despite its comment saying public. DONE: browser Sentry now uses tunnel '/api/sentry', served by a new Cloudflare Pages Function (functions/api/sentry.ts) that forwards only envelopes for the configured DSN's host+project (403 otherwise, 413 over 5 MB, 404 when unconfigured) — CSP connect-src stays 'self'. Edge functions: _shared/report.ts posts a Sentry envelope (no SDK; no-op without SENTRY_DSN; 2 s timeout; never throws). handleUnexpectedError reports the real error and marks the response; edge-functions-server.ts reports every other 5xx and thrown error, skipping marked ones, and lazy-imports the reporter so it cannot break boot. health-check answers an unauthenticated GET with only {ok} 200/503; admin JWT keeps the detail. MONITORING.md names what to set (VITE_SENTRY_DSN as a build AND Pages runtime var, SENTRY_DSN in Coolify) and where to point an uptime monitor. OWNER ACTION: create the uptime monitors and set the DSNs."
+    },
+    {
+      "id": "US-223",
+      "title": "The CI security job fails on a package nothing imports",
+      "description": "As a developer, I need the dependency audit green and lint able to fail, so that red CI means something again.",
+      "acceptanceCriteria": [
+        "Remove axios and jsonwebtoken (zero imports) and the unused workbox-* packages; delete dead Hero3D.tsx / Hero3DPhone.tsx",
+        "npm audit fix; react-router-dom on the patched 6.x release for GHSA-wrjc-x8rr-h8h6",
+        "npm audit --omit=dev --audit-level=high exits 0",
+        "ci.yml lint uses --max-warnings=<current count> instead of -1, so the warning count can only go down; react-hooks/exhaustive-deps becomes an error after fixing the 19 hits",
+        "npm run build and the route-weight budget still pass",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Measured 2026-09-30: npm audit high exits 1 (axios, brace-expansion); 677 ESLint warnings hidden by --max-warnings=-1. Overlaps open US-124/US-125 — close whichever criteria this satisfies. DONE: removed axios, jsonwebtoken, workbox-build/-precaching/-routing/-strategies (zero imports; workbox-window is used and kept) and the unreferenced Hero3D.tsx / Hero3DPhone.tsx. `npm audit fix` crashes on an npm bug (edgesOut null), so advisories were fixed individually: dompurify to latest, react-router-dom 6.30.6, brace-expansion/fflate/postcss-selector-parser updated. `npm audit --audit-level=high` (CI's exact command, dev deps included) now exits 0: 0 high, 0 critical, 6 moderate. react-router's GHSA-wrjc-x8rr-h8h6 is only fixed in v7 (a major migration, not done): the one untrusted navigate() (Login ?redirect=) already goes through an allowlist, and validateRedirectPath now also refuses any backslash, with a new test. ESLint in ci.yml: --max-warnings=675 (today's count) in both jobs instead of -1. NOT done: making react-hooks/exhaustive-deps an error (19 call sites need individual review — left for the ratchet). vite build passes; route-weight not runnable here (Playwright/Chromium version mismatch), CI runs it."
+    },
+    {
+      "id": "US-224",
+      "title": "Stop selling features that do not exist",
+      "description": "As a prospective or paying agent, I need every promise on the site to be true, so that I am not billed for automation, trials and add-ons that do nothing.",
+      "acceptanceCriteria": [
+        "execute-workflow no longer charges emails_per_month for a send_email step that sends nothing; workflows are labelled 'Beta — manual runs only' until US-136 ships, and 'Follow-up sequences' is removed from upsell lists (Overview.tsx:96)",
+        "'Free 14-day trial' copy is replaced with 'Start free' everywhere it appears (grep), unless a real trial ships",
+        "Pricing add-ons with no backend (MLS, CRM connectors, SMS, Premium Themes) become 'Notify me' waitlist buttons that record interest",
+        "Login.tsx AI claims and made-up stats, and 'Predictive analytics' on Overview, are removed or rewritten to what exists",
+        "Settings: the three toggles no code reads (email_leads, sms_leads, weekly_report) are removed; the working LeadNotificationPreferences control is the only one",
+        "CLAUDE.md corrected where it says workflow email steps are wired, FCM push exists, and there are no automated tests",
+        "The existing honest-claims / seo-claims guard (US-173) is extended to Login and the dashboard upsell copy",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence: execute-workflow/index.ts:40-72; Pricing.tsx:431-449; Login.tsx:225-236; Settings.tsx:514,531,548; trial copy in InstagramBioAnalyzer.tsx:583, LocationTemplate.tsx, VsLater.tsx:667 and others. Supersedes part of US-143. DONE: workflow send_email no longer charges emails_per_month and reports {success:false, skipped:true}; Workflows marked Beta with 'run only when you start them, email steps don't send yet' (list page + nav description); Overview upsell drops Follow-up sequences and Predictive analytics. Every 'free trial' / '14-day' claim replaced (src pages, bio drip templates, four edge-function emails, LocationTemplate FAQ JSON-LD which also falsely said all plans include unlimited listings). Pricing add-ons → AddOnWaitlist 'Notify me' buttons writing to new feature_waitlist (insert-only for anon/authenticated, read by service role; migration 20260930000004). Login: AI claims and the 2x/5+/30% stats replaced — the US-159/US-173 guards missed them because value and label were on separate lines. HeroSection default, VsLater, VsBeacons, faq-schema and link-strategy no longer imply MLS sync / CRM syncing / property matching; test-social-webhook sample dropped a '1,000+ agents' count and a trial. Settings: email_leads/sms_leads/weekly_report toggles removed. CLAUDE.md corrected (workflow emails, FCM, testing state, leads plaintext columns, generated beds/baths, Dockerfile path). Guard: marketing-claims.test.ts 'feature claims' scans src AND supabase/functions for trial, MLS integration, predictive, property matching/market intelligence; self-test proves each rule fires."
+    },
+    {
+      "id": "US-225",
+      "title": "Lead counts, CSV export and analytics only see the first 50 leads",
+      "description": "As an agent, I need totals, exports and the funnel to cover all my leads, so that I can trust the numbers and never lose data on export.",
+      "acceptanceCriteria": [
+        "A lead_status_counts RPC (or count:'exact', head:true per status) drives the Leads stat cards, independent of the active filter and page",
+        "Export CSV pages through every matching lead and batch-decrypts, not just loaded rows",
+        "Analytics funnel and lead-source table use range-bound aggregate queries, not the paged useLeads()",
+        "Lead search is debounced ~300ms; searching by email/phone works (hashed lookup via edge function) or the placeholder says 'Search by name'",
+        "Unit tests: stat cards with a status filter active still show all statuses; export of 120 leads yields 120 rows",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "useLeads.ts:32 (page size 50), :84 (name-only ilike); Leads.tsx:169-200, 321-358, 450-452, 604; Analytics.tsx:71, 84-120. DONE: new SECURITY INVOKER RPC lead_stats(p_since, p_sla_hours) → {total, by_status, by_source, avg_response_ms, needs_attention} over the caller's own leads (migration 20260930000005; authenticated only). useLeadStats drives the Leads cards (all but 'hot', which needs the client-side score) and the Analytics funnel, source table and period conversions, range-bound. Export CSV uses fetchAllLeads: same filters, 100-row pages (pii-crypto's MAX_ROWS), 10,000 ceiling with a 'narrow the filters' message; button shows Exporting…. Search is debounced 300 ms (the comment claimed it already was) and the placeholder says 'Search leads by name…' — email search NOT built: email is ciphertext; leads.email_hash (US-220) covers only leads captured via submit-lead after it shipped, so a hashed lookup would silently miss agent-entered and older leads. Tests: fetchAllLeads returns 120 of 120 in two batches; verify-schema checks lead_stats counts 120 across statuses, ignores another agent's leads, refuses anon. Not changed: Analytics' custom report still uses the paged list."
+    },
+    {
+      "id": "US-226",
+      "title": "Team plan invites can never be accepted",
+      "description": "As a Team-plan owner, I need invited agents to join and see leads routed to them, so that the $99 plan delivers what it sells.",
+      "acceptanceCriteria": [
+        "teams invite sends an email with a link to /team/accept?team=<id>&token=<one-time token>",
+        "New route /team/accept calls teams action 'accept' for the signed-in user (redirecting through login/register first)",
+        "useLeads returns leads where user_id = me OR assigned_to = me, with an 'Assigned to me' filter; assignee sees contact details (pii-crypto honours assignment)",
+        "The routing trigger's assignment notifies the assignee",
+        "A test covers invite → accept → routed lead visible to assignee",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "teams/index.ts:67-105 inserts user_id null and sends nothing; accept at :108-118 has no caller; routing needs accepted_at (20260902000006:85); useLeads.ts:78 filters user_id only; pii-crypto:192. Production is also missing teams tables (US-146). DONE: teams invite generates a 256-bit token, stores only its SHA-256 (team_members.invite_token_hash — the roster is readable by every member) and emails /team/accept?team=&token= (teams/invites.ts, unit-tested); accept redeems by token, once, and no longer matches on the caller's email interpolated into a PostgREST .or() string (which let anyone who could register an invited address take the seat). New /team/accept page inside RequireAuth; /team/accept added to the login redirect allowlist, exempted from the first-run onboarding redirect, given a _redirects rule and an a11y-suite entry. useLeads/fetchAllLeads read user_id OR assigned_to, with an 'Assigned to me' filter (URL assigned=me; button shown only when you have assigned leads). pii-crypto decrypts assigned leads too and checks the lock against each lead's OWNER. New AFTER INSERT/UPDATE OF assigned_to trigger notify_lead_assignee writes a notifications row (migration 20260930000006). verify-schema: routed lead → accepted teammate can read it and has a lead_assigned notification (fails without the migration). TeamPage says whether the email went. Note: production lacks teams/team_members/notifications (US-146) — apply migrations there first."
+    },
+    {
+      "id": "US-227",
+      "title": "Agents cannot see which campaigns turn visits into leads",
+      "description": "As an agent, I need my funnel — views, form opens, submissions, CTA taps — by source, so that I know which posts and campaigns produce clients.",
+      "acceptanceCriteria": [
+        "analytics_events CHECK constraint extended with form_open, form_submit, cta_click, social_click, listing_view",
+        "trackFormSubmission and the sticky bar's schedule/valuation/contact taps go through recordAnalyticsEvent (window.analytics is removed)",
+        "SocialLinks clicks and listing modal opens are recorded",
+        "analytics_views stores utm_source/utm_medium/utm_campaign from getLeadAttribution()",
+        "Analytics page shows views → leads conversion rate by source for the selected range",
+        "Unit tests for the event mapping; verify:schema accepts the new event types",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "leadSubmission.ts:169-194 posts to an undefined window.analytics; analyticsEvents.ts:23-29,112-113 drops unmapped methods; CHECK at 20260902000012:130. DONE: migration 20260930000007 extends analytics_events' CHECK with form_open, form_submit, cta_click, social_click, listing_view; adds utm_source/medium/campaign to analytics_views and utm_source/campaign to analytics_events (length-bounded); adds SECURITY INVOKER campaign_conversion(p_since) → per-source views, form_opens, leads (RLS keeps the plan's history window). Client: trackFormSubmission now records form_submit through recordAnalyticsEvent (window.analytics and the localStorage copy removed) and takes the agent id; useFormOpenTracking on the four forms; sticky-bar schedule/valuation/contact → cta_click; SocialLinks → social_click; listing opens (click or pasted ?listing=) → listing_view; Calendly bookings → form_submit 'calendly_showing'; profile views store utm_*. Analytics page: 'Which sources convert' table with views → leads rate. Tests: toCampaignRows, updated analyticsEvents/ContactForm tests; verify-schema checks anon can write every new type and campaign_conversion returns the expected per-source counts."
+    },
+    {
+      "id": "US-228",
+      "title": "Lead forms ask for nine required fields before a lead exists",
+      "description": "As an agent, I need visitors to become leads with the least effort, so that mobile link-in-bio traffic converts.",
+      "acceptanceCriteria": [
+        "Buyer, seller, valuation and contact forms become two steps: step 1 (name + email OR phone, plus address for valuation) submits and creates the lead",
+        "Step 2 collects qualifiers as optional fields and adds them to form_data via an update call authorised by a one-time token returned from submit-lead",
+        "validateLeadData accepts email or phone; the kiosk accepts phone-only",
+        "ContactForm drops the 10-character minimum message",
+        "Unit tests for the relaxed validation; Playwright test submits step 1 only and a lead exists",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "BuyerInquiryForm.tsx:22-32 (8 required), SellerInquiryForm.tsx:22-33, HomeValuationForm.tsx:22-33, ContactForm.tsx:13-18; server requires email at _shared/validation.ts:187. Land after US-220 so the relaxed form is not a spam gift. DONE: new TwoStepLeadForm; Buyer, Seller and HomeValuation forms are now configs over it (same exports/props; ~1,100 lines → ~350). Step 1: name + email OR phone (+ address for seller/valuation) creates the lead; step 2: the old qualifiers as optional native selects (native pickers on phones), 'Add these details' or 'Skip'. ContactForm stays one step: email or phone, message optional with no minimum. Kiosk accepts phone-only. Server: validateLeadData takes email or phone; submit-lead returns a single-use 30-minute update_token (hash in leads.update_token_hash, migration 20260930000008) and an action:'enrich' path that may write only price_range/timeline/property_address/message/preapproved and merge form_data (_shared/lead-enrichment.ts, unit-tested); phone-only leads skip the auto-reply and the email dedupe. Found on the way: submitLead read result.leadId but the server sends lead_id, so no caller had ever received the lead id. Tests: validation (email/phone), enrichment builder, TwoStepLeadForm component flow (phone-only → enrich; skip; valuation requirements). DEVIATION: no Playwright spec — the component test covers the flow without a live backend. Known gap: notify-lead and Zapier fire at step 1, so they carry only step-1 fields; the qualifiers appear on the lead in the dashboard."
+    },
+    {
+      "id": "US-229",
+      "title": "A lead's reply to the auto-response goes to noreply",
+      "description": "As an agent, I need a lead replying to my auto-response to reach me, so that the warmest touch is not lost.",
+      "acceptanceCriteria": [
+        "EmailOptions gains replyTo; the submit-lead auto-reply sets it to the agent's email_display or account email",
+        "The auto-reply includes the agent's phone, photo, Calendly link when set, and the listing link for listing enquiries; the generic purple-gradient template is replaced with a plain branded one",
+        "A failed sendEmail is logged (and reported via US-222's reporter)",
+        "Unit test renders the template with and without optional fields",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "_shared/email.ts:6-12,71-74 (no reply_to); submit-lead/index.ts:273-328 says 'call me' without a number. DONE: EmailOptions.replyTo → Resend reply_to. New createLeadAutoReply (replaces the unused createAutoResponseEmail): reply-to = agent's email_display or account email; body and HTML include the agent's phone (tel: link), photo, Calendly button, profile link and, for a listing enquiry, the address and its ?listing= link; plain warm template instead of the purple gradient; everything escaped and only http(s) links kept. submit-lead uses it (one extra profiles read and, for listing leads, one listings read), and a failed send is logged and sent to Sentry via _shared/report.ts. Tests: reply_to reaches Resend; template with/without optional fields; escaping and javascript: links dropped."
+    },
+    {
+      "id": "US-230",
+      "title": "Nothing brings an agent back: no digest, no key-date reminders",
+      "description": "As an agent, I need a morning email of what needs me today, so that follow-ups, birthdays and new leads are not missed.",
+      "acceptanceCriteria": [
+        "scheduled-maintenance gains a daily digest task: new leads (for digest subscribers), due/overdue follow-up tasks, and contact_key_dates in the next 7 days (reuse src/lib/keyDates.ts logic in _shared)",
+        "A Monday weekly variant adds views/leads/clicks for the past 7 days",
+        "Preferences live in LeadNotificationPreferences ('Daily digest' stops saying 'Not available yet'); unsubscribe link honoured",
+        "Idempotent per user per day (a sent-log table or column), so a re-run does not double-send",
+        "Unit tests for digest assembly and the idempotency guard",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "scheduled-maintenance runs only overdue_leads (:74) and account_deletions (:178); contact_key_dates is read by no function but gdpr-export. Covers most of US-133. DONE: scheduled-maintenance task 'digests' (scheduled-maintenance/digests.ts) runs in DIGEST_HOUR_UTC (default 13, i.e. 13:17 UTC with the hourly cron) or on POST {force_digest:true}. Per agent: new leads in the last 24h, open tasks due by end of today, and contact_key_dates inside each date's own reminder window (_shared/keyDates.ts — an exact copy of src/lib/keyDates.ts, held identical by a test, because the container ships only supabase/functions). Pure builder _shared/digest.ts returns null when there is nothing (no empty emails); Monday edition adds 7-day views/leads/link clicks. Preference notification_preferences.digest = daily (default) | weekly (Mondays) | off, set in Settings → Lead Notifications ('Morning email'); every email links there to change/turn off. Idempotent via new digest_log (PK user+day+kind; claim before send, release on failure; migration 20260930000009). 'Daily digest' lead mode is real now: notify-lead skips the instant email only when the morning email is daily, so no setting combination loses a lead. Tests: buildDigest (empty → null, reminder windows, Monday edition, escaping), digestKindFor, keyDates parity. DIGEST_HOUR_UTC declared in functions .env.example. Not per-agent timezone: profiles has no timezone column."
+    },
+    {
+      "id": "US-231",
+      "title": "The admin cannot see users, and churn always reads 0%",
+      "description": "As the operator, I need to find and support any user and see true MRR and churn, so that I can run the business from the admin panel.",
+      "acceptanceCriteria": [
+        "New admin-users edge function (service role, has_role admin) with search by email/username, plan, Stripe customer link, last sign-in; UserManagementPanel uses it instead of auth.admin.listUsers() from the browser",
+        "HealthDashboard churn matches the status the webhook writes ('cancelled' vs 'canceled' reconciled in one place) over a 30-day canceled_at window",
+        "MRR computed from stored amount and interval (annual ÷ 12), not list price per plan name",
+        "'Active (7d)' uses last sign-in or analytics activity, not profiles.updated_at",
+        "Admin lands on an overview tab, not pSEO",
+        "Unit tests for the MRR and churn calculations",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "UserManagementPanel.tsx:100; HealthDashboard.tsx:120,179,184; stripe-webhook writes 'cancelled' at :385,:421; AdminDashboard.tsx:75. DONE: new admin-users edge function (requireAdmin, service role) lists auth users (paged, 5,000 cap) joined with profile, role and subscription, with server-side search and stats (admin-users/merge.ts, unit-tested). UserManagementPanel uses it instead of supabase.auth.admin.listUsers() from the browser (which needs the service key and always failed), shows a Stripe customer link, and takes its stats from it. revenueMetrics.ts: MRR from stored amount and interval (annual ÷ 12; list price only as fallback) over active + past_due; churn over 30 days counting both 'canceled' and the webhook's 'cancelled'. HealthDashboard uses them and shows 'Signed in (7d)' from last_sign_in_at instead of profiles.updated_at. AdminDashboard opens on a Users tab that renders the real panel — it was a 'coming soon' placeholder — with a link to the Health dashboard. DEVIATION: the status spelling is reconciled in the reader (both spellings counted), not by rewriting what the webhook writes, so existing rows stay valid."
+    },
+    {
+      "id": "US-232",
+      "title": "The most eager buyer on the pricing page hits a dead end",
+      "description": "As a visitor ready to pay, I need Subscribe to carry me through sign-up to checkout, and as the operator I need to know which profiles bring signups.",
+      "acceptanceCriteria": [
+        "Logged-out Subscribe on Pricing navigates to /auth/register?plan=X&interval=Y instead of a toast",
+        "The plan intent survives registration and onboarding and opens checkout when onboarding completes",
+        "The profile 'Powered by' badge links with ?ref=<username>&utm_source=profile_badge; the ref is stored on the new profile (referred_by) at signup",
+        "Admin overview shows signups by referrer",
+        "Playwright test: logged-out Subscribe → register page with plan preserved",
+        "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Pricing.tsx:187-198; FullProfilePage.tsx:699-706. A reward (Stripe coupon for both agents) is a follow-up once attribution data exists. DONE: src/lib/signupIntent.ts keeps the plan chosen on /pricing (localStorage — email verification opens a new tab; 7 days) and the first-touch ?ref= (30 days). Logged-out Subscribe → /auth/register?plan=&interval= (Register shows 'You picked X — checkout opens right after'); onboarding completion → /dashboard/subscription?checkout=<plan>&interval=, which opens checkout once (through US-217's change-or-checkout path) and clears the intent. The 'Powered by' badge links https://agentbio.net/?utm_source=profile_badge&utm_medium=referral&ref=<username>. signUp passes ref and signup_source; handle_new_user records profiles.referred_by only when the ref names a real profile, plus signup_source (migration 20260930000010); a trigger stops agents rewriting either later. Health dashboard: 'Signups by referrer (30d)'. Tests: signupIntent unit tests (register URL, intent survives, first-touch referral, badge URL); verify-schema check (signup records referrer; agent cannot rewrite it). DEVIATION: no Playwright spec — covered by unit tests. Reward (coupon for both agents) left as the noted follow-up."
     }
   ]
 }

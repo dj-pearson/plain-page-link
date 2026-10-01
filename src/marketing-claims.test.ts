@@ -220,3 +220,59 @@ describe('marketing claims', () => {
     }
   });
 });
+
+/**
+ * US-224: features and offers that do not exist.
+ *
+ * The rules above are about numbers. These are about things: a "free 14-day
+ * trial" (checkout sets no trial and the webhook never stored one), "MLS
+ * integration" (no MLS code anywhere, yet sold at $25/mo on the pricing page),
+ * "predictive" analytics or lead scoring and "smart property matching" (the
+ * lead score is a rules heuristic; matching and market intelligence were never
+ * built). They lived in src/ and in the edge functions' drip emails, so both
+ * trees are scanned. Legal pages are exempt: the refund window is a real 14
+ * days.
+ *
+ * When one of these ships, delete its rule in the same change.
+ */
+describe('feature claims', () => {
+  const FEATURE_RULES: { rule: string; pattern: RegExp }[] = [
+    { rule: 'a free trial that checkout does not offer', pattern: /free\s+trial|\b14[- ]day\s+(free\s+)?trial|free\s+for\s+14\s+days/i },
+    { rule: 'MLS integration, which does not exist', pattern: /\bMLS\s+integration\b/i },
+    { rule: 'predictive analytics or scoring, which does not exist', pattern: /\bpredictive\s+(lead\s+scoring|analytics)\b/i },
+    { rule: 'property matching or market intelligence, which do not exist', pattern: /\b(smart\s+)?property\s+matching\b|\bmarket\s+intelligence\b/i },
+  ];
+  const ROOTS = [SRC, join(process.cwd(), 'supabase', 'functions')];
+  const EXEMPT = ['pages/legal/', 'pages/BlogCategory.tsx', 'marketing-claims.test.ts'];
+
+  it('advertises nothing the product cannot do', () => {
+    const findings: string[] = [];
+    for (const root of ROOTS) {
+      for (const file of walk(root)) {
+        const rel = file.slice(process.cwd().length + 1).split('\\').join('/');
+        if (EXEMPT.some((e) => rel.includes(e))) continue;
+        const lines = readFileSync(file, 'utf8').split('\n');
+        const isComment = commentMask(lines);
+        lines.forEach((line, i) => {
+          if (isComment[i]) return;
+          for (const { rule, pattern } of FEATURE_RULES) {
+            if (pattern.test(line)) findings.push(`${rel}:${i + 1}  ${rule}\n      ${line.trim().slice(0, 90)}`);
+          }
+        });
+      }
+    }
+    expect(findings).toEqual([]);
+  });
+
+  it('is actually able to fail', () => {
+    for (const sample of [
+      'Start Your Free 14-Day Trial',
+      'Try AgentBio Free for 14 Days',
+      '<p className="font-semibold">MLS Integration</p>',
+      'with predictive lead scoring and smart property matching',
+      'accelerates deals with market intelligence',
+    ]) {
+      expect(FEATURE_RULES.some(({ pattern }) => pattern.test(sample)), sample).toBe(true);
+    }
+  });
+});

@@ -246,8 +246,7 @@ export function getRecommendedFeatures(input: BioAnalysisInput): {
   ];
 
   const advanced = [
-    'MLS integration (auto-update listings)',
-    'CRM integration (auto-capture leads)',
+    'Lead capture that lands in a CRM',
     'Advanced analytics and heatmaps',
     'A/B testing for CTAs',
     'QR code generator for offline marketing',

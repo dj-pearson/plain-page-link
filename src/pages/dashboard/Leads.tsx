@@ -25,7 +25,10 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { useLeads } from '@/hooks/useLeads';
+import { useLeads, fetchAllLeads } from '@/hooks/useLeads';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { exportToCSV } from '@/lib/exportUtils';
 import { cn } from '@/lib/utils';
@@ -53,12 +56,16 @@ import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import type { LeadScore } from '@/hooks/useMLLeadScoring';
 import { logger } from '@/lib/logger';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
+import { useLeadStats } from '@/hooks/useLeadStats';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 export default function Leads() {
-  // Search is local (it debounces into the query below); status and type live
-  // in the URL so a filtered view is linkable and a notification deep link can
-  // preselect one (US-104).
-  const [searchQuery, setSearchQuery] = useState('');
+  // Search is local; status and type live in the URL so a filtered view is
+  // linkable and a notification deep link can preselect one (US-104).
+  // US-225: the comment here said search debounced; it did not — every
+  // keystroke was a new query key, a database query and a pii-crypto call.
+  const [searchInput, setSearchInput] = useState('');
+  const searchQuery = useDebouncedValue(searchInput, 300);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -67,6 +74,7 @@ export default function Leads() {
   const [isBulkActing, setIsBulkActing] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date');
   const { toast } = useToast();
+  const { user } = useAuthStore();
   const { subscription } = useSubscriptionLimits();
   const { scoreLeadObject } = useMLLeadScoring();
 
@@ -75,8 +83,9 @@ export default function Leads() {
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = searchParams.get('status') ?? 'all';
   const typeFilter = searchParams.get('type') ?? 'all';
+  const assignedToMe = searchParams.get('assigned') === 'me';
 
-  const setFilter = (key: 'status' | 'type', value: string) => {
+  const setFilter = (key: 'status' | 'type' | 'assigned', value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value === 'all') next.delete(key);
     else next.set(key, value);
@@ -86,6 +95,7 @@ export default function Leads() {
 
   const { slaHours, update: updatePreferences } = useNotificationPreferences();
   const setSlaHours = (hours: number) => updatePreferences.mutate({ sla_hours: hours });
+  const { stats: serverStats } = useLeadStats({ slaHours });
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
 
   // The one reader of `leads`. useLeads owns the query, the cache key and the
@@ -105,7 +115,22 @@ export default function Leads() {
     isFetchingNextPage,
     bulkUpdateStatus,
     bulkDelete,
-  } = useLeads({ status: statusFilter, leadType: typeFilter, search: searchQuery });
+  } = useLeads({ status: statusFilter, leadType: typeFilter, search: searchQuery, assignedToMe });
+
+  // Only teammates have leads assigned to them; the filter shows for them.
+  const { data: assignedCount = 0 } = useQuery({
+    queryKey: ['leads-assigned-count', user?.id],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('assigned_to', user!.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
 
   // Tapping a lead's email or phone number on the card records the response,
   // the same way the detail modal does (US-101).
@@ -199,12 +224,26 @@ export default function Leads() {
       { total: 0, new: 0, contacted: 0, converted: 0, hot: 0, needsAttention: 0 }
     );
 
-    return {
+    const loaded = {
       ...acc,
       avgResponse: respondedCount > 0 ? respondedTotalMs / respondedCount : null,
     };
+    // US-225: every count except "hot" comes from lead_stats(), over all of the
+    // agent's leads. These used to be counted from the loaded, status-filtered
+    // pages — so choosing "New" showed 0 contacted and 0 converted. "Hot" needs
+    // the client-side score, so it is still counted over the loaded leads.
+    if (!serverStats) return loaded;
+    return {
+      ...loaded,
+      total: serverStats.total,
+      new: serverStats.byStatus.new ?? 0,
+      contacted: serverStats.byStatus.contacted ?? 0,
+      converted: serverStats.byStatus.converted ?? 0,
+      needsAttention: serverStats.needsAttention,
+      avgResponse: serverStats.avgResponseMs,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, leadScores, slaMs]);
+  }, [leads, leadScores, slaMs, serverStats]);
 
   // Deep link from a notification: /dashboard/leads?lead=<id> opens that lead.
   // The trigger has always written data.lead_id and nothing ever read it, so
@@ -312,14 +351,37 @@ export default function Leads() {
     }
   };
 
-  const handleExportLeads = () => {
+  const [isExporting, setIsExporting] = useState(false);
+  const handleExportLeads = async () => {
     // Check if user has export feature
     if (subscription?.plan_name === 'free') {
       setShowUpgradeModal(true);
       return;
     }
+    if (!user?.id) return;
 
-    if (filteredLeads.length === 0) {
+    // US-225: every matching lead, not the rows loaded on screen.
+    setIsExporting(true);
+    let exportLeads: Lead[];
+    let truncated = false;
+    try {
+      const all = await fetchAllLeads(user.id, {
+        status: statusFilter,
+        leadType: typeFilter,
+        search: searchQuery,
+        assignedToMe,
+      });
+      truncated = all.truncated;
+      exportLeads = needsAttentionOnly ? all.leads.filter(isNeedsAttention) : all.leads;
+    } catch (err) {
+      logger.error('Lead export failed', err as Error);
+      toast({ title: 'Export failed', description: 'Could not load your leads. Please try again.', variant: 'destructive' });
+      return;
+    } finally {
+      setIsExporting(false);
+    }
+
+    if (exportLeads.length === 0) {
       toast({
         title: 'No leads to export',
         description: 'Nothing matches the current filters.',
@@ -355,7 +417,7 @@ export default function Leads() {
         'Created At',
         'First Responded At',
       ],
-      rows: filteredLeads.map((lead) => {
+      rows: exportLeads.map((lead) => {
         const origin = describeLeadOrigin(lead);
         return [
           lead.name,
@@ -378,7 +440,9 @@ export default function Leads() {
 
     toast({
       title: 'Leads exported',
-      description: `Successfully exported ${filteredLeads.length} leads to CSV`,
+      description: truncated
+        ? `Exported the newest ${exportLeads.length} leads — narrow the filters to export the rest.`
+        : `Exported ${exportLeads.length} leads to CSV`,
     });
   };
 
@@ -447,12 +511,8 @@ export default function Leads() {
 
   const filteredLeads = useMemo(() => {
     let result = leads?.filter((lead) => {
-      const matchesSearch = searchQuery
-        ? lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (lead.email ?? '').toLowerCase().includes(searchQuery.toLowerCase())
-        : true;
-      const matchesAttention = needsAttentionOnly ? isNeedsAttention(lead) : true;
-      return matchesSearch && matchesAttention;
+      // The name search already ran in SQL (useLeads).
+      return needsAttentionOnly ? isNeedsAttention(lead) : true;
     });
 
     if (sortBy === 'score' && result) {
@@ -489,11 +549,11 @@ export default function Leads() {
           <Button
             onClick={handleExportLeads}
             variant="outline"
-            disabled={!leads || leads.length === 0}
+            disabled={!leads || leads.length === 0 || isExporting}
             className="flex-1 sm:flex-none min-h-[44px] active:scale-95 transition-all"
           >
             <Download className="h-4 w-4 mr-2" />
-            <span className="text-sm sm:text-base">Export CSV</span>
+            <span className="text-sm sm:text-base">{isExporting ? 'Exporting…' : 'Export CSV'}</span>
             {subscription?.plan_name === 'free' && (
               <Badge variant="secondary" className="ml-2">
                 Pro
@@ -601,9 +661,13 @@ export default function Leads() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <input
               type="text"
-              placeholder="Search leads by name or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              // US-225: email is ciphertext, so the server can only match names;
+              // the old client-side email match only saw rows already loaded
+              // whose NAME had matched, i.e. never.
+              placeholder="Search leads by name…"
+              aria-label="Search leads by name"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base min-h-[44px]"
             />
           </div>
@@ -641,6 +705,16 @@ export default function Leads() {
                 (US-105). It is a rules-based priority, and it says so. */}
             <span className="hidden sm:inline">{sortBy === 'score' ? 'Priority' : 'Recent'}</span>
           </Button>
+          {(assignedCount > 0 || assignedToMe) && (
+            <Button
+              variant={assignedToMe ? 'default' : 'outline'}
+              onClick={() => setFilter('assigned', assignedToMe ? 'all' : 'me')}
+              className="min-h-[44px] flex-shrink-0"
+              aria-pressed={assignedToMe}
+            >
+              Assigned to me
+            </Button>
+          )}
           <Button
             variant={needsAttentionOnly ? 'default' : 'outline'}
             onClick={() => setNeedsAttentionOnly((v) => !v)}

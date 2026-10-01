@@ -4,6 +4,7 @@ import { getSiteUrl } from '../_shared/env.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
+import { safeHtmlText } from '../_shared/public-email.ts';
 
 /**
  * Cron job to send scheduled Instagram Bio Analyzer emails
@@ -80,8 +81,8 @@ serve(async (req) => {
         try {
           const emailContent = getEmailTemplate(
             sequenceToSend,
-            capture.first_name,
-            capture.market,
+            safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
+            safeHtmlText(capture.market, 100),
             capture.instagram_bio_analyses?.overall_score || 0
           )
 
@@ -197,7 +198,7 @@ Pro tip: Track which content drives the most link clicks.
 
 AgentBio shows you exactly which posts convert.
 
-Try AgentBio Free for 14 Days: ${siteUrl}/auth/register
+Start Free on AgentBio: ${siteUrl}/auth/register
 
 To your success,
 The AgentBio Team`,
@@ -238,7 +239,7 @@ Linktree Pro: $9/month
 
 AgentBio: $29/month
 → Built for real estate
-→ MLS integration
+→ Open house sign-in kiosk
 → Lead capture
 → Advanced analytics
 
@@ -271,7 +272,7 @@ SPECIAL OFFER (Expires Tonight):
 → Custom QR code design
 → Priority support
 
-Risk-Free: 14-day free trial, cancel anytime
+Risk-Free: start on the free plan, upgrade only if it pays for itself
 
 Claim Your 20% Discount: ${siteUrl}/auth/register?coupon=BIO20
 

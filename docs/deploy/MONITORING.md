@@ -84,3 +84,15 @@ Configure these URLs for your Sentry org/project (placeholders):
 - **Daily**: Sentry unresolved issues triaged.
 - **Per release**: Sentry "Releases" regression check; Web Vitals trend.
 - **Weekly**: dependency audit review; `SECURITY_NOTES.md` reconciled.
+
+## What actually reports, and where (US-222)
+
+| Signal | Path | Set up |
+| --- | --- | --- |
+| Browser errors | `src/lib/sentry.ts` → same-origin tunnel `POST /api/sentry` (`functions/api/sentry.ts`) → Sentry | `VITE_SENTRY_DSN` at build time **and** as a Pages environment variable (the tunnel reads it at runtime; `SENTRY_DSN` also works) |
+| Edge-function errors | `handleUnexpectedError` and every 5xx seen by `edge-functions-server.ts` → `_shared/report.ts` → Sentry | `SENTRY_DSN` in the Coolify application's environment |
+| Liveness | `GET https://functions.agentbio.net/health-check` with **no** Authorization header → `{"ok":true}` 200 / `{"ok":false}` 503 | Point an external uptime monitor (e.g. UptimeRobot, Better Stack) at it every 1–5 minutes, plus one at `https://agentbio.net/` |
+
+Before US-222 none of these fired: the CSP blocked the browser SDK's requests
+to sentry.io, edge-function errors went only to container stdout, and the
+health check required an admin login, so no monitor could call it.

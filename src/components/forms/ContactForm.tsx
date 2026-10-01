@@ -8,14 +8,25 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { submitLead, trackFormSubmission } from '@/lib/leadSubmission';
+import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { useFormOpenTracking } from '@/hooks/useFormOpenTracking';
+import { HoneypotField } from './HoneypotField';
 import { logger } from '@/lib/logger';
 
-const contactSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email address'),
-  phone: z.string().min(10, 'Please enter a valid phone number'),
-  message: z.string().min(10, 'Message must be at least 10 characters'),
-});
+// US-228: an email OR a phone, and no minimum message length. "Message must
+// be at least 10 characters" stood between a visitor typing "Call me" and a
+// lead, and a phone number alone could not be sent at all.
+const contactSchema = z
+  .object({
+    name: z.string().min(2, 'Name must be at least 2 characters'),
+    email: z.union([z.literal(''), z.string().email('Please enter a valid email address')]),
+    phone: z.union([z.literal(''), z.string().min(7, 'Please enter a valid phone number')]),
+    message: z.string().max(2000).optional(),
+  })
+  .refine((d) => d.email !== '' || d.phone !== '', {
+    message: 'Please give an email or a phone number',
+    path: ['email'],
+  });
 
 type ContactFormData = z.infer<typeof contactSchema>;
 
@@ -37,6 +48,8 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { honeypotRef, signals } = useSpamGuard();
+  useFormOpenTracking(agentId, 'contact_form');
   const {
     register,
     handleSubmit,
@@ -56,11 +69,12 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
       // every "Send Message" was a 400 the visitor saw as a generic failure
       // (US-095).
       const result = await submitLead({
+        spam: signals(),
         agentId,
         leadType: 'contact',
         name: data.name,
-        email: data.email,
-        phone: data.phone,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
         listingId: listing?.id,
         data: {
           message: data.message,
@@ -73,7 +87,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
         throw new Error(result.error || 'Failed to send message');
       }
 
-      trackFormSubmission('contact_form', true);
+      trackFormSubmission(agentId, 'contact_form', true);
       setIsSuccess(true);
       reset();
 
@@ -83,7 +97,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
       }, 3000);
     } catch (err) {
       logger.error('Error submitting contact form', err as Error);
-      trackFormSubmission('contact_form', false);
+      trackFormSubmission(agentId, 'contact_form', false);
       setError(err instanceof Error ? err.message : 'Failed to send message. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -135,6 +149,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
           </div>
         )}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <HoneypotField ref={honeypotRef} />
           <FormField
             label="Your Name"
             id="name"
@@ -150,7 +165,6 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
             type="email"
             placeholder="john@example.com"
             error={errors.email?.message}
-            required
             {...register('email')}
           />
 
@@ -160,7 +174,6 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
             type="tel"
             placeholder="(555) 123-4567"
             error={errors.phone?.message}
-            required
             {...register('phone')}
           />
 
@@ -174,7 +187,6 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
             }
             rows={4}
             error={errors.message?.message}
-            required
             {...register('message')}
           />
 

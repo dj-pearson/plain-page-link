@@ -1,7 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
-import { sendEmail } from '../_shared/email.ts'
+import { sendEmail, createLeadAutoReply } from '../_shared/email.ts'
+import { reportError } from '../_shared/report.ts'
+import { getSiteUrl } from '../_shared/env.ts'
 import { encryptSecret } from '../_shared/encryption.ts'
+import { readSpamSignals, botReason, emailLookupHash } from '../_shared/spam-guard.ts'
+import {
+  buildEnrichment,
+  generateEnrichToken,
+  hashEnrichToken,
+  ENRICH_TOKEN_RE,
+  ENRICH_TOKEN_TTL_MINUTES,
+} from '../_shared/lead-enrichment.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts'
 import { validateLeadData, sanitizeString, getClientIP, isValidWebhookUrl } from '../_shared/validation.ts'
@@ -12,7 +22,7 @@ import { successResponse, validationError, rateLimitResponse, handleUnexpectedEr
 interface LeadData {
   user_id: string
   name: string
-  email: string
+  email?: string
   phone?: string
   message?: string
   lead_type: string
@@ -56,6 +66,30 @@ function sanitizeFormData(raw: unknown): Record<string, unknown> | undefined {
     }
   }
   return Object.keys(out).length > 0 ? out : undefined
+}
+
+/**
+ * A single-use token for step two of the form (US-228), valid for
+ * ENRICH_TOKEN_TTL_MINUTES. Only its hash is stored. Best effort: a lead
+ * without one is still a lead, the visitor just cannot add details to it.
+ */
+async function issueEnrichToken(leadId: string): Promise<string | null> {
+  try {
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const token = generateEnrichToken()
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        update_token_hash: await hashEnrichToken(token),
+        update_token_expires_at: new Date(Date.now() + ENRICH_TOKEN_TTL_MINUTES * 60_000).toISOString(),
+      })
+      .eq('id', leadId)
+    if (error) throw error
+    return token
+  } catch (e) {
+    console.error(`[submit-lead] could not issue a step-two token for ${leadId}:`, e)
+    return null
+  }
 }
 
 serve(async (req) => {
@@ -104,6 +138,48 @@ serve(async (req) => {
       return rateLimitResponse(rateLimit.retryAfterSeconds, req, 'Too many requests. Please try again later.');
     }
 
+    // US-220: invisible bot signals. A trip gets the ordinary success answer
+    // and nothing is stored or sent, so the bot learns nothing.
+    const spamReason = botReason(readSpamSignals(rawData));
+    if (spamReason) {
+      console.warn(`[submit-lead] dropped a submission for ${rawData?.user_id ?? '?'}: ${spamReason}`);
+      return successResponse({ lead_id: null }, req);
+    }
+
+    // US-228: step two of a form — the qualifiers, added to the lead step one
+    // created, authorised by the single-use token step one returned.
+    if (rawData?.action === 'enrich') {
+      const token = rawData.update_token
+      if (typeof rawData.lead_id !== 'string' || typeof token !== 'string' || !ENRICH_TOKEN_RE.test(token)) {
+        return validationError(['lead_id and update_token are required'], req)
+      }
+      const enrichment = buildEnrichment(rawData)
+      if (enrichment.errors.length > 0) return validationError(enrichment.errors, req)
+
+      const { data: target, error: targetError } = await supabase
+        .from('leads')
+        .select('id, form_data')
+        .eq('id', rawData.lead_id)
+        .eq('update_token_hash', await hashEnrichToken(token))
+        .gt('update_token_expires_at', new Date().toISOString())
+        .maybeSingle()
+      if (targetError) throw targetError
+      if (!target) return validationError(['This form has expired. Your details were already sent.'], req)
+
+      const { error: enrichError } = await supabase
+        .from('leads')
+        .update({
+          ...enrichment.columns,
+          form_data: { ...(target.form_data ?? {}), ...enrichment.formData },
+          update_token_hash: null,
+          update_token_expires_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', target.id)
+      if (enrichError) throw enrichError
+      return successResponse({ lead_id: target.id }, req)
+    }
+
     // Validate input data
     const validation = validateLeadData(rawData);
     if (!validation.valid) {
@@ -115,7 +191,8 @@ serve(async (req) => {
     const leadData: LeadData = {
       user_id: rawData.user_id,
       name: sanitizeString(rawData.name),
-      email: rawData.email.trim().toLowerCase(),
+      // US-228: optional when a phone is given.
+      email: rawData.email ? String(rawData.email).trim().toLowerCase() : undefined,
       phone: rawData.phone ? sanitizeString(rawData.phone) : undefined,
       message: rawData.message ? sanitizeString(rawData.message) : undefined,
       lead_type: rawData.lead_type,
@@ -167,6 +244,38 @@ serve(async (req) => {
 
     const { email: _plaintextEmail, phone: _plaintextPhone, ...storedLead } = leadData
 
+    // US-220: the same person enquiring again within a day — a double submit,
+    // a refresh, or a bot replaying one address — is folded into the lead they
+    // already have: its form answers are merged, and nothing is notified,
+    // auto-replied or counted against the agent's allowance a second time.
+    const hashSecret = Deno.env.get('PII_ENCRYPTION_KEY') ?? Deno.env.get('ENCRYPTION_KEY')
+    const emailHash = hashSecret && leadData.email ? await emailLookupHash(leadData.email, hashSecret) : null
+    if (emailHash) {
+      const { data: earlier, error: earlierError } = await supabase
+        .from('leads')
+        .select('id, form_data, message')
+        .eq('user_id', leadData.user_id)
+        .eq('lead_type', leadData.lead_type)
+        .eq('email_hash', emailHash)
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (earlierError) throw earlierError
+      if (earlier) {
+        const { error: mergeError } = await supabase
+          .from('leads')
+          .update({
+            form_data: { ...(earlier.form_data ?? {}), ...(leadData.form_data ?? {}) },
+            message: leadData.message ?? earlier.message,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', earlier.id)
+        if (mergeError) throw mergeError
+        return successResponse({ lead_id: earlier.id, update_token: await issueEnrichToken(earlier.id) }, req)
+      }
+    }
+
     // Insert lead into database
     const { data: lead, error: insertError } = await supabase
       .from('leads')
@@ -174,6 +283,7 @@ serve(async (req) => {
         ...storedLead,
         encrypted_email: encryptedEmail,
         encrypted_phone: encryptedPhone,
+        email_hash: emailHash,
       })
       .select()
       .single()
@@ -261,71 +371,61 @@ serve(async (req) => {
       }
     }
 
-    // Send auto-response email to lead
-    const leadTypeLabels: Record<string, string> = {
-      buyer: 'buying inquiry',
-      seller: 'selling inquiry',
-      valuation: 'home valuation request',
-      contact: 'message',
-      open_house: 'visit to the open house',
+    // Auto-reply to the lead (US-229: from the shared template, with a
+    // reply-to that reaches the agent and their phone, photo, booking link and
+    // the listing).
+    //
+    // US-220: however many leads arrive, one agent's form sends at most this
+    // many auto-replies a day — the cap on how much mail a flood through this
+    // endpoint can put in strangers' inboxes. The leads themselves are kept.
+    const autoReplyBudget = await checkRateLimitDb(
+      supabase,
+      `autoreply:${leadData.user_id}`,
+      'submit-lead-autoreply',
+      { maxRequests: 50, windowSeconds: 86400, failClosed: false }
+    )
+    if (!leadData.email) {
+      // A phone-only lead (US-228) has nowhere to send an auto-reply.
+    } else if (!autoReplyBudget.allowed) {
+      console.warn(`[submit-lead] auto-reply cap reached for ${leadData.user_id}; lead ${lead.id} stored without one`)
+    } else {
+      const { data: agentProfile } = await supabase
+        .from('profiles')
+        .select('username, avatar_url, calendly_url')
+        .eq('id', leadData.user_id)
+        .maybeSingle()
+      const { data: listingRow } = leadData.listing_id
+        ? await supabase.from('listings').select('address').eq('id', leadData.listing_id).maybeSingle()
+        : { data: null }
+      const siteUrl = getSiteUrl()
+      const profileUrl = agentProfile?.username ? `${siteUrl}/${agentProfile.username}` : null
+
+      const reply = await sendEmail(
+        createLeadAutoReply({
+          to: leadData.email,
+          leadName: leadData.name,
+          leadType: leadData.lead_type,
+          agent: {
+            name: agentName,
+            replyTo: agentContact?.emailDisplay || agentContact?.email || null,
+            phone: agentContact?.phone ?? null,
+            photoUrl: agentProfile?.avatar_url ?? null,
+            calendlyUrl: agentProfile?.calendly_url ?? null,
+            profileUrl,
+          },
+          listing: listingRow?.address
+            ? {
+                address: listingRow.address as string,
+                url: profileUrl && leadData.listing_id ? `${profileUrl}?listing=${leadData.listing_id}` : null,
+              }
+            : null,
+        })
+      )
+      if (!reply.ok) {
+        console.error(`[submit-lead] auto-reply for lead ${lead.id} failed: ${reply.error}`)
+        void reportError(new Error(`auto-reply failed: ${reply.error}`), { functionName: 'submit-lead' })
+      }
     }
-
-    await sendEmail({
-      to: leadData.email,
-      subject: `Thank you for your ${leadTypeLabels[leadData.lead_type] || 'inquiry'}`,
-      body: `Hi ${leadData.name},
-
-${leadData.lead_type === 'open_house'
-  ? `Thank you for stopping by the open house today! If you would like a second look, the disclosures, or a list of similar homes, just reply to this email.`
-  : `Thank you for reaching out! I have received your ${leadTypeLabels[leadData.lead_type] || 'inquiry'} and will get back to you as soon as possible.`}
-
-${leadData.lead_type === 'buyer' ? `I'm excited to help you find your perfect home!` : ''}
-${leadData.lead_type === 'seller' ? `I look forward to discussing how I can help you sell your property.` : ''}
-${leadData.lead_type === 'valuation' ? `I'll prepare a comprehensive market analysis for your property.` : ''}
-
-In the meantime, feel free to call me if you have any urgent questions.
-
-Best regards,
-${agentName}`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
-    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-    .footer { text-center; margin-top: 20px; font-size: 12px; color: #666; }
-    .highlight { background: #eef2ff; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1 style="margin: 0;">${leadData.lead_type === 'open_house' ? 'Thanks for Visiting!' : 'Thank You for Reaching Out!'}</h1>
-    </div>
-    <div class="content">
-      <p>Hi ${leadData.name},</p>
-      ${leadData.lead_type === 'open_house'
-        ? `<p>Thank you for stopping by the open house today! If you would like a second look, the disclosures, or a list of similar homes, just reply to this email.</p>`
-        : `<p>Thank you for your <strong>${leadTypeLabels[leadData.lead_type] || 'inquiry'}</strong>! I have received your message and will get back to you as soon as possible.</p>`}
-
-      ${leadData.lead_type === 'buyer' ? `<div class="highlight"><p><strong>🏡 Looking for your dream home?</strong><br>I'm excited to help you find the perfect property that meets your needs!</p></div>` : ''}
-      ${leadData.lead_type === 'seller' ? `<div class="highlight"><p><strong>🏠 Ready to sell?</strong><br>I look forward to discussing how I can help you get the best value for your property!</p></div>` : ''}
-      ${leadData.lead_type === 'valuation' ? `<div class="highlight"><p><strong>📊 Home valuation request received!</strong><br>I'll prepare a comprehensive market analysis for your property.</p></div>` : ''}
-
-      <p>In the meantime, feel free to reach out if you have any urgent questions.</p>
-
-      <p>Best regards,<br><strong>${agentName}</strong></p>
-    </div>
-    <div class="footer">
-      <p>This email was sent from AgentBio.net</p>
-    </div>
-  </div>
-</body>
-</html>`
-    })
 
     // Notify the agent through notify-lead, the one notification path.
     //
@@ -358,7 +458,7 @@ ${agentName}`,
       console.error(`Could not reach notify-lead for lead ${lead.id}:`, notifyError)
     }
 
-    return successResponse({ lead_id: lead.id }, req)
+    return successResponse({ lead_id: lead.id, update_token: await issueEnrichToken(lead.id) }, req)
 
   } catch (error) {
     console.error('Error in submit-lead function:', error)

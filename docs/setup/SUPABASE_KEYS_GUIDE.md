@@ -30,7 +30,7 @@
 These are JSON Web Tokens with this structure:
 
 ```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTcwNTAzOTk4MCwiZXhwIjo0OTIwNzEzNTgwLCJyb2xlIjoiYW5vbiJ9.signature_here
+<redacted — read from Coolify env (SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY)>
 ```
 
 **Parts:**

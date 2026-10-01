@@ -10,6 +10,7 @@ import { logger } from '@/lib/logger';
 import { initWebVitals } from '@/lib/web-vitals';
 import { registerServiceWorker } from '@/lib/register-sw';
 import { captureAttribution } from '@/lib/attribution';
+import { captureReferral } from '@/lib/signupIntent';
 import './index.css';
 
 // Initialize Sentry as early as possible for error monitoring
@@ -21,6 +22,8 @@ initSentry();
 // form the campaign that brought them is long gone from the address bar, so it
 // is read once here, at the landing URL, and kept for the session (US-188).
 captureAttribution();
+// US-232: and who sent them, from the "Powered by" badge's ?ref=.
+captureReferral(window.location.search);
 
 const queryClient: QueryClient = new QueryClient({
   // Any successful write may have moved a plan meter (a listing added, a

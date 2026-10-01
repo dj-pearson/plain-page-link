@@ -12,11 +12,22 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { getLeadAttribution } from '@/lib/attribution';
 
 const VISITOR_ID_KEY = 'visitor_id';
 
 /** The event types `analytics_events.event_type` accepts (the CHECK constraint). */
-export type AnalyticsEventType = 'link_click' | 'contact_call' | 'contact_email' | 'contact_text';
+export type AnalyticsEventType =
+  | 'link_click'
+  | 'contact_call'
+  | 'contact_email'
+  | 'contact_text'
+  // US-227: the rest of the funnel.
+  | 'form_open'
+  | 'form_submit'
+  | 'cta_click'
+  | 'social_click'
+  | 'listing_view';
 
 /** The contact methods ContactButtons and StickyActionBar report. */
 export type ContactMethod = 'call' | 'phone' | 'email' | 'text' | 'sms';
@@ -85,13 +96,18 @@ export async function recordAnalyticsEvent({
   if (!userId) return;
 
   try {
+    // US-227: which campaign the visitor came from, so taps and form opens can
+    // be read per source beside leads (which carry utm_* since US-188).
+    const { utm_source, utm_campaign } = getLeadAttribution();
     const { error } = await supabase.from('analytics_events').insert({
       user_id: userId,
       visitor_id: getVisitorId(),
       event_type: eventType,
       target_id: targetId,
-      target_label: targetLabel,
+      target_label: targetLabel?.slice(0, 200) ?? null,
       device: getDeviceClass(),
+      utm_source: utm_source?.slice(0, 100) ?? null,
+      utm_campaign: utm_campaign?.slice(0, 200) ?? null,
     });
     if (error) {
       logger.warn('Failed to record an analytics event', { eventType });
@@ -109,12 +125,29 @@ export async function recordAnalyticsEvent({
  */
 export async function trackContactTap(userId: string | undefined, method: string): Promise<void> {
   if (!userId) return;
-  const eventType = CONTACT_EVENT[method.toLowerCase() as ContactMethod];
-  if (!eventType) return;
+  const key = method.trim().toLowerCase();
+  if (!key) return;
+  // US-227: the sticky bar's Schedule, Home Value and Contact taps have no
+  // contact_* type and were silently dropped. They are calls to action.
+  const eventType = CONTACT_EVENT[key as ContactMethod] ?? 'cta_click';
 
-  await recordAnalyticsEvent({
-    userId,
-    eventType,
-    targetLabel: method.toLowerCase(),
-  });
+  await recordAnalyticsEvent({ userId, eventType, targetLabel: key });
 }
+
+/** A lead form was opened (the dialog or step shown). */
+export const trackFormOpen = (userId: string | undefined, formType: string) =>
+  userId ? recordAnalyticsEvent({ userId, eventType: 'form_open', targetLabel: formType }) : Promise.resolve();
+
+/** A lead form was submitted successfully. */
+export const trackFormSubmit = (userId: string | undefined, formType: string) =>
+  userId ? recordAnalyticsEvent({ userId, eventType: 'form_submit', targetLabel: formType }) : Promise.resolve();
+
+/** A social profile icon (Instagram, Zillow, …) was followed. */
+export const trackSocialClick = (userId: string | undefined, platform: string) =>
+  userId ? recordAnalyticsEvent({ userId, eventType: 'social_click', targetLabel: platform }) : Promise.resolve();
+
+/** A listing's detail was opened on the public profile. */
+export const trackListingView = (userId: string | undefined, listingId: string, address?: string | null) =>
+  userId
+    ? recordAnalyticsEvent({ userId, eventType: 'listing_view', targetId: listingId, targetLabel: address ?? null })
+    : Promise.resolve();

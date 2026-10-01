@@ -26,6 +26,8 @@ import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
 import { formatNumber, formatPrice, getInitials, parsePrice } from '@/lib/format';
 import { toStringList } from '@/types/profile';
 import { cn } from '@/lib/utils';
+import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { HoneypotField } from '@/components/forms/HoneypotField';
 
 /** How long the thank-you stays up before the form clears for the next visitor. */
 const KIOSK_RESET_MS = 8000;
@@ -115,11 +117,18 @@ function formatWindow(startsAt: string, endsAt: string): string {
   return `${format(s, 'EEEE, MMMM d')} · ${time}`;
 }
 
-const signInSchema = z.object({
-  name: z.string().trim().min(1, 'Please enter your name').max(100, 'That name is too long'),
-  email: z.string().trim().email('Please enter a valid email address'),
-  phone: z.string().trim().max(30, 'That phone number is too long'),
-});
+// US-228: an email or a phone. A visitor happy to leave a number but not an
+// address was turned away at the door.
+const signInSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Please enter your name').max(100, 'That name is too long'),
+    email: z.union([z.literal(''), z.string().trim().email('Please enter a valid email address')]),
+    phone: z.string().trim().max(30, 'That phone number is too long'),
+  })
+  .refine((d) => d.email.trim() !== '' || d.phone.trim() !== '', {
+    message: 'Please give an email or a phone number',
+    path: ['email'],
+  });
 
 type FieldErrors = Partial<Record<'name' | 'email' | 'phone', string>>;
 
@@ -202,6 +211,7 @@ export default function OpenHouseSignIn() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { honeypotRef, signals } = useSpamGuard();
   const [submittedName, setSubmittedName] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -249,10 +259,11 @@ export default function OpenHouseSignIn() {
     setSubmitting(true);
     try {
       await submitOpenHouseSignIn({
+        spam: signals(),
         agentId: openHouse.agentId,
         openHouseId: openHouse.id,
         name: parsed.data.name,
-        email: parsed.data.email,
+        email: parsed.data.email.trim() || undefined,
         phone: parsed.data.phone || undefined,
         hasAgent: form.hasAgent === null ? undefined : form.hasAgent === 'yes',
         preapproved: form.preapproval === null ? undefined : form.preapproval === 'yes',
@@ -430,6 +441,7 @@ export default function OpenHouseSignIn() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate className="w-full max-w-xl space-y-6">
+            <HoneypotField ref={honeypotRef} />
             <div>
               <h1 className="text-3xl font-semibold">Welcome! Please sign in</h1>
               <p className="mt-2 text-lg text-muted-foreground">It takes about 30 seconds.</p>
@@ -459,7 +471,7 @@ export default function OpenHouseSignIn() {
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <label htmlFor="oh-email" className="mb-2 block text-base font-medium">
-                  Email <span className="text-muted-foreground">(required)</span>
+                  Email <span className="text-muted-foreground">(or phone)</span>
                 </label>
                 <input
                   id="oh-email"

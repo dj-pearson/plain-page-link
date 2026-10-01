@@ -160,20 +160,9 @@ export default function InstagramBioAnalyzer() {
           const { data: _functionData, error: functionError } = await edgeFunctions.invoke(
             'send-bio-analyzer-email',
             {
-              body: {
-                // Misnamed on the edge function's side: send-bio-analyzer-email
-                // looks this id up in instagram_bio_email_captures and stores it
-                // as email_capture_id, so it wants the capture row, not the
-                // analysis. The old `captureData?.id || analysisId` fallback
-                // would have sent the analysis id and failed the lookup.
-                analysisId: captureId,
-                email: data.email,
-                firstName: data.firstName,
-                market: data.market,
-                brokerage: data.brokerage,
-                score: analysisResult.overallScore,
-                bioRewrites: analysisResult.rewrittenBios.map(b => b.bio),
-              },
+              // Only the capture id: the function reads the address and the
+              // analysis from the stored rows, and sends once (US-219).
+              body: { captureId },
             }
           );
 
@@ -580,7 +569,7 @@ export default function InstagramBioAnalyzer() {
                   window.location.href = '/auth/register';
                 }}
               >
-                Start Your Free 14-Day Trial
+                Create Your Free Page
                 <ArrowRight className="w-5 h-5" />
               </Button>
 

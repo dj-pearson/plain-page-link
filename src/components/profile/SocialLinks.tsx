@@ -1,4 +1,5 @@
 import { Instagram, Facebook, Linkedin, Music, Youtube, Home, Building, Globe } from 'lucide-react';
+import { trackSocialClick } from '@/lib/analyticsEvents';
 import type { PublicProfile } from '@/types/profile';
 
 interface SocialLinksProps {
@@ -80,6 +81,8 @@ export default function SocialLinks({ profile }: SocialLinksProps) {
               rel="noopener noreferrer"
               className={`flex items-center gap-2 px-4 py-2 border-2 border-gray-200 rounded-lg text-gray-700 font-medium transition-all ${platform.color} hover:border-current hover:shadow-md`}
               aria-label={platform.label}
+              // US-227: social icons were plain links, invisible to the funnel.
+              onClick={() => void trackSocialClick(profile.id, platform.label.toLowerCase())}
             >
               <Icon className="h-5 w-5" />
               <span className="hidden sm:inline">{platform.label}</span>

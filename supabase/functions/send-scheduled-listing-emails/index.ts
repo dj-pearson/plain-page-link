@@ -8,6 +8,7 @@ import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { getSiteUrl } from '../_shared/env.ts';
+import { safeHtmlText } from '../_shared/public-email.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'noreply@agentbio.net';
@@ -72,7 +73,7 @@ serve(async (req) => {
         // Send email via Resend
         const emailSent = await sendSequenceEmail({
           email: capture.email,
-          firstName: capture.first_name,
+          firstName: safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
           sequenceNumber: scheduleInfo.dayNumber,
           subject: scheduleInfo.subject,
           captureId: capture.id,
@@ -206,7 +207,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p style="text-align: center; margin-top: 40px;">
         <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Start Your Free Trial
+          Create Your Free Page
         </a>
       </p>
     </div>`,
@@ -339,7 +340,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p style="text-align: center; margin-top: 40px;">
         <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Start Your Free 14-Day Trial
+          Create Your Free Page
         </a>
       </p>
     </div>`,
@@ -466,7 +467,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p style="text-align: center;">
         <a href="${SITE_URL}/register?coupon=LISTING20" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 18px; font-weight: bold;">
-          Start My 14-Day Free Trial
+          Create My Free Page
         </a>
       </p>
 

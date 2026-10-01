@@ -185,11 +185,17 @@ export default async (req: Request) => {
       // The ownership filter is the control. The service-role client bypasses
       // RLS, so without `.eq('user_id', user.id)` this would open any row whose
       // id the caller could guess or read from an audit entry.
+      //
+      // US-226: a lead also opens for the teammate it is assigned to — RLS
+      // lets them read the row, and routing assigns it so they can call. The
+      // id comes from the verified JWT, so it is safe in the filter string.
+      const ownership =
+        op === 'decrypt_leads' ? `user_id.eq.${user.id},assigned_to.eq.${user.id}` : `user_id.eq.${user.id}`;
       const { data: rows, error } = await supabase
         .from(table)
-        .select('id, encrypted_email, encrypted_phone')
+        .select('id, user_id, encrypted_email, encrypted_phone')
         .in('id', rowIds)
-        .eq('user_id', user.id);
+        .or(ownership);
 
       if (error) {
         return errorResponse(`Could not read those ${table}`, 'LEAD_READ_FAILED', req, 502);
@@ -207,18 +213,27 @@ export default async (req: Request) => {
       // (20260923000003): their contact details stay sealed until the agent
       // upgrades or the month turns. This is the gate — the dashboard only
       // draws the blur. Contacts are the agent's own entries and never lock.
-      let locked = new Set<string>();
+      // The allowance is the lead OWNER's, so assigned leads are checked
+      // against their owner's plan, one call per owner.
+      const locked = new Set<string>();
       if (op === 'decrypt_leads' && (rows ?? []).length > 0) {
-        const { data: lockedIds, error: lockError } = await supabase.rpc('locked_lead_ids', {
-          _user_id: user.id,
-          _lead_ids: (rows ?? []).map((row) => row.id as string),
-        });
-        if (lockError) {
-          // Fail open: a transient database error must not blank every lead
-          // an agent has. The allowance is a paywall, not a security boundary.
-          console.error('[pii-crypto] locked_lead_ids failed; returning details unlocked', lockError);
-        } else {
-          locked = new Set((lockedIds ?? []) as string[]);
+        const byOwner = new Map<string, string[]>();
+        for (const row of rows ?? []) {
+          const owner = row.user_id as string;
+          byOwner.set(owner, [...(byOwner.get(owner) ?? []), row.id as string]);
+        }
+        for (const [owner, ids] of byOwner) {
+          const { data: lockedIds, error: lockError } = await supabase.rpc('locked_lead_ids', {
+            _user_id: owner,
+            _lead_ids: ids,
+          });
+          if (lockError) {
+            // Fail open: a transient database error must not blank every lead
+            // an agent has. The allowance is a paywall, not a security boundary.
+            console.error('[pii-crypto] locked_lead_ids failed; returning details unlocked', lockError);
+          } else {
+            for (const id of (lockedIds ?? []) as string[]) locked.add(id);
+          }
         }
       }
 

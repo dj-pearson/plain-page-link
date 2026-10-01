@@ -314,6 +314,8 @@ export type Database = {
           target_id: string | null;
           target_label: string | null;
           user_id: string;
+          utm_campaign: string | null;
+          utm_source: string | null;
           visitor_id: string | null;
         };
         Insert: {
@@ -324,6 +326,8 @@ export type Database = {
           target_id?: string | null;
           target_label?: string | null;
           user_id: string;
+          utm_campaign?: string | null;
+          utm_source?: string | null;
           visitor_id?: string | null;
         };
         Update: {
@@ -334,6 +338,8 @@ export type Database = {
           target_id?: string | null;
           target_label?: string | null;
           user_id?: string;
+          utm_campaign?: string | null;
+          utm_source?: string | null;
           visitor_id?: string | null;
         };
         Relationships: [
@@ -353,6 +359,9 @@ export type Database = {
           location: string | null;
           source: string | null;
           user_id: string;
+          utm_campaign: string | null;
+          utm_medium: string | null;
+          utm_source: string | null;
           viewed_at: string | null;
           visitor_id: string | null;
         };
@@ -362,6 +371,9 @@ export type Database = {
           location?: string | null;
           source?: string | null;
           user_id: string;
+          utm_campaign?: string | null;
+          utm_medium?: string | null;
+          utm_source?: string | null;
           viewed_at?: string | null;
           visitor_id?: string | null;
         };
@@ -371,6 +383,9 @@ export type Database = {
           location?: string | null;
           source?: string | null;
           user_id?: string;
+          utm_campaign?: string | null;
+          utm_medium?: string | null;
+          utm_source?: string | null;
           viewed_at?: string | null;
           visitor_id?: string | null;
         };
@@ -1197,6 +1212,35 @@ export type Database = {
           },
         ];
       };
+      digest_log: {
+        Row: {
+          digest_date: string;
+          kind: string;
+          sent_at: string;
+          user_id: string;
+        };
+        Insert: {
+          digest_date: string;
+          kind: string;
+          sent_at?: string;
+          user_id: string;
+        };
+        Update: {
+          digest_date?: string;
+          kind?: string;
+          sent_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'digest_log_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       encrypted_pii_config: {
         Row: {
           created_at: string;
@@ -1581,6 +1625,35 @@ export type Database = {
           },
           {
             foreignKeyName: 'feature_usage_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      feature_waitlist: {
+        Row: {
+          created_at: string;
+          feature: string;
+          id: string;
+          user_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          feature: string;
+          id?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          feature?: string;
+          id?: string;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'feature_waitlist_user_id_fkey';
             columns: ['user_id'];
             isOneToOne: false;
             referencedRelation: 'users';
@@ -2640,6 +2713,7 @@ export type Database = {
           contacted_at: string | null;
           created_at: string | null;
           device: string | null;
+          email_hash: string | null;
           encrypted_email: string | null;
           encrypted_phone: string | null;
           first_responded_at: string | null;
@@ -2659,6 +2733,8 @@ export type Database = {
           source: string | null;
           status: string | null;
           timeline: string | null;
+          update_token_expires_at: string | null;
+          update_token_hash: string | null;
           updated_at: string | null;
           user_id: string;
           utm_campaign: string | null;
@@ -2671,6 +2747,7 @@ export type Database = {
           contacted_at?: string | null;
           created_at?: string | null;
           device?: string | null;
+          email_hash?: string | null;
           encrypted_email?: string | null;
           encrypted_phone?: string | null;
           first_responded_at?: string | null;
@@ -2690,6 +2767,8 @@ export type Database = {
           source?: string | null;
           status?: string | null;
           timeline?: string | null;
+          update_token_expires_at?: string | null;
+          update_token_hash?: string | null;
           updated_at?: string | null;
           user_id: string;
           utm_campaign?: string | null;
@@ -2702,6 +2781,7 @@ export type Database = {
           contacted_at?: string | null;
           created_at?: string | null;
           device?: string | null;
+          email_hash?: string | null;
           encrypted_email?: string | null;
           encrypted_phone?: string | null;
           first_responded_at?: string | null;
@@ -2721,6 +2801,8 @@ export type Database = {
           source?: string | null;
           status?: string | null;
           timeline?: string | null;
+          update_token_expires_at?: string | null;
+          update_token_hash?: string | null;
           updated_at?: string | null;
           user_id?: string;
           utm_campaign?: string | null;
@@ -3725,10 +3807,12 @@ export type Database = {
           onboarding_completed_at: string | null;
           phone: string | null;
           realtor_com_url: string | null;
+          referred_by: string | null;
           seo_description: string | null;
           seo_title: string | null;
           service_cities: Json | null;
           service_zip_codes: Json | null;
+          signup_source: string | null;
           sms_enabled: boolean | null;
           specialties: Json | null;
           theme: string | null;
@@ -3769,10 +3853,12 @@ export type Database = {
           onboarding_completed_at?: string | null;
           phone?: string | null;
           realtor_com_url?: string | null;
+          referred_by?: string | null;
           seo_description?: string | null;
           seo_title?: string | null;
           service_cities?: Json | null;
           service_zip_codes?: Json | null;
+          signup_source?: string | null;
           sms_enabled?: boolean | null;
           specialties?: Json | null;
           theme?: string | null;
@@ -3813,10 +3899,12 @@ export type Database = {
           onboarding_completed_at?: string | null;
           phone?: string | null;
           realtor_com_url?: string | null;
+          referred_by?: string | null;
           seo_description?: string | null;
           seo_title?: string | null;
           service_cities?: Json | null;
           service_zip_codes?: Json | null;
+          signup_source?: string | null;
           sms_enabled?: boolean | null;
           specialties?: Json | null;
           theme?: string | null;
@@ -7483,6 +7571,8 @@ export type Database = {
           accepted_at: string | null;
           email: string | null;
           id: string;
+          invite_sent_at: string | null;
+          invite_token_hash: string | null;
           invited_at: string;
           role: string;
           team_id: string;
@@ -7492,6 +7582,8 @@ export type Database = {
           accepted_at?: string | null;
           email?: string | null;
           id?: string;
+          invite_sent_at?: string | null;
+          invite_token_hash?: string | null;
           invited_at?: string;
           role?: string;
           team_id: string;
@@ -7501,6 +7593,8 @@ export type Database = {
           accepted_at?: string | null;
           email?: string | null;
           id?: string;
+          invite_sent_at?: string | null;
+          invite_token_hash?: string | null;
           invited_at?: string;
           role?: string;
           team_id?: string;
@@ -8974,6 +9068,11 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: string;
       };
+      assert_caller_is: { Args: { p_user_id: string }; Returns: undefined };
+      assert_caller_is_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
       assert_within_plan: {
         Args: { _at?: string; _key: string; _user_id: string };
         Returns: undefined;
@@ -8985,6 +9084,10 @@ export type Database = {
       calculate_next_run_time: {
         Args: { p_cron_expression?: string; p_current_time?: string; p_schedule_type: string };
         Returns: string;
+      };
+      campaign_conversion: {
+        Args: { p_since?: string };
+        Returns: Record<string, unknown>[];
       };
       cancel_account_deletion: {
         Args: { p_cancel_reason?: string; p_user_id: string };
@@ -9213,6 +9316,10 @@ export type Database = {
       is_team_member: {
         Args: { p_team_id: string; p_user_id: string };
         Returns: boolean;
+      };
+      lead_stats: {
+        Args: { p_since?: string; p_sla_hours?: number };
+        Returns: Json;
       };
       list_public_open_houses: {
         Args: { _user_id: string };

@@ -4425,3 +4425,229 @@ route-coverage test that derives its list from App.tsx rather than from memory.
 Each one was run against the commit before its fix and watched to fail. A guard
 that has only ever passed has not been tested — which is, in the end, the same
 sentence as the paragraph above.
+
+---
+
+## Platform Improvement Roadmap — 2026-09-30 (stories US-213 to US-232 added)
+
+Five parallel read-only audits: agent dashboard, visitor conversion, backend
+security, engineering health, growth/billing. Every story cites file:line
+evidence in its notes. Findings marked "reproduced" were run as anon/
+authenticated against a throwaway Postgres built from the migrations.
+
+Loop order = id order. Priority 1 (US-213..219) are security and money bugs and
+go first; US-213 is critical (any account deletable with the anon key).
+
+  P1  US-213  Account deletion RPCs executable by anon (reproduced)
+      US-214  Rate-limit bucket poisoning + spoofable client IP (reproduced)
+      US-215  is_sample bypasses every plan limit and the lead lock (reproduced)
+      US-216  stripe-webhook: async signature check, checked writes, retries
+      US-217  Plan change creates a second subscription (double billing)
+      US-218  execute-workflow SSRF / cross-tenant writes; social publish gate
+      US-219  Free-tool email functions are an open relay
+  P2  US-220  Lead-form bot protection (honeypot, timing, dedupe)
+      US-221  CSP blocks Calendly/video; bookings become leads
+      US-222  Sentry live in prod, edge-function error reporting, public probe
+      US-223  CI audit green (drop axios etc.), lint warning ratchet
+      US-224  Remove claims for features that do not exist
+      US-225  Lead counts/export/analytics cover all leads, not 50
+      US-226  Team invites acceptable; assignees see routed leads
+      US-227  Funnel tracking by campaign source
+  P3  US-228  Two-step lead forms, email OR phone
+      US-229  Auto-reply reply-to and agent details
+      US-230  Daily/weekly digest with tasks and key dates
+      US-231  Admin users panel, true MRR and churn
+      US-232  Pricing → register → checkout intent; badge referral attribution
+
+Deliberately not included (still worth doing): workflow runtime (US-136, open —
+US-218 and US-224 make it safe and honest first), binding PII ciphertext to its
+row (decrypt_contacts oracle), listing pages + agent sitemap (US-141), open
+house guest list and offline kiosk, backups/DR for self-hosted Postgres, reverse
+trial. Owner-only: US-191 key rotation remains open and outranks all of these.
+
+---
+
+## Roadmap loop — iteration 1/20 — US-213: any account deletable with the anon key
+
+- Reproduced first: as anon, request_account_deletion(victim, …, -1) then
+  process_scheduled_account_deletions() removed the victim from auth.users.
+- Root cause is general, not one function: Supabase default privileges grant
+  EXECUTE on every public function to anon/authenticated and the baseline has
+  no GRANT/REVOKE, so 93 SECURITY DEFINER functions were anonymous RPCs.
+- Fix: deny-by-default migration (20260930000001), explicit grant-back of 22,
+  assert_caller_is / assert_caller_is_admin guards on the ones taking an id.
+  Also closed on the way: anyone reading anyone's sessions (IP + location),
+  forging admin audit entries, starting other agents' workflows.
+- Guard: verify-schema DEFINER_CALLABLE allowlist + "every browser rpc() is
+  executable" + the exploit itself. Watched fail on the pre-fix tree (84 + 9),
+  pass after. The second check found a browser RPC my grep had missed.
+- Deploy note: apply the migration, then smoke the admin panel (user stats,
+  slow queries, system health) and Settings → Sessions as a real user.
+
+## Roadmap loop — iteration 2/20 — US-214: rate limits a stranger could fill
+
+- The DB half landed with US-213 (check_rate_limit is service-role only).
+- The rate-limit edge function had zero callers: deleted.
+- getClientIP took the leftmost X-Forwarded-For (client-written). DNS check:
+  functions.agentbio.net → Contabo IP directly, api.agentbio.net → Cloudflare.
+  So cf-connecting-ip is spoofable on the host the browser actually uses.
+  Now one implementation, rightmost-hop, configurable. Four Stripe functions
+  had their own copy of the leftmost read; they use the shared one.
+- Sandbox cannot reach esm.sh, so full `deno check` / smoke run only in CI.
+
+## Roadmap loop — iteration 3/20 — US-215: the paywall had an off switch
+
+- Agents could write is_sample; every limit trigger and the lead lock skip
+  sample rows. Now only an admin or the service role can set/change it
+  (invoker trigger), sample rows are hidden from visitors, and the link /
+  testimonial limit triggers also run when a sample becomes real.
+- Kept the admin SampleDataManager path instead of an RPC (noted in prd).
+- Guard reproduces insert-as-sample, flip-to-sample and public visibility;
+  4 failures before, clean after.
+
+## Roadmap loop — iteration 4/20 — US-216: a 2xx must mean the plan changed
+
+- Split stripe-webhook into index.ts (signature, deps) and handler.ts (logic,
+  vitest-runnable). constructEventAsync for Deno's SubtleCrypto.
+- Checked writes, claim released on failure, 500 so Stripe retries; plan
+  lookup errors no longer fall through to 'free'; user_id falls back to the
+  Stripe customer mapping.
+- Found on the way: Stripe statuses outside the enum (unpaid, paused,
+  incomplete_expired) — mapped, or checked writes would retry forever.
+- Kept fail-open on an unwritable claim table (prod lacks it, US-146).
+
+## Roadmap loop — iteration 5/20 — US-217: every plan change billed twice
+
+- Existing subscribers now get stripe.subscriptions.update (prorated) instead
+  of a second Checkout. Stripe is the authority for "is this customer live".
+- One-time payment mode refused: it still took money after US-059.
+- Webhook audits any duplicate that still gets through (critical risk).
+- Owner: check Stripe for customers with two live subscriptions and refund.
+
+## Roadmap loop — iteration 6/20 — US-218: workflows as a proxy into the network
+
+- webhook_call: safeFetch, status only. update_lead / create_task: ownership
+  check before the service-role write, assignee limited.
+- publish-article-to-social: admin or service role, rate-limited, published
+  articles only.
+- Source-level assertions watched fail on the old index.ts.
+
+## Roadmap loop — iteration 7/20 — US-219: an open relay on the free tools
+
+- Request body no longer chooses recipient or content: capture id only,
+  claimed once, recent, per-IP and per-recipient limits.
+- Stored content is still visitor-written (anon inserts it), so everything
+  interpolated is escaped and link-stripped (_shared/public-email.ts).
+- Residual risk recorded in prd notes: one link-free email per forged
+  capture; double opt-in would close it.
+
+## Roadmap loop — iteration 8/20 — US-220: bots spending the agent's allowance
+
+- Honeypot + time-to-submit on every public lead path; trips get a fake 200.
+- leads.email_hash (keyed HMAC) folds repeat enquiries within 24h into one
+  lead, no second notification/auto-reply/allowance. Also the basis for
+  email search (US-225).
+- 50 auto-replies/day/agent cap bounds mail to strangers.
+
+## Roadmap loop — iteration 9/20 — US-221: the empty scheduler
+
+- CSP (both copies) now allows Calendly and the video hosts; a test parses
+  both and was watched fail on the old files.
+- Widget initialised explicitly (the old DOM-scan only worked on first open).
+- Two-field details step → prefilled Calendly → booking message → one lead
+  with listing and campaign attribution.
+
+## Roadmap loop — iteration 10/20 — US-222: errors that went nowhere
+
+- Browser Sentry via a same-origin Pages Function tunnel (project-locked).
+- Edge functions: SDK-free envelope reporter, wired into the shared error
+  handler and the router's 5xx catch-all (deduplicated by a marker header).
+- health-check: unauthenticated liveness {ok} for uptime monitors.
+- Owner: set SENTRY_DSN (Coolify) + VITE_SENTRY_DSN (Pages build + runtime),
+  add two uptime monitors.
+
+## Roadmap loop — iteration 11/20 — US-223: a red security job
+
+- Six unused packages and two dead 3D components removed; remaining
+  advisories fixed one by one (npm audit fix crashes). High/critical: 0.
+- react-router open redirect needs v7; mitigated at the only untrusted
+  navigate (backslash refused, tested).
+- Lint can fail again: --max-warnings=675, lower as warnings go.
+
+## Roadmap loop — iteration 12/20 — US-224: selling what does not exist
+
+- Trial, MLS/CRM/SMS add-ons, predictive AI, property matching, workflow
+  emails: removed, relabelled, or turned into a waitlist that measures demand.
+- Workflow email step no longer spends the email quota for nothing.
+- New guard scans src + edge functions for the feature claims; each rule is
+  self-tested. CLAUDE.md corrected in five places.
+
+## Roadmap loop — iteration 13/20 — US-225: numbers from the first 50 rows
+
+- lead_stats() RPC (invoker) replaces client-side counting on Leads and
+  Analytics; export pages through every matching lead in pii-crypto-sized
+  batches; search debounced and honestly labelled name-only.
+
+## Roadmap loop — iteration 14/20 — US-226: a $99 plan whose invites never landed
+
+- Tokenised, emailed invites (hash stored), a /team/accept page, and an
+  accept that no longer trusts the caller's email.
+- Assignees see and can decrypt routed leads; a trigger notifies them.
+- DB check covers routing → visibility → notification.
+
+## Roadmap loop — iteration 15/20 — US-227: a funnel nobody could see
+
+- Five new event types, UTM on views and events, campaign_conversion() RPC,
+  and a "Which sources convert" table. Form submissions stop going to an
+  undefined window.analytics.
+
+## Roadmap loop — iteration 16/20 — US-228: nine required fields before a lead
+
+- Two steps: contact first (email OR phone), qualifiers optional after, via
+  a single-use enrichment token. Contact form and kiosk accept phone-only.
+- Found: submitLead never returned the lead id (lead_id vs leadId).
+
+## Roadmap loop — iteration 17/20 — US-229: replies to noreply
+
+- Auto-reply now has a reply-to that reaches the agent, their number, photo,
+  booking link and the listing; failed sends reach Sentry.
+
+## Roadmap loop — iteration 18/20 — US-230: nothing brought an agent back
+
+- Morning email from the hourly job: new leads, follow-ups due, clients'
+  dates inside their reminder window; Monday adds the week. Only when there
+  is something; once per day via digest_log; daily/weekly/off in Settings.
+- "Daily digest" lead mode finally means a digest.
+
+## Roadmap loop — iteration 19/20 — US-231: an operator who could not see users
+
+- admin-users edge function replaces a browser call that always failed;
+  Users is the admin landing tab (it was "coming soon").
+- MRR from real amounts/intervals; churn counts the webhook's 'cancelled'.
+
+## Roadmap loop — iteration 20/20 — US-232: the most eager buyer hit a dead end
+
+- Plan intent survives register → onboarding → checkout; the badge carries
+  ?ref=; profiles.referred_by is set once at signup and cannot be rewritten;
+  signups by referrer on the Health dashboard.
+
+---
+
+## The roadmap loop, in one paragraph
+
+Twenty stories, US-213 to US-232, from five parallel audits. The first seven
+were the kind that end a company: any account deletable with the anon key
+(93 SECURITY DEFINER functions were anonymous RPCs), a paywall with an
+off-switch, payments that could land on the free plan, every plan change
+billed twice, a workflow step that proxied into the Docker network, and two
+public endpoints that mailed anything to anyone from our domain. The middle
+was honesty and plumbing — claims for features that do not exist, a scheduler
+that opened empty, errors that reached nobody, numbers computed from the first
+50 rows, team invites nobody could accept, a funnel nobody could see. The last
+five were growth: a lead after two fields instead of nine, replies that reach
+the agent, a morning email, an admin who can find a user, and a Subscribe
+button that leads somewhere. Each database defect has a verify-schema check
+that was run against the tree before its fix and watched to fail. Owner
+actions are listed in the prd notes: apply migrations 20260930000001–10, set
+SENTRY_DSN / VITE_SENTRY_DSN, add uptime monitors, and check Stripe for
+customers already holding two live subscriptions.

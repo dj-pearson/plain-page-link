@@ -184,8 +184,13 @@ export function validateLeadData(data: any): ValidationResult {
     errors.push('Name must be between 1 and 100 characters');
   }
   
-  if (!data.email || !validateEmail(data.email)) {
-    errors.push('Invalid email address');
+  // US-228: an email OR a phone. Requiring an email made a phone-only lead
+  // impossible — including at the open house kiosk, where a visitor happy to
+  // leave a number was turned away.
+  if (data.email) {
+    if (!validateEmail(data.email)) errors.push('Invalid email address');
+  } else if (!data.phone) {
+    errors.push('Please give an email address or a phone number');
   }
   
   if (
@@ -279,12 +284,8 @@ export function validateContactData(data: any): ValidationResult {
   };
 }
 
-// Get client IP from request
-export function getClientIP(req: Request): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0] || 
-         req.headers.get('x-real-ip') || 
-         'unknown';
-}
+// The one implementation lives in client-ip.ts (US-214).
+export { getClientIP } from './client-ip.ts';
 
 /**
  * Public review submission (US-113).

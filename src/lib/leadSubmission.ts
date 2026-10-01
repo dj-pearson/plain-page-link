@@ -19,6 +19,8 @@
 import { callEdgeFunction } from '@/lib/edgeFunctions';
 import { getLeadAttribution } from '@/lib/attribution';
 import { logger } from '@/lib/logger';
+import type { SpamSignals } from '@/hooks/useSpamGuard';
+import { trackFormSubmit } from '@/lib/analyticsEvents';
 
 /** Lead types accepted by the edge function's validateLeadData(). */
 export type LeadType = 'buyer' | 'seller' | 'valuation' | 'contact';
@@ -28,7 +30,8 @@ export interface LeadSubmissionData {
   agentId: string;
   leadType: LeadType;
   name: string;
-  email: string;
+  /** An email or a phone is required (US-228); both is best. */
+  email?: string;
   phone?: string;
   /**
    * Answers the form collected. Fields with a dedicated column are lifted out
@@ -39,11 +42,15 @@ export interface LeadSubmissionData {
   listingId?: string;
   source?: string;
   referrer?: string;
+  /** From useSpamGuard().signals() — honeypot and time-to-submit (US-220). */
+  spam?: SpamSignals;
 }
 
 export interface LeadSubmissionResponse {
   success: boolean;
   leadId?: string;
+  /** Single-use, 30 minutes: lets step two add details to this lead (US-228). */
+  updateToken?: string;
   error?: string;
 }
 
@@ -129,13 +136,16 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
   const { columns, formData } = splitFormData(leadData.data);
 
   try {
-    const result = await callEdgeFunction<{ success: boolean; leadId?: string }>('submit-lead', {
+    // The function answers { success, data: { lead_id, update_token } } and
+    // callEdgeFunction unwraps `data`. This read `leadId`, which the server has
+    // never sent, so no caller ever got the id back (found in US-228).
+    const result = await callEdgeFunction<{ lead_id?: string | null; update_token?: string | null }>('submit-lead', {
       body: {
         user_id: leadData.agentId,
         lead_type: leadData.leadType,
         name: leadData.name,
-        email: leadData.email,
-        phone: leadData.phone,
+        email: leadData.email || undefined,
+        phone: leadData.phone || undefined,
         listing_id: leadData.listingId,
         source: leadData.source ?? 'website',
         referrer_url:
@@ -148,11 +158,16 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
         ...getLeadAttribution(),
         ...columns,
         form_data: Object.keys(formData).length > 0 ? formData : undefined,
+        ...leadData.spam,
       },
       auth: false, // public capture — visitors are not signed in
     });
 
-    return { success: true, leadId: result?.leadId };
+    return {
+      success: true,
+      leadId: result?.lead_id ?? undefined,
+      updateToken: result?.update_token ?? undefined,
+    };
   } catch (error) {
     logger.error('Lead submission failed', error as Error);
     return {
@@ -164,36 +179,41 @@ export async function submitLead(leadData: LeadSubmissionData): Promise<LeadSubm
 }
 
 /**
- * Track form submission analytics
+ * Step two of a lead form: add the optional answers to the lead step one
+ * created (US-228). The token is the one submitLead returned.
  */
-export function trackFormSubmission(formType: string, success: boolean) {
+export async function enrichLead(
+  leadId: string,
+  updateToken: string,
+  data: Record<string, unknown>
+): Promise<LeadSubmissionResponse> {
+  const { columns, formData } = splitFormData(data);
   try {
-    // Track with visitor analytics if available
-    if (
-      typeof window !== 'undefined' &&
-      (window as { analytics?: { track: (e: string, p: unknown) => void } }).analytics
-    ) {
-      (
-        window as unknown as { analytics: { track: (e: string, p: unknown) => void } }
-      ).analytics.track('form_submit', {
-        formType,
-        success,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Also track in localStorage for local analytics
-    const storageKey = `analytics_form_submissions`;
-    const existing = localStorage.getItem(storageKey);
-    const submissions = existing ? JSON.parse(existing) : [];
-    submissions.push({
-      formType,
-      success,
-      timestamp: Date.now(),
+    await callEdgeFunction('submit-lead', {
+      body: {
+        action: 'enrich',
+        lead_id: leadId,
+        update_token: updateToken,
+        ...columns,
+        form_data: Object.keys(formData).length > 0 ? formData : undefined,
+      },
+      auth: false,
     });
-    localStorage.setItem(storageKey, JSON.stringify(submissions));
+    return { success: true, leadId };
   } catch (error) {
-    logger.error('Failed to track form submission:', error as Error);
-    // Don't fail the submission if analytics fails
+    logger.error('Lead enrichment failed', error as Error);
+    return { success: false, error: error instanceof Error ? error.message : 'Could not save those details.' };
   }
+}
+
+/**
+ * Record a form submission for the agent's funnel (US-227).
+ *
+ * This sent the event to `window.analytics`, which nothing in the app defines,
+ * and to the visitor's own localStorage — so no agent ever saw a submission
+ * counted. Successful submissions now go to analytics_events as form_submit;
+ * failures are the visitor's problem to retry, not a funnel stage.
+ */
+export function trackFormSubmission(agentId: string | undefined, formType: string, success: boolean) {
+  if (success) void trackFormSubmit(agentId, formType);
 }

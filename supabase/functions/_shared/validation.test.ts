@@ -105,3 +105,19 @@ describe('validateReviewData', () => {
     expect(validateReviewData({ ...validReview, transaction_type: 'renter' }).valid).toBe(false);
   });
 });
+
+describe('validateLeadData: email or phone (US-228)', () => {
+  const base = { name: 'Dana', lead_type: 'buyer', user_id: '11111111-1111-1111-1111-111111111111' };
+  it('accepts a phone-only lead', () => {
+    expect(validateLeadData({ ...base, phone: '555-123-4567' }).valid).toBe(true);
+  });
+  it('accepts an email-only lead', () => {
+    expect(validateLeadData({ ...base, email: 'dana@example.com' }).valid).toBe(true);
+  });
+  it('refuses a lead with neither', () => {
+    expect(validateLeadData(base).errors).toContain('Please give an email address or a phone number');
+  });
+  it('still refuses a malformed email', () => {
+    expect(validateLeadData({ ...base, email: 'nope', phone: '555-123-4567' }).errors).toContain('Invalid email address');
+  });
+});

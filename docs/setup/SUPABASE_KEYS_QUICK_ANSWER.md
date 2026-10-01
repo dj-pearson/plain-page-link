@@ -7,7 +7,7 @@
 Your Supabase keys are **JWT (JSON Web Tokens)** with a specific format:
 
 ```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTcwNTAzOTk4MCwiZXhwIjo0OTIwNzEzNTgwLCJyb2xlIjoiYW5vbiJ9.signature
+<redacted — read from Coolify env (SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY)>
 ```
 
 ## Your Current Keys ARE Valid ✅

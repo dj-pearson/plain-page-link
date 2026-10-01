@@ -66,7 +66,7 @@ describe('ContactForm', () => {
     await fillAndSubmit();
 
     expect(await screen.findByText('Message Sent!')).toBeInTheDocument();
-    expect(trackMock).toHaveBeenCalledWith('contact_form', true);
+    expect(trackMock).toHaveBeenCalledWith(expect.anything(), 'contact_form', true);
   });
 
   it('surfaces the reason the submission was rejected, not a generic failure', async () => {
@@ -76,6 +76,6 @@ describe('ContactForm', () => {
 
     expect(await screen.findByText('Invalid lead type')).toBeInTheDocument();
     expect(screen.queryByText('Message Sent!')).not.toBeInTheDocument();
-    expect(trackMock).toHaveBeenCalledWith('contact_form', false);
+    expect(trackMock).toHaveBeenCalledWith(expect.anything(), 'contact_form', false);
   });
 });

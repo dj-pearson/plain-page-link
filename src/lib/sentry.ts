@@ -12,6 +12,9 @@ const isDevelopment = import.meta.env.DEV;
 const isProduction = import.meta.env.PROD;
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 
+/** Same-origin path served by functions/api/sentry.ts. */
+export const SENTRY_TUNNEL = '/api/sentry';
+
 // List of URLs to ignore (internal/expected errors)
 const IGNORED_ERRORS = [
   'ResizeObserver loop limit exceeded',
@@ -52,6 +55,10 @@ export function initSentry(): void {
 
   Sentry.init({
     dsn: sentryDsn,
+    // US-222: through our own origin (functions/api/sentry.ts). The CSP's
+    // connect-src has no Sentry host, so reports sent straight to sentry.io
+    // were blocked by the browser and production errors went nowhere.
+    tunnel: SENTRY_TUNNEL,
     environment: isDevelopment ? 'development' : 'production',
     release: import.meta.env.VITE_APP_VERSION || '1.0.0',
 

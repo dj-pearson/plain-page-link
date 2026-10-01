@@ -110,7 +110,9 @@ export default function RequireAuth({ requireAdmin = false }: RequireAuthProps) 
   if (
     onboardingStateKnown &&
     !profile.onboarding_completed_at &&
-    !location.pathname.startsWith('/onboarding')
+    !location.pathname.startsWith('/onboarding') &&
+    // US-226: accepting a team invite must not be swallowed by the wizard.
+    !location.pathname.startsWith('/team/')
   ) {
     return <Navigate to="/onboarding/wizard" replace />;
   }

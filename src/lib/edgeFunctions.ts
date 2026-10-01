@@ -284,29 +284,26 @@ export const EdgeFunctions = {
     }),
 
   // Send listing generator email
-  sendListingGeneratorEmail: (data: { email: string; description: string; listingData: any }) =>
+  // Only the stored capture's id: the function reads recipient and content (US-219).
+  sendListingGeneratorEmail: (data: { captureId: string }) =>
     callEdgeFunction<{ success: boolean }>('send-listing-generator-email', {
       body: data,
       auth: false,
     }),
 
   // Send bio analyzer email
-  sendBioAnalyzerEmail: (data: { email: string; analysis: any }) =>
+  sendBioAnalyzerEmail: (data: { captureId: string }) =>
     callEdgeFunction<{ success: boolean }>('send-bio-analyzer-email', {
       body: data,
       auth: false,
     }),
 
-  // Create Stripe checkout session (subscription or one-time)
-  createCheckoutSession: (data: {
-    priceId: string;
-    successUrl: string;
-    cancelUrl: string;
-    mode?: 'subscription' | 'payment';
-    productType?: string;
-    quantity?: number;
-  }) =>
-    callEdgeFunction<{ sessionId: string; url: string }>('create-checkout-session', {
+  // Start a plan purchase. A new subscriber gets a Checkout url; an existing
+  // one has their subscription changed in place and gets { changed } (US-217).
+  createCheckoutSession: (data: { priceId: string; successUrl: string; cancelUrl: string }) =>
+    callEdgeFunction<
+      { sessionId: string; url: string } | { changed: boolean; subscriptionId: string }
+    >('create-checkout-session', {
       body: data,
       auth: true,
     }),

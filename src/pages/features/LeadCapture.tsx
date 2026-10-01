@@ -362,7 +362,7 @@ export default function LeadCapture() {
               to="/auth/register"
               className="inline-flex items-center gap-2 px-8 py-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl font-light tracking-tight transition-all hover:border-[#80d0c7] hover:shadow-lg hover:shadow-[#80d0c7]/20"
             >
-              <span className="glass-accent">Start Free Trial</span>
+              <span className="glass-accent">Start Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
               No credit card required • All 3 form types included • Instant notifications

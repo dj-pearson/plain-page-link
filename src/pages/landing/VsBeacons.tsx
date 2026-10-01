@@ -23,7 +23,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: 'Can Beacons show real estate listings?',
     answer:
-      "No. Beacons doesn't have property listing gallery features. You can add basic links to listings, but without built-in photo galleries, pricing displays, bed/bath counts, or MLS integration that real estate agents need to properly showcase properties.",
+      "No. Beacons doesn't have property listing gallery features. You can add basic links to listings, but without built-in photo galleries, pricing displays, bed/bath counts, or active/sold status that real estate agents need to properly showcase properties.",
   },
 ];
 

@@ -11,7 +11,7 @@
  * stubbed global is enough — no Deno runtime needed.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { sendEmail, escapeHtml } from './email.ts';
+import { sendEmail, escapeHtml, createLeadAutoReply } from './email.ts';
 
 const env: Record<string, string> = {};
 
@@ -101,5 +101,61 @@ describe('escapeHtml', () => {
   it('returns an empty string for null and undefined', () => {
     expect(escapeHtml(null)).toBe('');
     expect(escapeHtml(undefined)).toBe('');
+  });
+});
+
+describe('createLeadAutoReply (US-229)', () => {
+  const base = {
+    to: 'dana@example.com',
+    leadName: 'Dana',
+    leadType: 'buyer',
+    agent: { name: 'Jane Agent', replyTo: 'jane@realty.example', phone: '(555) 123-4567' },
+  };
+
+  it('replies reach the agent, and the agent can be called', () => {
+    const mail = createLeadAutoReply(base);
+    expect(mail.replyTo).toBe('jane@realty.example');
+    expect(mail.body).toContain('(555) 123-4567');
+    expect(mail.html).toContain('tel:5551234567');
+  });
+
+  it('carries the booking link and the listing when there are some', () => {
+    const mail = createLeadAutoReply({
+      ...base,
+      agent: { ...base.agent, calendlyUrl: 'https://calendly.com/jane', profileUrl: 'https://agentbio.net/jane' },
+      listing: { address: '12 Maple Ave', url: 'https://agentbio.net/jane?listing=abc' },
+    });
+    expect(mail.body).toContain('https://calendly.com/jane');
+    expect(mail.html).toContain('12 Maple Ave');
+    expect(mail.html).toContain('https://agentbio.net/jane?listing=abc');
+  });
+
+  it('works without optional fields, and never promises a phone it does not have', () => {
+    const mail = createLeadAutoReply({ ...base, agent: { name: 'Jane Agent' } });
+    expect(mail.replyTo).toBeUndefined();
+    expect(mail.body).not.toMatch(/call or text/i);
+    expect(mail.html).not.toContain('calendly');
+  });
+
+  it('escapes visitor and agent text, and drops non-http links', () => {
+    const mail = createLeadAutoReply({
+      ...base,
+      leadName: '<script>x</script>',
+      agent: { name: 'Jane', calendlyUrl: 'javascript:alert(1)' },
+    });
+    expect(mail.html).not.toContain('<script>');
+    expect(mail.html).not.toContain('javascript:');
+  });
+});
+
+describe('sendEmail reply-to (US-229)', () => {
+  it('passes replyTo to Resend as reply_to', async () => {
+    env.RESEND_API_KEY = 're_test';
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'm1' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await sendEmail({ ...message, replyTo: 'jane@realty.example' });
+    const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.reply_to).toBe('jane@realty.example');
+    vi.unstubAllGlobals();
   });
 });

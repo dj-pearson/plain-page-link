@@ -1705,6 +1705,359 @@ check('SECURITY DEFINER functions pin search_path', () =>
 );
 
 // ---------------------------------------------------------------------------
+// 8b. SECURITY DEFINER functions are not callable by the browser roles unless
+//     listed here. Such a function bypasses RLS, and Supabase's default
+//     privileges grant EXECUTE on every new public function to anon and
+//     authenticated — so until US-213 every one of them was an anonymous RPC.
+//     request_account_deletion(<any id>, …, -1) followed by
+//     process_scheduled_account_deletions() deleted any account with the anon
+//     key alone. Adding a SECURITY DEFINER function now means either revoking
+//     EXECUTE in its migration or adding it here with the reason it is safe.
+// ---------------------------------------------------------------------------
+const DEFINER_CALLABLE = new Map([
+  // anon + authenticated: public by design, or used by RLS policies that are
+  // evaluated for visitors.
+  ['has_role', { anon: true, why: 'RLS policies' }],
+  ['is_team_admin', { anon: true, why: 'RLS policies' }],
+  ['is_team_member', { anon: true, why: 'RLS policies' }],
+  ['check_username_available', { anon: true, why: 'signup form; returns a boolean' }],
+  ['list_public_open_houses', { anon: true, why: 'public profile; omits private_notes' }],
+  ['get_public_open_house', { anon: true, why: 'open house kiosk; omits private_notes' }],
+  ['increment_link_clicks', { anon: true, why: 'the only writer of links.click_count; throttled' }],
+  ['profile_shows_branding', { anon: true, why: 'public profile; returns a boolean' }],
+  ['public_agent_response_hours', { anon: true, why: 'public profile; aggregate only' }],
+  // authenticated only: each checks auth.uid() or admin itself.
+  ['get_plan_usage', { why: 'reads auth.uid() only' }],
+  ['analytics_visible_since', { why: 'reads auth.uid() only' }],
+  ['get_user_plan', { why: 'plan name and limits; no contact data' }],
+  ['get_user_sessions', { why: 'assert_caller_is' }],
+  ['get_connected_search_platforms', { why: 'assert_caller_is' }],
+  ['log_lead_activity', { why: 'checks lead ownership against auth.uid()' }],
+  ['log_lead_call', { why: 'checks lead ownership against auth.uid()' }],
+  ['log_lead_email', { why: 'checks lead ownership against auth.uid()' }],
+  ['start_workflow_execution', { why: 'assert_caller_is on the workflow owner' }],
+  ['get_user_statistics', { why: 'assert_caller_is_admin' }],
+  ['log_admin_action', { why: 'assert_caller_is_admin + assert_caller_is' }],
+  ['top_slow_queries', { why: 'assert_caller_is_admin' }],
+  ['get_system_health_summary', { why: 'assert_caller_is_admin' }],
+]);
+
+check('SECURITY DEFINER functions are not callable by anon/authenticated unless allowed', () => {
+  const out = [];
+  for (const row of q(`
+    SELECT p.proname || '|' || pg_get_function_identity_arguments(p.oid)
+             || '|' || has_function_privilege('anon', p.oid, 'EXECUTE')
+             || '|' || has_function_privilege('authenticated', p.oid, 'EXECUTE')
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.prosecdef
+    ORDER BY 1;
+  `)) {
+    const [name, args, anon, authed] = row.split('|');
+    const allowed = DEFINER_CALLABLE.get(name);
+    if (anon === 'true' && !allowed?.anon) out.push(`${name}(${args}) is executable by anon`);
+    else if (authed === 'true' && !allowed) out.push(`${name}(${args}) is executable by authenticated`);
+  }
+  return out;
+});
+
+check('every rpc() the browser calls is executable by authenticated', () => {
+  const out = [];
+  for (const file of sourceFiles(['src'])) {
+    if (/\.test\.tsx?$/.test(file)) continue;
+    const text = stripComments(readFileSync(file, 'utf8'));
+    for (const m of text.matchAll(/\.rpc\(\s*['"]([a-z0-9_]+)['"]/g)) {
+      const [ok] = q(`
+        SELECT bool_or(has_function_privilege('authenticated', p.oid, 'EXECUTE'))::text
+        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public' AND p.proname = '${m[1]}';
+      `);
+      if (ok !== 'true') out.push(`${m[1]} <- ${file.replace(ROOT + '/', '')}`);
+    }
+  }
+  return [...new Set(out)].sort();
+});
+
+check('account deletion and session reads are refused for another user', () => {
+  const out = [];
+  const victim = '00000000-dead-beef-0000-0000000de1e7';
+  const other = '00000000-dead-beef-0000-0000000de1e8';
+  const as = (role, sub, sql) =>
+    q(`SET ROLE ${role}; ${sub ? `SET request.jwt.claim.sub = '${sub}';` : ''} ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES
+        ('${victim}', 'victim@example.test'), ('${other}', 'other@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username) VALUES
+        ('${victim}', 'verifyvictim'), ('${other}', 'verifyother') ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // The exploit, as a visitor and as another signed-in user.
+    for (const [role, sub] of [['anon', null], ['authenticated', other]]) {
+      if (!refused(() => as(role, sub, `SELECT public.request_account_deletion('${victim}', 'x', NULL, NULL, -1);`)))
+        out.push(`${role} could schedule another user's account deletion`);
+      if (!refused(() => as(role, sub, `SELECT public.process_scheduled_account_deletions();`)))
+        out.push(`${role} could run process_scheduled_account_deletions`);
+      if (!refused(() => as(role, sub, `SELECT public.cancel_account_deletion('${victim}', 'x');`)))
+        out.push(`${role} could cancel another user's account deletion`);
+      if (!refused(() => as(role, sub, `SELECT * FROM public.get_user_sessions('${victim}');`)))
+        out.push(`${role} could read another user's sessions`);
+      if (!refused(() => as(role, sub, `SELECT public.log_admin_action('${victim}', 'forged');`)))
+        out.push(`${role} could write the admin audit log`);
+    }
+    const [present] = q(`SELECT count(*) FROM auth.users WHERE id = '${victim}';`);
+    if (present !== '1') out.push('the victim account was deleted');
+
+    // The owner still reads their own sessions.
+    if (refused(() => as('authenticated', victim, `SELECT * FROM public.get_user_sessions('${victim}');`)))
+      out.push("a user was refused their own sessions");
+
+    // The service role (gdpr-deletion) can still schedule one, but never sooner than 30 days.
+    q(`SET request.jwt.claim.role = 'service_role';
+       SELECT public.request_account_deletion('${victim}', 'x', NULL, NULL, -1);`);
+    const [days] = q(`SELECT floor(extract(epoch FROM scheduled_for - now()) / 86400)::int
+                        FROM public.account_deletion_scheduled WHERE user_id = '${victim}';`);
+    if (!(Number(days) >= 29)) out.push(`a grace period of -1 scheduled the deletion ${days} days out`);
+    q(`SELECT public.process_scheduled_account_deletions();`);
+    const [still] = q(`SELECT count(*) FROM auth.users WHERE id = '${victim}';`);
+    if (still !== '1') out.push('a freshly scheduled deletion was executed immediately');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.account_deletion_scheduled WHERE user_id IN ('${victim}', '${other}');
+         DELETE FROM public.gdpr_data_requests WHERE user_id IN ('${victim}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${victim}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${victim}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+check('is_sample cannot be written by an agent, and samples are never public', () => {
+  const out = [];
+  const uid = '00000000-dead-beef-0000-0000005a3b1e';
+  const admin = '00000000-dead-beef-0000-0000005a3b1f';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${uid}', 'sample@example.test'), ('${admin}', 'admin@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username) VALUES ('${uid}', 'verifysample'), ('${admin}', 'verifyadmin')
+        ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.user_roles (user_id, role) VALUES ('${admin}', 'admin') ON CONFLICT DO NOTHING;
+    `);
+
+    // 1. Insert as a sample to dodge the limit.
+    if (!refused(() => as(uid, `INSERT INTO public.links (user_id, title, url, position, is_sample)
+                                VALUES ('${uid}', 'x', 'https://example.test', 1, true);`)))
+      out.push('an agent inserted a link with is_sample = true');
+    if (!refused(() => as(uid, `INSERT INTO public.listings (user_id, address, city, price, status, is_sample)
+                                VALUES ('${uid}', '1 Sample St', 'Testville', '1', 'active', true);`)))
+      out.push('an agent inserted a listing with is_sample = true');
+
+    // 2. Flip a real row to a sample (this is how locked leads were unlocked).
+    q(`INSERT INTO public.leads (id, user_id, lead_type, name, encrypted_email)
+         VALUES ('00000000-dead-beef-0000-0000005a3b20', '${uid}', 'buyer', 'L', 'enc:v1:x');`);
+    if (!refused(() => as(uid, `UPDATE public.leads SET is_sample = true WHERE user_id = '${uid}';`)))
+      out.push('an agent flipped their own lead to is_sample = true');
+
+    // An agent's ordinary edits still work.
+    if (refused(() => as(uid, `UPDATE public.leads SET notes = 'called' WHERE user_id = '${uid}';`)))
+      out.push("an agent could not edit their own lead's notes");
+
+    // The admin tool still seeds samples, and visitors never see them.
+    if (refused(() => as(admin, `INSERT INTO public.listings (user_id, address, city, price, status, is_sample)
+                                 VALUES ('${admin}', '2 Sample St', 'Testville', '1', 'active', true);`)))
+      out.push('an admin could not seed a sample listing');
+    q(`INSERT INTO public.links (user_id, title, url, position, is_active, is_sample)
+         VALUES ('${admin}', 'demo', 'https://example.test', 1, true, true);`);
+    const [pub] = q(`SET ROLE anon;
+      SELECT (SELECT count(*) FROM public.listings WHERE user_id = '${admin}')
+           + (SELECT count(*) FROM public.links WHERE user_id = '${admin}');`);
+    if (pub !== '0') out.push(`visitors can see ${pub} sample rows`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.leads WHERE user_id IN ('${uid}', '${admin}');
+         DELETE FROM public.links WHERE user_id IN ('${uid}', '${admin}');
+         DELETE FROM public.listings WHERE user_id IN ('${uid}', '${admin}');
+         DELETE FROM public.user_roles WHERE user_id = '${admin}';
+         DELETE FROM public.profiles WHERE id IN ('${uid}', '${admin}');
+         DELETE FROM auth.users WHERE id IN ('${uid}', '${admin}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+check('lead_stats counts every lead the caller owns, and only those', () => {
+  const out = [];
+  const me = '00000000-dead-beef-0000-0000001ead51';
+  const other = '00000000-dead-beef-0000-0000001ead52';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${me}', 'stats1@example.test'), ('${other}', 'stats2@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, status)
+         SELECT '${me}', 'buyer', 'L' || g, 'enc', (ARRAY['new', 'contacted', 'converted'])[1 + g % 3]
+           FROM generate_series(1, 120) g;
+       INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, status)
+         SELECT '${other}', 'buyer', 'O' || g, 'enc', 'new' FROM generate_series(1, 7) g;`);
+    const [raw] = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}'; SELECT public.lead_stats()::text;`);
+    const stats = JSON.parse(raw);
+    if (stats.total !== 120) out.push(`total is ${stats.total}, expected 120 (more than one page of 50)`);
+    for (const s of ['new', 'contacted', 'converted']) {
+      if (stats.by_status?.[s] !== 40) out.push(`by_status.${s} is ${stats.by_status?.[s]}, expected 40`);
+    }
+    try {
+      q(`SET ROLE anon; SELECT public.lead_stats();`);
+      out.push('anon can call lead_stats');
+    } catch {
+      /* expected */
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.leads WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${me}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${me}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+check('a routed lead reaches the accepted teammate, who can read it and is notified', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-00000007ea01';
+  const mate = '00000000-dead-beef-0000-00000007ea02';
+  const team = '00000000-dead-beef-0000-00000007ea03';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${owner}', 'owner@example.test'), ('${mate}', 'mate@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.teams (id, name, owner_id) VALUES ('${team}', 'Verify Team', '${owner}');
+       INSERT INTO public.team_members (team_id, user_id, email, role, accepted_at)
+         VALUES ('${team}', '${mate}', 'mate@example.test', 'member', now());`);
+    // The owner's own row is left out on purpose: round robin then has one member.
+    q(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email)
+         VALUES ('${owner}', 'buyer', 'Routed Lead', 'enc');`);
+    const [assigned] = q(`SELECT assigned_to FROM public.leads WHERE user_id = '${owner}' AND name = 'Routed Lead';`);
+    if (assigned !== mate) out.push(`the lead was assigned to "${assigned}", expected the accepted teammate`);
+    const [visible] = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${mate}';
+      SELECT count(*) FROM public.leads WHERE user_id = '${owner}';`);
+    if (visible !== '1') out.push(`the teammate can read ${visible} of the owner's leads, expected the 1 assigned`);
+    const [notified] = q(`SELECT count(*) FROM public.notifications WHERE user_id = '${mate}' AND type = 'lead_assigned';`);
+    if (notified !== '1') out.push(`the teammate has ${notified} lead_assigned notifications, expected 1`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}');
+         DELETE FROM public.leads WHERE user_id = '${owner}';
+         DELETE FROM public.team_round_robin WHERE team_id = '${team}';
+         DELETE FROM public.team_members WHERE team_id = '${team}';
+         DELETE FROM public.teams WHERE id = '${team}';
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+check('funnel events are accepted from visitors and campaign_conversion reads them', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-0000000f0e11';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'funnel@example.test') ON CONFLICT (id) DO NOTHING;
+       UPDATE public.profiles SET is_published = true WHERE id = '${agent}';`);
+    for (const type of ['form_open', 'form_submit', 'cta_click', 'social_click', 'listing_view']) {
+      try {
+        q(`SET ROLE anon; INSERT INTO public.analytics_events (user_id, visitor_id, event_type, utm_source)
+             VALUES ('${agent}', 'v-${type}', '${type}', 'instagram');`);
+      } catch (e) {
+        out.push(`a visitor could not record ${type}: ${String(e.stderr || e.message).split('\n')[0]}`);
+      }
+    }
+    q(`SET ROLE anon; INSERT INTO public.analytics_views (user_id, visitor_id, utm_source)
+         VALUES ('${agent}', 'v1', 'instagram'), ('${agent}', 'v2', 'instagram'), ('${agent}', 'v3', NULL);`);
+    q(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, utm_source)
+         VALUES ('${agent}', 'buyer', 'From IG', 'enc', 'instagram');`);
+    const rows = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${agent}';
+      SELECT source || ':' || views || ':' || form_opens || ':' || leads FROM public.campaign_conversion() ORDER BY source;`);
+    const expected = ['direct:1:0:0', 'instagram:2:1:1'];
+    if (JSON.stringify(rows) !== JSON.stringify(expected)) {
+      out.push(`campaign_conversion returned ${JSON.stringify(rows)}, expected ${JSON.stringify(expected)}`);
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.analytics_events WHERE user_id = '${agent}';
+         DELETE FROM public.analytics_views WHERE user_id = '${agent}';
+         DELETE FROM public.leads WHERE user_id = '${agent}';
+         DELETE FROM public.profiles WHERE id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+check('a signup records who referred it, and the agent cannot rewrite it', () => {
+  const out = [];
+  const referrer = '00000000-dead-beef-0000-0000000ef001';
+  const newbie = '00000000-dead-beef-0000-0000000ef002';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${referrer}', 'referrer@example.test') ON CONFLICT (id) DO NOTHING;
+       UPDATE public.profiles SET username = 'verifyreferrer' WHERE id = '${referrer}';
+       INSERT INTO auth.users (id, email, raw_user_meta_data)
+         VALUES ('${newbie}', 'newbie@example.test', '{"ref": "VerifyReferrer", "signup_source": "profile_badge"}');`);
+    const [row] = q(`SELECT coalesce(referred_by, '-') || '|' || coalesce(signup_source, '-') FROM public.profiles WHERE id = '${newbie}';`);
+    if (row !== 'verifyreferrer|profile_badge') out.push(`the new profile recorded "${row}", expected verifyreferrer|profile_badge`);
+    q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${newbie}';
+       UPDATE public.profiles SET referred_by = 'someoneelse' WHERE id = '${newbie}';`);
+    const [after] = q(`SELECT referred_by FROM public.profiles WHERE id = '${newbie}';`);
+    if (after !== 'verifyreferrer') out.push(`the agent rewrote their own referred_by to "${after}"`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.user_roles WHERE user_id IN ('${referrer}', '${newbie}');
+         DELETE FROM public.profiles WHERE id IN ('${referrer}', '${newbie}');
+         DELETE FROM auth.users WHERE id IN ('${referrer}', '${newbie}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 9. Every column named in a .select('...') list must exist on the target table.
 //    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and
 //    that gap is what shipped US-070 and US-083. Five edge functions selected

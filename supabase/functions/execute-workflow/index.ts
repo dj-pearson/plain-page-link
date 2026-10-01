@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
+import { safeFetch } from '../_shared/ssrf-guard.ts';
+import { assertLeadOwnedBy, taskAssignee } from './ownership.ts';
 
 /**
  * Execute Workflow - Multi-Step Workflow Orchestration
@@ -36,39 +38,23 @@ interface ExecutionContext {
 // Node Executors
 const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionContext, supabase: any) => Promise<any>> = {
   // Actions
-  send_email: async (node, context, supabase) => {
-    const { to, subject, body, template } = node.config;
+  send_email: async (node, context) => {
+    const { to, subject } = node.config;
     const resolvedTo = resolveVariables(to, context);
     const resolvedSubject = resolveVariables(subject, context);
-    const resolvedBody = resolveVariables(body, context);
 
-    // Each email is charged to the owner's plan (emails_per_month,
-    // 20260923000003) before it goes out. Over the quota the step fails with
-    // a reason the agent can act on, rather than the workflow carrying on as
-    // if the lead had been emailed.
-    const { data: quota, error: quotaError } = await supabase.rpc('consume_plan_quota', {
-      _user_id: context.ownerId,
-      _key: 'emails_per_month',
-      _count: 1,
-    });
-    if (quotaError) throw quotaError;
-    if (!quota?.allowed) {
-      throw new Error(
-        quota?.limit === 0
-          ? 'Automated emails are not included in your plan. Upgrade to send them.'
-          : `This month's ${quota?.limit} automated emails are used up. Upgrade for more.`
-      );
-    }
-
-    console.log(`Sending email to ${resolvedTo}: ${resolvedSubject}`);
-
-    // In production, this would integrate with an email service
-    // For now, log the action
+    // US-224: this charged the owner's emails_per_month quota and then only
+    // logged the email — agents paid, from a metered allowance, for mail that
+    // was never sent, and the step reported success. Until the workflow runtime
+    // sends mail for real (US-136, which must charge consume_plan_quota when it
+    // does), the step says plainly that it did nothing and costs nothing.
+    console.log(`[execute-workflow] email step skipped (not sending yet): ${resolvedTo}: ${resolvedSubject}`);
     return {
-      success: true,
+      success: false,
+      skipped: true,
+      reason: 'Email steps do not send yet',
       to: resolvedTo,
       subject: resolvedSubject,
-      sentAt: new Date().toISOString(),
     };
   },
 
@@ -96,6 +82,9 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
       return { success: true, leadId: resolvedLeadId, updates };
     }
 
+    // US-218: the service-role client bypasses RLS; check ownership ourselves.
+    const lead = await assertLeadOwnedBy(supabase, resolvedLeadId, context.ownerId);
+
     if (Object.keys(updates).length > 0) {
       const { error } = await supabase.from('leads').update(updates).eq('id', resolvedLeadId);
       if (error) throw error;
@@ -103,15 +92,8 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
 
     let scored: { score: number; priority: string } | undefined;
     if (score !== undefined && score !== null && score !== '') {
-      // lead_scores.user_id is NOT NULL, and the score belongs to whoever owns
-      // the lead — read it rather than trusting the workflow's context.
-      const { data: lead, error: leadError } = await supabase
-        .from('leads')
-        .select('user_id')
-        .eq('id', resolvedLeadId)
-        .single();
-      if (leadError) throw leadError;
-
+      // lead_scores.user_id is NOT NULL, and the score belongs to the lead's
+      // owner, checked above.
       const numericScore = Math.max(0, Math.min(100, Number(score)));
       if (!Number.isFinite(numericScore)) {
         throw new Error(`update_lead: score "${score}" is not a number`);
@@ -152,20 +134,16 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
       throw new Error('create_task: no lead to attach the task to');
     }
 
-    const { data: lead, error: leadError } = await supabase
-      .from('leads')
-      .select('user_id')
-      .eq('id', resolvedLeadId)
-      .single();
-    if (leadError) throw leadError;
+    // US-218: the service-role client bypasses RLS; check ownership ourselves.
+    const lead = await assertLeadOwnedBy(supabase, resolvedLeadId, context.ownerId);
 
     const { data, error } = await supabase
       .from('lead_activities')
       .insert({
         lead_id: resolvedLeadId,
-        // assignee is honoured when the workflow names one; otherwise the task
-        // belongs to whoever owns the lead. lead_activities.user_id is NOT NULL.
-        user_id: resolveVariables(assignee, context) || lead.user_id,
+        // The owner, or the teammate the lead is assigned to; never a
+        // stranger's id from the workflow config (US-218).
+        user_id: taskAssignee(resolveVariables(assignee, context), lead),
         activity_type: 'task',
         title: resolvedTitle,
         content: notes ? resolveVariables(notes, context) : null,
@@ -192,7 +170,12 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
     const resolvedBody = body ? resolveVariables(JSON.stringify(body), context) : undefined;
 
     try {
-      const response = await fetch(resolvedUrl, {
+      // US-218: this was a bare fetch() to a URL the agent writes, run from
+      // inside the Docker network, with the response body stored on the
+      // execution and returned — a full-read proxy into postgres-meta, studio
+      // and kong. safeFetch refuses private and internal targets on every
+      // redirect hop, and only the status is kept.
+      const response = await safeFetch(resolvedUrl, {
         method: method || 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -200,13 +183,11 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
         },
         body: resolvedBody,
       });
-
-      const responseData = await response.json().catch(() => null);
+      await response.body?.cancel();
 
       return {
         success: response.ok,
         status: response.status,
-        data: responseData,
       };
     } catch (error) {
       return {

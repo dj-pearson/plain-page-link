@@ -222,26 +222,29 @@ export default function Login() {
                 Turn every click into a <span className="text-cyan-300">closed deal</span>
               </h1>
               <p className="mt-4 text-lg text-blue-100/60 max-w-md leading-relaxed">
-                AI-powered intelligence that transforms your real estate business with predictive
-                lead scoring and smart property matching.
+                Your listings, lead capture and client follow-up in one link — with every lead
+                scored and waiting in your dashboard.
               </p>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-6">
+            {/* US-224: this was "2x Lead Conversion / 5+ Hours Saved/Week / 30%
+                Faster Close" — numbers nobody measured, missed by the US-159 and
+                US-173 sweeps because each value and its label sat on separate
+                lines. What is here instead is what the product does. */}
+            <ul className="grid grid-cols-3 gap-6">
               {[
-                { value: '2x', label: 'Lead Conversion' },
-                { value: '5+', label: 'Hours Saved/Week' },
-                { value: '30%', label: 'Faster Close' },
+                { value: 'Listings', label: 'Active and sold' },
+                { value: 'Leads', label: 'Scored on arrival' },
+                { value: 'Clients', label: 'Birthdays and touches' },
               ].map((stat) => (
-                <div key={stat.label} className="space-y-1">
+                <li key={stat.label} className="space-y-1">
                   <div className="text-2xl font-bold text-white">{stat.value}</div>
                   <div className="text-xs text-blue-200/50 uppercase tracking-wider">
                     {stat.label}
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
 
             {/* The testimonial that stood here — a named quote attributed
                 to "Sarah Mitchell, Top Producer, Miami" — is removed (US-111).

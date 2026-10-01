@@ -149,3 +149,63 @@ describe('_headers', () => {
     expect(uncovered, 'these ship on every page and revalidate on every visit').toEqual([]);
   });
 });
+
+/**
+ * US-221: the production CSP allowed neither Calendly's script nor its iframe,
+ * so "Schedule a Showing" opened an empty box for every agent with Calendly
+ * connected, and video blocks rendered blank. The policy is set twice — the
+ * _headers response header and the index.html meta tag — and a browser
+ * enforces both, so both must allow what the profile embeds.
+ */
+describe('Content-Security-Policy allows what the public profile embeds', () => {
+  const directives = (policy: string) =>
+    Object.fromEntries(
+      policy
+        .split(';')
+        .map((d) => d.trim().split(/\s+/))
+        .filter((parts) => parts[0])
+        .map(([name, ...sources]) => [name, sources])
+    ) as Record<string, string[]>;
+
+  const headerPolicy = (() => {
+    const line = readFileSync(join(PUBLIC, '_headers'), 'utf8')
+      .split('\n')
+      .find((l) => l.trim().startsWith('Content-Security-Policy:'));
+    return directives(line?.split('Content-Security-Policy:')[1] ?? '');
+  })();
+  const metaPolicy = (() => {
+    const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+    const m = /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html);
+    return directives(m?.[1] ?? '');
+  })();
+
+  const required: Record<string, string[]> = {
+    'script-src': ['https://assets.calendly.com'],
+    'style-src': ['https://assets.calendly.com'],
+    'frame-src': ['https://calendly.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
+  };
+
+  for (const [name, policy] of [
+    ['_headers', headerPolicy],
+    ['index.html', metaPolicy],
+  ] as const) {
+    it(`${name} allows Calendly and video embeds`, () => {
+      for (const [directive, sources] of Object.entries(required)) {
+        for (const source of sources) expect(policy[directive] ?? [], `${directive} ${source}`).toContain(source);
+      }
+    });
+  }
+});
+
+/**
+ * US-222: Sentry must report through the same-origin tunnel, because the CSP
+ * deliberately has no Sentry host in connect-src.
+ */
+describe('Sentry reaches production', () => {
+  it('src/lib/sentry.ts sends through the tunnel that functions/api/sentry.ts serves', () => {
+    const src = readFileSync(join(ROOT, 'src/lib/sentry.ts'), 'utf8');
+    expect(src).toMatch(/tunnel:\s*SENTRY_TUNNEL/);
+    expect(src).toMatch(/SENTRY_TUNNEL\s*=\s*'\/api\/sentry'/);
+    expect(readFileSync(join(ROOT, 'functions/api/sentry.ts'), 'utf8')).toMatch(/export async function onRequestPost/);
+  });
+});

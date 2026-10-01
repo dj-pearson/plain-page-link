@@ -19,6 +19,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
+import { useSpamGuard } from '@/hooks/useSpamGuard';
+import { HoneypotField } from '@/components/forms/HoneypotField';
 import { getLeadAttribution } from '@/lib/attribution';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 
@@ -35,6 +37,7 @@ interface FormDataState {
 export function ContactBlock({ config, isEditing = false, userId }: ContactBlockProps) {
   const [formData, setFormData] = useState<FormDataState>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { honeypotRef, signals } = useSpamGuard();
   const [isSuccess, setIsSuccess] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -108,6 +111,7 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
         // device was already sent from here, with its own copy of the
         // user-agent test; the campaign it came from was not (US-188).
         ...getLeadAttribution(),
+        ...signals(),
       };
 
       // Call the submit-lead edge function
@@ -166,6 +170,7 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
+        <HoneypotField ref={honeypotRef} />
         {config.fields.map((field) => (
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>

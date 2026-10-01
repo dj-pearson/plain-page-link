@@ -2,7 +2,7 @@ import * as React from 'react';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { useState } from 'react';
 import { Check, Zap } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,6 +16,8 @@ import { Switch } from '@/components/ui/switch';
 import { useSubscription, stripePriceIdFor } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
+import { AddOnWaitlist } from '@/components/pricing/AddOnWaitlist';
+import { registerUrlForPlan } from '@/lib/signupIntent';
 import { useToast } from '@/hooks/use-toast';
 import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -183,18 +185,18 @@ export default function Pricing() {
   };
 
   const schema = generatePricingSchema();
+  const navigate = useNavigate();
 
-  const handleSubscribe = async (priceId: string) => {
+  const handleSubscribe = async (priceId: string, planName: string) => {
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        toast({
-          title: 'Authentication required',
-          description: 'Please sign in to subscribe',
-          variant: 'destructive',
-        });
+        // US-232: this was an "Authentication required" toast and nothing
+        // else — the visitor most ready to pay was dropped. The plan now
+        // rides through sign-up and onboarding to checkout.
+        navigate(registerUrlForPlan(planName, isYearly ? 'year' : 'month'));
         return;
       }
 
@@ -207,7 +209,10 @@ export default function Pricing() {
       });
 
       if (error) throw error;
-      if (data.url) window.location.href = data.url;
+      if (data?.url) window.location.href = data.url;
+      // Already subscribed: the existing subscription was changed in place
+      // rather than a second one opened (US-217).
+      else if (data && 'changed' in data) window.location.href = '/dashboard/subscription';
     } catch (error) {
       toast({
         title: 'Error',
@@ -407,7 +412,7 @@ export default function Pricing() {
                         }
                         onClick={() => {
                           const priceId = stripePriceIdFor(plan, isYearly ? 'year' : 'month');
-                          if (priceId) handleSubscribe(priceId);
+                          if (priceId) handleSubscribe(priceId, plan.name);
                         }}
                         asChild={plan.name === 'free'}
                       >
@@ -428,27 +433,10 @@ export default function Pricing() {
                 ))}
               </div>
 
-              <div className="mt-16 text-center">
-                <h3 className="text-2xl font-bold mb-4">Add-Ons Available</h3>
-                <div className="grid md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                  <Card className="p-4">
-                    <p className="font-semibold">Premium Themes</p>
-                    <p className="text-sm text-muted-foreground">$15 one-time</p>
-                  </Card>
-                  <Card className="p-4">
-                    <p className="font-semibold">MLS Integration</p>
-                    <p className="text-sm text-muted-foreground">$25/month</p>
-                  </Card>
-                  <Card className="p-4">
-                    <p className="font-semibold">CRM Connectors</p>
-                    <p className="text-sm text-muted-foreground">$20/month each</p>
-                  </Card>
-                  <Card className="p-4">
-                    <p className="font-semibold">SMS Notifications</p>
-                    <p className="text-sm text-muted-foreground">$15/month</p>
-                  </Card>
-                </div>
-              </div>
+              {/* US-224: these four were sold here with prices — $25/mo MLS
+                  integration, $20/mo CRM connectors, $15/mo SMS, $15 themes —
+                  and none of them exists. Now they measure demand instead. */}
+              <AddOnWaitlist />
 
               {/* FAQ Section */}
               <div className="mt-20">

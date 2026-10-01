@@ -64,7 +64,7 @@ AgentBio gives you a professional link-in-bio built specifically for real estate
 → Analytics to track what's working
 → QR codes for your business cards and flyers
 
-[Start Your Free 14-Day Trial](${appUrl}/auth/register)
+[Create Your Free Page](${appUrl}/auth/register)
 
 To your Instagram success,
 The AgentBio Team
@@ -207,7 +207,7 @@ Friday: Client testimonial → Links to free home valuation
 
 Stop guessing. Start knowing what works.
 
-[Try AgentBio Free for 14 Days](${appUrl}/auth/register)
+[Start Free on AgentBio](${appUrl}/auth/register)
 
 To your success,
 The AgentBio Team
@@ -288,7 +288,7 @@ Fair question. Here's an honest comparison:
 **What AgentBio Does Better (for agents):**
 
 **1. Real Estate-Specific Features**
-→ MLS integration (listings auto-update)
+→ Active and sold listing galleries
 → Home valuation calculator
 → Property search integration
 → Mortgage calculator
@@ -297,7 +297,7 @@ Fair question. Here's an honest comparison:
 → Built-in contact forms
 → Lead scoring and qualification
 → CRM integration (Follow Up Boss, Salesforce, etc.)
-→ Automated follow-up sequences
+→ Follow-up reminders on every lead
 
 **3. Professional Design**
 → Templates built for real estate
@@ -326,7 +326,7 @@ Linktree Pro: $9/month
 
 AgentBio: $29/month
 → Built for real estate
-→ MLS integration
+→ Open house sign-in kiosk
 → Advanced lead capture
 → Your branding
 → **Unlimited everything**
@@ -340,7 +340,7 @@ AgentBio cost per year: $348
 
 Most agents close 2-5 extra deals per year from better Instagram conversion.
 
-[Try AgentBio Free for 14 Days](${appUrl}/auth/register)
+[Start Free on AgentBio](${appUrl}/auth/register)
 
 No credit card required. See the difference yourself.
 
@@ -386,7 +386,7 @@ That's where AgentBio comes in.
 
 **What You Get:**
 ✓ Professional link-in-bio platform
-✓ MLS integration (auto-update listings)
+✓ Open house sign-in kiosk
 ✓ Lead capture forms (home valuation, buyer consultation)
 ✓ Analytics dashboard
 ✓ QR codes for offline marketing
@@ -397,7 +397,7 @@ That's where AgentBio comes in.
 ✓ Mobile app access
 
 **Risk-Free Guarantee:**
-→ 14-day free trial (no credit card required)
+→ Free plan, no credit card required
 → Cancel anytime (no contracts)
 → Money-back guarantee if you're not satisfied
 
@@ -421,7 +421,7 @@ P.S. Still have questions? Reply to this email. I'm here to help.
 
 P.P.S. Your competitors in ${market} are already optimizing their Instagram presence. Every day you wait is a day of lost leads.
 
-[Start Your Free Trial Now →](${appUrl}/auth/register?coupon=BIO20)
+[Claim Your Discount →](${appUrl}/auth/register?coupon=BIO20)
 
 ---
 

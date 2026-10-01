@@ -69,6 +69,9 @@
 # is a different event, and the page is noindex.
 /open-house/*   /index.html 200
 
+# US-226: team invite links.
+/team/*         /index.html 200
+
 # A public profile: /:username, and its review form. One path segment, which is
 # indistinguishable from a typo without a database lookup — so this rule keeps
 # every single-segment URL answering 200, and functions/[username].ts is what

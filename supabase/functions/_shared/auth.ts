@@ -54,17 +54,8 @@ export async function requireAdmin(req: Request, supabase: SupabaseClient) {
   return user;
 }
 
-/**
- * Get client IP address from request
- * @param req - Request object
- * @returns IP address string
- */
-export function getClientIP(req: Request): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0].trim()
-    || req.headers.get('x-real-ip')
-    || req.headers.get('cf-connecting-ip') // Cloudflare
-    || 'unknown';
-}
+// The one implementation lives in client-ip.ts (US-214).
+export { getClientIP } from './client-ip.ts';
 
 /**
  * Validate user owns resource

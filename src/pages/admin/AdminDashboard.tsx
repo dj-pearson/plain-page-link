@@ -1,6 +1,7 @@
 import { Navigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { UserManagementPanel } from '@/components/admin/UserManagementPanel';
 import {
   Settings,
   BrainCircuit,
@@ -72,8 +73,15 @@ export function AdminDashboard() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="pseo" className="space-y-6">
+        {/* US-231: the operator landed on pSEO tooling, and the Users tab said
+            "User role management interface coming soon...". Users come first
+            now, with the real panel. */}
+        <Tabs defaultValue="users" className="space-y-6">
           <TabsList className="grid w-full grid-cols-10 lg:w-auto">
+            <TabsTrigger value="users" className="gap-2">
+              <Users className="h-4 w-4" />
+              Users
+            </TabsTrigger>
             <TabsTrigger value="pseo" className="gap-2">
               <Globe className="h-4 w-4" />
               pSEO
@@ -105,10 +113,6 @@ export function AdminDashboard() {
             <TabsTrigger value="sample-data" className="gap-2">
               <Database className="h-4 w-4" />
               Sample Data
-            </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              User Roles
             </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2">
               <Settings className="h-4 w-4" />
@@ -161,10 +165,14 @@ export function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-6">
-            <div className="rounded-lg border p-6">
-              <h2 className="text-2xl font-bold mb-4">User Role Management</h2>
-              <p className="text-muted-foreground">User role management interface coming soon...</p>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Revenue, churn and signups are on the{' '}
+              <Link to="/admin/health" className="text-primary underline">
+                Health dashboard
+              </Link>
+              .
+            </p>
+            <UserManagementPanel />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">

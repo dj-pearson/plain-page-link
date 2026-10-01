@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useToast } from '@/hooks/use-toast';
 import {
   Users,
@@ -85,8 +86,9 @@ export const UserManagementPanel = () => {
   });
 
   useEffect(() => {
+    // Statistics arrive with the user list (admin-users), counted from real
+    // sign-ins; get_user_statistics stays as the fallback.
     loadUsers();
-    loadStatistics();
   }, []);
 
   useEffect(() => {
@@ -96,10 +98,17 @@ export const UserManagementPanel = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      // Get all users from auth.users (admin only)
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
-
+      // US-231: through the admin-users edge function. This called
+      // supabase.auth.admin.listUsers() from the browser, which needs the
+      // service-role key — with the anon key it always failed, so this list
+      // was always empty and no user could be found or supported.
+      const { data: listing, error: authError } = await edgeFunctions.invoke('admin-users', { body: {} });
       if (authError) throw authError;
+      const authData = {
+        users: ((listing as { users?: User[] } | null)?.users ?? []) as User[],
+      };
+      const listedStats = (listing as { stats?: typeof stats } | null)?.stats;
+      if (listedStats) setStats(listedStats);
 
       // Get profiles
       const { data: profiles, error: profilesError } = await supabase.from('profiles').select('*');
@@ -128,6 +137,7 @@ export const UserManagementPanel = () => {
 
       setUsers(usersWithDetails);
       setFilteredUsers(usersWithDetails);
+      if (!listedStats) void loadStatistics();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -416,7 +426,19 @@ export const UserManagementPanel = () => {
                       <TableCell className="font-medium">{user.email}</TableCell>
                       <TableCell>{user.profile?.username || '-'}</TableCell>
                       <TableCell>{getRoleBadge(user.role || 'user')}</TableCell>
-                      <TableCell>{getSubscriptionBadge(user.subscription)}</TableCell>
+                      <TableCell>
+                        {getSubscriptionBadge(user.subscription)}
+                        {user.subscription?.stripe_customer_id && (
+                          <a
+                            href={`https://dashboard.stripe.com/customers/${user.subscription.stripe_customer_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-2 text-xs text-primary underline"
+                          >
+                            Stripe
+                          </a>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {formatDistanceToNow(new Date(user.created_at), {
                           addSuffix: true,

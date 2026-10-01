@@ -85,7 +85,7 @@ const stubLeadsQuery = (
   });
   // `range` is what useLeads pages with since US-104; without it the chain
   // returns undefined and the page renders its error card.
-  for (const m of ['order', 'in', 'is', 'limit', 'range', 'ilike']) {
+  for (const m of ['order', 'in', 'is', 'limit', 'range', 'ilike', 'or']) {
     builder[m] = vi.fn(() => builder);
   }
   builder.then = (resolve: (v: unknown) => unknown) =>
