@@ -11,6 +11,7 @@ import { Bell } from 'lucide-react';
 import {
   useNotificationPreferences,
   type LeadNotificationMode,
+  type DigestMode,
 } from '@/hooks/useNotificationPreferences';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,11 +30,10 @@ const OPTIONS: { value: LeadNotificationMode; label: string; description: string
   {
     value: 'daily_digest',
     label: 'Daily digest',
-    // Honest label. The digest job does not exist; notify-lead used to skip
-    // these agents entirely, so choosing "daily digest" meant never being
-    // emailed about a lead at all (US-099). Until the job is built the setting
-    // behaves as Instant, and saying so beats a promise nothing keeps.
-    description: 'Not available yet — currently sends instantly, like Instant',
+    // US-230: the digest exists now. (It did not, and this said so — US-099.)
+    // With the morning email off or weekly, notify-lead still sends instantly
+    // so no lead waits a week.
+    description: 'New leads arrive in your morning email instead of one by one',
   },
   { value: 'off', label: 'Off', description: 'Do not email me about new leads' },
 ];
@@ -42,7 +42,7 @@ export function LeadNotificationPreferences() {
   const { toast } = useToast();
   // One reader and writer for this column — see useNotificationPreferences for
   // why the Leads page and this card must not each hold their own query.
-  const { leadMode: mode, slaHours, isLoading, update } = useNotificationPreferences();
+  const { leadMode: mode, slaHours, digestMode, isLoading, update } = useNotificationPreferences();
 
   const save = (next: Parameters<typeof update.mutate>[0]) =>
     update.mutate(next, {
@@ -88,6 +88,28 @@ export function LeadNotificationPreferences() {
             ))}
           </SelectContent>
         </Select>
+
+        <div className="mt-6 space-y-2">
+          <p className="text-sm font-medium" id="digest-label">Morning email</p>
+          <p className="text-xs text-muted-foreground">
+            New leads, follow-ups due today and your clients&apos; upcoming birthdays and
+            anniversaries — sent only when there is something. Monday&apos;s adds last week&apos;s numbers.
+          </p>
+          <Select
+            value={digestMode}
+            onValueChange={(value) => save({ digest: value as DigestMode })}
+            disabled={isLoading || update.isPending}
+          >
+            <SelectTrigger className="w-full sm:w-72" aria-labelledby="digest-label">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">Every morning</SelectItem>
+              <SelectItem value="weekly">Mondays only</SelectItem>
+              <SelectItem value="off">Off</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="mt-6 space-y-2">
           <p className="text-sm font-medium">Chase me about unanswered leads after</p>

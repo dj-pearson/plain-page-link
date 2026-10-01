@@ -3633,8 +3633,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "scheduled-maintenance runs only overdue_leads (:74) and account_deletions (:178); contact_key_dates is read by no function but gdpr-export. Covers most of US-133."
+      "passes": true,
+      "notes": "scheduled-maintenance runs only overdue_leads (:74) and account_deletions (:178); contact_key_dates is read by no function but gdpr-export. Covers most of US-133. DONE: scheduled-maintenance task 'digests' (scheduled-maintenance/digests.ts) runs in DIGEST_HOUR_UTC (default 13, i.e. 13:17 UTC with the hourly cron) or on POST {force_digest:true}. Per agent: new leads in the last 24h, open tasks due by end of today, and contact_key_dates inside each date's own reminder window (_shared/keyDates.ts — an exact copy of src/lib/keyDates.ts, held identical by a test, because the container ships only supabase/functions). Pure builder _shared/digest.ts returns null when there is nothing (no empty emails); Monday edition adds 7-day views/leads/link clicks. Preference notification_preferences.digest = daily (default) | weekly (Mondays) | off, set in Settings → Lead Notifications ('Morning email'); every email links there to change/turn off. Idempotent via new digest_log (PK user+day+kind; claim before send, release on failure; migration 20260930000009). 'Daily digest' lead mode is real now: notify-lead skips the instant email only when the morning email is daily, so no setting combination loses a lead. Tests: buildDigest (empty → null, reminder windows, Monday edition, escaping), digestKindFor, keyDates parity. DIGEST_HOUR_UTC declared in functions .env.example. Not per-agent timezone: profiles has no timezone column."
     },
     {
       "id": "US-231",

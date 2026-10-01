@@ -1212,6 +1212,35 @@ export type Database = {
           },
         ];
       };
+      digest_log: {
+        Row: {
+          digest_date: string;
+          kind: string;
+          sent_at: string;
+          user_id: string;
+        };
+        Insert: {
+          digest_date: string;
+          kind: string;
+          sent_at?: string;
+          user_id: string;
+        };
+        Update: {
+          digest_date?: string;
+          kind?: string;
+          sent_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'digest_log_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       encrypted_pii_config: {
         Row: {
           created_at: string;

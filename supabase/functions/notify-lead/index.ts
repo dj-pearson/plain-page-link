@@ -22,9 +22,10 @@ import { getSiteUrl } from '../_shared/env.ts';
  *
  * Respects the agent's profiles.notification_preferences.leads setting:
  *   - 'instant'      → send the email now
- *   - 'daily_digest' → send now, because no digest job exists. Skipping meant
- *                      agents on this setting were never emailed at all. The
- *                      settings UI says so.
+ *   - 'daily_digest' → no instant email; the lead arrives in the next morning
+ *                      email (US-230) — provided that email is on daily. With
+ *                      it off or weekly the lead is sent now, so no setting
+ *                      combination can lose a lead.
  *   - 'off'          → send nothing
  *
  * Authenticated via the service-role key; this is server-to-server, not a user
@@ -106,14 +107,16 @@ serve(async (req) => {
       );
     }
 
-    // 'off' is the only setting that suppresses the email. 'daily_digest' used
-    // to skip here "because a separate digest job handles these" — no such job
-    // exists, so every agent who chose it silently received nothing at all.
-    // Until one is built, a digest subscriber gets instant mail, which is the
-    // failure mode that loses no leads.
     const leadPref = (contact?.notificationPreferences?.leads as string | undefined) ?? 'instant';
     if (leadPref === 'off') {
       return successResponse({ notified: false, reason: 'preference_off' }, req);
+    }
+    // US-230: the digest job exists now (scheduled-maintenance/digests.ts). It
+    // used not to, and this used to send instantly for digest subscribers so
+    // no lead was lost; it still does unless the morning email is on daily.
+    const digestPref = (contact?.notificationPreferences?.digest as string | undefined) ?? 'daily';
+    if (leadPref === 'daily_digest' && digestPref === 'daily') {
+      return successResponse({ notified: false, reason: 'daily_digest' }, req);
     }
 
     const siteUrl = getSiteUrl();

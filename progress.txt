@@ -4611,3 +4611,10 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 
 - Auto-reply now has a reply-to that reaches the agent, their number, photo,
   booking link and the listing; failed sends reach Sentry.
+
+## Roadmap loop — iteration 18/20 — US-230: nothing brought an agent back
+
+- Morning email from the hourly job: new leads, follow-ups due, clients'
+  dates inside their reminder window; Monday adds the week. Only when there
+  is something; once per day via digest_log; daily/weekly/off in Settings.
+- "Daily digest" lead mode finally means a digest.

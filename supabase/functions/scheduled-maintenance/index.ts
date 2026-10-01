@@ -6,6 +6,7 @@ import { sendEmail } from '../_shared/email.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getSiteUrl } from '../_shared/env.ts';
+import { runDigests } from './digests.ts';
 
 /**
  * Scheduled maintenance.
@@ -213,6 +214,14 @@ serve(async (req) => {
         })
       );
     }
+
+    // ---------------------------------------------------------------------
+    // 4. The morning email (US-230): new leads, follow-ups due today and
+    //    clients' upcoming dates, once a day in DIGEST_HOUR_UTC. POST
+    //    {"force_digest": true} runs it now (still once per agent per day).
+    // ---------------------------------------------------------------------
+    const body = (await req.json().catch(() => ({}))) as { force_digest?: boolean };
+    results.push(await run('digests', () => runDigests(supabase, { force: body.force_digest === true })));
 
     const failed = results.filter((r) => !r.ok);
     console.log(

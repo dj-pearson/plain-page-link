@@ -16,16 +16,20 @@ import type { Json } from '@/integrations/supabase/types';
 
 export type LeadNotificationMode = 'instant' | 'daily_digest' | 'off';
 
+/** The morning email (US-230): read by scheduled-maintenance/digests.ts. */
+export type DigestMode = 'daily' | 'weekly' | 'off';
+
 /** How long a new lead may sit unanswered before it counts as overdue. */
 export const DEFAULT_SLA_HOURS = 2;
 
 export interface NotificationPreferences {
   leads: LeadNotificationMode;
   sla_hours: number;
+  digest: DigestMode;
   [key: string]: Json | undefined;
 }
 
-const DEFAULTS: NotificationPreferences = { leads: 'instant', sla_hours: DEFAULT_SLA_HOURS };
+const DEFAULTS: NotificationPreferences = { leads: 'instant', sla_hours: DEFAULT_SLA_HOURS, digest: 'daily' };
 
 export function useNotificationPreferences() {
   const { user } = useAuthStore();
@@ -47,6 +51,7 @@ export function useNotificationPreferences() {
         ...(stored as NotificationPreferences),
         leads: (stored.leads as LeadNotificationMode) ?? DEFAULTS.leads,
         sla_hours: typeof stored.sla_hours === 'number' ? stored.sla_hours : DEFAULTS.sla_hours,
+        digest: stored.digest === 'weekly' || stored.digest === 'off' ? stored.digest : DEFAULTS.digest,
       };
     },
   });
@@ -72,6 +77,7 @@ export function useNotificationPreferences() {
     preferences,
     slaHours: preferences.sla_hours,
     leadMode: preferences.leads,
+    digestMode: preferences.digest,
     isLoading,
     update,
   };
