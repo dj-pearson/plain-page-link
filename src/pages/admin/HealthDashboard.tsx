@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 import { Activity, Users, UserPlus, Building2, MessageSquare, DollarSign } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { computeMrr, churnRate, type SubscriptionMetricRow } from '@/lib/revenueMetrics';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { edgeFunctions } from '@/lib/edgeFunctions';
@@ -53,10 +54,7 @@ async function countRows(table: string, filter?: { column: string; gte: string }
   }
 }
 
-interface SubscriptionRow {
-  plan_name: string | null;
-  status: string | null;
-}
+type SubscriptionRow = SubscriptionMetricRow;
 
 async function fetchDated(table: string, column: string, since: string): Promise<string[]> {
   try {
@@ -117,7 +115,12 @@ export default function HealthDashboard() {
       ] = await Promise.all([
         countRows('profiles'),
         countRows('profiles', { column: 'created_at', gte: since7 }),
-        countRows('profiles', { column: 'updated_at', gte: since7 }),
+        // US-231: was profiles.updated_at — a profile edit, not activity.
+        // Real sign-ins live in auth.users, which only admin-users can read.
+        edgeFunctions
+          .invoke('admin-users', { body: {} })
+          .then(({ data }) => (data as { stats?: { active7d?: number } } | null)?.stats?.active7d ?? null)
+          .catch(() => null),
         countRows('listings'),
         countRows('leads'),
         fetchDated('profiles', 'created_at', since14),
@@ -136,7 +139,7 @@ export default function HealthDashboard() {
       try {
         const { data: subData, error: subError } = await supabase
           .from('subscriptions')
-          .select('plan_name, status');
+          .select('plan_name, status, amount, interval, canceled_at');
         if (subError) throw subError;
         subs = (subData as SubscriptionRow[] | null) ?? [];
       } catch (error) {
@@ -175,25 +178,25 @@ export default function HealthDashboard() {
   }
 
   // Revenue metrics from subscriptions + pricing config.
-  const activeSubs = (data?.subs ?? []).filter((s) => s.status === 'active');
-  const canceledSubs = (data?.subs ?? []).filter((s) => s.status === 'canceled');
+  // US-231: MRR from what each subscription is actually charged (amount and
+  // interval), churn over 30 days and over both spellings of cancelled — it
+  // filtered 'canceled' while the webhook writes 'cancelled', so read 0%.
+  const activeSubs = (data?.subs ?? []).filter((s) => s.status === 'active' || s.status === 'past_due');
   const planPrice = (name: string | null): number => {
     const plan = PRICING_PLANS.find((p) => p.id === (name ?? '').toLowerCase());
     return plan?.price_monthly ?? 0;
   };
-  const mrr = activeSubs.reduce((sum, s) => sum + planPrice(s.plan_name), 0);
+  const mrr = computeMrr(data?.subs ?? [], planPrice);
   const byPlan = activeSubs.reduce<Record<string, number>>((acc, s) => {
     const key = s.plan_name ?? 'unknown';
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
-  const totalLifecycle = activeSubs.length + canceledSubs.length;
-  const churnRate =
-    totalLifecycle > 0 ? Math.round((canceledSubs.length / totalLifecycle) * 100) : 0;
+  const churn = churnRate(data?.subs ?? []);
 
   const metricCards = [
     { label: 'Total Users', value: data?.totalUsers, icon: <Users className="h-5 w-5" /> },
-    { label: 'Active (7d)', value: data?.activeUsers, icon: <Activity className="h-5 w-5" /> },
+    { label: 'Signed in (7d)', value: data?.activeUsers ?? undefined, icon: <Activity className="h-5 w-5" /> },
     { label: 'New Signups (7d)', value: data?.newSignups, icon: <UserPlus className="h-5 w-5" /> },
     {
       label: 'Total Listings',
@@ -270,7 +273,7 @@ export default function HealthDashboard() {
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <div className="text-2xl font-bold text-foreground">${mrr.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground">MRR (est.)</div>
+            <div className="text-xs text-muted-foreground">MRR</div>
           </div>
           <div>
             <div className="text-2xl font-bold text-foreground">{activeSubs.length}</div>
@@ -282,8 +285,8 @@ export default function HealthDashboard() {
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-foreground">{churnRate}%</div>
-            <div className="text-xs text-muted-foreground">Churn rate</div>
+            <div className="text-2xl font-bold text-foreground">{churn}%</div>
+            <div className="text-xs text-muted-foreground">Churn (30 days)</div>
           </div>
         </CardContent>
       </Card>

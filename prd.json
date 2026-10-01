@@ -3650,8 +3650,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "UserManagementPanel.tsx:100; HealthDashboard.tsx:120,179,184; stripe-webhook writes 'cancelled' at :385,:421; AdminDashboard.tsx:75."
+      "passes": true,
+      "notes": "UserManagementPanel.tsx:100; HealthDashboard.tsx:120,179,184; stripe-webhook writes 'cancelled' at :385,:421; AdminDashboard.tsx:75. DONE: new admin-users edge function (requireAdmin, service role) lists auth users (paged, 5,000 cap) joined with profile, role and subscription, with server-side search and stats (admin-users/merge.ts, unit-tested). UserManagementPanel uses it instead of supabase.auth.admin.listUsers() from the browser (which needs the service key and always failed), shows a Stripe customer link, and takes its stats from it. revenueMetrics.ts: MRR from stored amount and interval (annual ÷ 12; list price only as fallback) over active + past_due; churn over 30 days counting both 'canceled' and the webhook's 'cancelled'. HealthDashboard uses them and shows 'Signed in (7d)' from last_sign_in_at instead of profiles.updated_at. AdminDashboard opens on a Users tab that renders the real panel — it was a 'coming soon' placeholder — with a link to the Health dashboard. DEVIATION: the status spelling is reconciled in the reader (both spellings counted), not by rewriting what the webhook writes, so existing rows stay valid."
     },
     {
       "id": "US-232",

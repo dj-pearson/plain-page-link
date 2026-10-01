@@ -4618,3 +4618,9 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
   dates inside their reminder window; Monday adds the week. Only when there
   is something; once per day via digest_log; daily/weekly/off in Settings.
 - "Daily digest" lead mode finally means a digest.
+
+## Roadmap loop — iteration 19/20 — US-231: an operator who could not see users
+
+- admin-users edge function replaces a browser call that always failed;
+  Users is the admin landing tab (it was "coming soon").
+- MRR from real amounts/intervals; churn counts the webhook's 'cancelled'.
