@@ -465,7 +465,8 @@ function App() {
         </Suspense>
       </LazyLoadErrorBoundary>
 
-      <Toaster position="top-right" richColors />
+      {/* closeButton: every toast can be dismissed (US-238). */}
+      <Toaster position="top-right" richColors closeButton />
 
       {/* Accessibility widget for user preferences (WCAG 1.4.4, 1.4.3, 2.3.3) */}
       <AccessibilityWidget />

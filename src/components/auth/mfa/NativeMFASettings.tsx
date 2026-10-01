@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useNativeMFA } from '@/hooks/useNativeMFA';
 import { logger } from '@/lib/logger';
+import { normalizeOtp } from '@/lib/otp';
 
 /**
  * Enrol and remove a second factor (US-085).
@@ -142,9 +143,8 @@ export function NativeMFASettings() {
                 id="enrol-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setCode(normalizeOtp(e.target.value))}
                 placeholder="000000"
               />
             </div>

@@ -389,6 +389,8 @@ export default function Login() {
                   <input
                     {...register('email')}
                     id="login-email"
+                    aria-invalid={errors.email ? true : undefined}
+                    aria-describedby={errors.email ? 'login-email-error' : undefined}
                     type="email"
                     placeholder="you@example.com"
                     autoComplete="email"
@@ -398,7 +400,7 @@ export default function Login() {
                   />
                 </div>
                 {errors.email && (
-                  <p className="mt-1.5 text-xs text-red-600">{errors.email.message}</p>
+                  <p id="login-email-error" role="alert" className="mt-1.5 text-xs text-red-600">{errors.email.message}</p>
                 )}
               </div>
 
@@ -422,6 +424,8 @@ export default function Login() {
                   <input
                     {...register('password')}
                     id="login-password"
+                    aria-invalid={errors.password ? true : undefined}
+                    aria-describedby={errors.password ? 'login-password-error' : undefined}
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     autoComplete="current-password"
@@ -439,7 +443,7 @@ export default function Login() {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="mt-1.5 text-xs text-red-600">{errors.password.message}</p>
+                  <p id="login-password-error" role="alert" className="mt-1.5 text-xs text-red-600">{errors.password.message}</p>
                 )}
               </div>
 

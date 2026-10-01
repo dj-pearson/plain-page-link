@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, ShieldCheck, KeyRound } from 'lucide-react';
 import { useNativeMFA } from '@/hooks/useNativeMFA';
 import { logger } from '@/lib/logger';
+import { normalizeOtp } from '@/lib/otp';
 
 interface NativeMFAVerificationProps {
   onSuccess: () => void;
@@ -129,9 +130,8 @@ export function NativeMFAVerification({ onSuccess, onCancel }: NativeMFAVerifica
                 id="legacy-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
                 value={legacyCode}
-                onChange={(e) => setLegacyCode(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setLegacyCode(normalizeOtp(e.target.value))}
                 placeholder="000000"
               />
             </div>
@@ -142,9 +142,8 @@ export function NativeMFAVerification({ onSuccess, onCancel }: NativeMFAVerifica
                 id="new-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setCode(normalizeOtp(e.target.value))}
                 placeholder="000000"
               />
             </div>
@@ -192,9 +191,8 @@ export function NativeMFAVerification({ onSuccess, onCancel }: NativeMFAVerifica
           id="mfa-code"
           inputMode="numeric"
           autoComplete="one-time-code"
-          maxLength={6}
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+          onChange={(e) => setCode(normalizeOtp(e.target.value))}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && code.length === 6) handleChallenge();
           }}

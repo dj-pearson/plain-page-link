@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Home, Lock, Eye, EyeOff, Check, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,37 +13,48 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  // US-238: which field the error is about, so focus and aria-invalid land there.
+  const [errorField, setErrorField] = useState<"password" | "confirm" | null>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmRef = useRef<HTMLInputElement>(null);
+
+  const fail = (message: string, field: "password" | "confirm" | null) => {
+    setError(message);
+    setErrorField(field);
+    (field === "confirm" ? confirmRef : passwordRef).current?.focus();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setErrorField(null);
 
     if (password !== confirmPassword) {
-      setError("Passwords don't match");
+      fail("Passwords don't match", "confirm");
       return;
     }
 
     // SECURITY FIX: Enforce 12 character minimum
     if (password.length < 12) {
-      setError("Password must be at least 12 characters");
+      fail("Password must be at least 12 characters", "password");
       return;
     }
 
     // Additional password strength checks
     if (!/[a-z]/.test(password)) {
-      setError("Password must contain at least one lowercase letter");
+      fail("Password must contain at least one lowercase letter", "password");
       return;
     }
     if (!/[A-Z]/.test(password)) {
-      setError("Password must contain at least one uppercase letter");
+      fail("Password must contain at least one uppercase letter", "password");
       return;
     }
     if (!/\d/.test(password)) {
-      setError("Password must contain at least one number");
+      fail("Password must contain at least one number", "password");
       return;
     }
     if (!/[^a-zA-Z\d]/.test(password)) {
-      setError("Password must contain at least one special character");
+      fail("Password must contain at least one special character", "password");
       return;
     }
 
@@ -54,7 +65,7 @@ export default function ResetPassword() {
     });
 
     if (error) {
-      setError(error.message);
+      fail(error.message, null);
       setLoading(false);
     } else {
       setSuccess(true);
@@ -119,18 +130,23 @@ export default function ResetPassword() {
           <div className="bg-white rounded-lg shadow-lg p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{error}</p>
+                <div role="alert" id="reset-error" className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="reset-password" className="block text-sm font-medium text-gray-700 mb-2">
                   New Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" aria-hidden="true" />
                   <input
+                    ref={passwordRef}
+                    id="reset-password"
+                    autoComplete="new-password"
+                    aria-invalid={errorField === "password" ? true : undefined}
+                    aria-describedby={errorField === "password" ? "reset-error" : undefined}
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -156,12 +172,17 @@ export default function ResetPassword() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="reset-password-confirm" className="block text-sm font-medium text-gray-700 mb-2">
                   Confirm New Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" aria-hidden="true" />
                   <input
+                    ref={confirmRef}
+                    id="reset-password-confirm"
+                    autoComplete="new-password"
+                    aria-invalid={errorField === "confirm" ? true : undefined}
+                    aria-describedby={errorField === "confirm" ? "reset-error" : undefined}
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}

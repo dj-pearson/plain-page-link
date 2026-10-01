@@ -65,4 +65,16 @@ describe('Login page', () => {
     renderWithProviders(<Login />);
     expect(screen.getByText('Login Failed')).toBeInTheDocument();
   });
+
+  // US-238: a failed submit puts focus on the first invalid field and ties the
+  // message to it, so a screen-reader user hears what is wrong and where.
+  it('focuses the first invalid field and links it to its message', async () => {
+    renderWithProviders(<Login />);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+    const email = screen.getByLabelText('Email address');
+    await waitFor(() => expect(email).toHaveFocus());
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    const describedBy = email.getAttribute('aria-describedby');
+    expect(describedBy && document.getElementById(describedBy)).toHaveAttribute('role', 'alert');
+  });
 });

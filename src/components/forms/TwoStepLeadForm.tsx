@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,16 @@ import { enrichLead, submitLead, trackFormSubmission, type LeadType } from '@/li
  * never reached the button. Step one asks for a name and an email or phone
  * (and the address, for a seller or a valuation) and creates the lead. Step two
  * offers the rest as optional and adds it to the same lead.
+ *
+ * US-238, for a screen-reader user:
+ *   - moving to step two focuses its heading; until then focus was left on a
+ *     button that no longer existed, i.e. nowhere;
+ *   - a failed submit focuses the first invalid field;
+ *   - the outcome is spoken from a live region that is in the DOM from the
+ *     start — one inserted already holding text is often not announced;
+ *   - the form no longer closes itself three seconds after success, which
+ *     took the confirmation (and any "we did not get the extras" warning) away
+ *     before it could be read. The visitor closes it.
  */
 
 export interface QualifierField {
@@ -77,10 +87,31 @@ export function TwoStepLeadForm({
   const [lead, setLead] = useState<{ id: string; token: string } | null>(null);
   const { honeypotRef, signals } = useSpamGuard();
   useFormOpenTracking(agentId, formType);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const doneRef = useRef<HTMLHeadingElement>(null);
+  const [announcement, setAnnouncement] = useState('');
+
+  // Focus follows the step. Not on first render: that would steal focus from
+  // whatever opened the form.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (step === 'details') headingRef.current?.focus();
+    if (step === 'done') doneRef.current?.focus();
+  }, [step]);
 
   const finish = () => {
     setStep('done');
-    setTimeout(() => onSuccess?.(), 3000);
+    setAnnouncement(`${successTitle}. ${successMessage}`);
+  };
+
+  const focusFirstInvalid = (invalid: Record<string, string>) => {
+    const order = ['name', 'email', 'phone', 'address'];
+    const first = order.find((k) => invalid[k]);
+    if (first) document.getElementById(`${formType}-${first}`)?.focus();
   };
 
   const submitContact = async (e: FormEvent) => {
@@ -91,10 +122,15 @@ export function TwoStepLeadForm({
     const phone = contact.phone.trim();
     if (!email && !phone) next.email = 'Please give an email or a phone number';
     if (email && !/^\S+@\S+\.\S+$/.test(email)) next.email = 'Please enter a valid email address';
-    if (phone && phone.replace(/\D/g, '').length < 7) next.phone = 'Please enter a valid phone number';
-    if (askAddress && contact.address.trim().length < 5) next.address = 'Please enter the property address';
+    if (phone && phone.replace(/\D/g, '').length < 7)
+      next.phone = 'Please enter a valid phone number';
+    if (askAddress && contact.address.trim().length < 5)
+      next.address = 'Please enter the property address';
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) {
+      focusFirstInvalid(next);
+      return;
+    }
 
     setBusy(true);
     setSubmitError(null);
@@ -119,6 +155,7 @@ export function TwoStepLeadForm({
     if (result.leadId && result.updateToken && qualifiers.length > 0) {
       setLead({ id: result.leadId, token: result.updateToken });
       setStep('details');
+      setAnnouncement(`${agentName} has your details. A few optional questions follow.`);
     } else {
       finish();
     }
@@ -133,159 +170,220 @@ export function TwoStepLeadForm({
     const result = await enrichLead(lead.id, lead.token, filled);
     setBusy(false);
     // The lead already exists; a failure here loses only the extras.
-    if (!result.success) setSubmitError('We got your details, but not these extras. Your agent will ask.');
+    if (!result.success)
+      setSubmitError('We got your details, but not these extras. Your agent will ask.');
     finish();
   };
 
+  // Always mounted, so the text is announced when it changes.
+  const liveRegion = (
+    <p role="status" aria-live="polite" className="sr-only">
+      {announcement}
+    </p>
+  );
+
   if (step === 'done') {
+    // The fragment keeps the live region at the same position in both
+    // branches, so React keeps the same node rather than remounting it.
     return (
-      <Card className="border-green-200 bg-green-50">
-        <CardContent className="pt-6">
-          <div className="flex flex-col items-center text-center space-y-4" role="status">
-            <CheckCircle className="w-16 h-16 text-green-600" aria-hidden="true" />
-            <div>
-              <h3 className="text-lg font-semibold text-green-900">{successTitle}</h3>
-              <p className="text-sm text-green-700 mt-1">{successMessage}</p>
-              {submitError && <p className="text-sm text-green-800 mt-2">{submitError}</p>}
+      <>
+        {liveRegion}
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <CheckCircle className="w-16 h-16 text-green-600" aria-hidden="true" />
+              <div>
+                <h3
+                  ref={doneRef}
+                  tabIndex={-1}
+                  className="text-lg font-semibold text-green-900 focus:outline-none"
+                >
+                  {successTitle}
+                </h3>
+                <p className="text-sm text-green-800 mt-1">{successMessage}</p>
+                {submitError && (
+                  <p role="alert" className="text-sm text-green-900 mt-2 font-medium">
+                    {submitError}
+                  </p>
+                )}
+              </div>
+              {onSuccess && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[44px]"
+                  onClick={onSuccess}
+                >
+                  Close
+                </Button>
+              )}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {icon}
-          {step === 'contact' ? title : `Thanks — ${agentName} has your details`}
-        </CardTitle>
-        <CardDescription>
-          {step === 'contact' ? description : 'A few optional questions help them prepare. Skip any you like.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {submitError && step === 'contact' && (
-          <div role="alert" className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
-            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" aria-hidden="true" />
-            <p className="text-sm text-red-700">{submitError}</p>
-          </div>
-        )}
+    <>
+      {liveRegion}
+      <Card>
+        <CardHeader>
+          <CardTitle
+            ref={headingRef}
+            tabIndex={-1}
+            className="flex items-center gap-2 focus:outline-none"
+          >
+            {icon}
+            {step === 'contact' ? title : `Thanks — ${agentName} has your details`}
+          </CardTitle>
+          <CardDescription>
+            {step === 'contact'
+              ? description
+              : 'A few optional questions help them prepare. Skip any you like.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {submitError && step === 'contact' && (
+            <div
+              role="alert"
+              className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4"
+            >
+              <AlertCircle
+                className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-red-700">{submitError}</p>
+            </div>
+          )}
 
-        {step === 'contact' ? (
-          <form onSubmit={submitContact} className="relative space-y-4" noValidate>
-            <HoneypotField ref={honeypotRef} />
-            <FormField
-              label="Your Name"
-              id={`${formType}-name`}
-              autoComplete="name"
-              required
-              value={contact.name}
-              error={errors.name}
-              onChange={(e) => setContact({ ...contact, name: e.target.value })}
-            />
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {step === 'contact' ? (
+            <form onSubmit={submitContact} className="relative space-y-4" noValidate>
+              <HoneypotField ref={honeypotRef} />
               <FormField
-                label="Email"
-                id={`${formType}-email`}
-                type="email"
-                autoComplete="email"
-                value={contact.email}
-                error={errors.email}
-                helperText="Email or phone — whichever you prefer"
-                onChange={(e) => setContact({ ...contact, email: e.target.value })}
-              />
-              <FormField
-                label="Phone"
-                id={`${formType}-phone`}
-                type="tel"
-                autoComplete="tel"
-                value={contact.phone}
-                error={errors.phone}
-                onChange={(e) => setContact({ ...contact, phone: e.target.value })}
-              />
-            </div>
-            {askAddress && (
-              <FormField
-                label="Property Address"
-                id={`${formType}-address`}
-                autoComplete="street-address"
+                label="Your Name"
+                id={`${formType}-name`}
+                autoComplete="name"
                 required
-                value={contact.address}
-                error={errors.address}
-                onChange={(e) => setContact({ ...contact, address: e.target.value })}
+                value={contact.name}
+                error={errors.name}
+                onChange={(e) => setContact({ ...contact, name: e.target.value })}
               />
-            )}
-            <Button type="submit" className="w-full min-h-[44px]" disabled={busy}>
-              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-              Send to {agentName}
-            </Button>
-            <FormPrivacyNotice />
-          </form>
-        ) : (
-          <form onSubmit={submitDetails} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {qualifiers.map((field) => {
-                const id = `${formType}-${field.key}`;
-                const value = answers[field.key] ?? '';
-                const set = (v: string) => setAnswers({ ...answers, [field.key]: v });
-                if (field.kind === 'textarea') {
-                  return (
-                    <div key={field.key} className="md:col-span-2">
-                      <TextareaField
-                        label={field.label}
-                        id={id}
-                        rows={3}
-                        placeholder={field.placeholder}
-                        value={value}
-                        onChange={(e) => set(e.target.value)}
-                      />
-                    </div>
-                  );
-                }
-                if (field.kind === 'select') {
-                  return (
-                    <div key={field.key} className="space-y-2">
-                      <label htmlFor={id} className="text-sm font-medium">
-                        {field.label}
-                      </label>
-                      <select id={id} className={selectClass} value={value} onChange={(e) => set(e.target.value)}>
-                        <option value="">—</option>
-                        {field.options?.map(([v, label]) => (
-                          <option key={v} value={v}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                }
-                return (
-                  <FormField
-                    key={field.key}
-                    label={field.label}
-                    id={id}
-                    type={field.kind === 'number' ? 'number' : 'text'}
-                    placeholder={field.placeholder}
-                    value={value}
-                    onChange={(e) => set(e.target.value)}
-                  />
-                );
-              })}
-            </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="ghost" className="min-h-[44px]" onClick={finish} disabled={busy}>
-                Skip
-              </Button>
-              <Button type="submit" className="min-h-[44px]" disabled={busy}>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormField
+                  label="Email"
+                  id={`${formType}-email`}
+                  type="email"
+                  autoComplete="email"
+                  value={contact.email}
+                  error={errors.email}
+                  helperText="Email or phone — whichever you prefer"
+                  onChange={(e) => setContact({ ...contact, email: e.target.value })}
+                />
+                <FormField
+                  label="Phone"
+                  id={`${formType}-phone`}
+                  type="tel"
+                  autoComplete="tel"
+                  value={contact.phone}
+                  error={errors.phone}
+                  onChange={(e) => setContact({ ...contact, phone: e.target.value })}
+                />
+              </div>
+              {askAddress && (
+                <FormField
+                  label="Property Address"
+                  id={`${formType}-address`}
+                  autoComplete="street-address"
+                  required
+                  value={contact.address}
+                  error={errors.address}
+                  onChange={(e) => setContact({ ...contact, address: e.target.value })}
+                />
+              )}
+              <Button type="submit" className="w-full min-h-[44px]" disabled={busy}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-                Add these details
+                Send to {agentName}
               </Button>
-            </div>
-          </form>
-        )}
-      </CardContent>
-    </Card>
+              <FormPrivacyNotice />
+            </form>
+          ) : (
+            <form onSubmit={submitDetails} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {qualifiers.map((field) => {
+                  const id = `${formType}-${field.key}`;
+                  const value = answers[field.key] ?? '';
+                  const set = (v: string) => setAnswers({ ...answers, [field.key]: v });
+                  if (field.kind === 'textarea') {
+                    return (
+                      <div key={field.key} className="md:col-span-2">
+                        <TextareaField
+                          label={field.label}
+                          id={id}
+                          rows={3}
+                          placeholder={field.placeholder}
+                          value={value}
+                          onChange={(e) => set(e.target.value)}
+                        />
+                      </div>
+                    );
+                  }
+                  if (field.kind === 'select') {
+                    return (
+                      <div key={field.key} className="space-y-2">
+                        <label htmlFor={id} className="text-sm font-medium">
+                          {field.label}
+                        </label>
+                        <select
+                          id={id}
+                          className={selectClass}
+                          value={value}
+                          onChange={(e) => set(e.target.value)}
+                        >
+                          <option value="">—</option>
+                          {field.options?.map(([v, label]) => (
+                            <option key={v} value={v}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+                  return (
+                    <FormField
+                      key={field.key}
+                      label={field.label}
+                      id={id}
+                      type={field.kind === 'number' ? 'number' : 'text'}
+                      placeholder={field.placeholder}
+                      value={value}
+                      onChange={(e) => set(e.target.value)}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-h-[44px]"
+                  onClick={finish}
+                  disabled={busy}
+                >
+                  Skip
+                </Button>
+                <Button type="submit" className="min-h-[44px]" disabled={busy}>
+                  {busy ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : null}
+                  Add these details
+                </Button>
+              </div>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Home, Mail, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,7 @@ export default function ForgotPassword() {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const emailRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +34,8 @@ export default function ForgotPassword() {
        */
       logger.error('Password reset request failed', error, { action: 'reset_password' });
       setError("We couldn't send that email. Please check the address and try again.");
+      // US-238: back to the field the message is about.
+      emailRef.current?.focus();
     } else {
       setSent(true);
     }
@@ -107,18 +110,24 @@ export default function ForgotPassword() {
           <div className="bg-white rounded-lg shadow-lg p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{error}</p>
+                <div role="alert" id="forgot-email-error" className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                {/* US-238: the label was not associated with the input at all. */}
+                <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" aria-hidden="true" />
                   <input
+                    ref={emailRef}
+                    id="forgot-email"
+                    autoComplete="email"
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? 'forgot-email-error' : undefined}
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}

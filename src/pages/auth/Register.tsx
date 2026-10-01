@@ -505,8 +505,8 @@ export default function Register() {
 
                 {/* Error */}
                 {error && (
-                  <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div role="alert" className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
                     <div>
                       <p className="text-sm font-medium text-red-800">Registration Failed</p>
                       <p className="text-xs text-red-600 mt-1">{error}</p>
@@ -537,6 +537,8 @@ export default function Register() {
                       <input
                         {...register('username')}
                         id="register-username"
+                        aria-invalid={errors.username || (usernameTouched && usernameError) ? true : undefined}
+                        aria-describedby="register-username-status register-username-url"
                         type="text"
                         placeholder="johndoe"
                         autoComplete="username"
@@ -562,16 +564,20 @@ export default function Register() {
                           )}
                       </div>
                     </div>
-                    {errors.username && (
-                      <p className="mt-1 text-xs text-red-600">{errors.username.message}</p>
-                    )}
-                    {!errors.username && usernameTouched && usernameError && (
-                      <p className="mt-1 text-xs text-red-600">{usernameError}</p>
-                    )}
-                    {!errors.username && usernameTouched && isAvailable && !isChecking && (
-                      <p className="mt-1 text-xs text-green-600">Username is available</p>
-                    )}
-                    <p className="mt-1 text-[11px] text-gray-500">
+                    {/* US-238: one polite region for the availability check, so
+                        "taken" / "available" is heard as it changes. */}
+                    <div id="register-username-status" aria-live="polite">
+                      {errors.username && (
+                        <p className="mt-1 text-xs text-red-600">{errors.username.message}</p>
+                      )}
+                      {!errors.username && usernameTouched && usernameError && (
+                        <p className="mt-1 text-xs text-red-600">{usernameError}</p>
+                      )}
+                      {!errors.username && usernameTouched && isAvailable && !isChecking && (
+                        <p className="mt-1 text-xs text-green-700">Username is available</p>
+                      )}
+                    </div>
+                    <p id="register-username-url" className="mt-1 text-[11px] text-gray-600">
                       agentbio.net/{usernameValue || 'username'}
                     </p>
                   </div>
@@ -589,6 +595,8 @@ export default function Register() {
                       <input
                         {...register('name')}
                         id="register-name"
+                    aria-invalid={errors.name ? true : undefined}
+                    aria-describedby={errors.name ? 'register-name-error' : undefined}
                         type="text"
                         placeholder="John Doe"
                         autoComplete="name"
@@ -598,7 +606,7 @@ export default function Register() {
                       />
                     </div>
                     {errors.name && (
-                      <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
+                      <p id="register-name-error" role="alert" className="mt-1 text-xs text-red-600">{errors.name.message}</p>
                     )}
                   </div>
 
@@ -615,6 +623,8 @@ export default function Register() {
                       <input
                         {...register('email')}
                         id="register-email"
+                    aria-invalid={errors.email ? true : undefined}
+                    aria-describedby={errors.email ? 'register-email-error' : undefined}
                         type="email"
                         placeholder="you@example.com"
                         autoComplete="email"
@@ -624,7 +634,7 @@ export default function Register() {
                       />
                     </div>
                     {errors.email && (
-                      <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
+                      <p id="register-email-error" role="alert" className="mt-1 text-xs text-red-600">{errors.email.message}</p>
                     )}
                   </div>
 
@@ -643,6 +653,8 @@ export default function Register() {
                           onChange: (e) => setPasswordValue(e.target.value),
                         })}
                         id="register-password"
+                    aria-invalid={errors.password ? true : undefined}
+                    aria-describedby={errors.password ? 'register-password-error' : undefined}
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Create a strong password"
                         autoComplete="new-password"
@@ -664,7 +676,7 @@ export default function Register() {
                       </button>
                     </div>
                     {errors.password && (
-                      <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
+                      <p id="register-password-error" role="alert" className="mt-1 text-xs text-red-600">{errors.password.message}</p>
                     )}
                     <PasswordStrengthIndicator password={passwordValue} />
                   </div>
@@ -682,6 +694,8 @@ export default function Register() {
                       <input
                         {...register('confirmPassword')}
                         id="register-confirm-password"
+                    aria-invalid={errors.confirmPassword ? true : undefined}
+                    aria-describedby={errors.confirmPassword ? 'register-confirm-password-error' : undefined}
                         type={showConfirmPassword ? 'text' : 'password'}
                         placeholder="Confirm your password"
                         autoComplete="new-password"
@@ -703,7 +717,7 @@ export default function Register() {
                       </button>
                     </div>
                     {errors.confirmPassword && (
-                      <p className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>
+                      <p id="register-confirm-password-error" role="alert" className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>
                     )}
                   </div>
 
@@ -713,6 +727,8 @@ export default function Register() {
                       <input
                         {...register('agreedToTerms')}
                         type="checkbox"
+                        aria-invalid={errors.agreedToTerms ? true : undefined}
+                        aria-describedby={errors.agreedToTerms ? 'register-terms-error' : undefined}
                         className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                       />
                       <span className="ml-2.5 text-xs text-gray-600 leading-relaxed">
@@ -747,7 +763,7 @@ export default function Register() {
                       </span>
                     </label>
                     {errors.agreedToTerms && (
-                      <p className="mt-2 text-xs text-red-600" role="alert">
+                      <p id="register-terms-error" className="mt-2 text-xs text-red-600" role="alert">
                         {errors.agreedToTerms.message}
                       </p>
                     )}

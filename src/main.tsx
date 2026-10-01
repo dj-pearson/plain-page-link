@@ -8,10 +8,15 @@ import ErrorBoundary from './components/ui/ErrorBoundary';
 import { initSentry } from './lib/sentry';
 import { logger } from '@/lib/logger';
 import { initWebVitals } from '@/lib/web-vitals';
+import { installToastPolicy } from '@/lib/toastPolicy';
+
 import { registerServiceWorker } from '@/lib/register-sw';
 import { captureAttribution } from '@/lib/attribution';
 import { captureReferral } from '@/lib/signupIntent';
 import './index.css';
+
+// US-238: error toasts persist until dismissed.
+installToastPolicy();
 
 // Initialize Sentry as early as possible for error monitoring
 initSentry();

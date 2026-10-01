@@ -43,6 +43,9 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
         const generatedId = useId();
         const fieldId = id ?? generatedId;
         const errorId = `${fieldId}-error`;
+        const helperId = `${fieldId}-help`;
+        // US-238: helper text was never announced; the error replaces it.
+        const describedBy = error ? errorId : helperText ? helperId : undefined;
 
         return (
             <div className="space-y-2">
@@ -66,20 +69,20 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
                         className
                     )}
                     aria-invalid={error ? "true" : "false"}
-                    aria-describedby={error ? errorId : undefined}
+                    aria-describedby={describedBy}
                     {...props}
                 />
                 {error && (
                     <p
                         id={errorId}
-                        className="text-sm text-red-500 font-medium"
+                        className="text-sm text-red-600 font-medium"
                         role="alert"
                     >
                         {error}
                     </p>
                 )}
                 {helperText && !error && (
-                    <p className="text-sm text-muted-foreground">
+                    <p id={helperId} className="text-sm text-muted-foreground">
                         {helperText}
                     </p>
                 )}
@@ -130,7 +133,7 @@ export const TextareaField = forwardRef<
             {error && (
                 <p
                     id={errorId}
-                    className="text-sm text-red-500 font-medium"
+                    className="text-sm text-red-600 font-medium"
                     role="alert"
                 >
                     {error}

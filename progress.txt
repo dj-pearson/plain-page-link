@@ -4752,3 +4752,15 @@ microenterprise). UK/AODA/ACA/508 not applicable today.
 - Gotcha worth remembering: a cross-origin <track> needs crossorigin on the
   <video>, which then needs CORS on the video too. Supabase storage sends it;
   the help text says so rather than pretending any host works.
+
+---
+
+## Iteration — US-238: form focus and announcements
+
+- Live regions must exist before they speak. A region inside each branch of a
+  conditional is a new node each time; a fragment with the region first keeps
+  React reusing the same node across branches.
+- react-hook-form already focuses the first error (shouldFocusError default) —
+  the auth gap was the aria wiring and the non-RHF password pages.
+- maxLength is applied before onChange: a pasted "123 456" became "123 45".
+- Sonner error toasts made persistent once, centrally, rather than at 35 sites.
