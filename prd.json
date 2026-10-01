@@ -3666,8 +3666,8 @@
         "Typecheck passes: tsc --noEmit succeeds, and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Pricing.tsx:187-198; FullProfilePage.tsx:699-706. A reward (Stripe coupon for both agents) is a follow-up once attribution data exists."
+      "passes": true,
+      "notes": "Pricing.tsx:187-198; FullProfilePage.tsx:699-706. A reward (Stripe coupon for both agents) is a follow-up once attribution data exists. DONE: src/lib/signupIntent.ts keeps the plan chosen on /pricing (localStorage — email verification opens a new tab; 7 days) and the first-touch ?ref= (30 days). Logged-out Subscribe → /auth/register?plan=&interval= (Register shows 'You picked X — checkout opens right after'); onboarding completion → /dashboard/subscription?checkout=<plan>&interval=, which opens checkout once (through US-217's change-or-checkout path) and clears the intent. The 'Powered by' badge links https://agentbio.net/?utm_source=profile_badge&utm_medium=referral&ref=<username>. signUp passes ref and signup_source; handle_new_user records profiles.referred_by only when the ref names a real profile, plus signup_source (migration 20260930000010); a trigger stops agents rewriting either later. Health dashboard: 'Signups by referrer (30d)'. Tests: signupIntent unit tests (register URL, intent survives, first-touch referral, badge URL); verify-schema check (signup records referrer; agent cannot rewrite it). DEVIATION: no Playwright spec — covered by unit tests. Reward (coupon for both agents) left as the noted follow-up."
     }
   ]
 }

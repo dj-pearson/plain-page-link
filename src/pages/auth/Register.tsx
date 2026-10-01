@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { MARKETING_COPY } from '@/config/marketing-claims';
 import {
   Home,
@@ -27,6 +27,7 @@ import { OTPInput } from '@/components/auth/OTPInput';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { capturePlanIntent } from '@/lib/signupIntent';
 
 const registerSchema = z
   .object({
@@ -73,6 +74,11 @@ export default function Register() {
   });
 
   const usernameValue = watch('username');
+
+  // US-232: a visitor sent here by Subscribe on /pricing keeps their plan; it
+  // opens checkout once onboarding is done.
+  const location = useLocation();
+  const [planIntent] = useState(() => capturePlanIntent(location.search));
 
   // Already signed in: there is nothing to register. Hand off to /dashboard and
   // let RequireAuth decide, rather than naming the wizard here — this route
@@ -506,6 +512,14 @@ export default function Register() {
                       <p className="text-xs text-red-600 mt-1">{error}</p>
                     </div>
                   </div>
+                )}
+
+                {planIntent && (
+                  <p className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-foreground" role="status">
+                    You picked <strong className="capitalize">{planIntent.plan}</strong>
+                    {planIntent.interval === 'year' ? ' (yearly)' : ''}. Set up your page first — checkout opens
+                    right after.
+                  </p>
                 )}
 
                 {/* Registration Form */}

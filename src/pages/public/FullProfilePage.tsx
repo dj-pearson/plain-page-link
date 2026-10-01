@@ -23,6 +23,7 @@ import CustomLinks from '@/components/profile/CustomLinks';
 import { UpcomingOpenHouses } from '@/components/profile/UpcomingOpenHouses';
 import { useProfileTracking, trackLinkClick } from '@/hooks/useProfileTracking';
 import { trackContactTap, trackListingView } from '@/lib/analyticsEvents';
+import { poweredByUrl } from '@/lib/signupIntent';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
 import { SEOHead } from '@/components/SEOHead';
@@ -707,8 +708,10 @@ export default function FullProfilePage() {
                 {showBranding && (
                   <p className="text-xs text-gray-600 mt-1 sm:mt-2">
                     Powered by{' '}
+                    {/* US-232: attributed to this profile, so the signups it
+                        brings can be counted (profiles.referred_by). */}
                     <a
-                      href="https://agentbio.net"
+                      href={poweredByUrl(profile.username)}
                       className="hover:text-blue-600 active:text-blue-700 hover:underline"
                       target="_blank"
                       rel="noopener"

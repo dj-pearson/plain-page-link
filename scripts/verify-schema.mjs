@@ -2028,6 +2028,35 @@ check('funnel events are accepted from visitors and campaign_conversion reads th
   return out;
 });
 
+check('a signup records who referred it, and the agent cannot rewrite it', () => {
+  const out = [];
+  const referrer = '00000000-dead-beef-0000-0000000ef001';
+  const newbie = '00000000-dead-beef-0000-0000000ef002';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${referrer}', 'referrer@example.test') ON CONFLICT (id) DO NOTHING;
+       UPDATE public.profiles SET username = 'verifyreferrer' WHERE id = '${referrer}';
+       INSERT INTO auth.users (id, email, raw_user_meta_data)
+         VALUES ('${newbie}', 'newbie@example.test', '{"ref": "VerifyReferrer", "signup_source": "profile_badge"}');`);
+    const [row] = q(`SELECT coalesce(referred_by, '-') || '|' || coalesce(signup_source, '-') FROM public.profiles WHERE id = '${newbie}';`);
+    if (row !== 'verifyreferrer|profile_badge') out.push(`the new profile recorded "${row}", expected verifyreferrer|profile_badge`);
+    q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${newbie}';
+       UPDATE public.profiles SET referred_by = 'someoneelse' WHERE id = '${newbie}';`);
+    const [after] = q(`SELECT referred_by FROM public.profiles WHERE id = '${newbie}';`);
+    if (after !== 'verifyreferrer') out.push(`the agent rewrote their own referred_by to "${after}"`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.user_roles WHERE user_id IN ('${referrer}', '${newbie}');
+         DELETE FROM public.profiles WHERE id IN ('${referrer}', '${newbie}');
+         DELETE FROM auth.users WHERE id IN ('${referrer}', '${newbie}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // 9. Every column named in a .select('...') list must exist on the target table.
 //    Check 4 above proves the TABLE exists; nothing proved the COLUMNS did, and

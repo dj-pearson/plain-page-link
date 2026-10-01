@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { readPlanIntent } from '@/lib/signupIntent';
 import { useState } from 'react';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -198,8 +199,15 @@ export default function OnboardingWizardPage() {
         description: 'Your profile is ready to share. Check your email for next steps!',
       });
 
-      // Navigate to dashboard
-      navigate('/dashboard', { replace: true });
+      // US-232: a visitor who chose a plan on /pricing before signing up goes
+      // straight to checkout for it; everyone else to the dashboard.
+      const intent = readPlanIntent();
+      navigate(
+        intent
+          ? `/dashboard/subscription?checkout=${encodeURIComponent(intent.plan)}&interval=${intent.interval}`
+          : '/dashboard',
+        { replace: true }
+      );
     } catch (error: any) {
       logger.error('Error completing onboarding', error as Error);
       toast({

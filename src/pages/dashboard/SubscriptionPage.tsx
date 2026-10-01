@@ -6,7 +6,9 @@
  * Portal). Recent invoices are shown when available.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { clearPlanIntent } from '@/lib/signupIntent';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Loader2, ExternalLink, CreditCard } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,18 +99,18 @@ export default function SubscriptionPage() {
     },
   });
 
-  const handleUpgrade = async (plan: SubscriptionPlan) => {
+  const handleUpgrade = async (plan: SubscriptionPlan, chosenInterval: 'month' | 'year' = interval) => {
     // From the plan row, at the interval the agent chose. This read
     // plan.stripe_price_id_monthly off src/config/pricing-plans.ts, whose
     // values were the literals 'price_starter_monthly' and friends — not price
     // ids that exist in any Stripe account. create-checkout-session only checks
     // /^price_/, so they passed validation and Stripe answered "No such price",
     // which reached the agent as "Could not start checkout" (US-118).
-    const priceId = stripePriceIdFor(plan, interval);
+    const priceId = stripePriceIdFor(plan, chosenInterval);
     if (!priceId) {
       toast({
         title: 'Not available yet',
-        description: `${plan.name} has no ${interval === 'year' ? 'annual' : 'monthly'} price configured. Please contact support.`,
+        description: `${plan.name} has no ${chosenInterval === 'year' ? 'annual' : 'monthly'} price configured. Please contact support.`,
       });
       return;
     }
@@ -172,6 +174,28 @@ export default function SubscriptionPage() {
       setPortalLoading(false);
     }
   };
+
+  // US-232: arriving from onboarding with ?checkout=<plan> — the plan chosen
+  // on /pricing before signing up — opens checkout for it, once.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoCheckout = useRef(false);
+  useEffect(() => {
+    const wanted = searchParams.get('checkout');
+    if (!wanted || autoCheckout.current || isLoading || plans.length === 0) return;
+    autoCheckout.current = true;
+    clearPlanIntent();
+    const chosen: 'month' | 'year' = searchParams.get('interval') === 'year' ? 'year' : 'month';
+    const next = new URLSearchParams(searchParams);
+    next.delete('checkout');
+    next.delete('interval');
+    setSearchParams(next, { replace: true });
+    const plan = plans.find((p) => p.name === wanted.toLowerCase());
+    if (plan && plan.name !== currentPlanId) {
+      setInterval(chosen);
+      void handleUpgrade(plan, chosen);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, isLoading, plans]);
 
   const formatDate = (iso?: string) =>
     iso

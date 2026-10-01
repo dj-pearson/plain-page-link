@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { readReferral } from '@/lib/signupIntent';
+import { getAttribution } from '@/lib/attribution';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
@@ -250,6 +252,8 @@ export const useAuthStore = create<AuthState>()(
 
       signUp: async (email: string, password: string, username: string, fullName?: string) => {
         set({ isLoading: true, error: null });
+        const referral = readReferral();
+        const signupSource = getAttribution()?.utm_source;
 
         try {
           const { data, error } = await supabase.auth.signUp({
@@ -259,6 +263,10 @@ export const useAuthStore = create<AuthState>()(
               data: {
                 username,
                 full_name: fullName || '',
+                // US-232: handle_new_user records these on the profile; it
+                // ignores a ref that names no real profile.
+                ...(referral ? { ref: referral.ref } : {}),
+                ...(referral?.source || signupSource ? { signup_source: referral?.source ?? signupSource } : {}),
               },
               emailRedirectTo: `${window.location.origin}/`,
             },

@@ -4624,3 +4624,30 @@ trial. Owner-only: US-191 key rotation remains open and outranks all of these.
 - admin-users edge function replaces a browser call that always failed;
   Users is the admin landing tab (it was "coming soon").
 - MRR from real amounts/intervals; churn counts the webhook's 'cancelled'.
+
+## Roadmap loop — iteration 20/20 — US-232: the most eager buyer hit a dead end
+
+- Plan intent survives register → onboarding → checkout; the badge carries
+  ?ref=; profiles.referred_by is set once at signup and cannot be rewritten;
+  signups by referrer on the Health dashboard.
+
+---
+
+## The roadmap loop, in one paragraph
+
+Twenty stories, US-213 to US-232, from five parallel audits. The first seven
+were the kind that end a company: any account deletable with the anon key
+(93 SECURITY DEFINER functions were anonymous RPCs), a paywall with an
+off-switch, payments that could land on the free plan, every plan change
+billed twice, a workflow step that proxied into the Docker network, and two
+public endpoints that mailed anything to anyone from our domain. The middle
+was honesty and plumbing — claims for features that do not exist, a scheduler
+that opened empty, errors that reached nobody, numbers computed from the first
+50 rows, team invites nobody could accept, a funnel nobody could see. The last
+five were growth: a lead after two fields instead of nine, replies that reach
+the agent, a morning email, an admin who can find a user, and a Subscribe
+button that leads somewhere. Each database defect has a verify-schema check
+that was run against the tree before its fix and watched to fail. Owner
+actions are listed in the prd notes: apply migrations 20260930000001–10, set
+SENTRY_DSN / VITE_SENTRY_DSN, add uptime monitors, and check Stripe for
+customers already holding two live subscriptions.

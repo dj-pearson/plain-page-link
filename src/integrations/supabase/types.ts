@@ -3807,10 +3807,12 @@ export type Database = {
           onboarding_completed_at: string | null;
           phone: string | null;
           realtor_com_url: string | null;
+          referred_by: string | null;
           seo_description: string | null;
           seo_title: string | null;
           service_cities: Json | null;
           service_zip_codes: Json | null;
+          signup_source: string | null;
           sms_enabled: boolean | null;
           specialties: Json | null;
           theme: string | null;
@@ -3851,10 +3853,12 @@ export type Database = {
           onboarding_completed_at?: string | null;
           phone?: string | null;
           realtor_com_url?: string | null;
+          referred_by?: string | null;
           seo_description?: string | null;
           seo_title?: string | null;
           service_cities?: Json | null;
           service_zip_codes?: Json | null;
+          signup_source?: string | null;
           sms_enabled?: boolean | null;
           specialties?: Json | null;
           theme?: string | null;
@@ -3895,10 +3899,12 @@ export type Database = {
           onboarding_completed_at?: string | null;
           phone?: string | null;
           realtor_com_url?: string | null;
+          referred_by?: string | null;
           seo_description?: string | null;
           seo_title?: string | null;
           service_cities?: Json | null;
           service_zip_codes?: Json | null;
+          signup_source?: string | null;
           sms_enabled?: boolean | null;
           specialties?: Json | null;
           theme?: string | null;

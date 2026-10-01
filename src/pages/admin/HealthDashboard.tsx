@@ -159,7 +159,30 @@ export default function HealthDashboard() {
         /* leave as disconnected */
       }
 
+      // US-232: where the last 30 days' signups came from — the profile whose
+      // "Powered by" badge sent them, or the campaign.
+      let referrals: { source: string; signups: number }[] = [];
+      try {
+        const { data: refRows, error: refError } = await supabase
+          .from('profiles')
+          .select('referred_by, signup_source')
+          .gte('created_at', daysAgoISO(30));
+        if (refError) throw refError;
+        const counts = new Map<string, number>();
+        for (const r of (refRows ?? []) as { referred_by: string | null; signup_source: string | null }[]) {
+          const key = r.referred_by ? `@${r.referred_by}` : r.signup_source || 'direct';
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        referrals = [...counts.entries()]
+          .map(([source, signups]) => ({ source, signups }))
+          .sort((a, b) => b.signups - a.signups)
+          .slice(0, 10);
+      } catch (error) {
+        logger.error('Health dashboard: referral metrics unavailable', error as Error);
+      }
+
       return {
+        referrals,
         totalUsers,
         newSignups,
         activeUsers,
@@ -338,6 +361,26 @@ export default function HealthDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Signups by referrer (30d)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {(data?.referrals ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No signups in the last 30 days.</p>
+          ) : (
+            <ul className="divide-y divide-border text-sm">
+              {(data?.referrals ?? []).map((r) => (
+                <li key={r.source} className="flex justify-between py-2">
+                  <span className="text-foreground">{r.source}</span>
+                  <span className="tabular-nums font-medium">{r.signups}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

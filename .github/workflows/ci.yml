@@ -215,9 +215,9 @@ jobs:
         run: npm ci
 
       # US-223: was --max-warnings=-1, which let the count only grow. This is
-      # the count on 2026-09-30; lower it whenever a change removes warnings.
+      # the count after the 2026-09-30 roadmap loop; lower it whenever a change removes warnings.
       - name: Run ESLint
-        run: npx eslint src/ --max-warnings=675
+        run: npx eslint src/ --max-warnings=673
 
   security:
     name: Security Audit
@@ -244,7 +244,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Run ESLint
-        run: npx eslint src/ --max-warnings=675
+        run: npx eslint src/ --max-warnings=673
 
   e2e:
     name: End-to-End (Playwright)

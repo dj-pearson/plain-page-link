@@ -2,7 +2,7 @@ import * as React from 'react';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
 import { useState } from 'react';
 import { Check, Zap } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -17,6 +17,7 @@ import { useSubscription, stripePriceIdFor } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { AddOnWaitlist } from '@/components/pricing/AddOnWaitlist';
+import { registerUrlForPlan } from '@/lib/signupIntent';
 import { useToast } from '@/hooks/use-toast';
 import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -184,18 +185,18 @@ export default function Pricing() {
   };
 
   const schema = generatePricingSchema();
+  const navigate = useNavigate();
 
-  const handleSubscribe = async (priceId: string) => {
+  const handleSubscribe = async (priceId: string, planName: string) => {
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        toast({
-          title: 'Authentication required',
-          description: 'Please sign in to subscribe',
-          variant: 'destructive',
-        });
+        // US-232: this was an "Authentication required" toast and nothing
+        // else — the visitor most ready to pay was dropped. The plan now
+        // rides through sign-up and onboarding to checkout.
+        navigate(registerUrlForPlan(planName, isYearly ? 'year' : 'month'));
         return;
       }
 
@@ -411,7 +412,7 @@ export default function Pricing() {
                         }
                         onClick={() => {
                           const priceId = stripePriceIdFor(plan, isYearly ? 'year' : 'month');
-                          if (priceId) handleSubscribe(priceId);
+                          if (priceId) handleSubscribe(priceId, plan.name);
                         }}
                         asChild={plan.name === 'free'}
                       >
