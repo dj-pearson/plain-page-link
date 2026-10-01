@@ -48,6 +48,8 @@ const BASELINE: Record<string, number> = {
   dashboard: 0,
   'public profile': 0,
   'public profile with a listing modal open': 0,
+  'public profile (phone)': 0,
+  'public profile with a listing modal open (phone)': 0,
 };
 
 import { test, expect, type Page } from '@playwright/test';
@@ -386,5 +388,49 @@ test.describe('Accessibility (axe-core)', () => {
       blocking.length,
       `New critical/serious a11y violations on ${name} (baseline ${baseline}):\n${describe(blocking)}`
     ).toBeLessThanOrEqual(baseline);
+  });
+});
+
+/**
+ * US-233: the suite scanned at a desktop viewport only, and the one critical
+ * defect on /demo exists only at phone width — ListingGallery's Filters and
+ * Sort buttons hide their text below `sm`, leaving two unnamed buttons. Most
+ * visitors to an agent's page arrive from an Instagram bio, on a phone.
+ *
+ * The page-builder GalleryBlock lightbox does not render on /demo; its dialog
+ * semantics are held by src/components/pageBuilder/blocks/blocks.a11y.test.tsx.
+ * The photo gallery a phone visitor does reach is the listing modal's.
+ */
+test.describe('Accessibility at phone width (axe-core)', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  const check = async (page: Page, name: string) => {
+    const { blocking, total } = await analyze(page);
+    if (blocking.length > 0) {
+      console.log(`[a11y] ${name}: ${blocking.length} critical/serious of ${total} total →`, describe(blocking));
+    }
+    const baseline = BASELINE[name] ?? 0;
+    expect(
+      blocking.length,
+      `New critical/serious a11y violations on ${name} (baseline ${baseline}):\n${describe(blocking)}`
+    ).toBeLessThanOrEqual(baseline);
+  };
+
+  test('public profile (phone) stays at/below baseline', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/demo', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await assertAppRendered(page, '/demo');
+    await check(page, 'public profile (phone)');
+  });
+
+  test('public profile with a listing modal open (phone) stays at/below baseline', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/demo', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await assertAppRendered(page, '/demo');
+    await page.getByRole('button', { name: /View listing:/ }).first().click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await check(page, 'public profile with a listing modal open (phone)');
   });
 });

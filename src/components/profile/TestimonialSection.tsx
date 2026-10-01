@@ -140,11 +140,12 @@ export function TestimonialSection({ testimonials }: TestimonialSectionProps) {
           {/* Navigation Buttons */}
           {sortedTestimonials.length > 1 && (
             <div className="flex justify-center gap-4 mt-6">
-              <Button variant="outline" size="icon" onClick={goToPrevious}>
-                <ChevronLeft className="h-4 w-4" />
+              {/* US-233: icon-only buttons with no accessible name. */}
+              <Button variant="outline" size="icon" onClick={goToPrevious} aria-label="Previous testimonial">
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               </Button>
-              <Button variant="outline" size="icon" onClick={goToNext}>
-                <ChevronRight className="h-4 w-4" />
+              <Button variant="outline" size="icon" onClick={goToNext} aria-label="Next testimonial">
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
           )}

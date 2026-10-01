@@ -297,20 +297,25 @@ export default function ListingDetailModal({
               {photos.length > 1 && (
                 <>
                   <button
+                    type="button"
                     onClick={() =>
                       setCurrentImageIndex((i) => (i - 1 + photos.length) % photos.length)
                     }
+                    // US-233: icon-only, and unnamed until now.
+                    aria-label="Previous photo"
                     className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
-                    <ChevronLeft className="h-5 w-5 text-gray-800" />
+                    <ChevronLeft className="h-5 w-5 text-gray-800" aria-hidden="true" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setCurrentImageIndex((i) => (i + 1) % photos.length)}
+                    aria-label="Next photo"
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
-                    <ChevronRight className="h-5 w-5 text-gray-800" />
+                    <ChevronRight className="h-5 w-5 text-gray-800" aria-hidden="true" />
                   </button>
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
+                  <div aria-live="polite" className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
                     {currentImageIndex + 1} / {photos.length}
                   </div>
                 </>
@@ -321,7 +326,12 @@ export default function ListingDetailModal({
                   {photos.slice(0, 5).map((photo, idx) => (
                     <button
                       key={idx}
+                      type="button"
                       onClick={() => setCurrentImageIndex(idx)}
+                      // US-233: the thumbnail's only content is alt="", so
+                      // each button's name was empty.
+                      aria-label={`Show photo ${idx + 1} of ${photos.length}`}
+                      aria-current={idx === currentImageIndex ? 'true' : undefined}
                       className={cn(
                         'w-12 h-9 rounded-md overflow-hidden border-2 transition-all flex-shrink-0',
                         idx === currentImageIndex

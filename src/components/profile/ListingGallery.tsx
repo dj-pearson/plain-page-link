@@ -3,6 +3,13 @@ import { Search, SlidersHorizontal, ArrowUpDown, Home, X } from 'lucide-react';
 import ListingCard from './ListingCard';
 import { parsePrice } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { PublicProfileListing } from '@/types';
 
 interface ListingGalleryProps {
@@ -44,7 +51,6 @@ export default function ListingGallery({ listings, title, onListingClick }: List
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<PropertyTypeFilter>('all');
   const [bedroomFilter, setBedroomFilter] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
-  const [showSort, setShowSort] = useState(false);
 
   const availableTypes = useMemo(() => {
     const types = new Set<string>();
@@ -116,9 +122,10 @@ export default function ListingGallery({ listings, title, onListingClick }: List
 
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" aria-hidden="true" />
           <input
-            type="text"
+            type="search"
+            aria-label="Search properties"
             placeholder="Search properties..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -127,7 +134,12 @@ export default function ListingGallery({ listings, title, onListingClick }: List
         </div>
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={() => setShowFilters(!showFilters)}
+            // US-233: below sm the label is hidden, which left a nameless
+            // button on phones — the axe failure only a mobile scan saw.
+            aria-label="Filters"
+            aria-expanded={showFilters}
             className={cn(
               'inline-flex items-center gap-2 px-3.5 py-2.5 border rounded-lg text-sm font-medium transition-all min-h-[44px]',
               showFilters || hasActiveFilters
@@ -135,7 +147,7 @@ export default function ListingGallery({ listings, title, onListingClick }: List
                 : 'border-gray-200 hover:bg-gray-50'
             )}
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">Filters</span>
             {hasActiveFilters && (
               <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">
@@ -143,37 +155,29 @@ export default function ListingGallery({ listings, title, onListingClick }: List
               </span>
             )}
           </button>
-          <div className="relative">
-            <button
-              onClick={() => setShowSort(!showSort)}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all min-h-[44px]"
-            >
-              <ArrowUpDown className="h-4 w-4" />
-              <span className="hidden sm:inline">{SORT_LABELS[sortBy]}</span>
-            </button>
-            {showSort && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowSort(false)} />
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 w-48 py-1">
-                  {Object.entries(SORT_LABELS).map(([key, label]) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setSortBy(key as SortOption);
-                        setShowSort(false);
-                      }}
-                      className={cn(
-                        'w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors min-h-[44px]',
-                        sortBy === key && 'font-semibold text-blue-600 bg-blue-50'
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          {/* US-233: a hand-built menu (no menu role, no Escape, no arrow
+              keys, focus lost on close) is now the Radix DropdownMenu. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Sort: ${SORT_LABELS[sortBy]}`}
+                className="inline-flex items-center gap-2 px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all min-h-[44px]"
+              >
+                <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">{SORT_LABELS[sortBy]}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                {Object.entries(SORT_LABELS).map(([key, label]) => (
+                  <DropdownMenuRadioItem key={key} value={key} className="min-h-[44px]">
+                    {label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

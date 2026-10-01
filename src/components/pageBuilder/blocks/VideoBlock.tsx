@@ -93,19 +93,19 @@ export function VideoBlock({ config, isEditing = false }: VideoBlockProps) {
                 {!isPlaying && config.thumbnail ? (
                     // Thumbnail with play button
                     <div className="relative w-full h-full">
-                        <img
-                            src={config.thumbnail}
-                            alt={config.title || "Video"}
-                            className="w-full h-full object-cover"
-                        />
+                        {/* The button names the video; the thumbnail is decorative. */}
+                        <img src={config.thumbnail} alt="" className="w-full h-full object-cover" />
                         <button
+                            type="button"
                             onClick={handlePlay}
                             disabled={isEditing}
-                            className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors group"
+                            // US-233: this button had no accessible name.
+                            aria-label={config.title ? `Play video: ${config.title}` : "Play video"}
+                            className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors group focus-visible:ring-2 focus-visible:ring-white"
                         >
-                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <span className="w-16 h-16 bg-white rounded-full flex items-center justify-center group-hover:scale-110 transition-transform" aria-hidden="true">
                                 <Play className="w-8 h-8 text-primary ml-1" />
-                            </div>
+                            </span>
                         </button>
                     </div>
                 ) : (

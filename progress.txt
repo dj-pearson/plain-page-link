@@ -4676,3 +4676,19 @@ Legal posture (not legal advice — counsel to confirm): ADA Title III applies
 and is the main exposure (WCAG 2.1 AA de facto; target 2.2 AA). Fair Housing
 Act relevant to listing information. EU EAA probably not applicable (US, B2B,
 microenterprise). UK/AODA/ACA/508 not applicable today.
+
+---
+
+## Iteration — US-233: public-page blocks a keyboard could not reach, unnamed buttons
+
+- LinkBlock / ImageBlock: <div onClick> + window.location → <a href> (sanitised),
+  new-tab hint for screen readers.
+- GalleryBlock: thumbnails are buttons in a list; lightbox is the Radix Dialog
+  (Escape, focus trap, named controls, arrow keys). Learned: Radix returns focus
+  only to a DialogTrigger — a dialog opened from your own button must restore
+  focus itself in onCloseAutoFocus. Worth checking every controlled Dialog.
+- Named: VideoBlock play, listing photo prev/next/thumbnails, testimonial prev/next,
+  ListingGallery Filters/Sort (text hidden below sm — the phone-only critical).
+- Sort menu → Radix DropdownMenu. FAB label starts with its visible text (2.5.3).
+- a11y suite: phone-width describe for /demo (+ listing modal). Watched it fail
+  on the old ListingGallery (button-name critical x2), pass on the new.

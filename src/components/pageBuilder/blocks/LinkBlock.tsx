@@ -3,6 +3,7 @@
  * Displays a customizable link button
  */
 
+import type React from "react";
 import { LinkBlockConfig } from "@/types/pageBuilder";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, ChevronRight } from "lucide-react";
@@ -14,79 +15,95 @@ interface LinkBlockProps {
 }
 
 export function LinkBlock({ config, isEditing = false }: LinkBlockProps) {
-    const handleClick = () => {
-        if (isEditing) return;
+    // US-233: these were <div onClick> navigating with window.location — not
+    // links to a keyboard, a screen reader, middle-click or "copy link". A real
+    // <a href> now; in the editor (or with an unsafe URL) a plain element.
+    const safeUrl = isEditing ? null : sanitizeUrl(config.url);
+    const linkProps = safeUrl
+        ? {
+              href: safeUrl,
+              ...(config.openInNewTab ? { target: "_blank", rel: "noopener noreferrer" } : {}),
+          }
+        : null;
+    const newTabHint = config.openInNewTab ? <span className="sr-only"> (opens in a new tab)</span> : null;
 
-        // Sanitize URL to prevent XSS via javascript: or data: protocols
-        const safeUrl = sanitizeUrl(config.url);
-        if (!safeUrl) return;
-
-        if (config.openInNewTab) {
-            window.open(safeUrl, "_blank", "noopener,noreferrer");
-        } else {
-            window.location.href = safeUrl;
-        }
-    };
+    const Shell = ({ className, children }: { className: string; children: React.ReactNode }) =>
+        linkProps ? (
+            <a {...linkProps} className={className}>
+                {children}
+                {newTabHint}
+            </a>
+        ) : (
+            <div className={className}>{children}</div>
+        );
 
     const renderButton = () => (
         <Button
-            onClick={handleClick}
-            disabled={isEditing}
+            asChild={!!linkProps}
+            disabled={!linkProps}
             className="w-full gap-2 justify-between"
             variant={config.style === "minimal" ? "ghost" : "default"}
             size="lg"
         >
-            <span className="flex items-center gap-2">
-                {config.icon && <span>{config.icon}</span>}
-                {config.title}
-            </span>
-            {config.openInNewTab ? (
-                <ExternalLink className="w-4 h-4" />
+            {linkProps ? (
+                <a {...linkProps}>
+                    <span className="flex items-center gap-2">
+                        {config.icon && <span aria-hidden="true">{config.icon}</span>}
+                        {config.title}
+                    </span>
+                    {config.openInNewTab ? (
+                        <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                    ) : (
+                        <ChevronRight className="w-4 h-4" aria-hidden="true" />
+                    )}
+                    {newTabHint}
+                </a>
             ) : (
-                <ChevronRight className="w-4 h-4" />
+                <span className="flex w-full items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                        {config.icon && <span aria-hidden="true">{config.icon}</span>}
+                        {config.title}
+                    </span>
+                    <ChevronRight className="w-4 h-4" aria-hidden="true" />
+                </span>
             )}
         </Button>
     );
 
     const renderCard = () => (
-        <div
-            onClick={handleClick}
-            className={`
-                p-4 rounded-lg border bg-white hover:shadow-md transition-all
-                ${!isEditing && "cursor-pointer hover:border-primary"}
-            `}
+        <Shell
+            className={`block p-4 rounded-lg border bg-white hover:shadow-md transition-all ${
+                linkProps ? "hover:border-primary focus-visible:ring-2 focus-visible:ring-primary" : ""
+            }`}
         >
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+            <span className="flex items-center justify-between">
+                <span className="flex items-center gap-3">
                     {config.icon && (
-                        <div className="text-2xl">{config.icon}</div>
+                        <span className="text-2xl" aria-hidden="true">{config.icon}</span>
                     )}
                     <span className="font-semibold">{config.title}</span>
-                </div>
+                </span>
                 {config.openInNewTab ? (
-                    <ExternalLink className="w-5 h-5 text-gray-400" />
+                    <ExternalLink className="w-5 h-5 text-gray-500" aria-hidden="true" />
                 ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                    <ChevronRight className="w-5 h-5 text-gray-500" aria-hidden="true" />
                 )}
-            </div>
-        </div>
+            </span>
+        </Shell>
     );
 
     const renderMinimal = () => (
-        <div
-            onClick={handleClick}
-            className={`
-                py-3 px-4 text-center
-                ${!isEditing && "cursor-pointer hover:text-primary"}
-                transition-colors
-            `}
+        <Shell
+            className={`block py-3 px-4 text-center transition-colors ${
+                linkProps ? "hover:text-primary underline-offset-4 hover:underline" : ""
+            }`}
         >
             <span className="flex items-center justify-center gap-2">
-                {config.icon && <span>{config.icon}</span>}
+                {config.icon && <span aria-hidden="true">{config.icon}</span>}
                 <span className="font-medium">{config.title}</span>
-                {config.openInNewTab && <ExternalLink className="w-4 h-4" />}
+                {config.openInNewTab && <ExternalLink className="w-4 h-4" aria-hidden="true" />}
             </span>
-        </div>
+        </Shell>
     );
 
     return (

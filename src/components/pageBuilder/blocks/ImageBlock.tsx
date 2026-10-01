@@ -28,15 +28,9 @@ export function ImageBlock({ config, isEditing = false }: ImageBlockProps) {
         }
     };
 
-    const handleClick = () => {
-        if (!isEditing && config.link) {
-            // Sanitize URL to prevent XSS via javascript: or data: protocols
-            const safeUrl = sanitizeUrl(config.link);
-            if (safeUrl) {
-                window.open(safeUrl, "_blank", "noopener,noreferrer");
-            }
-        }
-    };
+    // US-233: a linked image is an <a href>, not a <div onClick> a keyboard
+    // cannot reach. The link opens in a new tab, as it always did.
+    const safeLink = !isEditing && config.link ? sanitizeUrl(config.link) : null;
 
     // Sanitize image URL
     const safeImageUrl = sanitizeUrl(config.imageUrl || "");
@@ -57,23 +51,21 @@ export function ImageBlock({ config, isEditing = false }: ImageBlockProps) {
 
     return (
         <div className={`${getSizeClass()} mx-auto space-y-2`}>
-            <div
-                onClick={handleClick}
-                className={`
-                    rounded-lg overflow-hidden
-                    ${
-                        config.link && !isEditing
-                            ? "cursor-pointer hover:opacity-90 transition-opacity"
-                            : ""
-                    }
-                `}
-            >
-                <img
-                    src={safeImageUrl}
-                    alt={config.alt}
-                    className="w-full h-auto"
-                />
-            </div>
+            {safeLink ? (
+                <a
+                    href={safeLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block rounded-lg overflow-hidden hover:opacity-90 transition-opacity focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                    <img src={safeImageUrl} alt={config.alt} className="w-full h-auto" />
+                    <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+            ) : (
+                <div className="rounded-lg overflow-hidden">
+                    <img src={safeImageUrl} alt={config.alt} className="w-full h-auto" />
+                </div>
+            )}
 
             {/* Caption */}
             {config.caption && (

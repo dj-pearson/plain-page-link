@@ -169,16 +169,19 @@ export function StickyActionBar({
           )}
           whileTap={{ scale: 0.95 }}
           style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
-          aria-label={isExpanded ? 'Close quick actions' : 'Open quick actions'}
+          // US-233 (WCAG 2.5.3): the accessible name starts with the visible
+          // text, so a voice-control user saying "Contact" reaches it.
+          aria-label={isExpanded ? 'Close quick actions' : 'Contact — open quick actions'}
+          aria-expanded={isExpanded}
         >
           {isExpanded ? (
             <>
-              <ChevronUp className="h-5 w-5" />
+              <ChevronUp className="h-5 w-5" aria-hidden="true" />
               <span className="font-semibold text-sm">Close</span>
             </>
           ) : (
             <>
-              <Phone className="h-5 w-5" />
+              <Phone className="h-5 w-5" aria-hidden="true" />
               <span className="font-semibold text-sm">Contact</span>
             </>
           )}
