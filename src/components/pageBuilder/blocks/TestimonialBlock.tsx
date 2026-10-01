@@ -86,8 +86,8 @@ export function TestimonialBlock({ config, isEditing = false }: TestimonialBlock
                         <AvatarImage src={testimonial.avatarUrl} alt={testimonial.name} />
                     )}
                     <AvatarFallback
-                        className="text-sm font-semibold text-white"
-                        style={{ backgroundColor: "var(--theme-primary, #2563eb)" }}
+                        className="text-sm font-semibold"
+                        style={{ backgroundColor: "var(--theme-primary, #2563eb)", color: "var(--theme-on-primary, #ffffff)" }}
                     >
                         {testimonial.name.charAt(0)}
                     </AvatarFallback>

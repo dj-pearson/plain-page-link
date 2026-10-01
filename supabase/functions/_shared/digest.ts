@@ -111,7 +111,7 @@ export function buildDigest(input: DigestInput): EmailOptions | null {
     to: input.to,
     subject: input.weekly ? 'Your week on AgentBio, and today' : 'Today on AgentBio',
     body: text.join('\n'),
-    html: `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#f6f5f2;font-family:Arial,sans-serif;color:#1f2933;">
+    html: `<!DOCTYPE html><html lang="en"><body style="margin:0;padding:24px;background:#f6f5f2;font-family:Arial,sans-serif;color:#1f2933;">
 <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px;">
 <p style="margin:0 0 16px;font-size:16px;">Good morning ${e(input.agentName)},</p>
 ${html.join('\n')}

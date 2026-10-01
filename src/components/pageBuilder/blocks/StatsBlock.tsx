@@ -64,7 +64,7 @@ export function StatsBlock({ config, isEditing = false }: StatsBlockProps) {
                                 className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
                                 style={{
                                     backgroundColor: "var(--theme-primary, #2563eb)",
-                                    color: "white",
+                                    color: "var(--theme-on-primary, #ffffff)",
                                     opacity: 0.9,
                                 }}
                             >

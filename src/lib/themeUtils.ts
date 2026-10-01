@@ -4,6 +4,17 @@
  */
 
 import { PageTheme } from "@/types/pageBuilder";
+import { readableTextOn } from "@/lib/wcagContrast";
+
+/** US-234: black or white text for each theme fill, whichever reads. */
+function onColors(theme: PageTheme): Record<string, string> {
+    const on = (hex: string) => (/^#?[0-9a-f]{3}([0-9a-f]{3})?$/i.test(hex) ? readableTextOn(hex) : "#ffffff");
+    return {
+        "--theme-on-primary": on(theme.colors.primary),
+        "--theme-on-secondary": on(theme.colors.secondary),
+        "--theme-on-accent": on(theme.colors.accent),
+    };
+}
 
 /**
  * Get border radius CSS value from theme setting
@@ -41,6 +52,7 @@ export function themeToCSSVariables(theme: PageTheme): Record<string, string> {
         "--theme-background": theme.colors.background,
         "--theme-text": theme.colors.text,
         "--theme-accent": theme.colors.accent,
+        ...onColors(theme),
         "--theme-font-heading": theme.fonts.heading,
         "--theme-font-body": theme.fonts.body,
         "--theme-border-radius": getBorderRadiusValue(theme.borderRadius),
@@ -75,6 +87,7 @@ export function getThemedStyles(theme: PageTheme) {
         "--theme-background": theme.colors.background,
         "--theme-text": theme.colors.text,
         "--theme-accent": theme.colors.accent,
+        ...onColors(theme),
         "--theme-font-heading": `'${theme.fonts.heading}', sans-serif`,
         "--theme-font-body": `'${theme.fonts.body}', sans-serif`,
         "--theme-border-radius": getBorderRadiusValue(theme.borderRadius),

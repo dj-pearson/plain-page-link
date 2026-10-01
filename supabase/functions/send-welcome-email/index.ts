@@ -125,27 +125,27 @@ The AgentBio Team
 P.S. Share your first listing today and see how AgentBio helps you convert Instagram followers into clients!`,
       html: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 0 auto; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
+    .header { background: linear-gradient(135deg, #4f46e5 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
     .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
     .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.95; }
     .content { background: #ffffff; padding: 40px 30px; }
-    .profile-box { background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-left: 4px solid #667eea; padding: 20px; margin: 25px 0; border-radius: 8px; }
-    .profile-url { font-size: 18px; font-weight: 600; color: #667eea; word-break: break-all; }
+    .profile-box { background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-left: 4px solid #4f46e5; padding: 20px; margin: 25px 0; border-radius: 8px; }
+    .profile-url { font-size: 18px; font-weight: 600; color: #4f46e5; word-break: break-all; }
     .steps { margin: 30px 0; }
     .step { margin-bottom: 20px; padding-left: 35px; position: relative; }
-    .step-number { position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: #667eea; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: bold; }
+    .step-number { position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: #4f46e5; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: bold; }
     .step h3 { margin: 0 0 5px 0; font-size: 16px; color: #1f2937; }
     .step p { margin: 0; font-size: 14px; color: #6b7280; }
-    .button { display: inline-block; background: #667eea; color: white !important; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; }
+    .button { display: inline-block; background: #4f46e5; color: white !important; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; }
     .button:hover { background: #5568d3; }
     .help-section { background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin: 25px 0; }
     .footer { background: #f9fafb; padding: 30px; text-align: center; font-size: 14px; color: #6b7280; }
-    .footer a { color: #667eea; text-decoration: none; }
+    .footer a { color: #4f46e5; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -208,9 +208,9 @@ P.S. Share your first listing today and see how AgentBio helps you convert Insta
       <div class="help-section">
         <p style="margin: 0 0 10px 0; font-weight: 600; color: #1f2937;">Need Help?</p>
         <p style="margin: 0; font-size: 14px; color: #6b7280;">
-          • Check out our <a href="${getSiteUrl()}/blog" style="color: #667eea;">video tutorials</a><br>
+          • Check out our <a href="${getSiteUrl()}/blog" style="color: #4f46e5;">video tutorials</a><br>
           • Join our agent community<br>
-          • Email us: <a href="mailto:support@agentbio.net" style="color: #667eea;">support@agentbio.net</a>
+          • Email us: <a href="mailto:support@agentbio.net" style="color: #4f46e5;">support@agentbio.net</a>
         </p>
       </div>
 

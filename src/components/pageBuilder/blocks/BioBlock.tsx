@@ -60,6 +60,7 @@ export function BioBlock({ config, isEditing = false }: BioBlockProps) {
                 <div className="flex gap-3 justify-center pt-2">
                     <Button className="gap-2" style={{
                         backgroundColor: "var(--theme-primary, #2563eb)",
+                        color: "var(--theme-on-primary, #ffffff)",
                         borderRadius: "var(--theme-border-radius, 0.5rem)",
                     }}>
                         <Mail className="w-4 h-4" />

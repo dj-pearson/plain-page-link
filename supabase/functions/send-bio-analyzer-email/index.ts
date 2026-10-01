@@ -216,12 +216,12 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
 
   return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-    .header { background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); color: white; padding: 40px 30px; text-align: center; }
+    .header { background: linear-gradient(135deg, #9333ea 0%, #be185d 100%); color: white; padding: 40px 30px; text-align: center; }
     .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
     .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.95; }
     .content { padding: 40px 30px; }
@@ -232,7 +232,7 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
     .bio-text { font-family: monospace; font-size: 14px; line-height: 1.8; color: #1f2937; white-space: pre-wrap; }
     .checklist { margin: 25px 0; }
     .checklist-item { padding: 12px; background: #f0fdf4; border-left: 3px solid #10b981; margin-bottom: 10px; border-radius: 4px; }
-    .cta-box { background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); color: white; padding: 30px; text-align: center; border-radius: 12px; margin: 30px 0; }
+    .cta-box { background: linear-gradient(135deg, #9333ea 0%, #be185d 100%); color: white; padding: 30px; text-align: center; border-radius: 12px; margin: 30px 0; }
     .cta-box h3 { margin: 0 0 15px 0; font-size: 22px; }
     .cta-box ul { text-align: left; max-width: 400px; margin: 20px auto; }
     .cta-box li { margin-bottom: 8px; }

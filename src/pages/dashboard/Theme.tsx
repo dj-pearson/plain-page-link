@@ -24,6 +24,8 @@ import { logger } from '@/lib/logger';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { ContrastPanel } from '@/components/theme/ContrastPanel';
+import { themeContrastChecks, fixAllContrast } from '@/lib/themeContrast';
 
 const AVAILABLE_FONTS = [
   'Inter',
@@ -50,6 +52,8 @@ export default function Theme() {
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
   const { subscription } = useSubscriptionLimits();
   const { hasFeature } = usePlanUsage();
+  const contrastChecks = themeContrastChecks(customColors);
+  const contrastFailures = contrastChecks.filter((k) => !k.pass);
 
   // Load saved theme from database
   useEffect(() => {
@@ -123,6 +127,17 @@ export default function Theme() {
       toast({
         title: 'Error',
         description: 'You must be logged in to save themes',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // US-234: an unreadable pair is not saved. Before this the editor
+    // published any five colours, including white text on a pale primary.
+    if (contrastFailures.length > 0) {
+      toast({
+        title: 'Some text would be hard to read',
+        description: `${contrastFailures.map((k) => k.label).join('; ')}. Use "Use nearest passing colour" in Customize → Readability.`,
         variant: 'destructive',
       });
       return;
@@ -215,6 +230,11 @@ export default function Theme() {
 
   const handleColorChange = (key: keyof typeof customColors, value: string) => {
     setCustomColors((prev) => ({ ...prev, [key]: value }));
+    setIsCustomizing(true);
+  };
+
+  const handleFixAllContrast = () => {
+    setCustomColors((prev) => ({ ...prev, ...fixAllContrast(prev) }));
     setIsCustomizing(true);
   };
 
@@ -418,6 +438,12 @@ export default function Theme() {
                 />
               </CardContent>
             </Card>
+
+            <ContrastPanel
+              checks={contrastChecks}
+              onFix={(key, value) => handleColorChange(key, value)}
+              onFixAll={handleFixAllContrast}
+            />
 
             {/* Fonts */}
             <Card>

@@ -5,6 +5,7 @@
 
 import { PageTheme } from "@/types/pageBuilder";
 import { logger } from "@/lib/logger";
+import { readableTextOn, readableTextOnHsl } from "@/lib/wcagContrast";
 
 // ThemeConfig interface for theme cards
 export interface ThemeConfig {
@@ -37,8 +38,8 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
         isPremium: false,
         colors: {
             primary: "#2563eb",
-            secondary: "#10b981",
-            accent: "#f59e0b",
+            secondary: "#059669",
+            accent: "#b45309",
             background: "#ffffff",
             foreground: "#1f2937",
             muted: "#9ca3af",
@@ -90,8 +91,8 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
         description: "Vibrant and energetic color scheme",
         isPremium: true,
         colors: {
-            primary: "#dc2626",
-            secondary: "#f59e0b",
+            primary: "#b91c1c",
+            secondary: "#b45309",
             accent: "#7c2d12",
             background: "#fef2f2",
             foreground: "#1f2937",
@@ -108,7 +109,7 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
         description: "Sophisticated purple and violet tones",
         isPremium: true,
         colors: {
-            primary: "#6366f1",
+            primary: "#4f46e5",
             secondary: "#8b5cf6",
             accent: "#c026d3",
             background: "#faf5ff",
@@ -126,9 +127,9 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
         description: "Calming blue and cyan palette",
         isPremium: true,
         colors: {
-            primary: "#0891b2",
-            secondary: "#06b6d4",
-            accent: "#0e7490",
+            primary: "#0e7490",
+            secondary: "#0891b2",
+            accent: "#155e75",
             background: "#ecfeff",
             foreground: "#164e63",
             muted: "#67e8f9",
@@ -146,7 +147,7 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
         has3D: true,
         threeDEffect: "3d-particles",
         colors: {
-            primary: "#8b5cf6",
+            primary: "#9d71f7",
             secondary: "#a78bfa",
             accent: "#c084fc",
             background: "#0f172a",
@@ -206,7 +207,7 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
         has3D: true,
         threeDEffect: "3d-particles",
         colors: {
-            primary: "#7c3aed",
+            primary: "#a78bfa",
             secondary: "#a855f7",
             accent: "#fbbf24",
             background: "#1e1b4b",
@@ -226,7 +227,7 @@ export const DEFAULT_THEMES: ThemeConfig[] = [
         has3D: true,
         threeDEffect: "3d-mesh",
         colors: {
-            primary: "#10b981",
+            primary: "#4ade80",
             secondary: "#34d399",
             accent: "#6ee7b7",
             background: "#0c4a6e",
@@ -247,10 +248,10 @@ export const themePresets: Record<string, PageTheme> = {
         preset: "modern",
         colors: {
             primary: "#2563eb",
-            secondary: "#10b981",
+            secondary: "#059669",
             background: "#ffffff",
             text: "#1f2937",
-            accent: "#f59e0b",
+            accent: "#b45309",
         },
         fonts: {
             heading: "Inter",
@@ -297,8 +298,8 @@ export const themePresets: Record<string, PageTheme> = {
         name: "Bold",
         preset: "bold",
         colors: {
-            primary: "#dc2626",
-            secondary: "#f59e0b",
+            primary: "#b91c1c",
+            secondary: "#b45309",
             background: "#fef2f2",
             text: "#1f2937",
             accent: "#7c2d12",
@@ -314,7 +315,7 @@ export const themePresets: Record<string, PageTheme> = {
         name: "Elegant",
         preset: "elegant",
         colors: {
-            primary: "#6366f1",
+            primary: "#4f46e5",
             secondary: "#8b5cf6",
             background: "#faf5ff",
             text: "#1e1b4b",
@@ -331,11 +332,11 @@ export const themePresets: Record<string, PageTheme> = {
         name: "Ocean",
         preset: "ocean",
         colors: {
-            primary: "#0891b2",
-            secondary: "#06b6d4",
+            primary: "#0e7490",
+            secondary: "#0891b2",
             background: "#ecfeff",
             text: "#164e63",
-            accent: "#0e7490",
+            accent: "#155e75",
         },
         fonts: {
             heading: "Roboto",
@@ -348,11 +349,11 @@ export const themePresets: Record<string, PageTheme> = {
         name: "Sunset",
         preset: "sunset",
         colors: {
-            primary: "#f97316",
-            secondary: "#fb923c",
+            primary: "#c2410c",
+            secondary: "#ea580c",
             background: "#fff7ed",
             text: "#7c2d12",
-            accent: "#ea580c",
+            accent: "#9a3412",
         },
         fonts: {
             heading: "Poppins",
@@ -365,8 +366,8 @@ export const themePresets: Record<string, PageTheme> = {
         name: "Forest",
         preset: "forest",
         colors: {
-            primary: "#059669",
-            secondary: "#10b981",
+            primary: "#047857",
+            secondary: "#059669",
             background: "#f0fdf4",
             text: "#14532d",
             accent: "#065f46",
@@ -474,6 +475,9 @@ export const generateThemeCSS = (theme: PageTheme): string => {
             --theme-background: ${theme.colors.background};
             --theme-text: ${theme.colors.text};
             --theme-accent: ${theme.colors.accent};
+            --theme-on-primary: ${readableTextOn(theme.colors.primary)};
+            --theme-on-secondary: ${readableTextOn(theme.colors.secondary)};
+            --theme-on-accent: ${readableTextOn(theme.colors.accent)};
             --theme-border-radius: ${borderRadiusMap[theme.borderRadius]};
             --theme-spacing: ${spacingMap[theme.spacing]};
             --theme-font-heading: ${theme.fonts.heading}, sans-serif;
@@ -495,25 +499,6 @@ export const getThemePresetNames = (): string[] => {
 // Validate color hex code
 export const isValidHexColor = (color: string): boolean => {
     return /^#([0-9A-F]{3}){1,2}$/i.test(color);
-};
-
-// Generate contrasting text color for a background
-export const getContrastingColor = (
-    hexColor: string
-): "#000000" | "#ffffff" => {
-    // Remove # if present
-    const color = hexColor.replace("#", "");
-
-    // Convert to RGB
-    const r = parseInt(color.substring(0, 2), 16);
-    const g = parseInt(color.substring(2, 4), 16);
-    const b = parseInt(color.substring(4, 6), 16);
-
-    // Calculate luminance
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-    // Return black for light backgrounds, white for dark backgrounds
-    return luminance > 0.5 ? "#000000" : "#ffffff";
 };
 
 // Lighten or darken a color
@@ -603,6 +588,15 @@ export const applyTheme = (themeData: string | ThemeConfig | null) => {
             if (bgColor) root.style.setProperty("--theme-background", hexToHSL(bgColor));
             if (textColor) root.style.setProperty("--theme-text", hexToHSL(textColor));
             if (accentColor) root.style.setProperty("--theme-accent", hexToHSL(accentColor));
+
+            // US-234: text on a theme fill is black or white, whichever reads.
+            // Buttons hard-coded white, which is 1.67:1 on Luxe's gold.
+            const onColor = (name: string, hex: unknown) => {
+                if (typeof hex === "string" && isValidHexColor(hex)) root.style.setProperty(name, readableTextOnHsl(hex));
+            };
+            onColor("--theme-on-primary", primaryColor);
+            onColor("--theme-on-secondary", secondaryColor);
+            onColor("--theme-on-accent", accentColor);
         }
 
         // Apply fonts

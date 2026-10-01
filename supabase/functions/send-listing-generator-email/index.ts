@@ -189,7 +189,7 @@ function getWelcomeEmailHTML(data: {
   const investmentDesc = descriptions.find((d) => d.style === 'investment');
 
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -198,7 +198,7 @@ function getWelcomeEmailHTML(data: {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
 
   <!-- Header -->
-  <div style="text-align: center; padding: 30px 0; background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); border-radius: 12px; margin-bottom: 30px;">
+  <div style="text-align: center; padding: 30px 0; background: linear-gradient(135deg, #9333ea 0%, #be185d 100%); border-radius: 12px; margin-bottom: 30px;">
     <h1 style="color: white; margin: 0; font-size: 28px;">🏡 Your Listing Descriptions Are Ready!</h1>
   </div>
 
@@ -297,7 +297,7 @@ function getWelcomeEmailHTML(data: {
   </div>
 
   <!-- CTA -->
-  <div style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); border-radius: 12px; margin: 30px 0;">
+  <div style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #9333ea 0%, #be185d 100%); border-radius: 12px; margin: 30px 0;">
     <h2 style="color: white; margin-top: 0;">Want AI-Powered Marketing for EVERY Listing?</h2>
     <p style="color: white; margin-bottom: 25px;">
       AgentBio creates your entire marketing presence - Instagram optimization, link-in-bio pages, content calendars, and automated follow-up.

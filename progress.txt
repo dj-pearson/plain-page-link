@@ -4692,3 +4692,21 @@ microenterprise). UK/AODA/ACA/508 not applicable today.
 - Sort menu → Radix DropdownMenu. FAB label starts with its visible text (2.5.3).
 - a11y suite: phone-width describe for /demo (+ listing modal). Watched it fail
   on the old ListingGallery (button-name critical x2), pass on the new.
+
+---
+
+## Iteration — US-234: theme contrast
+
+- wcagContrast.ts replaces the unused, wrong getContrastingColor. Key fact: black
+  or white always reaches ≥4.58:1 on any colour, so automatic label colour makes
+  every button pass whatever the agent picks — the sweep test proves it.
+- --theme-on-{primary,secondary,accent} set by every theme setter; consumers no
+  longer hard-code white. The "white button with primary text" inverse becomes
+  on-colour + primary, which passes whenever the fill does.
+- 9 presets moved to nearest passing shades; a test iterates all 20 palettes.
+  Gotcha: primary is used AS text (outline CTA, stat numbers), so it needs 4.5
+  against the page, not 3. The gradient CTA needs on-primary to clear the accent too.
+- Editor: Readability panel + save refusal. Emails: lang="en", darker brand fills.
+- Learned: two theme systems coexist — applyTheme writes HSL triplets on :root
+  (consumed as hsl(var())), themeUtils writes raw hex on the builder container
+  (consumed as var()). Any new variable must be set in both formats.

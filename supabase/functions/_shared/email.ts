@@ -166,11 +166,11 @@ View this lead: ${dashboardUrl}
 
 — AgentBio`,
     html: `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
   <div style="max-width:600px;margin:0 auto;">
-    <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:32px 30px;text-align:center;">
+    <div style="background:linear-gradient(135deg,#4f46e5 0%,#764ba2 100%);color:#fff;padding:32px 30px;text-align:center;">
       <h1 style="margin:0;font-size:22px;font-weight:600;">🔔 New Lead Captured</h1>
       <p style="margin:8px 0 0;opacity:.95;font-size:15px;">${escapeHtml(data.name)} is interested in ${escapeHtml(listing)}</p>
     </div>
@@ -184,11 +184,11 @@ View this lead: ${dashboardUrl}
       <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
       ${
         data.message
-          ? `<div style="margin:20px 0;padding:16px;background:#f9fafb;border-left:4px solid #667eea;border-radius:8px;"><p style="margin:0 0 6px;color:#6b7280;font-size:13px;font-weight:600;">MESSAGE</p><p style="margin:0;color:#1f2937;font-size:14px;white-space:pre-wrap;">${escapeHtml(data.message)}</p></div>`
+          ? `<div style="margin:20px 0;padding:16px;background:#f9fafb;border-left:4px solid #4f46e5;border-radius:8px;"><p style="margin:0 0 6px;color:#6b7280;font-size:13px;font-weight:600;">MESSAGE</p><p style="margin:0;color:#1f2937;font-size:14px;white-space:pre-wrap;">${escapeHtml(data.message)}</p></div>`
           : ''
       }
       <div style="text-align:center;margin-top:24px;">
-        <a href="${dashboardUrl}" style="display:inline-block;background:#667eea;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:600;">View Lead in Dashboard →</a>
+        <a href="${dashboardUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:600;">View Lead in Dashboard →</a>
       </div>
     </div>
     <div style="background:#f9fafb;padding:24px;text-align:center;color:#6b7280;font-size:13px;">
@@ -268,7 +268,7 @@ export function createLeadAutoReply(data: LeadAutoReplyData): EmailOptions {
 
   const e = escapeHtml
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f6f5f2;font-family:Georgia,'Times New Roman',serif;color:#1f2933;">
+<html lang="en"><body style="margin:0;padding:24px;background:#f6f5f2;font-family:Georgia,'Times New Roman',serif;color:#1f2933;">
   <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;">
     <p style="margin:0 0 16px;font-size:16px;">Hi ${e(data.leadName)},</p>
     <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">${e(opener)}</p>
@@ -357,7 +357,7 @@ ${dashboardUrl}
 
 — AgentBio`,
     html: `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
   <div style="max-width:600px;margin:0 auto;">

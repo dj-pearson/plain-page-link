@@ -25,12 +25,20 @@ export function CTABlock({ config, isEditing = false }: CTABlockProps) {
         }
     };
 
+    // US-234: text on a theme fill uses --theme-on-* (black or white, chosen
+    // from the colour) instead of hard-coded white, which was 1.67:1 on Luxe.
+    // The inverse button is the on-colour filled with the primary as text, so
+    // it passes whenever the fill does — "white with primary text" did not on
+    // any theme with a light primary.
+    const ON_PRIMARY = "var(--theme-on-primary, #ffffff)";
+    const PRIMARY = "var(--theme-primary, #2563eb)";
+
     const getVariantStyles = (): React.CSSProperties => {
         switch (config.variant) {
             case "gradient":
                 return {
                     background: "linear-gradient(135deg, var(--theme-primary, #2563eb) 0%, var(--theme-accent, #7c3aed) 100%)",
-                    color: "white",
+                    color: ON_PRIMARY,
                     borderRadius: "var(--theme-border-radius, 0.75rem)",
                 };
             case "outline":
@@ -43,8 +51,8 @@ export function CTABlock({ config, isEditing = false }: CTABlockProps) {
             case "solid":
             default:
                 return {
-                    background: "var(--theme-primary, #2563eb)",
-                    color: "white",
+                    background: PRIMARY,
+                    color: ON_PRIMARY,
                     borderRadius: "var(--theme-border-radius, 0.75rem)",
                 };
         }
@@ -54,21 +62,21 @@ export function CTABlock({ config, isEditing = false }: CTABlockProps) {
         switch (config.variant) {
             case "gradient":
                 return {
-                    backgroundColor: "white",
-                    color: "var(--theme-primary, #2563eb)",
+                    backgroundColor: ON_PRIMARY,
+                    color: PRIMARY,
                     borderRadius: "var(--theme-border-radius, 0.5rem)",
                 };
             case "outline":
                 return {
-                    backgroundColor: "var(--theme-primary, #2563eb)",
-                    color: "white",
+                    backgroundColor: PRIMARY,
+                    color: ON_PRIMARY,
                     borderRadius: "var(--theme-border-radius, 0.5rem)",
                 };
             case "solid":
             default:
                 return {
-                    backgroundColor: "white",
-                    color: "var(--theme-primary, #2563eb)",
+                    backgroundColor: ON_PRIMARY,
+                    color: PRIMARY,
                     borderRadius: "var(--theme-border-radius, 0.5rem)",
                 };
         }
@@ -100,7 +108,7 @@ export function CTABlock({ config, isEditing = false }: CTABlockProps) {
                 style={getButtonStyles()}
             >
                 {config.buttonText || "Get Started"}
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-5 h-5" aria-hidden="true" />
             </Button>
         </div>
     );

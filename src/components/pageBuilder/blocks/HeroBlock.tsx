@@ -85,6 +85,9 @@ export function HeroBlock({ config, isEditing = false }: HeroBlockProps) {
                     : "linear-gradient(135deg, var(--theme-primary, #2563eb) 0%, var(--theme-accent, #7c3aed) 100%)",
                 backgroundSize: "cover",
                 backgroundPosition: "center",
+                // US-234: with no image the text sits on the theme gradient, so
+                // it takes the primary's readable on-colour, not the page's.
+                ...(config.backgroundImageUrl ? {} : { color: "var(--theme-on-primary, #ffffff)" }),
             }}
         >
             {/* Overlay */}
@@ -116,11 +119,12 @@ export function HeroBlock({ config, isEditing = false }: HeroBlockProps) {
                         className="mt-6 gap-2 text-base px-8 py-3 shadow-lg hover:shadow-xl transition-all hover:scale-105"
                         style={{
                             backgroundColor: "var(--theme-primary, #2563eb)",
+                            color: "var(--theme-on-primary, #ffffff)",
                             borderRadius: "var(--theme-border-radius, 0.5rem)",
                         }}
                     >
                         {config.ctaText}
-                        <ArrowRight className="w-5 h-5" />
+                        <ArrowRight className="w-5 h-5" aria-hidden="true" />
                     </Button>
                 )}
             </div>
