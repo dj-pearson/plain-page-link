@@ -29,7 +29,7 @@ concurrency:
 jobs:
   maintenance:
     name: Run scheduled maintenance
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_MONITOR || 'ubuntu-latest' }}  # seconds of curl; a slot-exempt monitor runner
     # Without the secrets this would be a job that goes green having done
     # nothing, which is the failure mode US-090 warns about.
     if: github.repository_owner != ''

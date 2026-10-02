@@ -13,7 +13,7 @@ concurrency:
 jobs:
   typecheck:
     name: Type Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +44,7 @@ jobs:
   test:
     name: Test
     needs: typecheck
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +76,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -145,7 +145,7 @@ jobs:
   bundle-size:
     name: Bundle Size
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -195,7 +195,7 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -221,7 +221,7 @@ jobs:
 
   security:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -248,7 +248,7 @@ jobs:
 
   e2e:
     name: End-to-End (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     # US-205: tests/e2e has six specs and 22 tests covering auth, onboarding,
     # public profile visibility, listing deep links, analytics and the page
     # builder — and no workflow had ever run them. They are hermetic (every
@@ -289,7 +289,7 @@ jobs:
 
   security-tests:
     name: Security (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     # US-205: tests/security has 113 tests across auth, XSS, security headers
     # and edge-function authorization, and had never been run by CI either.
     # Slower than the other browser suites — a few minutes, single-worker by
@@ -334,7 +334,7 @@ jobs:
 
   accessibility:
     name: Accessibility (axe-core)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     # US-205: this was continue-on-error, "warn-only initially". It has been
     # passing 6/6 against an explicit baseline in tests/a11y, and a job that
     # cannot fail is a job nobody reads. Blocking now; the baseline is what

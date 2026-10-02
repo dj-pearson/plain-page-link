@@ -19,7 +19,7 @@ concurrency:
 jobs:
   edge-functions:
     name: Edge Functions (deno check)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     # Blocking: the deno-check baseline has been cleared (114 -> 0). New
     # genuine type errors in edge functions now fail CI. (Strictness is relaxed
     # via supabase/functions/deno.json strict:false; genuine errors like wrong
@@ -70,7 +70,7 @@ jobs:
 
   smoke-functions:
     name: Edge Functions (smoke)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     # US-204. `deno check` is a type check; it cannot see a function that fails
     # at import, registers no handler, or blames the caller's missing
     # credentials on itself. Running them found all three — see
@@ -94,7 +94,7 @@ jobs:
 
   migrations:
     name: SQL Migrations (structural lint)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -107,7 +107,7 @@ jobs:
 
   schema:
     name: Applied Schema (real Postgres)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     # The structural lint above only reads the migrations as text. It cannot see
     # a trigger referencing a column that does not exist, a table the app queries
     # that no migration creates, or an RPC called by a name nothing defines —
@@ -121,16 +121,29 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: agentbio
         ports:
-          - 5432:5432
+          - 5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+    # DB_URL is written by the first step: the service host and port are only
+    # known at run time.
     env:
       PGPASSWORD: postgres
-      DB_URL: postgresql://postgres:postgres@localhost:5432/agentbio
     steps:
+      - name: Locate the Postgres service
+        # On the self-hosted box each runner lives in its own network namespace
+        # (ghrN), where localhost is the namespace's own loopback and the
+        # service's published port sits on the host end of the veth, i.e. the
+        # default gateway. GitHub-hosted runners reach it on localhost. The host
+        # port is ephemeral so concurrent jobs on one box cannot collide on 5432.
+        run: |
+          host=localhost
+          gw=$(ip route show default | awk '{print $3; exit}')
+          case "$gw" in 10.200.*) host=$gw ;; esac
+          port=${{ job.services.postgres.ports['5432'] }}
+          echo "DB_URL=postgresql://postgres:postgres@$host:$port/agentbio?sslmode=disable" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
