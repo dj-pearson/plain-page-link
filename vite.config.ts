@@ -76,6 +76,15 @@ const VENDOR_CHUNKS: readonly (readonly [string, readonly string[]])[] = [
       // them. Rollup put them in charts-vendor, so loading a 3D profile theme
       // pulled in 394 KB of charting library to get Object.assign.
       '@babel/runtime',
+      // And once more, for Radix (US-244). Button is on every page and imports
+      // Slot from @radix-ui/react-slot, which was listed in ui-vendor — so the
+      // entry chunk statically imported all of ui-vendor (dialog, select,
+      // dropdown, tabs, popover, accordion, toast... 37 KB gzip) to render a
+      // <button>. Slot and the compose-refs helper it is built on are about a
+      // kilobyte; they live with React, and ui-vendor loads only on the pages
+      // that open a dialog or a menu.
+      '@radix-ui/react-slot',
+      '@radix-ui/react-compose-refs',
     ],
   ],
   // Supabase client - used everywhere
@@ -96,7 +105,6 @@ const VENDOR_CHUNKS: readonly (readonly [string, readonly string[]])[] = [
       '@radix-ui/react-label',
       '@radix-ui/react-progress',
       '@radix-ui/react-separator',
-      '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
     ],
   ],
@@ -105,8 +113,12 @@ const VENDOR_CHUNKS: readonly (readonly [string, readonly string[]])[] = [
   ['three-vendor', ['three', '@react-three/fiber', '@react-three/drei']],
   // Charts - dashboard only
   ['charts-vendor', ['recharts']],
-  // Animation libraries
-  ['animation-vendor', ['framer-motion', 'gsap', '@gsap/react']],
+  // Animation libraries, in two chunks (US-244). They were one
+  // animation-vendor chunk, so the public profile — which uses framer-motion
+  // and nothing else — downloaded GSAP too (67 KB gzip together). GSAP is
+  // used by the landing hero alone.
+  ['motion-vendor', ['framer-motion']],
+  ['gsap-vendor', ['gsap', '@gsap/react']],
   // Markdown rendering - blog only
   ['markdown-vendor', ['react-markdown', 'remark-gfm']],
   // Form handling
