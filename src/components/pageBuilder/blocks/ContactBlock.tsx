@@ -241,7 +241,10 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
                 value={formData[field.id] as string | undefined}
                 onValueChange={(value) => handleChange(field.id, value)}
               >
-                <SelectTrigger className={validationErrors[field.id] ? 'border-red-500' : ''}>
+                <SelectTrigger
+                  id={field.id}
+                  className={validationErrors[field.id] ? 'border-red-500' : ''}
+                >
                   <SelectValue placeholder={field.placeholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -271,7 +274,7 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
 
             {/* Validation Error */}
             {validationErrors[field.id] && (
-              <p className="text-sm text-red-500">{validationErrors[field.id]}</p>
+              <p className="text-sm text-destructive">{validationErrors[field.id]}</p>
             )}
           </div>
         ))}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import { Search, SlidersHorizontal, ArrowUpDown, Home, X } from 'lucide-react';
 import ListingCard from './ListingCard';
 import { parsePrice } from '@/lib/format';
@@ -45,6 +45,12 @@ export default function ListingGallery({ listings, title, onListingClick }: List
   const [bedroomFilter, setBedroomFilter] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
+  const idBase = useId();
+  const searchId = `${idBase}-search`;
+  const filtersPanelId = `${idBase}-filters`;
+  const sortMenuId = `${idBase}-sort`;
+  const typeLabelId = `${idBase}-type-label`;
+  const bedsLabelId = `${idBase}-beds-label`;
 
   const availableTypes = useMemo(() => {
     const types = new Set<string>();
@@ -96,6 +102,7 @@ export default function ListingGallery({ listings, title, onListingClick }: List
   }, [listings, searchQuery, sortBy, propertyTypeFilter, bedroomFilter]);
 
   const hasActiveFilters = propertyTypeFilter !== 'all' || bedroomFilter > 0;
+  const activeFilterCount = (propertyTypeFilter !== 'all' ? 1 : 0) + (bedroomFilter > 0 ? 1 : 0);
 
   const clearFilters = () => {
     setPropertyTypeFilter('all');
@@ -116,9 +123,16 @@ export default function ListingGallery({ listings, title, onListingClick }: List
 
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <label htmlFor={searchId} className="sr-only">
+            Search properties
+          </label>
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+            aria-hidden="true"
+          />
           <input
-            type="text"
+            id={searchId}
+            type="search"
             placeholder="Search properties..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -127,7 +141,11 @@ export default function ListingGallery({ listings, title, onListingClick }: List
         </div>
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
+            aria-controls={filtersPanelId}
+            aria-label={hasActiveFilters ? `Filters, ${activeFilterCount} active` : 'Filters'}
             className={cn(
               'inline-flex items-center gap-2 px-3.5 py-2.5 border rounded-lg text-sm font-medium transition-all min-h-[44px]',
               showFilters || hasActiveFilters
@@ -135,29 +153,52 @@ export default function ListingGallery({ listings, title, onListingClick }: List
                 : 'border-gray-200 hover:bg-gray-50'
             )}
           >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span className="hidden sm:inline">Filters</span>
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            {/* The name comes from aria-label, so the icon-only mobile button
+                is named too; the text stays sr-only rather than display:none
+                (US-245). */}
+            <span className="sr-only sm:not-sr-only">Filters</span>
             {hasActiveFilters && (
-              <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">
-                {(propertyTypeFilter !== 'all' ? 1 : 0) + (bedroomFilter > 0 ? 1 : 0)}
+              <span
+                className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center"
+                aria-hidden="true"
+              >
+                {activeFilterCount}
               </span>
             )}
           </button>
-          <div className="relative">
+          <div
+            className="relative"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && showSort) {
+                e.stopPropagation();
+                setShowSort(false);
+              }
+            }}
+          >
             <button
+              type="button"
               onClick={() => setShowSort(!showSort)}
+              aria-expanded={showSort}
+              aria-controls={sortMenuId}
+              aria-label={`Sort: ${SORT_LABELS[sortBy]}`}
               className="inline-flex items-center gap-2 px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all min-h-[44px]"
             >
-              <ArrowUpDown className="h-4 w-4" />
-              <span className="hidden sm:inline">{SORT_LABELS[sortBy]}</span>
+              <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+              <span className="sr-only sm:not-sr-only">{SORT_LABELS[sortBy]}</span>
             </button>
             {showSort && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowSort(false)} />
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 w-48 py-1">
+                <div
+                  id={sortMenuId}
+                  className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 w-48 py-1"
+                >
                   {Object.entries(SORT_LABELS).map(([key, label]) => (
                     <button
                       key={key}
+                      type="button"
+                      aria-pressed={sortBy === key}
                       onClick={() => {
                         setSortBy(key as SortOption);
                         setShowSort(false);
@@ -178,16 +219,24 @@ export default function ListingGallery({ listings, title, onListingClick }: List
       </div>
 
       {showFilters && (
-        <div className="bg-gray-50 rounded-xl p-4 space-y-4 border border-gray-100">
+        <div
+          id={filtersPanelId}
+          className="bg-gray-50 rounded-xl p-4 space-y-4 border border-gray-100"
+        >
           {availableTypes.size > 0 && (
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+              <p
+                id={typeLabelId}
+                className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block"
+              >
                 Property Type
-              </label>
-              <div className="flex flex-wrap gap-2">
+              </p>
+              <div className="flex flex-wrap gap-2" role="group" aria-labelledby={typeLabelId}>
                 {(['all', ...Array.from(availableTypes)] as PropertyTypeFilter[]).map((type) => (
                   <button
                     key={type}
+                    type="button"
+                    aria-pressed={propertyTypeFilter === type}
                     onClick={() => setPropertyTypeFilter(type)}
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
@@ -203,13 +252,18 @@ export default function ListingGallery({ listings, title, onListingClick }: List
             </div>
           )}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+            <p
+              id={bedsLabelId}
+              className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block"
+            >
               Minimum Bedrooms
-            </label>
-            <div className="flex gap-2">
+            </p>
+            <div className="flex gap-2" role="group" aria-labelledby={bedsLabelId}>
               {[0, 1, 2, 3, 4, 5].map((n) => (
                 <button
                   key={n}
+                  type="button"
+                  aria-pressed={bedroomFilter === n}
                   onClick={() => setBedroomFilter(n)}
                   className={cn(
                     'w-10 h-10 rounded-lg text-sm font-medium border transition-all flex items-center justify-center',

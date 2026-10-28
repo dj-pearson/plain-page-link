@@ -139,16 +139,23 @@ export function AddTestimonialModal({ open, onOpenChange, onSave }: AddTestimoni
 
           {/* Rating */}
           <div>
-            <Label>Rating *</Label>
-            <div className="flex gap-2 mt-2">
+            <Label id="testimonial-rating-label">Rating *</Label>
+            <div
+              className="flex gap-1 mt-2"
+              role="group"
+              aria-labelledby="testimonial-rating-label"
+            >
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
                   type="button"
                   onClick={() => setValue('rating', star)}
-                  className="focus:outline-none"
+                  aria-label={`${star} star${star === 1 ? '' : 's'}`}
+                  aria-pressed={star === rating}
+                  className="p-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <Star
+                    aria-hidden="true"
                     className={`h-8 w-8 transition-colors ${
                       star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
                     }`}
