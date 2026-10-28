@@ -54,6 +54,23 @@ const MISSING_SERVER_CONFIG = new Set([
   'generate-marketing-post',
 ]);
 
+/**
+ * Functions that must refuse an anonymous caller outright (US-234): 401/403,
+ * not a 400 for the missing URL and not a 200. Each is probed twice — with no
+ * Authorization header, and with the anon key as a Bearer token, which is what
+ * anyone can lift from the bundle and what trigger-rebuild used to accept.
+ * A 400 here means the function read the body before deciding who was asking.
+ */
+const ADMIN_ONLY = new Set([
+  'seo-audit',
+  'analyze-content',
+  'analyze-internal-links',
+  'analyze-semantic-keywords',
+  'optimize-page-content',
+  'apply-seo-fixes',
+  'trigger-rebuild',
+]);
+
 const log = (...args) => console.log('[smoke]', ...args);
 
 async function main() {
@@ -114,6 +131,29 @@ async function main() {
         continue;
       }
 
+      if (ADMIN_ONLY.has(name)) {
+        if (status !== 401 && status !== 403) {
+          failures.push(`${name}: admin-only but answered ${status} with no credentials: ${body}`);
+          continue;
+        }
+        try {
+          const anon = await fetch(`${BASE}/${name}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer smoke-anon' },
+            body: '{}',
+            signal: AbortSignal.timeout(90_000),
+          });
+          if (anon.status !== 401 && anon.status !== 403) {
+            failures.push(
+              `${name}: admin-only but answered ${anon.status} to the anon key: ${(await anon.text()).slice(0, 200)}`
+            );
+          }
+        } catch (error) {
+          failures.push(`${name}: no response to the anon-key probe (${error.message})`);
+        }
+        continue;
+      }
+
       if (status < 500) continue;
       if (ALLOWED_5XX.has(name)) continue;
       if (MISSING_SERVER_CONFIG.has(name)) continue;
@@ -129,7 +169,7 @@ async function main() {
     }
 
     if (failures.length > 0) {
-      console.error('\n[smoke] functions answering 5xx to an unauthenticated POST:');
+      console.error('\n[smoke] functions answering 5xx to an unauthenticated POST, or admin-only ones not refusing it:');
       for (const failure of failures) console.error(`  ${failure}`);
       console.error(
         '\nA 5xx here means the function either could not run, or reported the ' +

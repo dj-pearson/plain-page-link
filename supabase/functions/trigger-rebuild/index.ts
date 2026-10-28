@@ -14,20 +14,36 @@
  * minutes. It lives in the function's environment as CLOUDFLARE_DEPLOY_HOOK_URL
  * and is never returned to the caller, not even in an error.
  *
- * Requires an authenticated caller. Publishing is an editor action, and an
- * open endpoint that starts a paid build on request is a denial-of-wallet
- * primitive.
+ * Requires an admin. Publishing is an admin action (articles is writable only
+ * by admins), and an open endpoint that starts a paid build on request is a
+ * denial-of-wallet primitive.
+ *
+ * US-234: the check here used to be that the Authorization header began with
+ * "Bearer " — any string at all, including the anon key that ships in the
+ * bundle. It now verifies an admin, and rate-limits per admin so a loop or a
+ * stolen session cannot burn the build quota either.
  */
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { requireAdmin } from '../_shared/auth.ts';
 import { handleCorsPreFlight } from '../_shared/cors.ts';
+import { checkRateLimitDb, type RateLimitConfig } from '../_shared/rate-limiter.ts';
 import {
   errorResponse,
   handleUnexpectedError,
   methodNotAllowedResponse,
+  rateLimitResponse,
   successResponse,
-  unauthorizedResponse,
 } from '../_shared/response.ts';
 
 const HOOK_TIMEOUT_MS = 10_000;
+
+/**
+ * Cloudflare coalesces queued builds, so more than a handful in ten minutes
+ * buys nothing. Fails closed: a rebuild that is skipped costs nothing (the
+ * next deploy carries the article), a limiter that waves everything through
+ * when it cannot count is no limiter.
+ */
+const REBUILD_LIMIT: RateLimitConfig = { maxRequests: 6, windowSeconds: 600, failClosed: true };
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -39,10 +55,17 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Supabase verifies the JWT before the function runs when verify_jwt is on,
-    // but this function can also be deployed with it off, so check explicitly.
-    const authorization = req.headers.get('Authorization') ?? '';
-    if (!authorization.toLowerCase().startsWith('bearer ')) {
-      return unauthorizedResponse(req);
+    // but production runs it behind edge-functions-server.ts, which does not,
+    // so check explicitly — and check for an admin, not for a "Bearer " prefix.
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+    const admin = await requireAdmin(req, supabase);
+
+    const rate = await checkRateLimitDb(supabase, `trigger-rebuild:${admin.id}`, 'trigger-rebuild', REBUILD_LIMIT);
+    if (!rate.allowed) {
+      return rateLimitResponse(rate.retryAfterSeconds, req, 'A rebuild was requested recently; try again shortly.');
     }
 
     const hookUrl = Deno.env.get('CLOUDFLARE_DEPLOY_HOOK_URL');
