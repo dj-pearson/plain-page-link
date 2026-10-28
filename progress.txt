@@ -4749,3 +4749,10 @@ landing hero re-hides its painted H1 (LCP).
   unnamed buttons; thumbnails were divs. Photo arrows, review arrows, the
   mobile Filters/Sort buttons and review stars had no accessible name.
   Error red measured 3.76:1 (light) and 2.00:1 (dark); now 5.61 and 7.23.
+
+## Site improvement loop — iteration 10/15 — US-246: working leads from a phone fought the layout
+
+- Seven controls (~600px) in a row that could not wrap pushed the whole
+  dashboard sideways on a phone. Phone-only leads (since US-228) showed an
+  empty mailto:null row; call links were ~16px tall. Overview showed zeros
+  when analytics failed. All fixed; 44px targets with names throughout.

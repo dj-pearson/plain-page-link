@@ -3875,8 +3875,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Leads.tsx:659,758,771,781,900-914; LeadDetailModal.tsx:451; Overview.tsx:36,187; DashboardLayout.tsx:174,211; Listings.tsx:815-829; StickyActionBar.tsx:129; ContactForm.tsx:119 copy."
+      "passes": true,
+      "notes": "Leads.tsx:659,758,771,781,900-914; LeadDetailModal.tsx:451; Overview.tsx:36,187; DashboardLayout.tsx:174,211; Listings.tsx:815-829; StickyActionBar.tsx:129; ContactForm.tsx:119 copy. DONE: The Leads toolbar wraps; below sm the search has its own full-width row. Icon-only sort, needs-attention and SLA controls, bulk-action controls and the per-lead checkbox have aria-labels and are 44px. Leads, LeadDetailModal and Overview show no email row for a phone-only lead (Overview shows the phone); call/email links are 44px targets. Overview shows an error card with Retry (useAnalytics isError/refetch) instead of zeros. Listings edit/delete are 44px and labelled with the address; the table scrolls (overflow-x-auto) instead of clipping. Mobile share and StickyActionBar close are 44px. ContactForm no longer promises a confirmation email (DEVIATION: not even with an email — submit-lead's auto-reply is capped daily). Bulk-action criterion applied to Leads (Listings has none). 8 new tests failed before, pass after."
     },
     {
       "id": "US-247",
