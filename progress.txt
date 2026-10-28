@@ -4756,3 +4756,12 @@ landing hero re-hides its painted H1 (LCP).
   dashboard sideways on a phone. Phone-only leads (since US-228) showed an
   empty mailto:null row; call links were ~16px tall. Overview showed zeros
   when analytics failed. All fixed; 44px targets with names throughout.
+
+## Site improvement loop — iteration 11/15 — US-235: any signed-in user could read every agent's webhook
+
+- US-073 revoked profiles from anon only; any free signup could list every
+  agent's Zapier webhook, notification settings and referrer, and read any
+  agent's plan. authenticated now gets the public column set; the owner's
+  full row comes from get_own_profile(); get_user_plan asserts the caller.
+- Merged with US-236/239: one-pass apply of all migrations + full
+  verify-schema + types:check all clean.

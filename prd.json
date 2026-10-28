@@ -3710,8 +3710,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "20260808000002_close_anon_data_exposure.sql:145-157 revoked from anon only. Migration slot: 20261028000003."
+      "passes": true,
+      "notes": "20260808000002_close_anon_data_exposure.sql:145-157 revoked from anon only. Migration slot: 20261028000003. DONE: Migration 20261028000003 gives authenticated the same public profile columns as anon. The owner reads their full row through get_own_profile() (SECURITY DEFINER, auth.uid()-scoped; fetchOwnProfile in src/lib/ownProfile.ts) used by the auth store, useProfile and notification preferences; updates ask for id back. get_user_plan asserts the caller unless admin; its body moved to resolve_user_plan (not browser-executable), which profile_shows_branding, plan_limit, get_plan_usage and the custom-domain trigger call (DEVIATION: a wrapper, because nested calls run as the visitor). Health dashboard referral counts moved into admin-users. verify-schema 8c failed 13 ways before and passes after; full verify-schema passes with US-236 and US-239 migrations applied in one pass; types:check clean. A vitest guard rejects any browser read of profiles selecting *, bare .select() or a private column. Owner: apply 20261028000003 together with the frontend deploy (old clients' select('*') will be refused)."
     },
     {
       "id": "US-236",
