@@ -27,6 +27,7 @@ import {
 import { parseSquareFeet } from '@/lib/format';
 import { logger } from '@/lib/logger';
 import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
+import { todayCalendarDate } from '@/lib/localDate';
 import { AddListingModal } from '@/components/modals/AddListingModal';
 import { EditListingModal, EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
@@ -166,7 +167,7 @@ export default function Listings() {
         status: data.status,
         // Nothing wrote either date. listed_date is what "days on market"
         // counts from, and sold_date is set on the transition below (US-107).
-        listed_date: new Date().toISOString().slice(0, 10),
+        listed_date: todayCalendarDate(),
         image: imageUrls[0] || null,
         photos: imageUrls.length > 0 ? imageUrls : null,
         description: data.description || null,
@@ -362,7 +363,7 @@ export default function Listings() {
         // it. Nothing wrote sold_date at all, so a sold listing had no close
         // date and days_on_market could never be computed (US-107).
         sold_date: CLOSED_LISTING_STATUSES.has(data.status)
-          ? (editingListing.sold_date ?? new Date().toISOString().slice(0, 10))
+          ? (editingListing.sold_date ?? todayCalendarDate())
           : null,
         // `photos` is the gallery and `image` is the card thumbnail; they must
         // agree, so the cover is always photos[0] (US-107).

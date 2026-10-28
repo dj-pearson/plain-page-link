@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { CheckSquare, CalendarClock } from 'lucide-react';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { useDueLeadTasks, useLeadActivities } from '@/hooks/useLeadActivities';
+import { taskDueAt } from '@/lib/localDate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +25,10 @@ export function DueFollowUps() {
   // An empty block is noise on a dashboard. Nothing due, nothing rendered.
   if (isLoading || tasks.length === 0) return null;
 
-  const overdue = tasks.filter((t) => t.task_due_date && isPast(new Date(t.task_due_date)));
+  const overdue = tasks.filter((t) => {
+    const due = taskDueAt(t.task_due_date);
+    return due !== null && isPast(due);
+  });
 
   return (
     <Card>
@@ -41,7 +45,7 @@ export function DueFollowUps() {
       </CardHeader>
       <CardContent className="space-y-2">
         {tasks.slice(0, 8).map((task) => {
-          const due = task.task_due_date ? new Date(task.task_due_date) : null;
+          const due = taskDueAt(task.task_due_date);
           const late = due ? isPast(due) : false;
           return (
             <div

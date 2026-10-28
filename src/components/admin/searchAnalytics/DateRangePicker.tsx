@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { calendarDateInDays, parseCalendarDate, todayCalendarDate } from '@/lib/localDate';
 
 interface DateRangePickerProps {
   startDate: string;
@@ -14,11 +15,7 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
   const [isOpen, setIsOpen] = useState(false);
 
   const handlePresetClick = (days: number) => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - days);
-
-    onChange(start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+    onChange(calendarDateInDays(-days), todayCalendarDate());
     setIsOpen(false);
   };
 
@@ -36,8 +33,8 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
         <PopoverTrigger asChild>
           <Button variant="outline" className="gap-2">
             <CalendarIcon className="h-4 w-4" />
-            {format(new Date(startDate), 'MMM dd, yyyy')} -{' '}
-            {format(new Date(endDate), 'MMM dd, yyyy')}
+            {format(parseCalendarDate(startDate) ?? new Date(), 'MMM dd, yyyy')} -{' '}
+            {format(parseCalendarDate(endDate) ?? new Date(), 'MMM dd, yyyy')}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-4" align="start">

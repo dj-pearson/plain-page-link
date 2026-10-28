@@ -54,6 +54,7 @@ import { useLeadActivities, type LeadActivity } from '@/hooks/useLeadActivities'
 import { getLeadNextStep } from '@/lib/leadNextStep';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
+import { calendarDateInDays, dueDateToIso, taskDueAt } from '@/lib/localDate';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
 import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButton';
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
@@ -248,9 +249,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     if (nextStep.action === 'task') {
       // Prefill the follow-up form rather than inventing a due date.
       setTaskTitle(nextStep.label);
-      const inAWeek = new Date();
-      inAWeek.setDate(inAWeek.getDate() + (nextStep.urgency === 'today' ? 0 : 7));
-      setTaskDue(inAWeek.toISOString().slice(0, 10));
+      setTaskDue(calendarDateInDays(nextStep.urgency === 'today' ? 0 : 7));
       return;
     }
     // call / email / sms all open the relevant app and record the response.
@@ -265,11 +264,12 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
   };
 
   const handleAddTask = () => {
-    if (!lead || !taskTitle.trim() || !taskDue) return;
+    const dueDate = dueDateToIso(taskDue);
+    if (!lead || !taskTitle.trim() || !dueDate) return;
     createTask({
       leadId: lead.id,
       title: taskTitle.trim(),
-      dueDate: new Date(taskDue).toISOString(),
+      dueDate,
     });
     setTaskTitle('');
     setTaskDue('');
@@ -689,7 +689,9 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                         <p className="text-xs text-muted-foreground mt-1">
                           {a.activity_type === 'task' && a.task_due_date
                             ? `${a.task_completed_at ? 'Completed' : 'Due'} ${formatDistanceToNow(
-                                new Date(a.task_completed_at ?? a.task_due_date),
+                                (a.task_completed_at
+                                  ? new Date(a.task_completed_at)
+                                  : taskDueAt(a.task_due_date)) ?? new Date(a.task_due_date),
                                 { addSuffix: true }
                               )}`
                             : formatDistanceToNow(new Date(a.activity_at ?? a.created_at), {

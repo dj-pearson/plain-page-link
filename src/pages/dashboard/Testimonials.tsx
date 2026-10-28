@@ -26,6 +26,7 @@ import { RequestTestimonialModal } from '@/components/testimonials/RequestTestim
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/lib/logger';
+import { todayCalendarDate } from '@/lib/localDate';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function Testimonials() {
@@ -74,7 +75,7 @@ export default function Testimonials() {
         listing_id: null,
         transaction_type: null,
         sort_order: null,
-        date: new Date().toISOString().split('T')[0],
+        date: todayCalendarDate(),
         is_published: true,
       });
       toast({
