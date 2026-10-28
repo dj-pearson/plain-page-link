@@ -33,7 +33,12 @@ import { formatResponseTime } from '@/lib/responseTime';
 import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { parsePrice } from '@/lib/format';
 import { LISTING_PARAM } from '@/lib/listingShare';
-import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
+import {
+  addImagePreload,
+  FEATURED_LISTING_IMAGE_SIZES,
+  PLACEHOLDER_PROPERTY_IMAGE,
+  responsiveImage,
+} from '@/lib/images';
 import { logger } from '@/lib/logger';
 import type { PublicProfileListing } from '@/types';
 import NotFound from './NotFound';
@@ -153,40 +158,26 @@ export default function FullProfilePage() {
     }
   }, [data]);
 
-  // Preload featured listing images and avatar for faster rendering
+  // Preload the one image that is the page's LCP candidate: the carousel's
+  // first slide.
+  //
+  // This preloaded the avatar and the full-size original of up to five
+  // featured listings - including sold ones the carousel never shows - all at
+  // the same priority, so on a phone they competed with each other and with
+  // the page's own scripts. And its cleanup removed every image preload in the
+  // document, not just its own (US-243).
   useEffect(() => {
-    if (!data) return;
-    const imagesToPreload: string[] = [];
+    if (!data || data.settings?.show_listings === false) return;
 
-    // Preload avatar
-    if (data.profile?.avatar_url) {
-      imagesToPreload.push(data.profile.avatar_url);
-    }
+    // The same choice FeaturedListingsCarousel makes for slide 0: the first
+    // featured listing among the available ones, in their display order.
+    const first = selectAvailableListings(data.listings ?? []).find((l) => l.is_featured);
+    if (!first) return;
 
-    // Preload first image of each featured listing
-    // No inline shapes here: data.listings is PublicProfileListing[], and the
-    // hand-written annotations disagreed with it (is_featured is nullable).
-    const featured = data.listings?.filter((l) => l.is_featured) || [];
-    featured.slice(0, 5).forEach((listing) => {
-      const imgSrc = getImageUrl(listing.image || listing.photos?.[0]);
-      if (imgSrc && imgSrc !== PLACEHOLDER_PROPERTY_IMAGE) {
-        imagesToPreload.push(imgSrc);
-      }
-    });
+    const image = responsiveImage(first.image || first.photos?.[0]);
+    if (image.original === PLACEHOLDER_PROPERTY_IMAGE) return;
 
-    // Preload via link tags for browser-level priority
-    imagesToPreload.forEach((src) => {
-      const link = document.createElement('link');
-      link.rel = 'preload';
-      link.as = 'image';
-      link.href = src;
-      document.head.appendChild(link);
-    });
-
-    return () => {
-      // Cleanup preload links on unmount
-      document.querySelectorAll('link[rel="preload"][as="image"]').forEach((el) => el.remove());
-    };
+    return addImagePreload(image, FEATURED_LISTING_IMAGE_SIZES);
   }, [data]);
 
   /**

@@ -12,7 +12,12 @@ import {
   Share2,
 } from 'lucide-react';
 import { formatPrice, parsePrice } from '@/lib/format';
-import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
+import {
+  fallBackToOriginal,
+  FEATURED_LISTING_IMAGE_SIZES,
+  HIGH_FETCH_PRIORITY,
+  responsiveImage,
+} from '@/lib/images';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
@@ -177,7 +182,8 @@ export function FeaturedListingsCarousel({
     setCurrentIndex(index);
   };
 
-  const primaryPhoto = getImageUrl(currentListing.image || currentListing.photos?.[0]);
+  // Variants up to 800px, never the original (US-243).
+  const primaryPhoto = responsiveImage(currentListing.image || currentListing.photos?.[0]);
 
   return (
     <div
@@ -203,12 +209,20 @@ export function FeaturedListingsCarousel({
         >
           {/* Background Image */}
           <img
-            src={primaryPhoto}
+            src={primaryPhoto.src}
+            srcSet={primaryPhoto.srcSet}
+            sizes={primaryPhoto.srcSet ? FEATURED_LISTING_IMAGE_SIZES : undefined}
+            width={1024}
+            height={600}
             alt={currentListing.address || 'Featured Property'}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
-            }}
+            // The first slide is the page's largest above-the-fold image, and
+            // the one FullProfilePage preloads. Later slides only appear after
+            // the visitor has been on the page a while.
+            loading={currentIndex === 0 ? 'eager' : 'lazy'}
+            decoding="async"
+            {...(currentIndex === 0 ? HIGH_FETCH_PRIORITY : {})}
+            onError={(e) => fallBackToOriginal(e.currentTarget, primaryPhoto.original)}
           />
 
           {/* Gradient Overlay */}

@@ -63,6 +63,12 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
               {profile.avatar_url ? (
                 <img
                   src={profile.avatar_url}
+                  // Avatars have no resized variants (optimize-image only runs
+                  // on listing photos), so this is still the uploaded file; the
+                  // dimensions at least reserve its box (US-243).
+                  width={128}
+                  height={128}
+                  decoding="async"
                   alt={profile.full_name || profile.username}
                   className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-white shadow-xl"
                 />
