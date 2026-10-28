@@ -126,10 +126,10 @@ export function StickyActionBar({
                   <h3 className="font-semibold text-gray-900">Quick Actions</h3>
                   <button
                     onClick={() => setIsExpanded(false)}
-                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                    className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                     aria-label="Close quick actions"
                   >
-                    <X className="h-5 w-5 text-gray-500" />
+                    <X className="h-5 w-5 text-gray-500" aria-hidden="true" />
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">

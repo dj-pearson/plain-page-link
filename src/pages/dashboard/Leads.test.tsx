@@ -43,13 +43,26 @@ const { exportToCSVMock } = vi.hoisted(() => ({ exportToCSVMock: vi.fn() }));
 vi.mock('@/lib/exportUtils', () => ({ exportToCSV: exportToCSVMock }));
 
 // Decryption is an Edge Function call, addressed by lead id since US-119.
+// `decrypted.email` lets a test stand in a phone-only lead (US-228).
+const { decrypted } = vi.hoisted(() => ({
+  decrypted: { email: undefined as string | null | undefined },
+}));
 vi.mock('@/lib/pii', async () => {
   const { mockLead } = await import('@/test/fixtures/lead');
   return {
     encryptPIIBatch: vi.fn(async (values: (string | null)[]) => values),
     decryptLeadContacts: vi.fn(
       async (ids: string[]) =>
-        new Map(ids.map((id) => [id, { id, email: mockLead.email, phone: mockLead.phone }]))
+        new Map(
+          ids.map((id) => [
+            id,
+            {
+              id,
+              email: decrypted.email === undefined ? mockLead.email : decrypted.email,
+              phone: mockLead.phone,
+            },
+          ])
+        )
     ),
   };
 });
@@ -101,6 +114,7 @@ describe('Leads page', () => {
     selected = [];
     updates = [];
     eqCalls.length = 0;
+    decrypted.email = undefined;
     fromMock.mockReset();
     rpcMock.mockReset();
     exportToCSVMock.mockReset();
@@ -125,6 +139,42 @@ describe('Leads page', () => {
       'href',
       `tel:${mockLead.phone}`
     );
+  });
+
+  // US-246: a phone-only lead showed an envelope beside an empty mailto: link.
+  it('renders no email row for a phone-only lead', async () => {
+    decrypted.email = null;
+    renderWithProviders(<Leads />);
+    await screen.findByText(mockLead.name);
+
+    const tel = screen.getByRole('link', { name: mockLead.phone! });
+    expect(tel).toHaveAttribute('href', `tel:${mockLead.phone}`);
+    expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
+  });
+
+  it('gives the call and email links a 44px tap target', async () => {
+    renderWithProviders(<Leads />);
+    await screen.findByText(mockLead.name);
+
+    expect(screen.getByRole('link', { name: mockLead.phone! })).toHaveClass('min-h-[44px]');
+    expect(screen.getByRole('link', { name: mockLead.email! })).toHaveClass('min-h-[44px]');
+  });
+
+  // jsdom does no layout, so a 360px render proves nothing; what broke was the
+  // toolbar being one nowrap flex row of seven controls. Assert the classes
+  // that make it wrap, with the search on a row of its own below sm.
+  it('wraps the toolbar and gives the search its own row on a phone', async () => {
+    renderWithProviders(<Leads />);
+    await screen.findByText(mockLead.name);
+
+    const toolbar = screen.getByTestId('leads-toolbar');
+    expect(toolbar).toHaveClass('flex', 'flex-wrap');
+    const searchBox = screen.getByRole('textbox', { name: /search leads/i }).parentElement!;
+    expect(searchBox.parentElement).toBe(toolbar);
+    expect(searchBox).toHaveClass('w-full', 'sm:flex-1');
+    // The icon-only controls still have names on a phone.
+    expect(screen.getByRole('button', { name: /sort by priority/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /needs attention/i })).toBeInTheDocument();
   });
 
   it('never asks PostgREST for the dropped plaintext columns', async () => {

@@ -375,7 +375,11 @@ export default function Leads() {
       exportLeads = needsAttentionOnly ? all.leads.filter(isNeedsAttention) : all.leads;
     } catch (err) {
       logger.error('Lead export failed', err as Error);
-      toast({ title: 'Export failed', description: 'Could not load your leads. Please try again.', variant: 'destructive' });
+      toast({
+        title: 'Export failed',
+        description: 'Could not load your leads. Please try again.',
+        variant: 'destructive',
+      });
       return;
     } finally {
       setIsExporting(false);
@@ -553,7 +557,9 @@ export default function Leads() {
             className="flex-1 sm:flex-none min-h-[44px] active:scale-95 transition-all"
           >
             <Download className="h-4 w-4 mr-2" />
-            <span className="text-sm sm:text-base">{isExporting ? 'Exporting…' : 'Export CSV'}</span>
+            <span className="text-sm sm:text-base">
+              {isExporting ? 'Exporting…' : 'Export CSV'}
+            </span>
             {subscription?.plan_name === 'free' && (
               <Badge variant="secondary" className="ml-2">
                 Pro
@@ -656,8 +662,12 @@ export default function Leads() {
 
       {/* Search, Sort & Bulk Actions - Mobile optimized */}
       <div className="space-y-3">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        {/* US-246: this was one nowrap row of seven controls (~600px wide), so
+            at 360px it pushed the whole dashboard sideways. It wraps now, and
+            below sm the search takes a row of its own with the filters under
+            it; from sm up the search grows to fill whatever the row leaves. */}
+        <div className="flex flex-wrap gap-2" data-testid="leads-toolbar">
+          <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <input
               type="text"
@@ -692,6 +702,9 @@ export default function Leads() {
             variant={sortBy === 'score' ? 'default' : 'outline'}
             onClick={() => setSortBy(sortBy === 'date' ? 'score' : 'date')}
             className="min-h-[44px] gap-2 flex-shrink-0"
+            // Icon-only below sm, so the name has to come from here.
+            aria-label="Sort by priority"
+            aria-pressed={sortBy === 'score'}
             title={
               sortBy === 'score'
                 ? 'Sorted by priority — a rules-based score over source, contact details, lead type and timing'
@@ -719,6 +732,8 @@ export default function Leads() {
             variant={needsAttentionOnly ? 'default' : 'outline'}
             onClick={() => setNeedsAttentionOnly((v) => !v)}
             className="min-h-[44px] gap-2 flex-shrink-0"
+            aria-label={`Needs attention${leadStats.needsAttention > 0 ? ` (${leadStats.needsAttention})` : ''}`}
+            aria-pressed={needsAttentionOnly}
             title={`Show leads with no response after ${slaHours}h`}
           >
             <AlertTriangle className="h-4 w-4" />
@@ -730,7 +745,11 @@ export default function Leads() {
             )}
           </Button>
           <Select value={String(slaHours)} onValueChange={(v) => setSlaHours(Number(v))}>
-            <SelectTrigger className="w-[110px] min-h-[44px] flex-shrink-0" title="SLA threshold">
+            <SelectTrigger
+              className="w-[110px] min-h-[44px] flex-shrink-0"
+              title="SLA threshold"
+              aria-label="SLA threshold"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -755,7 +774,10 @@ export default function Leads() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Select onValueChange={handleBulkStatusUpdate} disabled={isBulkActing}>
-                    <SelectTrigger className="w-[140px] sm:w-[160px] h-9 bg-white">
+                    <SelectTrigger
+                      className="w-[140px] sm:w-[160px] min-h-[44px] bg-white"
+                      aria-label="Update status of selected leads"
+                    >
                       <SelectValue placeholder="Update status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -771,7 +793,8 @@ export default function Leads() {
                     size="sm"
                     onClick={handleBulkDelete}
                     disabled={isBulkActing}
-                    className="gap-2"
+                    className="gap-2 min-h-[44px]"
+                    aria-label={`Delete ${selectedLeadIds.size} selected lead${selectedLeadIds.size !== 1 ? 's' : ''}`}
                   >
                     <Trash2 className="h-4 w-4" />
                     Delete
@@ -781,6 +804,8 @@ export default function Leads() {
                     size="sm"
                     onClick={() => setSelectedLeadIds(new Set())}
                     disabled={isBulkActing}
+                    className="min-h-[44px]"
+                    aria-label="Clear selection"
                   >
                     Clear
                   </Button>
@@ -866,6 +891,8 @@ export default function Leads() {
                     <button
                       onClick={(e) => toggleLeadSelection(lead.id, e)}
                       className="flex-shrink-0 mt-1 hover:bg-gray-100 rounded p-1 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      aria-label={`Select ${lead.name}`}
+                      aria-pressed={selectedLeadIds.has(lead.id)}
                     >
                       {selectedLeadIds.has(lead.id) ? (
                         <CheckSquare className="h-5 w-5 text-primary" />
@@ -897,24 +924,29 @@ export default function Leads() {
                           <LockedLeadDetails withMessage={!!lead.message} />
                         ) : (
                           <>
-                            <div className="flex items-center gap-2 min-h-[32px]">
-                              <Mail className="h-3 w-3 flex-shrink-0" />
-                              <a
-                                href={`mailto:${lead.email}`}
-                                onClick={(e) => {
-                                  // Without this the click also bubbles to the
-                                  // card and opens the detail modal behind the
-                                  // mail client.
-                                  e.stopPropagation();
-                                  void recordContact(lead, 'email').then(() => refetch());
-                                }}
-                                className="hover:text-primary active:text-primary-dark break-all"
-                              >
-                                {lead.email}
-                              </a>
-                            </div>
+                            {/* US-246: a phone-only lead (US-228) rendered an
+                                envelope beside an empty mailto: link. The
+                                links are the 44px targets, not the rows. */}
+                            {lead.email && (
+                              <div className="flex items-center gap-2">
+                                <Mail className="h-3 w-3 flex-shrink-0" />
+                                <a
+                                  href={`mailto:${lead.email}`}
+                                  onClick={(e) => {
+                                    // Without this the click also bubbles to the
+                                    // card and opens the detail modal behind the
+                                    // mail client.
+                                    e.stopPropagation();
+                                    void recordContact(lead, 'email').then(() => refetch());
+                                  }}
+                                  className="inline-flex items-center min-h-[44px] hover:text-primary active:text-primary-dark break-all"
+                                >
+                                  {lead.email}
+                                </a>
+                              </div>
+                            )}
                             {lead.phone && (
-                              <div className="flex items-center gap-2 min-h-[32px]">
+                              <div className="flex items-center gap-2">
                                 <Phone className="h-3 w-3 flex-shrink-0" />
                                 <a
                                   href={`tel:${lead.phone}`}
@@ -922,7 +954,7 @@ export default function Leads() {
                                     e.stopPropagation();
                                     void recordContact(lead, 'call').then(() => refetch());
                                   }}
-                                  className="hover:text-primary active:text-primary-dark"
+                                  className="inline-flex items-center min-h-[44px] hover:text-primary active:text-primary-dark"
                                 >
                                   {lead.phone}
                                 </a>

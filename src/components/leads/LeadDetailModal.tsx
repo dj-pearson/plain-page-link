@@ -448,20 +448,24 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               <LockedLeadDetails />
             ) : (
               <div className="space-y-2">
-                <a
-                  href={`mailto:${lead.email}`}
-                  onClick={() => void handleContactAction('email')}
-                  className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
-                >
-                  <Mail className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span className="flex-1 text-sm">{lead.email}</span>
-                  <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
+                {/* US-246: no envelope row with an empty mailto: for a
+                    phone-only lead. */}
+                {lead.email && (
+                  <a
+                    href={`mailto:${lead.email}`}
+                    onClick={() => void handleContactAction('email')}
+                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
+                  >
+                    <Mail className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                    <span className="flex-1 text-sm break-all">{lead.email}</span>
+                    <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                )}
                 {lead.phone && (
                   <a
                     href={`tel:${lead.phone}`}
                     onClick={() => void handleContactAction('call')}
-                    className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
+                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
                   >
                     <Phone className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                     <span className="flex-1 text-sm">{lead.phone}</span>
@@ -472,7 +476,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                   <a
                     href={`sms:${lead.phone}`}
                     onClick={() => void handleContactAction('sms')}
-                    className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
+                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
                   >
                     <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                     <span className="flex-1 text-sm">Send SMS</span>

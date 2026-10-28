@@ -143,7 +143,9 @@ export default function DashboardLayout() {
           role="banner"
         >
           <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Dashboard</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate min-w-0">
+              Dashboard
+            </h1>
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
               <NotificationBell />
               {profile?.username && (
@@ -171,7 +173,7 @@ export default function DashboardLayout() {
                     variant="outline"
                     size="sm"
                     onClick={handleCopyProfileURL}
-                    className="md:hidden p-2"
+                    className="md:hidden p-2 min-h-[44px] min-w-[44px]"
                     aria-label="Share profile URL"
                   >
                     {copied ? (

@@ -739,7 +739,9 @@ export default function Listings() {
 
       {/* List View */}
       {!isError && viewMode === 'list' && filteredListings.length > 0 && (
-        <div className="border border-border rounded-lg overflow-hidden">
+        // overflow-x-auto, not hidden: at 360px a wide row scrolls inside its
+        // own box rather than clipping the edit/delete buttons (US-246).
+        <div className="border border-border rounded-lg overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
@@ -813,19 +815,21 @@ export default function Listings() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => setEditingListing(listing)}
-                        className="p-2 hover:bg-accent rounded-lg transition-colors"
+                        className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
                         title="Edit"
+                        aria-label={`Edit ${listing.address}`}
                       >
-                        <Edit className="h-3.5 w-3.5" />
+                        <Edit className="h-4 w-4" aria-hidden="true" />
                       </button>
                       <button
                         onClick={() =>
                           setListingToDelete({ id: listing.id, address: listing.address })
                         }
-                        className="p-2 hover:bg-accent rounded-lg transition-colors text-red-600"
+                        className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center hover:bg-accent rounded-lg transition-colors text-red-600"
                         title="Delete"
+                        aria-label={`Delete ${listing.address}`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                       </button>
                     </div>
                   </td>
