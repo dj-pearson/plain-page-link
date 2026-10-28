@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { requireAdmin } from '../_shared/auth.ts';
+import { requireAdminOrServiceRole } from '../_shared/auth.ts';
 import { assertFetchableUrl } from '../_shared/ssrf-guard.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
@@ -45,7 +45,8 @@ serve(async (req) => {
 
     // US-078: admin SEO tooling running with the service role. It was
     // callable by anyone holding the anon key, which ships in the bundle.
-    await requireAdmin(req, supabase);
+    // run-scheduled-audit calls this with the service-role key.
+    await requireAdminOrServiceRole(req, supabase);
 
     // Call PageSpeed Insights API
     const strategy = device === 'mobile' ? 'mobile' : 'desktop';

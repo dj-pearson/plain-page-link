@@ -97,3 +97,14 @@ describe('admin-only edge functions refuse anyone but an admin (US-234)', () => 
     expect(body).toMatch(/if \(isServiceRoleRequest\(req\)\) return null;\s*return await requireAdmin\(req, supabase\);/);
   });
 });
+
+// run-scheduled-audit also calls these with the service-role key. US-078 gated
+// them with plain requireAdmin, so every scheduled run got a 401 from them.
+describe('functions run-scheduled-audit calls admit the service role', () => {
+  for (const name of ['check-core-web-vitals', 'check-broken-links', 'check-security-headers', 'analyze-images']) {
+    it(name, () => {
+      expect(source(name)).toMatch(/await requireAdminOrServiceRole\(req, supabase\)/);
+      expect(source(name)).not.toMatch(/await requireAdmin\(req, supabase\)/);
+    });
+  }
+});
