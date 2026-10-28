@@ -3668,6 +3668,230 @@
       "priority": 3,
       "passes": true,
       "notes": "Pricing.tsx:187-198; FullProfilePage.tsx:699-706. A reward (Stripe coupon for both agents) is a follow-up once attribution data exists. DONE: src/lib/signupIntent.ts keeps the plan chosen on /pricing (localStorage — email verification opens a new tab; 7 days) and the first-touch ?ref= (30 days). Logged-out Subscribe → /auth/register?plan=&interval= (Register shows 'You picked X — checkout opens right after'); onboarding completion → /dashboard/subscription?checkout=<plan>&interval=, which opens checkout once (through US-217's change-or-checkout path) and clears the intent. The 'Powered by' badge links https://agentbio.net/?utm_source=profile_badge&utm_medium=referral&ref=<username>. signUp passes ref and signup_source; handle_new_user records profiles.referred_by only when the ref names a real profile, plus signup_source (migration 20260930000010); a trigger stops agents rewriting either later. Health dashboard: 'Signups by referrer (30d)'. Tests: signupIntent unit tests (register URL, intent survives, first-touch referral, badge URL); verify-schema check (signup records referrer; agent cannot rewrite it). DEVIATION: no Playwright spec — covered by unit tests. Reward (coupon for both agents) left as the noted follow-up."
+    },
+    {
+      "id": "US-233",
+      "title": "Forged SAML responses sign in as any user",
+      "description": "As the operator, I need SSO to never mint a session from an unsigned assertion.",
+      "acceptanceCriteria": [
+        "sso-callback refuses the SAML/okta/azure_ad branch (4xx, no generateLink) unless the assertion signature is verified against enterprise_sso_config.saml_certificate; until a verifier exists the branch is disabled",
+        "The asserted email must belong to the config's organization_domain; auto-provisioning a NameID mapping requires the same",
+        "Unit test: a hand-made unsigned SAMLResponse with RelayState from sso-initiate yields no redirectUrl",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "sso-callback/index.ts:124-170,329-381 decodes base64 and regex-extracts the email; saml_certificate never read. sso-initiate:198 is unauthenticated and returns the requestId. listUsers() only sees 50 users. Migration slot if needed: 20261028000001."
+    },
+    {
+      "id": "US-234",
+      "title": "Five SEO functions, apply-seo-fixes and trigger-rebuild run for anyone",
+      "description": "As the operator, I need internal tools to refuse anonymous callers so they cannot be used for SSRF, LLM spend or build-quota exhaustion.",
+      "acceptanceCriteria": [
+        "seo-audit, analyze-content, analyze-internal-links, analyze-semantic-keywords, optimize-page-content and apply-seo-fixes return 401/403 unless the caller is admin (requireAdmin); the swallowed try/catch around requireAuth is gone",
+        "Every caller-supplied URL in those functions is fetched through safeFetch",
+        "trigger-rebuild requires an admin (not merely a 'Bearer ' prefix) and is rate-limited",
+        "smoke:functions / unit test proves each refuses an anonymous request",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "seo-audit/index.ts:35-48, analyze-content:48-63, analyze-internal-links:38-50, analyze-semantic-keywords:38-49, optimize-page-content:38-52 (LLM at :142,:169), apply-seo-fixes:28-35,83, trigger-rebuild:43-46. US-078 claimed the SEO crawlers were admin-only; these five were missed."
+    },
+    {
+      "id": "US-235",
+      "title": "Signed-in users can read every agent's Zapier webhook and plan",
+      "description": "As an agent, I need my private profile columns hidden from other signed-in users, not just from anon.",
+      "acceptanceCriteria": [
+        "authenticated loses table-wide SELECT on profiles; the public column set is re-granted; the owner still reads their full row (own-row path)",
+        "get_user_plan(uuid) asserts the caller is that user (or admin/service role)",
+        "verify:schema check: an authenticated user cannot select another profile's zapier_webhook_url / notification_preferences / referred_by — run before the fix and watched to fail",
+        "The dashboard (Profile, Settings, auth store) still loads the owner's own full profile",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "20260808000002_close_anon_data_exposure.sql:145-157 revoked from anon only. Migration slot: 20261028000003."
+    },
+    {
+      "id": "US-236",
+      "title": "Leads can be backdated to unlock them, and assignees can take them",
+      "description": "As the operator, I need the lead lock and monthly quotas to hold, and as an agent I need my leads to stay mine.",
+      "acceptanceCriteria": [
+        "leads UPDATE policy gains WITH CHECK (auth.uid() = user_id)",
+        "A BEFORE UPDATE trigger (or column grants) freezes user_id and created_at for anon/authenticated on leads, and created_at on contacts and open_houses",
+        "The anon direct INSERT policy on testimonials is dropped; submit-review (service role) still inserts",
+        "verify:schema checks for backdating a locked lead, an assignee re-owning a lead and an anon testimonial insert — each run before the fix and watched to fail",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "20260902000006_zip_routing_and_assignee_access.sql (USING uid=user_id OR uid=assigned_to, no WITH CHECK); locked_lead_ids ranks by date_trunc('month',created_at); plan_usage counts by created_at (20260923000002:120); 20260808000004:27-40 anon testimonial INSERT backstop. Migration slot: 20261028000004."
+    },
+    {
+      "id": "US-237",
+      "title": "The profile editor wipes edits on photo upload and can double-encrypt the phone",
+      "description": "As an agent editing my profile, I need my typed changes and my phone number to survive.",
+      "acceptanceCriteria": [
+        "Profile form hydrates from the server once; an avatar upload updates avatar_url only and keeps other unsaved edits",
+        "decryptOwnProfilePhone failure no longer substitutes ciphertext: the query errors or phone is excluded from the save when it was never decrypted",
+        "A save failure shows the real reason inline (plan-limit copy via planLimitKeyFromError), and a mobile-reachable save bar exists; navigating away with unsaved changes warns",
+        "Unit tests cover the hydrate-once and the decrypt-failure paths",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Profile.tsx:61-103 effect re-runs on refetch; useAvatarUpload.ts:89 invalidates; useProfile.ts:52 `?? profileData.phone`; pii.ts:163-175 returns null on error; Profile.tsx:205-211."
+    },
+    {
+      "id": "US-238",
+      "title": "Onboarding throws away everything when the save fails",
+      "description": "As a new agent, I need a failed save to leave my answers in place and a first listing that has a city.",
+      "acceptanceCriteria": [
+        "The saving state overlays the wizard instead of unmounting it; on failure the agent stays on the last step with every field and photo intact and an inline error",
+        "Step 5 no longer says the profile is live before it is saved (save first, or reword; copy-link active only after success)",
+        "The first listing uses separate address/city fields; no listing is created with an empty city or a '0' price",
+        "Unit/component test for the failure path",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "OnboardingWizardPage.tsx:211,223,132-140; OnboardingWizard.tsx:101-121,632."
+    },
+    {
+      "id": "US-239",
+      "title": "Analytics totals stop at 1,000 views and 500 leads",
+      "description": "As a busy agent, I need my view and lead totals, conversion and period comparison to be true.",
+      "acceptanceCriteria": [
+        "totalViews/totalLeads/conversion and the previous period come from exact counts (head:true count or an aggregate RPC), not array lengths",
+        "The previous-period query throws on error instead of reading as +100%",
+        "Views-by-date chart is not truncated at the row cap (server-side bucketing or paged)",
+        "Unit test: 1,500 views yields 1,500",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "useAnalytics.ts:165,210,239,271-285; consumers Analytics.tsx:412 (CSV 228-231), Overview, QuickActionsDashboard, InsightsWidget. US-225 added lead_stats(); reuse the pattern. Migration slot if needed: 20261028000007."
+    },
+    {
+      "id": "US-240",
+      "title": "Task due dates land a day early west of UTC",
+      "description": "As an agent in the US, I need a task due tomorrow to be due tomorrow.",
+      "acceptanceCriteria": [
+        "Date-only inputs are converted with local calendar semantics (end of local day for due dates); prefill uses the local date, not toISOString().slice(0,10)",
+        "Same fix for listings listed_date and any other date-only input found by grep",
+        "Unit tests run under TZ=America/Los_Angeles",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "LeadDetailModal.tsx:253,272,692; DueFollowUps.tsx:27,44; Listings.tsx:169; helper toCalendarDate in src/lib/keyDates.ts."
+    },
+    {
+      "id": "US-241",
+      "title": "Changing the username leaves the dashboard sharing a dead link",
+      "description": "As an agent who renamed my page, I need every copy/share/view link to use the new name immediately.",
+      "acceptanceCriteria": [
+        "After a username save the auth store profile is updated from the saved row",
+        "useAuthStore does not null the profile on a transient fetch error (SIGNED_IN/USER_UPDATED)",
+        "App.tsx reads the auth store through selectors, and the INITIAL_SESSION listener does not refetch the profile initialize already loaded",
+        "Unit tests for the store behaviour",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Settings.tsx:157; DashboardLayout.tsx:41-43,186; Overview.tsx:213-219; useAuthStore.ts:134,228,245; App.tsx:131."
+    },
+    {
+      "id": "US-242",
+      "title": "Crawlers see the homepage on every agent's profile URL",
+      "description": "As an agent sharing my link, I need Google and link previews to see my page, under any capitalisation.",
+      "acceptanceCriteria": [
+        "/:username responses no longer carry the homepage's #root body or its WebSite/SoftwareApplication/FAQPage JSON-LD",
+        "A mixed-case username 301s to the lowercase URL (normalizeUsername) instead of 404",
+        "?listing= only resolves a listing owned by that profile",
+        "X-Robots-Tag noindex for /dashboard*, /admin*, /onboarding/*, /team/*; robots.txt no longer hides the header",
+        "functions tests use the real prerendered index.html shape",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "functions/[username].ts:46,118,132,166; functions/_lib/social-meta.ts:288 STRIP_PATTERNS; Landing.tsx:102-164; public/_redirects:83; public/_headers:26; robots.txt:5; functions/_tests/username-route.test.ts:14."
+    },
+    {
+      "id": "US-243",
+      "title": "The profile page downloads full-size photos",
+      "description": "As a visitor on a phone, I need the agent's page to load fast.",
+      "acceptanceCriteria": [
+        "getImageUrl accepts a width and maps to the existing -200/-400/-800.webp variants with a fallback to the original on error",
+        "ListingCard, FeaturedListingsCarousel and ProfileHeader use srcSet/sizes, explicit width/height, lazy loading below the fold",
+        "Only the first featured image is preloaded (fetchpriority high); the cleanup removes only links it added",
+        "Unit tests for the URL mapping",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "src/lib/images.ts:30; ListingCard.tsx:111; FeaturedListingsCarousel.tsx:205; ProfileHeader.tsx:64; FullProfilePage.tsx:157-189; variants produced by US-032/US-107; OptimizedImage.tsx unused."
+    },
+    {
+      "id": "US-244",
+      "title": "Every page pays for GSAP, all of Radix and modals it never opens",
+      "description": "As a visitor, I need the entry and profile chunks to carry only what the page uses.",
+      "acceptanceCriteria": [
+        "animation-vendor split into motion-vendor (framer-motion) and gsap-vendor",
+        "@radix-ui/react-slot no longer drags ui-vendor into the entry chunk",
+        "LeadFormModal, ListingDetailModal, CalendlyModal, HomeValuationForm and CustomBlocksSection load lazily on the profile page",
+        "Measured before/after gzip of entry and profile route recorded in notes; size-check and route-weight pass",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "vite.config.ts:27-51; button.tsx:2; FullProfilePage.tsx:12,16-19. Audit measured entry 219 KB, profile +166.5 KB."
+    },
+    {
+      "id": "US-245",
+      "title": "Public profile controls are unnamed for screen readers and keyboards",
+      "description": "As a visitor using a keyboard or screen reader, I need to browse photos, filter listings and leave a review.",
+      "acceptanceCriteria": [
+        "GalleryBlock lightbox rebuilt on Dialog with title, Escape, focus return; thumbnails are buttons; prev/next/close named",
+        "ListingDetailModal prev/next and thumbnail buttons, TestimonialSection arrows, ListingGallery filter/sort (sr-only on mobile, aria-expanded), AddTestimonialModal stars (label, aria-pressed, focus ring) all named",
+        "ListingGallery search input labelled; ContactBlock SelectTrigger gets id",
+        "Destructive text colour meets 4.5:1 in light and dark",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "GalleryBlock.tsx:73-121; ListingDetailModal.tsx:299,307,322; TestimonialSection.tsx:90,98,143,146; ListingGallery.tsx:120,129,147; AddTestimonialModal.tsx:145-149; ContactBlock.tsx:176,244; index.css:34,66."
+    },
+    {
+      "id": "US-246",
+      "title": "Triaging leads on a phone: overflowing toolbar, empty email rows, tiny call links",
+      "description": "As an agent working leads from my phone, I need to search, filter and call without fighting the layout.",
+      "acceptanceCriteria": [
+        "Leads toolbar wraps on narrow screens with search on its own row; dashboard does not scroll sideways at 360px",
+        "Email row hidden for phone-only leads in Leads, LeadDetailModal and Overview; tel/mailto are 44px targets",
+        "Overview shows an error card with Retry when analytics fail instead of zeros",
+        "Listings edit/delete, bulk-action controls, mobile share and sticky close button meet 44px with aria-labels",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Leads.tsx:659,758,771,781,900-914; LeadDetailModal.tsx:451; Overview.tsx:36,187; DashboardLayout.tsx:174,211; Listings.tsx:815-829; StickyActionBar.tsx:129; ContactForm.tsx:119 copy."
+    },
+    {
+      "id": "US-247",
+      "title": "The public profile ignores the agent's theme with hard-coded gradients; sample data and link reorder break",
+      "description": "As an agent, I need my page in my colours, and as an operator I need sample data and link ordering to work.",
+      "acceptanceCriteria": [
+        "StickyActionBar, SoldProperties, SocialProofBanner, ProfileHeader and onboarding use theme tokens (bg-primary, text-primary-foreground/80) instead of blue→purple gradients",
+        "sample-data-service no longer writes generated beds/baths/sqft; unused useListingUpdate removed",
+        "Link up/down rewrites positions densely so a failed write cannot leave duplicates",
+        "npx impeccable detect on the touched components reports no new tells",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "StickyActionBar.tsx:168; SoldProperties.tsx:49; SocialProofBanner.tsx:69; ProfileHeader.tsx:70,197; OnboardingWizard.tsx:174,638; OnboardingWizardPage.tsx:225; sample-data-service.ts:114-120; useListingUpdate.ts:44-46; Links.tsx:196-199."
     }
   ]
 }
