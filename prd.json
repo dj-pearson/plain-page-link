@@ -3845,8 +3845,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "vite.config.ts:27-51; button.tsx:2; FullProfilePage.tsx:12,16-19. Audit measured entry 219 KB, profile +166.5 KB."
+      "passes": true,
+      "notes": "vite.config.ts:27-51; button.tsx:2; FullProfilePage.tsx:12,16-19. Audit measured entry 219 KB, profile +166.5 KB. DONE: The entry chunk no longer pulls ui-vendor (Slot and compose-refs moved to react-vendor); animation-vendor split into motion-vendor and gsap-vendor. FullProfilePage lazy-loads LeadFormModal, ListingDetailModal, CalendlyModal, HomeValuationDialog (new) and CustomBlocksSection, mounted only while open / when a custom page exists, behind LazyModal (spinner while loading, Reload/Close if the chunk fails); LeadCaptureCTA lazy-loads its LeadFormModal too (DEVIATION: outside named scope, it kept the form libs on the route). Gzip static graphs: entry 219.2→183.2 KB; profile beyond entry 166.5→115.6 KB; route-weight /demo 1389 KB/70 req→1126/56, / 1218→1107. size-check and route-weight pass (re-run size-check on the merged branch: 242 chunks OK). DEVIATIONS: button.tsx untouched; ui-vendor (35.5 KB) still on the profile via UpcomingOpenHouses' dropdown (follow-up); modals unmount on close and lose their close animation. Tests: src/profile-bundle.test.ts (6; 4 failed on old source), LazyModal.test.tsx (2). Merge note: React import line combined with US-247's CSSProperties."
     },
     {
       "id": "US-245",

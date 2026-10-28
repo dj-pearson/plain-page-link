@@ -4780,3 +4780,9 @@ landing hero re-hides its painted H1 (LCP).
   refreshed after the save; a transient fetch error no longer nulls the
   profile; App and DashboardLayout subscribe through selectors and the
   signed-in profile is fetched once on load instead of twice.
+
+## Site improvement loop — iteration 14/15 — US-244: every page paid for code it never ran
+
+- Every page downloaded all of Radix for one Slot import; the profile
+  downloaded GSAP (landing-only) and five modals it may never open. Entry
+  219→183 KB gzip, profile route +166→+116 KB, /demo 70→56 requests.
