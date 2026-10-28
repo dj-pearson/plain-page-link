@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
 import { encryptPII, decryptOwnProfilePhone } from '@/lib/pii';
 import { toProfile } from '@/types/profile';
+import { fetchOwnProfile } from '@/lib/ownProfile';
 import type { Profile } from '@/types/profile';
 
 /**
@@ -35,11 +36,9 @@ export function useProfile() {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      // US-235: through get_own_profile — authenticated can select only the
+      // public columns of profiles, and this needs the owner's private ones.
+      const { data, error } = await fetchOwnProfile();
 
       if (error) throw error;
       const profileData = toProfile(data);
@@ -73,7 +72,7 @@ export function useProfile() {
         .from('profiles')
         .update(encryptedUpdates)
         .eq('id', user.id)
-        .select()
+        .select('id')
         .single();
 
       if (error) throw error;

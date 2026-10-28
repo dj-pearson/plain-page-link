@@ -1731,7 +1731,8 @@ const DEFINER_CALLABLE = new Map([
   // authenticated only: each checks auth.uid() or admin itself.
   ['get_plan_usage', { why: 'reads auth.uid() only' }],
   ['analytics_visible_since', { why: 'reads auth.uid() only' }],
-  ['get_user_plan', { why: 'plan name and limits; no contact data' }],
+  ['get_user_plan', { why: "assert_caller_is unless admin (US-235); nested SQL calls resolve_user_plan" }],
+  ['get_own_profile', { why: 'returns the row WHERE id = auth.uid() only (US-235)' }],
   ['get_user_sessions', { why: 'assert_caller_is' }],
   ['get_connected_search_platforms', { why: 'assert_caller_is' }],
   ['log_lead_activity', { why: 'checks lead ownership against auth.uid()' }],
@@ -2313,6 +2314,104 @@ check('reviews reach testimonials only through submit-review (service role)', ()
       q(`DELETE FROM public.testimonials WHERE user_id IN ('${agent}', '${other}');
          DELETE FROM public.profiles WHERE id IN ('${agent}', '${other}');
          DELETE FROM auth.users WHERE id IN ('${agent}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// 8c. A signed-in user must not read another agent's private profile columns
+//     or plan (US-235). US-073 revoked table-wide SELECT on profiles from anon
+//     and re-granted the public columns, but left authenticated with it — and
+//     "Published profiles are publicly readable" reaches authenticated too, so
+//     any free signup could read every published agent's zapier_webhook_url,
+//     notification_preferences and referred_by, and call get_user_plan() with
+//     anyone's id. Column grants are not row-aware, so the owner's own private
+//     columns now come through get_own_profile().
+// ---------------------------------------------------------------------------
+check("a signed-in user cannot read another agent's private profile columns or plan", () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-000000023501';
+  const other = '00000000-dead-beef-0000-000000023502';
+  const admin = '00000000-dead-beef-0000-000000023503';
+  const as = (role, sub, sql) =>
+    q(`SET ROLE ${role}; ${sub ? `SET request.jwt.claim.sub = '${sub}';` : ''} ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  const PRIVATE = ['zapier_webhook_url', 'notification_preferences', 'referred_by', 'signup_source',
+    'custom_domain', 'custom_css', 'onboarding_completed_at', 'view_count', 'lead_count', 'link_click_count'];
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${owner}', 'us235owner@example.test'), ('${other}', 'us235other@example.test'),
+         ('${admin}', 'us235admin@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.profiles (id, username) VALUES
+         ('${owner}', 'us235owner'), ('${other}', 'us235other'), ('${admin}', 'us235admin')
+         ON CONFLICT (id) DO NOTHING;
+       UPDATE public.profiles SET is_published = true, zapier_webhook_url = 'https://hooks.zapier.com/x',
+         notification_preferences = '{"leads":"instant"}', referred_by = 'someone' WHERE id = '${owner}';
+       INSERT INTO public.user_roles (user_id, role) VALUES ('${admin}', 'admin') ON CONFLICT DO NOTHING;`);
+
+    // Another signed-in user: the published row is visible, its private columns are not.
+    for (const col of PRIVATE) {
+      if (!refused(() => as('authenticated', other, `SELECT ${col} FROM public.profiles WHERE id = '${owner}';`)))
+        out.push(`authenticated could select another profile's ${col}`);
+    }
+    if (!refused(() => as('authenticated', other, `SELECT * FROM public.profiles WHERE id = '${owner}';`)))
+      out.push('authenticated could select * from another profile');
+    const [username] = as('authenticated', other, `SELECT username FROM public.profiles WHERE id = '${owner}';`);
+    if (username !== 'us235owner') out.push('authenticated lost the public columns of a published profile');
+    if (!refused(() => as('authenticated', other, `SELECT public.get_user_plan('${owner}');`)))
+      out.push("authenticated could read another agent's plan through get_user_plan");
+    if (!refused(() => as('anon', null, `SELECT public.get_user_plan('${owner}');`)))
+      out.push("anon could read an agent's plan through get_user_plan");
+
+    // The owner still reads and writes their whole row, and their own plan.
+    const [own] = as(
+      'authenticated',
+      owner,
+      `SELECT zapier_webhook_url || '|' || (notification_preferences ->> 'leads') FROM public.get_own_profile();`
+    );
+    if (own !== 'https://hooks.zapier.com/x|instant') out.push(`get_own_profile returned "${own}" to the owner`);
+    const [none] = as('authenticated', other, `SELECT count(*) FROM public.get_own_profile() WHERE id = '${owner}';`);
+    if (none !== '0') out.push("get_own_profile returned someone else's row");
+    if (
+      refused(() =>
+        as('authenticated', owner, `UPDATE public.profiles SET bio = 'x', notification_preferences = '{}' WHERE id = '${owner}';`)
+      )
+    )
+      out.push('the owner could not update their own profile');
+    if (refused(() => as('authenticated', owner, `SELECT public.get_user_plan('${owner}');`)))
+      out.push('the owner was refused their own plan');
+
+    // Admins and the service role still read any plan, and a public page still
+    // learns whether to show the badge: profile_shows_branding asks for the
+    // plan of a profile that is not the visitor's.
+    if (refused(() => as('authenticated', admin, `SELECT public.get_user_plan('${owner}');`)))
+      out.push("an admin was refused another agent's plan");
+    if (
+      refused(() =>
+        q(`SET request.jwt.claim.role = 'service_role'; SET ROLE service_role; SELECT public.get_user_plan('${owner}');`)
+      )
+    )
+      out.push("the service role was refused an agent's plan");
+    if (refused(() => as('anon', null, `SELECT public.profile_shows_branding('${owner}');`)))
+      out.push('a visitor could no longer ask profile_shows_branding');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.user_roles WHERE user_id IN ('${owner}', '${other}', '${admin}');
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${other}', '${admin}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${other}', '${admin}');`);
     } catch {
       /* best effort */
     }

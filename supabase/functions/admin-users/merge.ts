@@ -83,3 +83,34 @@ export function userStats(rows: AdminUserRow[], now: Date = new Date()): AdminUs
     subscribed: rows.filter((r) => r.subscription_status === 'active' || r.subscription_status === 'past_due').length,
   };
 }
+
+export interface ReferralProfileLike {
+  created_at: string;
+  referred_by?: string | null;
+  signup_source?: string | null;
+}
+
+/**
+ * Where the last `days` days' signups came from (US-232): the profile whose
+ * "Powered by" badge sent them, or the campaign. Computed here because
+ * referred_by and signup_source are private columns the browser cannot select
+ * on another agent's profile, admin or not (US-235).
+ */
+export function signupReferrals(
+  profiles: ReferralProfileLike[],
+  days = 30,
+  now: Date = new Date(),
+  limit = 10
+): { source: string; signups: number }[] {
+  const since = now.getTime() - days * 86_400_000;
+  const counts = new Map<string, number>();
+  for (const p of profiles) {
+    if (new Date(p.created_at).getTime() < since) continue;
+    const key = p.referred_by ? `@${p.referred_by}` : p.signup_source || 'direct';
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([source, signups]) => ({ source, signups }))
+    .sort((a, b) => b.signups - a.signups)
+    .slice(0, limit);
+}

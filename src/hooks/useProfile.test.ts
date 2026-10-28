@@ -11,9 +11,13 @@ import { mockAuthenticatedUser } from '@/test/mocks/auth';
 let queryResult: MockQueryResult;
 let authUser: { id: string } | null;
 const fromMock = vi.fn((_table: string) => createQueryBuilder(queryResult));
+const rpcMock = vi.fn((_fn: string) => createQueryBuilder(queryResult));
 
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (table: string) => fromMock(table) },
+  supabase: {
+    from: (table: string) => fromMock(table),
+    rpc: (fn: string) => rpcMock(fn),
+  },
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
@@ -30,6 +34,7 @@ const wrapper = ({ children }: { children: ReactNode }) =>
 describe('useProfile', () => {
   beforeEach(() => {
     fromMock.mockClear();
+    rpcMock.mockClear();
     authUser = { id: mockAuthenticatedUser.id };
     queryResult = { data: mockProfile, error: null };
   });
@@ -38,7 +43,10 @@ describe('useProfile', () => {
     const { result } = renderHook(() => useProfile(), { wrapper });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.profile).toEqual(mockProfile);
-    expect(fromMock).toHaveBeenCalledWith('profiles');
+    // US-235: the owner's private columns come through get_own_profile —
+    // authenticated can select only the public columns of profiles.
+    expect(rpcMock).toHaveBeenCalledWith('get_own_profile');
+    expect(fromMock).not.toHaveBeenCalled();
   });
 
   it('does not fetch when there is no authenticated user', async () => {
@@ -47,6 +55,7 @@ describe('useProfile', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.profile).toBeUndefined();
     expect(fromMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it('surfaces an error state when the query fails', async () => {

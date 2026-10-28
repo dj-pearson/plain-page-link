@@ -608,6 +608,13 @@ seo_title, seo_description, og_image, custom_css, custom_domain, is_published (b
 view_count / lead_count / link_click_count (int, denormalised counters)
 created_at, updated_at
 ```
+`anon` and `authenticated` hold SELECT on the public columns only (US-073,
+US-235); zapier_webhook_url, notification_preferences, custom_domain,
+custom_css, referred_by, signup_source, onboarding_completed_at, updated_at and
+the counters are private. Column grants are not row-aware, so the owner reads
+their full row through `get_own_profile()` (`fetchOwnProfile` in
+`src/lib/ownProfile.ts`) — `.select('*')` on profiles, or a bare `.select()`
+after an update, is refused for every browser caller.
 
 **listings** — properties. Note `price` is **text**, not numeric, and there is
 no `title` or `images` column.

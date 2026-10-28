@@ -8,6 +8,7 @@ import { logAuditEvent } from '@/lib/audit';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
 import { toProfile } from '@/types/profile';
+import { fetchOwnProfile } from '@/lib/ownProfile';
 
 // Auth store with Google Sign-In support and Single Sign-Out (SLO)
 
@@ -131,7 +132,7 @@ export const useAuthStore = create<AuthState>()(
           if (session?.user) {
             // Fetch profile and roles in parallel for better performance
             const [profileResult, rolesResult] = await Promise.all([
-              supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+              fetchOwnProfile(),
               supabase
                 .from('user_roles')
                 .select('role')
@@ -225,7 +226,7 @@ export const useAuthStore = create<AuthState>()(
           setTimeout(async () => {
             try {
               const [profileResult, rolesResult] = await Promise.all([
-                supabase.from('profiles').select('*').eq('id', userId).single(),
+                fetchOwnProfile(),
                 supabase
                   .from('user_roles')
                   .select('role')
@@ -266,7 +267,9 @@ export const useAuthStore = create<AuthState>()(
                 // US-232: handle_new_user records these on the profile; it
                 // ignores a ref that names no real profile.
                 ...(referral ? { ref: referral.ref } : {}),
-                ...(referral?.source || signupSource ? { signup_source: referral?.source ?? signupSource } : {}),
+                ...(referral?.source || signupSource
+                  ? { signup_source: referral?.source ?? signupSource }
+                  : {}),
               },
               emailRedirectTo: `${window.location.origin}/`,
             },
@@ -286,7 +289,7 @@ export const useAuthStore = create<AuthState>()(
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
               const [profileResult, rolesResult] = await Promise.all([
-                supabase.from('profiles').select('*').eq('id', data.user.id).single(),
+                fetchOwnProfile(),
                 supabase
                   .from('user_roles')
                   .select('role')
@@ -363,7 +366,7 @@ export const useAuthStore = create<AuthState>()(
 
           // Fetch profile, roles, and MFA settings in parallel for better performance
           const [profileResult, rolesResult, mfaResult] = await Promise.all([
-            supabase.from('profiles').select('*').eq('id', data.user.id).single(),
+            fetchOwnProfile(),
             supabase
               .from('user_roles')
               .select('role')
@@ -640,13 +643,18 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
 
         try {
-          const { data, error } = await supabase
+          const { error: updateError } = await supabase
             .from('profiles')
             .update(updates)
             .eq('id', user.id)
-            .select()
+            .select('id')
             .single();
 
+          if (updateError) throw updateError;
+
+          // US-235: the saved row is read back through get_own_profile — a
+          // bare .select() asks for private columns authenticated cannot read.
+          const { data, error } = await fetchOwnProfile();
           if (error) throw error;
 
           set({

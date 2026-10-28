@@ -9234,6 +9234,55 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };
+      get_own_profile: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          avatar_url: string;
+          bio: string;
+          brokerage_logo: string;
+          brokerage_name: string;
+          calendly_url: string;
+          certifications: Json;
+          created_at: string;
+          custom_css: string;
+          custom_domain: string;
+          email_display: string;
+          facebook_url: string;
+          full_name: string;
+          id: string;
+          instagram_url: string;
+          is_published: boolean;
+          lead_count: number;
+          license_number: string;
+          license_state: string;
+          link_click_count: number;
+          linkedin_url: string;
+          notification_preferences: Json;
+          og_image: string;
+          onboarding_completed_at: string;
+          phone: string;
+          realtor_com_url: string;
+          referred_by: string;
+          seo_description: string;
+          seo_title: string;
+          service_cities: Json;
+          service_zip_codes: Json;
+          signup_source: string;
+          sms_enabled: boolean;
+          specialties: Json;
+          theme: string;
+          tiktok_url: string;
+          title: string;
+          updated_at: string;
+          username: string;
+          view_count: number;
+          website_url: string;
+          years_experience: number;
+          youtube_url: string;
+          zapier_webhook_url: string;
+          zillow_url: string;
+        }[];
+      };
       get_pages_needing_optimization: {
         Args: Record<PropertyKey, never>;
         Returns: Record<string, unknown>[];
@@ -9514,6 +9563,7 @@ export type Database = {
         Args: { p_user_id: string };
         Returns: undefined;
       };
+      resolve_user_plan: { Args: { _user_id: string }; Returns: Json };
       revoke_all_other_sessions: {
         Args: { p_current_session_id?: string; p_user_id: string };
         Returns: number;
