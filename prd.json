@@ -3860,8 +3860,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "GalleryBlock.tsx:73-121; ListingDetailModal.tsx:299,307,322; TestimonialSection.tsx:90,98,143,146; ListingGallery.tsx:120,129,147; AddTestimonialModal.tsx:145-149; ContactBlock.tsx:176,244; index.css:34,66."
+      "passes": true,
+      "notes": "GalleryBlock.tsx:73-121; ListingDetailModal.tsx:299,307,322; TestimonialSection.tsx:90,98,143,146; ListingGallery.tsx:120,129,147; AddTestimonialModal.tsx:145-149; ContactBlock.tsx:176,244; index.css:34,66. DONE: GalleryBlock lightbox rebuilt on the ui Dialog (sr-only title \"Photo n of N\", caption as description, Escape and arrow keys, focus returns to the opening tile); tiles are named buttons. ListingDetailModal prev/next named, thumbnails named with aria-pressed; TestimonialSection arrows named; ListingGallery search labelled, Filters/Sort named with aria-expanded/aria-controls (text sr-only on mobile instead of hidden), Escape closes sort, chip groups labelled with aria-pressed; AddTestimonialModal stars are a labelled group with aria-pressed and a focus-visible ring; ContactBlock SelectTrigger gets its id and its error text uses text-destructive. Light --destructive 60.2%→46% lightness (3.76→5.61:1); dark --destructive is a light red (2.00→7.23:1) with dark foreground text (6.45:1) — DEVIATION: no single red passes both as text and as a fill under white text in dark mode. Tests: 17 of 20 new Testing Library tests failed before; destructiveContrast.test.ts; axe Playwright suite 43/43 against a local vite server."
     },
     {
       "id": "US-246",
