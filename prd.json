@@ -3680,8 +3680,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "sso-callback/index.ts:124-170,329-381 decodes base64 and regex-extracts the email; saml_certificate never read. sso-initiate:198 is unauthenticated and returns the requestId. listUsers() only sees 50 users. Migration slot if needed: 20261028000001."
+      "passes": true,
+      "notes": "sso-callback/index.ts:124-170,329-381 decodes base64 and regex-extracts the email; saml_certificate never read. sso-initiate:198 is unauthenticated and returns the requestId. listUsers() only sees 50 users. Migration slot if needed: 20261028000001. DONE: sso-callback minted a magic link for whatever email an unsigned SAMLResponse named. SAML-family providers (saml/okta/azure_ad) are now refused (400) by sso-initiate before any session row and by sso-callback before any DB access, until a real XML-DSig verifier exists. OIDC checks iss (when configured), aud/azp, exp, the stored nonce, email_verified and exact organization_domain; a final domain gate runs before generateLink. Logic in supabase/functions/_shared/sso.ts; 27 tests, 3 failed against the old code. DEVIATION: OIDC kept (token from token endpoint over TLS; claims checked, signature not). Owner: redeploy sso-initiate/sso-callback; SAML orgs must move to OIDC. Follow-ups: listUsers paging, mapped-account email for the link, SAML options still offered in SSOConfigForm."
     },
     {
       "id": "US-234",

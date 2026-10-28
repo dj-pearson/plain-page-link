@@ -4681,3 +4681,11 @@ proxy rate limit) and the pending aal2 migration; HMAC-signed OAuth state;
 PII in three edge-function logs; contacts list past 2,000 (infinite query);
 digest paging past 5,000 profiles; 3D theme backgrounds load 213 KB eagerly;
 landing hero re-hides its painted H1 (LCP).
+
+## Site improvement loop — iteration 1/15 — US-233: a forged SAML response signed in as anyone
+
+- A hand-made, unsigned SAMLResponse plus a requestId from the public
+  sso-initiate was enough for a magic link to any account. SAML-family
+  providers are refused until signatures are verified; OIDC now checks
+  iss/aud/exp/nonce/email_verified and the org domain before generateLink.
+- 27 unit tests (_shared/sso.test.ts); 3 failed against the old functions.
