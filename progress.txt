@@ -4697,3 +4697,10 @@ landing hero re-hides its painted H1 (LCP).
   shows an inline error. "Your Profile is Live!" appears only after the save.
 - The first listing gets real city/state fields instead of a comma split, and
   is never created with an empty city or a '0' price.
+
+## Site improvement loop — iteration 3/15 — US-236: a locked lead unlocked by changing its date
+
+- An agent could UPDATE a locked lead's created_at into an empty month and
+  pii-crypto would decrypt it; an assignee could set user_id to themselves.
+  Both columns are now frozen by trigger; the anon testimonial insert
+  backstop is gone. Three verify-schema checks failed before, pass after.

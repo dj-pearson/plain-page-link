@@ -3725,8 +3725,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "20260902000006_zip_routing_and_assignee_access.sql (USING uid=user_id OR uid=assigned_to, no WITH CHECK); locked_lead_ids ranks by date_trunc('month',created_at); plan_usage counts by created_at (20260923000002:120); 20260808000004:27-40 anon testimonial INSERT backstop. Migration slot: 20261028000004."
+      "passes": true,
+      "notes": "20260902000006_zip_routing_and_assignee_access.sql (USING uid=user_id OR uid=assigned_to, no WITH CHECK); locked_lead_ids ranks by date_trunc('month',created_at); plan_usage counts by created_at (20260923000002:120); 20260808000004:27-40 anon testimonial INSERT backstop. Migration slot: 20261028000004. DONE: Migration 20261028000004 adds guard_frozen_columns(): anon/authenticated can no longer change leads.user_id/created_at or contacts/open_houses.created_at, so a locked lead cannot be backdated into a month with room. The leads UPDATE policy is TO authenticated with WITH CHECK (uid = user_id OR uid = assigned_to): an assignee still works the lead but cannot re-own or reassign it (DEVIATION: owner-only would block assignee status updates; user_id is frozen instead). The anon testimonial INSERT policy is dropped; reviews arrive only through submit-review (service role). Three verify-schema checks watched to fail before and pass after (35/35); the plan-limits check's visitor review now inserts as service_role. Owner: apply migration 20261028000004."
     },
     {
       "id": "US-237",
