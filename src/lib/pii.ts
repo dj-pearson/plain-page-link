@@ -160,18 +160,24 @@ export async function decryptContactDetails(
  *
  * Takes no argument on purpose: the row is chosen by the JWT, not by the
  * caller, so there is nothing to point at somebody else's data.
+ *
+ * Throws when it cannot produce plaintext (US-237). It used to return null on
+ * any failure, and useProfile filled the gap with the stored column — which is
+ * ciphertext. The profile form then showed `enc:v1:…` as the phone number, and
+ * saving ran encryptPII over the ciphertext, so the next successful decrypt
+ * returned the first envelope rather than the number. A value pii-crypto hands
+ * back still encrypted (corrupt, or written under a rotated key — it returns
+ * those untouched) is the same failure.
  */
 export async function decryptOwnProfilePhone(): Promise<string | null> {
-  try {
-    const { data, error } = await supabase.functions.invoke<{ phone: string | null }>(
-      'pii-crypto',
-      { body: { op: 'decrypt_profile' } }
-    );
-    if (error) return null;
-    return data?.phone ?? null;
-  } catch {
-    return null;
-  }
+  const { data, error } = await supabase.functions.invoke<{ phone: string | null }>('pii-crypto', {
+    body: { op: 'decrypt_profile' },
+  });
+  if (error) throw error;
+  if (!data) throw new Error('pii-crypto returned an unexpected response');
+  const phone = data.phone ?? null;
+  if (isEncryptedPII(phone)) throw new Error('The stored phone number could not be decrypted');
+  return phone;
 }
 
 /**

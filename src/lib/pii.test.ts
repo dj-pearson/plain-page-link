@@ -25,6 +25,7 @@ import {
 const PREFIX = 'enc:v1:';
 let invocations: { op: string; body: Record<string, unknown> }[] = [];
 let failNextCall = false;
+let profilePhoneReply: string | null = '+1 555 000 1111';
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -61,7 +62,7 @@ vi.mock('@/integrations/supabase/client', () => ({
         }
 
         if (body.op === 'decrypt_profile') {
-          return { data: { phone: '+1 555 000 1111' }, error: null };
+          return { data: { phone: profilePhoneReply }, error: null };
         }
 
         return { data: null, error: new Error(`unexpected op ${String(body.op)}`) };
@@ -170,8 +171,28 @@ describe('decryptOwnProfilePhone', () => {
     expect(Object.keys(invocations[0].body)).toEqual(['op']);
   });
 
-  it('returns null when the call fails, so the stored value can stand in', async () => {
+  // US-237: it used to return null here, and useProfile substituted the stored
+  // column — ciphertext — which the form then showed and re-encrypted on save.
+  it('throws when the call fails, rather than letting ciphertext stand in', async () => {
     failNextCall = true;
-    expect(await decryptOwnProfilePhone()).toBeNull();
+    await expect(decryptOwnProfilePhone()).rejects.toThrow();
+  });
+
+  it('throws when pii-crypto hands the value back still encrypted', async () => {
+    profilePhoneReply = `${PREFIX}eyJjaXBoZXJ0ZXh0IjoiIn0=`;
+    try {
+      await expect(decryptOwnProfilePhone()).rejects.toThrow(/could not be decrypted/);
+    } finally {
+      profilePhoneReply = '+1 555 000 1111';
+    }
+  });
+
+  it('returns null for a profile with no phone', async () => {
+    profilePhoneReply = null;
+    try {
+      expect(await decryptOwnProfilePhone()).toBeNull();
+    } finally {
+      profilePhoneReply = '+1 555 000 1111';
+    }
   });
 });

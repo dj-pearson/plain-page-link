@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
-import { encryptPII, decryptOwnProfilePhone } from '@/lib/pii';
+import { encryptPII, decryptOwnProfilePhone, isEncryptedPII } from '@/lib/pii';
+import { logger } from '@/lib/logger';
 import { toProfile } from '@/types/profile';
 import { fetchOwnProfile } from '@/lib/ownProfile';
 import type { Profile } from '@/types/profile';
@@ -44,13 +45,22 @@ export function useProfile() {
       const profileData = toProfile(data);
       // The function chooses the row from the JWT rather than being handed a
       // ciphertext — pii-crypto used to decrypt whatever it was given, for
-      // anyone logged in (US-119). It returns null when it cannot decrypt, so
-      // the stored value stands in, which is what the old client did with a
-      // legacy plaintext number.
-      return {
-        ...profileData,
-        phone: (await decryptOwnProfilePhone()) ?? profileData.phone,
-      };
+      // anyone logged in (US-119). pii-crypto passes legacy plaintext through.
+      //
+      // US-237: when it cannot decrypt, the phone is unknown, not the stored
+      // column. That column is ciphertext; it used to stand in here, so the
+      // form showed `enc:v1:…` and a save encrypted the ciphertext again. The
+      // rest of the profile still loads, and phoneUnavailable tells the form
+      // to leave phone out of a save unless the agent types a new one.
+      let phone: string | null = null;
+      let phoneUnavailable = false;
+      try {
+        phone = await decryptOwnProfilePhone();
+      } catch (decryptError) {
+        logger.error('Could not decrypt the profile phone number', decryptError);
+        phoneUnavailable = true;
+      }
+      return { ...profileData, phone, phoneUnavailable };
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
@@ -65,7 +75,13 @@ export function useProfile() {
       // decryptPII on read passes any legacy plaintext through).
       const encryptedUpdates: Partial<Profile> = { ...updates };
       if ('phone' in updates) {
-        encryptedUpdates.phone = await encryptPII(updates.phone ?? null);
+        if (isEncryptedPII(updates.phone)) {
+          // Already ciphertext — a read that never decrypted. Encrypting it
+          // again would bury the number under a second envelope (US-237).
+          delete encryptedUpdates.phone;
+        } else {
+          encryptedUpdates.phone = await encryptPII(updates.phone ?? null);
+        }
       }
 
       const { data, error } = await supabase

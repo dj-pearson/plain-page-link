@@ -86,7 +86,16 @@ export function useAvatarUpload() {
 
       // Without this the dashboard header and profile preview go on rendering
       // the cached avatar_url until something else refetches.
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      //
+      // US-237: patch avatar_url in the cached profile rather than
+      // invalidating it. The refetch an invalidate caused handed the profile
+      // editor a new object, and its hydrate effect reset every field the
+      // agent had typed but not saved. Only avatar_url changed, so only
+      // avatar_url moves.
+      queryClient.setQueryData<{ avatar_url: string | null } | null | undefined>(
+        ['profile', user.id],
+        (old) => (old ? { ...old, avatar_url: publicUrl } : old)
+      );
       queryClient.invalidateQueries({ queryKey: ['public-profile'] });
 
       toast({
