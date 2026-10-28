@@ -4720,3 +4720,11 @@ landing hero re-hides its painted H1 (LCP).
   its FAQ/Software JSON-LD under the agent's title. Body and schema are now
   the agent's. /JaneDoe 301s to /janedoe instead of 404; ?listing= must belong
   to that agent; dashboard/admin/onboarding/team send X-Robots-Tag noindex.
+
+## Site improvement loop — iteration 6/15 — US-243: the profile page downloaded full-size photos
+
+- optimize-image had been writing 200/400/800 webp variants of every listing
+  photo since US-032 and nothing read them; phones downloaded originals (up
+  to 5 MB each) and five were preloaded at high priority. Cards and the
+  carousel now use srcset with a fallback to the original for old uploads;
+  one image is preloaded.

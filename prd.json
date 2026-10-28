@@ -3830,8 +3830,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "src/lib/images.ts:30; ListingCard.tsx:111; FeaturedListingsCarousel.tsx:205; ProfileHeader.tsx:64; FullProfilePage.tsx:157-189; variants produced by US-032/US-107; OptimizedImage.tsx unused."
+      "passes": true,
+      "notes": "src/lib/images.ts:30; ListingCard.tsx:111; FeaturedListingsCarousel.tsx:205; ProfileHeader.tsx:64; FullProfilePage.tsx:157-189; variants produced by US-032/US-107; OptimizedImage.tsx unused. DONE: getImageUrl takes { width } and maps to the real optimize-image outputs (<stem>-200/400/800.webp, listing-photos bucket only; avatars and hot-linked photos have none); responsiveImage gives src/srcSet from variants only; fallBackToOriginal retries the original for older uploads without variants, then the placeholder (no loop). ListingCard and FeaturedListingsCarousel use srcSet/sizes, width/height, decoding=async; cards lazy, first carousel slide eager with fetchpriority=high. ProfileHeader avatar gets width/height/decoding. FullProfilePage preloads only the first slide (imagesrcset/imagesizes) and its cleanup removes only its own link. DEVIATIONS: avatar preload removed; avatar resizing at upload skipped; original excluded from srcSet so desktop carousel tops out at 800px (a 1600 variant needs optimize-image). Tests: src/lib/images.test.ts (13)."
     },
     {
       "id": "US-244",
