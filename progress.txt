@@ -4704,3 +4704,19 @@ landing hero re-hides its painted H1 (LCP).
   pii-crypto would decrypt it; an assignee could set user_id to themselves.
   Both columns are now frozen by trigger; the anon testimonial insert
   backstop is gone. Three verify-schema checks failed before, pass after.
+
+## Site improvement loop — iteration 4/15 — US-234: internal SEO tools ran for anyone
+
+- Six SEO functions swallowed requireAuth in a try/catch and carried on, so
+  the anon key bought a service-role fetch of any URL (internal Docker hosts)
+  and paid LLM calls. trigger-rebuild accepted "Bearer x". All now admin-only
+  (or service role for the scheduler), with safeFetch on every caller URL.
+- Found on the way: the scheduled audit's four other checks had been 401ing
+  since US-078. Fixed.
+
+## Site improvement loop — iteration 5/15 — US-242: Google saw the homepage on every agent's URL
+
+- Every /:username response to a crawler carried the homepage's body and
+  its FAQ/Software JSON-LD under the agent's title. Body and schema are now
+  the agent's. /JaneDoe 301s to /janedoe instead of 404; ?listing= must belong
+  to that agent; dashboard/admin/onboarding/team send X-Robots-Tag noindex.

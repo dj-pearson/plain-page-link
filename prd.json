@@ -3695,8 +3695,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "seo-audit/index.ts:35-48, analyze-content:48-63, analyze-internal-links:38-50, analyze-semantic-keywords:38-49, optimize-page-content:38-52 (LLM at :142,:169), apply-seo-fixes:28-35,83, trigger-rebuild:43-46. US-078 claimed the SEO crawlers were admin-only; these five were missed."
+      "passes": true,
+      "notes": "seo-audit/index.ts:35-48, analyze-content:48-63, analyze-internal-links:38-50, analyze-semantic-keywords:38-49, optimize-page-content:38-52 (LLM at :142,:169), apply-seo-fixes:28-35,83, trigger-rebuild:43-46. US-078 claimed the SEO crawlers were admin-only; these five were missed. DONE: seo-audit, analyze-content, analyze-internal-links, analyze-semantic-keywords, optimize-page-content and apply-seo-fixes check for an admin before reading the body (the swallowed requireAuth try/catch is gone); every caller-supplied URL goes through safeFetch. trigger-rebuild requires an admin and is rate-limited (6/10 min per admin, fails closed). New _shared/auth.ts requireAdminOrServiceRole admits run-scheduled-audit's service-role calls — used by seo-audit, analyze-content and (coordinator follow-up) check-core-web-vitals, check-broken-links, check-security-headers, analyze-images, which US-078 had gated with plain requireAdmin so every scheduled run got 401. _shared/admin-gate.test.ts (failed 21/23 before). smoke-edge-functions.mjs requires 401/403 from all seven with no credentials and with the anon key (not run locally: no deno). Owner: redeploy edge functions."
     },
     {
       "id": "US-235",
@@ -3815,8 +3815,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "functions/[username].ts:46,118,132,166; functions/_lib/social-meta.ts:288 STRIP_PATTERNS; Landing.tsx:102-164; public/_redirects:83; public/_headers:26; robots.txt:5; functions/_tests/username-route.test.ts:14."
+      "passes": true,
+      "notes": "functions/[username].ts:46,118,132,166; functions/_lib/social-meta.ts:288 STRIP_PATTERNS; Landing.tsx:102-164; public/_redirects:83; public/_headers:26; robots.txt:5; functions/_tests/username-route.test.ts:14. DONE: functions/[username].ts served crawlers the prerendered homepage (US-147) with only the head swapped, so every agent URL carried Landing's #root and its WebSite/SoftwareApplication/FAQPage JSON-LD; tests passed because the fixture was an empty shell. social-meta now strips all ld+json and meta[name=title] and replaces #root with the agent's h1/summary before injecting the agent's tags. Mixed-case usernames 301 to normalizeUsername() (query kept, reserved routes untouched); ?listing= is scoped by user_id=eq.<profile id>. _headers adds X-Robots-Tag noindex for /dashboard, /admin, /onboarding/*, /team/*; robots.txt drops Disallow: /dashboard/. Fixture functions/_tests/fixtures/prerendered-index.html is the real vite-built index.html with Landing rendered in; 4 route tests failed against the old code. DEVIATION: fixture rendered in jsdom (Playwright browser download refused here); CI's prerender + verify:seo should confirm."
     },
     {
       "id": "US-243",
