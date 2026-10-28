@@ -3799,8 +3799,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Settings.tsx:157; DashboardLayout.tsx:41-43,186; Overview.tsx:213-219; useAuthStore.ts:134,228,245; App.tsx:131."
+      "passes": true,
+      "notes": "Settings.tsx:157; DashboardLayout.tsx:41-43,186; Overview.tsx:213-219; useAuthStore.ts:134,228,245; App.tsx:131. DONE: Settings.tsx:157 invalidated only ['profile'], so the header's copy/share/view links (which read the auth store) kept the old username. Settings now awaits a new store action refreshProfile() that re-reads via get_own_profile (DEVIATION: since US-235 the update returns id only), keeps the old profile on failure and never throws. The listener and initialize() use profileAfterFetch(): a transient error keeps the same user's profile and role; PGRST116 or a different user clears it. INITIAL_SESSION skips the refetch only when initialize() loaded that same user without error (cleared on every other event and on failure). App.tsx and DashboardLayout read the store through selectors. Tests: src/stores/useAuthStore.test.ts (12; 7 failed on the old store) plus a Settings test. Remaining whole-store reads for a later story: MobileNav.tsx:27, OnboardingWizardPage.tsx:24, PageList.tsx:26, ProfileDisplaySettings.tsx:14, useSecurity.ts:183, Login.tsx:39, ~38 hooks reading only user."
     },
     {
       "id": "US-242",

@@ -4772,3 +4772,11 @@ landing hero re-hides its painted H1 (LCP).
   because bg-primary read the dashboard's --primary. It now reads the
   agent's theme. Sample listings never inserted (generated columns written);
   the schema-reference test now catches that class. Link arrows renumber.
+
+## Site improvement loop — iteration 13/15 — US-241: a renamed agent kept sharing the old link
+
+- After a rename the auth store kept the old username, so "View my page"
+  and Copy link pointed at a URL that no longer resolves. The store is
+  refreshed after the save; a transient fetch error no longer nulls the
+  profile; App and DashboardLayout subscribe through selectors and the
+  signed-in profile is fetched once on load instead of twice.
