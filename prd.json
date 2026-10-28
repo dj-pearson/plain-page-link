@@ -3755,8 +3755,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "OnboardingWizardPage.tsx:211,223,132-140; OnboardingWizard.tsx:101-121,632."
+      "passes": true,
+      "notes": "OnboardingWizardPage.tsx:211,223,132-140; OnboardingWizard.tsx:101-121,632. DONE: The wizard is no longer unmounted while saving: saving is an overlay (role=status) and handleComplete returns true/false; on failure the wizard keeps its step, fields and photos and shows an inline role=alert above \"Try again\". The save moved to step 4 (\"Save & publish\") so step 5's \"Live\" heading and Copy Link appear only after success (DEVIATION from \"save at the end of step 4 or reword\" — chose save; Back disabled on step 5; US-232 plan intent kept via onFinish). Step 3 has separate street/city/state/ZIP; buildFirstListingInsert refuses a listing without address, city and a non-zero price. Tests: OnboardingWizardPage.test.tsx (failure path, retry, missing city), OnboardingWizard.test.ts (listing builder)."
     },
     {
       "id": "US-239",

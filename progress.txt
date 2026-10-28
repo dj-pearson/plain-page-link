@@ -4689,3 +4689,11 @@ landing hero re-hides its painted H1 (LCP).
   providers are refused until signatures are verified; OIDC now checks
   iss/aud/exp/nonce/email_verified and the org domain before generateLink.
 - 27 unit tests (_shared/sso.test.ts); 3 failed against the old functions.
+
+## Site improvement loop — iteration 2/15 — US-238: a failed onboarding save erased the agent's answers
+
+- The saving spinner replaced the wizard, so a failed save reset it to step 1
+  with blank fields. Saving is now an overlay; failure keeps everything and
+  shows an inline error. "Your Profile is Live!" appears only after the save.
+- The first listing gets real city/state fields instead of a comma split, and
+  is never created with an empty city or a '0' price.
