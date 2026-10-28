@@ -4765,3 +4765,10 @@ landing hero re-hides its painted H1 (LCP).
   full row comes from get_own_profile(); get_user_plan asserts the caller.
 - Merged with US-236/239: one-pass apply of all migrations + full
   verify-schema + types:check all clean.
+
+## Site improvement loop — iteration 12/15 — US-247: the agent's page ignored the agent's colours
+
+- The public profile painted blue→purple over the theme the agent chose,
+  because bg-primary read the dashboard's --primary. It now reads the
+  agent's theme. Sample listings never inserted (generated columns written);
+  the schema-reference test now catches that class. Link arrows renumber.

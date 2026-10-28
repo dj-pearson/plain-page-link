@@ -3890,8 +3890,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "StickyActionBar.tsx:168; SoldProperties.tsx:49; SocialProofBanner.tsx:69; ProfileHeader.tsx:70,197; OnboardingWizard.tsx:174,638; OnboardingWizardPage.tsx:225; sample-data-service.ts:114-120; useListingUpdate.ts:44-46; Links.tsx:196-199."
+      "passes": true,
+      "notes": "StickyActionBar.tsx:168; SoldProperties.tsx:49; SocialProofBanner.tsx:69; ProfileHeader.tsx:70,197; OnboardingWizard.tsx:174,638; OnboardingWizardPage.tsx:225; sample-data-service.ts:114-120; useListingUpdate.ts:44-46; Links.tsx:196-199. DONE: applyTheme only wrote --theme-*, so bg-primary on the public profile meant dashboard navy; FullProfilePage's main now maps --primary/--primary-foreground to the agent's theme (applyTheme adds a contrast-picked --theme-primary-foreground), and StickyActionBar, SoldProperties, SocialProofBanner, ProfileHeader and onboarding use bg-primary, text-primary-foreground(/80) or bg-muted instead of blue→purple gradients. sample-data-service wrote GENERATED beds/baths/sqft so every sample listing insert failed — removed; the unused useListingUpdate (same defect) deleted. schema-references.test.ts now parses GENERATED columns from migrations and follows writes through named literals (watched it fail on both sites first). Link up/down renumbers densely via moveAndRenumber (src/lib/linkOrder.ts), so links sharing a position move and a failed write is repaired by the next move. DEVIATIONS: no transactional RPC (no unique constraint on position); onboarding uses bg-muted (no agent theme yet); the theme primary overrides the high-contrast setting's primary on the public profile; sqft is GENERATED too (CLAUDE.md wrong). Merge note: OnboardingWizardPage conflict resolved to US-238's overlay (no gradient)."
     }
   ]
 }

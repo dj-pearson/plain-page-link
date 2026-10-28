@@ -620,7 +620,7 @@ after an update, is refused for every browser caller.
 no `title` or `images` column.
 ```
 id, user_id (NOT NULL), address (NOT NULL), city (NOT NULL), price (text, NOT NULL)
-beds, baths (int, GENERATED — never write them), sqft (int)
+beds, baths, sqft (int, GENERATED — never write them)
 bedrooms / bathrooms (numeric), square_feet (int), lot_size_acres (numeric)
 image (single, legacy), photos (jsonb, the real gallery), virtual_tour_url
 status ('active' | 'sold' | 'pending'), property_type, description, mls_number
