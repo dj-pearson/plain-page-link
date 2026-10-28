@@ -66,7 +66,7 @@ export function SocialProofBanner({ stats }: SocialProofBannerProps) {
   }
 
   return (
-    <div className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-8 px-4 rounded-xl shadow-lg">
+    <div className="w-full bg-primary text-primary-foreground py-8 px-4 rounded-xl shadow-lg">
       <div className="max-w-4xl mx-auto">
         {/* Was "Trusted by Hundreds of Happy Clients" — rendered
                     verbatim above 1 sale and 0 reviews. The heading now
@@ -79,11 +79,11 @@ export function SocialProofBanner({ stats }: SocialProofBannerProps) {
             const Icon = stat.icon;
             return (
               <div key={index} className="text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/20 mb-3">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary-foreground/15 mb-3">
                   <Icon className="w-6 h-6" />
                 </div>
                 <div className="text-2xl md:text-3xl font-bold mb-1">{stat.value}</div>
-                <div className="text-sm opacity-90">{stat.label}</div>
+                <div className="text-sm text-primary-foreground/80">{stat.label}</div>
               </div>
             );
           })}

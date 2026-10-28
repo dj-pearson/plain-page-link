@@ -270,7 +270,7 @@ export function OnboardingWizard({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-8 px-4">
+    <div className="min-h-screen bg-muted/40 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header with Progress */}
         <div className="mb-8">
@@ -834,7 +834,7 @@ function StepShare({ username, saved }: { username: string; saved: boolean }) {
           : 'Your link will work as soon as your profile is saved.'}
       </p>
 
-      <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+      <div className="bg-muted rounded-xl p-6 mb-6">
         <div className="text-sm text-gray-600 mb-2">Your AgentBio Link</div>
         <div className="text-2xl font-bold text-blue-600 mb-4 break-all">{profileUrl}</div>
         <Button onClick={handleCopy} size="lg" className="mb-4" disabled={!saved}>

@@ -45,7 +45,7 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
   return (
     <div className="relative bg-white rounded-xl shadow-lg overflow-hidden">
       {/* Background Pattern */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-white opacity-60" />
+      <div className="absolute inset-0 bg-primary/5" />
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
@@ -73,8 +73,8 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
                   className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-white shadow-xl"
                 />
               ) : (
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-4 border-white shadow-xl">
-                  <span className="text-3xl md:text-4xl font-bold text-white">
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-primary flex items-center justify-center border-4 border-white shadow-xl">
+                  <span className="text-3xl md:text-4xl font-bold text-primary-foreground">
                     {(profile.full_name || profile.username || 'U')
                       .split(' ')
                       .map((n) => n[0])
@@ -200,7 +200,7 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
                 {profile.specialties.map((specialty, index) => (
                   <span
                     key={index}
-                    className="px-3 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 rounded-lg text-xs md:text-sm font-semibold border border-blue-200/50"
+                    className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs md:text-sm font-semibold border border-primary/20"
                   >
                     {specialty}
                   </span>

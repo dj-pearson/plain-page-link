@@ -163,9 +163,7 @@ export function StickyActionBar({
           onClick={() => setIsExpanded(!isExpanded)}
           className={cn(
             'fixed bottom-6 right-4 z-50 rounded-full px-6 py-4 shadow-2xl transition-all flex items-center gap-2 min-h-[56px]',
-            isExpanded
-              ? 'bg-gray-900 text-white'
-              : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+            isExpanded ? 'bg-gray-900 text-white' : 'bg-primary text-primary-foreground'
           )}
           whileTap={{ scale: 0.95 }}
           style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
@@ -228,8 +226,8 @@ export function StickyActionBar({
                   className="w-12 h-12 rounded-full mx-auto mb-2 object-cover border-2 border-gray-200"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full mx-auto mb-2 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-2 border-gray-200">
-                  <span className="text-sm font-bold text-white">
+                <div className="w-12 h-12 rounded-full mx-auto mb-2 bg-primary flex items-center justify-center border-2 border-gray-200">
+                  <span className="text-sm font-bold text-primary-foreground">
                     {(profile.full_name || profile.username || 'U')
                       .split(' ')
                       .map((n) => n[0])

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
@@ -472,10 +472,19 @@ export default function FullProfilePage() {
         id="main-content"
         tabIndex={-1}
         className="min-h-screen relative"
-        style={{
-          backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
-          color: `hsl(var(--theme-text, 222 47% 11%))`,
-        }}
+        style={
+          {
+            backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
+            color: `hsl(var(--theme-text, 222 47% 11%))`,
+            // applyTheme writes only --theme-*; Tailwind's bg-primary /
+            // text-primary-foreground read --primary. Re-point them here, on
+            // the profile alone, so the profile's components can use the
+            // tokens and get the agent's colour, not the dashboard navy
+            // (US-247). Fallback is the 'modern' preset's #2563eb.
+            '--primary': 'var(--theme-primary, 221 83% 53%)',
+            '--primary-foreground': 'var(--theme-primary-foreground, 0 0% 100%)',
+          } as CSSProperties
+        }
       >
         <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 max-w-5xl relative z-10 pb-24 sm:pb-8">
           <div className="space-y-4 sm:space-y-6">
