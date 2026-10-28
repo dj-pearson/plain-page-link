@@ -9064,6 +9064,10 @@ export type Database = {
       };
     };
     Functions: {
+      analytics_summary: {
+        Args: { p_since: string; p_tz?: string; p_until?: string };
+        Returns: Json;
+      };
       analytics_visible_since: {
         Args: Record<PropertyKey, never>;
         Returns: string;

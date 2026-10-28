@@ -1,18 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
-import type { Database } from '@/integrations/supabase/types';
+import type { Database, Json } from '@/integrations/supabase/types';
 import { decryptLeadContacts } from '@/lib/pii';
 import { groupLeadsByChannel } from '@/lib/leadAttribution';
 
 export type TimeRange = '7d' | '30d' | '90d';
-
-/** One day's bucket while grouping; `visitors` is a Set until it is counted. */
-interface ViewsByDate {
-  name: string;
-  views: number;
-  visitors: Set<string>;
-}
 
 /**
  * A point on the views-over-time chart.
@@ -117,6 +110,94 @@ async function decryptRecentLeads(rows: EncryptedLeadRow[]): Promise<RecentLead[
   }));
 }
 
+/**
+ * One window's figures, counted by `analytics_summary()` (US-239).
+ *
+ * These used to be the lengths of arrays fetched with .limit(1000) (views,
+ * events) and .limit(500) (leads), so every total stopped at the cap, the
+ * conversion rate was a ratio of two capped numbers, and the chart lost its
+ * oldest days. The RPC counts in the database, inside the plan's history
+ * window (it is SECURITY INVOKER, so RLS on analytics_views /
+ * analytics_events applies).
+ */
+export interface AnalyticsSummary {
+  views: number;
+  visitors: number;
+  leads: number;
+  conversions: number;
+  /** lead_type → count; an empty type is 'contact', as it always was here. */
+  leadsByType: Record<string, number>;
+  /** Mean ms from arrival to first response, or null with none responded to. */
+  avgResponseMs: number | null;
+  /** Calendar days in the viewer's zone, oldest first; 'YYYY-MM-DD'. */
+  byDay: Array<{ day: string; views: number; visitors: number }>;
+  /** Event counts by type; `label` is the link's label for link_click only. */
+  events: Array<{ type: string; label: string | null; count: number }>;
+}
+
+export const EMPTY_SUMMARY: AnalyticsSummary = {
+  views: 0,
+  visitors: 0,
+  leads: 0,
+  conversions: 0,
+  leadsByType: {},
+  avgResponseMs: null,
+  byDay: [],
+  events: [],
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const toCount = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const records = (value: unknown): Record<string, unknown>[] =>
+  (Array.isArray(value) ? (value as unknown[]) : []).filter(isRecord);
+
+/** Reads the RPC's jsonb defensively; anything missing reads as zero. */
+export function toAnalyticsSummary(raw: Json | null | undefined): AnalyticsSummary {
+  if (!isRecord(raw)) return EMPTY_SUMMARY;
+  const byType = isRecord(raw.leads_by_type) ? raw.leads_by_type : {};
+  const avg = raw.avg_response_ms;
+  return {
+    views: toCount(raw.views),
+    visitors: toCount(raw.visitors),
+    leads: toCount(raw.leads),
+    conversions: toCount(raw.conversions),
+    leadsByType: Object.fromEntries(Object.entries(byType).map(([k, v]) => [k, toCount(v)])),
+    avgResponseMs: avg === null || avg === undefined ? null : toCount(avg),
+    byDay: records(raw.by_day).map((d) => ({
+      day: String(d.day ?? ''),
+      views: toCount(d.views),
+      visitors: toCount(d.visitors),
+    })),
+    events: records(raw.events).map((e) => ({
+      type: String(e.type ?? ''),
+      label: typeof e.label === 'string' ? e.label : null,
+      count: toCount(e.count),
+    })),
+  };
+}
+
+/** 'YYYY-MM-DD' → 'Oct 28', read as a local calendar date (not UTC midnight). */
+export function formatDayLabel(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  if (!y || !m || !d) return day;
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** The viewer's IANA zone, so a day on the chart is the agent's day. */
+function localTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
 export function useAnalytics(timeRange: TimeRange = '30d') {
   const { user } = useAuthStore();
 
@@ -141,49 +222,32 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     return date.toISOString();
   })();
 
-  // Fetch analytics views with optimizations
+  // Views, visitors, leads, conversions, the by-day chart and the interaction
+  // breakdown for the window, counted in the database (US-239).
   const {
-    data: views = [],
-    isLoading: viewsLoading,
-    isError: viewsError,
-    error: viewsErrorObj,
-    refetch: refetchViews,
+    data: summary = EMPTY_SUMMARY,
+    isLoading: summaryLoading,
+    isError: summaryError,
+    error: summaryErrorObj,
+    refetch: refetchSummary,
   } = useQuery({
-    queryKey: ['analytics-views', user?.id, timeRange],
+    queryKey: ['analytics-summary', user?.id, timeRange],
     queryFn: async () => {
-      if (!user?.id) return [];
-
-      const { data, error } = await supabase
-        .from('analytics_views')
-        // Only real, used columns. The table has no page_url/referrer columns —
-        // selecting them made every request error out ("column does not exist"),
-        // which the catch below swallowed as [], so analytics always read empty.
-        .select('viewed_at, visitor_id') // Only needed columns
-        .eq('user_id', user.id)
-        .gte('viewed_at', cutoffDate) // Filter by time range
-        .order('viewed_at', { ascending: false })
-        .limit(1000); // Hard limit for safety
-
-      // Table/view may not exist yet — return empty instead of throwing
-      if (error) {
-        if (
-          error.code === '42P01' ||
-          error.message?.includes('does not exist') ||
-          error.code === 'PGRST204'
-        ) {
-          return [];
-        }
-        throw error;
-      }
-      return data;
+      if (!user?.id) return EMPTY_SUMMARY;
+      const { data, error } = await supabase.rpc('analytics_summary', {
+        p_since: cutoffDate,
+        p_tz: localTimeZone(),
+      });
+      if (error) throw error;
+      return toAnalyticsSummary(data);
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes instead of 60 seconds
-    gcTime: 10 * 60 * 1000, // 10 minutes cache time
-    retry: false, // Don't retry if table doesn't exist
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
-  // Fetch leads for analytics with optimizations
+  // The latest leads, for the table and the channel breakdown. No total comes
+  // from here any more: this page stops at 500.
   const {
     data: leads = [],
     isLoading: leadsLoading,
@@ -220,150 +284,50 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
     gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
 
-  // Public interactions in the window: Call/Email/Text taps and link clicks.
-  const {
-    data: events = [],
-    isLoading: eventsLoading,
-    refetch: refetchEvents,
-  } = useQuery({
-    queryKey: ['analytics-events', user?.id, timeRange],
-    queryFn: async () => {
-      if (!user?.id) return [];
-
-      const { data, error } = await supabase
-        .from('analytics_events')
-        .select('event_type, target_label, occurred_at')
-        .eq('user_id', user.id)
-        .gte('occurred_at', cutoffDate)
-        .order('occurred_at', { ascending: false })
-        .limit(1000);
-
-      // The table arrived in 20260902000012. An environment that has not run
-      // the migration reports empty rather than breaking the whole page —
-      // the same tolerance analytics_views already has above.
-      if (error) {
-        if (
-          error.code === '42P01' ||
-          error.message?.includes('does not exist') ||
-          error.code === 'PGRST204'
-        ) {
-          return [];
-        }
-        throw error;
-      }
-      return data;
-    },
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    retry: false,
-  });
-
-  // Previous-window counts. Deliberately head-only counts rather than rows:
-  // the comparison needs totals, and pulling another 1,500 rows to length them
-  // would double the payload for no benefit.
-  const { data: previousCounts } = useQuery({
+  // The preceding window, counted the same way. It throws on error: it used to
+  // read a failed query's missing data as zero, and a zero previous period is
+  // what turns every trend into "+100%". A failed comparison now shows none.
+  const { data: previousSummary } = useQuery({
     queryKey: ['analytics-previous', user?.id, timeRange],
     queryFn: async () => {
-      if (!user?.id) return { views: 0, visitors: 0, leads: 0, conversions: 0 };
-
-      const [viewsResult, leadsResult] = await Promise.all([
-        supabase
-          .from('analytics_views')
-          .select('visitor_id')
-          .eq('user_id', user.id)
-          .gte('viewed_at', previousCutoffDate)
-          .lt('viewed_at', cutoffDate)
-          .limit(1000),
-        supabase
-          .from('leads')
-          .select('status')
-          .eq('user_id', user.id)
-          .gte('created_at', previousCutoffDate)
-          .lt('created_at', cutoffDate)
-          .limit(500),
-      ]);
-
-      const previousViews = viewsResult.data ?? [];
-      const previousLeads = leadsResult.data ?? [];
-
-      return {
-        views: previousViews.length,
-        visitors: new Set(previousViews.map((v) => v.visitor_id)).size,
-        leads: previousLeads.length,
-        conversions: previousLeads.filter((l) => l.status === 'converted').length,
-      };
+      if (!user?.id) return EMPTY_SUMMARY;
+      const { data, error } = await supabase.rpc('analytics_summary', {
+        p_since: previousCutoffDate,
+        p_until: cutoffDate,
+        p_tz: localTimeZone(),
+      });
+      if (error) throw error;
+      return toAnalyticsSummary(data);
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
-  /**
-   * Mean minutes between a lead arriving and the agent first responding, over
-   * the leads that were responded to. US-087: this was hardcoded 0 and shown
-   * on the KPI cards as though measured.
-   */
-  const avgResponseMinutes = (() => {
-    const spans: number[] = [];
-    for (const lead of leads as Array<{
-      created_at?: string | null;
-      first_responded_at?: string | null;
-    }>) {
-      if (!lead.created_at || !lead.first_responded_at) continue;
-      spans.push(new Date(lead.first_responded_at).getTime() - new Date(lead.created_at).getTime());
-    }
-    if (spans.length === 0) return null;
-    const total = spans.reduce((sum, span) => sum + span, 0);
-    return Math.round(total / spans.length / 60000);
-  })();
-
-  // Calculate stats from data
   const stats = {
-    totalViews: views.length,
-    uniqueVisitors: new Set(views.map((v) => v.visitor_id)).size,
-    totalLeads: leads.length,
+    totalViews: summary.views,
+    uniqueVisitors: summary.visitors,
+    totalLeads: summary.leads,
     /** Percentage points, not a formatted string — callers format it. */
-    conversionRate: views.length > 0 ? (leads.length / views.length) * 100 : 0,
-    /** null when no lead in the window has been responded to yet. */
-    avgResponseMinutes,
+    conversionRate: summary.views > 0 ? (summary.leads / summary.views) * 100 : 0,
+    /**
+     * Mean minutes between a lead arriving and the agent first responding, over
+     * the leads that were responded to; null when none has been yet. US-087:
+     * this was hardcoded 0 and shown on the KPI cards as though measured.
+     */
+    avgResponseMinutes:
+      summary.avgResponseMs === null ? null : Math.round(summary.avgResponseMs / 60000),
   };
 
-  // Group views by date for chart. The accumulator used to be `any`, which
-  // propagated all the way out: Object.entries below then produced
-  // `value: unknown`, and Analytics.tsx divided by it and rendered it.
-  const viewsByDate = views.reduce<Record<string, ViewsByDate>>((acc, view) => {
-    // viewed_at is nullable; an undated view belongs in no bucket rather than
-    // in a "Jan 1" one (new Date(null) is the epoch).
-    if (!view.viewed_at) return acc;
-    const date = new Date(view.viewed_at).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-    if (!acc[date]) {
-      acc[date] = { name: date, views: 0, visitors: new Set<string>() };
-    }
-    acc[date].views++;
-    if (view.visitor_id) {
-      acc[date].visitors.add(view.visitor_id);
-    }
-    return acc;
-  }, {});
-
-  const viewsData: ViewsDatum[] = Object.values(viewsByDate).map((day) => ({
-    name: day.name,
+  // Bucketed by the server in the viewer's zone, oldest first, so no day is
+  // lost to a row cap and an undated view lands in no bucket.
+  const viewsData: ViewsDatum[] = summary.byDay.map((day) => ({
+    name: formatDayLabel(day.day),
     views: day.views,
-    visitors: day.visitors.size,
+    visitors: day.visitors,
   }));
 
-  // Group leads by type
-  const leadsByType = leads.reduce<Record<string, number>>((acc, lead) => {
-    const type = lead.lead_type || 'contact';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {});
-
-  const leadsData: LeadsDatum[] = Object.entries(leadsByType).map(([name, value]) => ({
+  const leadsData: LeadsDatum[] = Object.entries(summary.leadsByType).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value,
   }));
@@ -382,48 +346,54 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
   // zero, so a week with no email taps reads as zero rather than as absence.
   const contactTaps: InteractionDatum[] = Object.entries(CONTACT_LABELS).map(([type, name]) => ({
     name,
-    value: events.filter((e) => e.event_type === type).length,
+    value: summary.events.filter((e) => e.type === type).reduce((sum, e) => sum + e.count, 0),
   }));
 
   const totalContactTaps = contactTaps.reduce((sum, row) => sum + row.value, 0);
 
   // Link clicks in the same window, per link. `links.click_count` is a lifetime
   // total and cannot answer "this month", which is what the page is asking.
-  const linkClickEvents = events.filter((e) => e.event_type === 'link_click');
-  const linkClicksByLabel = linkClickEvents.reduce<Record<string, number>>((acc, event) => {
-    const name = event.target_label || 'Untitled link';
-    acc[name] = (acc[name] || 0) + 1;
-    return acc;
-  }, {});
+  const linkClicksByLabel = summary.events
+    .filter((e) => e.type === 'link_click')
+    .reduce<Record<string, number>>((acc, event) => {
+      const name = event.label || 'Untitled link';
+      acc[name] = (acc[name] || 0) + event.count;
+      return acc;
+    }, {});
   const linkClicks: InteractionDatum[] = Object.entries(linkClicksByLabel)
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  const previousStats = previousCounts ?? { views: 0, visitors: 0, leads: 0, conversions: 0 };
+  const previousStats = {
+    views: previousSummary?.views ?? 0,
+    visitors: previousSummary?.visitors ?? 0,
+    leads: previousSummary?.leads ?? 0,
+    conversions: previousSummary?.conversions ?? 0,
+  };
 
   return {
     stats,
     previousStats,
     /**
      * False when the preceding window holds no data at all — a first-week
-     * account. Showing "+100%" against zero is worse than showing nothing.
+     * account — or could not be read. Showing "+100%" against zero is worse
+     * than showing nothing.
      */
-    hasPreviousPeriod: (previousCounts?.views ?? 0) + (previousCounts?.leads ?? 0) > 0,
+    hasPreviousPeriod: previousStats.views + previousStats.leads > 0,
     viewsData,
     leadsData,
     leadsByChannel,
     contactTaps,
     totalContactTaps,
     linkClicks,
-    totalLinkClicks: linkClickEvents.length,
+    totalLinkClicks: linkClicks.reduce((sum, row) => sum + row.value, 0),
     recentLeads: leads.slice(0, 10),
-    isLoading: viewsLoading || leadsLoading || eventsLoading,
-    isError: viewsError || leadsError,
-    error: viewsErrorObj || leadsErrorObj,
+    isLoading: summaryLoading || leadsLoading,
+    isError: summaryError || leadsError,
+    error: summaryErrorObj || leadsErrorObj,
     refetch: () => {
-      refetchViews();
+      refetchSummary();
       refetchLeads();
-      refetchEvents();
     },
     timeRange,
   };

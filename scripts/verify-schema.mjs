@@ -2059,6 +2059,69 @@ check('a signup records who referred it, and the agent cannot rewrite it', () =>
   return out;
 });
 
+// US-239: the Analytics totals were array lengths of pages capped at 1,000
+// views and 500 leads. analytics_summary() counts in the database — past those
+// caps — and must still stop at the plan's history window, and at the caller.
+check('analytics_summary counts past the old row caps, inside the plan history window', () => {
+  const out = [];
+  const me = '00000000-dead-beef-0000-0000000a2391';
+  const other = '00000000-dead-beef-0000-0000000a2392';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${me}', 'sum1@example.test'), ('${other}', 'sum2@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.analytics_views (user_id, visitor_id, viewed_at)
+         SELECT '${me}', 'v' || (g % 300), now() - make_interval(hours => g % 72)
+           FROM generate_series(1, 1500) g;
+       -- Older than the free plan's 30-day window: hidden, even when asked for.
+       INSERT INTO public.analytics_views (user_id, visitor_id, viewed_at)
+         SELECT '${me}', 'old', now() - interval '200 days' FROM generate_series(1, 10);
+       INSERT INTO public.analytics_views (user_id, visitor_id, viewed_at)
+         SELECT '${other}', 'x', now() FROM generate_series(1, 5);
+       INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, status)
+         SELECT '${me}', (ARRAY['buyer', 'seller'])[1 + g % 2], 'S' || g, 'enc',
+                CASE WHEN g % 10 = 0 THEN 'converted' ELSE 'new' END
+           FROM generate_series(1, 600) g;
+       -- One visitor each: throttle_analytics_events caps a single visitor's burst.
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_label)
+         SELECT '${me}', 'e' || g, 'link_click', 'Zillow' FROM generate_series(1, 1200) g;`);
+    const [raw] = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}';
+      SELECT public.analytics_summary(now() - interval '365 days', NULL, 'America/Chicago')::text;`);
+    const s = JSON.parse(raw);
+    if (s.views !== 1500) out.push(`views is ${s.views}, expected 1500 (past the old 1,000 cap, none older than the plan window)`);
+    if (s.visitors !== 300) out.push(`visitors is ${s.visitors}, expected 300`);
+    const dayTotal = (s.by_day ?? []).reduce((n, d) => n + d.views, 0);
+    if (dayTotal !== 1500) out.push(`by_day sums to ${dayTotal}, expected 1500`);
+    if (s.leads !== 600) out.push(`leads is ${s.leads}, expected 600 (past the old 500 cap)`);
+    if (s.conversions !== 60) out.push(`conversions is ${s.conversions}, expected 60`);
+    if (s.leads_by_type?.buyer !== 300) out.push(`leads_by_type.buyer is ${s.leads_by_type?.buyer}, expected 300`);
+    const zillow = (s.events ?? []).find((e) => e.type === 'link_click' && e.label === 'Zillow');
+    if (zillow?.count !== 1200) out.push(`Zillow link clicks are ${zillow?.count}, expected 1200`);
+    const [prev] = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}';
+      SELECT public.analytics_summary(now() - interval '400 days', now() - interval '100 days')::text;`);
+    const p = JSON.parse(prev);
+    if (p.views !== 0) out.push(`a window behind the plan's history limit counted ${p.views} views, expected 0`);
+    try {
+      q(`SET ROLE anon; SELECT public.analytics_summary(now() - interval '1 day');`);
+      out.push('anon can call analytics_summary');
+    } catch {
+      /* expected */
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.analytics_events WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.analytics_views WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.leads WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${me}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${me}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // US-236: lead ownership and lead dates are not the agent's to rewrite.
 //   * locked_lead_ids() ranks a month's leads by created_at, and plan_usage()
