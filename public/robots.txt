@@ -2,7 +2,9 @@
 User-agent: *
 Allow: /
 Disallow: /api/
-Disallow: /dashboard/
+# /dashboard/ is no longer disallowed either (US-242), for the same reason:
+# it, /admin, /onboarding/* and /team/* now carry X-Robots-Tag: noindex in
+# public/_headers, and a Disallow here would hide that header from the crawler.
 # /auth/ is deliberately NOT disallowed (US-151). Disallow stops the crawl,
 # not the indexing: Google indexed /auth/login from links alone (114
 # impressions in 16 months) and could never fetch the noindex that would

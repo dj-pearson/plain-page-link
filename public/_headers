@@ -25,6 +25,31 @@
 /auth/*
   X-Robots-Tag: noindex, follow
 
+# The signed-in app, and the invite links into it (US-242). _redirects answers
+# each of these with index.html under a 200 — which since US-147 is the
+# prerendered homepage — so without a header every /dashboard/* or /team/<token>
+# URL a crawler found was one more copy of the homepage. Bare /dashboard and
+# /admin are listed separately rather than as /dashboard*, which would also
+# match a username that merely starts with the word. robots.txt must not
+# Disallow these paths: a crawler that may not fetch a URL never sees this.
+/dashboard
+  X-Robots-Tag: noindex, nofollow
+
+/dashboard/*
+  X-Robots-Tag: noindex, nofollow
+
+/admin
+  X-Robots-Tag: noindex, nofollow
+
+/admin/*
+  X-Robots-Tag: noindex, nofollow
+
+/onboarding/*
+  X-Robots-Tag: noindex, nofollow
+
+/team/*
+  X-Robots-Tag: noindex, nofollow
+
 # Everything else under /assets/ carries a content hash in its name, so a year
 # is right and immutable is honest.
 # /*.tsx and /*.ts stood here too, declaring TypeScript source to be

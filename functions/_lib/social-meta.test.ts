@@ -11,6 +11,7 @@ import {
   injectSocialTags,
   isCrawler,
   isReservedSegment,
+  replaceRootContent,
   type ListingMeta,
   type ProfileMeta,
 } from './social-meta';
@@ -177,7 +178,9 @@ describe('injectSocialTags', () => {
     expect(out).toContain('content="https://cdn.example.com/jane.jpg"');
     expect(out).toContain('rel="canonical" href="https://agentbio.net/jane"');
     expect(out).toContain('"@type":"RealEstateAgent"');
-    expect(out).toContain('<div id="root"></div>');
+    expect(out).toContain(
+      '<div id="root"><main><h1>Jane Doe — Associate Broker at Summit Realty</h1>'
+    );
   });
 
   it('escapes a name that would otherwise break out of the attribute', () => {
@@ -204,5 +207,23 @@ describe('injectSocialTags', () => {
     expect(injectSocialTags(INDEX, buildProfileTags(profile, ORIGIN))).toContain(
       'name="twitter:card" content="summary_large_image"'
     );
+  });
+});
+
+describe('replaceRootContent', () => {
+  it('replaces the whole of #root, not up to its first nested </div>', () => {
+    const html =
+      '<body><div id="root"><div><div>a</div><div>b</div></div><p>c</p></div><div id="portal"></div></body>';
+    expect(replaceRootContent(html, '<h1>x</h1>')).toBe(
+      '<body><div id="root"><h1>x</h1></div><div id="portal"></div></body>'
+    );
+  });
+
+  it('leaves a document without #root, or with an unbalanced one, unchanged', () => {
+    expect(replaceRootContent('<body><main></main></body>', 'x')).toBe(
+      '<body><main></main></body>'
+    );
+    const unbalanced = '<body><div id="root"><div>open</body>';
+    expect(replaceRootContent(unbalanced, 'x')).toBe(unbalanced);
   });
 });

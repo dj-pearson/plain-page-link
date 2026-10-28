@@ -9,12 +9,24 @@
  * an app route, or fail the page when the database is unreachable.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { onRequestGet } from '../[username]';
 
-const INDEX_HTML = `<!DOCTYPE html><html><head>
-  <meta property="og:image" content="https://agentbio.net/Cover.png" />
-  <title>Real Estate Agent Bio Page Builder – AgentBio</title>
-</head><body><div id="root"></div></body></html>`;
+/**
+ * What next() really returns for /:username: dist/index.html, which since
+ * US-147 is the PRERENDERED HOMEPAGE — Landing's full body in #root, the
+ * helmet-managed tags (data-rh="true") and the homepage's JSON-LD @graph.
+ *
+ * This used to be a five-line shell with an empty #root, which is why the
+ * suite passed while every crawler got the homepage's body and its
+ * WebSite/SoftwareApplication/FAQPage graph under an agent's URL (US-242).
+ * The fixture is the real `vite build` index.html with Landing rendered into
+ * it and serialised the way scripts/prerender.mts does (duplicate tags
+ * removed in favour of the data-rh ones). Regenerate it if the homepage's
+ * head changes shape.
+ */
+const INDEX_HTML = readFileSync(join(__dirname, 'fixtures', 'prerendered-index.html'), 'utf8');
 
 const NOT_FOUND_HTML = `<!DOCTYPE html><html><head>
   <title>Page not found | AgentBio</title>
@@ -33,6 +45,7 @@ const ENV = {
 };
 
 const PROFILE_ROW = {
+  id: 'profile-jane',
   username: 'jane',
   full_name: 'Jane Doe',
   bio: 'Fifteen years on the east bench.',
@@ -113,6 +126,79 @@ describe('GET /:username', () => {
     expect(html).toContain('<title>Jane Doe — Associate Broker at Summit Realty</title>');
     expect(html).toContain('content="https://cdn.example.com/jane.jpg"');
     expect(html).not.toContain('Cover.png');
+  });
+
+  it("does not serve the homepage's body or structured data under the agent's URL (US-242)", async () => {
+    // The fixture really is the homepage; prove it, or the rest proves nothing.
+    expect(INDEX_HTML).toContain('"@type":"SoftwareApplication"');
+    expect(INDEX_HTML).toContain('"@type":"FAQPage"');
+    expect(INDEX_HTML).toContain('<main id="main-content"');
+
+    const html = await (await call({}).promise).text();
+
+    for (const type of ['WebSite', 'SoftwareApplication', 'FAQPage', 'ProfessionalService']) {
+      expect(html, type).not.toContain(`"@type":"${type}"`);
+    }
+    expect(html.match(/application\/ld\+json/g)).toHaveLength(1);
+    expect(html).toContain('"@type":"RealEstateAgent"');
+
+    expect(html).not.toContain('id="main-content"');
+    expect(html).not.toContain('Link in Bio for Real Estate Agents');
+    expect(html).toContain(
+      '<div id="root"><main><h1>Jane Doe — Associate Broker at Summit Realty</h1><p>Fifteen years on the east bench.</p></main></div>'
+    );
+    // Exactly one of each head tag, all the agent's.
+    expect(html.match(/<title>/g)).toHaveLength(1);
+    expect(html.match(/rel="canonical"/g)).toHaveLength(1);
+    expect(html.match(/property="og:title"/g)).toHaveLength(1);
+    expect(html.match(/name="description"/g)).toHaveLength(1);
+    expect(html).toContain('href="https://agentbio.net/jane"');
+    // The app still boots for a crawler that runs scripts.
+    expect(html).toMatch(
+      /<script type="module" crossorigin="" src="\/assets\/index-[^"]+\.js"><\/script>/
+    );
+  });
+
+  it('301s a mixed-case username to the lowercase URL instead of a 404 (US-242)', async () => {
+    for (const userAgent of [CRAWLER, HUMAN]) {
+      fetchMock.mockClear();
+      const { promise, next } = call({
+        path: '/JaneDoe?listing=abc-123',
+        username: 'JaneDoe',
+        userAgent,
+      });
+      const response = await promise;
+      expect(response.status, userAgent).toBe(301);
+      expect(response.headers.get('location')).toBe('https://agentbio.net/janedoe?listing=abc-123');
+      expect(next).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  });
+
+  it('does not redirect an app route that happens to be capitalised', async () => {
+    const { promise, next } = call({ path: '/Dashboard', username: 'Dashboard' });
+    expect((await promise).status).toBe(200);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it("only resolves a ?listing= that belongs to the profile's agent (US-242)", async () => {
+    await call({ path: '/jane?listing=abc-123' }).promise;
+    const listingUrl = fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .find((url) => url.includes('/rest/v1/listings'));
+    expect(listingUrl).toContain('id=eq.abc-123');
+    expect(listingUrl).toContain('user_id=eq.profile-jane');
+
+    // PostgREST answers [] when the id is someone else's: the agent's card stays.
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+      if (url.includes('user_id=eq.profile-jane')) return Response.json([]);
+      return Response.json([LISTING_ROW]);
+    });
+    const html = await (await call({ path: '/jane?listing=abc-123' }).promise).text();
+    expect(html).not.toContain('412 Maple Avenue');
+    expect(html).toContain('<title>Jane Doe — Associate Broker at Summit Realty</title>');
   });
 
   it('leaves a person the SPA untouched, and does not query the database for them', async () => {
