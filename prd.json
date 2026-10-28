@@ -3770,8 +3770,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "useAnalytics.ts:165,210,239,271-285; consumers Analytics.tsx:412 (CSV 228-231), Overview, QuickActionsDashboard, InsightsWidget. US-225 added lead_stats(); reuse the pattern. Migration slot if needed: 20261028000007."
+      "passes": true,
+      "notes": "useAnalytics.ts:165,210,239,271-285; consumers Analytics.tsx:412 (CSV 228-231), Overview, QuickActionsDashboard, InsightsWidget. US-225 added lead_stats(); reuse the pattern. Migration slot if needed: 20261028000007. DONE: useAnalytics totals (views, visitors, leads, conversion, avg response, lead-type and interaction breakdowns, views-by-day chart) and the previous period come from analytics_summary() (migration 20261028000007; SECURITY INVOKER on auth.uid() like lead_stats, plus explicit analytics_visible_since() so counts never pass the plan's history window; anon revoked). Days bucketed in the viewer's IANA zone, oldest first (DEVIATION: chart was newest-first). Previous-period query throws on error, so a failure hides the comparison instead of reading +100%. verify-schema check (1,500 views, 600 leads, 1,200 clicks; window past plan limit counts 0; anon refused) failed before, passes after; useAnalytics.test.ts asserts 1,500 views yields 1,500. leadsByChannel and recentLeads still come from the latest-500 page. Owner: apply 20261028000007 — until then the Analytics page errors."
     },
     {
       "id": "US-240",

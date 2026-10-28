@@ -4735,3 +4735,10 @@ landing hero re-hides its painted H1 (LCP).
   28th in California — so it showed "due today" and "overdue" a day early,
   and the "today" prefill was tomorrow after 5pm. Now end of the local day;
   old rows are read as their calendar day. Same fix for listed/sold dates.
+
+## Site improvement loop — iteration 8/15 — US-239: analytics stopped counting at 1,000
+
+- Total Views was views.length of a 1,000-row page; leads of a 500-row page;
+  the comparison query ignored its error and read +100%. One aggregate RPC
+  (analytics_summary) now counts inside the plan's history window, buckets
+  days in the agent's time zone, and a failed comparison is hidden.
