@@ -4728,3 +4728,10 @@ landing hero re-hides its painted H1 (LCP).
   to 5 MB each) and five were preloaded at high priority. Cards and the
   carousel now use srcset with a fallback to the original for old uploads;
   one image is preloaded.
+
+## Site improvement loop — iteration 7/15 — US-240: follow-ups came due a day early in the US
+
+- A follow-up picked for the 29th was stored as UTC midnight — 5pm on the
+  28th in California — so it showed "due today" and "overdue" a day early,
+  and the "today" prefill was tomorrow after 5pm. Now end of the local day;
+  old rows are read as their calendar day. Same fix for listed/sold dates.

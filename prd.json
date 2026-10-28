@@ -3784,8 +3784,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "LeadDetailModal.tsx:253,272,692; DueFollowUps.tsx:27,44; Listings.tsx:169; helper toCalendarDate in src/lib/keyDates.ts."
+      "passes": true,
+      "notes": "LeadDetailModal.tsx:253,272,692; DueFollowUps.tsx:27,44; Listings.tsx:169; helper toCalendarDate in src/lib/keyDates.ts. DONE: Date-only inputs go through src/lib/localDate.ts. Follow-up due dates are stored as the end of the agent's local day (dueDateToIso); the today/in-a-week prefill uses the local date. DueFollowUps and the modal timeline read due dates with taskDueAt, which treats pre-fix rows (UTC midnight) as that calendar day — no data migration. listed_date, sold_date, testimonial date and the admin search-analytics range/picker use the local date. The morning digest's task cutoff is noon UTC tomorrow so a task due today in the US is still included (DEVIATION: outside named files; zones beyond UTC+12 may see tomorrow's task a day early). Tests run under TZ=America/Los_Angeles; 3 failed on the old code. Not changed: execute-workflow server-side due dates, audit-log filter (UTC). Owner: redeploy scheduled-maintenance."
     },
     {
       "id": "US-241",
