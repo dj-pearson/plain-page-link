@@ -35,7 +35,8 @@ import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
 import { GDPRSettings } from '@/components/settings/GDPRSettings';
 
 export default function Settings() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const { settings, updateSettings } = useSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -154,8 +155,12 @@ export default function Settings() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
+      // US-241: the dashboard header's copy/share/view links read the auth
+      // store, not ['profile']. Without this they kept sharing the old,
+      // now-dead address until a reload.
+      await refreshProfile();
       toast({
         title: 'Profile updated',
         description: 'Your profile has been updated successfully.',

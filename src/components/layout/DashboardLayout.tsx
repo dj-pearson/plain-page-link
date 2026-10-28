@@ -14,7 +14,9 @@ import { PRIMARY_NAV } from '@/config/dashboard-nav';
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, signOut, role } = useAuthStore();
+  const profile = useAuthStore((s) => s.profile);
+  const signOut = useAuthStore((s) => s.signOut);
+  const role = useAuthStore((s) => s.role);
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
