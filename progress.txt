@@ -4786,3 +4786,46 @@ landing hero re-hides its painted H1 (LCP).
 - Every page downloaded all of Radix for one Slot import; the profile
   downloaded GSAP (landing-only) and five modals it may never open. Entry
   219→183 KB gzip, profile route +166→+116 KB, /demo 70→56 requests.
+
+## Site improvement loop — iteration 15/15 — US-237: a photo upload erased the agent's profile edits
+
+- The form re-hydrated on every refetch, so uploading a photo erased every
+  typed edit. A failed phone decrypt put ciphertext in the form and the next
+  save encrypted it again — permanently. Hydrate once; avatar patches the
+  cache; an undecrypted phone is never saved; real errors shown inline;
+  mobile save bar; unsaved-changes warning.
+
+---
+
+## The site improvement loop, in one paragraph
+
+Fifteen stories, US-233 to US-247, from five parallel audits, run by one
+agent per story in an isolated worktree and integrated here one at a time.
+The four security stories each closed a door a signup or the anon key could
+walk through: a forged SAML response minted a login for any account, six SEO
+functions logged a failed auth check and carried on, any signed-in user could
+list every agent's Zapier webhook, and a locked lead could be backdated open.
+The middle six were data the product quietly lost or misstated — onboarding
+answers, profile edits, a double-encrypted phone, analytics capped at 1,000,
+due dates a day early west of UTC, a share link to a username that no longer
+existed — and Google seeing the homepage on every agent's URL. The last five
+were the visitor's phone: resized photos that existed and were never used,
+40 KB of modals and a whole Radix chunk nobody opened, controls with no
+names, a leads screen wider than the screen, and a page painted blue over
+the agent's chosen colours. Final state: tsc clean, 1254 unit tests (from
+1049), all migrations applied in one pass, every verify-schema check passing,
+production build and bundle budget OK.
+
+Owner actions:
+- Apply migrations 20261028000003 (deploy with the frontend — old clients'
+  profiles select('*') is refused), 20261028000004, 20261028000007 (Analytics
+  page errors until applied).
+- Redeploy edge functions: sso-initiate, sso-callback, the SEO functions,
+  apply-seo-fixes, trigger-rebuild, scheduled-maintenance, admin-users.
+- Orgs on SAML/Okta/Azure AD SSO must move to OIDC until XML-DSig exists.
+
+Follow-ups found (not done): SSO listUsers paging and mapped-account email;
+SAML options still offered in SSOConfigForm; ui-vendor still on the profile
+via UpcomingOpenHouses' dropdown; whole-store useAuthStore() reads
+(MobileNav and ~40 hooks); browser back button not covered by the
+unsaved-changes guard; plus the "Not included" list above.

@@ -3740,8 +3740,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Profile.tsx:61-103 effect re-runs on refetch; useAvatarUpload.ts:89 invalidates; useProfile.ts:52 `?? profileData.phone`; pii.ts:163-175 returns null on error; Profile.tsx:205-211."
+      "passes": true,
+      "notes": "Profile.tsx:61-103 effect re-runs on refetch; useAvatarUpload.ts:89 invalidates; useProfile.ts:52 `?? profileData.phone`; pii.ts:163-175 returns null on error; Profile.tsx:205-211. DONE: Profile.tsx hydrates from the server once (ref guard) and keeps a saved baseline for \"unsaved\". useAvatarUpload patches avatar_url in the cached profile (setQueryData) instead of invalidating, and the form applies it with a functional update, so typed edits survive. decryptOwnProfilePhone throws on failure (or when pii-crypto returns a value still prefixed enc:v1:); useProfile returns phone null with phoneUnavailable: true, the form leaves phone out of a save unless the agent types a new one, and updateProfile never re-encrypts ciphertext. A failed save shows the real reason inline; plan-limit refusals show the trigger's message with a link to /dashboard/subscription. A fixed save bar sits above MobileNav on phones (safe-area aware). Unsaved changes warn via beforeunload and an in-app link confirm (useUnsavedChangesWarning). DEVIATIONS: BrowserRouter has no useBlocker, so the browser back button is not covered; chose \"exclude phone\" over failing the query so a pii-crypto outage does not block the editor. Tests: Profile.test.tsx (9), useProfile.test.ts (+4), pii.test.ts (+2); 14 failed on the old code."
     },
     {
       "id": "US-238",
