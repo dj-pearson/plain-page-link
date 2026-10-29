@@ -19,17 +19,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
 
-const { profileMock, subscriptionMock, updateMock } = vi.hoisted(() => ({
+const { profileMock, subscriptionMock, updateMock, refreshProfileMock } = vi.hoisted(() => ({
   profileMock: vi.fn(),
   subscriptionMock: vi.fn(),
   updateMock: vi.fn(),
+  refreshProfileMock: vi.fn(),
 }));
 
 const USER = { id: '11111111-1111-1111-1111-111111111111', email: 'agent@example.test' };
 
 vi.mock('@/hooks/useProfile', () => ({ useProfile: () => profileMock() }));
 vi.mock('@/hooks/useSubscription', () => ({ useSubscription: () => subscriptionMock() }));
-vi.mock('@/stores/useAuthStore', () => ({ useAuthStore: () => ({ user: USER }) }));
+vi.mock('@/stores/useAuthStore', () => ({
+  useAuthStore: (selector: (s: { user: typeof USER; refreshProfile: () => unknown }) => unknown) =>
+    selector({ user: USER, refreshProfile: refreshProfileMock }),
+}));
 vi.mock('@/hooks/useSettings', () => ({
   useSettings: () => ({ settings: null, isLoading: false, updateSettings: { mutate: vi.fn() } }),
 }));
@@ -138,6 +142,27 @@ describe('Settings username change', () => {
     profileMock.mockReturnValue({ profile: PROFILE, isLoading: false });
     subscriptionMock.mockReturnValue({ subscription: null, isLoading: false });
     updateMock.mockReset();
+    refreshProfileMock.mockReset();
+    refreshProfileMock.mockResolvedValue(null);
+  });
+
+  // US-241: the dashboard header's copy/share/view links read the auth store.
+  // Only ['profile'] was invalidated, so they kept the old, dead address.
+  it('refreshes the auth store profile once the new username is saved', async () => {
+    renderWithProviders(<Settings />);
+
+    const username = await screen.findByDisplayValue('janedoe');
+    await userEvent.clear(username);
+    await userEvent.type(username, 'janerivers');
+    await userEvent.click(screen.getByRole('button', { name: /save profile changes/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /change it/i }));
+
+    await waitFor(() => expect(refreshProfileMock).toHaveBeenCalledTimes(1));
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ username: 'janerivers' }));
+    // The store is read after the write, not before it.
+    expect(updateMock.mock.invocationCallOrder[0]).toBeLessThan(
+      refreshProfileMock.mock.invocationCallOrder[0]
+    );
   });
 
   it('warns that shared links will break before moving the address', async () => {

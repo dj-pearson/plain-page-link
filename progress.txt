@@ -4651,3 +4651,181 @@ that was run against the tree before its fix and watched to fail. Owner
 actions are listed in the prd notes: apply migrations 20260930000001–10, set
 SENTRY_DSN / VITE_SENTRY_DSN, add uptime monitors, and check Stripe for
 customers already holding two live subscriptions.
+
+---
+
+## Site Improvement Loop — 2026-10-28 (stories US-233 to US-247 added)
+
+Five parallel read-only audits: security, performance (measured build),
+UI/UX journeys, accessibility + technical SEO, reliability/data. Every story
+cites file:line evidence in its notes. Baseline: tsc clean, 1049 unit tests pass.
+
+  P1  US-233  Forged SAML responses sign in as any user
+      US-234  Unauthenticated SEO functions (SSRF, LLM spend) + trigger-rebuild
+      US-235  authenticated reads every agent's Zapier webhook / plan
+      US-236  Leads backdated to unlock; assignee re-owns lead; anon reviews
+  P2  US-237  Profile editor wipes edits on photo upload; phone double-encrypted
+      US-238  Onboarding loses everything on a failed save
+      US-239  Analytics totals capped at 1,000 views / 500 leads
+      US-240  Task due dates a day early west of UTC
+      US-241  Username change leaves dashboard sharing a dead link
+      US-242  Crawlers see the homepage on /:username; case 404; noindex
+  P3  US-243  Profile serves full-size photos (resized variants unused)
+      US-244  Entry/profile chunks: GSAP+framer bundled, Radix for Slot, eager modals
+      US-245  Public profile a11y: lightbox, unnamed controls, contrast
+      US-246  Leads on a phone: toolbar overflow, empty email rows, 44px targets
+      US-247  Theme-token gradients, sample-data generated columns, link reorder
+
+Not included (still worth doing): server-side login lockout (GoTrue hook /
+proxy rate limit) and the pending aal2 migration; HMAC-signed OAuth state;
+PII in three edge-function logs; contacts list past 2,000 (infinite query);
+digest paging past 5,000 profiles; 3D theme backgrounds load 213 KB eagerly;
+landing hero re-hides its painted H1 (LCP).
+
+## Site improvement loop — iteration 1/15 — US-233: a forged SAML response signed in as anyone
+
+- A hand-made, unsigned SAMLResponse plus a requestId from the public
+  sso-initiate was enough for a magic link to any account. SAML-family
+  providers are refused until signatures are verified; OIDC now checks
+  iss/aud/exp/nonce/email_verified and the org domain before generateLink.
+- 27 unit tests (_shared/sso.test.ts); 3 failed against the old functions.
+
+## Site improvement loop — iteration 2/15 — US-238: a failed onboarding save erased the agent's answers
+
+- The saving spinner replaced the wizard, so a failed save reset it to step 1
+  with blank fields. Saving is now an overlay; failure keeps everything and
+  shows an inline error. "Your Profile is Live!" appears only after the save.
+- The first listing gets real city/state fields instead of a comma split, and
+  is never created with an empty city or a '0' price.
+
+## Site improvement loop — iteration 3/15 — US-236: a locked lead unlocked by changing its date
+
+- An agent could UPDATE a locked lead's created_at into an empty month and
+  pii-crypto would decrypt it; an assignee could set user_id to themselves.
+  Both columns are now frozen by trigger; the anon testimonial insert
+  backstop is gone. Three verify-schema checks failed before, pass after.
+
+## Site improvement loop — iteration 4/15 — US-234: internal SEO tools ran for anyone
+
+- Six SEO functions swallowed requireAuth in a try/catch and carried on, so
+  the anon key bought a service-role fetch of any URL (internal Docker hosts)
+  and paid LLM calls. trigger-rebuild accepted "Bearer x". All now admin-only
+  (or service role for the scheduler), with safeFetch on every caller URL.
+- Found on the way: the scheduled audit's four other checks had been 401ing
+  since US-078. Fixed.
+
+## Site improvement loop — iteration 5/15 — US-242: Google saw the homepage on every agent's URL
+
+- Every /:username response to a crawler carried the homepage's body and
+  its FAQ/Software JSON-LD under the agent's title. Body and schema are now
+  the agent's. /JaneDoe 301s to /janedoe instead of 404; ?listing= must belong
+  to that agent; dashboard/admin/onboarding/team send X-Robots-Tag noindex.
+
+## Site improvement loop — iteration 6/15 — US-243: the profile page downloaded full-size photos
+
+- optimize-image had been writing 200/400/800 webp variants of every listing
+  photo since US-032 and nothing read them; phones downloaded originals (up
+  to 5 MB each) and five were preloaded at high priority. Cards and the
+  carousel now use srcset with a fallback to the original for old uploads;
+  one image is preloaded.
+
+## Site improvement loop — iteration 7/15 — US-240: follow-ups came due a day early in the US
+
+- A follow-up picked for the 29th was stored as UTC midnight — 5pm on the
+  28th in California — so it showed "due today" and "overdue" a day early,
+  and the "today" prefill was tomorrow after 5pm. Now end of the local day;
+  old rows are read as their calendar day. Same fix for listed/sold dates.
+
+## Site improvement loop — iteration 8/15 — US-239: analytics stopped counting at 1,000
+
+- Total Views was views.length of a 1,000-row page; leads of a 500-row page;
+  the comparison query ignored its error and read +100%. One aggregate RPC
+  (analytics_summary) now counts inside the plan's history window, buckets
+  days in the agent's time zone, and a failed comparison is hidden.
+
+## Site improvement loop — iteration 9/15 — US-245: public profile controls had no names
+
+- The page-builder gallery lightbox had no dialog role, no Escape and
+  unnamed buttons; thumbnails were divs. Photo arrows, review arrows, the
+  mobile Filters/Sort buttons and review stars had no accessible name.
+  Error red measured 3.76:1 (light) and 2.00:1 (dark); now 5.61 and 7.23.
+
+## Site improvement loop — iteration 10/15 — US-246: working leads from a phone fought the layout
+
+- Seven controls (~600px) in a row that could not wrap pushed the whole
+  dashboard sideways on a phone. Phone-only leads (since US-228) showed an
+  empty mailto:null row; call links were ~16px tall. Overview showed zeros
+  when analytics failed. All fixed; 44px targets with names throughout.
+
+## Site improvement loop — iteration 11/15 — US-235: any signed-in user could read every agent's webhook
+
+- US-073 revoked profiles from anon only; any free signup could list every
+  agent's Zapier webhook, notification settings and referrer, and read any
+  agent's plan. authenticated now gets the public column set; the owner's
+  full row comes from get_own_profile(); get_user_plan asserts the caller.
+- Merged with US-236/239: one-pass apply of all migrations + full
+  verify-schema + types:check all clean.
+
+## Site improvement loop — iteration 12/15 — US-247: the agent's page ignored the agent's colours
+
+- The public profile painted blue→purple over the theme the agent chose,
+  because bg-primary read the dashboard's --primary. It now reads the
+  agent's theme. Sample listings never inserted (generated columns written);
+  the schema-reference test now catches that class. Link arrows renumber.
+
+## Site improvement loop — iteration 13/15 — US-241: a renamed agent kept sharing the old link
+
+- After a rename the auth store kept the old username, so "View my page"
+  and Copy link pointed at a URL that no longer resolves. The store is
+  refreshed after the save; a transient fetch error no longer nulls the
+  profile; App and DashboardLayout subscribe through selectors and the
+  signed-in profile is fetched once on load instead of twice.
+
+## Site improvement loop — iteration 14/15 — US-244: every page paid for code it never ran
+
+- Every page downloaded all of Radix for one Slot import; the profile
+  downloaded GSAP (landing-only) and five modals it may never open. Entry
+  219→183 KB gzip, profile route +166→+116 KB, /demo 70→56 requests.
+
+## Site improvement loop — iteration 15/15 — US-237: a photo upload erased the agent's profile edits
+
+- The form re-hydrated on every refetch, so uploading a photo erased every
+  typed edit. A failed phone decrypt put ciphertext in the form and the next
+  save encrypted it again — permanently. Hydrate once; avatar patches the
+  cache; an undecrypted phone is never saved; real errors shown inline;
+  mobile save bar; unsaved-changes warning.
+
+---
+
+## The site improvement loop, in one paragraph
+
+Fifteen stories, US-233 to US-247, from five parallel audits, run by one
+agent per story in an isolated worktree and integrated here one at a time.
+The four security stories each closed a door a signup or the anon key could
+walk through: a forged SAML response minted a login for any account, six SEO
+functions logged a failed auth check and carried on, any signed-in user could
+list every agent's Zapier webhook, and a locked lead could be backdated open.
+The middle six were data the product quietly lost or misstated — onboarding
+answers, profile edits, a double-encrypted phone, analytics capped at 1,000,
+due dates a day early west of UTC, a share link to a username that no longer
+existed — and Google seeing the homepage on every agent's URL. The last five
+were the visitor's phone: resized photos that existed and were never used,
+40 KB of modals and a whole Radix chunk nobody opened, controls with no
+names, a leads screen wider than the screen, and a page painted blue over
+the agent's chosen colours. Final state: tsc clean, 1254 unit tests (from
+1049), all migrations applied in one pass, every verify-schema check passing,
+production build and bundle budget OK.
+
+Owner actions:
+- Apply migrations 20261028000003 (deploy with the frontend — old clients'
+  profiles select('*') is refused), 20261028000004, 20261028000007 (Analytics
+  page errors until applied).
+- Redeploy edge functions: sso-initiate, sso-callback, the SEO functions,
+  apply-seo-fixes, trigger-rebuild, scheduled-maintenance, admin-users.
+- Orgs on SAML/Okta/Azure AD SSO must move to OIDC until XML-DSig exists.
+
+Follow-ups found (not done): SSO listUsers paging and mapped-account email;
+SAML options still offered in SSOConfigForm; ui-vendor still on the profile
+via UpcomingOpenHouses' dropdown; whole-store useAuthStore() reads
+(MobileNav and ~40 hooks); browser back button not covered by the
+unsaved-changes guard; plus the "Not included" list above.

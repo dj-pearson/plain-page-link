@@ -18,7 +18,13 @@ import {
  * Fetches user profile data
  */
 async function fetchUserProfile(userId: string) {
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  // US-235: public columns only — select('*') reaches private columns that
+  // authenticated cannot read, and these are all a bio block uses.
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('username, full_name, title, bio, avatar_url')
+    .eq('id', userId)
+    .single();
 
   if (error) {
     logger.error('Error fetching profile:', error as Error);

@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import type { TablesInsert } from '@/integrations/supabase/types';
 
 /**
  * OnboardingWizard Component
@@ -72,11 +73,20 @@ interface ProfileBasics {
   location: string;
 }
 
-/** Step 3's fields. `price`, `beds` and `baths` are the raw input strings. */
-interface FirstListing {
+/**
+ * Step 3's fields. `price`, `beds` and `baths` are the raw input strings.
+ *
+ * US-238: address, city, state and zip are separate fields. This was one
+ * free-text "123 Main St, Austin, TX 78701" box split on commas by the page,
+ * so "123 Main St Austin TX" became a listing with an empty city.
+ */
+export interface FirstListing {
   photo: File | null;
   photoPreview: string | null;
   address: string;
+  city: string;
+  state: string;
+  zip: string;
   price: string;
   beds: string;
   baths: string;
@@ -91,14 +101,86 @@ export interface OnboardingWizardData {
   importOption: 'scratch' | 'linktree' | null;
 }
 
+/**
+ * Whether step 3 is untouched (skip it), filled enough to become a listing, or
+ * started and not finished. A listing needs a street address, a city and a
+ * price with a number in it — `listings.city` and `price` are NOT NULL, and an
+ * empty city or a '0' price is a broken card on the agent's public page.
+ */
+export type FirstListingState = 'empty' | 'complete' | 'incomplete';
+
+export function firstListingState(listing: FirstListing): FirstListingState {
+  const started =
+    listing.photo !== null ||
+    [
+      listing.address,
+      listing.city,
+      listing.state,
+      listing.zip,
+      listing.price,
+      listing.beds,
+      listing.baths,
+    ].some((v) => v.trim() !== '');
+  if (!started) return 'empty';
+  const hasPrice = /[1-9]/.test(listing.price);
+  return listing.address.trim() && listing.city.trim() && hasPrice ? 'complete' : 'incomplete';
+}
+
+/**
+ * The listings row for step 3, or null when there is nothing complete to save.
+ * Never invents a city or a price.
+ */
+export function buildFirstListingInsert(
+  userId: string,
+  listing: FirstListing,
+  photoUrl: string | null
+): TablesInsert<'listings'> | null {
+  if (firstListingState(listing) !== 'complete') return null;
+  // Typed, not `any` (US-106): beds/baths are GENERATED so they are omitted;
+  // bathrooms is numeric so 2.5 stays 2.5; the column is is_featured.
+  return {
+    user_id: userId,
+    address: listing.address.trim(),
+    city: listing.city.trim(),
+    state: listing.state.trim() || null,
+    zip_code: listing.zip.trim() || null,
+    price: listing.price.trim(),
+    // bedrooms/bathrooms are NOT NULL with a 0 default; an empty field means
+    // "not stated", which is 0 rather than a failed insert.
+    bedrooms: Number(listing.beds) || 0,
+    bathrooms: Number(listing.baths) || 0,
+    status: listing.status || 'active',
+    is_featured: true,
+    photos: photoUrl ? [photoUrl] : [],
+  };
+}
+
 interface OnboardingWizardProps {
-  // Receives the collected wizard data on finish (persisted by the page).
-  onComplete: (wizardData: OnboardingWizardData) => void;
+  /**
+   * Persists the collected data. Resolves true when it saved; false leaves the
+   * agent where they are with everything they typed (US-238).
+   */
+  onComplete: (wizardData: OnboardingWizardData) => Promise<boolean>;
+  /** Leaves the wizard once the profile is saved. */
+  onFinish: () => void;
+  /** True while onComplete is in flight; the page draws the overlay. */
+  isSaving?: boolean;
+  /** Why the last save failed, shown inline next to the button that retries it. */
+  saveError?: string | null;
   userProfile?: { full_name?: string | null; username?: string | null } | null;
 }
 
-export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardProps) {
+export function OnboardingWizard({
+  onComplete,
+  onFinish,
+  isSaving = false,
+  saveError = null,
+  userProfile,
+}: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  // US-238: set only once onComplete resolves true. Step 5 used to announce
+  // "Your Profile is Live!" and offer Copy Link before anything was saved.
+  const [saved, setSaved] = useState(false);
   const [wizardData, setWizardData] = useState<OnboardingWizardData>({
     templateChoice: null as string | null,
     profileBasics: {
@@ -114,6 +196,9 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
       photo: null as File | null,
       photoPreview: null as string | null,
       address: '',
+      city: '',
+      state: '',
+      zip: '',
       price: '',
       beds: '',
       baths: '',
@@ -135,11 +220,20 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
 
   const templates = ONBOARDING_TEMPLATES;
 
-  const handleNext = () => {
-    if (currentStep < totalSteps) {
+  // Step 4 is where the profile is saved: step 5 can then truthfully say it is
+  // live. A failed save leaves currentStep and wizardData untouched.
+  const saveStep = totalSteps - 1;
+
+  const handleNext = async () => {
+    if (currentStep === saveStep) {
+      if (await onComplete(wizardData)) {
+        setSaved(true);
+        setCurrentStep(totalSteps);
+      }
+    } else if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     } else {
-      onComplete(wizardData);
+      onFinish();
     }
   };
 
@@ -149,9 +243,13 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
     }
   };
 
-  const handleSkipToEnd = () => {
-    onComplete(wizardData);
+  const handleSkipToEnd = async () => {
+    if (await onComplete(wizardData)) {
+      onFinish();
+    }
   };
+
+  const listingState = firstListingState(wizardData.firstListing);
 
   const canProceed = () => {
     switch (currentStep) {
@@ -160,7 +258,8 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
       case 2:
         return wizardData.profileBasics.fullName && wizardData.profileBasics.title;
       case 3:
-        return true; // Optional step
+        // Optional, but a half-filled listing cannot be saved.
+        return listingState !== 'incomplete';
       case 4:
         return true;
       case 5:
@@ -171,15 +270,17 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-8 px-4">
+    <div className="min-h-screen bg-muted/40 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header with Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-gray-900">Setup Your AgentBio Profile</h1>
-            <Button variant="ghost" size="sm" onClick={handleSkipToEnd}>
-              Skip Setup
-            </Button>
+            {!saved && (
+              <Button variant="ghost" size="sm" onClick={handleSkipToEnd} disabled={isSaving}>
+                Skip Setup
+              </Button>
+            )}
           </div>
           <Progress value={progress} className="h-2 mb-4" />
           <div className="flex items-center justify-between">
@@ -241,20 +342,57 @@ export function OnboardingWizard({ onComplete, userProfile }: OnboardingWizardPr
 
           {currentStep === 4 && <StepPreview wizardData={wizardData} />}
 
-          {currentStep === 5 && <StepShare username={userProfile?.username || 'yourname'} />}
+          {currentStep === 5 && (
+            <StepShare username={userProfile?.username || 'yourname'} saved={saved} />
+          )}
         </Card>
 
+        {/* US-238: inline, directly above the button that retries, so it is on
+            screen on a phone where a toast in the corner was not. */}
+        {saveError && (
+          <div
+            id="onboarding-save-error"
+            role="alert"
+            className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            <p className="font-semibold">Your profile was not saved.</p>
+            <p className="mt-1">{saveError}</p>
+          </div>
+        )}
+
+        {currentStep === 3 && listingState === 'incomplete' && (
+          <p className="mt-6 text-sm text-gray-700">
+            To add this listing, fill in the street address, city and price — or clear the fields to
+            skip it for now.
+          </p>
+        )}
+
         {/* Navigation */}
-        <div className="flex items-center justify-between mt-8">
-          <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
+        <div className="flex items-center justify-between gap-3 mt-8">
+          <Button
+            variant="outline"
+            onClick={handleBack}
+            // Back from step 5 would lead to a second save and a second listing.
+            disabled={currentStep === 1 || saved || isSaving}
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div className="text-sm text-gray-600">
+          <div className="hidden sm:block text-sm text-gray-600">
             Step {currentStep} of {totalSteps} • ~{10 - currentStep * 2} min remaining
           </div>
-          <Button onClick={handleNext} disabled={!canProceed()}>
-            {currentStep === totalSteps ? 'Go to Dashboard' : 'Next'}
+          <Button
+            onClick={handleNext}
+            disabled={!canProceed() || isSaving}
+            aria-describedby={saveError ? 'onboarding-save-error' : undefined}
+          >
+            {currentStep === totalSteps
+              ? 'Go to Dashboard'
+              : currentStep === saveStep
+                ? saveError
+                  ? 'Try again'
+                  : 'Save & publish'
+                : 'Next'}
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
@@ -480,21 +618,75 @@ function StepFirstListing({
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Address</label>
+          <label htmlFor="listing-address" className="block text-sm font-medium mb-2">
+            Street address
+          </label>
           <input
+            id="listing-address"
             type="text"
+            autoComplete="street-address"
             value={data.address}
             onChange={(e) => onChange({ ...data, address: e.target.value })}
-            placeholder="123 Main St, Austin, TX 78701"
+            placeholder="123 Main St"
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="col-span-2">
+            <label htmlFor="listing-city" className="block text-sm font-medium mb-2">
+              City
+            </label>
+            <input
+              id="listing-city"
+              type="text"
+              autoComplete="address-level2"
+              value={data.city}
+              onChange={(e) => onChange({ ...data, city: e.target.value })}
+              placeholder="Austin"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="listing-state" className="block text-sm font-medium mb-2">
+              State
+            </label>
+            <input
+              id="listing-state"
+              type="text"
+              autoComplete="address-level1"
+              value={data.state}
+              onChange={(e) => onChange({ ...data, state: e.target.value })}
+              placeholder="TX"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="listing-zip" className="block text-sm font-medium mb-2">
+              ZIP
+            </label>
+            <input
+              id="listing-zip"
+              type="text"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              value={data.zip}
+              onChange={(e) => onChange({ ...data, zip: e.target.value })}
+              placeholder="78701"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Price</label>
+            <label htmlFor="listing-price" className="block text-sm font-medium mb-2">
+              Price
+            </label>
             <input
+              id="listing-price"
               type="text"
+              inputMode="decimal"
               value={data.price}
               onChange={(e) => onChange({ ...data, price: e.target.value })}
               placeholder="$750,000"
@@ -598,7 +790,10 @@ function StepPreview({ wizardData }: { wizardData: OnboardingWizardData }) {
                   {wizardData.firstListing.price || '$XXX,XXX'}
                 </div>
                 <div className="text-sm text-gray-700 mb-2">
-                  {wizardData.firstListing.address || 'Property Address'}
+                  {[wizardData.firstListing.address, wizardData.firstListing.city]
+                    .map((part) => part.trim())
+                    .filter(Boolean)
+                    .join(', ') || 'Property Address'}
                 </div>
                 {(wizardData.firstListing.beds || wizardData.firstListing.baths) && (
                   <div className="text-sm text-gray-600">
@@ -614,11 +809,12 @@ function StepPreview({ wizardData }: { wizardData: OnboardingWizardData }) {
   );
 }
 
-function StepShare({ username }: { username: string }) {
+function StepShare({ username, saved }: { username: string; saved: boolean }) {
   const profileUrl = `agentbio.net/${username}`;
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
+    if (!saved) return;
     navigator.clipboard.writeText(`https://${profileUrl}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -629,16 +825,19 @@ function StepShare({ username }: { username: string }) {
       <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
         <Check className="h-8 w-8 text-green-600" />
       </div>
-      <h2 className="text-2xl font-bold mb-2">🎉 Your Profile is Live!</h2>
+      <h2 className="text-2xl font-bold mb-2">
+        {saved ? '🎉 Your Profile is Live!' : 'Almost there'}
+      </h2>
       <p className="text-gray-600 mb-8">
-        Share your link on Instagram, Facebook, business cards, and everywhere you connect with
-        clients.
+        {saved
+          ? 'Share your link on Instagram, Facebook, business cards, and everywhere you connect with clients.'
+          : 'Your link will work as soon as your profile is saved.'}
       </p>
 
-      <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+      <div className="bg-muted rounded-xl p-6 mb-6">
         <div className="text-sm text-gray-600 mb-2">Your AgentBio Link</div>
-        <div className="text-2xl font-bold text-blue-600 mb-4">{profileUrl}</div>
-        <Button onClick={handleCopy} size="lg" className="mb-4">
+        <div className="text-2xl font-bold text-blue-600 mb-4 break-all">{profileUrl}</div>
+        <Button onClick={handleCopy} size="lg" className="mb-4" disabled={!saved}>
           {copied ? 'Copied!' : 'Copy Link'}
         </Button>
       </div>

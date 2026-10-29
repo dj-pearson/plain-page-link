@@ -11,7 +11,12 @@
  * fails here rather than on a stranger's public page.
  */
 import { describe, it, expect } from 'vitest';
-import { ONBOARDING_TEMPLATES } from './OnboardingWizard';
+import {
+  ONBOARDING_TEMPLATES,
+  buildFirstListingInsert,
+  firstListingState,
+  type FirstListing,
+} from './OnboardingWizard';
 import { DEFAULT_THEMES, getCurrentTheme } from '@/lib/themes';
 
 describe('ONBOARDING_TEMPLATES', () => {
@@ -41,5 +46,71 @@ describe('ONBOARDING_TEMPLATES', () => {
   it('offers a distinct choice per card', () => {
     const ids = ONBOARDING_TEMPLATES.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+/**
+ * US-238: the first listing's city came from splitting one free-text address
+ * box on commas, and an empty price became '0'.
+ */
+describe('first listing', () => {
+  const blank: FirstListing = {
+    photo: null,
+    photoPreview: null,
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    price: '',
+    beds: '',
+    baths: '',
+    status: 'active',
+  };
+
+  it('treats an untouched step as empty and builds nothing', () => {
+    expect(firstListingState(blank)).toBe('empty');
+    expect(buildFirstListingInsert('u1', blank, null)).toBeNull();
+  });
+
+  it.each([
+    ['no city', { address: '123 Main St', price: '$750,000' }],
+    ['no address', { city: 'Austin', price: '$750,000' }],
+    ['no price', { address: '123 Main St', city: 'Austin' }],
+    ['a zero price', { address: '123 Main St', city: 'Austin', price: '0' }],
+    ['only beds', { beds: '3' }],
+  ])('never builds a listing with %s', (_label, fields) => {
+    const listing = { ...blank, ...fields };
+    expect(firstListingState(listing)).toBe('incomplete');
+    expect(buildFirstListingInsert('u1', listing, null)).toBeNull();
+  });
+
+  it('maps the separate fields straight through', () => {
+    const row = buildFirstListingInsert(
+      'u1',
+      {
+        ...blank,
+        address: ' 123 Main St ',
+        city: 'Austin',
+        state: 'TX',
+        zip: '78701',
+        price: '$750,000',
+        beds: '3',
+        baths: '2.5',
+      },
+      'https://cdn.test/p.png'
+    );
+    expect(row).toEqual({
+      user_id: 'u1',
+      address: '123 Main St',
+      city: 'Austin',
+      state: 'TX',
+      zip_code: '78701',
+      price: '$750,000',
+      bedrooms: 3,
+      bathrooms: 2.5,
+      status: 'active',
+      is_featured: true,
+      photos: ['https://cdn.test/p.png'],
+    });
   });
 });

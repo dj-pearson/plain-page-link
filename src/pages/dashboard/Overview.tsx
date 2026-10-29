@@ -7,6 +7,8 @@ import {
   Check,
   Copy,
   ExternalLink,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
@@ -16,6 +18,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ProfileCompletionWidget } from '@/components/dashboard/ProfileCompletionWidget';
 import { QuickActionsWidget } from '@/components/dashboard/QuickActionsWidget';
 import { ConversionFunnel } from '@/components/dashboard/ConversionFunnel';
@@ -33,7 +36,7 @@ import {
 } from '@/components/ui/dialog';
 
 export default function Overview() {
-  const { stats, recentLeads, isLoading } = useAnalytics();
+  const { stats, recentLeads, isLoading, isError, refetch } = useAnalytics();
   const { links } = useLinks();
   const { profile } = useProfile();
   const { subscription } = useSubscription();
@@ -126,32 +129,55 @@ export default function Overview() {
       {/* Quick Actions Widget */}
       <QuickActionsWidget />
 
-      {/* Stats Grid - Mobile optimized with 2 columns on small screens */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-        <StatCard
-          icon={<Eye className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />}
-          label="Profile Views"
-          value={stats.totalViews.toLocaleString()}
-        />
-        <StatCard
-          icon={<Users className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />}
-          // Not "New Leads": this is every lead in the window, whatever its
-          // status, so the label contradicted the Leads page's New count
-          // (US-104).
-          label="Leads (30d)"
-          value={stats.totalLeads.toString()}
-        />
-        <StatCard
-          icon={<MousePointerClick className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />}
-          label="Link Clicks"
-          value={totalLinkClicks.toLocaleString()}
-        />
-        <StatCard
-          icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />}
-          label="Conversion Rate"
-          value={`${stats.conversionRate.toFixed(2)}%`}
-        />
-      </div>
+      {/* US-246: a failed analytics query used to fall through to its
+          defaults, so the agent read "0 views, 0 leads" as fact. */}
+      {isError ? (
+        <Card role="alert">
+          <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0" aria-hidden="true" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-foreground">Your numbers did not load</p>
+              <p className="text-sm text-muted-foreground">
+                Views, leads and conversion are unavailable right now. Nothing has been lost.
+              </p>
+            </div>
+            <Button
+              onClick={() => refetch()}
+              variant="outline"
+              className="gap-2 min-h-[44px] self-start sm:self-auto"
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+          <StatCard
+            icon={<Eye className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />}
+            label="Profile Views"
+            value={stats.totalViews.toLocaleString()}
+          />
+          <StatCard
+            icon={<Users className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />}
+            // Not "New Leads": this is every lead in the window, whatever its
+            // status, so the label contradicted the Leads page's New count
+            // (US-104).
+            label="Leads (30d)"
+            value={stats.totalLeads.toString()}
+          />
+          <StatCard
+            icon={<MousePointerClick className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />}
+            label="Link Clicks"
+            value={totalLinkClicks.toLocaleString()}
+          />
+          <StatCard
+            icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />}
+            label="Conversion Rate"
+            value={`${stats.conversionRate.toFixed(2)}%`}
+          />
+        </div>
+      )}
 
       {/* What needs doing today, before anything that only reports numbers. */}
       <DueFollowUps />
@@ -171,7 +197,11 @@ export default function Overview() {
             <CardTitle className="text-base sm:text-lg">Recent Leads</CardTitle>
           </CardHeader>
           <CardContent>
-            {recentLeads.length > 0 ? (
+            {isError ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                Recent leads could not be loaded.
+              </p>
+            ) : recentLeads.length > 0 ? (
               <div className="space-y-2 sm:space-y-3">
                 {recentLeads.slice(0, 5).map((lead) => (
                   // US-103: these rows were not links, so the one place an
@@ -183,9 +213,12 @@ export default function Overview() {
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm sm:text-base truncate">{lead.name}</p>
-                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                        {lead.email}
-                      </p>
+                      {/* A phone-only lead has no email; show what there is. */}
+                      {(lead.email || lead.phone) && (
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                          {lead.email || lead.phone}
+                        </p>
+                      )}
                     </div>
                     <span
                       className={`px-2 py-1 text-xs rounded-full flex-shrink-0 font-medium ${

@@ -126,24 +126,24 @@ function chainAfter(source: string, start: number): string {
   return next >= 0 ? rest.slice(0, next) : rest;
 }
 
-/** Top-level keys of the object literal a write is given. */
-function writtenKeys(chain: string): string[] {
-  const write = WRITE.exec(chain);
-  if (!write) return [];
-
-  const open = chain.indexOf('{', write.index);
+/**
+ * Top-level keys of the object literal opening at `open` (a `{`), or of each
+ * object in the array literal opening there (a `[` of `{ ... }` rows).
+ */
+function literalKeys(text: string, open: number): string[] {
   let depth = 0;
-  let close = chain.length - 1;
-  for (let i = open; i < chain.length; i++) {
-    if (chain[i] === '{') depth++;
-    else if (chain[i] === '}' && --depth === 0) {
+  let close = text.length - 1;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{' || text[i] === '[') depth++;
+    else if ((text[i] === '}' || text[i] === ']') && --depth === 0) {
       close = i;
       break;
     }
   }
+  const keyDepth = text[open] === '[' ? 2 : 1;
 
-  // Depth-1, start-of-line keys only. A key written mid-line is almost always
-  // the `: null` of a ternary rather than a column.
+  // Start-of-line keys at the object's own depth only. A key written mid-line
+  // is almost always the `: null` of a ternary rather than a column.
   //
   // Shorthand counts: `{ url, device, lcp }` is three columns, and a scanner
   // that only reads `name:` misses them. seo_link_analysis was written with a
@@ -151,10 +151,10 @@ function writtenKeys(chain: string): string[] {
   // version of this test did not see it.
   const keys: string[] = [];
   depth = 0;
-  for (const line of chain.slice(open, close + 1).split('\n')) {
+  for (const line of text.slice(open, close + 1).split('\n')) {
     const key =
       /^\s*([a-z_][a-z_0-9]*)\s*:/.exec(line) ?? /^\s*([a-z_][a-z_0-9]*)\s*,?\s*$/.exec(line);
-    if (depth === 1 && key) keys.push(key[1]);
+    if (depth === keyDepth && key) keys.push(key[1]);
     for (const char of line) {
       if (char === '{' || char === '[') depth++;
       else if (char === '}' || char === ']') depth--;
@@ -163,7 +163,66 @@ function writtenKeys(chain: string): string[] {
   return keys;
 }
 
-function scan(kind: 'filter' | 'write'): Reference[] {
+const WRITE_IDENTIFIER = /\.(?:insert|update|upsert)\(\s*([A-Za-z_][\w]*)/;
+
+/**
+ * Keys a write is given: an inline object literal, or (US-247) a variable
+ * declared in the same file as an object or array literal.
+ *
+ * The inline-only version never saw sample-data-service, which builds
+ * `const sampleListings = [{ beds: 4, ... }]` and inserts
+ * `sampleListings.map(...)`; every row carried the GENERATED beds/baths/sqft
+ * and Postgres refused the whole insert.
+ */
+function writtenKeys(chain: string, source: string): string[] {
+  const write = WRITE.exec(chain);
+  if (write) return literalKeys(chain, chain.indexOf('{', write.index));
+
+  const named = WRITE_IDENTIFIER.exec(chain);
+  if (!named) return [];
+  const declaration = new RegExp(`\\b(?:const|let|var)\\s+${named[1]}\\b[^=;]*=\\s*([[{])`).exec(
+    source
+  );
+  if (!declaration) return [];
+  return literalKeys(source, declaration.index + declaration[0].length - 1);
+}
+
+/**
+ * GENERATED ALWAYS AS (...) STORED columns, read out of the migrations.
+ *
+ * types.ts cannot say which columns these are (the generator lists them in
+ * Insert and Update like any other), so tsc accepts `beds: 4` in an insert and
+ * Postgres rejects it: "cannot insert a non-DEFAULT value into column".
+ */
+function parseGeneratedColumns(): Map<string, Set<string>> {
+  const dir = join(ROOT, 'supabase/migrations');
+  const generated = new Map<string, Set<string>>();
+  for (const file of readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()) {
+    const sql = readFileSync(join(dir, file), 'utf-8').replace(/--[^\n]*/g, '');
+    for (const statement of sql.split(';')) {
+      if (!/GENERATED\s+ALWAYS\s+AS\s*\(/i.test(statement)) continue;
+      const table =
+        /(?:CREATE\s+TABLE|ALTER\s+TABLE)(?:\s+IF\s+(?:NOT\s+)?EXISTS)?(?:\s+ONLY)?\s+(?:public\.)?"?([a-z_0-9]+)/i.exec(
+          statement
+        );
+      if (!table) continue;
+      for (const column of statement.matchAll(
+        // One column definition per line, as pg_dump and these migrations write them.
+        /^[ \t]*(?:ADD[ \t]+COLUMN[ \t]+(?:IF[ \t]+NOT[ \t]+EXISTS[ \t]+)?)?"?([a-z_0-9]+)"?[ \t]+\S+(?:[ \t]+\S+)*?[ \t]+GENERATED[ \t]+ALWAYS[ \t]+AS[ \t]*\(/gim
+      )) {
+        if (!generated.has(table[1])) generated.set(table[1], new Set());
+        generated.get(table[1])!.add(column[1]);
+      }
+    }
+  }
+  return generated;
+}
+
+const GENERATED = parseGeneratedColumns();
+
+function scan(kind: 'filter' | 'write' | 'generated'): Reference[] {
   const found: Reference[] = [];
   for (const file of SOURCES) {
     const source = stripComments(readFileSync(file, 'utf-8'));
@@ -176,10 +235,16 @@ function scan(kind: 'filter' | 'write'): Reference[] {
 
       const chain = chainAfter(source, match.index! + match[0].length);
       const names =
-        kind === 'filter' ? [...chain.matchAll(FILTER)].map((m) => m[1]) : writtenKeys(chain);
+        kind === 'filter'
+          ? [...chain.matchAll(FILTER)].map((m) => m[1])
+          : writtenKeys(chain, source);
 
       for (const column of names) {
-        if (!columns.has(column)) {
+        const flagged =
+          kind === 'generated'
+            ? GENERATED.get(relation)?.has(column) === true
+            : !columns.has(column);
+        if (flagged) {
           found.push({
             file: file.slice(ROOT.length + 1),
             line: source.slice(0, match.index).split('\n').length,
@@ -234,6 +299,26 @@ describe('schema references (US-200)', () => {
       (r) => !KNOWN_BROKEN_WRITES[r.relation]?.includes(r.column)
     );
     expect(unexpected.map(describeRef)).toEqual([]);
+  });
+
+  it('never writes a GENERATED column (US-247)', () => {
+    // Postgres refuses any non-DEFAULT value for one, so the whole row fails.
+    expect([...(GENERATED.get('listings') ?? [])].sort()).toEqual(['baths', 'beds', 'sqft']);
+    expect(scan('generated').map(describeRef)).toEqual([]);
+  });
+
+  it('reads the keys of a write given a named literal, not only an inline one', () => {
+    const source = [
+      'const rows = [',
+      '  {',
+      '    beds: 4,',
+      '    address,',
+      '  },',
+      '];',
+      "await supabase.from('listings').insert(rows.map((r) => ({ ...r })));",
+    ].join('\n');
+    const chain = source.slice(source.indexOf('.insert'));
+    expect(writtenKeys(chain, source)).toEqual(['beds', 'address']);
   });
 
   it('has no stale entries in the frozen list', () => {

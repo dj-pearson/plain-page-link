@@ -105,18 +105,19 @@ export async function checkExistingData(userId: string): Promise<{
 async function generateSampleListings(userId: string): Promise<number> {
   logger.info('Generating sample listings', { userId });
 
+  // bedrooms / bathrooms / square_feet only. beds, baths and sqft are
+  // GENERATED from them (20260902000007), and naming them here made Postgres
+  // refuse the whole insert, so "Load sample data" never loaded a listing
+  // (US-247; src/schema-references.test.ts now catches it).
   const sampleListings = [
     {
       user_id: userId,
       address: '123 Sunset Boulevard',
       city: 'Los Angeles, CA 90001',
       price: '1250000',
-      beds: 4,
-      baths: 4,
       bedrooms: 4,
       bathrooms: 4,
       square_feet: 3200,
-      sqft: 3200,
       lot_size_acres: 0.25,
       property_type: 'Single Family Home',
       description:
@@ -135,12 +136,9 @@ async function generateSampleListings(userId: string): Promise<number> {
       address: '456 Oakwood Drive',
       city: 'San Francisco, CA 94102',
       price: '2850000',
-      beds: 5,
-      baths: 4,
       bedrooms: 5,
       bathrooms: 4,
       square_feet: 4500,
-      sqft: 4500,
       lot_size_acres: 0.5,
       property_type: 'Single Family Home',
       description:
@@ -158,12 +156,9 @@ async function generateSampleListings(userId: string): Promise<number> {
       address: '789 Maple Avenue',
       city: 'San Diego, CA 92101',
       price: '875000',
-      beds: 3,
-      baths: 3,
       bedrooms: 3,
       bathrooms: 3,
       square_feet: 2400,
-      sqft: 2400,
       lot_size_acres: 0.15,
       property_type: 'Townhouse',
       description:
@@ -178,12 +173,9 @@ async function generateSampleListings(userId: string): Promise<number> {
       address: '321 Palm Street',
       city: 'Santa Monica, CA 90401',
       price: '1450000',
-      beds: 3,
-      baths: 2,
       bedrooms: 3,
       bathrooms: 2,
       square_feet: 2100,
-      sqft: 2100,
       property_type: 'Condo',
       description:
         'Sold in record time! Luxury beachfront condo with panoramic ocean views. Recently updated with top-of-the-line finishes, this unit offered the perfect blend of comfort and coastal elegance.',

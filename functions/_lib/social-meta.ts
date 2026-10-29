@@ -284,29 +284,91 @@ export function buildListingTags(
   };
 }
 
-/** Tags that index.html hard-codes and that must not survive into a profile response. */
+/**
+ * Tags that dist/index.html carries and that must not survive into a profile
+ * response.
+ *
+ * dist/index.html is not the bare shell in the repository: since US-147 it is
+ * the prerendered homepage, so on top of index.html's own tags it carries every
+ * tag react-helmet-async wrote for Landing (each marked data-rh="true"), the
+ * homepage's <meta name="title">, and its JSON-LD — one @graph of WebSite,
+ * Organization, SoftwareApplication, BreadcrumbList, ProfessionalService and
+ * FAQPage. Left in, that graph told Google every agent's URL was the
+ * platform's homepage (US-242).
+ *
+ * Every application/ld+json block in the input is the homepage's: next() for
+ * /:username is the _redirects rewrite to /index.html, never a document of the
+ * agent's own. The agent's JSON-LD is added back below.
+ */
 const STRIP_PATTERNS: RegExp[] = [
   /<title>[\s\S]*?<\/title>/i,
   /<meta\s+name="description"[^>]*>/gi,
+  /<meta\s+name="title"[^>]*>/gi,
   /<meta\s+name="keywords"[^>]*>/gi,
   /<meta\s+property="og:[^"]*"[^>]*>/gi,
   /<meta\s+property="twitter:[^"]*"[^>]*>/gi,
   /<meta\s+name="twitter:[^"]*"[^>]*>/gi,
   /<link\s+rel="canonical"[^>]*>/gi,
+  /<script\b[^>]*type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/gi,
 ];
 
+const ROOT_OPEN = /<div\b[^>]*\bid="root"[^>]*>/i;
+
 /**
- * Replace index.html's marketing head with this page's own.
+ * Replace whatever is inside <div id="root"> with `body`.
+ *
+ * The prerendered homepage puts its whole body there — hero, pricing, FAQ,
+ * footer: 80 KB of somebody else's page under an agent's URL, and the first
+ * thing a crawler that does not run scripts reads as that page's content. The
+ * SPA mounts with createRoot, which discards whatever it finds in #root, so
+ * what goes here is read by crawlers only.
+ *
+ * The matching </div> is found by counting <div> depth, not by a lazy regex,
+ * which would stop at the first nested </div>. A document whose #root is
+ * missing or unbalanced is returned unchanged: the homepage's body is a worse
+ * page, not a broken one.
+ */
+export function replaceRootContent(html: string, body: string): string {
+  const open = ROOT_OPEN.exec(html);
+  if (!open) return html;
+  const contentStart = open.index + open[0].length;
+
+  const tag = /<(\/?)div\b[^>]*>/gi;
+  tag.lastIndex = contentStart;
+  let depth = 1;
+  let match: RegExpExecArray | null;
+  while ((match = tag.exec(html)) !== null) {
+    if (match[1]) {
+      depth -= 1;
+      if (depth === 0) {
+        return html.slice(0, contentStart) + body + html.slice(match.index);
+      }
+    } else if (!match[0].endsWith('/>')) {
+      depth += 1;
+    }
+  }
+  return html;
+}
+
+/**
+ * Replace the prerendered homepage's head and body with this page's own.
  *
  * A string rewrite rather than HTMLRewriter: the same code then runs in a test
- * without a Workers runtime, and the tags being replaced are hard-coded in a
- * file in this repository, not arbitrary markup.
+ * without a Workers runtime, and the document being rewritten is one this
+ * repository builds, not arbitrary markup.
  */
 export function injectSocialTags(html: string, tags: SocialTags): string {
   let out = html;
   for (const pattern of STRIP_PATTERNS) {
     out = out.replace(pattern, '');
   }
+
+  // The page's own heading and summary in place of the homepage's body, so a
+  // crawler's first, script-free pass reads the agent.
+  out = replaceRootContent(
+    out,
+    `<main><h1>${escapeAttribute(tags.title)}</h1><p>${escapeAttribute(tags.description)}</p></main>`
+  );
 
   const image = tags.image;
   const head = [

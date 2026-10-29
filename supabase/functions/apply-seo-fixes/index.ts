@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
-import { requireAuth } from '../_shared/auth.ts';
+import { requireAdmin } from '../_shared/auth.ts';
 import { errorStatus } from '../_shared/http-error.ts';
 
 serve(async (req) => {
@@ -12,6 +12,16 @@ serve(async (req) => {
   }
 
   try {
+    // US-234: writes seo_fixes_applied with the service role. requireAuth used
+    // to sit in a try/catch that logged the failure and carried on, so anyone
+    // holding the anon key could record "applied" fixes. Admin only, checked
+    // before the body is read.
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const user = await requireAdmin(req, supabase);
+    const userId = user.id;
+
     const { auditId, fixes } = await req.json();
 
     if (!auditId && !fixes) {
@@ -19,19 +29,6 @@ serve(async (req) => {
         JSON.stringify({ error: 'Either auditId or fixes array is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-
-    // Securely authenticate user with JWT verification
-    let userId = null;
-    try {
-      const user = await requireAuth(req, supabase);
-      userId = user.id;
-    } catch (e) {
-      console.error('Failed to authenticate user:', e);
     }
 
     const appliedFixes = [];

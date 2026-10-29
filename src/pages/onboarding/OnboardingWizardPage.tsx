@@ -1,10 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import { readPlanIntent } from '@/lib/signupIntent';
 import { useState } from 'react';
-import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import {
+  OnboardingWizard,
+  buildFirstListingInsert,
+  firstListingState,
+  type OnboardingWizardData,
+} from '@/components/onboarding/OnboardingWizard';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/integrations/supabase/client';
-import type { TablesInsert } from '@/integrations/supabase/types';
 import { buildOnboardingProfileUpdate } from '@/lib/onboardingProfile';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -20,8 +24,18 @@ export default function OnboardingWizardPage() {
   const { user, profile, updateProfile } = useAuthStore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleComplete = async (wizardData: any) => {
+  /**
+   * Saves everything the wizard collected. Resolves true on success.
+   *
+   * US-238: on failure this resolves false and the wizard — which is never
+   * unmounted while saving — keeps the agent on the same step with every field
+   * and photo intact and the reason inline. It used to swap the wizard for a
+   * spinner screen, which threw its state away, so a failed save sent the
+   * agent back to step 1 with an empty form and a toast.
+   */
+  const handleComplete = async (wizardData: OnboardingWizardData): Promise<boolean> => {
     if (!user) {
       toast({
         title: 'Error',
@@ -29,10 +43,11 @@ export default function OnboardingWizardPage() {
         variant: 'destructive',
       });
       navigate('/auth/login');
-      return;
+      return false;
     }
 
     setIsSaving(true);
+    setSaveError(null);
 
     try {
       // 1. Update profile with basic info.
@@ -93,10 +108,23 @@ export default function OnboardingWizardPage() {
       // finished the wizard straight back into it (US-108).
       await updateProfile(profileUpdates);
 
-      // 2. Create first listing if provided
-      if (wizardData.firstListing.address || wizardData.firstListing.price) {
+      // 2. Create first listing if provided.
+      //
+      // Only a complete one: street address, city and a price (US-238). The
+      // wizard will not leave step 3 half-filled, but "Skip Setup" can, and a
+      // listing with an empty city or a '0' price is worse than none.
+      const listingState = firstListingState(wizardData.firstListing);
+      if (listingState === 'incomplete') {
+        toast({
+          title: 'Your first listing was not saved',
+          description:
+            'It needs a street address, city and price. You can add it from the Listings page.',
+          variant: 'destructive',
+        });
+      }
+      if (listingState === 'complete') {
         try {
-          let photoUrl = null;
+          let photoUrl: string | null = null;
 
           // Upload listing photo if provided
           if (wizardData.firstListing.photo) {
@@ -128,40 +156,8 @@ export default function OnboardingWizardPage() {
             }
           }
 
-          // Parse address
-          const addressParts =
-            wizardData.firstListing.address?.split(',').map((s: string) => s.trim()) || [];
-          const address = addressParts[0] || '';
-          const city = addressParts[1] || '';
-          const stateZip = addressParts[2] || '';
-          const stateParts = stateZip.split(' ');
-          const state = stateParts[0] || '';
-          const zip = stateParts[1] || '';
-
-          // Typed, not `any`. Three things were wrong here and the cast hid all
-          // of them (US-106):
-          //   - `beds`/`baths` were NOT NULL integers with no default and this
-          //     insert never named them, so the wizard's first listing could
-          //     never save at all. They are GENERATED now, so omitting them is
-          //     correct.
-          //   - parseInt truncated 2.5 baths to 2; bathrooms is numeric.
-          //   - `featured` is not a column. The column is `is_featured`, so
-          //     "make the first listing featured" never happened.
-          const listingData: TablesInsert<'listings'> = {
-            user_id: user.id,
-            address: address,
-            city: city,
-            state: state,
-            zip_code: zip,
-            price: wizardData.firstListing.price || '0',
-            // bedrooms/bathrooms are NOT NULL with a 0 default; an empty field
-            // means "not stated", which is 0 rather than a failed insert.
-            bedrooms: Number(wizardData.firstListing.beds) || 0,
-            bathrooms: Number(wizardData.firstListing.baths) || 0,
-            status: wizardData.firstListing.status || 'active',
-            is_featured: true,
-            photos: photoUrl ? [photoUrl] : [],
-          };
+          const listingData = buildFirstListingInsert(user.id, wizardData.firstListing, photoUrl);
+          if (!listingData) throw new Error('First listing is incomplete');
 
           const { error: listingError } = await supabase.from('listings').insert(listingData);
 
@@ -198,39 +194,54 @@ export default function OnboardingWizardPage() {
         title: '🎉 Welcome to AgentBio!',
         description: 'Your profile is ready to share. Check your email for next steps!',
       });
-
-      // US-232: a visitor who chose a plan on /pricing before signing up goes
-      // straight to checkout for it; everyone else to the dashboard.
-      const intent = readPlanIntent();
-      navigate(
-        intent
-          ? `/dashboard/subscription?checkout=${encodeURIComponent(intent.plan)}&interval=${intent.interval}`
-          : '/dashboard',
-        { replace: true }
-      );
-    } catch (error: any) {
+      return true;
+    } catch (error) {
       logger.error('Error completing onboarding', error as Error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save your information. Please try again.',
-        variant: 'destructive',
-      });
+      setSaveError(
+        'Everything you entered is still here. Check your connection and press the button again.'
+      );
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (isSaving) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Setting up your profile...</h2>
-          <p className="text-gray-600">This will only take a moment</p>
-        </div>
-      </div>
+  // US-232: a visitor who chose a plan on /pricing before signing up goes
+  // straight to checkout for it; everyone else to the dashboard.
+  const handleFinish = () => {
+    const intent = readPlanIntent();
+    navigate(
+      intent
+        ? `/dashboard/subscription?checkout=${encodeURIComponent(intent.plan)}&interval=${intent.interval}`
+        : '/dashboard',
+      { replace: true }
     );
-  }
+  };
 
-  return <OnboardingWizard onComplete={handleComplete} userProfile={profile} />;
+  return (
+    <>
+      <OnboardingWizard
+        onComplete={handleComplete}
+        onFinish={handleFinish}
+        isSaving={isSaving}
+        saveError={saveError}
+        userProfile={profile}
+      />
+      {/* An overlay, not a replacement: unmounting the wizard here is what lost
+          every answer when the save failed (US-238). */}
+      {isSaving && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm px-4"
+        >
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Setting up your profile...</h2>
+            <p className="text-gray-600">This will only take a moment</p>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

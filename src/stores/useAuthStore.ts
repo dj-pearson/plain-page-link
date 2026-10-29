@@ -8,6 +8,8 @@ import { logAuditEvent } from '@/lib/audit';
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile, AppRole } from '@/types/database';
 import { toProfile } from '@/types/profile';
+import type { ProfileRow } from '@/types/profile';
+import { fetchOwnProfile } from '@/lib/ownProfile';
 
 // Auth store with Google Sign-In support and Single Sign-Out (SLO)
 
@@ -38,6 +40,34 @@ interface SLOMessage {
 // role fetches on every token refresh.
 let authListenersRegistered = false;
 
+// The user whose profile initialize() itself loaded (US-241). supabase-js
+// fires INITIAL_SESSION as soon as the listener subscribes, i.e. straight after
+// initialize() fetched the same rows; refetching then doubled every cold load's
+// profile/role reads. Only that exact case is skipped — when initialize failed,
+// or loaded someone else, this does not match and the listener fetches.
+let initialProfileUserId: string | null = null;
+
+/** Postgrest's "no row" — the profile genuinely does not exist. */
+const NO_ROW = 'PGRST116';
+
+/**
+ * The profile to store after a fetch of the owner's row (US-241).
+ *
+ * A transient error (network, 5xx, timeout) used to land as `profile: null`:
+ * the dashboard header lost the agent's name and its copy/share/view links
+ * pointed at `/`. Keep what we had for the same user; only "no row" or a
+ * different user clears it.
+ */
+export function profileAfterFetch(
+  current: Profile | null,
+  result: { data: ProfileRow | null; error: { code?: string } | null },
+  userId: string
+): Profile | null {
+  if (!result.error) return toProfile(result.data);
+  if (result.error.code === NO_ROW) return null;
+  return current?.id === userId ? current : null;
+}
+
 interface AuthState {
   user: User | null;
   session: Session | null;
@@ -57,6 +87,7 @@ interface AuthState {
   signOut: (options?: { global?: boolean }) => Promise<void>;
   signOutAllDevices: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  refreshProfile: () => Promise<Profile | null>;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   clearError: () => void;
@@ -131,7 +162,7 @@ export const useAuthStore = create<AuthState>()(
           if (session?.user) {
             // Fetch profile and roles in parallel for better performance
             const [profileResult, rolesResult] = await Promise.all([
-              supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+              fetchOwnProfile(),
               supabase
                 .from('user_roles')
                 .select('role')
@@ -144,14 +175,21 @@ export const useAuthStore = create<AuthState>()(
               rolesResult.data?.[0]?.role ||
               null;
 
+            const userId = session.user.id;
+            // The persisted profile/role may be another user's (a shared
+            // machine); they are only kept across a failed read for this one.
+            const sameUser = get().profile?.id === userId;
+            initialProfileUserId = profileResult.error || rolesResult.error ? null : userId;
+
             set({
               user: session.user,
               session,
-              profile: toProfile(profileResult.data),
-              role: role,
+              profile: profileAfterFetch(get().profile, profileResult, userId),
+              role: rolesResult.error && sameUser ? get().role : role,
               isLoading: false,
             });
           } else {
+            initialProfileUserId = null;
             set({
               user: null,
               session: null,
@@ -161,6 +199,7 @@ export const useAuthStore = create<AuthState>()(
             });
           }
         } catch (error: any) {
+          initialProfileUserId = null;
           logger.error('Auth initialization error', error);
           set({
             user: null,
@@ -222,10 +261,18 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const userId = session.user.id;
+
+          // initialize() has just read these rows for this user (US-241).
+          if (event === 'INITIAL_SESSION' && initialProfileUserId === userId) {
+            initialProfileUserId = null;
+            if (get().profile?.id === userId) return;
+          }
+          initialProfileUserId = null;
+
           setTimeout(async () => {
             try {
               const [profileResult, rolesResult] = await Promise.all([
-                supabase.from('profiles').select('*').eq('id', userId).single(),
+                fetchOwnProfile(),
                 supabase
                   .from('user_roles')
                   .select('role')
@@ -242,7 +289,12 @@ export const useAuthStore = create<AuthState>()(
                 rolesResult.data?.find((r) => r.role === 'admin')?.role ||
                 rolesResult.data?.[0]?.role ||
                 null;
-              set({ profile: toProfile(profileResult.data), role });
+              // US-241: a transient failure keeps what the store had.
+              const sameUser = get().profile?.id === userId;
+              set({
+                profile: profileAfterFetch(get().profile, profileResult, userId),
+                role: rolesResult.error && sameUser ? get().role : role,
+              });
             } catch (error) {
               logger.error('Error fetching user data in auth state listener', error);
             }
@@ -266,7 +318,9 @@ export const useAuthStore = create<AuthState>()(
                 // US-232: handle_new_user records these on the profile; it
                 // ignores a ref that names no real profile.
                 ...(referral ? { ref: referral.ref } : {}),
-                ...(referral?.source || signupSource ? { signup_source: referral?.source ?? signupSource } : {}),
+                ...(referral?.source || signupSource
+                  ? { signup_source: referral?.source ?? signupSource }
+                  : {}),
               },
               emailRedirectTo: `${window.location.origin}/`,
             },
@@ -286,7 +340,7 @@ export const useAuthStore = create<AuthState>()(
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
               const [profileResult, rolesResult] = await Promise.all([
-                supabase.from('profiles').select('*').eq('id', data.user.id).single(),
+                fetchOwnProfile(),
                 supabase
                   .from('user_roles')
                   .select('role')
@@ -363,7 +417,7 @@ export const useAuthStore = create<AuthState>()(
 
           // Fetch profile, roles, and MFA settings in parallel for better performance
           const [profileResult, rolesResult, mfaResult] = await Promise.all([
-            supabase.from('profiles').select('*').eq('id', data.user.id).single(),
+            fetchOwnProfile(),
             supabase
               .from('user_roles')
               .select('role')
@@ -640,13 +694,18 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
 
         try {
-          const { data, error } = await supabase
+          const { error: updateError } = await supabase
             .from('profiles')
             .update(updates)
             .eq('id', user.id)
-            .select()
+            .select('id')
             .single();
 
+          if (updateError) throw updateError;
+
+          // US-235: the saved row is read back through get_own_profile — a
+          // bare .select() asks for private columns authenticated cannot read.
+          const { data, error } = await fetchOwnProfile();
           if (error) throw error;
 
           set({
@@ -659,6 +718,27 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
           throw error;
+        }
+      },
+
+      /**
+       * Re-read the owner's row into the store (US-241). Anything that writes
+       * `profiles` outside updateProfile — the username card on Settings —
+       * calls this, or the header's copy/share/view links keep the old name.
+       * Never throws; a failed read keeps the profile the store had.
+       */
+      refreshProfile: async () => {
+        const userId = get().user?.id;
+        if (!userId) return null;
+        try {
+          const result = await fetchOwnProfile();
+          if (get().user?.id !== userId) return get().profile;
+          const profile = profileAfterFetch(get().profile, result, userId);
+          set({ profile });
+          return profile;
+        } catch (error) {
+          logger.error('Error refreshing profile', error);
+          return get().profile;
         }
       },
 

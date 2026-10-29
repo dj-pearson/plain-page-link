@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense, type CSSProperties } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
@@ -9,15 +9,9 @@ import SoldProperties from '@/components/profile/SoldProperties';
 import { LeadCaptureCTA } from '@/components/profile/LeadCaptureCTA';
 import { TestimonialSection } from '@/components/profile/TestimonialSection';
 import { ReviewInvite } from '@/components/profile/ReviewInvite';
-import { CustomBlocksSection } from '@/components/profile/CustomBlocksSection';
 import { SocialProofBanner } from '@/components/profile/SocialProofBanner';
 import { FeaturedListingsCarousel } from '@/components/profile/FeaturedListingsCarousel';
 import { StickyActionBar } from '@/components/profile/StickyActionBar';
-import ListingDetailModal from '@/components/profile/ListingDetailModal';
-import { LeadFormModal } from '@/components/profile/LeadFormModal';
-import { CalendlyModal } from '@/components/integrations/CalendlyModal';
-import { HomeValuationForm } from '@/components/forms/HomeValuationForm';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { QuickNav } from '@/components/profile/QuickNav';
 import CustomLinks from '@/components/profile/CustomLinks';
 import { UpcomingOpenHouses } from '@/components/profile/UpcomingOpenHouses';
@@ -33,7 +27,12 @@ import { formatResponseTime } from '@/lib/responseTime';
 import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { parsePrice } from '@/lib/format';
 import { LISTING_PARAM } from '@/lib/listingShare';
-import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
+import {
+  addImagePreload,
+  FEATURED_LISTING_IMAGE_SIZES,
+  PLACEHOLDER_PROPERTY_IMAGE,
+  responsiveImage,
+} from '@/lib/images';
 import { logger } from '@/lib/logger';
 import type { PublicProfileListing } from '@/types';
 import NotFound from './NotFound';
@@ -42,6 +41,32 @@ import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
 import { getSafeOrigin } from '@/lib/utils';
 import { needsCanonicalRedirect, normalizeUsername } from '@/lib/username';
+import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
+import { LazyModal } from '@/components/profile/LazyModal';
+
+// Loaded on demand (US-244). These were static imports, so every visitor to
+// /:username downloaded react-hook-form, zod, DOMPurify, Radix Dialog and the
+// page-builder renderer before the page could render — for forms most of them
+// never open. Each modal is now mounted, and its chunk fetched, only while it
+// is open; the page-builder blocks only when the agent has built a page.
+// (LeadCaptureCTA lazy-loads its own copy of LeadFormModal the same way.)
+const ListingDetailModal = lazy(() => import('@/components/profile/ListingDetailModal'));
+const LeadFormModal = lazy(() =>
+  import('@/components/profile/LeadFormModal').then((m) => ({ default: m.LeadFormModal }))
+);
+const CalendlyModal = lazy(() =>
+  import('@/components/integrations/CalendlyModal').then((m) => ({ default: m.CalendlyModal }))
+);
+const HomeValuationDialog = lazy(() =>
+  import('@/components/forms/HomeValuationDialog').then((m) => ({
+    default: m.HomeValuationDialog,
+  }))
+);
+const CustomBlocksSection = lazy(() =>
+  import('@/components/profile/CustomBlocksSection').then((m) => ({
+    default: m.CustomBlocksSection,
+  }))
+);
 
 export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -153,41 +178,36 @@ export default function FullProfilePage() {
     }
   }, [data]);
 
-  // Preload featured listing images and avatar for faster rendering
+  // Preload the one image that is the page's LCP candidate: the carousel's
+  // first slide.
+  //
+  // This preloaded the avatar and the full-size original of up to five
+  // featured listings - including sold ones the carousel never shows - all at
+  // the same priority, so on a phone they competed with each other and with
+  // the page's own scripts. And its cleanup removed every image preload in the
+  // document, not just its own (US-243).
   useEffect(() => {
-    if (!data) return;
-    const imagesToPreload: string[] = [];
+    if (!data || data.settings?.show_listings === false) return;
 
-    // Preload avatar
-    if (data.profile?.avatar_url) {
-      imagesToPreload.push(data.profile.avatar_url);
-    }
+    // The same choice FeaturedListingsCarousel makes for slide 0: the first
+    // featured listing among the available ones, in their display order.
+    const first = selectAvailableListings(data.listings ?? []).find((l) => l.is_featured);
+    if (!first) return;
 
-    // Preload first image of each featured listing
-    // No inline shapes here: data.listings is PublicProfileListing[], and the
-    // hand-written annotations disagreed with it (is_featured is nullable).
-    const featured = data.listings?.filter((l) => l.is_featured) || [];
-    featured.slice(0, 5).forEach((listing) => {
-      const imgSrc = getImageUrl(listing.image || listing.photos?.[0]);
-      if (imgSrc && imgSrc !== PLACEHOLDER_PROPERTY_IMAGE) {
-        imagesToPreload.push(imgSrc);
-      }
-    });
+    const image = responsiveImage(first.image || first.photos?.[0]);
+    if (image.original === PLACEHOLDER_PROPERTY_IMAGE) return;
 
-    // Preload via link tags for browser-level priority
-    imagesToPreload.forEach((src) => {
-      const link = document.createElement('link');
-      link.rel = 'preload';
-      link.as = 'image';
-      link.href = src;
-      document.head.appendChild(link);
-    });
-
-    return () => {
-      // Cleanup preload links on unmount
-      document.querySelectorAll('link[rel="preload"][as="image"]').forEach((el) => el.remove());
-    };
+    return addImagePreload(image, FEATURED_LISTING_IMAGE_SIZES);
   }, [data]);
+
+  const closeLeadModal = () => {
+    setIsLeadModalOpen(false);
+    setShowingListing(null);
+  };
+  const closeCalendlyModal = () => {
+    setIsCalendlyModalOpen(false);
+    setShowingListing(null);
+  };
 
   /**
    * A showing request on a specific property. Routes to the agent's Calendly
@@ -481,10 +501,19 @@ export default function FullProfilePage() {
         id="main-content"
         tabIndex={-1}
         className="min-h-screen relative"
-        style={{
-          backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
-          color: `hsl(var(--theme-text, 222 47% 11%))`,
-        }}
+        style={
+          {
+            backgroundColor: `hsl(var(--theme-background, 217 33% 97%))`,
+            color: `hsl(var(--theme-text, 222 47% 11%))`,
+            // applyTheme writes only --theme-*; Tailwind's bg-primary /
+            // text-primary-foreground read --primary. Re-point them here, on
+            // the profile alone, so the profile's components can use the
+            // tokens and get the agent's colour, not the dashboard navy
+            // (US-247). Fallback is the 'modern' preset's #2563eb.
+            '--primary': 'var(--theme-primary, 221 83% 53%)',
+            '--primary-foreground': 'var(--theme-primary-foreground, 0 0% 100%)',
+          } as CSSProperties
+        }
       >
         <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 max-w-5xl relative z-10 pb-24 sm:pb-8">
           <div className="space-y-4 sm:space-y-6">
@@ -603,11 +632,15 @@ export default function FullProfilePage() {
                 listings, testimonials, contact buttons and lead capture off
                 the public web entirely (US-116). */}
             {customPage && (
-              <CustomBlocksSection
-                blocks={customPage.blocks}
-                userId={profile.id}
-                title={customPage.title}
-              />
+              <LazyLoadErrorBoundary fallback={null}>
+                <Suspense fallback={<div className="min-h-[200px]" aria-hidden="true" />}>
+                  <CustomBlocksSection
+                    blocks={customPage.blocks}
+                    userId={profile.id}
+                    title={customPage.title}
+                  />
+                </Suspense>
+              </LazyLoadErrorBoundary>
             )}
 
             {/* Custom Links */}
@@ -726,61 +759,65 @@ export default function FullProfilePage() {
         </div>
 
         {/* Listing Detail Modal */}
+        {/* Each modal is mounted only while open, so its chunk is fetched on
+            first use rather than with the page (US-244). */}
         {selectedListing && (
-          <ListingDetailModal
-            listing={selectedListing}
-            isOpen={!!selectedListing}
-            onClose={() => setSelectedListing(null)}
-            calendlyUrl={data?.profile?.calendly_url ?? undefined}
-            onRequestShowing={handleRequestShowing}
-          />
+          <LazyModal onClose={() => setSelectedListing(null)}>
+            <ListingDetailModal
+              listing={selectedListing}
+              isOpen={!!selectedListing}
+              onClose={() => setSelectedListing(null)}
+              calendlyUrl={data?.profile?.calendly_url ?? undefined}
+              onRequestShowing={handleRequestShowing}
+            />
+          </LazyModal>
         )}
 
         {/* Lead Form Modal */}
-        <LeadFormModal
-          isOpen={isLeadModalOpen}
-          onClose={() => {
-            setIsLeadModalOpen(false);
-            setShowingListing(null);
-          }}
-          formType="contact"
-          agentId={profile.id}
-          agentName={profile.full_name || profile.username}
-          listing={
-            showingListing ? { id: showingListing.id, address: showingListing.address } : undefined
-          }
-        />
+        {isLeadModalOpen && (
+          <LazyModal onClose={closeLeadModal}>
+            <LeadFormModal
+              isOpen={isLeadModalOpen}
+              onClose={closeLeadModal}
+              formType="contact"
+              agentId={profile.id}
+              agentName={profile.full_name || profile.username}
+              listing={
+                showingListing
+                  ? { id: showingListing.id, address: showingListing.address }
+                  : undefined
+              }
+            />
+          </LazyModal>
+        )}
 
         {/* Calendly Modal */}
-        {profile.calendly_url && (
-          <CalendlyModal
-            isOpen={isCalendlyModalOpen}
-            onClose={() => {
-              setIsCalendlyModalOpen(false);
-              setShowingListing(null);
-            }}
-            calendlyUrl={profile.calendly_url}
-            agentId={profile.id}
-            title="Schedule a Showing"
-            subtitle="Choose a time that works best for you"
-            listingAddress={showingListing?.address}
-            listingId={showingListing?.id}
-          />
+        {profile.calendly_url && isCalendlyModalOpen && (
+          <LazyModal onClose={closeCalendlyModal}>
+            <CalendlyModal
+              isOpen={isCalendlyModalOpen}
+              onClose={closeCalendlyModal}
+              calendlyUrl={profile.calendly_url}
+              agentId={profile.id}
+              title="Schedule a Showing"
+              subtitle="Choose a time that works best for you"
+              listingAddress={showingListing?.address}
+              listingId={showingListing?.id}
+            />
+          </LazyModal>
         )}
 
         {/* Home Valuation Modal */}
-        <Dialog open={isHomeValuationModalOpen} onOpenChange={setIsHomeValuationModalOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            {/* Hidden: HomeValuationForm renders its own visible heading, but a
-                dialog without a title is announced unnamed (US-112). */}
-            <DialogTitle className="sr-only">Home valuation request</DialogTitle>
-            <HomeValuationForm
+        {isHomeValuationModalOpen && (
+          <LazyModal onClose={() => setIsHomeValuationModalOpen(false)}>
+            <HomeValuationDialog
+              open={isHomeValuationModalOpen}
+              onOpenChange={setIsHomeValuationModalOpen}
               agentId={profile.id}
               agentName={profile.full_name || profile.username}
-              onSuccess={() => setIsHomeValuationModalOpen(false)}
             />
-          </DialogContent>
-        </Dialog>
+          </LazyModal>
+        )}
 
         {/* Sticky Action Bar */}
         <StickyActionBar

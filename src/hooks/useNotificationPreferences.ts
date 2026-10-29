@@ -12,6 +12,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { fetchOwnProfile } from '@/lib/ownProfile';
 import type { Json } from '@/integrations/supabase/types';
 
 export type LeadNotificationMode = 'instant' | 'daily_digest' | 'off';
@@ -29,7 +30,11 @@ export interface NotificationPreferences {
   [key: string]: Json | undefined;
 }
 
-const DEFAULTS: NotificationPreferences = { leads: 'instant', sla_hours: DEFAULT_SLA_HOURS, digest: 'daily' };
+const DEFAULTS: NotificationPreferences = {
+  leads: 'instant',
+  sla_hours: DEFAULT_SLA_HOURS,
+  digest: 'daily',
+};
 
 export function useNotificationPreferences() {
   const { user } = useAuthStore();
@@ -39,11 +44,9 @@ export function useNotificationPreferences() {
     queryKey: ['notification-preferences', user?.id],
     enabled: !!user?.id,
     queryFn: async (): Promise<NotificationPreferences> => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('notification_preferences')
-        .eq('id', user!.id)
-        .single();
+      // US-235: notification_preferences is a private column, readable by its
+      // owner only through get_own_profile.
+      const { data, error } = await fetchOwnProfile();
       if (error) throw error;
 
       const stored = (data?.notification_preferences ?? {}) as Record<string, unknown>;
@@ -51,7 +54,8 @@ export function useNotificationPreferences() {
         ...(stored as NotificationPreferences),
         leads: (stored.leads as LeadNotificationMode) ?? DEFAULTS.leads,
         sla_hours: typeof stored.sla_hours === 'number' ? stored.sla_hours : DEFAULTS.sla_hours,
-        digest: stored.digest === 'weekly' || stored.digest === 'off' ? stored.digest : DEFAULTS.digest,
+        digest:
+          stored.digest === 'weekly' || stored.digest === 'off' ? stored.digest : DEFAULTS.digest,
       };
     },
   });

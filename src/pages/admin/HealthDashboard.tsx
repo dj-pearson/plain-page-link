@@ -56,6 +56,12 @@ async function countRows(table: string, filter?: { column: string; gte: string }
 
 type SubscriptionRow = SubscriptionMetricRow;
 
+/** The part of the admin-users response this dashboard reads. */
+interface AdminUsersSummary {
+  stats?: { active7d?: number };
+  referrals?: { source: string; signups: number }[];
+}
+
 async function fetchDated(table: string, column: string, since: string): Promise<string[]> {
   try {
     const client = supabase as unknown as {
@@ -107,7 +113,7 @@ export default function HealthDashboard() {
       const [
         totalUsers,
         newSignups,
-        activeUsers,
+        adminUsers,
         totalListings,
         totalLeads,
         signupDates,
@@ -119,7 +125,7 @@ export default function HealthDashboard() {
         // Real sign-ins live in auth.users, which only admin-users can read.
         edgeFunctions
           .invoke('admin-users', { body: {} })
-          .then(({ data }) => (data as { stats?: { active7d?: number } } | null)?.stats?.active7d ?? null)
+          .then(({ data }) => data as AdminUsersSummary | null)
           .catch(() => null),
         countRows('listings'),
         countRows('leads'),
@@ -160,26 +166,11 @@ export default function HealthDashboard() {
       }
 
       // US-232: where the last 30 days' signups came from — the profile whose
-      // "Powered by" badge sent them, or the campaign.
-      let referrals: { source: string; signups: number }[] = [];
-      try {
-        const { data: refRows, error: refError } = await supabase
-          .from('profiles')
-          .select('referred_by, signup_source')
-          .gte('created_at', daysAgoISO(30));
-        if (refError) throw refError;
-        const counts = new Map<string, number>();
-        for (const r of (refRows ?? []) as { referred_by: string | null; signup_source: string | null }[]) {
-          const key = r.referred_by ? `@${r.referred_by}` : r.signup_source || 'direct';
-          counts.set(key, (counts.get(key) ?? 0) + 1);
-        }
-        referrals = [...counts.entries()]
-          .map(([source, signups]) => ({ source, signups }))
-          .sort((a, b) => b.signups - a.signups)
-          .slice(0, 10);
-      } catch (error) {
-        logger.error('Health dashboard: referral metrics unavailable', error as Error);
-      }
+      // "Powered by" badge sent them, or the campaign. Counted by admin-users
+      // (US-235): referred_by and signup_source are private columns, and a
+      // browser read only ever saw published profiles anyway.
+      const referrals = adminUsers?.referrals ?? [];
+      const activeUsers = adminUsers?.stats?.active7d ?? null;
 
       return {
         referrals,
@@ -204,7 +195,9 @@ export default function HealthDashboard() {
   // US-231: MRR from what each subscription is actually charged (amount and
   // interval), churn over 30 days and over both spellings of cancelled — it
   // filtered 'canceled' while the webhook writes 'cancelled', so read 0%.
-  const activeSubs = (data?.subs ?? []).filter((s) => s.status === 'active' || s.status === 'past_due');
+  const activeSubs = (data?.subs ?? []).filter(
+    (s) => s.status === 'active' || s.status === 'past_due'
+  );
   const planPrice = (name: string | null): number => {
     const plan = PRICING_PLANS.find((p) => p.id === (name ?? '').toLowerCase());
     return plan?.price_monthly ?? 0;
@@ -219,7 +212,11 @@ export default function HealthDashboard() {
 
   const metricCards = [
     { label: 'Total Users', value: data?.totalUsers, icon: <Users className="h-5 w-5" /> },
-    { label: 'Signed in (7d)', value: data?.activeUsers ?? undefined, icon: <Activity className="h-5 w-5" /> },
+    {
+      label: 'Signed in (7d)',
+      value: data?.activeUsers ?? undefined,
+      icon: <Activity className="h-5 w-5" />,
+    },
     { label: 'New Signups (7d)', value: data?.newSignups, icon: <UserPlus className="h-5 w-5" /> },
     {
       label: 'Total Listings',

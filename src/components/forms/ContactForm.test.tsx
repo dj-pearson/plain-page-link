@@ -69,6 +69,28 @@ describe('ContactForm', () => {
     expect(trackMock).toHaveBeenCalledWith(expect.anything(), 'contact_form', true);
   });
 
+  // US-246: the success card told every visitor to check their email for a
+  // confirmation — including one who gave only a phone number (US-228).
+  it('does not point a phone-only visitor at an inbox they never gave', async () => {
+    renderWithProviders(<ContactForm agentId={AGENT_ID} agentName="Jane Doe" />);
+    await userEvent.type(screen.getByLabelText(/your name/i), 'Dana Rivers');
+    await userEvent.type(screen.getByLabelText(/phone number/i), '5550142000');
+    await userEvent.type(screen.getByLabelText(/message/i), 'Call me about Maple Avenue.');
+    await userEvent.click(screen.getByRole('button', { name: /send message/i }));
+
+    expect(await screen.findByText('Message Sent!')).toBeInTheDocument();
+    expect(screen.queryByText(/email/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/jane doe will reach you at the phone number/i)).toBeInTheDocument();
+  });
+
+  it('promises no confirmation email even when the visitor gave an address', async () => {
+    renderWithProviders(<ContactForm agentId={AGENT_ID} agentName="Jane Doe" />);
+    await fillAndSubmit();
+
+    expect(await screen.findByText('Message Sent!')).toBeInTheDocument();
+    expect(screen.queryByText(/confirmation/i)).not.toBeInTheDocument();
+  });
+
   it('surfaces the reason the submission was rejected, not a generic failure', async () => {
     submitLeadMock.mockResolvedValue({ success: false, error: 'Invalid lead type' });
     renderWithProviders(<ContactForm agentId={AGENT_ID} agentName="Jane Doe" />);

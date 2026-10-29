@@ -3,47 +3,27 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getClientIP } from '../_shared/auth.ts';
 import { sanitizeRedirectUrl } from '../_shared/url-validation.ts';
-import { decode as base64Decode, encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { getSiteUrl } from '../_shared/env.ts';
+import {
+  SAML_DISABLED_MESSAGE,
+  checkIdTokenClaims,
+  decodeJwtPayload,
+  isOidcProvider,
+  mayMintLinkFor,
+} from '../_shared/sso.ts';
 
 /**
- * SSO Callback - Handle SAML Response or OIDC Callback
- * Validates response, creates/updates user, issues session
+ * SSO Callback - Handle an OIDC callback and issue a session.
+ *
+ * SAML responses are refused (US-233): nothing verified their signature, so a
+ * forged response could sign in as any user. See _shared/sso.ts.
  */
 
-// Simple XML parser for SAML responses
-function extractFromXML(xml: string, tagName: string): string | null {
-  const regex = new RegExp(`<[^>]*:?${tagName}[^>]*>([^<]*)<`, 'i');
-  const match = xml.match(regex);
-  return match ? match[1].trim() : null;
-}
-
-// Extract SAML attributes
-function extractSAMLAttributes(xml: string): Record<string, string> {
-  const attributes: Record<string, string> = {};
-
-  // Common attribute patterns
-  const patterns = [
-    { name: 'email', regex: /<(?:saml2?:)?Attribute[^>]*Name="(?:email|mail|http:\/\/schemas\.xmlsoap\.org\/ws\/2005\/05\/identity\/claims\/emailaddress)"[^>]*>[\s\S]*?<(?:saml2?:)?AttributeValue[^>]*>([^<]+)</ },
-    { name: 'firstName', regex: /<(?:saml2?:)?Attribute[^>]*Name="(?:firstName|givenName|http:\/\/schemas\.xmlsoap\.org\/ws\/2005\/05\/identity\/claims\/givenname)"[^>]*>[\s\S]*?<(?:saml2?:)?AttributeValue[^>]*>([^<]+)</ },
-    { name: 'lastName', regex: /<(?:saml2?:)?Attribute[^>]*Name="(?:lastName|surname|sn|http:\/\/schemas\.xmlsoap\.org\/ws\/2005\/05\/identity\/claims\/surname)"[^>]*>[\s\S]*?<(?:saml2?:)?AttributeValue[^>]*>([^<]+)</ },
-    { name: 'displayName', regex: /<(?:saml2?:)?Attribute[^>]*Name="(?:displayName|name|http:\/\/schemas\.xmlsoap\.org\/ws\/2005\/05\/identity\/claims\/name)"[^>]*>[\s\S]*?<(?:saml2?:)?AttributeValue[^>]*>([^<]+)</ },
-  ];
-
-  for (const pattern of patterns) {
-    const match = xml.match(pattern.regex);
-    if (match) {
-      attributes[pattern.name] = match[1].trim();
-    }
+/** An error carrying the HTTP status the caller should see. */
+class SsoError extends Error {
+  constructor(message: string, readonly status = 400) {
+    super(message);
   }
-
-  // Extract NameID
-  const nameIdMatch = xml.match(/<(?:saml2?:)?NameID[^>]*>([^<]+)</);
-  if (nameIdMatch) {
-    attributes.nameId = nameIdMatch[1].trim();
-  }
-
-  return attributes;
 }
 
 // Exchange OIDC code for tokens
@@ -79,18 +59,6 @@ async function exchangeOIDCCode(
   return response.json();
 }
 
-// Decode JWT payload (without verification - verification should be done properly in production)
-function decodeJWTPayload(token: string): Record<string, any> {
-  const parts = token.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWT format');
-  }
-
-  const payload = parts[1];
-  const decoded = new TextDecoder().decode(base64Decode(payload.replace(/-/g, '+').replace(/_/g, '/')));
-  return JSON.parse(decoded);
-}
-
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
 
@@ -108,115 +76,89 @@ serve(async (req) => {
     const userAgent = req.headers.get('user-agent') || '';
 
     const body = await req.json();
-    const { SAMLResponse, RelayState, code, state, error: oauthError, error_description } = body;
+    const { SAMLResponse, code, state, error: oauthError, error_description } = body;
+
+    // SAML is refused before anything is looked up or written: nothing here
+    // can verify the response's signature, so nothing in it can be believed,
+    // and no session is minted from it.
+    if (SAMLResponse) {
+      throw new SsoError(SAML_DISABLED_MESSAGE, 400);
+    }
 
     // Handle OAuth/OIDC errors
     if (oauthError) {
       throw new Error(error_description || oauthError);
     }
 
-    let ssoSession;
-    let ssoConfig;
-    let userEmail: string;
-    let userAttributes: Record<string, string> = {};
-    let subjectId: string;
-
-    if (SAMLResponse) {
-      // Handle SAML Response
-      const samlXml = new TextDecoder().decode(base64Decode(SAMLResponse));
-
-      // Parse RelayState
-      let relayStateData: { requestId: string; state: string } = { requestId: '', state: '' };
-      if (RelayState) {
-        try {
-          relayStateData = JSON.parse(new TextDecoder().decode(base64Decode(RelayState)));
-        } catch {
-          console.error('Failed to parse RelayState');
-        }
-      }
-
-      // Find session by request ID
-      const { data: session, error: sessionError } = await supabase
-        .from('sso_login_sessions')
-        .select('*, enterprise_sso_config(*)')
-        .eq('request_id', relayStateData.requestId)
-        .eq('status', 'pending')
-        .single();
-
-      if (sessionError || !session) {
-        throw new Error('Invalid or expired SSO session');
-      }
-
-      ssoSession = session;
-      ssoConfig = session.enterprise_sso_config;
-
-      // Extract user info from SAML assertion
-      userAttributes = extractSAMLAttributes(samlXml);
-      userEmail = userAttributes.email || userAttributes.nameId || ssoSession.user_email;
-      subjectId = userAttributes.nameId || userEmail;
-
-      if (!userEmail) {
-        throw new Error('Unable to extract email from SAML response');
-      }
-
-      // Store SAML response for audit
-      await supabase
-        .from('sso_login_sessions')
-        .update({
-          saml_response: SAMLResponse,
-          saml_assertion_id: extractFromXML(samlXml, 'AssertionID') || undefined,
-        })
-        .eq('id', ssoSession.id);
-
-    } else if (code && state) {
-      // Handle OIDC Callback
-      const { data: session, error: sessionError } = await supabase
-        .from('sso_login_sessions')
-        .select('*, enterprise_sso_config(*)')
-        .eq('request_id', state)
-        .eq('status', 'pending')
-        .single();
-
-      if (sessionError || !session) {
-        throw new Error('Invalid or expired SSO session');
-      }
-
-      ssoSession = session;
-      ssoConfig = session.enterprise_sso_config;
-
-      // Exchange code for tokens
-      const tokens = await exchangeOIDCCode(
-        code,
-        ssoConfig.oidc_client_id,
-        ssoConfig.oidc_client_secret,
-        ssoConfig.oidc_token_endpoint,
-        `${appUrl}/auth/sso/callback`
-      );
-
-      // Decode ID token to get user info
-      const idTokenPayload = decodeJWTPayload(tokens.id_token);
-
-      userEmail = idTokenPayload.email;
-      subjectId = idTokenPayload.sub;
-      userAttributes = {
-        email: idTokenPayload.email,
-        firstName: idTokenPayload.given_name,
-        lastName: idTokenPayload.family_name,
-        displayName: idTokenPayload.name,
-        nameId: idTokenPayload.sub,
-      };
-
-      if (!userEmail) {
-        throw new Error('Unable to extract email from OIDC response');
-      }
-    } else {
-      throw new Error('Invalid SSO callback - missing SAMLResponse or code');
+    if (!code || !state) {
+      throw new Error('Invalid SSO callback - missing code or state');
     }
 
-    // Check if session is expired
+    const { data: ssoSession, error: sessionError } = await supabase
+      .from('sso_login_sessions')
+      .select('*, enterprise_sso_config(*)')
+      .eq('request_id', state)
+      .eq('status', 'pending')
+      .single();
+
+    if (sessionError || !ssoSession || !ssoSession.enterprise_sso_config) {
+      throw new Error('Invalid or expired SSO session');
+    }
+
+    const ssoConfig = ssoSession.enterprise_sso_config;
+
+    if (!isOidcProvider(ssoConfig.sso_provider)) {
+      throw new SsoError(SAML_DISABLED_MESSAGE, 400);
+    }
+
+    // Check expiry before spending the code at the IdP.
     if (new Date(ssoSession.expires_at) < new Date()) {
       throw new Error('SSO session has expired');
     }
+
+    // Exchange code for tokens
+    const tokens = await exchangeOIDCCode(
+      code,
+      ssoConfig.oidc_client_id,
+      ssoConfig.oidc_client_secret,
+      ssoConfig.oidc_token_endpoint,
+      `${appUrl}/auth/sso/callback`
+    );
+
+    // The ID token came straight from the token endpoint over TLS; its claims
+    // must still name this client, this login's nonce, and the org's domain.
+    let claims: Record<string, unknown>;
+    try {
+      claims = decodeJwtPayload(tokens.id_token);
+    } catch {
+      throw new SsoError('Invalid ID token', 401);
+    }
+
+    const decision = checkIdTokenClaims(
+      claims,
+      {
+        clientId: ssoConfig.oidc_client_id,
+        issuer: ssoConfig.oidc_issuer,
+        nonce: ssoSession.oidc_nonce,
+        nowSeconds: Math.floor(Date.now() / 1000),
+      },
+      ssoConfig.organization_domain,
+    );
+
+    if (!decision.ok) {
+      await supabase.from('sso_audit_logs').insert({
+        config_id: ssoConfig.id,
+        event_type: 'login_failed',
+        event_details: { reason: decision.error },
+        ip_address: clientIP,
+        user_agent: userAgent,
+      });
+      throw new SsoError(decision.error, decision.status);
+    }
+
+    const userEmail = decision.value.email;
+    const subjectId = decision.value.subjectId;
+    const userAttributes: Record<string, string> = decision.value.attributes;
 
     // Find or create user
     let userId: string | null = null;
@@ -258,7 +200,7 @@ serve(async (req) => {
     } else {
       // Check if user exists by email
       const { data: existingUser } = await supabase.auth.admin.listUsers();
-      const userByEmail = existingUser?.users?.find((u: { email?: string }) => u.email === userEmail);
+      const userByEmail = existingUser?.users?.find((u: { email?: string }) => (u.email ?? '').toLowerCase() === userEmail);
 
       if (userByEmail) {
         userId = userByEmail.id;
@@ -325,6 +267,12 @@ serve(async (req) => {
       throw new Error('Failed to authenticate user');
     }
 
+    // Whatever path resolved the account, the link is only ever minted for
+    // an address in the organisation's own domain.
+    if (!mayMintLinkFor(userEmail, ssoConfig.organization_domain)) {
+      throw new SsoError("Email is not in this organization's domain", 403);
+    }
+
     // Generate session token using Supabase Admin
     const { data: sessionData, error: sessionGenError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
@@ -387,13 +335,14 @@ serve(async (req) => {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An error occurred';
+    const status = error instanceof SsoError ? error.status : 400;
     console.error('SSO Callback Error:', message);
 
     return new Response(
       JSON.stringify({ error: message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status,
       }
     );
   }

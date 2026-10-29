@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeUsers, searchUsers, userStats } from './merge.ts';
+import { mergeUsers, searchUsers, signupReferrals, userStats } from './merge.ts';
 
 const now = new Date('2026-10-01T12:00:00Z');
 const users = [
@@ -28,5 +28,20 @@ describe('admin users (US-231)', () => {
 
   it('counts activity by last sign-in, not by profile edits', () => {
     expect(userStats(rows, now)).toEqual({ total: 3, active7d: 1, active24h: 1, admins: 1, subscribed: 1 });
+  });
+
+  it('counts recent signups by referrer, then campaign, then direct (US-235: server-side)', () => {
+    const profiles = [
+      { created_at: '2026-09-30T00:00:00Z', referred_by: 'danarivers', signup_source: 'profile_badge' },
+      { created_at: '2026-09-29T00:00:00Z', referred_by: 'danarivers', signup_source: null },
+      { created_at: '2026-09-28T00:00:00Z', referred_by: null, signup_source: 'newsletter' },
+      { created_at: '2026-09-27T00:00:00Z', referred_by: null, signup_source: null },
+      { created_at: '2026-07-01T00:00:00Z', referred_by: 'old', signup_source: null },
+    ];
+    expect(signupReferrals(profiles, 30, now)).toEqual([
+      { source: '@danarivers', signups: 2 },
+      { source: 'newsletter', signups: 1 },
+      { source: 'direct', signups: 1 },
+    ]);
   });
 });

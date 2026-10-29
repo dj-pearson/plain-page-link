@@ -7,14 +7,17 @@
  * not find, let alone support, a single user. This does the listing server-
  * side, for admins only.
  *
- *   POST { search?: string }  → { users: AdminUserRow[], stats: AdminUserStats }
+ *   POST { search?: string }  → { users: AdminUserRow[], stats: AdminUserStats, referrals }
+ *
+ * referrals (US-235): signups by referrer for the Health dashboard. profiles'
+ * referred_by / signup_source are private columns the browser cannot select.
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAdmin } from '../_shared/auth.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
-import { mergeUsers, searchUsers, userStats, type AuthUserLike } from './merge.ts';
+import { mergeUsers, searchUsers, signupReferrals, userStats, type AuthUserLike } from './merge.ts';
 
 /** Enough for this stage of the business; page through when it is not. */
 const MAX_USERS = 5000;
@@ -39,14 +42,21 @@ serve(async (req) => {
     }
 
     const [profiles, roles, subs] = await Promise.all([
-      service.from('profiles').select('id, username, full_name'),
+      service.from('profiles').select('id, username, full_name, created_at, referred_by, signup_source'),
       service.from('user_roles').select('user_id, role'),
       service.from('subscriptions').select('user_id, plan_name, status, stripe_customer_id'),
     ]);
     for (const r of [profiles, roles, subs]) if (r.error) throw r.error;
 
     const rows = mergeUsers(users, profiles.data ?? [], roles.data ?? [], subs.data ?? []);
-    return successResponse({ users: searchUsers(rows, search), stats: userStats(rows) }, req);
+    return successResponse(
+      {
+        users: searchUsers(rows, search),
+        stats: userStats(rows),
+        referrals: signupReferrals(profiles.data ?? []),
+      },
+      req
+    );
   } catch (error) {
     return handleUnexpectedError(error, req);
   }

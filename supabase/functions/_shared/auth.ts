@@ -5,6 +5,7 @@
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { forbidden, unauthorized } from './http-error.ts';
+import { isServiceRoleRequest } from './service-auth.ts';
 
 /**
  * Get authenticated user from request
@@ -52,6 +53,19 @@ export async function requireAdmin(req: Request, supabase: SupabaseClient) {
   }
 
   return user;
+}
+
+/**
+ * Require an admin, or the backend itself (the service-role key).
+ *
+ * US-234: run-scheduled-audit calls seo-audit and analyze-content
+ * server-to-server with the service-role key, which carries no user, so
+ * requireAdmin alone would refuse the scheduler. Returns the admin user, or
+ * null for a service-role call — and never anything for anyone else.
+ */
+export async function requireAdminOrServiceRole(req: Request, supabase: SupabaseClient) {
+  if (isServiceRoleRequest(req)) return null;
+  return await requireAdmin(req, supabase);
 }
 
 // The one implementation lives in client-ip.ts (US-214).

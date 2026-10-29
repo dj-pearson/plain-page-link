@@ -1644,8 +1644,10 @@ check('plan limits are enforced for every metered table', () => {
       `INSERT INTO public.testimonials (user_id, client_name, review, rating) VALUES ('${uid}', 'Fourth', 'Great', 5);`
     );
     if (own !== 'blocked:testimonials') out.push(`free plan: the agent's own 4th testimonial was "${own}"`);
+    // A visitor's review arrives through submit-review, as the service role
+    // (US-236 dropped the anon INSERT policy that used to carry it).
     try {
-      q(`SET ROLE anon;
+      q(`SET ROLE service_role;
          INSERT INTO public.testimonials (user_id, client_name, review, rating, is_published)
            VALUES ('${uid}', 'A visitor', 'Lovely to work with', 5, false);`);
     } catch (e) {
@@ -1729,7 +1731,8 @@ const DEFINER_CALLABLE = new Map([
   // authenticated only: each checks auth.uid() or admin itself.
   ['get_plan_usage', { why: 'reads auth.uid() only' }],
   ['analytics_visible_since', { why: 'reads auth.uid() only' }],
-  ['get_user_plan', { why: 'plan name and limits; no contact data' }],
+  ['get_user_plan', { why: "assert_caller_is unless admin (US-235); nested SQL calls resolve_user_plan" }],
+  ['get_own_profile', { why: 'returns the row WHERE id = auth.uid() only (US-235)' }],
   ['get_user_sessions', { why: 'assert_caller_is' }],
   ['get_connected_search_platforms', { why: 'assert_caller_is' }],
   ['log_lead_activity', { why: 'checks lead ownership against auth.uid()' }],
@@ -2050,6 +2053,365 @@ check('a signup records who referred it, and the agent cannot rewrite it', () =>
       q(`DELETE FROM public.user_roles WHERE user_id IN ('${referrer}', '${newbie}');
          DELETE FROM public.profiles WHERE id IN ('${referrer}', '${newbie}');
          DELETE FROM auth.users WHERE id IN ('${referrer}', '${newbie}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// US-239: the Analytics totals were array lengths of pages capped at 1,000
+// views and 500 leads. analytics_summary() counts in the database — past those
+// caps — and must still stop at the plan's history window, and at the caller.
+check('analytics_summary counts past the old row caps, inside the plan history window', () => {
+  const out = [];
+  const me = '00000000-dead-beef-0000-0000000a2391';
+  const other = '00000000-dead-beef-0000-0000000a2392';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${me}', 'sum1@example.test'), ('${other}', 'sum2@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.analytics_views (user_id, visitor_id, viewed_at)
+         SELECT '${me}', 'v' || (g % 300), now() - make_interval(hours => g % 72)
+           FROM generate_series(1, 1500) g;
+       -- Older than the free plan's 30-day window: hidden, even when asked for.
+       INSERT INTO public.analytics_views (user_id, visitor_id, viewed_at)
+         SELECT '${me}', 'old', now() - interval '200 days' FROM generate_series(1, 10);
+       INSERT INTO public.analytics_views (user_id, visitor_id, viewed_at)
+         SELECT '${other}', 'x', now() FROM generate_series(1, 5);
+       INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, status)
+         SELECT '${me}', (ARRAY['buyer', 'seller'])[1 + g % 2], 'S' || g, 'enc',
+                CASE WHEN g % 10 = 0 THEN 'converted' ELSE 'new' END
+           FROM generate_series(1, 600) g;
+       -- One visitor each: throttle_analytics_events caps a single visitor's burst.
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_label)
+         SELECT '${me}', 'e' || g, 'link_click', 'Zillow' FROM generate_series(1, 1200) g;`);
+    const [raw] = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}';
+      SELECT public.analytics_summary(now() - interval '365 days', NULL, 'America/Chicago')::text;`);
+    const s = JSON.parse(raw);
+    if (s.views !== 1500) out.push(`views is ${s.views}, expected 1500 (past the old 1,000 cap, none older than the plan window)`);
+    if (s.visitors !== 300) out.push(`visitors is ${s.visitors}, expected 300`);
+    const dayTotal = (s.by_day ?? []).reduce((n, d) => n + d.views, 0);
+    if (dayTotal !== 1500) out.push(`by_day sums to ${dayTotal}, expected 1500`);
+    if (s.leads !== 600) out.push(`leads is ${s.leads}, expected 600 (past the old 500 cap)`);
+    if (s.conversions !== 60) out.push(`conversions is ${s.conversions}, expected 60`);
+    if (s.leads_by_type?.buyer !== 300) out.push(`leads_by_type.buyer is ${s.leads_by_type?.buyer}, expected 300`);
+    const zillow = (s.events ?? []).find((e) => e.type === 'link_click' && e.label === 'Zillow');
+    if (zillow?.count !== 1200) out.push(`Zillow link clicks are ${zillow?.count}, expected 1200`);
+    const [prev] = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}';
+      SELECT public.analytics_summary(now() - interval '400 days', now() - interval '100 days')::text;`);
+    const p = JSON.parse(prev);
+    if (p.views !== 0) out.push(`a window behind the plan's history limit counted ${p.views} views, expected 0`);
+    try {
+      q(`SET ROLE anon; SELECT public.analytics_summary(now() - interval '1 day');`);
+      out.push('anon can call analytics_summary');
+    } catch {
+      /* expected */
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.analytics_events WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.analytics_views WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.leads WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${me}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${me}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// US-236: lead ownership and lead dates are not the agent's to rewrite.
+//   * locked_lead_ids() ranks a month's leads by created_at, and plan_usage()
+//     counts by it, so `UPDATE leads SET created_at = <last month>` moved a
+//     locked lead into a month with room and unlocked it.
+//   * "Users can update their own leads" let the assignee in (USING ... OR
+//     auth.uid() = assigned_to) with no WITH CHECK, so an assignee could
+//     `SET user_id = auth.uid()` and take the lead out of the owner's CRM.
+//   * The US-074 anon INSERT policy on testimonials outlived the move to the
+//     submit-review edge function (service role), and let anyone post a
+//     pending review straight past its validation and notification.
+// ---------------------------------------------------------------------------
+check('a locked lead cannot be backdated, and lead/contact/open-house dates are frozen', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000236a01';
+  const listing = '00000000-dead-beef-0000-000000236a02';
+  const contact = '00000000-dead-beef-0000-000000236a03';
+  const openHouse = '00000000-dead-beef-0000-000000236a04';
+  const as = (sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${agent}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'backdate@example.test') ON CONFLICT (id) DO NOTHING;`);
+    const [limit] = q(`SELECT public.plan_limit('${agent}', 'leads_per_month');`);
+    if (Number(limit) < 0) {
+      out.push(`the default plan has unlimited leads_per_month (${limit}); nothing to lock`);
+      return out;
+    }
+    // One more lead this month than the plan allows; the last one is locked.
+    q(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, created_at)
+         SELECT '${agent}', 'buyer', 'B' || g, 'enc', date_trunc('month', now()) + g * interval '1 second'
+           FROM generate_series(1, ${Number(limit) + 1}) g;`);
+    const [locked] = q(`SELECT id FROM public.leads WHERE user_id = '${agent}' ORDER BY created_at DESC LIMIT 1;`);
+    const isLocked = () =>
+      q(`SELECT count(*) FROM public.locked_lead_ids('${agent}', ARRAY['${locked}']::uuid[]);`)[0] === '1';
+    if (!isLocked()) out.push('setup: the lead past the monthly allowance is not locked');
+
+    // The exploit: move it into last month, where the allowance is untouched.
+    if (!refused(() => as(`UPDATE public.leads SET created_at = now() - interval '45 days' WHERE id = '${locked}';`)))
+      out.push("an agent changed a lead's created_at");
+    if (!isLocked()) out.push('backdating created_at unlocked a locked lead');
+
+    // The agent's ordinary edits still work, including on the locked lead.
+    if (refused(() => as(`UPDATE public.leads SET status = 'contacted', notes = 'called' WHERE id = '${locked}';`)))
+      out.push("an agent could not update their own lead's status and notes");
+    // Writing the unchanged value (a full-row PATCH) is not a change.
+    if (refused(() => as(`UPDATE public.leads SET created_at = created_at, user_id = user_id WHERE id = '${locked}';`)))
+      out.push('an agent was refused a write that left created_at and user_id unchanged');
+
+    // contacts and open_houses carry created_at too; neither is the agent's to rewrite.
+    q(`INSERT INTO public.listings (id, user_id, address, city, price, status)
+         VALUES ('${listing}', '${agent}', '1 Frozen St', 'Testville', '1', 'active');
+       INSERT INTO public.contacts (id, user_id, first_name, relationship)
+         VALUES ('${contact}', '${agent}', 'C', 'past_client');
+       INSERT INTO public.open_houses (id, user_id, listing_id, starts_at, ends_at)
+         VALUES ('${openHouse}', '${agent}', '${listing}', now() + interval '1 day', now() + interval '1 day 2 hours');`);
+    if (!refused(() => as(`UPDATE public.contacts SET created_at = now() - interval '1 year' WHERE id = '${contact}';`)))
+      out.push("an agent changed a contact's created_at");
+    if (!refused(() => as(`UPDATE public.open_houses SET created_at = now() - interval '1 year' WHERE id = '${openHouse}';`)))
+      out.push("an agent changed an open house's created_at");
+    if (refused(() => as(`UPDATE public.contacts SET notes = 'x' WHERE id = '${contact}';`)))
+      out.push('an agent could not edit their own contact');
+    if (refused(() => as(`UPDATE public.open_houses SET public_notes = 'x' WHERE id = '${openHouse}';`)))
+      out.push('an agent could not edit their own open house');
+
+    // The service role (backfills, admin repair) is not bound by it.
+    if (refused(() => q(`SET ROLE service_role; UPDATE public.leads SET created_at = created_at - interval '1 second' WHERE id = '${locked}';`)))
+      out.push("the service role could not correct a lead's created_at");
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.open_houses WHERE user_id = '${agent}';
+         DELETE FROM public.contacts WHERE user_id = '${agent}';
+         DELETE FROM public.listings WHERE user_id = '${agent}';
+         DELETE FROM public.leads WHERE user_id = '${agent}';
+         DELETE FROM public.profiles WHERE id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+check('an assignee works a lead but cannot take it or hand it away', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-000000236b01';
+  const mate = '00000000-dead-beef-0000-000000236b02';
+  const third = '00000000-dead-beef-0000-000000236b03';
+  const lead = '00000000-dead-beef-0000-000000236b04';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const row = () => q(`SELECT user_id || '|' || coalesce(assigned_to::text, '-') FROM public.leads WHERE id = '${lead}';`)[0];
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${owner}', 'take-owner@example.test'), ('${mate}', 'take-mate@example.test'), ('${third}', 'take-third@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.leads (id, user_id, assigned_to, lead_type, name, encrypted_email)
+         VALUES ('${lead}', '${owner}', '${mate}', 'buyer', 'Assigned Lead', 'enc');`);
+
+    // The exploit: the assignee re-owns the lead.
+    try {
+      as(mate, `UPDATE public.leads SET user_id = '${mate}' WHERE id = '${lead}';`);
+    } catch {
+      /* refused is the fix */
+    }
+    if (row() !== `${owner}|${mate}`) out.push(`an assignee re-owned the lead (now ${row()})`);
+
+    // Nor can the assignee give it to someone outside the owner's say.
+    try {
+      as(mate, `UPDATE public.leads SET assigned_to = '${third}' WHERE id = '${lead}';`);
+    } catch {
+      /* refused is the fix */
+    }
+    if (row() !== `${owner}|${mate}`) out.push(`an assignee reassigned the lead (now ${row()})`);
+
+    // The assignee still works it.
+    if (refused(() => as(mate, `UPDATE public.leads SET status = 'contacted' WHERE id = '${lead}';`)))
+      out.push("an assignee could not update the status of a lead assigned to them");
+    // The owner still reassigns it, and a stranger cannot touch it.
+    if (refused(() => as(owner, `UPDATE public.leads SET assigned_to = '${third}' WHERE id = '${lead}';`)))
+      out.push('the owner could not reassign their own lead');
+    if (row() !== `${owner}|${third}`) out.push(`the owner's reassignment did not land (now ${row()})`);
+    as(mate, `UPDATE public.leads SET status = 'lost' WHERE id = '${lead}';`);
+    const [status] = q(`SELECT status FROM public.leads WHERE id = '${lead}';`);
+    if (status !== 'contacted') out.push(`a former assignee still changed the lead's status to ${status}`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}', '${third}');
+         DELETE FROM public.leads WHERE id = '${lead}';
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}', '${third}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}', '${third}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+check('reviews reach testimonials only through submit-review (service role)', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000236c01';
+  const other = '00000000-dead-beef-0000-000000236c02';
+  const insert = (who) => `INSERT INTO public.testimonials (user_id, client_name, review, rating, is_published)
+                             VALUES ('${agent}', '${who}', 'Great agent', 5, false);`;
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'reviews@example.test'), ('${other}', 'reviews2@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       UPDATE public.profiles SET is_published = true WHERE id = '${agent}';`);
+    if (!refused(() => q(`SET ROLE anon; ${insert('Anon')}`)))
+      out.push('a visitor inserted a testimonial directly, bypassing submit-review');
+    if (!refused(() => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${other}'; ${insert('Other')}`)))
+      out.push("a signed-in user inserted a testimonial on another agent's profile");
+    // Clear anything that got through, so the plan's testimonial limit does not
+    // decide the legitimate inserts below.
+    q(`DELETE FROM public.testimonials WHERE user_id = '${agent}';`);
+    if (refused(() => q(`SET ROLE service_role; ${insert('Edge')}`)))
+      out.push('submit-review (service role) could not insert a testimonial');
+    if (refused(() => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${agent}'; ${insert('Own')}`)))
+      out.push('an agent could not add a testimonial to their own profile');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.testimonials WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${agent}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${agent}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// 8c. A signed-in user must not read another agent's private profile columns
+//     or plan (US-235). US-073 revoked table-wide SELECT on profiles from anon
+//     and re-granted the public columns, but left authenticated with it — and
+//     "Published profiles are publicly readable" reaches authenticated too, so
+//     any free signup could read every published agent's zapier_webhook_url,
+//     notification_preferences and referred_by, and call get_user_plan() with
+//     anyone's id. Column grants are not row-aware, so the owner's own private
+//     columns now come through get_own_profile().
+// ---------------------------------------------------------------------------
+check("a signed-in user cannot read another agent's private profile columns or plan", () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-000000023501';
+  const other = '00000000-dead-beef-0000-000000023502';
+  const admin = '00000000-dead-beef-0000-000000023503';
+  const as = (role, sub, sql) =>
+    q(`SET ROLE ${role}; ${sub ? `SET request.jwt.claim.sub = '${sub}';` : ''} ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  const PRIVATE = ['zapier_webhook_url', 'notification_preferences', 'referred_by', 'signup_source',
+    'custom_domain', 'custom_css', 'onboarding_completed_at', 'view_count', 'lead_count', 'link_click_count'];
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${owner}', 'us235owner@example.test'), ('${other}', 'us235other@example.test'),
+         ('${admin}', 'us235admin@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.profiles (id, username) VALUES
+         ('${owner}', 'us235owner'), ('${other}', 'us235other'), ('${admin}', 'us235admin')
+         ON CONFLICT (id) DO NOTHING;
+       UPDATE public.profiles SET is_published = true, zapier_webhook_url = 'https://hooks.zapier.com/x',
+         notification_preferences = '{"leads":"instant"}', referred_by = 'someone' WHERE id = '${owner}';
+       INSERT INTO public.user_roles (user_id, role) VALUES ('${admin}', 'admin') ON CONFLICT DO NOTHING;`);
+
+    // Another signed-in user: the published row is visible, its private columns are not.
+    for (const col of PRIVATE) {
+      if (!refused(() => as('authenticated', other, `SELECT ${col} FROM public.profiles WHERE id = '${owner}';`)))
+        out.push(`authenticated could select another profile's ${col}`);
+    }
+    if (!refused(() => as('authenticated', other, `SELECT * FROM public.profiles WHERE id = '${owner}';`)))
+      out.push('authenticated could select * from another profile');
+    const [username] = as('authenticated', other, `SELECT username FROM public.profiles WHERE id = '${owner}';`);
+    if (username !== 'us235owner') out.push('authenticated lost the public columns of a published profile');
+    if (!refused(() => as('authenticated', other, `SELECT public.get_user_plan('${owner}');`)))
+      out.push("authenticated could read another agent's plan through get_user_plan");
+    if (!refused(() => as('anon', null, `SELECT public.get_user_plan('${owner}');`)))
+      out.push("anon could read an agent's plan through get_user_plan");
+
+    // The owner still reads and writes their whole row, and their own plan.
+    const [own] = as(
+      'authenticated',
+      owner,
+      `SELECT zapier_webhook_url || '|' || (notification_preferences ->> 'leads') FROM public.get_own_profile();`
+    );
+    if (own !== 'https://hooks.zapier.com/x|instant') out.push(`get_own_profile returned "${own}" to the owner`);
+    const [none] = as('authenticated', other, `SELECT count(*) FROM public.get_own_profile() WHERE id = '${owner}';`);
+    if (none !== '0') out.push("get_own_profile returned someone else's row");
+    if (
+      refused(() =>
+        as('authenticated', owner, `UPDATE public.profiles SET bio = 'x', notification_preferences = '{}' WHERE id = '${owner}';`)
+      )
+    )
+      out.push('the owner could not update their own profile');
+    if (refused(() => as('authenticated', owner, `SELECT public.get_user_plan('${owner}');`)))
+      out.push('the owner was refused their own plan');
+
+    // Admins and the service role still read any plan, and a public page still
+    // learns whether to show the badge: profile_shows_branding asks for the
+    // plan of a profile that is not the visitor's.
+    if (refused(() => as('authenticated', admin, `SELECT public.get_user_plan('${owner}');`)))
+      out.push("an admin was refused another agent's plan");
+    if (
+      refused(() =>
+        q(`SET request.jwt.claim.role = 'service_role'; SET ROLE service_role; SELECT public.get_user_plan('${owner}');`)
+      )
+    )
+      out.push("the service role was refused an agent's plan");
+    if (refused(() => as('anon', null, `SELECT public.profile_shows_branding('${owner}');`)))
+      out.push('a visitor could no longer ask profile_shows_branding');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.user_roles WHERE user_id IN ('${owner}', '${other}', '${admin}');
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${other}', '${admin}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${other}', '${admin}');`);
     } catch {
       /* best effort */
     }

@@ -4,15 +4,13 @@ import { Camera, Save, Plus, X } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { useAvatarUpload } from '@/hooks/useAvatarUpload';
 import { useToast } from '@/hooks/use-toast';
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SkeletonProfile } from '@/components/ui/skeleton';
+import { planLimitKeyFromError, UPGRADE_PATH } from '@/lib/planLimits';
 
-export default function Profile() {
-  const { profile, isLoading, updateProfile } = useProfile();
-  const { uploadAvatar, uploading } = useAvatarUpload();
-  const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [formData, setFormData] = useState({
+function emptyForm() {
+  return {
     full_name: '',
     username: '',
     bio: '',
@@ -50,7 +48,93 @@ export default function Profile() {
     // SEO
     seo_title: '',
     seo_description: '',
-  });
+  };
+}
+
+type ProfileForm = ReturnType<typeof emptyForm>;
+
+function profileToForm(
+  profile: NonNullable<ReturnType<typeof useProfile>['profile']>
+): ProfileForm {
+  return {
+    full_name: profile.full_name || '',
+    username: profile.username || '',
+    bio: profile.bio || '',
+    avatar_url: profile.avatar_url || '',
+
+    // Professional Information
+    title: profile.title || '',
+    license_number: profile.license_number || '',
+    license_state: profile.license_state || '',
+    brokerage_name: profile.brokerage_name || '',
+    brokerage_logo: profile.brokerage_logo || '',
+    years_experience: profile.years_experience || 0,
+    specialties: profile.specialties || [],
+    certifications: profile.certifications || [],
+
+    // Contact Information
+    phone: profile.phone || '',
+    email_display: profile.email_display || '',
+    website_url: profile.website_url || '',
+    calendly_url: profile.calendly_url || '',
+
+    // Service Areas
+    service_cities: profile.service_cities || [],
+    service_zip_codes: profile.service_zip_codes || [],
+
+    // Social Media
+    facebook_url: profile.facebook_url || '',
+    instagram_url: profile.instagram_url || '',
+    linkedin_url: profile.linkedin_url || '',
+    tiktok_url: profile.tiktok_url || '',
+    youtube_url: profile.youtube_url || '',
+    zillow_url: profile.zillow_url || '',
+    realtor_com_url: profile.realtor_com_url || '',
+
+    // SEO
+    seo_title: profile.seo_title || '',
+    seo_description: profile.seo_description || '',
+  };
+}
+
+interface SaveError {
+  message: string;
+  /** A plan limit refused it; offer the upgrade path. */
+  planLimit: boolean;
+}
+
+/**
+ * The reason a save failed, in words the agent can act on (US-237). The form
+ * used to say "Failed to update profile. Please try again." whatever the
+ * cause, so a plan-limit refusal read as a transient fault to retry.
+ */
+function describeSaveError(error: unknown): SaveError {
+  const message =
+    error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+      ? error.message
+      : '';
+  if (planLimitKeyFromError(error)) {
+    // The trigger's message is written for the agent (20260923000002).
+    return { message: message || 'Your plan does not include this change.', planLimit: true };
+  }
+  return {
+    message: message
+      ? `Your profile was not saved: ${message}`
+      : 'Your profile was not saved. Check your connection and try again.',
+    planLimit: false,
+  };
+}
+
+export default function Profile() {
+  const { profile, isLoading, updateProfile } = useProfile();
+  const { uploadAvatar, uploading } = useAvatarUpload();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [formData, setFormData] = useState<ProfileForm>(emptyForm);
+  // What the server holds, as the form spells it — the baseline for "unsaved".
+  const [savedForm, setSavedForm] = useState<ProfileForm>(emptyForm);
+  const [saveError, setSaveError] = useState<SaveError | null>(null);
+  const hydrated = useRef(false);
 
   // States for managing array inputs
   const [specialtyInput, setSpecialtyInput] = useState('');
@@ -58,49 +142,23 @@ export default function Profile() {
   const [cityInput, setCityInput] = useState('');
   const [zipInput, setZipInput] = useState('');
 
+  // Hydrate from the server once (US-237). This ran on every new `profile`
+  // object, and an avatar upload invalidated the query, so the refetch reset
+  // every field the agent had typed but not saved. A later refetch (after a
+  // save, or a window refocus) must not overwrite the form either.
   useEffect(() => {
-    if (profile) {
-      setFormData({
-        full_name: profile.full_name || '',
-        username: profile.username || '',
-        bio: profile.bio || '',
-        avatar_url: profile.avatar_url || '',
-
-        // Professional Information
-        title: profile.title || '',
-        license_number: profile.license_number || '',
-        license_state: profile.license_state || '',
-        brokerage_name: profile.brokerage_name || '',
-        brokerage_logo: profile.brokerage_logo || '',
-        years_experience: profile.years_experience || 0,
-        specialties: profile.specialties || [],
-        certifications: profile.certifications || [],
-
-        // Contact Information
-        phone: profile.phone || '',
-        email_display: profile.email_display || '',
-        website_url: profile.website_url || '',
-        calendly_url: profile.calendly_url || '',
-
-        // Service Areas
-        service_cities: profile.service_cities || [],
-        service_zip_codes: profile.service_zip_codes || [],
-
-        // Social Media
-        facebook_url: profile.facebook_url || '',
-        instagram_url: profile.instagram_url || '',
-        linkedin_url: profile.linkedin_url || '',
-        tiktok_url: profile.tiktok_url || '',
-        youtube_url: profile.youtube_url || '',
-        zillow_url: profile.zillow_url || '',
-        realtor_com_url: profile.realtor_com_url || '',
-
-        // SEO
-        seo_title: profile.seo_title || '',
-        seo_description: profile.seo_description || '',
-      });
+    if (profile && !hydrated.current) {
+      hydrated.current = true;
+      const initial = profileToForm(profile);
+      setFormData(initial);
+      setSavedForm(initial);
     }
   }, [profile]);
+
+  // Both start as emptyForm and are set together on hydrate, so this is false
+  // until the agent changes something.
+  const isDirty = JSON.stringify(formData) !== JSON.stringify(savedForm);
+  useUnsavedChangesWarning(isDirty);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -191,37 +249,48 @@ export default function Profile() {
 
     const url = await uploadAvatar(file);
     if (url) {
-      setFormData({ ...formData, avatar_url: url });
+      // Functional updates: the upload takes seconds, and the agent may type
+      // meanwhile. `{ ...formData }` here was the form as it stood when the
+      // file was picked. The upload already saved avatar_url, so the
+      // baseline moves too — it is not an unsaved change (US-237).
+      setFormData((prev) => ({ ...prev, avatar_url: url }));
+      setSavedForm((prev) => ({ ...prev, avatar_url: url }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
+    const submitted = formData;
     try {
       // The username is not editable here any more, so it must not be sent:
       // this form used to submit whatever was in the field, raw and
       // un-normalised, competing with Settings' validated editor (US-117).
-      const { username: _username, ...editableFields } = formData;
+      const { username: _username, phone, ...rest } = submitted;
+      // A phone that could not be decrypted was never shown, so an empty
+      // field means "unknown", not "remove it". Leave the stored number alone
+      // unless the agent typed a new one (US-237).
+      const editableFields = profile?.phoneUnavailable && phone === '' ? rest : { ...rest, phone };
       await updateProfile.mutateAsync(editableFields);
+      setSavedForm(submitted);
       toast({
         title: 'Profile updated!',
         description: 'Your profile has been saved successfully.',
       });
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update profile. Please try again.',
-        variant: 'destructive',
-      });
+      setSaveError(describeSaveError(error));
     }
   };
+
+  const saveLabel = updateProfile.isPending ? 'Saving...' : 'Save Changes';
 
   if (isLoading) {
     return <SkeletonProfile />;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    // pb-20 on phones: room for the fixed save bar below the last field.
+    <form onSubmit={handleSubmit} className="space-y-6 pb-20 md:pb-0">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -230,13 +299,49 @@ export default function Profile() {
             Update your agent information and contact details
           </p>
         </div>
+        {/* On phones the save bar at the bottom takes over (US-237): this
+            button scrolled away with the header, above six tabs of fields. */}
         <button
           type="submit"
           disabled={updateProfile.isPending}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50"
+          className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
-          {updateProfile.isPending ? 'Saving...' : 'Save Changes'}
+          {saveLabel}
+        </button>
+      </div>
+
+      {saveError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-foreground"
+        >
+          <p>{saveError.message}</p>
+          {saveError.planLimit && (
+            <Link
+              to={UPGRADE_PATH}
+              className="mt-2 inline-block font-medium text-primary underline underline-offset-2"
+            >
+              See plans
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Mobile save bar. Fixed rather than sticky: the dashboard scrolls the
+          window. It sits on top of MobileNav (h-16, plus the home-indicator
+          inset that nav pads itself with) and below it in z-order. */}
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between gap-3 border-t border-border bg-background px-4 py-3 md:hidden">
+        <span className="text-sm text-muted-foreground" aria-live="polite">
+          {isDirty ? 'Unsaved changes' : 'All changes saved'}
+        </span>
+        <button
+          type="submit"
+          disabled={updateProfile.isPending}
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          {saveLabel}
         </button>
       </div>
 
@@ -544,17 +649,28 @@ export default function Profile() {
             <h2 className="text-lg font-semibold text-foreground mb-4">Contact Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-phone"
+                >
                   Phone Number
                 </label>
                 <input
+                  id="profile-phone"
                   type="tel"
                   name="phone"
                   value={formData.phone}
                   onChange={handlePhoneChange}
                   placeholder="(555) 123-4567"
+                  aria-describedby={profile?.phoneUnavailable ? 'profile-phone-note' : undefined}
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
+                {profile?.phoneUnavailable && (
+                  <p id="profile-phone-note" className="mt-2 text-sm text-muted-foreground">
+                    Your saved number could not be loaded just now. Leave this blank to keep it, or
+                    type a new one to replace it.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">

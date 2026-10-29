@@ -54,6 +54,7 @@ import { useLeadActivities, type LeadActivity } from '@/hooks/useLeadActivities'
 import { getLeadNextStep } from '@/lib/leadNextStep';
 import { buildLeadStatusPatch } from '@/lib/leadStatus';
 import { logger } from '@/lib/logger';
+import { calendarDateInDays, dueDateToIso, taskDueAt } from '@/lib/localDate';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
 import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButton';
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
@@ -248,9 +249,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     if (nextStep.action === 'task') {
       // Prefill the follow-up form rather than inventing a due date.
       setTaskTitle(nextStep.label);
-      const inAWeek = new Date();
-      inAWeek.setDate(inAWeek.getDate() + (nextStep.urgency === 'today' ? 0 : 7));
-      setTaskDue(inAWeek.toISOString().slice(0, 10));
+      setTaskDue(calendarDateInDays(nextStep.urgency === 'today' ? 0 : 7));
       return;
     }
     // call / email / sms all open the relevant app and record the response.
@@ -265,11 +264,12 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
   };
 
   const handleAddTask = () => {
-    if (!lead || !taskTitle.trim() || !taskDue) return;
+    const dueDate = dueDateToIso(taskDue);
+    if (!lead || !taskTitle.trim() || !dueDate) return;
     createTask({
       leadId: lead.id,
       title: taskTitle.trim(),
-      dueDate: new Date(taskDue).toISOString(),
+      dueDate,
     });
     setTaskTitle('');
     setTaskDue('');
@@ -448,20 +448,24 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
               <LockedLeadDetails />
             ) : (
               <div className="space-y-2">
-                <a
-                  href={`mailto:${lead.email}`}
-                  onClick={() => void handleContactAction('email')}
-                  className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
-                >
-                  <Mail className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span className="flex-1 text-sm">{lead.email}</span>
-                  <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
+                {/* US-246: no envelope row with an empty mailto: for a
+                    phone-only lead. */}
+                {lead.email && (
+                  <a
+                    href={`mailto:${lead.email}`}
+                    onClick={() => void handleContactAction('email')}
+                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
+                  >
+                    <Mail className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                    <span className="flex-1 text-sm break-all">{lead.email}</span>
+                    <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                )}
                 {lead.phone && (
                   <a
                     href={`tel:${lead.phone}`}
                     onClick={() => void handleContactAction('call')}
-                    className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
+                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
                   >
                     <Phone className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                     <span className="flex-1 text-sm">{lead.phone}</span>
@@ -472,7 +476,7 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                   <a
                     href={`sms:${lead.phone}`}
                     onClick={() => void handleContactAction('sms')}
-                    className="flex items-center gap-3 p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
+                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors group"
                   >
                     <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                     <span className="flex-1 text-sm">Send SMS</span>
@@ -689,7 +693,9 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
                         <p className="text-xs text-muted-foreground mt-1">
                           {a.activity_type === 'task' && a.task_due_date
                             ? `${a.task_completed_at ? 'Completed' : 'Due'} ${formatDistanceToNow(
-                                new Date(a.task_completed_at ?? a.task_due_date),
+                                (a.task_completed_at
+                                  ? new Date(a.task_completed_at)
+                                  : taskDueAt(a.task_due_date)) ?? new Date(a.task_due_date),
                                 { addSuffix: true }
                               )}`
                             : formatDistanceToNow(new Date(a.activity_at ?? a.created_at), {

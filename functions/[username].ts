@@ -25,6 +25,7 @@ import {
   type ListingMeta,
   type ProfileMeta,
 } from './_lib/social-meta';
+import { needsCanonicalRedirect, normalizeUsername } from '../src/lib/username';
 
 interface Env {
   /** Same values the SPA build uses; set in the Pages project's variables. */
@@ -43,8 +44,11 @@ interface PagesContext {
   next: () => Promise<Response>;
 }
 
+/** `id` is read only to scope a ?listing= lookup to this agent's own listings. */
+type ProfileRow = ProfileMeta & { id: string };
+
 const PROFILE_COLUMNS =
-  'username,full_name,bio,avatar_url,og_image,seo_title,seo_description,title,brokerage_name,service_cities';
+  'id,username,full_name,bio,avatar_url,og_image,seo_title,seo_description,title,brokerage_name,service_cities';
 const LISTING_COLUMNS =
   'id,address,city,state,price,bedrooms,bathrooms,square_feet,description,photos,image';
 
@@ -110,13 +114,29 @@ async function notFoundResponse(context: PagesContext): Promise<Response> {
 export const onRequestGet = async (context: PagesContext): Promise<Response> => {
   const { request, env, params, next } = context;
 
-  if (!isCrawler(request.headers.get('user-agent'))) {
+  const raw = params.username;
+  const segment = Array.isArray(raw) ? raw[0] : raw;
+  if (!segment || isReservedSegment(segment)) {
     return next();
   }
 
-  const raw = params.username;
-  const username = Array.isArray(raw) ? raw[0] : raw;
-  if (!username || isReservedSegment(username)) {
+  // Usernames are stored lower case, so /JaneDoe used to query
+  // username=eq.JaneDoe, find nothing, and answer a crawler 404 (US-176) —
+  // for a URL printed on business cards and typed on phones that capitalise
+  // the first letter. One 301 to the canonical address, for crawlers and
+  // people alike: FullProfilePage already redirects in the browser, and this
+  // gives the URL a single address before any script runs (US-242).
+  if (needsCanonicalRedirect(segment)) {
+    const url = new URL(request.url);
+    url.pathname = `/${encodeURIComponent(normalizeUsername(segment))}`;
+    return new Response(null, {
+      status: 301,
+      headers: { location: url.toString(), 'cache-control': 'public, max-age=3600' },
+    });
+  }
+  const username = segment;
+
+  if (!isCrawler(request.headers.get('user-agent'))) {
     return next();
   }
 
@@ -128,7 +148,7 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
   }
 
   const base = restUrl.replace(/\/$/, '');
-  const profiles = await fetchJson<ProfileMeta>(
+  const profiles = await fetchJson<ProfileRow>(
     `${base}/rest/v1/profiles?select=${PROFILE_COLUMNS}&username=eq.${encodeURIComponent(username)}&is_published=is.true&limit=1`,
     apiKey
   );
@@ -162,8 +182,10 @@ export const onRequestGet = async (context: PagesContext): Promise<Response> => 
 
   const listingId = url.searchParams.get('listing');
   if (listingId) {
+    // Scoped to this agent. Without user_id, /jane?listing=<anyone's id>
+    // unfurled another agent's property under Jane's name and URL (US-242).
     const listings = await fetchJson<ListingMeta>(
-      `${base}/rest/v1/listings?select=${LISTING_COLUMNS}&id=eq.${encodeURIComponent(listingId)}&limit=1`,
+      `${base}/rest/v1/listings?select=${LISTING_COLUMNS}&id=eq.${encodeURIComponent(listingId)}&user_id=eq.${encodeURIComponent(profile.id)}&limit=1`,
       apiKey
     );
     const listing = listings?.[0];

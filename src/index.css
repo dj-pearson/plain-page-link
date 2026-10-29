@@ -31,7 +31,14 @@
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
-    --destructive: 0 84.2% 60.2%;
+    /*
+     * US-245: --destructive is both a text colour (text-destructive on
+     * --background / --muted) and a fill under --destructive-foreground, so
+     * both pairs must clear 4.5:1. 60.2% lightness measured 3.76:1 on white;
+     * 46% gives 5.61 on --background, 5.12 on --muted, 5.35 under the
+     * foreground. destructiveContrast.test.ts recomputes these.
+     */
+    --destructive: 0 72.2% 46%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
@@ -63,8 +70,15 @@
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /*
+     * US-245: the old 30.6% red was 2.00:1 against the near-black background,
+     * so error text was all but invisible. No single red clears 4.5:1 against
+     * both near-black and near-white, so the dark theme inverts the pair: a
+     * light red (7.23 on --background, 5.28 on --muted) with dark text on top
+     * when it is used as a fill (6.45).
+     */
+    --destructive: 0 90.6% 70.8%;
+    --destructive-foreground: 222.2 47.4% 11.2%;
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;

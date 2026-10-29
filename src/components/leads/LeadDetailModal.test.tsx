@@ -244,4 +244,18 @@ describe('LeadDetailModal', () => {
       expect(logNoteMock).not.toHaveBeenCalled();
     });
   });
+
+  // US-246: a phone-only lead (US-228) got an envelope row with an empty
+  // mailto: link at the top of its contact details.
+  it('renders no email row for a phone-only lead', async () => {
+    const phoneOnly = makeLead({ id: 'lead-phone', name: 'Cleo Phone', email: null });
+    renderWithProviders(<LeadDetailModal lead={phoneOnly} open onOpenChange={noop} />);
+    expect(await screen.findByText('Cleo Phone')).toBeInTheDocument();
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.querySelector('a[href^="mailto:"]')).toBeNull();
+    const tel = dialog.querySelector('a[href^="tel:"]');
+    expect(tel).not.toBeNull();
+    expect(tel).toHaveClass('min-h-[44px]');
+  });
 });

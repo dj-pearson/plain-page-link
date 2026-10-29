@@ -21,12 +21,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { logger } from '@/lib/logger';
+import { calendarDateInDays, todayCalendarDate } from '@/lib/localDate';
 
 export function SearchAnalyticsDashboard() {
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
+    start: calendarDateInDays(-30),
+    end: todayCalendarDate(),
   });
   const [selectedPlatforms, setSelectedPlatforms] = useState<SearchPlatform[]>([
     'google_search_console',

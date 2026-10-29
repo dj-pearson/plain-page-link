@@ -141,7 +141,11 @@ const SearchAnalyticsPage = lazy(() => import('./pages/admin/SearchAnalyticsPage
 const ProfilePage = lazy(() => import('./pages/public/FullProfilePage'));
 
 function App() {
-  const { initialize, user } = useAuthStore();
+  // Selectors, not the whole store (US-241): App wraps every route, and a bare
+  // useAuthStore() re-rendered it on every store write — each isLoading flip
+  // and profile save.
+  const initialize = useAuthStore((s) => s.initialize);
+  const user = useAuthStore((s) => s.user);
 
   // Initialize auth and offline storage on mount
   useEffect(() => {

@@ -46,6 +46,9 @@ interface ContactFormProps {
 export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  // Whether the visitor gave an email, kept past reset() so the success copy
+  // can say how they will hear back (US-246).
+  const [gaveEmail, setGaveEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { honeypotRef, signals } = useSpamGuard();
@@ -88,6 +91,7 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
       }
 
       trackFormSubmission(agentId, 'contact_form', true);
+      setGaveEmail(!!data.email);
       setIsSuccess(true);
       reset();
 
@@ -115,8 +119,14 @@ export function ContactForm({ agentId, agentName, listing, onSuccess }: ContactF
               <p className="text-sm text-green-700 mt-1">
                 {agentName} will get back to you shortly.
               </p>
+              {/* US-246: a phone-only visitor (US-228) was told to check an
+                  inbox they never gave. submit-lead sends its auto-reply only
+                  when there is an address and the daily cap allows, so this
+                  promises no confirmation either way. */}
               <p className="text-xs text-green-600 mt-2">
-                Check your email for a confirmation message.
+                {gaveEmail
+                  ? 'Look out for a reply at the email address you gave.'
+                  : `${agentName} will reach you at the phone number you gave.`}
               </p>
             </div>
           </div>

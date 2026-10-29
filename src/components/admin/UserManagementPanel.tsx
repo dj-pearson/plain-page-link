@@ -57,7 +57,12 @@ interface User {
  * rendered empty for every active subscriber. The profiles one listed four of
  * the 42 columns and typed bio and avatar_url non-nullable.
  */
-type Profile = Database['public']['Tables']['profiles']['Row'];
+// US-235: the public columns only — authenticated cannot select another
+// agent's private ones, admin or not, and this panel shows the username.
+type Profile = Pick<
+  Database['public']['Tables']['profiles']['Row'],
+  'id' | 'username' | 'full_name'
+>;
 type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 
 interface UserWithDetails extends User {
@@ -102,7 +107,9 @@ export const UserManagementPanel = () => {
       // supabase.auth.admin.listUsers() from the browser, which needs the
       // service-role key — with the anon key it always failed, so this list
       // was always empty and no user could be found or supported.
-      const { data: listing, error: authError } = await edgeFunctions.invoke('admin-users', { body: {} });
+      const { data: listing, error: authError } = await edgeFunctions.invoke('admin-users', {
+        body: {},
+      });
       if (authError) throw authError;
       const authData = {
         users: ((listing as { users?: User[] } | null)?.users ?? []) as User[],
@@ -111,7 +118,9 @@ export const UserManagementPanel = () => {
       if (listedStats) setStats(listedStats);
 
       // Get profiles
-      const { data: profiles, error: profilesError } = await supabase.from('profiles').select('*');
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, full_name');
 
       if (profilesError) throw profilesError;
 

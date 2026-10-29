@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth } from '../_shared/auth.ts';
+import { requireAdminOrServiceRole } from '../_shared/auth.ts';
+import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 
 interface AuditRequest {
@@ -17,6 +18,18 @@ serve(async (req) => {
   }
 
   try {
+    // US-234: admin SEO tooling running with the service role, which fetches a
+    // caller-supplied URL. requireAuth used to sit in a try/catch that logged
+    // the failure and carried on, so anyone holding the anon key could use it.
+    // Checked before the body is read, so an anonymous call is a 401.
+    // run-scheduled-audit calls it with the service-role key, hence
+    // OrServiceRole.
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const caller = await requireAdminOrServiceRole(req, supabase);
+    const userId = caller?.id ?? null;
+
     const { url, auditType = 'full', saveResults = true }: AuditRequest = await req.json();
 
     if (!url) {
@@ -26,22 +39,8 @@ serve(async (req) => {
     console.log(`Starting ${auditType} SEO audit for: ${url}`);
     const startTime = Date.now();
 
-    // Initialize Supabase client
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-
-    // Securely authenticate user with JWT verification
-    let userId = null;
-    try {
-      const user = await requireAuth(req, supabase);
-      userId = user.id;
-    } catch (e) {
-      console.error('Failed to authenticate user:', e);
-    }
-
     // Fetch the page
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; SEO-Audit-Bot/1.0)',
       },
@@ -221,7 +220,7 @@ serve(async (req) => {
     // Check robots.txt and sitemap
     try {
       const robotsUrl = new URL('/robots.txt', url).toString();
-      const robotsResponse = await fetch(robotsUrl);
+      const robotsResponse = await safeFetch(robotsUrl);
       audit.hasRobotsTxt = robotsResponse.ok;
     } catch (e) {
       audit.hasRobotsTxt = false;
@@ -229,7 +228,7 @@ serve(async (req) => {
 
     try {
       const sitemapUrl = new URL('/sitemap.xml', url).toString();
-      const sitemapResponse = await fetch(sitemapUrl);
+      const sitemapResponse = await safeFetch(sitemapUrl);
       audit.hasSitemap = sitemapResponse.ok;
     } catch (e) {
       audit.hasSitemap = false;

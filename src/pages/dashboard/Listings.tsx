@@ -27,6 +27,7 @@ import {
 import { parseSquareFeet } from '@/lib/format';
 import { logger } from '@/lib/logger';
 import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
+import { todayCalendarDate } from '@/lib/localDate';
 import { AddListingModal } from '@/components/modals/AddListingModal';
 import { EditListingModal, EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
@@ -166,7 +167,7 @@ export default function Listings() {
         status: data.status,
         // Nothing wrote either date. listed_date is what "days on market"
         // counts from, and sold_date is set on the transition below (US-107).
-        listed_date: new Date().toISOString().slice(0, 10),
+        listed_date: todayCalendarDate(),
         image: imageUrls[0] || null,
         photos: imageUrls.length > 0 ? imageUrls : null,
         description: data.description || null,
@@ -362,7 +363,7 @@ export default function Listings() {
         // it. Nothing wrote sold_date at all, so a sold listing had no close
         // date and days_on_market could never be computed (US-107).
         sold_date: CLOSED_LISTING_STATUSES.has(data.status)
-          ? (editingListing.sold_date ?? new Date().toISOString().slice(0, 10))
+          ? (editingListing.sold_date ?? todayCalendarDate())
           : null,
         // `photos` is the gallery and `image` is the card thumbnail; they must
         // agree, so the cover is always photos[0] (US-107).
@@ -738,7 +739,9 @@ export default function Listings() {
 
       {/* List View */}
       {!isError && viewMode === 'list' && filteredListings.length > 0 && (
-        <div className="border border-border rounded-lg overflow-hidden">
+        // overflow-x-auto, not hidden: at 360px a wide row scrolls inside its
+        // own box rather than clipping the edit/delete buttons (US-246).
+        <div className="border border-border rounded-lg overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
@@ -812,19 +815,21 @@ export default function Listings() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => setEditingListing(listing)}
-                        className="p-2 hover:bg-accent rounded-lg transition-colors"
+                        className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
                         title="Edit"
+                        aria-label={`Edit ${listing.address}`}
                       >
-                        <Edit className="h-3.5 w-3.5" />
+                        <Edit className="h-4 w-4" aria-hidden="true" />
                       </button>
                       <button
                         onClick={() =>
                           setListingToDelete({ id: listing.id, address: listing.address })
                         }
-                        className="p-2 hover:bg-accent rounded-lg transition-colors text-red-600"
+                        className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center hover:bg-accent rounded-lg transition-colors text-red-600"
                         title="Delete"
+                        aria-label={`Delete ${listing.address}`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                       </button>
                     </div>
                   </td>

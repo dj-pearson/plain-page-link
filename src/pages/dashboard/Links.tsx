@@ -42,6 +42,7 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
+import { moveAndRenumber } from '@/lib/linkOrder';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -192,11 +193,15 @@ export default function Links() {
       const targetLink = visibleLinks[targetIndex];
 
       try {
-        // Swap positions
-        await Promise.all([
-          updateLink.mutateAsync({ id: link.id, position: targetLink.position }),
-          updateLink.mutateAsync({ id: targetLink.id, position: link.position }),
-        ]);
+        // Renumber the whole list densely rather than swap two stored
+        // positions: a swap of equal positions did nothing, and one failed
+        // half left a duplicate (US-247). All links, not only the visible
+        // ones, so a link awaiting undo-able deletion keeps a slot of its own.
+        await Promise.all(
+          moveAndRenumber(links, link.id, targetLink.id).map((write) =>
+            updateLink.mutateAsync(write)
+          )
+        );
       } catch (error) {
         toast({
           title: 'Error',
@@ -205,7 +210,7 @@ export default function Links() {
         });
       }
     },
-    [visibleLinks, updateLink, toast]
+    [visibleLinks, links, updateLink, toast]
   );
 
   const handleDeleteClick = (link: Link) => {

@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getErrorMessage } from '../_shared/errorHelpers.ts';
-import { requireAuth } from '../_shared/auth.ts';
+import { requireAdmin } from '../_shared/auth.ts';
+import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { errorStatus } from '../_shared/http-error.ts';
 
 /**
@@ -19,6 +20,16 @@ serve(async (req) => {
   }
 
   try {
+    // US-234: admin SEO tooling running with the service role, which fetches a
+    // caller-supplied URL. requireAuth used to sit in a try/catch that logged
+    // the failure and carried on, so anyone holding the anon key could use it.
+    // Checked before the body is read, so an anonymous call is a 401.
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const caller = await requireAdmin(req, supabase);
+    const userId = caller.id;
+
     const { url, maxDepth = 2, saveResults = true } = await req.json();
 
     if (!url) {
@@ -30,24 +41,11 @@ serve(async (req) => {
 
     console.log(`Analyzing internal links for: ${url}`);
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-
-    // Securely authenticate user with JWT verification
-    let userId = null;
-    try {
-      const user = await requireAuth(req, supabase);
-      userId = user.id;
-    } catch (e) {
-      console.error('Failed to authenticate user:', e);
-    }
-
     const baseDomain = new URL(url).hostname;
     const baseOrigin = new URL(url).origin;
 
     // Fetch and analyze the page
-    const response = await fetch(url);
+    const response = await safeFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.status}`);
     }

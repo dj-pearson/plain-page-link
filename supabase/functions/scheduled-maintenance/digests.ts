@@ -23,6 +23,11 @@ export function digestKindFor(pref: unknown, now: Date): 'daily' | 'weekly' | nu
   return monday ? 'weekly' : 'daily';
 }
 
+/** The UTC date after `now`'s, as `YYYY-MM-DD`. */
+export function dueCutoffDay(now: Date): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString().slice(0, 10);
+}
+
 function groupBy<T extends { user_id: string }>(rows: T[] | null): Map<string, T[]> {
   const out = new Map<string, T[]>();
   for (const row of rows ?? []) out.set(row.user_id, [...(out.get(row.user_id) ?? []), row]);
@@ -37,7 +42,11 @@ export async function runDigests(supabase: SupabaseClient, opts: { force?: boole
   const day = now.toISOString().slice(0, 10);
   const since24h = new Date(now.getTime() - 24 * 3_600_000).toISOString();
   const since7d = new Date(now.getTime() - 7 * 24 * 3_600_000).toISOString();
-  const endOfDay = `${day}T23:59:59.999Z`;
+  // Tasks are stored as the end of the agent's local due day (US-240): a task
+  // due today in Los Angeles is 06:59Z tomorrow. Noon UTC tomorrow is the end
+  // of today in UTC-12, so every US zone's "due today" is in, and no "due
+  // tomorrow" west of UTC+12 is.
+  const endOfDay = `${dueCutoffDay(now)}T11:59:59.999Z`;
 
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')

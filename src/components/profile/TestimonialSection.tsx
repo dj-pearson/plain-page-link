@@ -93,16 +93,18 @@ export function TestimonialSection({ testimonials }: TestimonialSectionProps) {
                 size="icon"
                 className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 rounded-full bg-white shadow-lg"
                 onClick={goToPrevious}
+                aria-label="Previous testimonials"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               </Button>
               <Button
                 variant="outline"
                 size="icon"
                 className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 rounded-full bg-white shadow-lg"
                 onClick={goToNext}
+                aria-label="Next testimonials"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </Button>
             </>
           )}
@@ -140,11 +142,21 @@ export function TestimonialSection({ testimonials }: TestimonialSectionProps) {
           {/* Navigation Buttons */}
           {sortedTestimonials.length > 1 && (
             <div className="flex justify-center gap-4 mt-6">
-              <Button variant="outline" size="icon" onClick={goToPrevious}>
-                <ChevronLeft className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goToPrevious}
+                aria-label="Previous testimonial"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               </Button>
-              <Button variant="outline" size="icon" onClick={goToNext}>
-                <ChevronRight className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goToNext}
+                aria-label="Next testimonial"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
           )}
