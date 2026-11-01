@@ -9385,6 +9385,10 @@ export type Database = {
         Args: { _user_id: string };
         Returns: Record<string, unknown>[];
       };
+      locked_lead_ciphertexts: {
+        Args: { _user_id: string; _values: string[] };
+        Returns: string[];
+      };
       locked_lead_ids: {
         Args: { _lead_ids: string[]; _user_id: string };
         Returns: string[];

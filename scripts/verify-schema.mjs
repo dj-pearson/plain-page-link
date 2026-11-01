@@ -2259,6 +2259,86 @@ check('a locked lead cannot be backdated, and lead/contact/open-house dates are 
   return out;
 });
 
+// ---------------------------------------------------------------------------
+// US-254: a locked lead's ciphertext is not the browser's to read.
+//   anon and authenticated held table-wide SELECT on leads, so an agent over
+//   the allowance could read a locked lead's encrypted_email, write it into a
+//   contact, and have pii-crypto's decrypt_contacts open it. The ciphertext
+//   columns are now unselectable; everything else still reads, and
+//   locked_lead_ciphertexts() lets pii-crypto refuse a copy made before.
+// ---------------------------------------------------------------------------
+check("the browser cannot select a lead's ciphertext, and a copied one is recognised", () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000254a01';
+  const as = (sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${agent}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'us254@example.test') ON CONFLICT (id) DO NOTHING;`);
+    const [limit] = q(`SELECT public.plan_limit('${agent}', 'leads_per_month');`);
+    if (Number(limit) < 0) {
+      out.push(`the default plan has unlimited leads_per_month (${limit}); nothing to lock`);
+      return out;
+    }
+    // One more lead this month than the plan allows; the last one is locked.
+    q(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, encrypted_phone, created_at)
+         SELECT '${agent}', 'buyer', 'L' || g, 'enc:v1:email-' || g, 'enc:v1:phone-' || g,
+                date_trunc('month', now()) + g * interval '1 second'
+           FROM generate_series(1, ${Number(limit) + 1}) g;`);
+    const lockedN = Number(limit) + 1;
+
+    // The owner's own row: the ciphertext is refused, every other column reads.
+    for (const col of ['encrypted_email', 'encrypted_phone', '*']) {
+      if (!refused(() => as(`SELECT ${col} FROM public.leads WHERE user_id = '${agent}';`)))
+        out.push(`authenticated could select leads.${col} on their own lead`);
+    }
+    if (!refused(() => q(`SET ROLE anon; SELECT encrypted_email FROM public.leads;`)))
+      out.push('anon could select leads.encrypted_email');
+    const [n] = as(`SELECT count(name) FROM public.leads WHERE user_id = '${agent}';`);
+    if (n !== String(lockedN)) out.push(`the owner read ${n} of their ${lockedN} leads' names`);
+
+    // Writes that ask only for readable columns back still work.
+    if (
+      refused(() =>
+        as(`INSERT INTO public.contacts (user_id, first_name, relationship) VALUES ('${agent}', 'C', 'past_client') RETURNING id;`)
+      )
+    )
+      out.push('setup: the owner could not add a contact');
+    if (refused(() => as(`UPDATE public.leads SET notes = 'called', encrypted_phone = 'enc:v1:new' WHERE user_id = '${agent}' AND name = 'L1' RETURNING id, name;`)))
+      out.push('the owner could not update a lead (including its ciphertext) and read back id, name');
+
+    // locked_lead_ciphertexts: the locked lead's values, nobody else's.
+    const asked = `ARRAY['enc:v1:email-${lockedN}', 'enc:v1:phone-${lockedN}', 'enc:v1:email-2', 'enc:v1:typed']`;
+    const got = q(`SET ROLE service_role; SELECT v FROM public.locked_lead_ciphertexts('${agent}', ${asked}) v ORDER BY 1;`);
+    if (got.join(',') !== `enc:v1:email-${lockedN},enc:v1:phone-${lockedN}`)
+      out.push(`locked_lead_ciphertexts returned [${got.join(', ')}]; expected only the locked lead's two values`);
+    const [otherOwner] = q(
+      `SET ROLE service_role; SELECT count(*) FROM public.locked_lead_ciphertexts('00000000-dead-beef-0000-000000254a99', ${asked});`
+    );
+    if (otherOwner !== '0') out.push("locked_lead_ciphertexts matched another owner's leads");
+    if (!refused(() => as(`SELECT public.locked_lead_ciphertexts('${agent}', ${asked});`)))
+      out.push('authenticated could execute locked_lead_ciphertexts');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.contacts WHERE user_id = '${agent}';
+         DELETE FROM public.leads WHERE user_id = '${agent}';
+         DELETE FROM public.profiles WHERE id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 check('an assignee works a lead but cannot take it or hand it away', () => {
   const out = [];
   const owner = '00000000-dead-beef-0000-000000236b01';

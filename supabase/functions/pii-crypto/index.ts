@@ -50,6 +50,7 @@ import {
 } from '../_shared/response.ts';
 import { checkRateLimitDb, RATE_LIMITS } from '../_shared/rate-limiter.ts';
 import { encryptSecret, decryptSecret } from '../_shared/encryption.ts';
+import { contactsCopiedFromLockedLeads } from './contactLock.ts';
 
 // One page of leads decrypts 2 fields x 50 rows. 200 leaves headroom without
 // letting a single request pin a worker on PBKDF2 — each value is a separate
@@ -212,7 +213,8 @@ export default async (req: Request) => {
       // Leads past the plan's monthly allowance are captured but not opened
       // (20260923000003): their contact details stay sealed until the agent
       // upgrades or the month turns. This is the gate — the dashboard only
-      // draws the blur. Contacts are the agent's own entries and never lock.
+      // draws the blur. Contacts are the agent's own entries and never lock —
+      // unless they carry a locked lead's ciphertext (US-254, below).
       // The allowance is the lead OWNER's, so assigned leads are checked
       // against their owner's plan, one call per owner.
       const locked = new Set<string>();
@@ -235,6 +237,25 @@ export default async (req: Request) => {
             for (const id of (lockedIds ?? []) as string[]) locked.add(id);
           }
         }
+      }
+
+      // US-254: contacts do not lock on their own, but a contact holding a
+      // locked lead's ciphertext — copied across by the owner — would open
+      // that lead's details here. Refuse those. Contacts are filtered to the
+      // caller's rows above, so the owner is the caller.
+      if (op === 'decrypt_contacts' && (rows ?? []).length > 0) {
+        const copied = await contactsCopiedFromLockedLeads(
+          { rpc: (fn, args) => supabase.rpc(fn, args) },
+          user.id,
+          (rows ?? []).map((row) => ({
+            id: row.id as string,
+            encrypted_email: row.encrypted_email as string | null,
+            encrypted_phone: row.encrypted_phone as string | null,
+          })),
+          (lockError) =>
+            console.error('[pii-crypto] locked_lead_ciphertexts failed; returning contacts unchecked', lockError)
+        );
+        for (const id of copied) locked.add(id);
       }
 
       const decrypted = await Promise.all(

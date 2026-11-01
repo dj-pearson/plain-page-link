@@ -2,12 +2,14 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { encryptPIIBatch, decryptLeadContacts } from '@/lib/pii';
-import type { Lead, LeadRow } from '@/types/lead';
+import { LEAD_COLUMNS } from '@/lib/leadColumns';
+import type { Lead, LeadReadRow } from '@/types/lead';
 
 /**
  * Turns stored lead rows into the app's Lead shape by decrypting the contact
  * details. Since US-086 dropped the plaintext columns, encrypted_email and
- * encrypted_phone are the only store.
+ * encrypted_phone are the only store — and since US-254 the browser cannot
+ * select them at all (LEAD_COLUMNS), so the plaintext comes only from here.
  *
  * By id, not by value (US-119): pii-crypto used to accept raw ciphertext from
  * anyone with a JWT, which made it an oracle for any ciphertext that leaked —
@@ -17,10 +19,10 @@ import type { Lead, LeadRow } from '@/types/lead';
  * One call for the whole page rather than one per row: the crypto lives in an
  * Edge Function since US-066, so per-row would be a round trip per lead.
  */
-async function decryptLeadRows(rows: LeadRow[]): Promise<Lead[]> {
+async function decryptLeadRows(rows: LeadReadRow[]): Promise<Lead[]> {
   const contacts = await decryptLeadContacts(rows.map((row) => row.id));
 
-  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }) => ({
+  return rows.map((rest) => ({
     ...rest,
     email: contacts.get(rest.id)?.email ?? null,
     phone: contacts.get(rest.id)?.phone ?? null,
@@ -57,7 +59,10 @@ function leadsQuery(
   // assignee to read them; this query filtered on user_id alone, so a lead the
   // team's routing handed to a member never appeared anywhere they could see.
   // userId is the session's own id, safe in the filter string.
-  let query = supabase.from('leads').select('*').or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
+  let query = supabase
+    .from('leads')
+    .select(LEAD_COLUMNS)
+    .or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
   if (filters.assignedToMe) query = query.eq('assigned_to', userId);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.leadType) query = query.eq('lead_type', filters.leadType);
@@ -91,7 +96,10 @@ export async function fetchAllLeads(
   };
   const out: Lead[] = [];
   for (let from = 0; from < EXPORT_MAX_LEADS; from += EXPORT_BATCH) {
-    const { data, error } = await leadsQuery(userId, normalized).range(from, from + EXPORT_BATCH - 1);
+    const { data, error } = await leadsQuery(userId, normalized).range(
+      from,
+      from + EXPORT_BATCH - 1
+    );
     if (error) throw error;
     const rows = data ?? [];
     out.push(...(await decryptLeadRows(rows)));
@@ -131,10 +139,12 @@ export function useLeads(filters: LeadFilters = {}) {
       // also meant decryptLeadRows sent every ciphertext to pii-crypto on each
       // visit (US-104).
       const from = (pageParam as number) * LEADS_PAGE_SIZE;
-      const { data, error } = await leadsQuery(user.id, { status, leadType, search, assignedToMe }).range(
-        from,
-        from + LEADS_PAGE_SIZE - 1
-      );
+      const { data, error } = await leadsQuery(user.id, {
+        status,
+        leadType,
+        search,
+        assignedToMe,
+      }).range(from, from + LEADS_PAGE_SIZE - 1);
 
       if (error) throw error;
       return decryptLeadRows(data ?? []);
@@ -181,7 +191,13 @@ export function useLeads(filters: LeadFilters = {}) {
         encrypted_phone: encryptedPhone,
       };
 
-      const { data, error } = await supabase.from('leads').insert(payload).select().single();
+      const { data, error } = await supabase
+        .from('leads')
+        .insert(payload)
+        // Not a bare .select(): that asks for `*`, and the ciphertext columns
+        // are not selectable by the browser (US-254).
+        .select(LEAD_COLUMNS)
+        .single();
 
       if (error) throw error;
 
@@ -222,7 +238,7 @@ export function useLeads(filters: LeadFilters = {}) {
         .update(encryptedUpdates as typeof updates)
         .eq('id', id)
         .eq('user_id', user.id)
-        .select()
+        .select(LEAD_COLUMNS)
         .single();
 
       if (error) throw error;
