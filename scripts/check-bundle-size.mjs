@@ -12,12 +12,15 @@
  * vite.config.ts. Adding to this list is a deliberate, reviewable
  * decision — keep it minimal.
  *
- * Run after `vite build`. Used by the CI `bundle-size` job.
+ * Run after `vite build`. Used by the CI `bundle-size` job, which builds with
+ * a dummy VITE_SENTRY_DSN so the error-monitoring path is in the bundle being
+ * checked (US-255). BUNDLE_DIST=<dir> checks a build in another directory.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const ASSETS_DIR = join(process.cwd(), "dist", "assets");
+const DIST_DIR = process.env.BUNDLE_DIST || join(process.cwd(), "dist");
+const ASSETS_DIR = join(DIST_DIR, "assets");
 const KB = 1024;
 const VENDOR_BUDGET = 600 * KB;
 const DEFAULT_BUDGET = 500 * KB;
@@ -66,6 +69,9 @@ const MUST_STAY_LAZY = {
     /^SearchAnalyticsDashboard-/,
     /^MLLeadScoringDashboard-/,
   ],
+  // US-255: Session Replay loads after the core SDK, from its own chunk. Only
+  // src/lib/sentry-replay.ts (itself dynamically imported) may import it.
+  "sentry-replay-vendor": [/^sentry-replay-(?!vendor-)/],
 };
 
 function budgetFor(name) {
@@ -174,9 +180,18 @@ const ENTRY_MUST_NOT_INCLUDE = {
   "charts-vendor": "recharts. Dashboard analytics only.",
   "three-vendor": "Three.js. Only a 3D theme or the 3D hero needs it.",
   "markdown-vendor": "react-markdown. Blog article rendering only.",
+  // US-255: with VITE_SENTRY_DSN set, the SDK and Session Replay were 81 KB
+  // gzip of the entry chunk. src/lib/sentry.ts loads them after `load`.
+  "sentry-vendor": "the Sentry SDK. Loaded at idle after the page has loaded.",
+  "sentry-replay-vendor": "Sentry Session Replay. Loaded after the SDK.",
 };
 
-const html = readFileSync(join(process.cwd(), "dist", "index.html"), "utf8");
+// The Sentry SDK writes its global carrier under this key. Matching the source
+// as well as the chunk names catches SDK code that Rollup filed somewhere
+// other than sentry-vendor (a shared helper adopted by the entry chunk, say).
+const SENTRY_SIGNATURE = "__SENTRY__";
+
+const html = readFileSync(join(DIST_DIR, "index.html"), "utf8");
 const entryChunks = [...html.matchAll(/assets\/([A-Za-z0-9._-]+\.js)/g)].map((m) => m[1]);
 
 if (entryChunks.length === 0) {
@@ -222,6 +237,32 @@ if (onFirstPaint.length) {
       "(usually an eagerly-imported route in App.tsx) and make it lazy."
   );
   process.exit(1);
+}
+
+const sentryOnFirstPaint = [...eager].filter((f) => sources.get(f)?.includes(SENTRY_SIGNATURE));
+if (sentryOnFirstPaint.length) {
+  console.error("[bundle-size] FAILED — Sentry SDK code is on the first-paint critical path:");
+  for (const f of sentryOnFirstPaint) console.error(`  - ${f}`);
+  console.error(
+    "  Something imports @sentry/* statically. Only src/lib/sentry-sdk.ts and " +
+      "src/lib/sentry-replay.ts may, and only src/lib/sentry.ts may reach them, " +
+      "through import()."
+  );
+  process.exit(1);
+}
+
+// A check that passes because the thing it guards is absent proves nothing.
+// With a DSN the SDK must have been compiled into some (lazy) chunk.
+if (process.env.VITE_SENTRY_DSN) {
+  const sdkChunk = files.find((f) => sources.get(f).includes(SENTRY_SIGNATURE));
+  if (!sdkChunk) {
+    console.error(
+      "[bundle-size] FAILED — VITE_SENTRY_DSN is set but no chunk contains the " +
+        "Sentry SDK, so the first-paint check above was not exercised."
+    );
+    process.exit(1);
+  }
+  console.log(`[bundle-size] Sentry SDK is lazy (${sdkChunk}), not on first paint.`);
 }
 
 console.log(

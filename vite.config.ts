@@ -127,6 +127,21 @@ const VENDOR_CHUNKS: readonly (readonly [string, readonly string[]])[] = [
   ['state-vendor', ['zustand', '@tanstack/react-query']],
   // Date utilities
   ['date-vendor', ['date-fns']],
+  // Error monitoring (US-255). Both are reached only through dynamic imports
+  // in src/lib/sentry.ts -> sentry-sdk.ts -> sentry-replay.ts, and are named so
+  // scripts/check-bundle-size.mjs can prove they stay off the first-paint
+  // graph. Replay (rrweb inside it) is the larger half and loads last.
+  [
+    'sentry-vendor',
+    [
+      '@sentry/react',
+      '@sentry/browser',
+      '@sentry/core',
+      '@sentry-internal/browser-utils',
+      '@sentry-internal/feedback',
+    ],
+  ],
+  ['sentry-replay-vendor', ['@sentry-internal/replay', '@sentry-internal/replay-canvas']],
 ];
 
 // jspdf / jspdf-autotable are deliberately absent from the table above

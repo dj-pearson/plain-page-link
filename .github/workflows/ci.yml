@@ -189,9 +189,17 @@ jobs:
           # instead, so the blog is inside every check (US-186).
           # The Cloudflare Pages deploy must NOT set this (US-148).
           PRERENDER_ALLOW_NO_ARTICLES: '1'
+          # US-255: production sets a DSN, so the bundle checked here must too,
+          # or the error-monitoring path is never in the bundle being measured.
+          # With a DSN, the Sentry SDK and Session Replay used to add 81 KB gzip
+          # to the entry chunk and nothing noticed. A dummy: no project behind it.
+          VITE_SENTRY_DSN: https://public@o0.ingest.sentry.io/0
 
       - name: Check bundle size budgets
         run: npm run size-check
+        env:
+          # Tells the check to insist the SDK was compiled (lazily) at all.
+          VITE_SENTRY_DSN: https://public@o0.ingest.sentry.io/0
 
   lint:
     name: Lint

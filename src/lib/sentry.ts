@@ -1,77 +1,108 @@
 /**
- * Sentry Error Monitoring Configuration
+ * Sentry error monitoring — the facade every caller imports.
  *
- * This module initializes Sentry for error tracking and performance monitoring.
- * It integrates with the existing errorHandler for consistent error management.
+ * US-255: this file must not import @sentry/* statically. It used to, and with
+ * VITE_SENTRY_DSN set the SDK plus Session Replay added ~81 KB gzip to the
+ * entry chunk of every page — the visitor opening an agent's profile from
+ * Instagram downloaded an error reporter before the page could render. Now:
+ *
+ *   - initSentry() (called from main.tsx) only installs two tiny window
+ *     listeners and schedules loadSentry() for after `load`, when idle.
+ *   - loadSentry() dynamic-imports ./sentry-sdk, which holds the SDK, the
+ *     integrations and the scrubbing; Session Replay is a further dynamic
+ *     import from there (./sentry-replay), in a chunk of its own.
+ *   - Everything called before the SDK arrives — exceptions, messages,
+ *     breadcrumbs, user/tag/context — is buffered (capped) and replayed.
+ *
+ * scripts/check-bundle-size.mjs builds with a dummy DSN in CI and fails if any
+ * Sentry code reaches the first-paint graph.
  */
-
-import * as Sentry from '@sentry/react';
 
 // Environment detection
 const isDevelopment = import.meta.env.DEV;
 const isProduction = import.meta.env.PROD;
-const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+const sentryDsn: string = import.meta.env.VITE_SENTRY_DSN || '';
+const sentryEnabled = isProduction || import.meta.env.VITE_SENTRY_ENABLED === 'true';
+
+/**
+ * Whether anything is ever sent. Without a DSN, or outside production without
+ * the explicit override, the SDK is never downloaded and every call is a no-op
+ * (the old code initialised a client with `enabled: false`, which sent nothing
+ * either).
+ */
+const active = Boolean(sentryDsn) && sentryEnabled;
 
 /** Same-origin path served by functions/api/sentry.ts. */
 export const SENTRY_TUNNEL = '/api/sentry';
 
-// List of URLs to ignore (internal/expected errors)
-const IGNORED_ERRORS = [
-  'ResizeObserver loop limit exceeded',
-  'ResizeObserver loop completed with undelivered notifications',
-  'Network request failed',
-  'Failed to fetch',
-  'Load failed',
-  'The user aborted a request',
-  'AbortError',
-];
+/** Events (exceptions, messages, breadcrumbs) held before the SDK loads. */
+export const MAX_BUFFERED_EVENTS = 50;
 
-// Sensitive data patterns to scrub
-const SENSITIVE_PATTERNS = [
-  /password/i,
-  /token/i,
-  /secret/i,
-  /api[_-]?key/i,
-  /authorization/i,
-  /bearer/i,
-  /session/i,
-  /credit[_-]?card/i,
-  /ssn/i,
-  /social[_-]?security/i,
-];
+export type SentrySeverity = 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug';
 
-/**
- * Initialize Sentry error monitoring
- * Should be called as early as possible in the app lifecycle
- */
-export function initSentry(): void {
-  // Only initialize if DSN is configured
-  if (!sentryDsn) {
-    if (isDevelopment) {
-      console.log('[Sentry] DSN not configured - error monitoring disabled');
-    }
-    return;
-  }
+export interface SentryBreadcrumb {
+  type?: string;
+  category?: string;
+  message?: string;
+  level?: SentrySeverity;
+  data?: Record<string, unknown>;
+  /** Seconds since the epoch, as Sentry expects. */
+  timestamp?: number;
+}
 
-  Sentry.init({
-    dsn: sentryDsn,
+export interface SentryUser {
+  id: string;
+  email?: string;
+  username?: string;
+}
+
+/** Plain options; ./sentry-sdk adds integrations and beforeSend. */
+export interface SentryConfig {
+  dsn: string;
+  tunnel: string;
+  environment: string;
+  release: string;
+  enabled: boolean;
+  tracesSampleRate: number;
+  replaysSessionSampleRate: number;
+  replaysOnErrorSampleRate: number;
+  tracePropagationTargets: (string | RegExp)[];
+  maxBreadcrumbs: number;
+  attachStacktrace: boolean;
+  normalizeDepth: number;
+  deploymentRegion: string;
+}
+
+/** What ./sentry-sdk hands back once the SDK is initialised. */
+export interface SentrySdk {
+  captureException(error: unknown, eventId: string, extra?: Record<string, unknown>): void;
+  captureMessage(
+    message: string,
+    level: SentrySeverity,
+    eventId: string,
+    extra?: Record<string, unknown>
+  ): void;
+  addBreadcrumb(breadcrumb: SentryBreadcrumb): void;
+  setUser(user: SentryUser | null): void;
+  setContext(name: string, context: Record<string, unknown>): void;
+  setTag(key: string, value: string): void;
+}
+
+export function buildSentryConfig(dsn: string): SentryConfig {
+  return {
+    dsn,
     // US-222: through our own origin (functions/api/sentry.ts). The CSP's
     // connect-src has no Sentry host, so reports sent straight to sentry.io
     // were blocked by the browser and production errors went nowhere.
     tunnel: SENTRY_TUNNEL,
     environment: isDevelopment ? 'development' : 'production',
     release: import.meta.env.VITE_APP_VERSION || '1.0.0',
-
-    // Only enable in production by default, but allow override
-    enabled: isProduction || import.meta.env.VITE_SENTRY_ENABLED === 'true',
-
+    enabled: sentryEnabled,
     // Performance monitoring - sample 10% of transactions in production
     tracesSampleRate: isProduction ? 0.1 : 1.0,
-
     // Session replay for debugging user issues (sample 1% in production)
     replaysSessionSampleRate: isProduction ? 0.01 : 0.1,
     replaysOnErrorSampleRate: isProduction ? 0.1 : 1.0,
-
     // Trace propagation targets for distributed tracing
     tracePropagationTargets: [
       'localhost',
@@ -79,85 +110,204 @@ export function initSentry(): void {
       /^https:\/\/functions\.agentbio\.net/,
       /^https:\/\/.*\.supabase\.co/,
     ],
-
-    // Integrations
-    integrations: [
-      // Browser tracing for performance monitoring (navigation + fetch)
-      Sentry.browserTracingIntegration(),
-      // Explicit breadcrumbs for navigation, console, fetch/xhr, and DOM
-      Sentry.breadcrumbsIntegration({
-        console: true,
-        dom: true,
-        fetch: true,
-        history: true,
-        xhr: true,
-      }),
-      // Session replay for error debugging
-      Sentry.replayIntegration({
-        // Mask all text for privacy
-        maskAllText: true,
-        // Block all media for privacy
-        blockAllMedia: true,
-      }),
-    ],
-
-    // Filter out non-actionable errors
-    beforeSend(event, hint) {
-      const error = hint.originalException;
-
-      // Filter out ignored errors
-      if (error instanceof Error) {
-        for (const pattern of IGNORED_ERRORS) {
-          if (error.message.includes(pattern)) {
-            return null;
-          }
-        }
-      }
-
-      // Scrub sensitive data from event
-      if (event.request?.data) {
-        event.request.data = scrubSensitiveData(event.request.data);
-      }
-
-      // Scrub sensitive data from breadcrumbs
-      if (event.breadcrumbs) {
-        event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => ({
-          ...breadcrumb,
-          data: breadcrumb.data ? scrubRecord(breadcrumb.data) : undefined,
-        }));
-      }
-
-      // Scrub sensitive data from extra context
-      if (event.extra) {
-        event.extra = scrubRecord(event.extra as Record<string, unknown>);
-      }
-
-      return event;
-    },
-
-    // Limit breadcrumbs for performance
     maxBreadcrumbs: 50,
-
-    // Attach stack traces to messages
     attachStacktrace: true,
-
-    // Normalize paths for source maps
     normalizeDepth: 5,
+    deploymentRegion: (import.meta.env.VITE_DEPLOYMENT_REGION as string | undefined) || 'unknown',
+  };
+}
+
+// --------------------------------------------------------------------------
+// Buffer
+// --------------------------------------------------------------------------
+
+type BufferedEvent =
+  | { kind: 'exception'; error: unknown; eventId: string; extra?: Record<string, unknown> }
+  | {
+      kind: 'message';
+      message: string;
+      level: SentrySeverity;
+      eventId: string;
+      extra?: Record<string, unknown>;
+    }
+  | { kind: 'breadcrumb'; breadcrumb: SentryBreadcrumb };
+
+let sdk: SentrySdk | null = null;
+let loading: Promise<void> | null = null;
+let events: BufferedEvent[] = [];
+let dropped = 0;
+// Scope state is last-write-wins, so it is kept as values rather than queued:
+// it can never be what overflows the cap. `undefined` = never set.
+let pendingUser: SentryUser | null | undefined;
+const pendingTags = new Map<string, string>();
+const pendingContexts = new Map<string, Record<string, unknown>>();
+
+function enqueue(event: BufferedEvent): void {
+  // Keep the earliest: the first error is usually the cause of the rest.
+  if (events.length >= MAX_BUFFERED_EVENTS) {
+    dropped++;
+    return;
+  }
+  events.push(event);
+}
+
+/** 32 lowercase hex characters — the shape of a Sentry event id. */
+function newEventId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().replace(/-/g, '');
+  }
+  let id = '';
+  for (let i = 0; i < 32; i++) id += Math.floor(Math.random() * 16).toString(16);
+  return id;
+}
+
+function flush(target: SentrySdk): void {
+  if (pendingUser !== undefined) target.setUser(pendingUser);
+  for (const [key, value] of pendingTags) target.setTag(key, value);
+  for (const [name, context] of pendingContexts) target.setContext(name, context);
+
+  for (const event of events) {
+    if (event.kind === 'exception') {
+      target.captureException(event.error, event.eventId, event.extra);
+    } else if (event.kind === 'message') {
+      target.captureMessage(event.message, event.level, event.eventId, event.extra);
+    } else {
+      target.addBreadcrumb(event.breadcrumb);
+    }
+  }
+  if (dropped > 0) {
+    target.addBreadcrumb({
+      category: 'sentry',
+      level: 'warning',
+      message: `${dropped} event(s) raised before error monitoring loaded were dropped`,
+    });
+  }
+
+  events = [];
+  dropped = 0;
+  pendingUser = undefined;
+  pendingTags.clear();
+  pendingContexts.clear();
+}
+
+function discardBuffer(): void {
+  events = [];
+  dropped = 0;
+  pendingUser = undefined;
+  pendingTags.clear();
+  pendingContexts.clear();
+}
+
+// --------------------------------------------------------------------------
+// Early global handlers — until the SDK's own GlobalHandlers take over
+// --------------------------------------------------------------------------
+
+let earlyHandlersInstalled = false;
+
+function onEarlyError(event: ErrorEvent): void {
+  const error: unknown =
+    event.error ?? new Error(event.message || 'Script error before monitoring loaded');
+  enqueue({ kind: 'exception', error, eventId: newEventId(), extra: { mechanism: 'onerror' } });
+}
+
+function onEarlyRejection(event: PromiseRejectionEvent): void {
+  const reason: unknown = event.reason;
+  const error =
+    reason instanceof Error ? reason : new Error(`Unhandled promise rejection: ${String(reason)}`);
+  enqueue({
+    kind: 'exception',
+    error,
+    eventId: newEventId(),
+    extra: { mechanism: 'onunhandledrejection' },
   });
+}
 
-  // Explicit tags for filtering/alerting in the Sentry dashboard.
-  const release = import.meta.env.VITE_APP_VERSION || '1.0.0';
-  Sentry.setTag('environment', isDevelopment ? 'development' : 'production');
-  Sentry.setTag('release', release);
-  Sentry.setTag(
-    'deployment.region',
-    (import.meta.env.VITE_DEPLOYMENT_REGION as string) || 'unknown'
-  );
+function installEarlyHandlers(): void {
+  if (earlyHandlersInstalled || typeof window === 'undefined') return;
+  window.addEventListener('error', onEarlyError);
+  window.addEventListener('unhandledrejection', onEarlyRejection);
+  earlyHandlersInstalled = true;
+}
 
-  if (isDevelopment) {
-    console.log('[Sentry] Initialized successfully');
+function removeEarlyHandlers(): void {
+  if (!earlyHandlersInstalled) return;
+  window.removeEventListener('error', onEarlyError);
+  window.removeEventListener('unhandledrejection', onEarlyRejection);
+  earlyHandlersInstalled = false;
+}
+
+// --------------------------------------------------------------------------
+// Loading
+// --------------------------------------------------------------------------
+
+/**
+ * Download and initialise the SDK now. Idempotent. Resolves once the buffer
+ * has been replayed; Session Replay follows in the background.
+ */
+export function loadSentry(): Promise<void> {
+  if (!active) return Promise.resolve();
+  if (loading) return loading;
+
+  loading = import('./sentry-sdk')
+    .then((mod) => {
+      const config = buildSentryConfig(sentryDsn);
+      const instance = mod.initSentrySdk(config);
+      removeEarlyHandlers();
+      sdk = instance;
+      flush(instance);
+      if (config.replaysSessionSampleRate > 0 || config.replaysOnErrorSampleRate > 0) {
+        void mod.enableReplay().catch(() => {
+          // Replay is a debugging aid; failing to fetch it must not matter.
+        });
+      }
+      if (isDevelopment) {
+        console.log('[Sentry] Initialized successfully');
+      }
+    })
+    .catch(() => {
+      // The chunk could not be fetched (offline, a deploy replaced it). Stop
+      // buffering so the queue does not grow for the rest of the session.
+      removeEarlyHandlers();
+      discardBuffer();
+    });
+
+  return loading;
+}
+
+function whenIdle(callback: () => void): void {
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(callback, { timeout: 5000 });
+  } else {
+    setTimeout(callback, 1);
   }
 }
+
+/**
+ * Initialize Sentry error monitoring. Cheap: it schedules the SDK download for
+ * after the page has loaded, and holds anything that goes wrong until then.
+ */
+export function initSentry(): void {
+  if (!sentryDsn) {
+    if (isDevelopment) {
+      console.log('[Sentry] DSN not configured - error monitoring disabled');
+    }
+    return;
+  }
+  if (!active || typeof window === 'undefined') return;
+
+  installEarlyHandlers();
+
+  const schedule = () => whenIdle(() => void loadSentry());
+  if (document.readyState === 'complete') {
+    schedule();
+  } else {
+    window.addEventListener('load', schedule, { once: true });
+  }
+}
+
+// --------------------------------------------------------------------------
+// Public API
+// --------------------------------------------------------------------------
 
 /**
  * Critical business events. These are surfaced as Sentry messages (info
@@ -190,120 +340,73 @@ export function trackHighValueLead(score: number, userId: string): void {
 }
 
 /**
- * Recursively scrub sensitive data from an object
- */
-function scrubSensitiveData(data: unknown): unknown {
-  if (typeof data === 'string') {
-    return data;
-  }
-
-  if (Array.isArray(data)) {
-    return data.map(scrubSensitiveData);
-  }
-
-  if (data && typeof data === 'object') {
-    const scrubbed: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data)) {
-      // Check if key contains sensitive pattern
-      const isSensitive = SENSITIVE_PATTERNS.some((pattern) => pattern.test(key));
-      scrubbed[key] = isSensitive ? '[REDACTED]' : scrubSensitiveData(value);
-    }
-    return scrubbed;
-  }
-
-  return data;
-}
-
-/**
- * scrubSensitiveData for a value already known to be a record.
- *
- * The recursive version has to return `unknown` because it accepts anything,
- * but the object branch always produces a Record. Sentry's breadcrumb `data`
- * and event `extra` are both typed as records, so this keeps that shape rather
- * than making each call site assert it.
- */
-function scrubRecord(data: Record<string, unknown>): Record<string, unknown> {
-  const scrubbed = scrubSensitiveData(data);
-  return scrubbed !== null && typeof scrubbed === 'object' && !Array.isArray(scrubbed)
-    ? (scrubbed as Record<string, unknown>)
-    : {};
-}
-
-/**
- * Capture an exception with Sentry
+ * Capture an exception. Returns the event id it is (or will be) sent under,
+ * so an error screen can show it even before the SDK has loaded.
  */
 export function captureException(
   error: Error,
   context?: Record<string, unknown>
 ): string | undefined {
-  if (!Sentry.getClient()) {
-    return undefined;
-  }
-
-  return Sentry.captureException(error, {
-    extra: context ? (scrubSensitiveData(context) as Record<string, unknown>) : undefined,
-  });
+  if (!active) return undefined;
+  const eventId = newEventId();
+  if (sdk) sdk.captureException(error, eventId, context);
+  else enqueue({ kind: 'exception', error, eventId, extra: context });
+  return eventId;
 }
 
 /**
- * Capture a message with Sentry
+ * Capture a message.
  */
 export function captureMessage(
   message: string,
-  level: Sentry.SeverityLevel = 'info',
+  level: SentrySeverity = 'info',
   context?: Record<string, unknown>
 ): string | undefined {
-  if (!Sentry.getClient()) {
-    return undefined;
-  }
-
-  return Sentry.captureMessage(message, {
-    level,
-    extra: context ? (scrubSensitiveData(context) as Record<string, unknown>) : undefined,
-  });
+  if (!active) return undefined;
+  const eventId = newEventId();
+  if (sdk) sdk.captureMessage(message, level, eventId, context);
+  else enqueue({ kind: 'message', message, level, eventId, extra: context });
+  return eventId;
 }
 
 /**
  * Set user context for error tracking
  */
-export function setUser(user: { id: string; email?: string; username?: string }): void {
-  if (!Sentry.getClient()) {
-    return;
-  }
-
-  Sentry.setUser({
+export function setUser(user: SentryUser): void {
+  if (!active) return;
+  const scoped: SentryUser = {
     id: user.id,
-    // Only include email if it's provided and we're in production
-    // (helps with debugging but is optional for privacy)
+    // Only include email outside production (helps with debugging but is
+    // optional for privacy)
     email: isProduction ? undefined : user.email,
     username: user.username,
-  });
+  };
+  if (sdk) sdk.setUser(scoped);
+  else pendingUser = scoped;
 }
 
 /**
  * Clear user context (on logout)
  */
 export function clearUser(): void {
-  if (!Sentry.getClient()) {
-    return;
-  }
-
-  Sentry.setUser(null);
+  if (!active) return;
+  if (sdk) sdk.setUser(null);
+  else pendingUser = null;
 }
 
 /**
  * Add a breadcrumb for debugging
  */
-export function addBreadcrumb(breadcrumb: Sentry.Breadcrumb): void {
-  if (!Sentry.getClient()) {
+export function addBreadcrumb(breadcrumb: SentryBreadcrumb): void {
+  if (!active) return;
+  if (sdk) {
+    sdk.addBreadcrumb(breadcrumb);
     return;
   }
-
-  Sentry.addBreadcrumb({
-    ...breadcrumb,
-    data: breadcrumb.data
-      ? (scrubSensitiveData(breadcrumb.data) as Record<string, unknown>)
-      : undefined,
+  // Stamp it now; replayed later it would otherwise carry the load time.
+  enqueue({
+    kind: 'breadcrumb',
+    breadcrumb: { ...breadcrumb, timestamp: breadcrumb.timestamp ?? Date.now() / 1000 },
   });
 }
 
@@ -311,44 +414,16 @@ export function addBreadcrumb(breadcrumb: Sentry.Breadcrumb): void {
  * Set extra context for the next error
  */
 export function setContext(name: string, context: Record<string, unknown>): void {
-  if (!Sentry.getClient()) {
-    return;
-  }
-
-  Sentry.setContext(name, scrubSensitiveData(context) as Record<string, unknown>);
+  if (!active) return;
+  if (sdk) sdk.setContext(name, context);
+  else pendingContexts.set(name, context);
 }
 
 /**
  * Set a tag for filtering errors
  */
 export function setTag(key: string, value: string): void {
-  if (!Sentry.getClient()) {
-    return;
-  }
-
-  Sentry.setTag(key, value);
+  if (!active) return;
+  if (sdk) sdk.setTag(key, value);
+  else pendingTags.set(key, value);
 }
-
-/**
- * Start a transaction for performance monitoring
- */
-export function startTransaction(name: string, op: string): Sentry.Span | undefined {
-  if (!Sentry.getClient()) {
-    return undefined;
-  }
-
-  return Sentry.startInactiveSpan({ name, op });
-}
-
-/**
- * Create a Sentry-aware error boundary wrapper
- */
-export const SentryErrorBoundary = Sentry.ErrorBoundary;
-
-/**
- * Sentry profiler for React components
- */
-export const SentryProfiler = Sentry.withProfiler;
-
-// Export Sentry for direct access if needed
-export { Sentry };
