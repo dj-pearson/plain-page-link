@@ -32,10 +32,7 @@ export function moveAndRenumber(
   targetId: string
 ): PositionWrite[] {
   if (id === targetId) return [];
-  const ordered = items
-    .map((item, index) => ({ item, index }))
-    .sort((a, b) => a.item.position - b.item.position || a.index - b.index)
-    .map(({ item }) => item);
+  const ordered = byPosition(items);
 
   const from = ordered.findIndex((item) => item.id === id);
   const to = ordered.findIndex((item) => item.id === targetId);
@@ -47,4 +44,29 @@ export function moveAndRenumber(
     .map((item, position) => ({ id: item.id, position, changed: item.position !== position }))
     .filter((write) => write.changed)
     .map(({ id: writeId, position }) => ({ id: writeId, position }));
+}
+
+/**
+ * `items` in display order (by position, ties in the order given), as a new
+ * array. The Links page lists and moves rows in this order rather than trusting
+ * the order of the cached array, which another page once sorted in place
+ * (US-252).
+ */
+export function byPosition<T extends PositionedItem>(items: readonly T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => a.item.position - b.item.position || a.index - b.index)
+    .map(({ item }) => item);
+}
+
+/**
+ * The `limit` most-clicked items, as a new array. Never sorts `items` itself:
+ * Overview used to call `links.sort(...)` on the TanStack Query cache, which
+ * reordered the Links page by clicks for the rest of the session (US-252).
+ */
+export function topByClicks<T extends { click_count?: number | null }>(
+  items: readonly T[],
+  limit: number
+): T[] {
+  return [...items].sort((a, b) => (b.click_count ?? 0) - (a.click_count ?? 0)).slice(0, limit);
 }

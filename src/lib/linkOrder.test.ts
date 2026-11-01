@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { moveAndRenumber } from './linkOrder';
+import { byPosition, moveAndRenumber, topByClicks } from './linkOrder';
 
 const links = (...positions: number[]) =>
   positions.map((position, i) => ({ id: String.fromCharCode(97 + i), position }));
@@ -46,5 +46,34 @@ describe('moveAndRenumber (US-247)', () => {
   it('does nothing for an unknown id or a move onto itself', () => {
     expect(moveAndRenumber(links(0, 1), 'a', 'a')).toEqual([]);
     expect(moveAndRenumber(links(0, 1), 'a', 'nope')).toEqual([]);
+  });
+});
+
+describe('display order (US-252)', () => {
+  it('byPosition sorts a copy and leaves the input untouched', () => {
+    const input = [
+      { id: 'c', position: 2 },
+      { id: 'a', position: 0 },
+      { id: 'b', position: 1 },
+    ];
+    expect(byPosition(input).map((l) => l.id)).toEqual(['a', 'b', 'c']);
+    expect(input.map((l) => l.id)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('byPosition keeps ties in the order given', () => {
+    expect(byPosition(links(1, 0, 1)).map((l) => l.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('topByClicks does not reorder the array it is given (the TanStack cache)', () => {
+    // Overview sorted the cached links array in place, so the Links page
+    // listed them by clicks and its up/down arrows moved the wrong rows.
+    const cached = [
+      { id: 'a', position: 0, click_count: 1 },
+      { id: 'b', position: 1, click_count: 9 },
+      { id: 'c', position: 2, click_count: null },
+      { id: 'd', position: 3, click_count: 5 },
+    ];
+    expect(topByClicks(cached, 2).map((l) => l.id)).toEqual(['b', 'd']);
+    expect(cached.map((l) => l.id)).toEqual(['a', 'b', 'c', 'd']);
   });
 });

@@ -42,7 +42,7 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
-import { moveAndRenumber } from '@/lib/linkOrder';
+import { byPosition, moveAndRenumber } from '@/lib/linkOrder';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -104,9 +104,10 @@ export default function Links() {
     undoMessage: (link) => `"${link.title}" will be deleted in 10 seconds. Click Undo to cancel.`,
   });
 
-  // Filter out pending deletions from display
+  // Filter out pending deletions from display, and list by position whatever
+  // order the cached array is in (US-252: Overview once sorted it in place).
   const visibleLinks = useMemo(
-    () => links.filter((link) => !isPendingDeletion(link.id)),
+    () => byPosition(links.filter((link) => !isPendingDeletion(link.id))),
     [links, isPendingDeletion]
   );
 

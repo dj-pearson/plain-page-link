@@ -27,6 +27,7 @@ import { ComingUp } from '@/components/dashboard/ComingUp';
 import { PlanUsageCard } from '@/components/dashboard/PlanUsageCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getPlanById } from '@/config/pricing-plans';
+import { topByClicks } from '@/lib/linkOrder';
 import {
   Dialog,
   DialogContent,
@@ -277,26 +278,23 @@ export default function Overview() {
           <CardContent>
             {links.length > 0 ? (
               <div className="space-y-2 sm:space-y-3">
-                {links
-                  .sort((a, b) => (b.click_count || 0) - (a.click_count || 0))
-                  .slice(0, 5)
-                  .map((link) => (
-                    <div
-                      key={link.id}
-                      className="flex items-center justify-between py-2 sm:py-2.5 border-b border-border last:border-0 gap-2 min-h-[44px]"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm sm:text-base truncate">{link.title}</p>
-                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                          {link.url}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm sm:text-base text-muted-foreground flex-shrink-0">
-                        <MousePointerClick className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="font-medium">{link.click_count || 0}</span>
-                      </div>
+                {topByClicks(links, 5).map((link) => (
+                  <div
+                    key={link.id}
+                    className="flex items-center justify-between py-2 sm:py-2.5 border-b border-border last:border-0 gap-2 min-h-[44px]"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm sm:text-base truncate">{link.title}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                        {link.url}
+                      </p>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-1 text-sm sm:text-base text-muted-foreground flex-shrink-0">
+                      <MousePointerClick className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="font-medium">{link.click_count || 0}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="text-center py-6 sm:py-8">
