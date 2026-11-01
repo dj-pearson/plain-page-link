@@ -174,16 +174,18 @@ Beautiful ranch home with updated kitchen...`}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <Label>Address</Label>
+                  <Label htmlFor="url-import-address">Address</Label>
                   <Input
+                    id="url-import-address"
                     value={parsedData.address}
                     onChange={(e) => setParsedData({ ...parsedData, address: e.target.value })}
                     className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label>City</Label>
+                  <Label htmlFor="url-import-city">City</Label>
                   <Input
+                    id="url-import-city"
                     value={parsedData.city}
                     onChange={(e) => setParsedData({ ...parsedData, city: e.target.value })}
                     className="mt-1"
@@ -191,8 +193,9 @@ Beautiful ranch home with updated kitchen...`}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label>State</Label>
+                    <Label htmlFor="url-import-state">State</Label>
                     <Input
+                      id="url-import-state"
                       value={parsedData.state}
                       onChange={(e) => setParsedData({ ...parsedData, state: e.target.value })}
                       maxLength={2}
@@ -200,8 +203,9 @@ Beautiful ranch home with updated kitchen...`}
                     />
                   </div>
                   <div>
-                    <Label>Zip</Label>
+                    <Label htmlFor="url-import-zip">Zip</Label>
                     <Input
+                      id="url-import-zip"
                       value={parsedData.zip_code}
                       onChange={(e) => setParsedData({ ...parsedData, zip_code: e.target.value })}
                       className="mt-1"
@@ -209,20 +213,21 @@ Beautiful ranch home with updated kitchen...`}
                   </div>
                 </div>
                 <div>
-                  <Label>Price</Label>
+                  <Label htmlFor="url-import-price">Price</Label>
                   <Input
+                    id="url-import-price"
                     value={parsedData.price}
                     onChange={(e) => setParsedData({ ...parsedData, price: e.target.value })}
                     className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label>Property Type</Label>
+                  <Label htmlFor="url-import-property-type">Property Type</Label>
                   <Select
                     value={parsedData.property_type}
                     onValueChange={(v) => setParsedData({ ...parsedData, property_type: v })}
                   >
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger id="url-import-property-type" className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -236,8 +241,9 @@ Beautiful ranch home with updated kitchen...`}
                   </Select>
                 </div>
                 <div>
-                  <Label>Bedrooms</Label>
+                  <Label htmlFor="url-import-bedrooms">Bedrooms</Label>
                   <Input
+                    id="url-import-bedrooms"
                     type="number"
                     value={parsedData.bedrooms}
                     onChange={(e) =>
@@ -247,8 +253,9 @@ Beautiful ranch home with updated kitchen...`}
                   />
                 </div>
                 <div>
-                  <Label>Bathrooms</Label>
+                  <Label htmlFor="url-import-bathrooms">Bathrooms</Label>
                   <Input
+                    id="url-import-bathrooms"
                     type="number"
                     step={0.5}
                     value={parsedData.bathrooms}
@@ -259,8 +266,9 @@ Beautiful ranch home with updated kitchen...`}
                   />
                 </div>
                 <div>
-                  <Label>Square Feet</Label>
+                  <Label htmlFor="url-import-square-feet">Square Feet</Label>
                   <Input
+                    id="url-import-square-feet"
                     type="number"
                     value={parsedData.square_feet || ''}
                     onChange={(e) =>
@@ -273,16 +281,18 @@ Beautiful ranch home with updated kitchen...`}
                   />
                 </div>
                 <div>
-                  <Label>MLS Number</Label>
+                  <Label htmlFor="url-import-mls">MLS Number</Label>
                   <Input
+                    id="url-import-mls"
                     value={parsedData.mls_number}
                     onChange={(e) => setParsedData({ ...parsedData, mls_number: e.target.value })}
                     className="mt-1"
                   />
                 </div>
                 <div className="col-span-2">
-                  <Label>Description</Label>
+                  <Label htmlFor="url-import-description">Description</Label>
                   <Textarea
+                    id="url-import-description"
                     value={parsedData.description}
                     onChange={(e) => setParsedData({ ...parsedData, description: e.target.value })}
                     rows={3}
