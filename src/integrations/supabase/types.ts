@@ -9081,6 +9081,7 @@ export type Database = {
         Args: { _at?: string; _key: string; _user_id: string };
         Returns: undefined;
       };
+      auth_user_id_by_email: { Args: { p_email: string }; Returns: string };
       calculate_content_freshness_score: {
         Args: { p_analyzed_at: string };
         Returns: number;

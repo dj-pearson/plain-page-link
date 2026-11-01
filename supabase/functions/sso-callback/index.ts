@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { getClientIP } from '../_shared/auth.ts';
 import { sanitizeRedirectUrl } from '../_shared/url-validation.ts';
 import { getSiteUrl } from '../_shared/env.ts';
+import { findAuthUserIdByEmail } from '../_shared/auth-user-lookup.ts';
 import {
   SAML_DISABLED_MESSAGE,
   checkIdTokenClaims,
@@ -198,12 +199,12 @@ serve(async (req) => {
         .eq('sso_subject_id', subjectId);
 
     } else {
-      // Check if user exists by email
-      const { data: existingUser } = await supabase.auth.admin.listUsers();
-      const userByEmail = existingUser?.users?.find((u: { email?: string }) => (u.email ?? '').toLowerCase() === userEmail);
+      // Check if user exists by email. the admin user list returned only its first
+      // page (50 users), so later accounts were missed (US-249).
+      const userIdByEmail = await findAuthUserIdByEmail(supabase, userEmail);
 
-      if (userByEmail) {
-        userId = userByEmail.id;
+      if (userIdByEmail) {
+        userId = userIdByEmail;
       } else if (ssoConfig.auto_provision_users) {
         // Create new user
         const fullName = userAttributes.displayName ||
