@@ -4945,3 +4945,9 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - Team invites are rate-limited per sender (20/day) and per recipient (3/day, keyed by SHA-256), owners are limited to one team, and links are stripped from team names in the email.
 - Migration 20261101000021 drops the FOR ALL policies on teams/team_members and revokes client writes, so an owner can no longer raise max_seats and an admin can no longer insert an accepted member; verify-schema check 12b proves it.
 - Integration: the generate-marketing-post and oauth-proxy conflicts kept the US-248/US-249 rewrites, which already log nothing sensitive.
+
+## Site improvement loop 2 — iteration 13/15 — US-260: agent profiles downloaded Three.js, Radix and full-size photos on open and animated under reduced motion
+
+- The 3D background loaded eagerly; it now waits for load plus idle, skips reduced-motion and Save-Data visitors, caps dpr at 1.5 and pauses while the tab is hidden.
+- The sticky bar, featured carousel and listing modal hold still under reduced motion. The add-to-calendar menu became a small disclosure, which removes ui-vendor from the profile chunk. Thumbnails use resized, lazy variants. App no longer opens an unused IndexedDB, so idb is out of the entry chunk.
+- check-bundle-size.mjs now guards both chunk graphs. Added 23 tests: disclosure and keyboard, reduced motion, useDeferred3D, Canvas dpr/frameloop, ListingsBlock, sizedImage.
