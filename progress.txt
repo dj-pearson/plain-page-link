@@ -4931,3 +4931,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - The shortcuts panel (already a Dialog from US-252) now wraps its floating button in a DialogTrigger so focus returns to it on close; theme tokens replace the gray literals.
 - Listings grid: Edit/Delete visible on touch and on keyboard focus with aria-labels and 44px targets; named grid/list toggles (aria-pressed) and Add chevron (aria-expanded); a loading skeleton replaces the empty-state flash; Move earlier/later buttons reorder through US-253's full-list reorderListings mutation.
 - Tests: EditModals.test.tsx (5), Listings.grid.test.tsx (4), a focus-return test in KeyboardShortcutsHelper.test.tsx; full suite 1399 passed, 1 skipped.
+
+## Site improvement loop 2 — iteration 11/15 — US-258: an agent who had just paid was shown the Free plan, and a paid plan change happened on one click
+
+- Both checkout entry points now return to one handled URL (src/lib/checkoutReturn.ts); useCheckoutReturn shows "Confirming your plan" and re-reads the plan every 2s for up to 30s, then confirms or says the payment is still processing. Overview's legacy ?subscription=success redirects there instead of a modal naming the stale plan.
+- Paying agents now confirm an Upgrade/Downgrade in PlanChangeConfirmDialog (price, proration, withdrawn cancellation, limits they would exceed) before Stripe is touched; Pricing routes them through it.
+- Subscription and Settings say "Ends" instead of "Renews" when cancel_at_period_end is set.
+- Tests: SubscriptionPage (7, incl. no checkout call until confirm), useCheckoutReturn fake-timer suite (6), Settings "Ends", Overview legacy redirect.
