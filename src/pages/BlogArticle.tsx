@@ -15,6 +15,8 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import ReactMarkdown from 'react-markdown';
 import { logger } from '@/lib/logger';
+import { getVisitorId } from '@/lib/analyticsEvents';
+import { rehypeArticleHeadings, stripLeadingTitle } from '@/lib/articleMarkdown';
 
 export default function BlogArticle() {
   const { slug } = useParams<{ slug: string }>();
@@ -50,19 +52,23 @@ export default function BlogArticle() {
     };
   }, [article?.content]);
 
-  // Increment view count
+  // The model's `# Title` line duplicates the h1 this page renders (US-262).
+  const body = useMemo(() => stripLeadingTitle(article?.content ?? ''), [article?.content]);
+
+  // Count the view. This was `.update({ view_count: n + 1 })`, which no policy
+  // lets a visitor make, so it counted nothing — and for an admin it bumped
+  // updated_at, the date the sitemap and dateModified report. The RPC is
+  // published-only, throttled per visitor, and leaves updated_at alone.
   useEffect(() => {
-    if (article?.id) {
-      supabase
-        .from('articles')
-        .update({ view_count: (article.view_count || 0) + 1 })
-        .eq('id', article.id)
-        .select('id')
-        .single()
-        .then(() => {
-          logger.debug('View count incremented');
-        });
-    }
+    if (!article?.id) return;
+    supabase
+      .rpc('increment_article_view', {
+        p_article_id: article.id,
+        p_visitor_id: getVisitorId() ?? undefined,
+      })
+      .then(({ error }) => {
+        if (error) logger.debug('Article view not counted', { articleId: article.id });
+      });
   }, [article?.id]);
 
   if (isLoading) {
@@ -243,28 +249,21 @@ export default function BlogArticle() {
               itemProp="articleBody"
             >
               <ReactMarkdown
+                // Demotes body h1s to h2 and gives every heading a unique id
+                // from its text (US-262). Done on the tree, not here: ids
+                // allocated in a render component would change on re-render.
+                rehypePlugins={[rehypeArticleHeadings]}
                 components={{
-                  // Add internal linking and semantic IDs for headings
-                  h2: ({ children, ...props }) => {
-                    const id = String(children).toLowerCase().replace(/\s+/g, '-');
-                    return (
-                      <h2 {...props} id={id} className="text-3xl font-bold mt-12 mb-4 scroll-mt-20">
-                        {children}
-                      </h2>
-                    );
-                  },
-                  h3: ({ children, ...props }) => {
-                    const id = String(children).toLowerCase().replace(/\s+/g, '-');
-                    return (
-                      <h3
-                        {...props}
-                        id={id}
-                        className="text-2xl font-semibold mt-8 mb-3 scroll-mt-20"
-                      >
-                        {children}
-                      </h3>
-                    );
-                  },
+                  h2: ({ node: _node, children, ...props }) => (
+                    <h2 {...props} className="text-3xl font-bold mt-12 mb-4 scroll-mt-20">
+                      {children}
+                    </h2>
+                  ),
+                  h3: ({ node: _node, children, ...props }) => (
+                    <h3 {...props} className="text-2xl font-semibold mt-8 mb-3 scroll-mt-20">
+                      {children}
+                    </h3>
+                  ),
                   // Enhanced paragraph styling
                   p: ({ children, ...props }) => (
                     <p {...props} className="mb-6 leading-relaxed text-lg">
@@ -333,7 +332,7 @@ export default function BlogArticle() {
                   ),
                 }}
               >
-                {article.content}
+                {body}
               </ReactMarkdown>
             </div>
 

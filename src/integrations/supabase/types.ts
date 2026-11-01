@@ -9340,6 +9340,10 @@ export type Database = {
         Args: { _role: Database['public']['Enums']['app_role']; _user_id: string };
         Returns: boolean;
       };
+      increment_article_view: {
+        Args: { p_article_id: string; p_visitor_id?: string };
+        Returns: undefined;
+      };
       increment_link_clicks: {
         Args: { link_id: string; visitor_id?: string };
         Returns: undefined;

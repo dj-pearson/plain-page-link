@@ -3,7 +3,7 @@
     "id": "f1000000-0000-4000-8000-000000000001",
     "slug": "fixture-choosing-a-listing-photo",
     "title": "Fixture: Choosing a Listing Photo",
-    "content": "<p>This article does not exist. It is a build fixture, used only by a verification build that has no database, so the SEO checks can see a blog at all. See scripts/data/README.md.</p><p>This one carries a featured_image_url on a host this repository does not control, which is the case where og:image width and height must NOT be asserted \u2014 the code has never seen that file (US-174).</p><p>Keeping it in the fixture means that path runs on every verification build rather than being something somebody once checked by hand and then stopped checking.</p>",
+    "content": "# Fixture: Choosing a Listing Photo\n\n<p>This article does not exist. It is a build fixture, used only by a verification build that has no database, so the SEO checks can see a blog at all. See scripts/data/README.md.</p><p>This one opens with a markdown # title line, as every generated article does, so verify:seo's one-h1 rule sees that shape (US-262).</p><p>This one carries a featured_image_url on a host this repository does not control, which is the case where og:image width and height must NOT be asserted \u2014 the code has never seen that file (US-174).</p><p>Keeping it in the fixture means that path runs on every verification build rather than being something somebody once checked by hand and then stopped checking.</p>",
     "excerpt": "A build fixture, not an article. It exists so a database-less verification build still renders the blog.",
     "featured_image_url": "https://images.example.invalid/fixture-listing-photo.jpg",
     "author_id": null,

@@ -302,8 +302,8 @@ async function interceptArticles(context: BrowserContext, articles: Article[]): 
   await context.route('**/rest/v1/articles*', async (route) => {
     const request = route.request();
 
-    // BlogArticle increments view_count on mount. There is no view to count
-    // here, and the anon role cannot write anyway.
+    // Nothing in the app writes to articles from a page any more, but a write
+    // reaching a live database from a build must never happen.
     if (request.method() !== 'GET') {
       return route.fulfill({ status: 204, body: '' });
     }
@@ -396,6 +396,11 @@ async function renderAll(
   await context.route('https://www.googletagmanager.com/**', (r) => r.abort());
   await context.route('https://www.google-analytics.com/**', (r) => r.abort());
   await interceptArticles(context, articles);
+  // BlogArticle counts a view on mount through this RPC (US-262). A build is
+  // not a reader, and must not count as one against the live database.
+  await context.route('**/rest/v1/rpc/increment_article_view*', (r) =>
+    r.fulfill({ status: 204, body: '' })
+  );
 
   const results: Rendered[] = new Array(routes.length);
   let cursor = 0;

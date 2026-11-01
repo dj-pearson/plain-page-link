@@ -80,6 +80,7 @@ describe('isReservedSegment', () => {
       'admin',
       'Pricing',
       'sitemap.xml',
+      'sitemap-profiles.xml',
       'sw.js',
     ]) {
       expect(isReservedSegment(segment), segment).toBe(true);

@@ -984,6 +984,73 @@ check('view and click counters are throttled, and match the rows they count', ()
 });
 
 // ---------------------------------------------------------------------------
+// 6f-2. A blog view is counted for an anonymous reader, and is not an edit.
+//
+//     BlogArticle updated articles.view_count directly; no policy lets a
+//     visitor UPDATE articles, so it counted nothing — and for an admin, the
+//     updated_at trigger turned each view into a new sitemap lastmod and
+//     dateModified (US-262). Asserted by execution as anon: the counter moves,
+//     updated_at does not, a draft is untouched, and the throttle holds.
+// ---------------------------------------------------------------------------
+check('increment_article_view counts as anon, throttles, and leaves updated_at alone', () => {
+  const out = [];
+  const pub = '00000000-dead-beef-0000-00000000a262';
+  const draft = '00000000-dead-beef-0000-00000000b262';
+  const stamp = '2020-01-01 00:00:00+00';
+  try {
+    // The reset UPDATE is itself a view_count-only change, so it must leave the
+    // stamp in place too.
+    q(`
+      DELETE FROM public.rate_limit_entries WHERE identifier LIKE 'verify-reader%';
+      INSERT INTO public.articles (id, title, slug, content, status, view_count, updated_at)
+        VALUES ('${pub}', 'Verify', 'verify-article-view-pub', 'x', 'published', 0, '${stamp}'),
+               ('${draft}', 'Verify', 'verify-article-view-draft', 'x', 'draft', 0, '${stamp}')
+        ON CONFLICT (id) DO NOTHING;
+      UPDATE public.articles SET view_count = 0 WHERE id IN ('${pub}', '${draft}');
+    `);
+    const [state] = q(`
+      SET ROLE anon;
+      SELECT public.increment_article_view('${pub}', 'verify-reader') FROM generate_series(1, 10);
+      SELECT public.increment_article_view('${draft}', 'verify-reader');
+      RESET ROLE;
+      SELECT (SELECT view_count || '|' || (updated_at = '${stamp}'::timestamptz)
+                FROM public.articles WHERE id = '${pub}')
+             || '|' || (SELECT view_count FROM public.articles WHERE id = '${draft}');
+    `);
+    const [views, unchanged, draftViews] = String(state).split('|');
+    if (Number(views) === 0) out.push('anon called increment_article_view and nothing was counted');
+    if (Number(views) > 3) {
+      out.push(`${views} views of one article from one reader in an hour; throttle not applied`);
+    }
+    if (unchanged !== 'true') {
+      out.push('counting a view moved articles.updated_at (sitemap lastmod / dateModified)');
+    }
+    if (Number(draftViews) !== 0) out.push('a draft article was counted');
+
+    const [edited] = q(`
+      UPDATE public.articles SET title = 'Verify edited' WHERE id = '${pub}';
+      SELECT (updated_at > '${stamp}'::timestamptz)::text FROM public.articles WHERE id = '${pub}';
+    `);
+    if (edited !== 'true') out.push('a real edit no longer moves articles.updated_at');
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'article view check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.rate_limit_entries WHERE identifier LIKE 'verify-reader%';
+         DELETE FROM public.articles WHERE id IN ('${pub}', '${draft}');`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 6g. "Is this username free?" must be answered by something that can see
 //     unpublished profiles.
 //
@@ -1726,7 +1793,8 @@ const DEFINER_CALLABLE = new Map([
   ['list_public_open_houses', { anon: true, why: 'public profile; omits private_notes' }],
   ['get_public_open_house', { anon: true, why: 'open house kiosk; omits private_notes' }],
   ['increment_link_clicks', { anon: true, why: 'the only writer of links.click_count; throttled' }],
-  ['profile_shows_branding', { anon: true, why: 'public profile; returns a boolean' }],
+  ['increment_article_view', { anon: true, why: 'blog view counter; published rows only, throttled (US-262)' }],
+  ['profile_shows_branding',{ anon: true, why: 'public profile; returns a boolean' }],
   ['public_agent_response_hours', { anon: true, why: 'public profile; aggregate only' }],
   // authenticated only: each checks auth.uid() or admin itself.
   ['get_plan_usage', { why: 'reads auth.uid() only' }],

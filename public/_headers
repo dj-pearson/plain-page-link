@@ -50,6 +50,17 @@
 /team/*
   X-Robots-Tag: noindex, nofollow
 
+# An agent's review form (US-262). _redirects answers /:username/review with
+# index.html — the prerendered homepage — and functions/[username].ts only
+# handles one segment, so a crawler fetching this URL read the homepage's title
+# and a canonical pointing at /. SubmitReview now sets its own noindex once the
+# bundle runs; this says it before any script does. "follow", because the page
+# links back to the agent's profile and that link is worth keeping. A
+# placeholder matches one segment, and no prerendered route has the shape
+# /<x>/review (crawl-directives.test.ts holds that true).
+/:username/review
+  X-Robots-Tag: noindex, follow
+
 # Everything else under /assets/ carries a content hash in its name, so a year
 # is right and immutable is honest.
 # /*.tsx and /*.ts stood here too, declaring TypeScript source to be

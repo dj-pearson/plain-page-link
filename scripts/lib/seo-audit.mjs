@@ -81,6 +81,21 @@ function rootLength(html) {
   return body ? body[1].length : 0;
 }
 
+/**
+ * How many <h1> elements the rendered body carries (US-262).
+ *
+ * Counted after </head> so nothing in the head (a JSON-LD string, a title that
+ * happens to mention the tag) is mistaken for one. A page's h1 is its one
+ * statement of what it is about: two is a page arguing with itself, none is a
+ * page that never says. Every AI-generated article shipped two — the
+ * template's title, and the model's own `# Title` at the top of the markdown.
+ */
+export function countH1(html) {
+  const end = html.indexOf('</head>');
+  const body = end === -1 ? html : html.slice(end);
+  return (body.match(/<h1[\s>]/gi) || []).length;
+}
+
 /** A page rendering less than this into the document never really rendered. */
 export const MIN_BODY_HTML = 500;
 
@@ -514,6 +529,17 @@ export function auditPages(pages, { origin }) {
     }
     if (rootLength(html) < MIN_BODY_HTML) {
       add(route, `body is essentially empty (${rootLength(html)} chars)`);
+    }
+
+    // --- exactly one <h1> (US-262) -------------------------------------------
+    // Two is wrong on any page. None is tolerated on a noindexed one: /auth/mfa
+    // and the SSO callback are a code prompt and a redirect, not documents, and
+    // a page telling Google not to index it has no outline to rank on.
+    const h1s = countH1(html);
+    if (h1s > 1) {
+      add(route, `has ${h1s} <h1> elements, expected exactly one`);
+    } else if (h1s === 0 && !noindex) {
+      add(route, 'has no <h1>');
     }
 
     // --- title ---------------------------------------------------------------

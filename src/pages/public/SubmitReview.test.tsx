@@ -15,6 +15,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { createQueryBuilder, type MockQueryResult } from '@/test/mocks/supabase';
 
 const AGENT_ID = '11111111-1111-1111-1111-111111111111';
@@ -36,11 +37,13 @@ import SubmitReview from './SubmitReview';
 
 const renderPage = () =>
   render(
-    <MemoryRouter initialEntries={['/janedoe/review']}>
-      <Routes>
-        <Route path="/:username/review" element={<SubmitReview />} />
-      </Routes>
-    </MemoryRouter>
+    <HelmetProvider>
+      <MemoryRouter initialEntries={['/janedoe/review']}>
+        <Routes>
+          <Route path="/:username/review" element={<SubmitReview />} />
+        </Routes>
+      </MemoryRouter>
+    </HelmetProvider>
   );
 
 const fillAndSubmit = async () => {
@@ -126,5 +129,19 @@ describe('SubmitReview', () => {
 
     expect(await screen.findByText(/thank you!/i)).toBeInTheDocument();
     expect(screen.getByText(/review each one before it appears/i)).toBeInTheDocument();
+  });
+
+  it('has a head of its own: its title, noindex,follow, and no homepage canonical (US-262)', async () => {
+    renderPage();
+    await screen.findByText(/share your experience/i);
+
+    // Helmet writes the head asynchronously, and the previous test's unmount
+    // clears it asynchronously too — so all of it is awaited together.
+    await waitFor(() => {
+      expect(document.title).toBe('Leave a review for Jane Doe | AgentBio');
+      const robots = document.head.querySelector('meta[name="robots"]');
+      expect(robots?.getAttribute('content')).toBe('noindex, follow');
+    });
+    expect(document.head.querySelector('link[rel="canonical"]')).toBeNull();
   });
 });

@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { logger } from '@/lib/logger';
 import { normalizeUsername } from '@/lib/username';
+import { SEOHead } from '@/components/SEOHead';
 
 export default function SubmitReview() {
   const { username } = useParams();
@@ -115,9 +116,29 @@ export default function SubmitReview() {
     }
   };
 
+  // The page had no head of its own, so it kept index.html's — which is the
+  // prerendered homepage: the homepage's title, description and canonical,
+  // under /<agent>/review (US-262). It is a form, not a page anyone searches
+  // for, so it is noindex; "follow" keeps the link back to the agent's profile
+  // worth something. public/_headers sends the same as X-Robots-Tag, which is
+  // what a crawler that never runs this bundle actually sees.
+  const agentName: string | undefined = profile?.full_name || undefined;
+  const seo = (
+    <SEOHead
+      title={agentName ? `Leave a review for ${agentName} | AgentBio` : 'Leave a review | AgentBio'}
+      description={
+        agentName
+          ? `Worked with ${agentName}? Share your experience in a short review.`
+          : 'Share your experience working with this agent in a short review.'
+      }
+      noindex
+    />
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+        {seo}
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -126,6 +147,7 @@ export default function SubmitReview() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+        {seo}
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Agent Not Found</CardTitle>
@@ -145,6 +167,7 @@ export default function SubmitReview() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+        {seo}
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
@@ -170,6 +193,7 @@ export default function SubmitReview() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12 px-4">
+      {seo}
       <div className="max-w-2xl mx-auto">
         <Card>
           <CardHeader>
