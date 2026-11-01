@@ -4917,3 +4917,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - sentry.ts is now an SDK-free facade: the SDK (sentry-sdk.ts) loads by dynamic import at idle after `load`, Replay (sentry-replay.ts) after that; earlier calls are buffered (cap 50) and replayed with the same event ids, early errors/rejections are caught and handed over. Entry with a DSN is now 62,806 B gzip.
 - check-bundle-size.mjs fails if Sentry code is on the first-paint graph (and if a DSN build has no SDK chunk at all); CI's bundle-size job builds with a dummy DSN. Unused exports (SentryErrorBoundary, SentryProfiler, startTransaction) removed.
 - src/lib/sentry.test.ts adds 9 tests; full suite 1377 passed, 1 skipped.
+
+## Site improvement loop 2 — iteration 9/15 — US-256: the next agent on a shared device could see the previous agent's cached leads, and a tab switch wiped unsaved theme edits
+
+- The page-wide QueryClient was never cleared on sign-out or account switch; new `bindQueryCacheToAuth` (src/lib/authQueryCache.ts) clears it whenever the signed-in user id changes away from a non-null value.
+- A same-user SIGNED_IN (fired on every tab refocus) or TOKEN_REFRESHED now only updates the session, keeping the user reference and skipping the profile/roles refetch; Theme and ProfileDisplaySettings reload only when the user id changes.
+- useSubscription drops its private ['session'] query, due-task keys include the user id, and auth-store reads in src/hooks and MobileNav use selectors.
+- Tests: same-user listener events, cache clearing on every sign-out path and account switch, Theme unsaved-colour survival, ProfileDisplaySettings reload rules.
