@@ -3892,6 +3892,243 @@
       "priority": 3,
       "passes": true,
       "notes": "StickyActionBar.tsx:168; SoldProperties.tsx:49; SocialProofBanner.tsx:69; ProfileHeader.tsx:70,197; OnboardingWizard.tsx:174,638; OnboardingWizardPage.tsx:225; sample-data-service.ts:114-120; useListingUpdate.ts:44-46; Links.tsx:196-199. DONE: applyTheme only wrote --theme-*, so bg-primary on the public profile meant dashboard navy; FullProfilePage's main now maps --primary/--primary-foreground to the agent's theme (applyTheme adds a contrast-picked --theme-primary-foreground), and StickyActionBar, SoldProperties, SocialProofBanner, ProfileHeader and onboarding use bg-primary, text-primary-foreground(/80) or bg-muted instead of blue→purple gradients. sample-data-service wrote GENERATED beds/baths/sqft so every sample listing insert failed — removed; the unused useListingUpdate (same defect) deleted. schema-references.test.ts now parses GENERATED columns from migrations and follows writes through named literals (watched it fail on both sites first). Link up/down renumbers densely via moveAndRenumber (src/lib/linkOrder.ts), so links sharing a position move and a failed write is repaired by the next move. DEVIATIONS: no transactional RPC (no unique constraint on position); onboarding uses bg-muted (no agent theme yet); the theme primary overrides the high-contrast setting's primary on the public profile; sqft is GENERATED too (CLAUDE.md wrong). Merge note: OnboardingWizardPage conflict resolved to US-238's overlay (no gradient)."
+    },
+    {
+      "id": "US-248",
+      "title": "generate-marketing-post lets any anonymous caller fetch any URL and spend the Claude budget",
+      "description": "As the operator, I need the admin-only marketing generator to refuse everyone but admins and never proxy into the private network.",
+      "acceptanceCriteria": [
+        "requireAdmin runs before req.json(); anonymous, anon-key Bearer and non-admin JWTs get 401/403",
+        "Webhook URL goes through safeFetch (or is looked up by webhookId from social_media_webhooks); private/loopback/link-local refused",
+        "Responses never echo the upstream body; per-admin rate limit",
+        "Function added to GATED in _shared/admin-gate.test.ts and ADMIN_ONLY in scripts/smoke-edge-functions.mjs (removed from MISSING_SERVER_CONFIG)",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "generate-marketing-post/index.ts:12-13 webhookUrl from body, :23 service role, :69-83 Claude up to 8000 tokens, :143-149 getUser never refuses, :178 bare fetch, :188-194 returns upstream body. Caller: SocialMediaManager.tsx:279,301 via useSocialMedia.ts:249. Smoke test hides it under MISSING_SERVER_CONFIG (smoke-edge-functions.mjs:51-55)."
+    },
+    {
+      "id": "US-249",
+      "title": "Google/Apple sign-in fails for returning users past the first 50, trusts unverified emails, and accepts forged state",
+      "description": "As an agent, I need social sign-in to log me into my own account, and never let someone else's unverified email or a forged callback into it.",
+      "acceptanceCriteria": [
+        "Existing user found by email without listUsers() first-page limit (service-role-only lookup RPC, or create-then-handle email_exists); shared by oauth-proxy and sso-callback",
+        "id_token with email_verified !== true is refused; JWT segments decoded as base64url",
+        "OAuth state is HMAC-SHA256 signed with exp (~10 min) and nonce; PKCE verifier not exposed in state; tampered/expired state -> 400 (unit tests)",
+        "Only the error field of a failed token response is logged",
+        "Any new SECURITY DEFINER function pins search_path, is REVOKEd from anon/authenticated, and verify:schema passes",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "oauth-proxy/index.ts:45-49 state=btoa(JSON) incl verifier, :107 parse w/o signature, :149 logs tokenData, :156 atob no email_verified, :164-165 listUsers() unpaged, :167-185 createUser then error. sso-callback/index.ts:202-203 same listUsers bug (known follow-up). Secret name: reference an env var (e.g. OAUTH_STATE_SECRET), list it as an owner action."
+    },
+    {
+      "id": "US-250",
+      "title": "New-lead emails and account deletions call an edge runtime that serves nothing; deleted accounts keep being billed",
+      "description": "As an agent I need every lead to notify me; as a user who deletes my account I need it erased and my card no longer charged.",
+      "acceptanceCriteria": [
+        "No source under supabase/functions builds a function URL from SUPABASE_URL + /functions/v1; all use getFunctionsUrl() (_shared/env.ts); a test enforces it",
+        "scheduled-maintenance's account_deletions task processes deletions directly (RPC or shared helper) and reports the count",
+        "Requesting deletion sets the Stripe subscription cancel_at_period_end (prior flag remembered); cancelling the request restores it",
+        "Before an erasure executes, a live Stripe subscription is cancelled; a Stripe failure leaves the deletion for retry and is logged (mocked-Stripe unit tests)",
+        "DeleteAccount page says the subscription will be cancelled",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "submit-lead/index.ts:444 notify-lead via SUPABASE_URL (errors only console.error 451-455); scheduled-maintenance/index.ts:181 process-account-deletions; schedule-seo-audit:86; run-scheduled-audit:181,206,231,256,281,306,382. docs/deploy/edge-functions.md:14-27 - api.agentbio.net/functions/v1 returned 500 InvalidWorkerCreation; only functions.agentbio.net serves. gdpr-deletion/index.ts:107-178 never touches Stripe; process_scheduled_account_deletions (baseline :2461-2510) deletes auth.users, cascading user_subscriptions."
+    },
+    {
+      "id": "US-251",
+      "title": "A late or re-delivered Stripe event can reopen a cancelled subscription and grant the paid plan forever",
+      "description": "As the operator, I need the plan an agent holds to match Stripe regardless of event order.",
+      "acceptanceCriteria": [
+        "subscription.updated, invoice.paid/payment_succeeded and subscription.deleted write Stripe's current state via deps.retrieveSubscription",
+        "An invoice event never moves a canceled row back to active (test: invoice.paid after deleted stays canceled)",
+        "A stale subscription.updated(active) after deleted leaves the row canceled (test)",
+        "deleted stores current_period_end <= ended_at (no unpaid grace period); trialing stored as trialing in both tables",
+        "Existing handler tests still pass",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "stripe-webhook/handler.ts:504-511 invoice sets active unconditionally; :373-387 writes payload status; :415-421 deleted keeps future period end; :394 trialing->'cancelled'. get_user_plan grants active with no period check (20260902000015_subscription_grace.sql:48-61)."
+    },
+    {
+      "id": "US-252",
+      "title": "Cmd/Ctrl+S marks every selected listing Sold; a deleted link comes back; Overview reorders the Links page",
+      "description": "As an agent, I need keyboard shortcuts and deletes in the dashboard to do only what I asked.",
+      "acceptanceCriteria": [
+        "KeyboardShortcutsHelper ignores events with meta/ctrl/alt, contentEditable/select/combobox targets, and while a dialog is open; '?' (Shift+/) opens help; a localStorage (try/catch) toggle disables single-key shortcuts; unit test on the guard",
+        "Listings page shortcuts get the same guard (Ctrl+A no longer navigates)",
+        "useSoftDelete flushes pending deletions on unmount/pagehide instead of cancelling them; pending ids are state so the item disappears immediately; Undo still works (fake-timer test)",
+        "Overview no longer sorts the cached links array in place; Links always lists by position (test)",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "KeyboardShortcutsHelper.tsx:31-56 (no modifier check), :41 '?' && !shiftKey; QuickActionsDashboard.tsx:201-230 s/p/a change status; Listings.tsx:82-107 Ctrl+A/L/D navigate. useSoftDelete.ts:52-56 clearTimeout on unmount, :162-164 ref-based isPendingDeletion; Links.tsx:108-111 memo. Overview.tsx:280-281 links.sort in place on TanStack cache."
+    },
+    {
+      "id": "US-253",
+      "title": "Importing a listing from Zillow fails every time and throws away the pasted text; reordering scrambles the public order",
+      "description": "As an agent, I need listing import to work and drag-reorder to produce the order I see, with one request per changed row.",
+      "acceptanceCriteria": [
+        "handleURLImport writes no generated columns (beds/baths/sqft) and sets listed_date like manual add; unit test asserts the payload",
+        "URL import dialog awaits the insert, closes only on success, keeps pasted text and shows the error inline on failure; no fake URL-scrape spinner",
+        "Reorder computes positions over the full listing list (pure helper, unit tested: filtered drag keeps hidden listings' relative order, dense unique sort_order)",
+        "Only changed rows are written, optimistic cache update with rollback, one invalidation and one audit event per reorder",
+        "Public profile listings query has a deterministic tiebreaker after sort_order",
+        "schema-references.test.ts (or a focused test) catches generated columns sent through hook mutations",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Listings.tsx:268-301 handleURLImport writes beds/baths/sqft (GENERATED, 20260902000007:58-60); URLImportDialog.tsx:205-215 onImport not awaited then handleClose clears; :194-201 fake URL tab. Listings.tsx:323-348 persistOrder rewrites filteredListings 0..n via N mutateAsync (each invalidates, audits, plan-usage); usePublicProfile.ts:113 no tiebreaker. Coordinate with US-252 (Listings.tsx shortcuts) and US-257 (grid actions)."
+    },
+    {
+      "id": "US-254",
+      "title": "An agent over the lead allowance can unlock a locked lead by copying its ciphertext into a contact",
+      "description": "As the operator, I need locked leads to stay locked until the agent upgrades.",
+      "acceptanceCriteria": [
+        "Migration revokes SELECT on leads from anon/authenticated and grants every column except encrypted_email/encrypted_phone (US-235 pattern)",
+        "Client selects on leads no longer request encrypted_* (useAnalytics, useOpenHouses, useLeads, sample-data-service, any .select() after write)",
+        "decrypt_contacts refuses a contact whose ciphertext equals one of the owner's locked leads' ciphertext (defence in depth)",
+        "verify:schema check: authenticated cannot select leads.encrypted_email; npm run verify:schema passes",
+        "Leads list, analytics and open-house sign-ins still show decrypted details for unlocked leads",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "pii-crypto/index.ts:211-215 lock check only for decrypt_leads, :186-194 decrypts any contact ciphertext; contacts FOR ALL owner policy 20260923000001:68-71; no column grant on leads. useLeads.ts:23, useAnalytics.ts:105,272 select then strip ciphertext."
+    },
+    {
+      "id": "US-255",
+      "title": "Sentry with Session Replay adds 81 KB gzip to every page's entry chunk in production, and CI never measures it",
+      "description": "As a visitor opening an agent's link from Instagram, I need the page to load without an error-reporting SDK in the critical path.",
+      "acceptanceCriteria": [
+        "src/lib/sentry.ts is a facade with no static @sentry import; SDK loaded via dynamic import at idle/after load; replay in its own lazy chunk",
+        "Calls before load (captureException, breadcrumbs, setUser, early error/unhandledrejection) are buffered (capped) and replayed (unit test)",
+        "With VITE_SENTRY_DSN set, the entry chunk is within 3 KB of the no-DSN build",
+        "check-bundle-size builds/checks with a dummy DSN and fails if the entry contains @sentry",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "main.tsx:8,17 static initSentry; sentry.ts:8 import * as Sentry, :96 replayIntegration; errorHandler.ts:5, ErrorBoundary.tsx:3, RouteErrorBoundary.tsx:3 static imports. Measured entry 64,942 B no DSN vs 145,864 B with DSN."
+    },
+    {
+      "id": "US-256",
+      "title": "Signing out leaves the next account seeing the previous agent's data; every tab switch refetches the profile and wipes unsaved Theme edits",
+      "description": "As an agent sharing a device, I must never see another agent's data; as any agent, returning to the tab must not discard my work.",
+      "acceptanceCriteria": [
+        "Query cache is cleared on sign-out (signOut, SIGNED_OUT, cross-tab) and whenever the auth user id changes (test)",
+        "useSubscription drops its own ['session'] query in favour of the store; lead-tasks query key includes the user id",
+        "SIGNED_IN/TOKEN_REFRESHED for the same user keeps the user reference and skips profile/role refetch; a different user still loads; USER_UPDATED still applies (store tests)",
+        "Theme.tsx and ProfileDisplaySettings effects depend on user?.id; changing a colour then re-rendering with a same-id user keeps it (test)",
+        "No whole-store useAuthStore() reads remain in src/hooks and src/components/mobile (selectors instead)",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "main.tsx:28 module QueryClient never cleared; useAuthStore.ts:251-298 writes new user + refetches profile/roles on every SIGNED_IN (auth-js fires it on every visibility change); 584-629 signOut clears only zustand. useSubscription.ts:61 ['session']; useLeadActivities.ts:434 ['lead-tasks','due',date]. Theme.tsx:43,55-57,88-90; ProfileDisplaySettings.tsx:14,18-20. 48 whole-store reads (MobileNav.tsx:27, useLeads.ts:106, useListings.ts:37 ...)."
+    },
+    {
+      "id": "US-257",
+      "title": "Edit Listing and Edit Testimonial wipe unsaved edits on any re-render and are not real dialogs; grid actions are invisible on touch",
+      "description": "As an agent editing a listing on any device or with a keyboard, I need my edits kept and the controls reachable.",
+      "acceptanceCriteria": [
+        "EditListingModal and EditTestimonialModal drop the initialData reset effect and are keyed by record id; re-render with equal-but-new initialData keeps typed values and photos (component test)",
+        "Both modals and KeyboardShortcutsHelper's panel use the Radix Dialog (role dialog with name, Escape, focus trap and return, 'Close' label)",
+        "Listings grid Edit/Delete visible without hover on touch (hover:none) and on focus-within; aria-labels; grid/list toggles named with aria-pressed; Add menu chevron exposes aria-expanded",
+        "Listings shows a loading skeleton while isLoading; listings can be moved up/down without drag",
+        "npx impeccable detect on touched components reports no new tells",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "EditListingModal.tsx:58-79 useState+useEffect reset, hand-built overlay; Listings.tsx:910-940 inline initialData; EditTestimonialModal.tsx:25-48; Testimonials.tsx:350-357; KeyboardShortcutsHelper.tsx:104-122. Listings.tsx:682-697 opacity-0 group-hover, :430-435 chevron, :573-590 toggles, :645-649 drag only, :860 no loading state. Merge after US-252/US-253 (same file)."
+    },
+    {
+      "id": "US-258",
+      "title": "After paying for an upgrade the agent sees no confirmation and still sees Free; one click changes a paid plan with no confirm",
+      "description": "As an agent upgrading or changing plans, I need to confirm the charge and then see that it worked.",
+      "acceptanceCriteria": [
+        "Both checkout entry points (SubscriptionPage, Pricing) return to one handled success URL",
+        "Landing on it shows confirmation and polls plan/usage queries (~2s, up to ~30s) until the plan changes, else a 'still processing' message; param stripped afterwards",
+        "For a subscribed user, Upgrade/Downgrade opens an AlertDialog stating target plan, interval, prorated charge note and (downgrade) limits that will apply; create-checkout-session is not invoked until confirm (component test); free users go straight to checkout",
+        "When cancel_at_period_end is true, Subscription and Settings show 'Ends <date>' instead of 'Renews'",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "SubscriptionPage.tsx:122 success_url ?status=success never read; Overview.tsx:60-67 only handles ?subscription=success (Pricing.tsx:206); SubscriptionPage.tsx:318-334 direct handleUpgrade; plan-change.ts:64-70 proration in place; SubscriptionPage.tsx:253-257, Settings.tsx:665-676 'Renews'."
+    },
+    {
+      "id": "US-259",
+      "title": "Lead and visitor emails are written in plaintext to function logs; any account can mass-send invite emails and lift its own seat cap",
+      "description": "As the operator, I need PII kept out of logs and the invite system unable to send spam from our domain.",
+      "acceptanceCriteria": [
+        "maskEmail() helper in _shared with unit tests; email.ts logs provider id + masked recipient; the listed console calls masked; source-scan test fails on console.* interpolating emails, token responses or raw bodies",
+        "teams invite rate-limited per user (e.g. 20/day, fail closed) and per recipient; teams per owner capped; team name link-stripped in email",
+        "Migration: authenticated cannot change teams.max_seats/owner_id; client roles cannot INSERT accepted team_members rows (edge function does inserts)",
+        "npm run verify:schema passes",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "_shared/email.ts:95 logs to; send-scheduled-bio-emails:108; send-scheduled-listing-emails:113; teams/index.ts:125; notify-lead:220; oauth-proxy:149 (coordinate with US-249); publish-article-to-social:69; generate-marketing-post:13,138 (coordinate with US-248). teams/index.ts:47-80,117-123,150-160; baseline :13664 'Owner modifies team' FOR ALL, :13420 'Admins manage roster' FOR ALL."
+    },
+    {
+      "id": "US-260",
+      "title": "Agents' public pages download Three.js, all of Radix and full-size photos they don't need, and animate forever under reduced motion",
+      "description": "As a visitor on a phone, I need an agent's page to load light and respect my motion settings.",
+      "acceptanceCriteria": [
+        "3D backgrounds: a useDeferred3D hook returns false under prefers-reduced-motion or saveData (static fallback, no three chunk) and true only after load+idle; Canvases cap dpr [1,1.5]; frameloop paused while hidden (unit test)",
+        "Profile framer-motion components (StickyActionBar, ListingDetailModal, FeaturedListingsCarousel) drop transforms under useReducedMotion; no MotionConfig in App",
+        "UpcomingOpenHouses add-to-calendar no longer imports ui-vendor (light disclosure, keyboard + Escape, test); check-bundle-size keeps ui-vendor off the profile",
+        "UpcomingOpenHouses, ListingDetailModal thumbnails, ListingsBlock and dashboard listing/open-house thumbnails use resized variants with lazy loading; no Unsplash fallback in ListingsBlock",
+        "offlineStorage.init() removed from App (no importers of its consumers); entry has no idb",
+        "Route-weight budget and size-check pass",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "FullProfilePage.tsx:462-477; ThreeDBackground.tsx:28-59, GradientMesh.tsx:8, FloatingGeometry.tsx:8; three-vendor 218 KB. UpcomingOpenHouses.tsx:15-20,70,131-135,159-179; ListingDetailModal.tsx:84,336-343; ListingsBlock.tsx:95-136; Listings.tsx:656-664,776-783 (coordinate); OpenHouses.tsx:81-119; App.tsx:6,158. Landing hero LCP fix (HeroSection.tsx:75-124) included if it fits: no opacity:0 on painted H1, gsap.matchMedia for reduced motion."
+    },
+    {
+      "id": "US-261",
+      "title": "Profile, onboarding and auth forms have fields with no accessible name and errors no screen reader hears",
+      "description": "As an agent using a screen reader or voice control, I need every field named and every error announced.",
+      "acceptanceCriteria": [
+        "Profile, OnboardingWizard, URLImportDialog, WorkflowBuilder, Team, Listings search, ApiKeys, LeadRoutingRules, WorkflowsList fields have id+htmlFor or aria-label",
+        "Static test walks dashboard, auth, onboarding and listings sources and fails on an input/textarea/select with no accessible name",
+        "Login and Register set aria-invalid and aria-describedby to the error text; ResetPassword error has role=alert; Reset/Forgot inputs labelled with autoComplete (new-password/email)",
+        "ForgotPassword, ResetPassword and MFAChallenge have <main id=main-content>",
+        "Input border/placeholder tokens meet 3:1 / 4.5:1 (extend destructiveContrast.test.ts)",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Profile.tsx 21 labels/2 htmlFor (416-472); OnboardingWizard.tsx:500-530; URLImportDialog.tsx:285; WorkflowBuilderPage.tsx:128-140; TeamPage.tsx:159,204; Listings.tsx:564; Login.tsx:389-443; Register.tsx:565-749; ResetPassword.tsx:121-170; ForgotPassword.tsx:116-128; ui/input.tsx:29-32, select.tsx:19, index.css:43-44."
+    },
+    {
+      "id": "US-262",
+      "title": "Agents' pages are in no sitemap; every generated blog post has two H1s; the review page tells Google it is the homepage",
+      "description": "As an agent, I need Google to find my page; as the operator I need blog and review pages to describe themselves correctly.",
+      "acceptanceCriteria": [
+        "Pages Function sitemap-profiles.xml lists published usernames (anon key, paged by 1000, URL-encoded, s-maxage=3600, 503 on upstream failure, never empty 200); unit test with mocked fetch; robots.txt gets a second Sitemap line; reserved segment covered",
+        "BlogArticle strips a leading '# Title' line and maps markdown h1 to h2; heading ids from text nodes, slugified and de-duplicated (tests)",
+        "verify:seo checks exactly one <h1>",
+        "SubmitReview has its own Helmet title and noindex,follow; _headers adds X-Robots-Tag for /:username/review (crawl-directives test)",
+        "Article view count goes through a SECURITY DEFINER increment that does not touch updated_at (REVOKE/GRANT per CLAUDE.md, or listed in DEFINER_CALLABLE with reason); verify:schema passes",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "scripts/prerender.mts:545-573 writeSitemap prerendered routes only; public/robots.txt; functions/[username].ts:151-153 query shape; functions/_lib/social-meta.ts isReservedSegment. generate-article/index.ts:262,381-417; BlogArticle.tsx:55-63 view_count update (admin-only policy, bumps updated_at), :191, :245-337. ReviewInvite.tsx:28; SubmitReview.tsx no Helmet; public/_headers."
     }
   ]
 }

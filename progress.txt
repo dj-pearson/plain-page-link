@@ -4829,3 +4829,36 @@ SAML options still offered in SSOConfigForm; ui-vendor still on the profile
 via UpcomingOpenHouses' dropdown; whole-store useAuthStore() reads
 (MobileNav and ~40 hooks); browser back button not covered by the
 unsaved-changes guard; plus the "Not included" list above.
+
+---
+
+## Site Improvement Loop 2 — 2026-11-01 (stories US-248 to US-262 added)
+
+Five parallel read-only audits: security, performance (measured builds incl.
+a DSN-set build), UI/UX journeys, accessibility + technical SEO,
+reliability/data. Every story cites file:line evidence in its notes.
+Baseline: tsc clean, 1254 unit tests pass.
+
+  P1  US-248  generate-marketing-post: anonymous SSRF + Claude spend
+      US-249  Social sign-in: unpaged listUsers, unverified email, unsigned state
+      US-250  Lead emails/deletions call an empty runtime; deletion keeps billing
+      US-251  Stripe event order can reopen a cancelled plan forever
+      US-252  Ctrl+S marks listings Sold; deleted link returns; cache sorted in place
+      US-253  Listing import always fails and loses input; reorder scrambles order
+  P2  US-254  Locked lead unlocked via contact ciphertext
+      US-255  Sentry + Replay: 81 KB gzip in every entry chunk
+      US-256  Sign-out cache leak; tab switch refetches and wipes Theme edits
+      US-257  Edit modals wipe edits, not dialogs; grid actions hidden on touch
+      US-258  No post-checkout confirmation; one-click paid plan change
+      US-259  PII in function logs; team invite spam and self-raised seat cap
+  P3  US-260  Profile weight/motion: Three.js, Radix, full-size thumbs
+      US-261  Unnamed form fields; unannounced auth errors
+      US-262  Profiles in no sitemap; double H1 on blog; review page as homepage
+
+Not included (still worth doing): overdue-lead chaser SLA/window/dedupe;
+digest catch-up window and per-batch paging past 5,000; GDPR export
+swallowing query errors (and missing lead_activities); CSP still lists
+esm.sh and agent URLs are not scheme-checked; SW runtime cache never pruned
+and /scripts/analytics.js cached immutable for a year; Google Fonts blocked by
+the index.html meta CSP; open-house sign-in counts capped at 1,000;
+SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
