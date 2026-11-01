@@ -3,7 +3,6 @@ import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './stores/useAuthStore';
 import { errorHandler } from './lib/errorHandler';
-import { offlineStorage } from './lib/offline-storage';
 import { cleanupServiceWorkers } from './lib/sw-cleanup';
 import { OfflineIndicator } from './components/mobile/OfflineIndicator';
 import { FullPageLoader } from './components/LoadingSpinner';
@@ -147,15 +146,17 @@ function App() {
   const initialize = useAuthStore((s) => s.initialize);
   const user = useAuthStore((s) => s.user);
 
-  // Initialize auth and offline storage on mount
+  // Initialize auth on mount.
+  //
+  // This also called offlineStorage.init(), opening an IndexedDB database on
+  // every visit - and its static import put the idb library in the entry chunk
+  // every visitor downloads. Nothing reads that database: sync-manager and
+  // useOfflineStorage, its only consumers, have no importers (US-260).
   useEffect(() => {
     // Clean up any interfering service workers first
     cleanupServiceWorkers();
 
     initialize();
-
-    // Initialize offline storage (lightweight)
-    offlineStorage.init();
   }, [initialize]);
 
   // Web push was removed in US-059. The client asked the visitor for

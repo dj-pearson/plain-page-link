@@ -270,6 +270,76 @@ console.log(
     `the ${Object.keys(ENTRY_MUST_NOT_INCLUDE).length} that must not be.`
 );
 
+// US-260: the idb library is not a vendor chunk, so the list above cannot name
+// it. App.tsx statically imported offline-storage to open an IndexedDB database
+// nothing read, which inlined idb into the entry chunk itself. Recognise it by
+// the event name only an IndexedDB open uses.
+const entryWithIdb = [...eager].filter((f) => (sources.get(f) ?? "").includes('"upgradeneeded"'));
+if (entryWithIdb.length) {
+  console.error(
+    `[bundle-size] FAILED — IndexedDB (idb) code in the entry graph: ${entryWithIdb.join(", ")}.`
+  );
+  console.error(
+    "  Offline storage is not a first-paint concern. Import it lazily from the " +
+      "feature that needs it, not from App.tsx."
+  );
+  process.exit(1);
+}
+
+// US-260: what the public profile downloads on top of the entry.
+//
+// The profile is the product - a link in an Instagram bio, opened on a phone -
+// and its route chunk is the second thing every such visitor fetches. One Radix
+// DropdownMenu (add-to-calendar on an open house) pulled ui-vendor, every Radix
+// primitive the dashboard uses, into its static closure. Hold that closure to
+// the same kind of list as the entry.
+const PROFILE_MUST_NOT_INCLUDE = {
+  "ui-vendor":
+    "Radix primitives. The profile's modals are lazy; nothing on first paint " +
+    "needs them (UpcomingOpenHouses uses a plain disclosure).",
+  "three-vendor": "Three.js. 3D themes load it after load + idle (useDeferred3D).",
+  "charts-vendor": "recharts. Dashboard analytics only.",
+  "form-vendor": "react-hook-form + zod. The lead forms are lazy modals.",
+};
+
+const profileChunks = files.filter((f) => f.startsWith("FullProfilePage-"));
+if (profileChunks.length === 0) {
+  console.error("[bundle-size] FAILED — no FullProfilePage-*.js chunk to check.");
+  process.exit(1);
+}
+const profileGraph = new Set();
+const profileQueue = [...profileChunks];
+while (profileQueue.length) {
+  const file = profileQueue.pop();
+  if (profileGraph.has(file)) continue;
+  profileGraph.add(file);
+  for (const [, imported] of (sources.get(file) ?? "").matchAll(
+    /from"\.\/([A-Za-z0-9._-]+\.js)"/g
+  )) {
+    if (!profileGraph.has(imported)) profileQueue.push(imported);
+  }
+}
+const onProfile = Object.entries(PROFILE_MUST_NOT_INCLUDE)
+  .map(([prefix, why]) => ({ chunk: [...profileGraph].find((f) => f.startsWith(`${prefix}-`)), why }))
+  .filter((p) => p.chunk);
+if (onProfile.length) {
+  console.error(
+    "[bundle-size] FAILED — chunk(s) statically reachable from the public profile that should not be:"
+  );
+  for (const p of onProfile) {
+    console.error(`  - ${p.chunk} (${fmt(statSync(join(ASSETS_DIR, p.chunk)).size)}) — ${p.why}`);
+  }
+  console.error(
+    "  Find the static import in FullProfilePage's graph that pulls it in and " +
+      "make it lazy, or replace the component with a lighter one."
+  );
+  process.exit(1);
+}
+console.log(
+  `[bundle-size] Profile graph: ${profileGraph.size} chunk(s), none of the ` +
+    `${Object.keys(PROFILE_MUST_NOT_INCLUDE).length} that must not be.`
+);
+
 const violations = [];
 const exempted = [];
 

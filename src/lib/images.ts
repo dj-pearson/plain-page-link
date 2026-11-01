@@ -134,6 +134,25 @@ export function responsiveImage(path: string | null | undefined): ResponsiveImag
   return { src: largest, srcSet, original };
 }
 
+/** A single-size listing photo: the variant to show, and the original to fall back to. */
+export interface SizedImage {
+  src: string;
+  original: string;
+}
+
+/**
+ * One fixed-width variant of a listing photo, for an <img> whose rendered size
+ * is known and small - a thumbnail, an open-house card, a dashboard row - where
+ * a srcset buys nothing (US-260). Pick the smallest width that is at least the
+ * rendered CSS width times ~2 for high-DPR screens. Use with
+ * `fallBackToOriginal(img, image.original)` on error: older uploads have no
+ * variants.
+ */
+export function sizedImage(path: string | null | undefined, width: ImageVariantWidth): SizedImage {
+  const original = getImageUrl(path);
+  return { src: imageVariantUrl(original, width) ?? original, original };
+}
+
 /**
  * `sizes` for the featured-listing carousel: full width up to the profile
  * page's max-w-5xl column. FullProfilePage's preload uses the same value, so
