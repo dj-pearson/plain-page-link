@@ -4951,3 +4951,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - The 3D background loaded eagerly; it now waits for load plus idle, skips reduced-motion and Save-Data visitors, caps dpr at 1.5 and pauses while the tab is hidden.
 - The sticky bar, featured carousel and listing modal hold still under reduced motion. The add-to-calendar menu became a small disclosure, which removes ui-vendor from the profile chunk. Thumbnails use resized, lazy variants. App no longer opens an unused IndexedDB, so idb is out of the entry chunk.
 - check-bundle-size.mjs now guards both chunk graphs. Added 23 tests: disclosure and keyboard, reduced motion, useDeferred3D, Canvas dpr/frameloop, ListingsBlock, sizedImage.
+
+## Site improvement loop 2 — iteration 14/15 — US-261: screen readers could not name most dashboard, onboarding and auth fields, or hear login errors
+
+- Fields on Profile, onboarding, URL import, workflows, Team, API keys, lead routing, SSO and Listings search were named only by placeholders or unlinked labels; each now has id+htmlFor or aria-label.
+- Login/Register set aria-invalid and aria-describedby on errors; reset, forgot-password and MFA pages gained a main landmark, labels and autoComplete.
+- --input border and placeholder colours now meet 3:1 / 4.5:1; ui/input and ui/select use the tokens.
+- Added src/test/a11y/fieldNames static scan (78 unnamed fields before, 0 after), Login/Register aria tests and contrast cases. URLImportDialog labels reapplied on top of US-253.
