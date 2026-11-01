@@ -4862,3 +4862,10 @@ esm.sh and agent URLs are not scheme-checked; SW runtime cache never pruned
 and /scripts/analytics.js cached immutable for a year; Google Fonts blocked by
 the index.html meta CSP; open-house sign-in counts capped at 1,000;
 SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
+
+## Site improvement loop 2 — iteration 1/15 — US-248: anyone could spend the Claude budget and make the server fetch the private network
+
+- generate-marketing-post read a webhook URL from the body before checking anyone, called Claude for up to 8000 tokens, POSTed with a bare fetch and returned the upstream body.
+- Now requireAdmin runs before the body is read, a per-admin fail-closed rate limit (10/hour) runs before Claude, the webhook is looked up by id in social_media_webhooks and delivered through safeFetch, and only delivered/status comes back. The admin UI sends webhookId.
+- Posts are saved as drafts and marked posted only after the webhook accepts them.
+- Tests: request.test.ts (parse, header filtering, delivery outcome); admin-gate.test.ts GATED entry plus rate-limit ordering checks; smoke script moved to ADMIN_ONLY. Follow-up: test-social-webhook and the browser-side retry still fetch webhooks unguarded.
