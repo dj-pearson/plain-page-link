@@ -17,7 +17,7 @@ export interface UploadProgress {
 }
 
 export function useListingImageUpload() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress>({ current: 0, total: 0, percentage: 0 });

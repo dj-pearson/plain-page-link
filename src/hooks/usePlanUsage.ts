@@ -45,7 +45,7 @@ function toPlanUsage(data: unknown): PlanUsage | null {
 }
 
 export function usePlanUsage() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
 
   const query = useQuery({
     queryKey: [...PLAN_USAGE_QUERY_KEY, user?.id],

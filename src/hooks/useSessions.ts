@@ -37,7 +37,7 @@ interface RevokeResponse {
 }
 
 export function useSessions() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

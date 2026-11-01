@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail, createLeadAutoReply } from '../_shared/email.ts'
 import { reportError } from '../_shared/report.ts'
-import { getSiteUrl } from '../_shared/env.ts'
+import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts'
 import { encryptSecret } from '../_shared/encryption.ts'
 import { readSpamSignals, botReason, emailLookupHash } from '../_shared/spam-guard.ts'
 import {
@@ -441,7 +441,7 @@ serve(async (req) => {
     // Best effort: the lead is already stored, and a notification failure must
     // not tell the visitor their enquiry did not go through.
     try {
-      const notifyResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/notify-lead`, {
+      const notifyResponse = await fetch(`${getFunctionsUrl()}/notify-lead`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -450,12 +450,15 @@ serve(async (req) => {
         body: JSON.stringify({ lead_id: lead.id }),
       })
       if (!notifyResponse.ok) {
-        console.error(
-          `notify-lead returned ${notifyResponse.status} for lead ${lead.id}: ${await notifyResponse.text()}`
-        )
+        const detail = `notify-lead returned ${notifyResponse.status} for lead ${lead.id}: ${await notifyResponse.text()}`
+        console.error(detail)
+        // US-250: this failed on every lead for as long as the URL pointed at
+        // the runtime that serves nothing, and only a console line said so.
+        void reportError(new Error(detail.slice(0, 500)), { functionName: 'submit-lead' })
       }
     } catch (notifyError) {
       console.error(`Could not reach notify-lead for lead ${lead.id}:`, notifyError)
+      void reportError(notifyError, { functionName: 'submit-lead' })
     }
 
     return successResponse({ lead_id: lead.id, update_token: await issueEnrichToken(lead.id) }, req)

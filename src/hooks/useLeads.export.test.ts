@@ -15,12 +15,15 @@ vi.mock('@/integrations/supabase/client', () => {
     order: () => builder,
     range: async (from: number, to: number) => {
       ranges.push([from, to]);
-      const rows = Array.from({ length: Math.max(0, Math.min(to, TOTAL - 1) - from + 1) }, (_, i) => ({
-        id: `lead-${from + i}`,
-        name: `Lead ${from + i}`,
-        encrypted_email: 'enc',
-        encrypted_phone: null,
-      }));
+      const rows = Array.from(
+        { length: Math.max(0, Math.min(to, TOTAL - 1) - from + 1) },
+        (_, i) => ({
+          id: `lead-${from + i}`,
+          name: `Lead ${from + i}`,
+          encrypted_email: 'enc',
+          encrypted_phone: null,
+        })
+      );
       return { data: rows, error: null };
     },
   };
@@ -31,7 +34,10 @@ vi.mock('@/lib/pii', () => ({
   decryptLeadContacts: async (ids: string[]) =>
     new Map(ids.map((id) => [id, { id, email: `${id}@example.com`, phone: null }])),
 }));
-vi.mock('@/stores/useAuthStore', () => ({ useAuthStore: () => ({ user: { id: 'agent-1' } }) }));
+vi.mock('@/stores/useAuthStore', () => ({
+  useAuthStore: <T>(select: (s: { user: { id: string } }) => T) =>
+    select({ user: { id: 'agent-1' } }),
+}));
 
 import { fetchAllLeads } from './useLeads';
 

@@ -11,13 +11,17 @@ import { logger } from '@/lib/logger';
 
 export function ProfileDisplaySettings() {
   const navigate = useNavigate();
-  const { user, profile } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const profile = useAuthStore((s) => s.profile);
   const [activePage, setActivePage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Keyed on the user id (US-256): a new user object for the same agent,
+  // which auth-js emits on every tab switch, is not a reason to reload.
   useEffect(() => {
-    loadActivePage();
-  }, [user]);
+    void loadActivePage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const loadActivePage = async () => {
     if (!user) return;

@@ -300,7 +300,9 @@ async function generateSampleLeads(userId: string): Promise<number> {
     const { data, error } = await supabase
       .from('leads')
       .insert(encryptedLeads.map((l) => ({ ...l, is_sample: true })))
-      .select();
+      // Only the count is used. A bare .select() asks for `*`, which includes
+      // the ciphertext columns the browser cannot read (US-254).
+      .select('id');
 
     if (error) {
       logger.error('Error creating sample leads', {

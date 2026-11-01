@@ -202,7 +202,7 @@ function useInvalidateSphere() {
 // ---------------------------------------------------------------------------
 
 export function useContacts() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const invalidate = useInvalidateSphere();
 
   const query = useQuery({
@@ -295,7 +295,7 @@ export function useContacts() {
 
 /** One contact, with email and phone decrypted. */
 export function useContact(contactId: string | null | undefined) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   return useQuery({
     queryKey: ['contact', contactId],
     queryFn: async (): Promise<Contact | null> => {
@@ -324,7 +324,7 @@ export function useContact(contactId: string | null | undefined) {
 
 /** Contacts whose stay-in-touch date is today or overdue, most overdue first. */
 export function useContactsDueForTouch(limit = 10) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   return useQuery({
     queryKey: ['contacts-due', user?.id, limit],
     queryFn: async () => {
@@ -361,7 +361,7 @@ export function useContactsDueForTouch(limit = 10) {
  * an annual date" is not something PostgREST can filter on.
  */
 export function useKeyDates(contactId?: string) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const invalidate = useInvalidateSphere();
 
   const query = useQuery({
@@ -448,7 +448,7 @@ export function useKeyDates(contactId?: string) {
 // ---------------------------------------------------------------------------
 
 export function useContactInteractions(contactId: string | null | undefined) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const invalidate = useInvalidateSphere();
   const queryClient = useQueryClient();
 

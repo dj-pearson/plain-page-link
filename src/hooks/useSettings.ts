@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 export interface UserSettings {
   id: string;
@@ -19,26 +19,26 @@ export interface UserSettings {
 }
 
 export function useSettings() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ["settings", user?.id],
+    queryKey: ['settings', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
 
       const { data, error } = await supabase
-        .from("user_settings")
-        .select("*")
-        .eq("user_id", user.id)
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
-      
+
       // If no settings exist, create default ones
       if (!data) {
         const { data: newSettings, error: insertError } = await supabase
-          .from("user_settings")
+          .from('user_settings')
           .insert({
             user_id: user.id,
             email_leads: true,
@@ -65,12 +65,12 @@ export function useSettings() {
 
   const updateSettings = useMutation({
     mutationFn: async (updates: Partial<UserSettings>) => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from("user_settings")
+        .from('user_settings')
         .update(updates)
-        .eq("user_id", user.id)
+        .eq('user_id', user.id)
         .select()
         .single();
 
@@ -78,7 +78,7 @@ export function useSettings() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['settings', user?.id] });
     },
   });
 

@@ -37,8 +37,11 @@ export function parseLeadStats(raw: unknown): LeadStats {
   };
 }
 
-export const useLeadStats = ({ since, slaHours = 24 }: { since?: Date; slaHours?: number } = {}) => {
-  const { user } = useAuthStore();
+export const useLeadStats = ({
+  since,
+  slaHours = 24,
+}: { since?: Date; slaHours?: number } = {}) => {
+  const user = useAuthStore((s) => s.user);
   const sinceIso = since ? since.toISOString().slice(0, 10) : null;
 
   const { data, isLoading, error } = useQuery({

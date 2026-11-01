@@ -498,8 +498,11 @@ function StepProfileBasics({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Full Name *</label>
+            <label htmlFor="onboarding-full-name" className="block text-sm font-medium mb-2">
+              Full Name *
+            </label>
             <input
+              id="onboarding-full-name"
               type="text"
               value={data.fullName}
               onChange={(e) => onChange({ ...data, fullName: e.target.value })}
@@ -509,8 +512,11 @@ function StepProfileBasics({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Title *</label>
+            <label htmlFor="onboarding-title" className="block text-sm font-medium mb-2">
+              Title *
+            </label>
             <input
+              id="onboarding-title"
               type="text"
               value={data.title}
               onChange={(e) => onChange({ ...data, title: e.target.value })}
@@ -522,8 +528,11 @@ function StepProfileBasics({
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Bio (optional)</label>
+          <label htmlFor="onboarding-bio" className="block text-sm font-medium mb-2">
+            Bio (optional)
+          </label>
           <textarea
+            id="onboarding-bio"
             value={data.bio}
             onChange={(e) => onChange({ ...data, bio: e.target.value })}
             placeholder="Helping families find their dream homes..."
@@ -533,8 +542,11 @@ function StepProfileBasics({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Phone (optional)</label>
+            <label htmlFor="onboarding-phone" className="block text-sm font-medium mb-2">
+              Phone (optional)
+            </label>
             <input
+              id="onboarding-phone"
               type="tel"
               value={data.phone}
               onChange={(e) => onChange({ ...data, phone: e.target.value })}
@@ -543,8 +555,11 @@ function StepProfileBasics({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Location (optional)</label>
+            <label htmlFor="onboarding-location" className="block text-sm font-medium mb-2">
+              Location (optional)
+            </label>
             <input
+              id="onboarding-location"
               type="text"
               value={data.location}
               onChange={(e) => onChange({ ...data, location: e.target.value })}
@@ -694,8 +709,11 @@ function StepFirstListing({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Beds</label>
+            <label htmlFor="listing-beds" className="block text-sm font-medium mb-2">
+              Beds
+            </label>
             <input
+              id="listing-beds"
               type="number"
               value={data.beds}
               onChange={(e) => onChange({ ...data, beds: e.target.value })}
@@ -704,8 +722,11 @@ function StepFirstListing({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Baths</label>
+            <label htmlFor="listing-baths" className="block text-sm font-medium mb-2">
+              Baths
+            </label>
             <input
+              id="listing-baths"
               type="number"
               value={data.baths}
               onChange={(e) => onChange({ ...data, baths: e.target.value })}

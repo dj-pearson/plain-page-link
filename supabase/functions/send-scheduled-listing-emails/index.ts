@@ -9,6 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 import { safeHtmlText } from '../_shared/public-email.ts';
+import { maskEmail } from '../_shared/log-redaction.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'noreply@agentbio.net';
@@ -110,8 +111,8 @@ serve(async (req) => {
           }
         }
       } catch (error) {
-        console.error(`Error sending email to ${capture.email}:`, error);
-        errors.push({ email: capture.email, error: error.message });
+        console.error(`Error sending email to capture ${capture.id} (${maskEmail(capture.email)}):`, error);
+        errors.push({ captureId: capture.id, error: error.message });
       }
     }
 

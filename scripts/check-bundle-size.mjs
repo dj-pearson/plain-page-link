@@ -12,12 +12,15 @@
  * vite.config.ts. Adding to this list is a deliberate, reviewable
  * decision — keep it minimal.
  *
- * Run after `vite build`. Used by the CI `bundle-size` job.
+ * Run after `vite build`. Used by the CI `bundle-size` job, which builds with
+ * a dummy VITE_SENTRY_DSN so the error-monitoring path is in the bundle being
+ * checked (US-255). BUNDLE_DIST=<dir> checks a build in another directory.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const ASSETS_DIR = join(process.cwd(), "dist", "assets");
+const DIST_DIR = process.env.BUNDLE_DIST || join(process.cwd(), "dist");
+const ASSETS_DIR = join(DIST_DIR, "assets");
 const KB = 1024;
 const VENDOR_BUDGET = 600 * KB;
 const DEFAULT_BUDGET = 500 * KB;
@@ -66,6 +69,9 @@ const MUST_STAY_LAZY = {
     /^SearchAnalyticsDashboard-/,
     /^MLLeadScoringDashboard-/,
   ],
+  // US-255: Session Replay loads after the core SDK, from its own chunk. Only
+  // src/lib/sentry-replay.ts (itself dynamically imported) may import it.
+  "sentry-replay-vendor": [/^sentry-replay-(?!vendor-)/],
 };
 
 function budgetFor(name) {
@@ -174,9 +180,18 @@ const ENTRY_MUST_NOT_INCLUDE = {
   "charts-vendor": "recharts. Dashboard analytics only.",
   "three-vendor": "Three.js. Only a 3D theme or the 3D hero needs it.",
   "markdown-vendor": "react-markdown. Blog article rendering only.",
+  // US-255: with VITE_SENTRY_DSN set, the SDK and Session Replay were 81 KB
+  // gzip of the entry chunk. src/lib/sentry.ts loads them after `load`.
+  "sentry-vendor": "the Sentry SDK. Loaded at idle after the page has loaded.",
+  "sentry-replay-vendor": "Sentry Session Replay. Loaded after the SDK.",
 };
 
-const html = readFileSync(join(process.cwd(), "dist", "index.html"), "utf8");
+// The Sentry SDK writes its global carrier under this key. Matching the source
+// as well as the chunk names catches SDK code that Rollup filed somewhere
+// other than sentry-vendor (a shared helper adopted by the entry chunk, say).
+const SENTRY_SIGNATURE = "__SENTRY__";
+
+const html = readFileSync(join(DIST_DIR, "index.html"), "utf8");
 const entryChunks = [...html.matchAll(/assets\/([A-Za-z0-9._-]+\.js)/g)].map((m) => m[1]);
 
 if (entryChunks.length === 0) {
@@ -224,9 +239,105 @@ if (onFirstPaint.length) {
   process.exit(1);
 }
 
+const sentryOnFirstPaint = [...eager].filter((f) => sources.get(f)?.includes(SENTRY_SIGNATURE));
+if (sentryOnFirstPaint.length) {
+  console.error("[bundle-size] FAILED — Sentry SDK code is on the first-paint critical path:");
+  for (const f of sentryOnFirstPaint) console.error(`  - ${f}`);
+  console.error(
+    "  Something imports @sentry/* statically. Only src/lib/sentry-sdk.ts and " +
+      "src/lib/sentry-replay.ts may, and only src/lib/sentry.ts may reach them, " +
+      "through import()."
+  );
+  process.exit(1);
+}
+
+// A check that passes because the thing it guards is absent proves nothing.
+// With a DSN the SDK must have been compiled into some (lazy) chunk.
+if (process.env.VITE_SENTRY_DSN) {
+  const sdkChunk = files.find((f) => sources.get(f).includes(SENTRY_SIGNATURE));
+  if (!sdkChunk) {
+    console.error(
+      "[bundle-size] FAILED — VITE_SENTRY_DSN is set but no chunk contains the " +
+        "Sentry SDK, so the first-paint check above was not exercised."
+    );
+    process.exit(1);
+  }
+  console.log(`[bundle-size] Sentry SDK is lazy (${sdkChunk}), not on first paint.`);
+}
+
 console.log(
   `[bundle-size] Entry graph: ${eager.size} chunk(s) on first paint, none of ` +
     `the ${Object.keys(ENTRY_MUST_NOT_INCLUDE).length} that must not be.`
+);
+
+// US-260: the idb library is not a vendor chunk, so the list above cannot name
+// it. App.tsx statically imported offline-storage to open an IndexedDB database
+// nothing read, which inlined idb into the entry chunk itself. Recognise it by
+// the event name only an IndexedDB open uses.
+const entryWithIdb = [...eager].filter((f) => (sources.get(f) ?? "").includes('"upgradeneeded"'));
+if (entryWithIdb.length) {
+  console.error(
+    `[bundle-size] FAILED — IndexedDB (idb) code in the entry graph: ${entryWithIdb.join(", ")}.`
+  );
+  console.error(
+    "  Offline storage is not a first-paint concern. Import it lazily from the " +
+      "feature that needs it, not from App.tsx."
+  );
+  process.exit(1);
+}
+
+// US-260: what the public profile downloads on top of the entry.
+//
+// The profile is the product - a link in an Instagram bio, opened on a phone -
+// and its route chunk is the second thing every such visitor fetches. One Radix
+// DropdownMenu (add-to-calendar on an open house) pulled ui-vendor, every Radix
+// primitive the dashboard uses, into its static closure. Hold that closure to
+// the same kind of list as the entry.
+const PROFILE_MUST_NOT_INCLUDE = {
+  "ui-vendor":
+    "Radix primitives. The profile's modals are lazy; nothing on first paint " +
+    "needs them (UpcomingOpenHouses uses a plain disclosure).",
+  "three-vendor": "Three.js. 3D themes load it after load + idle (useDeferred3D).",
+  "charts-vendor": "recharts. Dashboard analytics only.",
+  "form-vendor": "react-hook-form + zod. The lead forms are lazy modals.",
+};
+
+const profileChunks = files.filter((f) => f.startsWith("FullProfilePage-"));
+if (profileChunks.length === 0) {
+  console.error("[bundle-size] FAILED — no FullProfilePage-*.js chunk to check.");
+  process.exit(1);
+}
+const profileGraph = new Set();
+const profileQueue = [...profileChunks];
+while (profileQueue.length) {
+  const file = profileQueue.pop();
+  if (profileGraph.has(file)) continue;
+  profileGraph.add(file);
+  for (const [, imported] of (sources.get(file) ?? "").matchAll(
+    /from"\.\/([A-Za-z0-9._-]+\.js)"/g
+  )) {
+    if (!profileGraph.has(imported)) profileQueue.push(imported);
+  }
+}
+const onProfile = Object.entries(PROFILE_MUST_NOT_INCLUDE)
+  .map(([prefix, why]) => ({ chunk: [...profileGraph].find((f) => f.startsWith(`${prefix}-`)), why }))
+  .filter((p) => p.chunk);
+if (onProfile.length) {
+  console.error(
+    "[bundle-size] FAILED — chunk(s) statically reachable from the public profile that should not be:"
+  );
+  for (const p of onProfile) {
+    console.error(`  - ${p.chunk} (${fmt(statSync(join(ASSETS_DIR, p.chunk)).size)}) — ${p.why}`);
+  }
+  console.error(
+    "  Find the static import in FullProfilePage's graph that pulls it in and " +
+      "make it lazy, or replace the component with a lighter one."
+  );
+  process.exit(1);
+}
+console.log(
+  `[bundle-size] Profile graph: ${profileGraph.size} chunk(s), none of the ` +
+    `${Object.keys(PROFILE_MUST_NOT_INCLUDE).length} that must not be.`
 );
 
 const violations = [];

@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { decryptLeadContacts } from '@/lib/pii';
+import { LEAD_COLUMNS } from '@/lib/leadColumns';
 import { callEdgeFunction } from '@/lib/edgeFunctions';
 import { getLeadAttribution } from '@/lib/attribution';
 import { errorHandler } from '@/lib/errorHandler';
@@ -70,7 +71,7 @@ export function formatOpenHouseAddress(l: {
 }
 
 export function useOpenHouses() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -187,14 +188,15 @@ export function useOpenHouses() {
 
 /** The visitors who signed in at one open house, contact details decrypted. */
 export function useOpenHouseVisitors(openHouseId: string | null | undefined) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   return useQuery({
     queryKey: ['open-house-visitors', openHouseId],
     queryFn: async (): Promise<Lead[]> => {
       if (!user?.id || !openHouseId) return [];
       const { data, error } = await supabase
         .from('leads')
-        .select('*')
+        // Never '*': the ciphertext is not selectable by the browser (US-254).
+        .select(LEAD_COLUMNS)
         .eq('user_id', user.id)
         .eq('open_house_id', openHouseId)
         .order('created_at', { ascending: true })
@@ -202,7 +204,7 @@ export function useOpenHouseVisitors(openHouseId: string | null | undefined) {
       if (error) throw error;
       const rows = data ?? [];
       const details = await decryptLeadContacts(rows.map((r) => r.id));
-      return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }) => ({
+      return rows.map((rest) => ({
         ...rest,
         email: details.get(rest.id)?.email ?? null,
         phone: details.get(rest.id)?.phone ?? null,

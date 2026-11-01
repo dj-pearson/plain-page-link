@@ -14,6 +14,7 @@ import {
   auditPages,
   auditStructuredData,
   auditStructuredDataUrls,
+  countH1,
   readCanonical,
   readDescription,
   readTitle,
@@ -42,7 +43,12 @@ function preUS147Output() {
 }
 
 /** A page as the prerender writes it now. */
-function goodPage(route: string, title: string, description: string, body = 'x'.repeat(900)) {
+function goodPage(
+  route: string,
+  title: string,
+  description: string,
+  body = `<h1>${title}</h1>${'x'.repeat(900)}`
+) {
   return {
     route,
     html: `<!DOCTYPE html>
@@ -139,6 +145,38 @@ describe('seo-audit', () => {
       page.html = page.html.replace('<div id="root">', '<div id="root"><h1>404</h1>');
       const problems = auditPages([page], { origin: ORIGIN });
       expect(problems.some((p) => p.problem.includes('404'))).toBe(true);
+    });
+
+    it('catches an article that renders two <h1> elements (US-262)', () => {
+      const page = goodPage('/blog/a', 'A post', 'About a post.');
+      page.html = page.html.replace('</h1>', '</h1><div class="prose"><h1>A post</h1></div>');
+      const problems = auditPages([page], { origin: ORIGIN });
+      expect(problems.map((p) => p.problem)).toContain('has 2 <h1> elements, expected exactly one');
+    });
+
+    it('catches a page with no <h1> at all', () => {
+      const page = goodPage('/pricing', 'Pricing', 'Plans.', 'x'.repeat(900));
+      const problems = auditPages([page], { origin: ORIGIN });
+      expect(problems.map((p) => p.problem)).toContain('has no <h1>');
+    });
+
+    it('lets a noindexed page go without an <h1>, but never carry two', () => {
+      const robots = '<meta name="robots" content="noindex, follow" /></head>';
+      const none = goodPage('/auth/mfa', 'MFA', 'Enter your code.', 'x'.repeat(900));
+      none.html = none.html.replace('</head>', robots);
+      expect(auditPages([none], { origin: ORIGIN })).toEqual([]);
+
+      const two = goodPage('/auth/x', 'X', 'X page.', `<h1>a</h1><h1>b</h1>${'x'.repeat(900)}`);
+      two.html = two.html.replace('</head>', robots);
+      expect(auditPages([two], { origin: ORIGIN }).map((p) => p.problem)).toContain(
+        'has 2 <h1> elements, expected exactly one'
+      );
+    });
+
+    it('counts only body h1 elements, not head text or longer tag names', () => {
+      expect(
+        countH1('<head><script>"<h1>"</script></head><body><h1 class="a">x</h1><h10></h10></body>')
+      ).toBe(1);
     });
 
     it('does not demand a canonical from a noindexed page', () => {

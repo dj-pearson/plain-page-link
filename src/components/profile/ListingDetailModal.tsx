@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   X,
   ChevronLeft,
@@ -20,7 +20,12 @@ import {
   Layers,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { getImageUrls, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
+import {
+  fallBackToOriginal,
+  getImageUrls,
+  imageVariantUrl,
+  PLACEHOLDER_PROPERTY_IMAGE,
+} from '@/lib/images';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -73,6 +78,9 @@ export default function ListingDetailModal({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const [showShareTooltip, setShowShareTooltip] = useState(false);
+  // The photo cross-fade has no transform to drop, but under
+  // prefers-reduced-motion it swaps instantly (US-260).
+  const reduceMotion = useReducedMotion() ?? false;
 
   // `photos?.length ? … : …`, not `photos || …`.
   //
@@ -287,7 +295,7 @@ export default function ListingDetailModal({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.3 }}
                   onError={(e) => {
                     e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
                   }}
@@ -333,13 +341,15 @@ export default function ListingDetailModal({
                           : 'border-transparent opacity-70 hover:opacity-100'
                       )}
                     >
+                      {/* A 48x36 thumbnail: the 200px variant, not the
+                          multi-megabyte original (US-260). */}
                       <img
-                        src={photo}
+                        src={imageVariantUrl(photo, 200) ?? photo}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
-                        }}
+                        onError={(e) => fallBackToOriginal(e.currentTarget, photo)}
                       />
                     </button>
                   ))}

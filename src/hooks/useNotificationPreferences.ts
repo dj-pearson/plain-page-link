@@ -37,7 +37,7 @@ const DEFAULTS: NotificationPreferences = {
 };
 
 export function useNotificationPreferences() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const { data: preferences = DEFAULTS, isLoading } = useQuery({

@@ -20,6 +20,15 @@ Initialized in `src/lib/sentry.ts` (`initSentry()`), called from
 `src/main.tsx`. Disabled unless `VITE_SENTRY_DSN` is set; enabled in
 production or when `VITE_SENTRY_ENABLED=true`.
 
+`src/lib/sentry.ts` is a facade with no `@sentry/*` import (US-255). The SDK
+(`src/lib/sentry-sdk.ts`) is fetched with a dynamic import once the page has
+loaded and the browser is idle, and Session Replay (`src/lib/sentry-replay.ts`)
+after that, from its own chunk. Calls made before then — exceptions, messages,
+breadcrumbs, user/tag/context, and early `error`/`unhandledrejection` events —
+are buffered (50 events, earliest kept) and replayed. The CI bundle-size job
+builds with a dummy DSN and fails if Sentry code is on the first-paint graph.
+Never import `sentry-sdk.ts` or `@sentry/*` from anywhere else.
+
 - **Environment**: `production` / `development` (also set as a tag).
 - **Release**: `VITE_APP_VERSION` (falls back to `1.0.0`, matching
   `package.json`); set as a tag.

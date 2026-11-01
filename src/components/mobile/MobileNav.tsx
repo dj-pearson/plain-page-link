@@ -24,7 +24,9 @@ interface NavItem {
 export function MobileNav() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, signOut, role } = useAuthStore();
+  const profile = useAuthStore((s) => s.profile);
+  const signOut = useAuthStore((s) => s.signOut);
+  const role = useAuthStore((s) => s.role);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isVisible } = useScrollDirection({ threshold: 15, topThreshold: 50 });
 

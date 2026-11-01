@@ -12,6 +12,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { QueryClient } from '@tanstack/react-query';
+import { bindQueryCacheToAuth } from '@/lib/authQueryCache';
 
 type ProfileResult = {
   data: Record<string, unknown> | null;
@@ -32,6 +34,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
       getSession: () => h.getSession(),
+      signOut: () => Promise.resolve({ error: null }),
       onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
         h.listener = cb;
         return { data: { subscription: { unsubscribe: vi.fn() } } };
@@ -131,21 +134,18 @@ describe('auth listener', () => {
     return store;
   }
 
-  it.each(['SIGNED_IN', 'USER_UPDATED'] as const)(
-    'keeps the profile on a transient fetch error after %s',
-    async (event) => {
-      const store = await signedInAsA();
-      h.fetchOwnProfile.mockResolvedValue(transient);
-      h.roles.mockResolvedValue({ data: null, error: { message: 'timeout' } });
+  it('keeps the profile on a transient fetch error after USER_UPDATED', async () => {
+    const store = await signedInAsA();
+    h.fetchOwnProfile.mockResolvedValue(transient);
+    h.roles.mockResolvedValue({ data: null, error: { message: 'timeout' } });
 
-      fire(event, sessionFor(USER_A));
-      await flush();
+    fire('USER_UPDATED', sessionFor(USER_A));
+    await flush();
 
-      expect(h.fetchOwnProfile).toHaveBeenCalledTimes(1);
-      expect(store.getState().profile?.username).toBe('janedoe');
-      expect(store.getState().role).toBe('user');
-    }
-  );
+    expect(h.fetchOwnProfile).toHaveBeenCalledTimes(1);
+    expect(store.getState().profile?.username).toBe('janedoe');
+    expect(store.getState().role).toBe('user');
+  });
 
   it('still clears the profile when the row is genuinely gone (PGRST116)', async () => {
     const store = await signedInAsA();
@@ -219,16 +219,119 @@ describe('auth listener', () => {
     expect(store.getState().profile?.username).toBe('janedoe');
   });
 
-  it('only skips the first INITIAL_SESSION: a later sign-in for the same user refetches', async () => {
+  // US-256: auth-js fires SIGNED_IN on every tab-visibility change.
+  it.each(['SIGNED_IN', 'TOKEN_REFRESHED'] as const)(
+    '%s for the same user keeps the user reference and does not refetch',
+    async (event) => {
+      const store = await signedInAsA();
+      const userBefore = store.getState().user;
+      const profileBefore = store.getState().profile;
+      const fresh = { ...sessionFor({ ...USER_A }), access_token: 'rotated' };
+
+      fire(event, fresh);
+      await flush();
+
+      expect(store.getState().user).toBe(userBefore);
+      expect(store.getState().profile).toBe(profileBefore);
+      expect(store.getState().session).toBe(fresh);
+      expect(h.fetchOwnProfile).not.toHaveBeenCalled();
+      expect(h.roles).not.toHaveBeenCalled();
+    }
+  );
+
+  it('SIGNED_IN as a different user still loads that user', async () => {
     const store = await signedInAsA();
-    fire('INITIAL_SESSION', sessionFor(USER_A));
+    h.fetchOwnProfile.mockResolvedValue(ok(row(USER_B.id, 'bob')));
+
+    fire('SIGNED_IN', sessionFor(USER_B));
     await flush();
 
-    h.fetchOwnProfile.mockResolvedValue(ok(row(USER_A.id, 'janerivers')));
+    expect(store.getState().user?.id).toBe(USER_B.id);
+    expect(store.getState().profile?.username).toBe('bob');
+    expect(h.fetchOwnProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('SIGNED_IN for the same user refetches when the store has no profile for them', async () => {
+    const store = await loadStore();
+    h.getSession.mockResolvedValue({ data: { session: sessionFor(USER_A) } });
+    h.fetchOwnProfile.mockResolvedValue(transient);
+    await store.getState().initialize();
+    expect(store.getState().profile).toBeNull();
+
+    h.fetchOwnProfile.mockResolvedValue(ok(row(USER_A.id, 'janedoe')));
     fire('SIGNED_IN', sessionFor(USER_A));
     await flush();
 
+    expect(store.getState().profile?.username).toBe('janedoe');
+  });
+
+  it('USER_UPDATED still applies the new user and rereads the profile', async () => {
+    const store = await signedInAsA();
+    const updated = { ...USER_A, email: 'new@example.test' };
+    h.fetchOwnProfile.mockResolvedValue(ok(row(USER_A.id, 'janerivers')));
+
+    fire('USER_UPDATED', sessionFor(updated));
+    await flush();
+
+    expect(store.getState().user?.email).toBe('new@example.test');
     expect(h.fetchOwnProfile).toHaveBeenCalledTimes(1);
     expect(store.getState().profile?.username).toBe('janerivers');
+  });
+});
+
+describe('query cache across a change of agent (US-256)', () => {
+  async function signedInWithCache() {
+    const store = await loadStore();
+    h.getSession.mockResolvedValue({ data: { session: sessionFor(USER_A) } });
+    h.fetchOwnProfile.mockResolvedValue(ok(row(USER_A.id, 'janedoe')));
+    const queryClient = new QueryClient();
+    bindQueryCacheToAuth(queryClient, store);
+    await store.getState().initialize();
+    // A first sign-in on the page is not a change of agent.
+    queryClient.setQueryData(['leads'], [{ id: 'lead-of-agent-a' }]);
+    queryClient.setQueryData(['plan-usage'], { plan: 'pro' });
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(2);
+    return { store, queryClient };
+  }
+
+  it('signOut() empties the cache', async () => {
+    const { store, queryClient } = await signedInWithCache();
+    await store.getState().signOut();
+    expect(queryClient.getQueryData(['leads'])).toBeUndefined();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+  });
+
+  it('signOutAllDevices() empties the cache', async () => {
+    const { store, queryClient } = await signedInWithCache();
+    await store.getState().signOutAllDevices();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+  });
+
+  it('a SIGNED_OUT event empties the cache', async () => {
+    const { queryClient } = await signedInWithCache();
+    fire('SIGNED_OUT', null);
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+  });
+
+  it('a sign-out broadcast from another tab empties the cache', async () => {
+    const { store, queryClient } = await signedInWithCache();
+    store.getState()._handleSLOMessage({ type: 'SIGN_OUT', timestamp: Date.now() });
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+  });
+
+  it('a different account signing in empties the cache', async () => {
+    const { queryClient } = await signedInWithCache();
+    h.fetchOwnProfile.mockResolvedValue(ok(row(USER_B.id, 'bob')));
+    fire('SIGNED_IN', sessionFor(USER_B));
+    expect(queryClient.getQueryData(['leads'])).toBeUndefined();
+    await flush();
+  });
+
+  it('a token refresh or tab switch for the same agent keeps the cache', async () => {
+    const { queryClient } = await signedInWithCache();
+    fire('TOKEN_REFRESHED', sessionFor({ ...USER_A }));
+    fire('SIGNED_IN', sessionFor({ ...USER_A }));
+    await flush();
+    expect(queryClient.getQueryData(['leads'])).toEqual([{ id: 'lead-of-agent-a' }]);
   });
 });

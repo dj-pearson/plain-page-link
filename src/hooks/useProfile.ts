@@ -23,7 +23,7 @@ import type { Profile } from '@/types/profile';
 export type { Profile, ProfileRow } from '@/types/profile';
 
 export function useProfile() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const {

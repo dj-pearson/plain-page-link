@@ -7,6 +7,7 @@ import { successResponse, errorResponse, handleUnexpectedError } from '../_share
 import { getAgentContact } from '../_shared/agent-contact.ts';
 import { decryptSecret } from '../_shared/encryption.ts';
 import { getSiteUrl } from '../_shared/env.ts';
+import { maskEmail } from '../_shared/log-redaction.ts';
 
 /**
  * Notify Lead
@@ -217,7 +218,7 @@ serve(async (req) => {
     }
 
     if (!sent.ok) {
-      console.error(`[notify-lead] email to ${agentEmail} for lead ${lead.id} failed: ${sent.error}`);
+      console.error(`[notify-lead] email to ${maskEmail(agentEmail)} for lead ${lead.id} failed: ${sent.error}`);
       return errorResponse('The notification email could not be sent', 'EMAIL_SEND_FAILED', req, 502);
     }
 

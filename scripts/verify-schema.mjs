@@ -984,6 +984,73 @@ check('view and click counters are throttled, and match the rows they count', ()
 });
 
 // ---------------------------------------------------------------------------
+// 6f-2. A blog view is counted for an anonymous reader, and is not an edit.
+//
+//     BlogArticle updated articles.view_count directly; no policy lets a
+//     visitor UPDATE articles, so it counted nothing — and for an admin, the
+//     updated_at trigger turned each view into a new sitemap lastmod and
+//     dateModified (US-262). Asserted by execution as anon: the counter moves,
+//     updated_at does not, a draft is untouched, and the throttle holds.
+// ---------------------------------------------------------------------------
+check('increment_article_view counts as anon, throttles, and leaves updated_at alone', () => {
+  const out = [];
+  const pub = '00000000-dead-beef-0000-00000000a262';
+  const draft = '00000000-dead-beef-0000-00000000b262';
+  const stamp = '2020-01-01 00:00:00+00';
+  try {
+    // The reset UPDATE is itself a view_count-only change, so it must leave the
+    // stamp in place too.
+    q(`
+      DELETE FROM public.rate_limit_entries WHERE identifier LIKE 'verify-reader%';
+      INSERT INTO public.articles (id, title, slug, content, status, view_count, updated_at)
+        VALUES ('${pub}', 'Verify', 'verify-article-view-pub', 'x', 'published', 0, '${stamp}'),
+               ('${draft}', 'Verify', 'verify-article-view-draft', 'x', 'draft', 0, '${stamp}')
+        ON CONFLICT (id) DO NOTHING;
+      UPDATE public.articles SET view_count = 0 WHERE id IN ('${pub}', '${draft}');
+    `);
+    const [state] = q(`
+      SET ROLE anon;
+      SELECT public.increment_article_view('${pub}', 'verify-reader') FROM generate_series(1, 10);
+      SELECT public.increment_article_view('${draft}', 'verify-reader');
+      RESET ROLE;
+      SELECT (SELECT view_count || '|' || (updated_at = '${stamp}'::timestamptz)
+                FROM public.articles WHERE id = '${pub}')
+             || '|' || (SELECT view_count FROM public.articles WHERE id = '${draft}');
+    `);
+    const [views, unchanged, draftViews] = String(state).split('|');
+    if (Number(views) === 0) out.push('anon called increment_article_view and nothing was counted');
+    if (Number(views) > 3) {
+      out.push(`${views} views of one article from one reader in an hour; throttle not applied`);
+    }
+    if (unchanged !== 'true') {
+      out.push('counting a view moved articles.updated_at (sitemap lastmod / dateModified)');
+    }
+    if (Number(draftViews) !== 0) out.push('a draft article was counted');
+
+    const [edited] = q(`
+      UPDATE public.articles SET title = 'Verify edited' WHERE id = '${pub}';
+      SELECT (updated_at > '${stamp}'::timestamptz)::text FROM public.articles WHERE id = '${pub}';
+    `);
+    if (edited !== 'true') out.push('a real edit no longer moves articles.updated_at');
+  } catch (e) {
+    const msg = String(e.stderr || e.message)
+      .split('\n')
+      .filter((l) => l.includes('ERROR'))
+      .join('; ');
+    out.push(msg || 'article view check raised an error');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.rate_limit_entries WHERE identifier LIKE 'verify-reader%';
+         DELETE FROM public.articles WHERE id IN ('${pub}', '${draft}');`);
+    } catch {
+      /* cleanup is best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 6g. "Is this username free?" must be answered by something that can see
 //     unpublished profiles.
 //
@@ -1726,7 +1793,8 @@ const DEFINER_CALLABLE = new Map([
   ['list_public_open_houses', { anon: true, why: 'public profile; omits private_notes' }],
   ['get_public_open_house', { anon: true, why: 'open house kiosk; omits private_notes' }],
   ['increment_link_clicks', { anon: true, why: 'the only writer of links.click_count; throttled' }],
-  ['profile_shows_branding', { anon: true, why: 'public profile; returns a boolean' }],
+  ['increment_article_view', { anon: true, why: 'blog view counter; published rows only, throttled (US-262)' }],
+  ['profile_shows_branding',{ anon: true, why: 'public profile; returns a boolean' }],
   ['public_agent_response_hours', { anon: true, why: 'public profile; aggregate only' }],
   // authenticated only: each checks auth.uid() or admin itself.
   ['get_plan_usage', { why: 'reads auth.uid() only' }],
@@ -1840,6 +1908,51 @@ check('account deletion and session reads are refused for another user', () => {
          DELETE FROM public.gdpr_data_requests WHERE user_id IN ('${victim}', '${other}');
          DELETE FROM public.profiles WHERE id IN ('${victim}', '${other}');
          DELETE FROM auth.users WHERE id IN ('${victim}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+check('an account with a live Stripe subscription is not erased until it is cancelled', () => {
+  // US-250: erasing auth.users cascaded away user_subscriptions — the only
+  // record of the Stripe subscription — while the subscription kept charging.
+  const out = [];
+  const user = '00000000-dead-beef-0000-0000000de250';
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${user}', 'billed@example.test') ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username) VALUES ('${user}', 'verifybilled') ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.user_subscriptions (user_id, stripe_subscription_id, status)
+        VALUES ('${user}', 'sub_verify_250', 'active');
+      INSERT INTO public.account_deletion_scheduled (user_id, scheduled_for)
+        VALUES ('${user}', now() - interval '1 day');
+    `);
+    q(`SELECT public.process_scheduled_account_deletions();`);
+    const [kept] = q(`SELECT count(*) FROM auth.users WHERE id = '${user}';`);
+    if (kept !== '1') out.push('an account with a live subscription was erased');
+    const [logged] = q(`SELECT count(*) FROM public.account_deletion_log
+                         WHERE user_id = '${user}' AND status = 'failed' AND error_detail LIKE '%sub_verify_250%';`);
+    if (logged !== '1') out.push(`the held erasure was not logged (${logged} rows)`);
+
+    q(`UPDATE public.user_subscriptions SET status = 'canceled' WHERE user_id = '${user}';`);
+    const [erased] = q(`SELECT public.process_scheduled_account_deletions();`);
+    const [gone] = q(`SELECT count(*) FROM auth.users WHERE id = '${user}';`);
+    if (gone !== '0' || erased !== '1') {
+      const [why] = q(`SELECT coalesce(max(error_detail), '') FROM public.account_deletion_log
+                        WHERE user_id = '${user}' AND status = 'failed' AND error_detail NOT LIKE '%sub_verify_250%';`);
+      out.push(`the account was not erased once its subscription was cancelled ${why}`.trim());
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.account_deletion_scheduled WHERE user_id = '${user}';
+         DELETE FROM public.user_subscriptions WHERE user_id = '${user}';
+         DELETE FROM public.account_deletion_log WHERE user_id = '${user}';
+         DELETE FROM public.profiles WHERE id = '${user}';
+         DELETE FROM auth.users WHERE id = '${user}';`);
     } catch {
       /* best effort */
     }
@@ -2204,6 +2317,86 @@ check('a locked lead cannot be backdated, and lead/contact/open-house dates are 
       q(`DELETE FROM public.open_houses WHERE user_id = '${agent}';
          DELETE FROM public.contacts WHERE user_id = '${agent}';
          DELETE FROM public.listings WHERE user_id = '${agent}';
+         DELETE FROM public.leads WHERE user_id = '${agent}';
+         DELETE FROM public.profiles WHERE id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
+// US-254: a locked lead's ciphertext is not the browser's to read.
+//   anon and authenticated held table-wide SELECT on leads, so an agent over
+//   the allowance could read a locked lead's encrypted_email, write it into a
+//   contact, and have pii-crypto's decrypt_contacts open it. The ciphertext
+//   columns are now unselectable; everything else still reads, and
+//   locked_lead_ciphertexts() lets pii-crypto refuse a copy made before.
+// ---------------------------------------------------------------------------
+check("the browser cannot select a lead's ciphertext, and a copied one is recognised", () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000254a01';
+  const as = (sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${agent}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'us254@example.test') ON CONFLICT (id) DO NOTHING;`);
+    const [limit] = q(`SELECT public.plan_limit('${agent}', 'leads_per_month');`);
+    if (Number(limit) < 0) {
+      out.push(`the default plan has unlimited leads_per_month (${limit}); nothing to lock`);
+      return out;
+    }
+    // One more lead this month than the plan allows; the last one is locked.
+    q(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, encrypted_phone, created_at)
+         SELECT '${agent}', 'buyer', 'L' || g, 'enc:v1:email-' || g, 'enc:v1:phone-' || g,
+                date_trunc('month', now()) + g * interval '1 second'
+           FROM generate_series(1, ${Number(limit) + 1}) g;`);
+    const lockedN = Number(limit) + 1;
+
+    // The owner's own row: the ciphertext is refused, every other column reads.
+    for (const col of ['encrypted_email', 'encrypted_phone', '*']) {
+      if (!refused(() => as(`SELECT ${col} FROM public.leads WHERE user_id = '${agent}';`)))
+        out.push(`authenticated could select leads.${col} on their own lead`);
+    }
+    if (!refused(() => q(`SET ROLE anon; SELECT encrypted_email FROM public.leads;`)))
+      out.push('anon could select leads.encrypted_email');
+    const [n] = as(`SELECT count(name) FROM public.leads WHERE user_id = '${agent}';`);
+    if (n !== String(lockedN)) out.push(`the owner read ${n} of their ${lockedN} leads' names`);
+
+    // Writes that ask only for readable columns back still work.
+    if (
+      refused(() =>
+        as(`INSERT INTO public.contacts (user_id, first_name, relationship) VALUES ('${agent}', 'C', 'past_client') RETURNING id;`)
+      )
+    )
+      out.push('setup: the owner could not add a contact');
+    if (refused(() => as(`UPDATE public.leads SET notes = 'called', encrypted_phone = 'enc:v1:new' WHERE user_id = '${agent}' AND name = 'L1' RETURNING id, name;`)))
+      out.push('the owner could not update a lead (including its ciphertext) and read back id, name');
+
+    // locked_lead_ciphertexts: the locked lead's values, nobody else's.
+    const asked = `ARRAY['enc:v1:email-${lockedN}', 'enc:v1:phone-${lockedN}', 'enc:v1:email-2', 'enc:v1:typed']`;
+    const got = q(`SET ROLE service_role; SELECT v FROM public.locked_lead_ciphertexts('${agent}', ${asked}) v ORDER BY 1;`);
+    if (got.join(',') !== `enc:v1:email-${lockedN},enc:v1:phone-${lockedN}`)
+      out.push(`locked_lead_ciphertexts returned [${got.join(', ')}]; expected only the locked lead's two values`);
+    const [otherOwner] = q(
+      `SET ROLE service_role; SELECT count(*) FROM public.locked_lead_ciphertexts('00000000-dead-beef-0000-000000254a99', ${asked});`
+    );
+    if (otherOwner !== '0') out.push("locked_lead_ciphertexts matched another owner's leads");
+    if (!refused(() => as(`SELECT public.locked_lead_ciphertexts('${agent}', ${asked});`)))
+      out.push('authenticated could execute locked_lead_ciphertexts');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.contacts WHERE user_id = '${agent}';
          DELETE FROM public.leads WHERE user_id = '${agent}';
          DELETE FROM public.profiles WHERE id = '${agent}';
          DELETE FROM auth.users WHERE id = '${agent}';`);
@@ -2587,6 +2780,79 @@ check('no secret-shaped column is reachable by anon', () =>
     ORDER BY 1;
   `)
 );
+
+// ---------------------------------------------------------------------------
+// 12b. A team owner cannot raise their own seat cap or hand the team away, and
+//      a team admin cannot write an accepted roster row (US-259).
+//
+//      "Owner modifies team" was FOR ALL with owner_id = auth.uid(), so an owner
+//      could PATCH teams.max_seats to any number from the browser and skip the
+//      plan's seat limit; "Admins manage roster" was FOR ALL too, so an admin
+//      could INSERT a team_members row with accepted_at already set — a seat
+//      nobody was invited to, past the cap the teams function enforces. Every
+//      write to these tables goes through the teams edge function (service role).
+// ---------------------------------------------------------------------------
+check('team owners cannot change max_seats/owner_id and admins cannot insert accepted members', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-0000000e2591';
+  const other = '00000000-dead-beef-0000-0000000e2592';
+  const team = '00000000-dead-beef-0000-0000000e2593';
+  const as = (sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${owner}'; ${sql}`);
+  const refused = (label, sql) => {
+    try {
+      as(sql);
+    } catch {
+      return; // an error is a refusal
+    }
+    return label;
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${owner}', 'teamown@example.test'), ('${other}', 'teamother@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.teams (id, owner_id, name, max_seats) VALUES ('${team}', '${owner}', 'Seat Check', 5);
+       INSERT INTO public.team_members (team_id, user_id, email, role, accepted_at)
+         VALUES ('${team}', '${owner}', 'teamown@example.test', 'owner', now());`);
+
+    const [seen] = as(`SELECT count(*) FROM public.teams WHERE id = '${team}';`);
+    if (seen !== '1') out.push('the owner can no longer read their own team');
+    const [roster] = as(`SELECT count(*) FROM public.team_members WHERE team_id = '${team}';`);
+    if (roster !== '1') out.push('the owner can no longer read their own roster');
+
+    refused('', `UPDATE public.teams SET max_seats = 1000 WHERE id = '${team}';`);
+    refused('', `UPDATE public.teams SET owner_id = '${other}' WHERE id = '${team}';`);
+    const [after] = q(`SELECT max_seats || '|' || owner_id FROM public.teams WHERE id = '${team}';`);
+    if (after !== `5|${owner}`) out.push(`the owner rewrote their team to max_seats|owner_id = ${after}`);
+
+    const ins = refused(
+      'the owner inserted a second team with max_seats 1000 directly',
+      `INSERT INTO public.teams (owner_id, name, max_seats) VALUES ('${owner}', 'Bypass', 1000);`
+    );
+    if (ins) out.push(ins);
+
+    const mem = refused(
+      'a team admin inserted an already-accepted team_members row directly',
+      `INSERT INTO public.team_members (team_id, user_id, email, role, accepted_at)
+         VALUES ('${team}', '${other}', 'teamother@example.test', 'member', now());`
+    );
+    if (mem) out.push(mem);
+
+    refused('', `UPDATE public.team_members SET role = 'admin', accepted_at = now() WHERE team_id = '${team}';`);
+    const [roleNow] = q(`SELECT role FROM public.team_members WHERE team_id = '${team}' AND user_id = '${owner}';`);
+    if (roleNow !== 'owner') out.push(`a team admin rewrote a roster row's role to ${roleNow}`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.team_members WHERE team_id IN (SELECT id FROM public.teams WHERE owner_id = '${owner}');
+         DELETE FROM public.teams WHERE owner_id = '${owner}';
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
 
 // ---------------------------------------------------------------------------
 // 13. Every bucket named in storage.from() must be created by a migration.

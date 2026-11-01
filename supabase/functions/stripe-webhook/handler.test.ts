@@ -66,6 +66,7 @@ function fakeDb(
       update: (payload: unknown) => ((call.op = 'update'), (call.payload = payload), calls.push(call), builder),
       delete: () => ((call.op = 'delete'), calls.push(call), builder),
       eq: (col: string, val: unknown) => (call.filters.push([col, val]), builder),
+      neq: (col: string, val: unknown) => (call.filters.push([`!${col}`, val]), builder),
       or: (expr: string) => (call.filters.push(['__or', expr]), builder),
       maybeSingle: () => Promise.resolve(result()),
       single: () => Promise.resolve(result()),
@@ -192,7 +193,11 @@ describe('subscription and invoice events', () => {
 
   it('customer.subscription.updated stores statuses the enum can hold', async () => {
     const { db, calls } = fakeDb();
-    await handleStripeEvent(event('customer.subscription.updated', subscription('unpaid')), { ...d, db: db as never });
+    await handleStripeEvent(event('customer.subscription.updated', subscription('unpaid')), {
+      ...d,
+      db: db as never,
+      retrieveSubscription: vi.fn(async () => subscription('unpaid') as never),
+    });
     expect(calls.find((c) => c.table === 'user_subscriptions' && c.op === 'update')?.payload).toMatchObject({
       status: 'past_due',
     });
@@ -236,6 +241,137 @@ describe('subscription and invoice events', () => {
     expect(res.status).toBe(500);
   });
 });
+
+/**
+ * US-251: Stripe does not deliver events in order, and retries a failed one for
+ * three days. The handler used to write whatever the event carried, so an
+ * invoice.paid or a stale subscription.updated landing after
+ * customer.subscription.deleted put the row back to 'active' — and
+ * get_user_plan grants 'active' with no period check, i.e. forever.
+ */
+describe('event order (US-251)', () => {
+  const NOW = Math.floor(Date.now() / 1000);
+  const canceled = (over: Row = {}) => ({
+    ...subscription('canceled'),
+    current_period_end: NOW + 20 * 86_400,
+    canceled_at: NOW - 3_600,
+    ended_at: NOW - 3_600,
+    ...over,
+  });
+  const write = (calls: Call[], table: string) =>
+    calls.filter((c) => c.table === table && c.op === 'update').map((c) => c.payload as Row);
+  const retrieving = (sub: unknown) => vi.fn(async () => sub as never);
+
+  it('invoice.paid after deleted leaves the row canceled', async () => {
+    const { db, calls } = fakeDb();
+    const retrieveSubscription = retrieving(canceled());
+    const res = await handleStripeEvent(
+      event('invoice.paid', { id: 'in_1', subscription: 'sub_1', amount_paid: 4900 }),
+      deps(db, { retrieveSubscription })
+    );
+    expect(res.status).toBe(200);
+    expect(retrieveSubscription).toHaveBeenCalledWith('sub_1');
+    expect(write(calls, 'user_subscriptions').every((p) => p.status === 'canceled')).toBe(true);
+    expect(write(calls, 'user_subscriptions')).toHaveLength(1);
+    expect(write(calls, 'subscriptions')).toEqual([expect.objectContaining({ status: 'cancelled', plan_name: 'free' })]);
+  });
+
+  it('invoice.payment_succeeded for a live subscription writes its current state', async () => {
+    const { db, calls } = fakeDb();
+    await handleStripeEvent(
+      event('invoice.payment_succeeded', { id: 'in_1', subscription: 'sub_1', amount_paid: 4900 }),
+      deps(db)
+    );
+    expect(write(calls, 'user_subscriptions')).toEqual([
+      expect.objectContaining({ status: 'active', plan_id: 'plan-pro', current_period_end: iso(1_702_600_000) }),
+    ]);
+  });
+
+  it('a stale subscription.updated(active) after deleted leaves the row canceled', async () => {
+    const { db, calls } = fakeDb();
+    const res = await handleStripeEvent(
+      event('customer.subscription.updated', subscription('active')),
+      deps(db, { retrieveSubscription: retrieving(canceled()) })
+    );
+    expect(res.status).toBe(200);
+    expect(write(calls, 'user_subscriptions')).toEqual([expect.objectContaining({ status: 'canceled' })]);
+    expect(write(calls, 'subscriptions')).toEqual([
+      expect.objectContaining({ status: 'cancelled', plan_name: 'free', amount: 0 }),
+    ]);
+  });
+
+  it('deleted stores a period end no later than ended_at, so no unpaid grace is granted', async () => {
+    const { db, calls } = fakeDb();
+    const ended = canceled();
+    await handleStripeEvent(
+      event('customer.subscription.deleted', ended),
+      deps(db, { retrieveSubscription: retrieving(ended) })
+    );
+    const [us] = write(calls, 'user_subscriptions');
+    const [flat] = write(calls, 'subscriptions');
+    expect(us).toMatchObject({ status: 'canceled', current_period_end: iso(NOW - 3_600) });
+    expect(flat).toMatchObject({ status: 'cancelled', current_period_end: iso(NOW - 3_600) });
+  });
+
+  it('deleted at the end of a paid period keeps that period end', async () => {
+    const { db, calls } = fakeDb();
+    const ended = canceled({ current_period_end: NOW - 60, ended_at: NOW - 60 });
+    await handleStripeEvent(
+      event('customer.subscription.deleted', ended),
+      deps(db, { retrieveSubscription: retrieving(ended) })
+    );
+    expect(write(calls, 'user_subscriptions')[0]).toMatchObject({ current_period_end: iso(NOW - 60) });
+  });
+
+  it('deleted is canceled even if Stripe has not caught up yet', async () => {
+    const { db, calls } = fakeDb();
+    await handleStripeEvent(event('customer.subscription.deleted', canceled()), deps(db));
+    expect(write(calls, 'user_subscriptions')).toEqual([expect.objectContaining({ status: 'canceled' })]);
+    expect(Date.parse(write(calls, 'user_subscriptions')[0].current_period_end as string)).toBeLessThanOrEqual(
+      Date.now()
+    );
+  });
+
+  it('trialing is stored as trialing in both tables', async () => {
+    const { db, calls } = fakeDb();
+    await handleStripeEvent(
+      event('customer.subscription.updated', subscription('trialing')),
+      deps(db, { retrieveSubscription: retrieving(subscription('trialing')) })
+    );
+    expect(write(calls, 'user_subscriptions')[0]).toMatchObject({ status: 'trialing' });
+    expect(write(calls, 'subscriptions')[0]).toMatchObject({ status: 'trialing', plan_name: 'professional' });
+
+    const co = fakeDb();
+    await handleStripeEvent(checkout(), deps(co.db, { retrieveSubscription: retrieving(subscription('trialing')) }));
+    expect(co.calls.find((c) => c.table === 'subscriptions' && c.op === 'upsert')?.payload).toMatchObject({
+      status: 'trialing',
+    });
+  });
+
+  it('a failed Stripe lookup is a 500 so the event is retried', async () => {
+    const { db, calls } = fakeDb();
+    const res = await handleStripeEvent(
+      event('invoice.paid', { id: 'in_1', subscription: 'sub_1', amount_paid: 4900 }),
+      deps(db, { retrieveSubscription: vi.fn(async () => Promise.reject(new Error('stripe down'))) })
+    );
+    expect(res.status).toBe(500);
+    expect(write(calls, 'user_subscriptions')).toHaveLength(0);
+  });
+
+  it('invoice.payment_failed never moves a canceled row to past_due', async () => {
+    const { db, calls } = fakeDb();
+    await handleStripeEvent(
+      event('invoice.payment_failed', { id: 'in_1', subscription: 'sub_1', amount_due: 4900 }),
+      deps(db)
+    );
+    const us = calls.find((c) => c.table === 'user_subscriptions' && c.op === 'update');
+    const flat = calls.find((c) => c.table === 'subscriptions' && c.op === 'update');
+    expect(us?.filters).toContainEqual(['!status', 'canceled']);
+    expect(flat?.filters).toContainEqual(['!status', 'cancelled']);
+  });
+});
+
+const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
 
 describe('toStoredStatus', () => {
   it.each([

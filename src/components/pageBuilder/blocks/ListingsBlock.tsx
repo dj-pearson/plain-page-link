@@ -12,6 +12,7 @@ import { logger } from '@/lib/logger';
 import type { Database } from '@/integrations/supabase/types';
 import { formatPrice, parsePrice } from '@/lib/format';
 import { toStringList } from '@/types/profile';
+import { fallBackToOriginal, LISTING_CARD_IMAGE_SIZES, responsiveImage } from '@/lib/images';
 
 interface ListingsBlockProps {
   config: ListingsBlockConfig;
@@ -33,6 +34,28 @@ interface ListingsBlockProps {
 type Listing = Omit<Database['public']['Tables']['listings']['Row'], 'photos'> & {
   photos: string[] | null;
 };
+
+/**
+ * The listing's own photo at the size it is shown (200/400/800 variants with a
+ * srcset), never a stock photo of someone else's house. The old fallback was an
+ * 800px Unsplash image hot-linked from a third party, presented as the agent's
+ * listing (US-260). No photo shows the property placeholder.
+ */
+function ListingPhoto({ listing, alt }: { listing: Listing; alt: string }) {
+  const photo = responsiveImage(listing.photos?.[0] ?? listing.image);
+  return (
+    <img
+      src={photo.src}
+      srcSet={photo.srcSet}
+      sizes={photo.srcSet ? LISTING_CARD_IMAGE_SIZES : undefined}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      className="w-full h-full object-cover"
+      onError={(e) => fallBackToOriginal(e.currentTarget, photo.original)}
+    />
+  );
+}
 
 export function ListingsBlock({ config, isEditing = false, userId }: ListingsBlockProps) {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -92,14 +115,6 @@ export function ListingsBlock({ config, isEditing = false, userId }: ListingsBlo
     }
   };
 
-  const getPhotoUrl = (listing: Listing) => {
-    if (listing.photos && Array.isArray(listing.photos) && listing.photos.length > 0) {
-      return listing.photos[0];
-    }
-    // Default placeholder image
-    return 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800';
-  };
-
   const formatAddress = (listing: Listing) => {
     return `${listing.address}, ${listing.city}, ${listing.state}`;
   };
@@ -129,11 +144,7 @@ export function ListingsBlock({ config, isEditing = false, userId }: ListingsBlo
           >
             {/* Image */}
             <div className="relative aspect-video">
-              <img
-                src={getPhotoUrl(listing)}
-                alt={formatAddress(listing)}
-                className="w-full h-full object-cover"
-              />
+              <ListingPhoto listing={listing} alt={formatAddress(listing)} />
               {config.showStatus && (
                 <Badge
                   className="absolute top-2 right-2 capitalize"

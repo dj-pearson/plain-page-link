@@ -1,13 +1,15 @@
 import { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { BACKGROUND_CANVAS_DPR, useBackgroundFrameloop } from '@/hooks/useDeferred3D';
 
 function FloatingCube({ position, color }: { position: [number, number, number]; color: string }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  
+
   useFrame((state) => {
     if (meshRef.current) {
-      meshRef.current.position.y = position[1] + Math.sin(state.clock.getElapsedTime() + position[0]) * 0.5;
+      meshRef.current.position.y =
+        position[1] + Math.sin(state.clock.getElapsedTime() + position[0]) * 0.5;
       meshRef.current.rotation.x = state.clock.getElapsedTime() * 0.2;
       meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.3;
     }
@@ -26,6 +28,7 @@ interface FloatingGeometryProps {
 }
 
 export function FloatingGeometry({ color = '#f59e0b' }: FloatingGeometryProps) {
+  const frameloop = useBackgroundFrameloop();
   const cubes = [
     [-2, 0, -2],
     [2, 0, -2],
@@ -36,7 +39,11 @@ export function FloatingGeometry({ color = '#f59e0b' }: FloatingGeometryProps) {
 
   return (
     <div className="fixed inset-0 -z-10 opacity-25">
-      <Canvas camera={{ position: [0, 0, 8], fov: 75 }}>
+      <Canvas
+        camera={{ position: [0, 0, 8], fov: 75 }}
+        dpr={BACKGROUND_CANVAS_DPR}
+        frameloop={frameloop}
+      >
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={1} />
         {cubes.map((pos, i) => (

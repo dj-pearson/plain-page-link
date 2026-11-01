@@ -106,13 +106,14 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
         {/* Create form */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
           <Input
+            aria-label="Rule name"
             placeholder="Rule name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="sm:col-span-2"
           />
           <Select value={leadType} onValueChange={setLeadType}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Lead type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -137,7 +138,7 @@ export function LeadRoutingRules({ teamId, members }: LeadRoutingRulesProps) {
             onChange={(e) => setSource(e.target.value)}
           />
           <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Assign to">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

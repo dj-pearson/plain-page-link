@@ -149,6 +149,10 @@ export function GDPRSettings() {
               <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                 <li>30-day grace period before permanent deletion</li>
                 <li>You can cancel the deletion request during this period</li>
+                <li>
+                  Your subscription stops renewing at once and is cancelled when the account is
+                  deleted
+                </li>
                 <li>We recommend exporting your data first</li>
               </ul>
 
@@ -203,7 +207,8 @@ export function GDPRSettings() {
               <div className="space-y-4">
                 <p>
                   This will schedule your account for permanent deletion. You'll have 30 days to
-                  cancel this request if you change your mind.
+                  cancel this request if you change your mind. Your subscription will not renew, and
+                  it is cancelled when the account is deleted.
                 </p>
                 <div>
                   <Label htmlFor="reason" className="text-sm font-medium">

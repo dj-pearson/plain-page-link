@@ -640,6 +640,11 @@ first_responded_at, contacted_at, closed_at
 referrer_url, utm_source, utm_medium, utm_campaign, device
 created_at, updated_at
 ```
+`anon`/`authenticated` hold SELECT on every column **except** `encrypted_email`
+/ `encrypted_phone` (US-254): select `LEAD_COLUMNS` (`src/lib/leadColumns.ts`),
+never `*` or a bare `.select()` after a write, and decrypt by lead id through
+pii-crypto, which applies the lead allowance. While the ciphertext was readable
+an agent could copy a locked lead's into a contact and decrypt it there.
 
 **links** — the link-in-bio rows.
 ```

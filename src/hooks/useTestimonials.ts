@@ -12,7 +12,7 @@ export type { Testimonial } from '@/types/testimonial';
 import type { Testimonial } from '@/types/testimonial';
 
 export function useTestimonials() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 

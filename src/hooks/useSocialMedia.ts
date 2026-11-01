@@ -245,9 +245,10 @@ export function useSocialMedia() {
 
   // Generate marketing post
   const generateMarketingPostMutation = useMutation({
-    mutationFn: async (webhookUrl?: string) => {
+    // US-248: the function looks the webhook up by id; it no longer accepts a URL.
+    mutationFn: async (webhookId?: string) => {
       const { data, error } = await edgeFunctions.invoke('generate-marketing-post', {
-        body: { webhookUrl },
+        body: { webhookId },
       });
 
       if (error) throw error;

@@ -298,7 +298,7 @@ export function SocialMediaManager() {
                 onClick={() => {
                   const activeWebhook = webhooks.find((w) => w.is_active);
                   if (activeWebhook) {
-                    generateMarketingPost(activeWebhook.webhook_url);
+                    generateMarketingPost(activeWebhook.id);
                   }
                 }}
                 disabled={isGeneratingMarketingPost || !webhooks.some((w) => w.is_active)}

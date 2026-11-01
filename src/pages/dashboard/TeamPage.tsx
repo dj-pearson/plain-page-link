@@ -103,7 +103,10 @@ export default function TeamPage() {
       queryClient.invalidateQueries({ queryKey: ['team-members', team?.id] });
       toast(
         emailed
-          ? { title: 'Invitation emailed', description: 'They join once they open the link and sign in.' }
+          ? {
+              title: 'Invitation emailed',
+              description: 'They join once they open the link and sign in.',
+            }
           : {
               title: 'Invite saved, but the email did not send',
               description: 'Remove and re-invite them in a moment.',
@@ -157,6 +160,7 @@ export default function TeamPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-2 sm:flex-row">
             <Input
+              aria-label="Team name"
               placeholder="Team name (e.g. Acme Realty)"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
@@ -203,6 +207,8 @@ export default function TeamPage() {
         <CardContent className="flex flex-col gap-2 sm:flex-row">
           <Input
             type="email"
+            aria-label="Email address to invite"
+            autoComplete="off"
             placeholder="agent@example.com"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}

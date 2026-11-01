@@ -225,6 +225,118 @@ export function toStoredStatus(subscription: Stripe.Subscription): string {
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
 
 /**
+ * The `subscriptions` copy's status. It is free text spelled 'cancelled'
+ * (user_subscriptions is the enum, spelled 'canceled'). Trialing used to be
+ * written as 'cancelled' here (US-251).
+ */
+export function toFlatStatus(stored: string): string {
+  return stored === 'active' || stored === 'trialing' || stored === 'past_due' ? stored : 'cancelled';
+}
+
+/**
+ * The current_period_end to store. get_user_plan keeps a canceled
+ * subscription's plan until current_period_end, which is right for a
+ * cancellation at the end of a paid period and wrong for one that ended early
+ * (cancelled immediately, refunded, unpaid): Stripe still reports the period
+ * that would have been, so storing it gave the plan away for the rest of it.
+ * A subscription that is no longer running stores the moment it ended.
+ */
+export function storedPeriodEnd(
+  subscription: Pick<Stripe.Subscription, 'current_period_end' | 'ended_at' | 'canceled_at'>,
+  stored: string,
+  nowSeconds: number = Math.floor(Date.now() / 1000)
+): string {
+  if (stored !== 'canceled') return iso(subscription.current_period_end);
+  const ended = subscription.ended_at ?? subscription.canceled_at ?? nowSeconds;
+  return iso(Math.min(subscription.current_period_end, ended));
+}
+
+/**
+ * Write Stripe's current state of a subscription to both tables (US-251).
+ *
+ * `ended` is the payload of a customer.subscription.deleted event: canceled is
+ * terminal in Stripe, so that event records a cancellation whatever the read
+ * returns. Returns the status stored in user_subscriptions.
+ */
+async function syncSubscription(
+  deps: WebhookDeps,
+  subscriptionId: string,
+  ended?: Stripe.Subscription
+): Promise<string> {
+  const { db } = deps;
+  const current = await deps.retrieveSubscription(subscriptionId);
+  const subscription = ended && current.status !== 'canceled' ? { ...current, ...ended, status: 'canceled' as const } : current;
+  const status = toStoredStatus(subscription);
+  const periodEnd = storedPeriodEnd(subscription, status);
+
+  if (status === 'canceled') {
+    const freeLimits = await loadPlanLimits(deps, 'free');
+    const endedAt = subscription.canceled_at ?? subscription.ended_at;
+    must(
+      await db
+        .from('user_subscriptions')
+        .update({ status: 'canceled', cancel_at_period_end: false, current_period_end: periodEnd })
+        .eq('stripe_subscription_id', subscriptionId),
+      'user_subscriptions cancel'
+    );
+    must(
+      await db
+        .from('subscriptions')
+        .update({
+          plan_name: 'free',
+          status: 'cancelled',
+          canceled_at: endedAt ? iso(endedAt) : new Date().toISOString(),
+          current_period_end: periodEnd,
+          cancel_at: null,
+          amount: 0,
+          ...freeLimits,
+        })
+        .eq('stripe_subscription_id', subscriptionId),
+      'subscriptions cancel'
+    );
+    return status;
+  }
+
+  const price = subscription.items.data[0]?.price;
+  const plan = await resolvePlanFromPriceId(deps, price?.id);
+  const planLimits = await loadPlanLimits(deps, plan.name);
+
+  must(
+    await db
+      .from('user_subscriptions')
+      .update({
+        // Stripe's status unchanged; a scheduled cancellation is its own column (US-118).
+        status,
+        ...(plan.id ? { plan_id: plan.id } : {}),
+        current_period_start: iso(subscription.current_period_start),
+        current_period_end: periodEnd,
+        cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+      })
+      .eq('stripe_subscription_id', subscriptionId),
+    'user_subscriptions update'
+  );
+
+  must(
+    await db
+      .from('subscriptions')
+      .update({
+        plan_name: plan.name,
+        status: toFlatStatus(status),
+        stripe_price_id: price?.id,
+        current_period_start: iso(subscription.current_period_start),
+        current_period_end: periodEnd,
+        cancel_at: subscription.cancel_at ? iso(subscription.cancel_at) : null,
+        amount: (price?.unit_amount || 0) / 100,
+        interval: price?.recurring?.interval || 'month',
+        ...planLimits,
+      })
+      .eq('stripe_subscription_id', subscriptionId),
+    'subscriptions update'
+  );
+  return status;
+}
+
+/**
  * The agent a checkout belongs to: the user_id create-checkout-session put in
  * the metadata, else whoever already owns the Stripe customer. Neither is an
  * error Stripe should stop retrying.
@@ -324,7 +436,7 @@ async function processEvent(event: Stripe.Event, deps: WebhookDeps): Promise<voi
             stripe_subscription_id: subscriptionId,
             status: toStoredStatus(subscription),
             current_period_start: iso(subscription.current_period_start),
-            current_period_end: iso(subscription.current_period_end),
+            current_period_end: storedPeriodEnd(subscription, toStoredStatus(subscription)),
             cancel_at_period_end: subscription.cancel_at_period_end ?? false,
           },
           { onConflict: 'user_id' }
@@ -337,12 +449,12 @@ async function processEvent(event: Stripe.Event, deps: WebhookDeps): Promise<voi
           {
             user_id: userId,
             plan_name: plan.name,
-            status: 'active',
+            status: toFlatStatus(toStoredStatus(subscription)),
             stripe_customer_id: customerId,
             stripe_subscription_id: subscriptionId,
             stripe_price_id: price?.id,
             current_period_start: iso(subscription.current_period_start),
-            current_period_end: iso(subscription.current_period_end),
+            current_period_end: storedPeriodEnd(subscription, toStoredStatus(subscription)),
             amount: (price?.unit_amount || 0) / 100,
             interval: price?.recurring?.interval || 'month',
             ...planLimits,
@@ -364,76 +476,21 @@ async function processEvent(event: Stripe.Event, deps: WebhookDeps): Promise<voi
       return;
     }
 
+    // US-251: Stripe does not deliver these in order and retries for days, so
+    // none of them writes what its payload says. Each asks Stripe for the
+    // subscription as it is now and writes that.
     case 'customer.subscription.updated': {
       const subscription = event.data.object as Stripe.Subscription;
-      const price = subscription.items.data[0]?.price;
-      const plan = await resolvePlanFromPriceId(deps, price?.id);
-      const planLimits = await loadPlanLimits(deps, plan.name);
-      // Stripe's status unchanged; a scheduled cancellation is its own column (US-118).
-      const status = toStoredStatus(subscription);
-
-      must(
-        await db
-          .from('user_subscriptions')
-          .update({
-            status,
-            ...(plan.id ? { plan_id: plan.id } : {}),
-            current_period_start: iso(subscription.current_period_start),
-            current_period_end: iso(subscription.current_period_end),
-            cancel_at_period_end: subscription.cancel_at_period_end,
-          })
-          .eq('stripe_subscription_id', subscription.id),
-        'user_subscriptions update'
-      );
-
-      must(
-        await db
-          .from('subscriptions')
-          .update({
-            plan_name: plan.name,
-            status: status === 'active' ? 'active' : status === 'past_due' ? 'past_due' : 'cancelled',
-            stripe_price_id: price?.id,
-            current_period_start: iso(subscription.current_period_start),
-            current_period_end: iso(subscription.current_period_end),
-            cancel_at: subscription.cancel_at ? iso(subscription.cancel_at) : null,
-            amount: (price?.unit_amount || 0) / 100,
-            interval: price?.recurring?.interval || 'month',
-            ...planLimits,
-          })
-          .eq('stripe_subscription_id', subscription.id),
-        'subscriptions update'
-      );
-
+      const status = await syncSubscription(deps, subscription.id);
       console.log(`Subscription updated: ${subscription.id} -> ${status}`);
       return;
     }
 
     case 'customer.subscription.deleted': {
       const subscription = event.data.object as Stripe.Subscription;
-      const freeLimits = await loadPlanLimits(deps, 'free');
-
-      must(
-        await db
-          .from('user_subscriptions')
-          .update({ status: 'canceled', cancel_at_period_end: false })
-          .eq('stripe_subscription_id', subscription.id),
-        'user_subscriptions cancel'
-      );
-
-      must(
-        await db
-          .from('subscriptions')
-          .update({
-            plan_name: 'free',
-            status: 'cancelled',
-            canceled_at: new Date().toISOString(),
-            amount: 0,
-            ...freeLimits,
-          })
-          .eq('stripe_subscription_id', subscription.id),
-        'subscriptions cancel'
-      );
-
+      // Canceled is terminal in Stripe: a deleted event is canceled even if the
+      // API read has not caught up with it.
+      await syncSubscription(deps, subscription.id, subscription);
       console.log(`Subscription deleted: ${subscription.id}`);
       return;
     }
@@ -443,12 +500,22 @@ async function processEvent(event: Stripe.Event, deps: WebhookDeps): Promise<voi
       const subscriptionId = invoice.subscription as string | null;
       if (!subscriptionId) return;
 
+      // A late failure for a subscription that has since ended must not turn
+      // canceled back into past_due, which carries a seven-day grace (US-251).
       must(
-        await db.from('user_subscriptions').update({ status: 'past_due' }).eq('stripe_subscription_id', subscriptionId),
+        await db
+          .from('user_subscriptions')
+          .update({ status: 'past_due' })
+          .eq('stripe_subscription_id', subscriptionId)
+          .neq('status', 'canceled'),
         'user_subscriptions past_due'
       );
       must(
-        await db.from('subscriptions').update({ status: 'past_due' }).eq('stripe_subscription_id', subscriptionId),
+        await db
+          .from('subscriptions')
+          .update({ status: 'past_due' })
+          .eq('stripe_subscription_id', subscriptionId)
+          .neq('status', 'cancelled'),
         'subscriptions past_due'
       );
 
@@ -501,14 +568,10 @@ If you've already updated your details, you can ignore this message.
       const subscriptionId = invoice.subscription as string | null;
       if (!subscriptionId) return;
 
-      must(
-        await db.from('user_subscriptions').update({ status: 'active' }).eq('stripe_subscription_id', subscriptionId),
-        'user_subscriptions active'
-      );
-      must(
-        await db.from('subscriptions').update({ status: 'active' }).eq('stripe_subscription_id', subscriptionId),
-        'subscriptions active'
-      );
+      // Not 'active' unconditionally: an invoice paid on a subscription that
+      // has since been cancelled used to reopen it, and get_user_plan grants
+      // 'active' with no period check — the paid plan forever (US-251).
+      await syncSubscription(deps, subscriptionId);
 
       warnIf(
         await db.from('invoices').upsert(

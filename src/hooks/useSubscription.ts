@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
 import type { Database } from '@/integrations/supabase/types';
 
 type SubscriptionPlanRow = Database['public']['Tables']['subscription_plans']['Row'];
@@ -54,24 +55,24 @@ export interface UserSubscription {
   features: Record<string, any>;
   status: string;
   current_period_end?: string;
+  /** Set to end at current_period_end rather than renew (get_user_plan). */
+  cancel_at_period_end?: boolean;
 }
 
 export const useSubscription = () => {
-  const { data: session } = useQuery({
-    queryKey: ['session'],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getSession();
-      return data.session;
-    },
-  });
+  // US-256: the signed-in user comes from the auth store. A private
+  // ['session'] query cached the first session it saw for five minutes, so
+  // after a sign-out and a different sign-in this kept asking for the previous
+  // agent's plan.
+  const userId = useAuthStore((s) => s.user?.id ?? null);
 
   const { data: userSubscription, isLoading } = useQuery({
-    queryKey: ['user-subscription', session?.user?.id],
+    queryKey: ['user-subscription', userId],
     queryFn: async () => {
-      if (!session?.user?.id) return null;
+      if (!userId) return null;
 
       const { data, error } = await supabase.rpc('get_user_plan', {
-        _user_id: session.user.id,
+        _user_id: userId,
       });
 
       if (error) throw error;
@@ -80,7 +81,7 @@ export const useSubscription = () => {
       if (data === null || typeof data !== 'object' || Array.isArray(data)) return null;
       return data as unknown as UserSubscription;
     },
-    enabled: !!session?.user?.id,
+    enabled: !!userId,
   });
 
   const { data: plans } = useQuery({

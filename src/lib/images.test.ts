@@ -27,6 +27,7 @@ import {
   imageVariantUrl,
   PLACEHOLDER_PROPERTY_IMAGE,
   responsiveImage,
+  sizedImage,
 } from './images';
 
 const BASE = 'https://db.example.com/storage/v1/object/public/listing-photos';
@@ -176,5 +177,26 @@ describe('addImagePreload', () => {
     const left = document.head.querySelectorAll('link[rel="preload"]');
     expect(left).toHaveLength(1);
     expect(left[0]).toBe(foreign);
+  });
+});
+
+describe('sizedImage (US-260)', () => {
+  it('serves the requested variant and keeps the original for the fallback', () => {
+    expect(sizedImage(ORIGINAL, 200)).toEqual({
+      src: `${BASE}/user-1/listing-1/abc123-200.webp`,
+      original: ORIGINAL,
+    });
+  });
+
+  it('serves the original when no variant can exist', () => {
+    const hotlinked = 'https://photos.example.com/house.jpg';
+    expect(sizedImage(hotlinked, 400)).toEqual({ src: hotlinked, original: hotlinked });
+  });
+
+  it('serves the placeholder for a listing with no photo', () => {
+    expect(sizedImage(null, 400)).toEqual({
+      src: PLACEHOLDER_PROPERTY_IMAGE,
+      original: PLACEHOLDER_PROPERTY_IMAGE,
+    });
   });
 });

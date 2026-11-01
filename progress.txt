@@ -4829,3 +4829,178 @@ SAML options still offered in SSOConfigForm; ui-vendor still on the profile
 via UpcomingOpenHouses' dropdown; whole-store useAuthStore() reads
 (MobileNav and ~40 hooks); browser back button not covered by the
 unsaved-changes guard; plus the "Not included" list above.
+
+---
+
+## Site Improvement Loop 2 — 2026-11-01 (stories US-248 to US-262 added)
+
+Five parallel read-only audits: security, performance (measured builds incl.
+a DSN-set build), UI/UX journeys, accessibility + technical SEO,
+reliability/data. Every story cites file:line evidence in its notes.
+Baseline: tsc clean, 1254 unit tests pass.
+
+  P1  US-248  generate-marketing-post: anonymous SSRF + Claude spend
+      US-249  Social sign-in: unpaged listUsers, unverified email, unsigned state
+      US-250  Lead emails/deletions call an empty runtime; deletion keeps billing
+      US-251  Stripe event order can reopen a cancelled plan forever
+      US-252  Ctrl+S marks listings Sold; deleted link returns; cache sorted in place
+      US-253  Listing import always fails and loses input; reorder scrambles order
+  P2  US-254  Locked lead unlocked via contact ciphertext
+      US-255  Sentry + Replay: 81 KB gzip in every entry chunk
+      US-256  Sign-out cache leak; tab switch refetches and wipes Theme edits
+      US-257  Edit modals wipe edits, not dialogs; grid actions hidden on touch
+      US-258  No post-checkout confirmation; one-click paid plan change
+      US-259  PII in function logs; team invite spam and self-raised seat cap
+  P3  US-260  Profile weight/motion: Three.js, Radix, full-size thumbs
+      US-261  Unnamed form fields; unannounced auth errors
+      US-262  Profiles in no sitemap; double H1 on blog; review page as homepage
+
+Not included (still worth doing): overdue-lead chaser SLA/window/dedupe;
+digest catch-up window and per-batch paging past 5,000; GDPR export
+swallowing query errors (and missing lead_activities); CSP still lists
+esm.sh and agent URLs are not scheme-checked; SW runtime cache never pruned
+and /scripts/analytics.js cached immutable for a year; Google Fonts blocked by
+the index.html meta CSP; open-house sign-in counts capped at 1,000;
+SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
+
+## Site improvement loop 2 — iteration 1/15 — US-248: anyone could spend the Claude budget and make the server fetch the private network
+
+- generate-marketing-post read a webhook URL from the body before checking anyone, called Claude for up to 8000 tokens, POSTed with a bare fetch and returned the upstream body.
+- Now requireAdmin runs before the body is read, a per-admin fail-closed rate limit (10/hour) runs before Claude, the webhook is looked up by id in social_media_webhooks and delivered through safeFetch, and only delivered/status comes back. The admin UI sends webhookId.
+- Posts are saved as drafts and marked posted only after the webhook accepts them.
+- Tests: request.test.ts (parse, header filtering, delivery outcome); admin-gate.test.ts GATED entry plus rate-limit ordering checks; smoke script moved to ADMIN_ONLY. Follow-up: test-social-webhook and the browser-side retry still fetch webhooks unguarded.
+
+## Site improvement loop 2 — iteration 2/15 — US-249: returning Google/Apple users past the first 50 accounts could not sign in, and a forged state was trusted
+
+- oauth-proxy and sso-callback looked up existing accounts in the first page of listUsers() (50 users), so later users fell through to createUser and got create_user_failed; oauth-proxy also trusted unverified emails and an unsigned btoa state carrying the PKCE verifier.
+- New service-role-only RPC auth_user_id_by_email (migration 20261101000011) via _shared/auth-user-lookup.ts; a concurrent email_exists is treated as an existing user.
+- State is now HMAC-SHA256 signed with a nonce and 10-minute expiry, the PKCE verifier is derived from the nonce, the id_token's iss/aud/exp/email_verified are checked, redirect_to is limited to a same-site path, and failed token exchanges log only the error code.
+- Tests: oauth.test.ts (20). Owner: apply the migration, redeploy the edge functions server, set OAUTH_STATE_SECRET (32+ chars; falls back to a key derived from the service role key).
+
+## Site improvement loop 2 — iteration 3/15 — US-251: a late or re-delivered stripe event reopened a cancelled subscription and granted the paid plan forever
+
+- Out-of-order or retried invoice.paid / customer.subscription.updated(active) arriving after customer.subscription.deleted set the row back to 'active', and get_user_plan grants 'active' with no period check.
+- stripe-webhook now re-reads the subscription from Stripe (syncSubscription) on updated, deleted and invoice-paid events and writes Stripe's current state; a canceled row's period end is clipped to ended_at, trialing is stored as trialing in both tables, and a late payment_failed no longer moves a canceled row to past_due.
+- 9 new tests in supabase/functions/stripe-webhook/handler.test.ts, all failing before the fix; one existing test adjusted to mock the Stripe read.
+- Owner: redeploy the stripe-webhook edge function; optionally resend events for subscriptions canceled before the fix that still show 'active'.
+
+## Site improvement loop 2 — iteration 4/15 — US-250: new-lead emails, account erasures and scheduled SEO audits silently never ran, and a deleted account kept being billed
+
+- Nine function-to-function calls built `${SUPABASE_URL}/functions/v1`, a runtime that serves nothing; they now use getFunctionsUrl(), and function-urls.test.ts fails on any `/functions/v1` in function source.
+- scheduled-maintenance runs account erasures in-process via the shared processDueDeletions(); requesting deletion sets Stripe cancel_at_period_end (restored on cancel), and erasure cancels the live subscription first or holds the deletion and logs it.
+- Migration 20261101000012: process_scheduled_account_deletions() refuses to erase an account with a live subscription and pins search_path; new verify-schema check plus 15 vitest cases and a DeleteAccount copy test.
+
+## Site improvement loop 2 — iteration 5/15 — US-252: cmd/ctrl+s marked every selected listing sold, and a deleted link came back
+
+- Dashboard shortcuts matched bare keys with no modifier check, so Ctrl/Cmd+S ran "Mark Sold" and Ctrl+A on Listings jumped to Analytics; a shared guard (src/lib/keyboardShortcuts.ts) now skips modifier chords, typing fields/widgets and open dialogs, "?" opens help, and the help dialog can turn single-key shortcuts off.
+- useSoftDelete cancelled pending deletes on unmount and kept the row visible until the timer fired; it now flushes them on unmount and pagehide and tracks pending ids in state so the row disappears at once.
+- Overview sorted the cached links array in place; linkOrder gains byPosition/topByClicks (copy-sorts) used by Overview and Links.
+- Tests: useSoftDelete.test.ts, KeyboardShortcutsHelper.test.tsx, keyboardShortcuts.test.ts, linkOrder display-order block.
+
+## Site improvement loop 2 — iteration 6/15 — US-253: importing a listing from Zillow text failed every time and lost the pasted text, and a filtered drag scrambled the public order
+
+- The import wrote the GENERATED beds/baths/sqft columns, which Postgres refuses, and the dialog closed without waiting for the save. A tested buildImportedListing (src/lib/listingImport.ts) now writes only bedrooms/bathrooms/square_feet plus listed_date. The dialog waits for the save and stays open with an inline error if it fails. The fake "From URL" tab is gone.
+- Reorder now computes positions over the full list (src/lib/listingOrder.ts) and writes only the changed rows through one reorderListings mutation, with an optimistic update, rollback, one audit event and one invalidation. The dashboard and public profile break sort_order ties by created_at desc, then id.
+- The types generator emits generated columns as `?: never` in Insert/Update, so tsc now refuses beds/baths/sqft writes. That also caught the same bug in useSecureListings.
+- Tests: listingImport, listingOrder, URLImportDialog, useListings reorder plus a @ts-expect-error guard, and a schema-references check that every GENERATED column is never-typed.
+
+## Site improvement loop 2 — iteration 7/15 — US-254: an agent over the lead allowance could unlock a locked lead by copying its ciphertext into a contact
+
+- The browser could read leads.encrypted_email/encrypted_phone, paste them into an owned contact, and pii-crypto's decrypt_contacts would decrypt them without checking the allowance.
+- Migration 20261101000016 replaces table-wide SELECT on leads with a column grant to authenticated that omits the two ciphertext columns; every client read of leads now names its columns (LEAD_COLUMNS, held to types.ts by tsc).
+- pii-crypto refuses to decrypt a contact whose ciphertext matches one of the owner's locked leads, via service-role-only locked_lead_ciphertexts().
+- Tests: contactLock.test.ts, leadColumns.test.ts, and a verify:schema check that authenticated/anon cannot read the ciphertext and cannot call the new function.
+
+## Site improvement loop 2 — iteration 8/15 — US-255: every page downloaded the Sentry SDK and Session Replay (~81 KB gzip) before it could render
+
+- With VITE_SENTRY_DSN set, src/lib/sentry.ts imported @sentry/react and replayIntegration statically, so the entry chunk was 145,889 B gzip against 65,053 B without a DSN.
+- sentry.ts is now an SDK-free facade: the SDK (sentry-sdk.ts) loads by dynamic import at idle after `load`, Replay (sentry-replay.ts) after that; earlier calls are buffered (cap 50) and replayed with the same event ids, early errors/rejections are caught and handed over. Entry with a DSN is now 62,806 B gzip.
+- check-bundle-size.mjs fails if Sentry code is on the first-paint graph (and if a DSN build has no SDK chunk at all); CI's bundle-size job builds with a dummy DSN. Unused exports (SentryErrorBoundary, SentryProfiler, startTransaction) removed.
+- src/lib/sentry.test.ts adds 9 tests; full suite 1377 passed, 1 skipped.
+
+## Site improvement loop 2 — iteration 9/15 — US-256: the next agent on a shared device could see the previous agent's cached leads, and a tab switch wiped unsaved theme edits
+
+- The page-wide QueryClient was never cleared on sign-out or account switch; new `bindQueryCacheToAuth` (src/lib/authQueryCache.ts) clears it whenever the signed-in user id changes away from a non-null value.
+- A same-user SIGNED_IN (fired on every tab refocus) or TOKEN_REFRESHED now only updates the session, keeping the user reference and skipping the profile/roles refetch; Theme and ProfileDisplaySettings reload only when the user id changes.
+- useSubscription drops its private ['session'] query, due-task keys include the user id, and auth-store reads in src/hooks and MobileNav use selectors.
+- Tests: same-user listener events, cache clearing on every sign-out path and account switch, Theme unsaved-colour survival, ProfileDisplaySettings reload rules.
+
+## Site improvement loop 2 — iteration 10/15 — US-257: an agent editing a listing or testimonial lost what they had typed whenever the page re-rendered
+
+- EditListingModal and EditTestimonialModal reset their form from an `initialData` object rebuilt inline on every render; the reset effect is gone, callers key each modal by record id, and both are now Radix dialogs (named, Escape closes, focus trapped). A duplicate `id="description"` textarea was removed.
+- The shortcuts panel (already a Dialog from US-252) now wraps its floating button in a DialogTrigger so focus returns to it on close; theme tokens replace the gray literals.
+- Listings grid: Edit/Delete visible on touch and on keyboard focus with aria-labels and 44px targets; named grid/list toggles (aria-pressed) and Add chevron (aria-expanded); a loading skeleton replaces the empty-state flash; Move earlier/later buttons reorder through US-253's full-list reorderListings mutation.
+- Tests: EditModals.test.tsx (5), Listings.grid.test.tsx (4), a focus-return test in KeyboardShortcutsHelper.test.tsx; full suite 1399 passed, 1 skipped.
+
+## Site improvement loop 2 — iteration 11/15 — US-258: an agent who had just paid was shown the Free plan, and a paid plan change happened on one click
+
+- Both checkout entry points now return to one handled URL (src/lib/checkoutReturn.ts); useCheckoutReturn shows "Confirming your plan" and re-reads the plan every 2s for up to 30s, then confirms or says the payment is still processing. Overview's legacy ?subscription=success redirects there instead of a modal naming the stale plan.
+- Paying agents now confirm an Upgrade/Downgrade in PlanChangeConfirmDialog (price, proration, withdrawn cancellation, limits they would exceed) before Stripe is touched; Pricing routes them through it.
+- Subscription and Settings say "Ends" instead of "Renews" when cancel_at_period_end is set.
+- Tests: SubscriptionPage (7, incl. no checkout call until confirm), useCheckoutReturn fake-timer suite (6), Settings "Ends", Overview legacy redirect.
+
+## Site improvement loop 2 — iteration 12/15 — US-259: lead emails sat in function logs and any account could mass-mail team invites
+
+- Edge functions logged lead, visitor, agent and invitee emails, a token-exchange response and raw bodies in plaintext; they now log masked or minimal values via `_shared/log-redaction.ts`, and a source-scan test fails if a console call brings any back.
+- Team invites are rate-limited per sender (20/day) and per recipient (3/day, keyed by SHA-256), owners are limited to one team, and links are stripped from team names in the email.
+- Migration 20261101000021 drops the FOR ALL policies on teams/team_members and revokes client writes, so an owner can no longer raise max_seats and an admin can no longer insert an accepted member; verify-schema check 12b proves it.
+- Integration: the generate-marketing-post and oauth-proxy conflicts kept the US-248/US-249 rewrites, which already log nothing sensitive.
+
+## Site improvement loop 2 — iteration 13/15 — US-260: agent profiles downloaded Three.js, Radix and full-size photos on open and animated under reduced motion
+
+- The 3D background loaded eagerly; it now waits for load plus idle, skips reduced-motion and Save-Data visitors, caps dpr at 1.5 and pauses while the tab is hidden.
+- The sticky bar, featured carousel and listing modal hold still under reduced motion. The add-to-calendar menu became a small disclosure, which removes ui-vendor from the profile chunk. Thumbnails use resized, lazy variants. App no longer opens an unused IndexedDB, so idb is out of the entry chunk.
+- check-bundle-size.mjs now guards both chunk graphs. Added 23 tests: disclosure and keyboard, reduced motion, useDeferred3D, Canvas dpr/frameloop, ListingsBlock, sizedImage.
+
+## Site improvement loop 2 — iteration 14/15 — US-261: screen readers could not name most dashboard, onboarding and auth fields, or hear login errors
+
+- Fields on Profile, onboarding, URL import, workflows, Team, API keys, lead routing, SSO and Listings search were named only by placeholders or unlinked labels; each now has id+htmlFor or aria-label.
+- Login/Register set aria-invalid and aria-describedby on errors; reset, forgot-password and MFA pages gained a main landmark, labels and autoComplete.
+- --input border and placeholder colours now meet 3:1 / 4.5:1; ui/input and ui/select use the tokens.
+- Added src/test/a11y/fieldNames static scan (78 unnamed fields before, 0 after), Login/Register aria tests and contrast cases. URLImportDialog labels reapplied on top of US-253.
+
+## Site improvement loop 2 — iteration 15/15 — US-262: agents' pages were in no sitemap, blog posts had two h1s and blog views went uncounted
+
+- /:username pages are now listed by a new Pages Function, /sitemap-profiles.xml (published profiles only, paged, 503 rather than an empty or partial 200); robots.txt names it.
+- Generated articles drop the model's leading "# Title"; body h1s become h2 with stable, de-duplicated heading ids. verify:seo now fails on more than one h1, or none on an indexable page.
+- The review form sets its own title and noindex,follow (plus an X-Robots-Tag in _headers) instead of inheriting the homepage's. Blog view counts go through a throttled SECURITY DEFINER RPC that leaves updated_at alone.
+- Added sitemap-profiles, articleMarkdown, BlogArticle and SubmitReview head tests, crawl-directive assertions and a verify:schema check for increment_article_view.
+
+---
+
+## Site improvement loop 2, in one paragraph
+
+Fifteen stories, US-248 to US-262, from five parallel audits. Each was built
+in its own worktree and then integrated here one at a time. The first six
+were doors and money:
+- an anonymous generate-marketing-post that would fetch any URL and spend
+  the Claude budget;
+- social sign-in that failed past the first 50 users, trusted unverified
+  emails and accepted forged state;
+- lead emails and account erasures sent to a runtime that serves nothing,
+  with deleted accounts still being billed;
+- Stripe events that could reopen a cancelled plan;
+- Ctrl+S marking listings Sold;
+- a Zillow import that never worked.
+
+The middle six closed a lead-paywall bypass, took Sentry out of the entry
+chunk, stopped a sign-out leaking the last agent's data, kept edits in the
+modals and on the Theme page, confirmed plan changes and checkouts, and kept
+PII out of the logs and spam out of team invites. The last three made the
+public page lighter and calmer, gave forms names, and put agents' pages in a
+sitemap.
+
+Final state: tsc clean, 1500 unit tests (from 1254), all checks passing at
+each integration.
+
+Owner actions:
+- Apply migrations 20261101000011, 000012, 000016 (deploy with the frontend),
+  000021 and 000024.
+- Rebuild the functions.agentbio.net Coolify app. It ships generate-marketing-post,
+  oauth-proxy, sso-callback, stripe-webhook, submit-lead, scheduled-maintenance,
+  process-account-deletions, gdpr-deletion, pii-crypto, teams, notify-lead
+  and every function that uses _shared/email.ts.
+- Set OAUTH_STATE_SECRET there. Confirm STRIPE_SECRET_KEY and FUNCTIONS_URL
+  are set there too.
+- Deploy Cloudflare Pages, then submit /sitemap-profiles.xml to Google Search
+  Console and Bing.

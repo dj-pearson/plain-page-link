@@ -72,3 +72,47 @@ describe('--destructive contrast (US-245)', () => {
     expect(contrast([0, 84.2, 60.2], [0, 0, 100])).toBeLessThan(4.5);
   });
 });
+
+/**
+ * US-261: a form field's border is the only thing marking where it is
+ * (WCAG 1.4.11, 3:1 against the surface), and placeholder text is text
+ * (1.4.3, 4.5:1). The base Input and SelectTrigger used Tailwind gray-300
+ * borders (1.47:1 on white) and gray-400 placeholders (2.54:1), bypassing
+ * the tokens entirely; --input itself was 91.4% lightness (1.26:1).
+ */
+describe('form field contrast (US-261)', () => {
+  for (const theme of [':root', '.dark'] as const) {
+    describe(theme === ':root' ? 'light theme' : 'dark theme', () => {
+      it('--input border is distinguishable from --background (3:1)', () => {
+        expect(contrast(token(theme, 'input'), token(theme, 'background'))).toBeGreaterThanOrEqual(
+          3
+        );
+      });
+
+      it('--input border is distinguishable from --muted (3:1)', () => {
+        expect(contrast(token(theme, 'input'), token(theme, 'muted'))).toBeGreaterThanOrEqual(3);
+      });
+
+      it('placeholder colour (--muted-foreground) is readable on --background (4.5:1)', () => {
+        expect(
+          contrast(token(theme, 'muted-foreground'), token(theme, 'background'))
+        ).toBeGreaterThanOrEqual(4.5);
+      });
+    });
+  }
+
+  for (const file of ['input.tsx', 'select.tsx', 'textarea.tsx']) {
+    it(`components/ui/${file} draws its border and placeholder from the tokens`, () => {
+      const whole = readFileSync(resolve(__dirname, 'components/ui', file), 'utf8');
+      // select.tsx also holds the dropdown panel; only the trigger is a field.
+      const source = whole.split('const SelectScrollUpButton')[0];
+      expect(source).toContain('border-input');
+      expect(source).toContain('placeholder:text-muted-foreground');
+      expect(source).not.toMatch(/border-gray-[1-3]00|placeholder:text-gray-[1-4]00/);
+    });
+  }
+
+  it('measures the pre-US-261 --input as failing, so the check can fail', () => {
+    expect(contrast([214.3, 31.8, 91.4], [0, 0, 100])).toBeLessThan(3);
+  });
+});

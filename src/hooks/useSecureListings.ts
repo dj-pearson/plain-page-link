@@ -124,10 +124,17 @@ export function useSecureListings() {
         throw new Error('Square footage must be non-negative');
       }
 
+      // beds/baths/sqft are GENERATED from bedrooms/bathrooms/square_feet
+      // (20260902000007); Postgres refuses a value for them, so they are
+      // written through the canonical columns (US-253).
+      const { beds, baths, sqft, ...rest } = listingData;
       const { data, error } = await supabase
         .from('listings')
         .insert({
-          ...listingData,
+          ...rest,
+          bedrooms: beds,
+          bathrooms: baths,
+          square_feet: sqft ?? null,
           ...sanitizedData,
           user_id: userId,
         })
@@ -190,8 +197,13 @@ export function useSecureListings() {
       }
 
       // Build update with sanitized data
+      // Generated columns go through their canonical sources (US-253).
+      const { beds, baths, sqft, ...rest } = updates;
       const updateData = {
-        ...updates,
+        ...rest,
+        ...(beds !== undefined && { bedrooms: beds }),
+        ...(baths !== undefined && { bathrooms: baths }),
+        ...(sqft !== undefined && { square_feet: sqft }),
         ...Object.fromEntries(Object.entries(sanitizedUpdates).filter(([_, v]) => v !== undefined)),
         updated_at: new Date().toISOString(),
       };

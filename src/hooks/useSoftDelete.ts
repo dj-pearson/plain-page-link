@@ -7,7 +7,7 @@ import { toast as sonnerToast } from 'sonner';
 interface DeleteQueueItem<T> {
   id: string;
   data: T;
-  timeoutId: NodeJS.Timeout;
+  timeoutId: ReturnType<typeof setTimeout>;
   timestamp: number;
 }
 
@@ -41,47 +41,83 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
     resourceName,
   } = options;
 
-  const [deletionQueue, setDeletionQueue] = useState<Map<string, DeleteQueueItem<T>>>(new Map());
-  const queueRef = useRef(deletionQueue);
+  // The queue itself lives in a ref so timers, unmount and pagehide all see the
+  // same Map synchronously. The ids are mirrored into state so a render follows
+  // every change: `isPendingDeletion` used to read the ref through a callback
+  // that never changed identity, and a memo keyed on it (Links.tsx) never
+  // re-ran, so a deleted row stayed on screen until the timer fired (US-252).
+  const queueRef = useRef<Map<string, DeleteQueueItem<T>>>(new Map());
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const mountedRef = useRef(true);
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
+  const resourceNameRef = useRef(resourceName);
+  resourceNameRef.current = resourceName;
 
-  // Keep ref in sync with state
-  queueRef.current = deletionQueue;
-
-  // Clear any pending deletion timers on unmount so a permanent delete (and its
-  // setState/toast) can never fire after the component has unmounted.
-  useEffect(() => {
-    return () => {
-      queueRef.current.forEach((item) => clearTimeout(item.timeoutId));
-    };
+  const syncPending = useCallback(() => {
+    if (!mountedRef.current) return;
+    setPendingIds(new Set(queueRef.current.keys()));
   }, []);
+
+  /** Removes an item from the queue and stops its timer. */
+  const takeFromQueue = useCallback((id: string): DeleteQueueItem<T> | undefined => {
+    const queueItem = queueRef.current.get(id);
+    if (!queueItem) return undefined;
+    clearTimeout(queueItem.timeoutId);
+    queueRef.current.delete(id);
+    return queueItem;
+  }, []);
+
+  /** Performs the permanent delete now; reports the outcome by toast. */
+  const runDelete = useCallback(async (id: string) => {
+    const name = resourceNameRef.current;
+    try {
+      await onDeleteRef.current(id);
+      sonnerToast.success(`${name} deleted`, {
+        description: `Your ${name} has been permanently removed.`,
+      });
+    } catch (error) {
+      sonnerToast.error('Deletion failed', {
+        description: `Failed to delete ${name}. Please try again.`,
+      });
+    }
+  }, []);
+
+  // A pending delete the agent did not undo is a delete they asked for. Leaving
+  // the page inside the undo window used to clear the timers, so the item came
+  // back on the next visit (US-252). Flush them instead: on unmount (an in-app
+  // navigation) and on pagehide (a reload, a closed tab, an external link).
+  useEffect(() => {
+    mountedRef.current = true;
+    const flushAll = () => {
+      const ids = Array.from(queueRef.current.keys());
+      ids.forEach((id) => {
+        if (takeFromQueue(id)) void runDelete(id);
+      });
+      syncPending();
+    };
+    window.addEventListener('pagehide', flushAll);
+    return () => {
+      window.removeEventListener('pagehide', flushAll);
+      mountedRef.current = false;
+      flushAll();
+    };
+  }, [takeFromQueue, runDelete, syncPending]);
 
   /**
    * Cancels a pending deletion
    */
   const undoDelete = useCallback(
     (id: string) => {
-      const queueItem = queueRef.current.get(id);
-
-      if (!queueItem) {
-        return;
-      }
-
-      // Cancel the timeout
-      clearTimeout(queueItem.timeoutId);
-
-      // Remove from queue
-      setDeletionQueue((prev) => {
-        const newQueue = new Map(prev);
-        newQueue.delete(id);
-        return newQueue;
-      });
+      if (!takeFromQueue(id)) return;
+      syncPending();
 
       // Show undo confirmation
       sonnerToast.success('Deletion cancelled', {
         description: `Your ${resourceName} has been restored.`,
       });
     },
-    [resourceName]
+    [resourceName, takeFromQueue, syncPending]
   );
 
   /**
@@ -95,49 +131,19 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
       }
 
       // Create timeout for permanent deletion
-      const timeoutId = setTimeout(async () => {
-        try {
-          await onDelete(item.id);
-
-          // Remove from queue after successful deletion
-          setDeletionQueue((prev) => {
-            const newQueue = new Map(prev);
-            newQueue.delete(item.id);
-            return newQueue;
-          });
-
-          // Show success toast
-          sonnerToast.success(`${resourceName} deleted`, {
-            description: `Your ${resourceName} has been permanently removed.`,
-          });
-        } catch (error) {
-          // Show error toast
-          sonnerToast.error('Deletion failed', {
-            description: `Failed to delete ${resourceName}. Please try again.`,
-          });
-
-          // Remove from queue on error
-          setDeletionQueue((prev) => {
-            const newQueue = new Map(prev);
-            newQueue.delete(item.id);
-            return newQueue;
-          });
-        }
+      const timeoutId = setTimeout(() => {
+        if (!takeFromQueue(item.id)) return;
+        syncPending();
+        void runDelete(item.id);
       }, deleteDelay);
 
-      // Add to deletion queue
-      const queueItem: DeleteQueueItem<T> = {
+      queueRef.current.set(item.id, {
         id: item.id,
         data: item,
         timeoutId,
         timestamp: Date.now(),
-      };
-
-      setDeletionQueue((prev) => {
-        const newQueue = new Map(prev);
-        newQueue.set(item.id, queueItem);
-        return newQueue;
       });
+      syncPending();
 
       // Show undo toast (sonner renders the action button and honors duration)
       const toastId = sonnerToast(`${resourceName} deleted`, {
@@ -153,15 +159,14 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
         },
       });
     },
-    [onDelete, deleteDelay, undoMessage, resourceName, undoDelete]
+    [deleteDelay, undoMessage, resourceName, undoDelete, takeFromQueue, syncPending, runDelete]
   );
 
   /**
-   * Checks if an item is pending deletion
+   * Checks if an item is pending deletion. Its identity changes whenever the
+   * pending set does, so memos and effects that depend on it re-run.
    */
-  const isPendingDeletion = useCallback((id: string): boolean => {
-    return queueRef.current.has(id);
-  }, []);
+  const isPendingDeletion = useCallback((id: string): boolean => pendingIds.has(id), [pendingIds]);
 
   /**
    * Gets all items pending deletion
@@ -174,61 +179,37 @@ export function useSoftDelete<T extends { id: string }>(options: UseSoftDeleteOp
    * Cancels all pending deletions
    */
   const cancelAllDeletions = useCallback(() => {
-    queueRef.current.forEach((item) => {
-      clearTimeout(item.timeoutId);
-    });
-    setDeletionQueue(new Map());
+    const count = queueRef.current.size;
+    Array.from(queueRef.current.keys()).forEach((id) => takeFromQueue(id));
+    syncPending();
 
-    if (queueRef.current.size > 0) {
+    if (count > 0) {
       sonnerToast.success('All deletions cancelled', {
-        description: `${queueRef.current.size} ${resourceName}${queueRef.current.size > 1 ? 's' : ''} restored.`,
+        description: `${count} ${resourceName}${count > 1 ? 's' : ''} restored.`,
       });
     }
-  }, [resourceName]);
+  }, [resourceName, takeFromQueue, syncPending]);
 
   /**
    * Forces immediate deletion of a queued item
    */
   const forceDelete = useCallback(
     async (id: string) => {
-      const queueItem = queueRef.current.get(id);
-
-      if (!queueItem) {
-        return;
-      }
-
-      // Cancel the timeout
-      clearTimeout(queueItem.timeoutId);
-
-      // Remove from queue
-      setDeletionQueue((prev) => {
-        const newQueue = new Map(prev);
-        newQueue.delete(id);
-        return newQueue;
-      });
-
-      // Execute deletion immediately
-      try {
-        await onDelete(id);
-        sonnerToast.success(`${resourceName} deleted`, {
-          description: `Your ${resourceName} has been permanently removed.`,
-        });
-      } catch (error) {
-        sonnerToast.error('Deletion failed', {
-          description: `Failed to delete ${resourceName}. Please try again.`,
-        });
-      }
+      if (!takeFromQueue(id)) return;
+      syncPending();
+      await runDelete(id);
     },
-    [onDelete, resourceName]
+    [takeFromQueue, syncPending, runDelete]
   );
 
   return {
     softDelete,
     undoDelete,
     isPendingDeletion,
+    pendingIds,
     getPendingDeletions,
     cancelAllDeletions,
     forceDelete,
-    pendingCount: deletionQueue.size,
+    pendingCount: pendingIds.size,
   };
 }

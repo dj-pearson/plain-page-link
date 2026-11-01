@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { allPrerenderRoutes } from '../../src/config/prerender-routes';
 
 const PUBLIC = join(__dirname, '..', '..', 'public');
 
@@ -66,5 +67,40 @@ describe('crawl directives for the signed-in app', () => {
         );
       }
     }
+  });
+});
+
+/**
+ * The review form is noindex before any script runs (US-262).
+ *
+ * /:username/review is two segments, so functions/[username].ts never sees it
+ * and _redirects answers it with index.html — the prerendered homepage. The
+ * page told a crawler it was the homepage, title and canonical both.
+ */
+describe('crawl directives for an agent review form', () => {
+  const rules = headerRules();
+
+  it('/:username/review carries X-Robots-Tag: noindex, follow', () => {
+    const robots = (rules.get('/:username/review') ?? []).find((h) =>
+      h.startsWith('X-Robots-Tag:')
+    );
+    expect(robots).toBe('X-Robots-Tag: noindex, follow');
+  });
+
+  it('robots.txt does not Disallow review forms, which would hide that header', () => {
+    const disallowed = readFileSync(join(PUBLIC, 'robots.txt'), 'utf8')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => /^disallow:/i.test(l))
+      .map((l) => l.slice('disallow:'.length).trim());
+    expect(disallowed.some((p) => p.includes('review'))).toBe(false);
+  });
+
+  it('no prerendered static route is caught by the one-segment placeholder', () => {
+    // A placeholder matches any single segment, so /tools/review or /vs/review
+    // would be noindexed too. None exists; this keeps it that way. (A blog
+    // article slugged exactly "review" would be caught as well.)
+    const caught = allPrerenderRoutes().filter((r) => /^\/[^/]+\/review$/.test(r.path));
+    expect(caught).toEqual([]);
   });
 });

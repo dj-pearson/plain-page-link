@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   ChevronLeft,
   ChevronRight,
@@ -76,6 +76,10 @@ export function FeaturedListingsCarousel({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [savedListings, setSavedListings] = useState<string[]>([]);
+  // Under prefers-reduced-motion the slide changes by cross-fade only, and the
+  // price/address/stats do not slide up (US-260). Per component rather than a
+  // MotionConfig in App, so the entry chunk does not import framer-motion.
+  const reduceMotion = useReducedMotion() ?? false;
 
   // Load saved listings on mount
   useEffect(() => {
@@ -201,10 +205,10 @@ export function FeaturedListingsCarousel({
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 100 }}
+          animate={reduceMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -100 }}
+          transition={{ duration: reduceMotion ? 0.2 : 0.5, ease: 'easeInOut' }}
           className="absolute inset-0"
         >
           {/* Background Image */}
@@ -269,7 +273,7 @@ export function FeaturedListingsCarousel({
               {/* Price */}
               <div>
                 <motion.h2
-                  initial={{ y: 20, opacity: 0 }}
+                  initial={reduceMotion ? false : { y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.2 }}
                   className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2"
@@ -280,7 +284,7 @@ export function FeaturedListingsCarousel({
 
               {/* Address */}
               <motion.div
-                initial={{ y: 20, opacity: 0 }}
+                initial={reduceMotion ? false : { y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
                 className="flex items-start gap-2"
@@ -295,7 +299,7 @@ export function FeaturedListingsCarousel({
 
               {/* Property Stats */}
               <motion.div
-                initial={{ y: 20, opacity: 0 }}
+                initial={reduceMotion ? false : { y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.4 }}
                 className="flex flex-wrap gap-4 md:gap-6 text-white"
@@ -330,7 +334,7 @@ export function FeaturedListingsCarousel({
 
               {/* Action Buttons */}
               <motion.div
-                initial={{ y: 20, opacity: 0 }}
+                initial={reduceMotion ? false : { y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.5 }}
                 className="flex flex-wrap gap-3"

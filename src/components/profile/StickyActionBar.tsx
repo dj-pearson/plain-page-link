@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Phone, MessageSquare, Mail, Calendar, Home, X, ChevronUp } from 'lucide-react';
 import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,9 @@ export function StickyActionBar({
   onContactFormOpen,
 }: StickyActionBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  // No slide-ins, springs or tap-scale under prefers-reduced-motion (US-260):
+  // the panel fades, the desktop card is simply there.
+  const reduceMotion = useReducedMotion() ?? false;
 
   const handleAction = (method: string, value?: string) => {
     // The sticky bar is the main contact surface on a phone, and it reported
@@ -114,10 +117,12 @@ export function StickyActionBar({
         <AnimatePresence>
           {isExpanded && (
             <motion.div
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              initial={reduceMotion ? { opacity: 0 } : { y: 100, opacity: 0 }}
+              animate={reduceMotion ? { opacity: 1 } : { y: 0, opacity: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { y: 100, opacity: 0 }}
+              transition={
+                reduceMotion ? { duration: 0.15 } : { type: 'spring', damping: 25, stiffness: 300 }
+              }
               className="fixed bottom-20 left-0 right-0 z-50 px-4"
               style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
@@ -165,7 +170,7 @@ export function StickyActionBar({
             'fixed bottom-6 right-4 z-50 rounded-full px-6 py-4 shadow-2xl transition-all flex items-center gap-2 min-h-[56px]',
             isExpanded ? 'bg-gray-900 text-white' : 'bg-primary text-primary-foreground'
           )}
-          whileTap={{ scale: 0.95 }}
+          whileTap={reduceMotion ? undefined : { scale: 0.95 }}
           style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
           aria-label={isExpanded ? 'Close quick actions' : 'Open quick actions'}
         >
@@ -191,7 +196,7 @@ export function StickyActionBar({
           width — the pair used to leave no gap only by overlapping. */}
       <div className="hidden xl:block">
         <motion.div
-          initial={{ x: 100, opacity: 0 }}
+          initial={reduceMotion ? false : { x: 100, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.5, type: 'spring', damping: 25, stiffness: 200 }}
           className="fixed right-6 top-1/2 -translate-y-1/2 z-40"

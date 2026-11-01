@@ -23,7 +23,8 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
-  useAuthStore: () => ({ user: { id: 'agent-1' } }),
+  useAuthStore: <T>(select: (s: { user: { id: string } }) => T) =>
+    select({ user: { id: 'agent-1' } }),
 }));
 
 vi.mock('@/lib/pii', () => ({

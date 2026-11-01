@@ -11,8 +11,11 @@ Disallow: /api/
 # have stopped it. Those pages now serve noindex in the HTML and in an
 # X-Robots-Tag header, which only works if the crawler is allowed to read them.
 
-# Sitemaps
+# Sitemaps. The first is written by the build from the pages it prerendered;
+# the second is a Pages Function listing every published agent's page, which
+# the build cannot know about (US-262).
 Sitemap: https://agentbio.net/sitemap.xml
+Sitemap: https://agentbio.net/sitemap-profiles.xml
 
 # AI Search Crawlers - ALLOW (for citation and search results)
 User-agent: GPTBot

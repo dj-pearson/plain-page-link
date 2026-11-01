@@ -139,6 +139,7 @@ export default function ApiKeysPage() {
           ) : (
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
+                aria-label="API key name"
                 placeholder="Key name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}

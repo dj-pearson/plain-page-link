@@ -66,7 +66,7 @@ export default async (req: Request) => {
     }
 
     const bodyText = await req.text();
-    console.log('[publish-article-to-social] Request body:', bodyText);
+    console.log(`[publish-article-to-social] Request body length: ${bodyText.length} chars`);
 
     const { articleId } = JSON.parse(bodyText || '{}');
     console.log('[publish-article-to-social] Publishing article to social:', articleId);

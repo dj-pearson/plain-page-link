@@ -21,6 +21,13 @@ import type { Database } from '@/integrations/supabase/types';
 export type LeadRow = Database['public']['Tables']['leads']['Row'];
 
 /**
+ * The columns the browser may read (US-254). anon/authenticated hold SELECT on
+ * every column of `leads` except the two ciphertexts — select LEAD_COLUMNS
+ * (src/lib/leadColumns.ts) and decrypt through pii-crypto by lead id.
+ */
+export type LeadReadRow = Omit<LeadRow, 'encrypted_email' | 'encrypted_phone'>;
+
+/**
  * A lead as the app consumes it: the row, with the contact details decrypted.
  *
  * US-086 dropped the plaintext `email` and `phone` columns, so the row itself
@@ -31,7 +38,7 @@ export type LeadRow = Database['public']['Tables']['leads']['Row'];
  * ones. Nothing downstream can read ciphertext by accident, and nothing can
  * write plaintext to a column that no longer exists.
  */
-export type Lead = Omit<LeadRow, 'encrypted_email' | 'encrypted_phone'> & {
+export type Lead = LeadReadRow & {
   email: string | null;
   phone: string | null;
   /**

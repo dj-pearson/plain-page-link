@@ -56,7 +56,7 @@ import { UpgradeModal } from '@/components/UpgradeModal';
 import { usePlanUsage } from '@/hooks/usePlanUsage';
 import { formatOpenHouseAddress, useOpenHouses, type OpenHouse } from '@/hooks/useOpenHouses';
 import { useListings } from '@/hooks/useListings';
-import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
+import { fallBackToOriginal, sizedImage, type SizedImage } from '@/lib/images';
 import { toStringList } from '@/types/profile';
 import { cn } from '@/lib/utils';
 
@@ -78,10 +78,10 @@ function formatWhen(startsAt: string, endsAt: string): string {
   return `${day} · ${time}`;
 }
 
-function photoOf(oh: OpenHouse): string {
+/** A 96x72 thumbnail: the 200px variant, not the original upload (US-260). */
+function photoOf(oh: OpenHouse): SizedImage {
   const l = oh.listings;
-  if (!l) return PLACEHOLDER_PROPERTY_IMAGE;
-  return getImageUrl(toStringList(l.photos)[0] ?? l.image);
+  return sizedImage(l ? (toStringList(l.photos)[0] ?? l.image) : null, 200);
 }
 
 function addressOf(oh: OpenHouse): string {
@@ -110,22 +110,20 @@ function OpenHouseRow({
   onDelete,
 }: RowProps) {
   const muted = variant !== 'upcoming';
+  const photo = photoOf(oh);
   return (
     <li className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:gap-4">
       <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
         <img
-          src={photoOf(oh)}
+          src={photo.src}
           alt=""
           loading="lazy"
+          decoding="async"
           className={cn(
             'h-16 w-20 shrink-0 rounded-lg object-cover sm:h-[72px] sm:w-24',
             muted && 'opacity-80'
           )}
-          onError={(e) => {
-            if (!e.currentTarget.src.endsWith(PLACEHOLDER_PROPERTY_IMAGE)) {
-              e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
-            }
-          }}
+          onError={(e) => fallBackToOriginal(e.currentTarget, photo.original)}
         />
         <div className="min-w-0">
           <p className="font-semibold text-foreground">

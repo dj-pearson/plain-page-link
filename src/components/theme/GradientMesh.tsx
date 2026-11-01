@@ -1,10 +1,11 @@
 import { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { BACKGROUND_CANVAS_DPR, useBackgroundFrameloop } from '@/hooks/useDeferred3D';
 
 function AnimatedSphere({ color1, color2 }: { color1: string; color2: string }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  
+
   useFrame((state) => {
     if (meshRef.current) {
       meshRef.current.rotation.x = state.clock.getElapsedTime() * 0.2;
@@ -32,9 +33,14 @@ interface GradientMeshProps {
 }
 
 export function GradientMesh({ color1 = '#6366f1', color2 = '#8b5cf6' }: GradientMeshProps) {
+  const frameloop = useBackgroundFrameloop();
   return (
     <div className="fixed inset-0 -z-10 opacity-20">
-      <Canvas camera={{ position: [0, 0, 5], fov: 75 }}>
+      <Canvas
+        camera={{ position: [0, 0, 5], fov: 75 }}
+        dpr={BACKGROUND_CANVAS_DPR}
+        frameloop={frameloop}
+      >
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={1} />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color={color2} />

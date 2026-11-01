@@ -75,22 +75,7 @@ export type RecentLead = Pick<
   contact_locked?: boolean;
 };
 
-type EncryptedLeadRow = Pick<
-  Database['public']['Tables']['leads']['Row'],
-  | 'id'
-  | 'name'
-  | 'created_at'
-  | 'lead_type'
-  | 'status'
-  | 'encrypted_email'
-  | 'encrypted_phone'
-  | 'first_responded_at'
-  | 'utm_source'
-  | 'utm_medium'
-  | 'utm_campaign'
-  | 'referrer_url'
-  | 'device'
->;
+type StoredLeadRow = Omit<RecentLead, 'email' | 'phone' | 'contact_locked'>;
 
 /**
  * Decrypts a page of leads in one batched call.
@@ -99,10 +84,10 @@ type EncryptedLeadRow = Pick<
  * ciphertext for anyone holding a JWT (US-119). One call per page, since the
  * crypto lives in an Edge Function.
  */
-async function decryptRecentLeads(rows: EncryptedLeadRow[]): Promise<RecentLead[]> {
+async function decryptRecentLeads(rows: StoredLeadRow[]): Promise<RecentLead[]> {
   const contacts = await decryptLeadContacts(rows.map((row) => row.id));
 
-  return rows.map(({ encrypted_email: _e, encrypted_phone: _p, ...rest }) => ({
+  return rows.map((rest) => ({
     ...rest,
     email: contacts.get(rest.id)?.email ?? null,
     phone: contacts.get(rest.id)?.phone ?? null,
@@ -199,7 +184,7 @@ function localTimeZone(): string {
 }
 
 export function useAnalytics(timeRange: TimeRange = '30d') {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
 
   // Calculate date cutoff based on time range
   const getCutoffDate = (range: TimeRange) => {
@@ -263,13 +248,14 @@ export function useAnalytics(timeRange: TimeRange = '30d') {
         .from('leads')
         // id and name are here because LeadsTable renders both — it keyed every
         // row on an undefined id and printed an empty name cell without them.
-        // email/phone come from the encrypted columns (US-086 dropped the
-        // plaintext ones) and are decrypted below before any consumer sees them.
+        // email/phone are decrypted below by lead id (US-086 dropped the
+        // plaintext columns; US-254 made the ciphertext unselectable, so it is
+        // not asked for).
         // The attribution columns ride along on the query that is already
         // running — the breakdown is one aggregate over this page, not a
         // query per lead (US-189).
         .select(
-          'id, name, created_at, lead_type, status, encrypted_email, encrypted_phone, first_responded_at, utm_source, utm_medium, utm_campaign, referrer_url, device'
+          'id, name, created_at, lead_type, status, first_responded_at, utm_source, utm_medium, utm_campaign, referrer_url, device'
         )
         .eq('user_id', user.id)
         .gte('created_at', cutoffDate) // Filter by time range

@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAdmin } from '../_shared/auth.ts';
-import { getSiteUrl } from '../_shared/env.ts';
+import { getFunctionsUrl, getSiteUrl } from '../_shared/env.ts';
 import { errorStatus } from '../_shared/http-error.ts';
 
 interface AuditSchedule {
@@ -83,7 +83,7 @@ serve(async (req) => {
         const startTime = Date.now()
 
         // Call the existing seo-audit function
-        const auditResponse = await fetch(`${supabaseUrl}/functions/v1/seo-audit`, {
+        const auditResponse = await fetch(`${getFunctionsUrl()}/seo-audit`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

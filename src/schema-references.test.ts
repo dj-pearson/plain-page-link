@@ -307,6 +307,55 @@ describe('schema references (US-200)', () => {
     expect(scan('generated').map(describeRef)).toEqual([]);
   });
 
+  it('declares every GENERATED column `never` in Insert and Update (US-253)', () => {
+    // The scan above reads `.from(...).insert({...})` chains. Hook mutations
+    // — `addListing.mutateAsync({ beds, ... })` — never name the table, so it
+    // could not see URL import writing listings.beds/baths/sqft, which failed
+    // every import. The guard for those is the type: NewListing and
+    // ListingUpdate derive from Insert/Update, and `?: never` makes tsc refuse
+    // the key at every call site. This holds types.ts to the migrations.
+    const lines = readFileSync(join(ROOT, 'src/integrations/supabase/types.ts'), 'utf-8').split(
+      '\n'
+    );
+    const neverIn = new Map<string, Set<string>>();
+    let relation: string | null = null;
+    let mode: string | null = null;
+    for (const line of lines) {
+      if (/^ {4}Functions: \{$/.test(line)) break;
+      const start = /^ {6}([a-z_0-9]+): \{$/.exec(line);
+      if (start) {
+        relation = start[1];
+        mode = null;
+        continue;
+      }
+      const block = /^ {8}(Row|Insert|Update): \{$/.exec(line);
+      if (block) {
+        mode = block[1];
+        continue;
+      }
+      if (/^ {8}\}/.test(line)) mode = null;
+      const never = /^ {10}([a-z_0-9]+)\?: never;?$/.exec(line);
+      if (relation && mode && mode !== 'Row' && never) {
+        const key = `${relation}.${mode}`;
+        if (!neverIn.has(key)) neverIn.set(key, new Set());
+        neverIn.get(key)!.add(never[1]);
+      }
+    }
+
+    const missing: string[] = [];
+    for (const [relation, columns] of GENERATED) {
+      for (const column of columns) {
+        for (const mode of ['Insert', 'Update']) {
+          if (!neverIn.get(`${relation}.${mode}`)?.has(column)) {
+            missing.push(`${relation}.${mode}.${column}`);
+          }
+        }
+      }
+    }
+    expect(GENERATED.get('listings')?.size).toBe(3);
+    expect(missing).toEqual([]);
+  });
+
   it('reads the keys of a write given a named literal, not only an inline one', () => {
     const source = [
       'const rows = [',

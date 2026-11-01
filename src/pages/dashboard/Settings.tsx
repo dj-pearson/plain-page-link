@@ -665,7 +665,10 @@ export default function Settings() {
           {subscription?.current_period_end && (
             <div className="flex items-center justify-between py-3 border-b border-border">
               <div>
-                <div className="font-medium text-foreground">Renews</div>
+                {/* Set to cancel, it does not renew: it ends (US-258). */}
+                <div className="font-medium text-foreground">
+                  {subscription.cancel_at_period_end ? 'Ends' : 'Renews'}
+                </div>
                 <div className="text-sm text-muted-foreground">
                   {new Date(subscription.current_period_end).toLocaleDateString(undefined, {
                     year: 'numeric',

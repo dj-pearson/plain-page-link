@@ -110,7 +110,7 @@ async function readMFAStatus(userId: string | undefined): Promise<MFAStatus> {
 }
 
 export function useNativeMFA() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const {

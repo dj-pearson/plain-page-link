@@ -17,7 +17,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
-  useAuthStore: () => ({ user: authUser }),
+  useAuthStore: <T>(select: (s: { user: typeof authUser }) => T) => select({ user: authUser }),
 }));
 
 // Decryption is an Edge Function call, addressed by lead id since US-119. The

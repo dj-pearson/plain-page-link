@@ -10,12 +10,21 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { clearPlanIntent } from '@/lib/signupIntent';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Loader2, ExternalLink, CreditCard } from 'lucide-react';
+import { Check, Loader2, ExternalLink, CreditCard, CircleCheck, Clock, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription, stripePriceIdFor, type SubscriptionPlan } from '@/hooks/useSubscription';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/hooks/use-toast';
 import { edgeFunctions } from '@/lib/edgeFunctions';
+import { usePlanUsage } from '@/hooks/usePlanUsage';
+import { useCheckoutReturn } from '@/hooks/useCheckoutReturn';
+import {
+  CHECKOUT_PLAN_PARAM,
+  CHECKOUT_STATUS_PARAM,
+  CHECKOUT_RETURN_PATH,
+  checkoutSuccessUrl,
+} from '@/lib/checkoutReturn';
+import { PlanChangeConfirmDialog } from '@/components/dashboard/PlanChangeConfirmDialog';
 // The feature keys the comparison table shows. Names only — the values come
 // from subscription_plans.features, which is the source of truth (US-118).
 type PlanFeatureKey =
@@ -66,11 +75,23 @@ export default function SubscriptionPage() {
   const [portalLoading, setPortalLoading] = useState(false);
 
   const queryClient = useQueryClient();
+  // US-232: arriving from onboarding with ?checkout=<plan> — the plan chosen
+  // on /pricing before signing up — opens checkout for it, once (see below).
+  const [searchParams, setSearchParams] = useSearchParams();
   const currentPlanId = (subscription?.plan_name ?? 'free').toLowerCase();
   const currentPlan = plans.find((p) => p.name === currentPlanId);
   /** Upgrade or downgrade, by list price against the plan the agent is on. */
-  const changeLabel = (plan: SubscriptionPlan) =>
-    Number(plan.price_monthly) < Number(currentPlan?.price_monthly ?? 0) ? 'Downgrade' : 'Upgrade';
+  const isDowngrade = (plan: SubscriptionPlan) =>
+    Number(plan.price_monthly) < Number(currentPlan?.price_monthly ?? 0);
+  const changeLabel = (plan: SubscriptionPlan) => (isDowngrade(plan) ? 'Downgrade' : 'Upgrade');
+  // Already paying: a change is applied to the live subscription at once, so
+  // it waits for a yes in PlanChangeConfirmDialog (US-258).
+  const [pendingChange, setPendingChange] = useState<{
+    plan: SubscriptionPlan;
+    interval: 'month' | 'year';
+  } | null>(null);
+  const { plan: planUsage } = usePlanUsage();
+  const checkoutReturn = useCheckoutReturn(subscription?.plan_name);
 
   const { data: invoices } = useQuery({
     queryKey: ['billing-invoices', user?.id],
@@ -99,7 +120,10 @@ export default function SubscriptionPage() {
     },
   });
 
-  const handleUpgrade = async (plan: SubscriptionPlan, chosenInterval: 'month' | 'year' = interval) => {
+  const handleUpgrade = async (
+    plan: SubscriptionPlan,
+    chosenInterval: 'month' | 'year' = interval
+  ) => {
     // From the plan row, at the interval the agent chose. This read
     // plan.stripe_price_id_monthly off src/config/pricing-plans.ts, whose
     // values were the literals 'price_starter_monthly' and friends — not price
@@ -119,8 +143,8 @@ export default function SubscriptionPage() {
       const { data, error } = await edgeFunctions.invoke('create-checkout-session', {
         body: {
           priceId,
-          successUrl: `${window.location.origin}/dashboard/subscription?status=success`,
-          cancelUrl: `${window.location.origin}/dashboard/subscription`,
+          successUrl: checkoutSuccessUrl(window.location.origin, plan.name),
+          cancelUrl: `${window.location.origin}${CHECKOUT_RETURN_PATH}`,
         },
       });
       if (error) throw error;
@@ -130,18 +154,17 @@ export default function SubscriptionPage() {
       }
       // Already subscribed: Stripe changed the existing subscription in place
       // (prorated) instead of opening a second one (US-217). The webhook
-      // records it; refetch shortly so the new plan shows.
+      // records it; the same wait a Checkout return gets shows it arriving.
       if (data && 'changed' in data) {
-        toast({
-          title: data.changed ? `Switched to ${plan.name}` : `You're already on ${plan.name}`,
-          description: data.changed
-            ? 'Your subscription was updated. Stripe prorates the difference on your next invoice.'
-            : undefined,
-        });
-        setTimeout(() => {
+        if (data.changed) {
+          const next = new URLSearchParams(searchParams);
+          next.set(CHECKOUT_STATUS_PARAM, 'success');
+          next.set(CHECKOUT_PLAN_PARAM, plan.name);
+          setSearchParams(next, { replace: true });
+        } else {
+          toast({ title: `You're already on ${plan.name}` });
           void queryClient.invalidateQueries({ queryKey: ['user-subscription'] });
-          void queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
-        }, 2000);
+        }
       }
     } catch {
       toast({
@@ -175,9 +198,21 @@ export default function SubscriptionPage() {
     }
   };
 
-  // US-232: arriving from onboarding with ?checkout=<plan> — the plan chosen
-  // on /pricing before signing up — opens checkout for it, once.
-  const [searchParams, setSearchParams] = useSearchParams();
+  /** Free agents go straight to Checkout; paying agents confirm first. */
+  const requestChange = (plan: SubscriptionPlan, chosenInterval: 'month' | 'year' = interval) => {
+    if (currentPlanId === 'free') {
+      void handleUpgrade(plan, chosenInterval);
+    } else {
+      setPendingChange({ plan, interval: chosenInterval });
+    }
+  };
+
+  const confirmChange = () => {
+    if (!pendingChange) return;
+    const { plan, interval: chosen } = pendingChange;
+    setPendingChange(null);
+    void handleUpgrade(plan, chosen);
+  };
   const autoCheckout = useRef(false);
   useEffect(() => {
     const wanted = searchParams.get('checkout');
@@ -192,7 +227,7 @@ export default function SubscriptionPage() {
     const plan = plans.find((p) => p.name === wanted.toLowerCase());
     if (plan && plan.name !== currentPlanId) {
       setInterval(chosen);
-      void handleUpgrade(plan, chosen);
+      requestChange(plan, chosen);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, isLoading, plans]);
@@ -212,6 +247,14 @@ export default function SubscriptionPage() {
         <h1 className="text-2xl font-bold text-foreground">Subscription &amp; Billing</h1>
         <p className="text-muted-foreground">Manage your plan, billing, and invoices</p>
       </div>
+
+      {checkoutReturn.phase !== 'idle' && (
+        <CheckoutReturnBanner
+          phase={checkoutReturn.phase}
+          planName={checkoutReturn.targetPlan ?? subscription?.plan_name ?? null}
+          onDismiss={checkoutReturn.dismiss}
+        />
+      )}
 
       {/* Current plan */}
       <Card>
@@ -251,7 +294,10 @@ export default function SubscriptionPage() {
                 </div>
               </div>
               <div>
-                <div className="text-sm text-muted-foreground">Renews</div>
+                {/* A subscription set to cancel does not renew: it ends. */}
+                <div className="text-sm text-muted-foreground">
+                  {subscription?.cancel_at_period_end ? 'Ends' : 'Renews'}
+                </div>
                 <div className="text-lg font-semibold text-foreground">
                   {formatDate(subscription?.current_period_end)}
                 </div>
@@ -267,7 +313,9 @@ export default function SubscriptionPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle>Compare Plans</CardTitle>
-              <CardDescription>Change plan any time — Stripe prorates the difference</CardDescription>
+              <CardDescription>
+                Change plan any time — Stripe prorates the difference
+              </CardDescription>
             </div>
             {/* Annual prices existed in the plan rows and there was no way to
                 buy one: the upgrade button always sent the monthly id. */}
@@ -318,7 +366,7 @@ export default function SubscriptionPage() {
                         <Button
                           size="sm"
                           className="mt-2"
-                          onClick={() => handleUpgrade(plan)}
+                          onClick={() => requestChange(plan)}
                           disabled={actionPlan === plan.name || !purchasable}
                           // A plan with no Stripe price is not purchasable. It
                           // used to send a placeholder id and fail at Stripe.
@@ -353,6 +401,17 @@ export default function SubscriptionPage() {
           </table>
         </CardContent>
       </Card>
+
+      <PlanChangeConfirmDialog
+        plan={pendingChange?.plan ?? null}
+        interval={pendingChange?.interval ?? interval}
+        currentPlanName={currentPlanId}
+        isDowngrade={pendingChange ? isDowngrade(pendingChange.plan) : false}
+        cancelAtPeriodEnd={subscription?.cancel_at_period_end === true}
+        usage={planUsage?.usage}
+        onConfirm={confirmChange}
+        onCancel={() => setPendingChange(null)}
+      />
 
       {/* Billing history */}
       {invoices && invoices.length > 0 && (
@@ -391,6 +450,62 @@ export default function SubscriptionPage() {
             </ul>
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+}
+
+const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** What the agent sees on returning from Checkout, or after a plan change. */
+function CheckoutReturnBanner({
+  phase,
+  planName,
+  onDismiss,
+}: {
+  phase: 'waiting' | 'confirmed' | 'processing';
+  planName: string | null;
+  onDismiss: () => void;
+}) {
+  const plan = planName ? capitalise(planName) : 'your new plan';
+  const content = {
+    waiting: {
+      icon: <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />,
+      title: 'Confirming your plan',
+      body: `Stripe has accepted it; activating ${plan} here usually takes a few seconds.`,
+    },
+    confirmed: {
+      icon: <CircleCheck className="h-5 w-5 text-green-600" aria-hidden="true" />,
+      title: `You're on ${plan}`,
+      body: 'Your new limits and features are active now.',
+    },
+    processing: {
+      icon: <Clock className="h-5 w-5 text-primary" aria-hidden="true" />,
+      title: 'Still processing',
+      body: `Stripe accepted it but has not confirmed ${plan} to us yet. Refresh this page in a minute; if it still shows your old plan, contact support.`,
+    },
+  }[phase];
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex items-start gap-3 rounded-xl border border-border bg-primary/5 p-4"
+    >
+      <div className="mt-0.5 shrink-0">{content.icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-foreground">{content.title}</p>
+        <p className="text-sm text-foreground/80">{content.body}</p>
+      </div>
+      {phase !== 'waiting' && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="-m-1.5 shrink-0 rounded-md p-2.5 text-foreground/70 hover:bg-primary/10 hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
       )}
     </div>
   );

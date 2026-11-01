@@ -11,6 +11,8 @@ import { initWebVitals } from '@/lib/web-vitals';
 import { registerServiceWorker } from '@/lib/register-sw';
 import { captureAttribution } from '@/lib/attribution';
 import { captureReferral } from '@/lib/signupIntent';
+import { bindQueryCacheToAuth } from '@/lib/authQueryCache';
+import { useAuthStore } from '@/stores/useAuthStore';
 import './index.css';
 
 // Initialize Sentry as early as possible for error monitoring
@@ -45,6 +47,10 @@ const queryClient: QueryClient = new QueryClient({
     },
   },
 });
+
+// US-256: sign-out, or a different account signing in, empties the cache so
+// the next agent on a shared device never sees the previous one's data.
+bindQueryCacheToAuth(queryClient, useAuthStore);
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

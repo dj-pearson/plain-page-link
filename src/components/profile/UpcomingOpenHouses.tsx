@@ -10,17 +10,12 @@
  * fixed grays, because the public profile is themed per agent through CSS
  * variables and this section has to follow that theme.
  */
+import { useEffect, useId, useRef, useState } from 'react';
 import { format, isSameYear } from 'date-fns';
 import { CalendarPlus, ChevronDown, MapPin } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { formatOpenHouseAddress, usePublicOpenHouses } from '@/hooks/useOpenHouses';
 import { downloadIcs, googleCalendarUrl, type CalendarEvent } from '@/lib/openHouseCalendar';
-import { getImageUrl, PLACEHOLDER_PROPERTY_IMAGE } from '@/lib/images';
+import { fallBackToOriginal, sizedImage, type SizedImage } from '@/lib/images';
 import { formatPrice, parsePrice } from '@/lib/format';
 import { toStringList } from '@/types/profile';
 
@@ -40,7 +35,7 @@ interface UpcomingOpenHouse {
   address: string;
   fullAddress: string;
   price: string | null;
-  photo: string;
+  photo: SizedImage;
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null);
@@ -67,7 +62,9 @@ function toUpcoming(row: Record<string, unknown>): UpcomingOpenHouse | null {
       zip_code: str(row.zip_code),
     }),
     price: numericPrice > 0 ? formatPrice(numericPrice) : rawPrice,
-    photo: getImageUrl(toStringList(row.photos)[0] ?? str(row.image)),
+    // 400px: the card is full width on a phone (h-44) and 224px wide from sm.
+    // The original is often a multi-megabyte phone photo (US-260).
+    photo: sizedImage(toStringList(row.photos)[0] ?? str(row.image), 400),
   };
 }
 
@@ -82,6 +79,95 @@ function formatWhen(start: Date, end: Date): string {
 
 const actionClass =
   'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
+
+const menuItemClass =
+  'flex min-h-[44px] w-full items-center rounded-md px-3 text-left text-sm text-popover-foreground hover:bg-muted focus-visible:bg-muted focus-visible:outline-none';
+
+/**
+ * "Add to calendar": a disclosure button and a two-item panel.
+ *
+ * This was a Radix DropdownMenu, and that one import put the whole ui-vendor
+ * chunk (every Radix primitive the dashboard uses) on every public profile
+ * with an open house - for two links (US-260). A disclosure is also the more
+ * honest pattern for it: the panel holds an ordinary button and an ordinary
+ * link, reached with Tab. Escape and a click outside close it; Escape returns
+ * focus to the trigger.
+ */
+function AddToCalendar({ event, filename }: { event: CalendarEvent; filename: string }) {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [open]);
+
+  return (
+    <div
+      ref={rootRef}
+      className="relative"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && open) {
+          e.stopPropagation();
+          setOpen(false);
+          triggerRef.current?.focus();
+        }
+      }}
+      onBlur={(e) => {
+        // Tabbing past the last item closes it, as leaving a menu would.
+        if (open && !rootRef.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((o) => !o)}
+        className={actionClass}
+      >
+        <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+        Add to calendar
+        <ChevronDown
+          className={`h-4 w-4 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+      {open && (
+        <div
+          id={panelId}
+          className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          <button
+            type="button"
+            className={menuItemClass}
+            onClick={() => {
+              downloadIcs(event, filename);
+              setOpen(false);
+            }}
+          >
+            Apple / Outlook (.ics)
+          </button>
+          <a
+            href={googleCalendarUrl(event)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={menuItemClass}
+            onClick={() => setOpen(false)}
+          >
+            Google Calendar
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function UpcomingOpenHouses({
   agentId,
@@ -129,15 +215,12 @@ export function UpcomingOpenHouses({
             className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground sm:flex"
           >
             <img
-              src={oh.photo}
+              src={oh.photo.src}
               alt={oh.address}
               loading="lazy"
+              decoding="async"
               className="h-44 w-full object-cover sm:h-auto sm:w-56 sm:shrink-0"
-              onError={(e) => {
-                if (!e.currentTarget.src.endsWith(PLACEHOLDER_PROPERTY_IMAGE)) {
-                  e.currentTarget.src = PLACEHOLDER_PROPERTY_IMAGE;
-                }
-              }}
+              onError={(e) => fallBackToOriginal(e.currentTarget, oh.photo.original)}
             />
             <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 sm:p-5">
               <div>
@@ -156,41 +239,10 @@ export function UpcomingOpenHouses({
               </div>
 
               <div className="mt-auto flex flex-wrap gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger className={actionClass}>
-                    <CalendarPlus className="h-4 w-4" aria-hidden="true" />
-                    Add to calendar
-                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="border-border bg-popover text-popover-foreground"
-                  >
-                    <DropdownMenuItem
-                      className="min-h-[44px] focus:bg-muted focus:text-foreground"
-                      onSelect={() =>
-                        downloadIcs(
-                          calendarEvent(oh),
-                          `open-house-${oh.startsAt.toISOString().slice(0, 10)}.ics`
-                        )
-                      }
-                    >
-                      Apple / Outlook (.ics)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      asChild
-                      className="min-h-[44px] focus:bg-muted focus:text-foreground"
-                    >
-                      <a
-                        href={googleCalendarUrl(calendarEvent(oh))}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Google Calendar
-                      </a>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <AddToCalendar
+                  event={calendarEvent(oh)}
+                  filename={`open-house-${oh.startsAt.toISOString().slice(0, 10)}.ics`}
+                />
 
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(oh.fullAddress)}`}

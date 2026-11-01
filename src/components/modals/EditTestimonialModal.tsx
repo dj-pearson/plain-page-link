@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export interface EditTestimonialFormData {
   client_name: string;
@@ -21,14 +21,16 @@ interface EditTestimonialModalProps {
   initialData: EditTestimonialFormData;
 }
 
-export function EditTestimonialModal({ isOpen, onClose, onSubmit, initialData }: EditTestimonialModalProps) {
+export function EditTestimonialModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData,
+}: EditTestimonialModalProps) {
+  // Seeded once; the caller keys this by testimonial id. A reset effect on
+  // initialData (built inline by the caller) wiped typed edits on every
+  // re-render of the page (US-257).
   const [formData, setFormData] = useState<EditTestimonialFormData>(initialData);
-
-  useEffect(() => {
-    setFormData(initialData);
-  }, [initialData]);
-
-  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,17 +38,14 @@ export function EditTestimonialModal({ isOpen, onClose, onSubmit, initialData }:
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-card border border-border rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Edit Testimonial</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-accent rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-w-2xl gap-0 border-border bg-card p-0 text-card-foreground"
+      >
+        <DialogHeader className="border-b border-border p-4 text-left">
+          <DialogTitle className="text-xl text-foreground">Edit Testimonial</DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
@@ -126,7 +125,7 @@ export function EditTestimonialModal({ isOpen, onClose, onSubmit, initialData }:
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -125,16 +125,22 @@ export const WorkflowBuilderPage = () => {
           {workflow && (
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Workflow Name</label>
+                <label htmlFor="workflow-name" className="text-sm font-medium text-gray-700">
+                  Workflow Name
+                </label>
                 <Input
+                  id="workflow-name"
                   value={workflow.name}
                   onChange={(e) => updateWorkflowMeta({ name: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Description</label>
+                <label htmlFor="workflow-description" className="text-sm font-medium text-gray-700">
+                  Description
+                </label>
                 <Textarea
+                  id="workflow-description"
                   value={workflow.description || ''}
                   onChange={(e) => updateWorkflowMeta({ description: e.target.value })}
                   placeholder="Describe what this workflow does..."
@@ -143,14 +149,16 @@ export const WorkflowBuilderPage = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Category</label>
+                <label htmlFor="workflow-category" className="text-sm font-medium text-gray-700">
+                  Category
+                </label>
                 <Select
                   value={workflow.category}
                   onValueChange={(value) =>
                     updateWorkflowMeta({ category: value as WorkflowCategory })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="workflow-category">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -164,8 +172,11 @@ export const WorkflowBuilderPage = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Tags</label>
+                <label htmlFor="workflow-tags" className="text-sm font-medium text-gray-700">
+                  Tags
+                </label>
                 <Input
+                  id="workflow-tags"
                   value={workflow.tags.join(', ')}
                   onChange={(e) =>
                     updateWorkflowMeta({

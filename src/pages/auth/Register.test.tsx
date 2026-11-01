@@ -68,6 +68,35 @@ describe('Register page', () => {
     expect(signUp).not.toHaveBeenCalled();
   });
 
+  // US-261: every refused field says so (aria-invalid) and points at the
+  // sentence explaining why (aria-describedby).
+  it('marks invalid fields and describes them with their error text', async () => {
+    renderWithProviders(<Register />);
+    await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
+    const checkbox = screen.getByRole('checkbox');
+    await waitFor(() => expect(checkbox).toHaveAttribute('aria-invalid', 'true'));
+    expect(checkbox).toHaveAccessibleDescription(
+      'You must agree to the terms to create an account'
+    );
+    for (const label of [
+      'Username',
+      'Full Name',
+      'Email address',
+      'Password',
+      'Confirm Password',
+    ]) {
+      const field = screen.getByLabelText(label);
+      expect(field, label).toHaveAttribute('aria-invalid', 'true');
+      const describedBy = field.getAttribute('aria-describedby') ?? '';
+      expect(describedBy, label).not.toBe('');
+      const text = describedBy
+        .split(' ')
+        .map((id) => document.getElementById(id)?.textContent ?? '')
+        .join(' ');
+      expect(text.trim(), label).not.toBe('');
+    }
+  });
+
   it('calls signUp with the form values on valid submit', async () => {
     signUp.mockResolvedValue(undefined);
     renderWithProviders(<Register />);

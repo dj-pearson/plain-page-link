@@ -348,6 +348,9 @@ export default function Testimonials() {
       {/* Edit Testimonial Modal */}
       {editingTestimonial && (
         <EditTestimonialModal
+          // Keyed so a different testimonial mounts a fresh form; the modal no
+          // longer resets its state from initialData (US-257).
+          key={editingTestimonial.id}
           isOpen={!!editingTestimonial}
           onClose={() => setEditingTestimonial(null)}
           onSubmit={handleEditTestimonial}

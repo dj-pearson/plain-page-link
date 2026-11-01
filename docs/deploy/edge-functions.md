@@ -41,6 +41,14 @@ A directory under `supabase/functions/` with an `index.ts` is served. There is
 no list to add a name to: the router reads the directory at startup, which is
 the same rule Supabase's own runtime uses.
 
+A function that calls another one must build the URL with `getFunctionsUrl()`
+(`_shared/env.ts`, reads `FUNCTIONS_URL`), never `${SUPABASE_URL}/functions/v1`
+— that path reaches the empty runtime above. Until US-250, submit-lead's
+notify-lead call, scheduled-maintenance's account deletions and the scheduled
+SEO audits were all built that way, so every new-lead email and every account
+erasure failed. `_shared/function-urls.test.ts` now fails on any
+`/functions/v1` in a function's source.
+
 Environment variables on that application are marked build-time, so a
 **restart does not pick up a changed value and a deploy is required**. This is
 how the 2026-09-10 key rotation left the app holding a retired `service_role`

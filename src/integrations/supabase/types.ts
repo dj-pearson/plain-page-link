@@ -119,8 +119,10 @@ export type Database = {
           gdpr_request_id: string | null;
           id: string;
           ip_address: string | null;
+          prior_cancel_at_period_end: boolean | null;
           reason: string | null;
           scheduled_for: string;
+          stripe_subscription_id: string | null;
           user_id: string;
         };
         Insert: {
@@ -135,8 +137,10 @@ export type Database = {
           gdpr_request_id?: string | null;
           id?: string;
           ip_address?: string | null;
+          prior_cancel_at_period_end?: boolean | null;
           reason?: string | null;
           scheduled_for: string;
+          stripe_subscription_id?: string | null;
           user_id: string;
         };
         Update: {
@@ -151,8 +155,10 @@ export type Database = {
           gdpr_request_id?: string | null;
           id?: string;
           ip_address?: string | null;
+          prior_cancel_at_period_end?: boolean | null;
           reason?: string | null;
           scheduled_for?: string;
+          stripe_subscription_id?: string | null;
           user_id?: string;
         };
         Relationships: [
@@ -1595,7 +1601,7 @@ export type Database = {
           feature_key: string;
           id?: string;
           metadata?: Json | null;
-          pending_count?: number | null;
+          pending_count?: never;
           updated_at?: string | null;
           usage_count?: number;
           usage_period_end?: string;
@@ -1608,7 +1614,7 @@ export type Database = {
           feature_key?: string;
           id?: string;
           metadata?: Json | null;
-          pending_count?: number | null;
+          pending_count?: never;
           updated_at?: string | null;
           usage_count?: number;
           usage_period_end?: string;
@@ -3131,9 +3137,9 @@ export type Database = {
         Insert: {
           address: string;
           bathrooms?: number;
-          baths?: number | null;
+          baths?: never;
           bedrooms?: number;
-          beds?: number | null;
+          beds?: never;
           city: string;
           created_at?: string | null;
           days_on_market?: number | null;
@@ -3154,7 +3160,7 @@ export type Database = {
           property_type?: string | null;
           sold_date?: string | null;
           sort_order?: number | null;
-          sqft?: number | null;
+          sqft?: never;
           square_feet?: number | null;
           state?: string | null;
           status?: string | null;
@@ -3168,9 +3174,9 @@ export type Database = {
         Update: {
           address?: string;
           bathrooms?: number;
-          baths?: number | null;
+          baths?: never;
           bedrooms?: number;
-          beds?: number | null;
+          beds?: never;
           city?: string;
           created_at?: string | null;
           days_on_market?: number | null;
@@ -3191,7 +3197,7 @@ export type Database = {
           property_type?: string | null;
           sold_date?: string | null;
           sort_order?: number | null;
-          sqft?: number | null;
+          sqft?: never;
           square_feet?: number | null;
           state?: string | null;
           status?: string | null;
@@ -8522,7 +8528,7 @@ export type Database = {
           trigger_type: string;
           updated_at?: string | null;
           webhook_secret?: string | null;
-          webhook_url?: string | null;
+          webhook_url?: never;
           workflow_id: string;
         };
         Update: {
@@ -8536,7 +8542,7 @@ export type Database = {
           trigger_type?: string;
           updated_at?: string | null;
           webhook_secret?: string | null;
-          webhook_url?: string | null;
+          webhook_url?: never;
           workflow_id?: string;
         };
         Relationships: [
@@ -9081,6 +9087,7 @@ export type Database = {
         Args: { _at?: string; _key: string; _user_id: string };
         Returns: undefined;
       };
+      auth_user_id_by_email: { Args: { p_email: string }; Returns: string };
       calculate_content_freshness_score: {
         Args: { p_analyzed_at: string };
         Returns: number;
@@ -9333,6 +9340,10 @@ export type Database = {
         Args: { _role: Database['public']['Enums']['app_role']; _user_id: string };
         Returns: boolean;
       };
+      increment_article_view: {
+        Args: { p_article_id: string; p_visitor_id?: string };
+        Returns: undefined;
+      };
       increment_link_clicks: {
         Args: { link_id: string; visitor_id?: string };
         Returns: undefined;
@@ -9377,6 +9388,10 @@ export type Database = {
       list_public_open_houses: {
         Args: { _user_id: string };
         Returns: Record<string, unknown>[];
+      };
+      locked_lead_ciphertexts: {
+        Args: { _user_id: string; _values: string[] };
+        Returns: string[];
       };
       locked_lead_ids: {
         Args: { _lead_ids: string[]; _user_id: string };

@@ -114,6 +114,9 @@ const RESERVED_SEGMENTS = new Set([
   'assets',
   'icons',
   'sitemap.xml',
+  // US-262. A Pages Function of its own; isReservedSegment's dot rule already
+  // rejects it, and naming it here keeps that true if the dot rule changes.
+  'sitemap-profiles.xml',
   'robots.txt',
   'manifest.json',
   'llms.txt',

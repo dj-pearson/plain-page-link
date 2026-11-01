@@ -67,7 +67,8 @@ export interface SSOCallbackResponse {
 }
 
 export function useSSO() {
-  const { user, role } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const role = useAuthStore((s) => s.role);
   const queryClient = useQueryClient();
   const isAdmin = role === 'admin';
 
