@@ -51,7 +51,6 @@ const ALLOWED_5XX = new Set(['health-check']);
 const MISSING_SERVER_CONFIG = new Set([
   'generate-article',
   'generate-social-post',
-  'generate-marketing-post',
 ]);
 
 /**
@@ -69,6 +68,8 @@ const ADMIN_ONLY = new Set([
   'optimize-page-content',
   'apply-seo-fixes',
   'trigger-rebuild',
+  // US-248: was under MISSING_SERVER_CONFIG, which hid that it never checked.
+  'generate-marketing-post',
 ]);
 
 const log = (...args) => console.log('[smoke]', ...args);

@@ -35,6 +35,12 @@ const GATED: Record<string, { gate: 'requireAdmin' | 'requireAdminOrServiceRole'
   'apply-seo-fixes': { gate: 'requireAdmin', bareFetch: [] },
   // The deploy hook comes from the function's own environment, not the caller.
   'trigger-rebuild': { gate: 'requireAdmin', bareFetch: [/^fetch\(hookUrl,/] },
+  // US-248: took the webhook URL from the body, fetched it bare, and spent
+  // Claude credit for any caller. The webhook is now looked up by id.
+  'generate-marketing-post': {
+    gate: 'requireAdmin',
+    bareFetch: [/^fetch\('https:\/\/api\.anthropic\.com\//],
+  },
 };
 
 /** Offsets of `fetch(` not preceded by an identifier character (so not safeFetch). */
@@ -87,6 +93,19 @@ describe('admin-only edge functions refuse anyone but an admin (US-234)', () => 
     expect(limit).toBeGreaterThan(gate);
     expect(hook).toBeGreaterThan(limit);
     expect(src).toMatch(/if \(!rate\.allowed\) \{\s*return rateLimitResponse\(/);
+  });
+
+  it('generate-marketing-post rate-limits per admin, takes no URL from the body, and never echoes the upstream body', () => {
+    const src = source('generate-marketing-post');
+    const gate = src.indexOf('await requireAdmin(req, supabase)');
+    const limit = src.indexOf('await checkRateLimitDb(');
+    const claude = src.indexOf("fetch('https://api.anthropic.com/");
+    expect(limit).toBeGreaterThan(gate);
+    expect(claude).toBeGreaterThan(limit);
+    expect(src).toMatch(/`generate-marketing-post:\$\{admin\.id\}`/);
+    expect(src).not.toMatch(/\bwebhookUrl\b/);
+    expect(src).toMatch(/\.from\('social_media_webhooks'\)/);
+    expect(src).not.toMatch(/\.text\(\)/);
   });
 
   it('requireAdminOrServiceRole admits the service-role key and otherwise is requireAdmin', () => {
