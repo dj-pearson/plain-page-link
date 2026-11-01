@@ -28,6 +28,8 @@ import { parseSquareFeet } from '@/lib/format';
 import { logger } from '@/lib/logger';
 import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
 import { todayCalendarDate } from '@/lib/localDate';
+import { buildImportedListing } from '@/lib/listingImport';
+import { reorderWithinView, sortOrderChanges } from '@/lib/listingOrder';
 import { AddListingModal } from '@/components/modals/AddListingModal';
 import { EditListingModal, EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
@@ -72,8 +74,17 @@ export default function Listings() {
     null
   );
   const { toast } = useToast();
-  const { listings, isLoading, isError, error, refetch, addListing, updateListing, deleteListing } =
-    useListings();
+  const {
+    listings,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    addListing,
+    updateListing,
+    deleteListing,
+    reorderListings,
+  } = useListings();
   const { uploadListingImages } = useListingImageUpload();
   const { subscription, canAdd } = useSubscriptionLimits();
   const { profile } = useProfile();
@@ -265,39 +276,22 @@ export default function Listings() {
     });
   };
 
-  const handleURLImport = (importedListing: ImportedListingData) => {
-    addListing
-      .mutateAsync({
-        address: importedListing.address,
-        city: importedListing.city,
-        state: importedListing.state,
-        zip_code: importedListing.zip_code,
-        price: importedListing.price,
-        beds: importedListing.bedrooms,
-        baths: importedListing.bathrooms,
-        bedrooms: importedListing.bedrooms,
-        bathrooms: importedListing.bathrooms,
-        sqft: importedListing.square_feet,
-        square_feet: importedListing.square_feet,
-        status: importedListing.status || 'active',
-        description: importedListing.description,
-        mls_number: importedListing.mls_number,
-        property_type: importedListing.property_type,
-        lot_size_acres: importedListing.lot_size_acres,
-        // The dialog scrapes photos and they were dropped here, so every
-        // URL-imported listing arrived with no images at all.
-        photos: importedListing.photos.length > 0 ? importedListing.photos : null,
-        image: importedListing.photos[0] ?? null,
-      })
-      .then(() => {
-        toast({
-          title: 'Listing imported!',
-          description: 'Property has been added to your listings.',
-        });
-      })
-      .catch(() => {
-        toast({ title: 'Error', description: 'Failed to import listing.', variant: 'destructive' });
-      });
+  /**
+   * Save a reviewed import. Rejects on failure so the dialog stays open with
+   * the agent's text and shows why (US-253); the payload is built by
+   * buildImportedListing, which writes no generated column.
+   */
+  const handleURLImport = async (importedListing: ImportedListingData) => {
+    try {
+      await addListing.mutateAsync(buildImportedListing(importedListing, todayCalendarDate()));
+    } catch (error) {
+      logger.error('Failed to import listing', error as Error);
+      throw error;
+    }
+    toast({
+      title: 'Listing imported!',
+      description: 'Property has been added to your listings.',
+    });
   };
 
   const handleDeleteListing = async () => {
@@ -313,18 +307,28 @@ export default function Listings() {
   };
 
   /**
-   * Persist a new display order.
+   * Drop one card onto another.
    *
-   * The public gallery has always ordered by sort_order and nothing ever wrote
-   * it, so every listing sat at 0 and the order an agent saw on their own page
-   * was arbitrary (US-107). Positions are rewritten densely from the reordered
-   * list, so there are no gaps to reason about later.
+   * Positions are computed over the full listing list, not the filtered one:
+   * numbering only the visible cards 0..n gave them the positions hidden
+   * listings already held, and the public page interleaved them (US-253).
+   * Only rows whose sort_order changes are written, through one mutation that
+   * updates the cache optimistically and rolls back on failure.
    */
-  const persistOrder = async (ordered: typeof listings) => {
+  const handleDropOn = async (targetId: string) => {
+    if (!draggingId) return;
+    const ordered = reorderWithinView(
+      listings,
+      filteredListings.map((l) => l.id),
+      draggingId,
+      targetId
+    );
+    setDraggingId(null);
+    if (!ordered) return;
+    const changes = sortOrderChanges(ordered);
+    if (changes.length === 0) return;
     try {
-      await Promise.all(
-        ordered.map((l, index) => updateListing.mutateAsync({ id: l.id, sort_order: index }))
-      );
+      await reorderListings.mutateAsync(changes);
     } catch (error) {
       logger.error('Failed to save the listing order', error as Error);
       toast({
@@ -333,18 +337,6 @@ export default function Listings() {
         variant: 'destructive',
       });
     }
-  };
-
-  const handleDropOn = async (targetId: string) => {
-    if (!draggingId || draggingId === targetId) return;
-    const ordered = [...filteredListings];
-    const from = ordered.findIndex((l) => l.id === draggingId);
-    const to = ordered.findIndex((l) => l.id === targetId);
-    if (from === -1 || to === -1) return;
-    const [moved] = ordered.splice(from, 1);
-    ordered.splice(to, 0, moved);
-    setDraggingId(null);
-    await persistOrder(ordered);
   };
 
   const handleEditListing = async (data: EditListingFormData) => {
@@ -478,9 +470,9 @@ export default function Listings() {
                 >
                   <Globe className="h-4 w-4 text-blue-600" />
                   <div className="text-left">
-                    <div className="font-medium">Import from URL / Paste</div>
+                    <div className="font-medium">Import from Zillow / Paste</div>
                     <div className="text-xs text-muted-foreground">
-                      Copy from Zillow, Realtor.com, etc.
+                      Paste a listing copied from Zillow, Realtor.com, etc.
                     </div>
                   </div>
                 </button>
@@ -884,7 +876,7 @@ export default function Listings() {
               onClick={() => setIsURLDialogOpen(true)}
               className="inline-flex items-center gap-2 px-6 py-3 bg-card border border-border rounded-lg hover:bg-accent transition-all font-medium min-h-[44px]"
             >
-              <Globe className="h-5 w-5 text-blue-600" /> Import from URL
+              <Globe className="h-5 w-5 text-blue-600" /> Import from Zillow
             </button>
           </div>
         </div>

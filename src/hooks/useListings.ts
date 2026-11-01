@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { logAuditEvent } from '@/lib/audit';
 import { toStringList } from '@/types/profile';
+import { applySortOrderChanges, type SortOrderChange } from '@/lib/listingOrder';
 import type { Database } from '@/integrations/supabase/types';
 
 type ListingRow = Database['public']['Tables']['listings']['Row'];
@@ -56,9 +57,12 @@ export function useListings() {
         // shows the agent exactly what a visitor will see. It ordered by
         // created_at, which meant the dashboard and the public page disagreed
         // as soon as sort_order was written (US-107). created_at breaks ties,
-        // since every listing starts at sort_order 0.
+        // since every listing starts at sort_order 0, and id breaks the rest so
+        // equal rows cannot swap between fetches (US-253). Mirrors
+        // compareListingOrder, which the optimistic reorder sorts with.
         .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true });
 
       if (error) throw error;
       return (data ?? []).map((row): Listing => ({ ...row, photos: toStringList(row.photos) }));
@@ -118,6 +122,52 @@ export function useListings() {
     },
   });
 
+  /**
+   * Write a new display order (US-253).
+   *
+   * Takes only the rows whose sort_order changes (see sortOrderChanges), so a
+   * drag writes what moved rather than every listing. The reorder used to call
+   * updateListing once per visible row: N requests, N cache invalidations and
+   * N audit events for one drag. This writes the changed rows in parallel,
+   * reorders the cache immediately so the card lands where it was dropped,
+   * restores it if any write fails, and invalidates and audits once.
+   */
+  const reorderListings = useMutation({
+    mutationFn: async (changes: SortOrderChange[]) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      const results = await Promise.all(
+        changes.map(({ id, sort_order }) =>
+          supabase.from('listings').update({ sort_order }).eq('id', id).eq('user_id', user.id)
+        )
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onMutate: async (changes) => {
+      const key = ['listings', user?.id];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<Listing[]>(key);
+      if (previous) {
+        queryClient.setQueryData<Listing[]>(key, applySortOrderChanges(previous, changes));
+      }
+      return { previous };
+    },
+    onError: (_error, _changes, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData<Listing[]>(['listings', user?.id], context.previous);
+      }
+    },
+    onSuccess: (_data, changes) => {
+      logAuditEvent('listing_reorder', {
+        resourceType: 'listing',
+        details: { changed: changes.length },
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['listings', user?.id] });
+    },
+  });
+
   const deleteListing = useMutation({
     mutationFn: async (id: string) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -148,6 +198,7 @@ export function useListings() {
     refetch,
     addListing,
     updateListing,
+    reorderListings,
     deleteListing,
   };
 }

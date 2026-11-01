@@ -110,7 +110,13 @@ export const usePublicProfile = (rawUsername: string) => {
           )
           .eq('user_id', profile.id)
           .in('status', ['active', 'pending', 'under_contract', 'sold'])
-          .order('sort_order', { ascending: true }),
+          // The dashboard's order exactly (compareListingOrder). sort_order
+          // alone left ties — every listing an agent never dragged sits at 0
+          // — in whatever order Postgres returned them, which could change
+          // from one visit to the next (US-253).
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true }),
 
         // Fetch testimonials with only needed columns
         supabase

@@ -17,147 +17,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Globe, Loader2, AlertCircle, CheckCircle, Sparkles, ClipboardPaste } from 'lucide-react';
 import {
-  Link,
-  Globe,
-  Loader2,
-  AlertCircle,
-  CheckCircle,
-  Sparkles,
-  ClipboardPaste,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+  importErrorMessage,
+  parseListingText,
+  type ImportedListingData,
+} from '@/lib/listingImport';
 
-export interface ImportedListingData {
-  address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  price: string;
-  bedrooms: number;
-  bathrooms: number;
-  square_feet: number | null;
-  property_type: string;
-  status: string;
-  description: string;
-  mls_number: string;
-  lot_size_acres: number | null;
-  photos: string[];
-}
+export type { ImportedListingData };
 
 interface URLImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (listing: ImportedListingData) => void;
+  /**
+   * Saves the reviewed listing. The dialog awaits it and closes only when it
+   * resolves; a rejection keeps the dialog, the pasted text and the reviewed
+   * fields, and shows `importErrorMessage`'s text inline (US-253).
+   */
+  onImport: (listing: ImportedListingData) => Promise<void>;
 }
 
 export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialogProps) {
-  const [mode, setMode] = useState<'url' | 'paste'>('paste');
-  const [url, setUrl] = useState('');
   const [pastedText, setPastedText] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parsedData, setParsedData] = useState<ImportedListingData | null>(null);
   const [step, setStep] = useState<'input' | 'review'>('input');
-
-  // Parse pasted listing text with pattern matching
-  const parseListingText = (text: string): ImportedListingData => {
-    const data: ImportedListingData = {
-      address: '',
-      city: '',
-      state: '',
-      zip_code: '',
-      price: '',
-      bedrooms: 0,
-      bathrooms: 0,
-      square_feet: null,
-      property_type: 'single_family',
-      status: 'active',
-      description: '',
-      mls_number: '',
-      lot_size_acres: null,
-      photos: [],
-    };
-
-    // Extract price ($XXX,XXX or $X.XM patterns)
-    const priceMatch = text.match(/\$[\d,]+(?:\.\d+)?(?:\s*[MmKk])?/);
-    if (priceMatch) {
-      const priceStr = priceMatch[0].replace(/[$,\s]/g, '');
-      if (priceStr.toLowerCase().endsWith('m')) {
-        data.price = String(parseFloat(priceStr) * 1000000);
-      } else if (priceStr.toLowerCase().endsWith('k')) {
-        data.price = String(parseFloat(priceStr) * 1000);
-      } else {
-        data.price = priceStr;
-      }
-    }
-
-    // Extract beds/baths patterns: "3 bed" "3 bd" "3 bedroom" "3br"
-    const bedMatch = text.match(/(\d+)\s*(?:bed(?:room)?s?|bd|br)\b/i);
-    if (bedMatch) data.bedrooms = parseInt(bedMatch[1]);
-
-    const bathMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?|ba)\b/i);
-    if (bathMatch) data.bathrooms = parseFloat(bathMatch[1]);
-
-    // Extract sqft: "1,800 sq ft" "1800sqft" "1,800 square feet"
-    const sqftMatch = text.match(/([\d,]+)\s*(?:sq\.?\s*(?:ft|feet)|sqft|square\s*feet)/i);
-    if (sqftMatch) data.square_feet = parseInt(sqftMatch[1].replace(/,/g, ''));
-
-    // Extract lot size: "0.25 acres" "10,000 sq ft lot"
-    const lotMatch = text.match(/([\d.]+)\s*acres?/i);
-    if (lotMatch) data.lot_size_acres = parseFloat(lotMatch[1]);
-
-    // Extract MLS: "MLS# 12345" "MLS: ML12345"
-    const mlsMatch = text.match(/MLS[#:\s]*([A-Za-z0-9]+)/i);
-    if (mlsMatch) data.mls_number = mlsMatch[1];
-
-    // Extract address - look for street number + street name pattern
-    const addressMatch = text.match(
-      /(\d+\s+[A-Z][a-zA-Z\s]+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Way|Court|Ct|Circle|Cir|Place|Pl|Terrace|Ter)[.,]?)/i
-    );
-    if (addressMatch) data.address = addressMatch[1].trim().replace(/[,.]$/, '');
-
-    // Extract city, state, zip from address-like patterns
-    const cityStateZipMatch = text.match(
-      /([A-Z][a-z]+(?:\s[A-Z][a-z]+)?),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/
-    );
-    if (cityStateZipMatch) {
-      data.city = cityStateZipMatch[1];
-      data.state = cityStateZipMatch[2];
-      data.zip_code = cityStateZipMatch[3];
-    }
-
-    // Detect property type from keywords
-    const textLower = text.toLowerCase();
-    if (textLower.includes('condo') || textLower.includes('condominium')) {
-      data.property_type = 'condo';
-    } else if (textLower.includes('townhouse') || textLower.includes('townhome')) {
-      data.property_type = 'townhouse';
-    } else if (
-      textLower.includes('multi-family') ||
-      textLower.includes('duplex') ||
-      textLower.includes('triplex')
-    ) {
-      data.property_type = 'multi_family';
-    } else if (
-      textLower.includes('land') ||
-      textLower.includes('lot') ||
-      textLower.includes('vacant')
-    ) {
-      data.property_type = 'land';
-    } else if (
-      textLower.includes('commercial') ||
-      textLower.includes('office') ||
-      textLower.includes('retail')
-    ) {
-      data.property_type = 'commercial';
-    }
-
-    // Use remaining text as description (clean up)
-    data.description = text.slice(0, 500).trim();
-
-    return data;
-  };
 
   const handleParsePaste = () => {
     if (!pastedText.trim()) {
@@ -165,58 +50,43 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
       return;
     }
     setError(null);
-    setLoading(true);
-
-    // Simulate brief processing delay for UX
-    setTimeout(() => {
-      const parsed = parseListingText(pastedText);
-      setParsedData(parsed);
-      setStep('review');
-      setLoading(false);
-    }, 300);
+    setParsedData(parseListingText(pastedText));
+    setStep('review');
   };
 
-  const handleURLFetch = () => {
-    if (!url.trim()) {
-      setError('Please enter a URL');
-      return;
-    }
-
-    // Validate URL pattern
-    try {
-      new URL(url);
-    } catch {
-      setError('Please enter a valid URL');
-      return;
-    }
-
+  /**
+   * Awaits the save. This used to call onImport without waiting and close
+   * straight away, clearing the pasted text — so when the insert failed (as it
+   * did every time, on the generated beds/baths/sqft) the agent got an error
+   * toast and nothing to retry with (US-253).
+   */
+  const handleImport = async () => {
+    if (!parsedData || saving) return;
+    setSaving(true);
     setError(null);
-    setLoading(true);
-
-    // For now, show instructions since we can't scrape directly from client
-    setTimeout(() => {
-      setLoading(false);
-      setError(
-        "Direct URL scraping requires a backend service. For now, visit the listing page, copy the listing details (Ctrl+A, Ctrl+C), then use the 'Paste Details' tab to import."
-      );
-    }, 1000);
-  };
-
-  const handleImport = () => {
-    if (parsedData) {
-      onImport(parsedData);
-      handleClose();
+    try {
+      await onImport(parsedData);
+      reset();
+      onOpenChange(false);
+    } catch (err) {
+      setError(importErrorMessage(err));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleClose = () => {
-    onOpenChange(false);
-    setUrl('');
+  const reset = () => {
     setPastedText('');
     setError(null);
     setParsedData(null);
     setStep('input');
-    setLoading(false);
+  };
+
+  const handleClose = () => {
+    // A save in flight finishes or fails with the dialog still open.
+    if (saving) return;
+    onOpenChange(false);
+    reset();
   };
 
   const handlePasteFromClipboard = async () => {
@@ -234,58 +104,40 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Globe className="h-5 w-5" />
-            Import Listing from URL or Paste
+            Import a Listing
           </DialogTitle>
           <DialogDescription>
-            Import listing details from a real estate website or paste listing text
+            Open the listing on Zillow, Realtor.com, Redfin or your own site, select the page
+            (Ctrl+A or Cmd+A), copy it, and paste it below.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
+          {/*
+            There was a "From URL" tab here. It showed a spinner for a second
+            and then told the agent to copy and paste instead: nothing fetches
+            a listing page, and a browser cannot (US-253). Pasting is the one
+            path that works, so it is the only one offered.
+          */}
           {step === 'input' && (
             <div className="space-y-4 py-4">
-              {/* Mode Tabs */}
-              <div className="flex rounded-lg border p-1 gap-1">
-                <button
-                  onClick={() => setMode('paste')}
-                  className={cn(
-                    'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2',
-                    mode === 'paste' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-                  )}
-                >
-                  <ClipboardPaste className="h-4 w-4" />
-                  Paste Details
-                </button>
-                <button
-                  onClick={() => setMode('url')}
-                  className={cn(
-                    'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2',
-                    mode === 'url' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-                  )}
-                >
-                  <Link className="h-4 w-4" />
-                  From URL
-                </button>
-              </div>
-
-              {mode === 'paste' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Paste Listing Details</Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handlePasteFromClipboard}
-                      className="gap-1.5 text-xs"
-                    >
-                      <ClipboardPaste className="h-3.5 w-3.5" />
-                      Paste from Clipboard
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={pastedText}
-                    onChange={(e) => setPastedText(e.target.value)}
-                    placeholder={`Paste the listing details here. Our smart parser will extract:
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Paste Listing Details</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handlePasteFromClipboard}
+                    className="gap-1.5 text-xs"
+                  >
+                    <ClipboardPaste className="h-3.5 w-3.5" />
+                    Paste from Clipboard
+                  </Button>
+                </div>
+                <Textarea
+                  value={pastedText}
+                  onChange={(e) => setPastedText(e.target.value)}
+                  placeholder={`Paste the listing details here. Our smart parser will extract:
 - Address, city, state, zip
 - Price, bedrooms, bathrooms
 - Square footage, lot size
@@ -296,40 +148,16 @@ $425,000 | 3 bed | 2 bath | 1,800 sqft
 123 Oak Street, Springfield, IL 62701
 MLS# ML12345
 Beautiful ranch home with updated kitchen...`}
-                    rows={10}
-                    className="font-mono text-sm"
-                  />
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Smart parser automatically extracts property details from any format
-                  </div>
+                  rows={10}
+                  className="font-mono text-sm"
+                />
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Smart parser automatically extracts property details from any format
                 </div>
-              )}
+              </div>
 
-              {mode === 'url' && (
-                <div className="space-y-3">
-                  <Label>Listing URL</Label>
-                  <Input
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://www.realtor.com/realestateandhomes-detail/..."
-                    className="font-mono text-sm"
-                  />
-                  <div className="bg-muted/50 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Supported sites: Realtor.com, Zillow, Redfin, your own website. Copy the full
-                      listing URL and paste it above.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-amber-800">{error}</p>
-                </div>
-              )}
+              {error && <InlineError message={error} />}
             </div>
           )}
 
@@ -461,6 +289,8 @@ Beautiful ranch home with updated kitchen...`}
                   />
                 </div>
               </div>
+
+              {error && <InlineError message={error} />}
             </div>
           )}
         </div>
@@ -469,29 +299,48 @@ Beautiful ranch home with updated kitchen...`}
         <div className="flex items-center justify-between pt-4 border-t">
           <Button
             variant="outline"
-            onClick={step === 'review' ? () => setStep('input') : handleClose}
+            disabled={saving}
+            onClick={
+              step === 'review'
+                ? () => {
+                    setError(null);
+                    setStep('input');
+                  }
+                : handleClose
+            }
           >
             {step === 'review' ? 'Back' : 'Cancel'}
           </Button>
           {step === 'input' && (
-            <Button
-              onClick={mode === 'paste' ? handleParsePaste : handleURLFetch}
-              disabled={loading || (mode === 'paste' ? !pastedText.trim() : !url.trim())}
-            >
-              {loading ? (
+            <Button onClick={handleParsePaste} disabled={!pastedText.trim()}>
+              <Sparkles className="h-4 w-4 mr-2" /> Extract Details
+            </Button>
+          )}
+          {step === 'review' && (
+            <Button onClick={() => void handleImport()} disabled={saving}>
+              {saving ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...
                 </>
               ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" /> Extract Details
-                </>
+                'Import Listing'
               )}
             </Button>
           )}
-          {step === 'review' && <Button onClick={handleImport}>Import Listing</Button>}
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function InlineError({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3"
+    >
+      <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-destructive" />
+      <p className="text-sm text-destructive">{message}</p>
+    </div>
   );
 }

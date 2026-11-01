@@ -1601,7 +1601,7 @@ export type Database = {
           feature_key: string;
           id?: string;
           metadata?: Json | null;
-          pending_count?: number | null;
+          pending_count?: never;
           updated_at?: string | null;
           usage_count?: number;
           usage_period_end?: string;
@@ -1614,7 +1614,7 @@ export type Database = {
           feature_key?: string;
           id?: string;
           metadata?: Json | null;
-          pending_count?: number | null;
+          pending_count?: never;
           updated_at?: string | null;
           usage_count?: number;
           usage_period_end?: string;
@@ -3137,9 +3137,9 @@ export type Database = {
         Insert: {
           address: string;
           bathrooms?: number;
-          baths?: number | null;
+          baths?: never;
           bedrooms?: number;
-          beds?: number | null;
+          beds?: never;
           city: string;
           created_at?: string | null;
           days_on_market?: number | null;
@@ -3160,7 +3160,7 @@ export type Database = {
           property_type?: string | null;
           sold_date?: string | null;
           sort_order?: number | null;
-          sqft?: number | null;
+          sqft?: never;
           square_feet?: number | null;
           state?: string | null;
           status?: string | null;
@@ -3174,9 +3174,9 @@ export type Database = {
         Update: {
           address?: string;
           bathrooms?: number;
-          baths?: number | null;
+          baths?: never;
           bedrooms?: number;
-          beds?: number | null;
+          beds?: never;
           city?: string;
           created_at?: string | null;
           days_on_market?: number | null;
@@ -3197,7 +3197,7 @@ export type Database = {
           property_type?: string | null;
           sold_date?: string | null;
           sort_order?: number | null;
-          sqft?: number | null;
+          sqft?: never;
           square_feet?: number | null;
           state?: string | null;
           status?: string | null;
@@ -8528,7 +8528,7 @@ export type Database = {
           trigger_type: string;
           updated_at?: string | null;
           webhook_secret?: string | null;
-          webhook_url?: string | null;
+          webhook_url?: never;
           workflow_id: string;
         };
         Update: {
@@ -8542,7 +8542,7 @@ export type Database = {
           trigger_type?: string;
           updated_at?: string | null;
           webhook_secret?: string | null;
-          webhook_url?: string | null;
+          webhook_url?: never;
           workflow_id?: string;
         };
         Relationships: [

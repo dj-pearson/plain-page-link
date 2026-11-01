@@ -128,8 +128,16 @@ function renderColumns(columns, mode, indent) {
   // Insert: optional when the database can supply the value (default, identity,
   //         generated) or when NULL is acceptable.
   // Update: every column optional, since a patch may touch any subset.
+  //
+  // GENERATED ALWAYS AS (...) STORED columns are `?: never` in Insert and
+  // Update, as `supabase gen types` writes them. Postgres refuses any
+  // non-DEFAULT value for one and fails the whole row, so a write naming one is
+  // a bug tsc should report. This emitted them as ordinary optional columns,
+  // and URL import wrote listings.beds/baths/sqft and failed on every attempt
+  // (US-253).
   return columns
     .map((c) => {
+      if (mode !== 'Row' && c.isGenerated) return `${IND(indent)}${c.name}?: never`;
       const base = tsType(c);
       const nullable = !c.notNull;
       const type = nullable ? `${base} | null` : base;
