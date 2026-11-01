@@ -12,6 +12,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -116,25 +117,30 @@ export function KeyboardShortcutsHelper({ shortcuts, className }: KeyboardShortc
   );
 
   return (
-    <>
+    // The Dialog wraps the trigger so Radix returns focus to it on close (US-257).
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {/* Floating Help Button */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsOpen(true)}
-        aria-label="Keyboard shortcuts"
-        className={cn(
-          'fixed bottom-4 right-4 md:bottom-6 md:right-6 z-30',
-          'shadow-lg gap-2',
-          className
-        )}
-      >
-        <Keyboard className="w-4 h-4" aria-hidden="true" />
-        <span className="hidden md:inline">Shortcuts</span>
-        <kbd className="px-1.5 py-0.5 text-xs bg-gray-100 rounded border" aria-hidden="true">
-          ?
-        </kbd>
-      </Button>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Keyboard shortcuts"
+          className={cn(
+            'fixed bottom-4 right-4 md:bottom-6 md:right-6 z-30',
+            'shadow-lg gap-2',
+            className
+          )}
+        >
+          <Keyboard className="w-4 h-4" aria-hidden="true" />
+          <span className="hidden md:inline">Shortcuts</span>
+          <kbd
+            className="px-1.5 py-0.5 text-xs bg-muted rounded border border-border"
+            aria-hidden="true"
+          >
+            ?
+          </kbd>
+        </Button>
+      </DialogTrigger>
 
       {/* Recently Used Indicator */}
       {recentlyUsed && (
@@ -150,63 +156,61 @@ export function KeyboardShortcutsHelper({ shortcuts, className }: KeyboardShortc
       )}
 
       {/* Shortcuts Panel */}
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent
-          className="max-w-2xl"
-          // Escape closes the panel; stop it here so it does not also reach a
-          // page shortcut bound to Escape (clearing a selection, say).
-          onEscapeKeyDown={(e) => e.stopPropagation()}
-        >
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Keyboard className="w-5 h-5" aria-hidden="true" />
-              Keyboard shortcuts
-            </DialogTitle>
-            <DialogDescription>
-              Press ? (Shift+/) to open this panel. Shortcuts never fire while you type in a field,
-              hold Cmd, Ctrl or Alt, or have a dialog open.
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent
+        className="max-w-2xl"
+        // Escape closes the panel; stop it here so it does not also reach a
+        // page shortcut bound to Escape (clearing a selection, say).
+        onEscapeKeyDown={(e) => e.stopPropagation()}
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Keyboard className="w-5 h-5" aria-hidden="true" />
+            Keyboard shortcuts
+          </DialogTitle>
+          <DialogDescription>
+            Press ? (Shift+/) to open this panel. Shortcuts never fire while you type in a field,
+            hold Cmd, Ctrl or Alt, or have a dialog open.
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="flex items-center justify-between gap-4 rounded-lg bg-gray-50 p-3">
-            <Label htmlFor={switchId} className="text-sm font-medium leading-snug">
-              Single-key shortcuts
-              <span className="block text-xs font-normal text-gray-600">
-                Turn off if you use a screen reader or speech input. Escape still works.
-              </span>
-            </Label>
-            <Switch
-              id={switchId}
-              checked={singleKeyEnabled}
-              onCheckedChange={handleSingleKeyChange}
-            />
-          </div>
+        <div className="flex items-center justify-between gap-4 rounded-lg bg-muted/60 p-3">
+          <Label htmlFor={switchId} className="text-sm font-medium leading-snug">
+            Single-key shortcuts
+            <span className="block text-xs font-normal text-muted-foreground">
+              Turn off if you use a screen reader or speech input. Escape still works.
+            </span>
+          </Label>
+          <Switch
+            id={switchId}
+            checked={singleKeyEnabled}
+            onCheckedChange={handleSingleKeyChange}
+          />
+        </div>
 
-          <div className="space-y-6">
-            {Object.entries(groupedShortcuts).map(([category, categoryShortcuts]) => (
-              <section key={category}>
-                <h4 className="font-semibold text-sm text-gray-900 mb-3">{category}</h4>
-                <ul className="space-y-2">
-                  {categoryShortcuts.map((shortcut) => (
-                    <li
-                      key={shortcut.key}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <span className="text-sm">{shortcut.description}</span>
-                      <kbd className="px-3 py-1.5 bg-white border border-gray-300 rounded font-mono text-sm">
-                        {isSingleCharacterKey(shortcut.key)
-                          ? shortcut.key.toUpperCase()
-                          : shortcut.key}
-                      </kbd>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        <div className="space-y-6">
+          {Object.entries(groupedShortcuts).map(([category, categoryShortcuts]) => (
+            <section key={category}>
+              <h4 className="font-semibold text-sm text-foreground mb-3">{category}</h4>
+              <ul className="space-y-2">
+                {categoryShortcuts.map((shortcut) => (
+                  <li
+                    key={shortcut.key}
+                    className="flex items-center justify-between p-3 bg-muted/60 rounded-lg"
+                  >
+                    <span className="text-sm">{shortcut.description}</span>
+                    <kbd className="px-3 py-1.5 bg-background border border-border rounded font-mono text-sm">
+                      {isSingleCharacterKey(shortcut.key)
+                        ? shortcut.key.toUpperCase()
+                        : shortcut.key}
+                    </kbd>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

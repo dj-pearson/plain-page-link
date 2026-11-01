@@ -13,6 +13,8 @@ import {
   List,
   Star,
   ChevronDown,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -42,6 +44,7 @@ import type { SharedListing } from '@/components/listings/SocialShareDialog';
 import { useListingImageUpload } from '@/hooks/useListingImageUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
@@ -307,7 +310,7 @@ export default function Listings() {
   };
 
   /**
-   * Drop one card onto another.
+   * Move one listing to another's place (a drop, or the Move buttons).
    *
    * Positions are computed over the full listing list, not the filtered one:
    * numbering only the visible cards 0..n gave them the positions hidden
@@ -315,15 +318,13 @@ export default function Listings() {
    * Only rows whose sort_order changes are written, through one mutation that
    * updates the cache optimistically and rolls back on failure.
    */
-  const handleDropOn = async (targetId: string) => {
-    if (!draggingId) return;
+  const moveListing = async (movedId: string, targetId: string) => {
     const ordered = reorderWithinView(
       listings,
       filteredListings.map((l) => l.id),
-      draggingId,
+      movedId,
       targetId
     );
-    setDraggingId(null);
     if (!ordered) return;
     const changes = sortOrderChanges(ordered);
     if (changes.length === 0) return;
@@ -337,6 +338,25 @@ export default function Listings() {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleDropOn = async (targetId: string) => {
+    if (!draggingId) return;
+    const draggedId = draggingId;
+    setDraggingId(null);
+    await moveListing(draggedId, targetId);
+  };
+
+  /**
+   * Move a listing one place earlier (-1) or later (+1) in the visible order.
+   * Drag was the only way to reorder, which a keyboard or touch user cannot
+   * do (US-257); this goes through the same full-list reorder as a drop.
+   */
+  const handleMove = async (id: string, delta: -1 | 1) => {
+    const from = filteredListings.findIndex((l) => l.id === id);
+    const neighbour = filteredListings[from + delta];
+    if (from === -1 || !neighbour) return;
+    await moveListing(id, neighbour.id);
   };
 
   const handleEditListing = async (data: EditListingFormData) => {
@@ -420,10 +440,14 @@ export default function Listings() {
               <span className="text-sm">Add Property</span>
             </button>
             <button
+              type="button"
               onClick={() => setShowAddMenu(!showAddMenu)}
+              aria-label="More ways to add a property"
+              aria-haspopup="true"
+              aria-expanded={showAddMenu}
               className="inline-flex items-center px-2.5 py-2.5 bg-primary text-primary-foreground rounded-r-lg hover:bg-primary/90 active:scale-[0.98] transition-all min-h-[44px] shadow-sm border-l border-primary-foreground/20"
             >
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
 
@@ -564,22 +588,28 @@ export default function Listings() {
         </div>
         <div className="flex border border-border rounded-lg overflow-hidden">
           <button
+            type="button"
             onClick={() => setViewMode('grid')}
+            aria-label="Grid view"
+            aria-pressed={viewMode === 'grid'}
             className={cn(
               'p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors',
               viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
             )}
           >
-            <LayoutGrid className="h-4 w-4" />
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
           </button>
           <button
+            type="button"
             onClick={() => setViewMode('list')}
+            aria-label="List view"
+            aria-pressed={viewMode === 'list'}
             className={cn(
               'p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors',
               viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
             )}
           >
-            <List className="h-4 w-4" />
+            <List className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -625,10 +655,32 @@ export default function Listings() {
         </Card>
       )}
 
+      {/* Loading — without this a slow load read as "No properties yet"
+          appearing and then vanishing (US-257). */}
+      {!isError && isLoading && (
+        <div
+          role="status"
+          aria-label="Loading listings"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
+              <Skeleton className="h-48 sm:h-52 w-full rounded-none bg-muted" />
+              <div className="space-y-3 p-4">
+                <Skeleton className="h-6 w-28 bg-muted" />
+                <Skeleton className="h-4 w-full bg-muted" />
+                <Skeleton className="h-3 w-1/2 bg-muted" />
+              </div>
+            </div>
+          ))}
+          <span className="sr-only">Loading listings…</span>
+        </div>
+      )}
+
       {/* Grid View */}
       {!isError && viewMode === 'grid' && filteredListings.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {filteredListings.map((listing) => (
+          {filteredListings.map((listing, index) => (
             <div
               key={listing.id}
               // Native HTML5 drag, matching PageBuilder — no new dependency.
@@ -671,20 +723,26 @@ export default function Listings() {
                     </span>
                   </div>
                 )}
-                <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Hover-only made these invisible on touch screens (no hover)
+                    and to a keyboard user tabbing onto them (US-257). */}
+                <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
                   <button
+                    type="button"
                     onClick={() => setEditingListing(listing)}
-                    className="p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-all shadow-md"
+                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-white/90 text-gray-900 shadow-md backdrop-blur-sm transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     title="Edit"
+                    aria-label={`Edit ${listing.address}`}
                   >
-                    <Edit className="h-3.5 w-3.5" />
+                    <Edit className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setListingToDelete({ id: listing.id, address: listing.address })}
-                    className="p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-all text-red-600 shadow-md"
+                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-white/90 text-red-600 shadow-md backdrop-blur-sm transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     title="Delete"
+                    aria-label={`Delete ${listing.address}`}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -714,14 +772,39 @@ export default function Listings() {
                     </>
                   )}
                 </div>
-                <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <div className="text-xs text-muted-foreground">
-                    Listed{' '}
-                    {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : '—'}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+                  <div className="min-w-0 text-xs text-muted-foreground">
+                    <div>
+                      Listed{' '}
+                      {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : '—'}
+                    </div>
+                    {listing.mls_number && (
+                      <div className="truncate">MLS# {listing.mls_number}</div>
+                    )}
                   </div>
-                  {listing.mls_number && (
-                    <div className="text-xs text-muted-foreground">MLS# {listing.mls_number}</div>
-                  )}
+                  {/* Reorder without drag, for keyboard and touch (US-257). */}
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void handleMove(listing.id, -1)}
+                      disabled={index === 0}
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                      title="Move earlier"
+                      aria-label={`Move ${listing.address} earlier`}
+                    >
+                      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleMove(listing.id, 1)}
+                      disabled={index === filteredListings.length - 1}
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                      title="Move later"
+                      aria-label={`Move ${listing.address} later`}
+                    >
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -901,6 +984,9 @@ export default function Listings() {
 
       {editingListing && (
         <EditListingModal
+          // Keyed so a different listing mounts a fresh form; the modal no
+          // longer resets its state from initialData (US-257).
+          key={editingListing.id}
           isOpen={!!editingListing}
           onClose={() => setEditingListing(null)}
           onSubmit={handleEditListing}

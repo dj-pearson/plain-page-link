@@ -4,7 +4,8 @@
  * opened the help because the handler required Shift to be up.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { KeyboardShortcutsHelper } from './KeyboardShortcutsHelper';
 import { SINGLE_KEY_SHORTCUTS_STORAGE_KEY } from '@/lib/keyboardShortcuts';
 
@@ -73,5 +74,31 @@ describe('KeyboardShortcutsHelper (US-252)', () => {
     expect(markSold).not.toHaveBeenCalled();
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(clear).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * US-257: the shortcuts panel did not return focus to the button that opened
+ * it, and its close button had no name.
+ */
+describe('KeyboardShortcutsHelper panel (US-257)', () => {
+  it('opens as a named dialog, closes on Escape and returns focus', async () => {
+    const user = userEvent.setup();
+    render(
+      <KeyboardShortcutsHelper
+        shortcuts={[{ key: 'n', description: 'Add new listing', action: vi.fn() }]}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Keyboard shortcuts' });
+    await user.click(trigger);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
+    expect(dialog).toHaveTextContent('Add new listing');
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });

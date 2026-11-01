@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -56,13 +56,12 @@ export function EditListingModal({
   initialData,
   listingId,
 }: EditListingModalProps) {
+  // Seeded once. There used to be an effect that reset this whenever
+  // initialData changed — and the caller builds initialData inline, so every
+  // re-render of the Listings page wiped what the agent had typed (US-257).
+  // The caller keys this component by listing id, so a different listing
+  // still mounts a fresh form.
   const [formData, setFormData] = useState<EditListingFormData>(initialData);
-
-  useEffect(() => {
-    setFormData(initialData);
-  }, [initialData]);
-
-  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,14 +69,14 @@ export function EditListingModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-card border border-border rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Edit Property Listing</h2>
-          <button onClick={onClose} className="p-2 hover:bg-accent rounded-lg transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-w-2xl gap-0 border-border bg-card p-0 text-card-foreground"
+      >
+        <DialogHeader className="border-b border-border p-4 text-left">
+          <DialogTitle className="text-xl text-foreground">Edit Property Listing</DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -301,17 +300,6 @@ export function EditListingModal({
                 Feature this listing on my profile
               </Label>
             </div>
-
-            <div className="col-span-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description || ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={4}
-                placeholder="Describe the property features..."
-              />
-            </div>
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -323,7 +311,7 @@ export function EditListingModal({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
