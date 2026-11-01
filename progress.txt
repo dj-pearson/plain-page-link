@@ -4958,3 +4958,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - Login/Register set aria-invalid and aria-describedby on errors; reset, forgot-password and MFA pages gained a main landmark, labels and autoComplete.
 - --input border and placeholder colours now meet 3:1 / 4.5:1; ui/input and ui/select use the tokens.
 - Added src/test/a11y/fieldNames static scan (78 unnamed fields before, 0 after), Login/Register aria tests and contrast cases. URLImportDialog labels reapplied on top of US-253.
+
+## Site improvement loop 2 — iteration 15/15 — US-262: agents' pages were in no sitemap, blog posts had two h1s and blog views went uncounted
+
+- /:username pages are now listed by a new Pages Function, /sitemap-profiles.xml (published profiles only, paged, 503 rather than an empty or partial 200); robots.txt names it.
+- Generated articles drop the model's leading "# Title"; body h1s become h2 with stable, de-duplicated heading ids. verify:seo now fails on more than one h1, or none on an indexable page.
+- The review form sets its own title and noindex,follow (plus an X-Robots-Tag in _headers) instead of inheriting the homepage's. Blog view counts go through a throttled SECURITY DEFINER RPC that leaves updated_at alone.
+- Added sitemap-profiles, articleMarkdown, BlogArticle and SubmitReview head tests, crawl-directive assertions and a verify:schema check for increment_article_view.
