@@ -4883,3 +4883,9 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - stripe-webhook now re-reads the subscription from Stripe (syncSubscription) on updated, deleted and invoice-paid events and writes Stripe's current state; a canceled row's period end is clipped to ended_at, trialing is stored as trialing in both tables, and a late payment_failed no longer moves a canceled row to past_due.
 - 9 new tests in supabase/functions/stripe-webhook/handler.test.ts, all failing before the fix; one existing test adjusted to mock the Stripe read.
 - Owner: redeploy the stripe-webhook edge function; optionally resend events for subscriptions canceled before the fix that still show 'active'.
+
+## Site improvement loop 2 — iteration 4/15 — US-250: new-lead emails, account erasures and scheduled SEO audits silently never ran, and a deleted account kept being billed
+
+- Nine function-to-function calls built `${SUPABASE_URL}/functions/v1`, a runtime that serves nothing; they now use getFunctionsUrl(), and function-urls.test.ts fails on any `/functions/v1` in function source.
+- scheduled-maintenance runs account erasures in-process via the shared processDueDeletions(); requesting deletion sets Stripe cancel_at_period_end (restored on cancel), and erasure cancels the live subscription first or holds the deletion and logs it.
+- Migration 20261101000012: process_scheduled_account_deletions() refuses to erase an account with a live subscription and pins search_path; new verify-schema check plus 15 vitest cases and a DeleteAccount copy test.
