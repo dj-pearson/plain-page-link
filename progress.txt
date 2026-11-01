@@ -4896,3 +4896,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - useSoftDelete cancelled pending deletes on unmount and kept the row visible until the timer fired; it now flushes them on unmount and pagehide and tracks pending ids in state so the row disappears at once.
 - Overview sorted the cached links array in place; linkOrder gains byPosition/topByClicks (copy-sorts) used by Overview and Links.
 - Tests: useSoftDelete.test.ts, KeyboardShortcutsHelper.test.tsx, keyboardShortcuts.test.ts, linkOrder display-order block.
+
+## Site improvement loop 2 — iteration 6/15 — US-253: importing a listing from Zillow text failed every time and lost the pasted text, and a filtered drag scrambled the public order
+
+- The import wrote the GENERATED beds/baths/sqft columns, which Postgres refuses, and the dialog closed without waiting for the save. A tested buildImportedListing (src/lib/listingImport.ts) now writes only bedrooms/bathrooms/square_feet plus listed_date. The dialog waits for the save and stays open with an inline error if it fails. The fake "From URL" tab is gone.
+- Reorder now computes positions over the full list (src/lib/listingOrder.ts) and writes only the changed rows through one reorderListings mutation, with an optimistic update, rollback, one audit event and one invalidation. The dashboard and public profile break sort_order ties by created_at desc, then id.
+- The types generator emits generated columns as `?: never` in Insert/Update, so tsc now refuses beds/baths/sqft writes. That also caught the same bug in useSecureListings.
+- Tests: listingImport, listingOrder, URLImportDialog, useListings reorder plus a @ts-expect-error guard, and a schema-references check that every GENERATED column is never-typed.
