@@ -4965,3 +4965,42 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - Generated articles drop the model's leading "# Title"; body h1s become h2 with stable, de-duplicated heading ids. verify:seo now fails on more than one h1, or none on an indexable page.
 - The review form sets its own title and noindex,follow (plus an X-Robots-Tag in _headers) instead of inheriting the homepage's. Blog view counts go through a throttled SECURITY DEFINER RPC that leaves updated_at alone.
 - Added sitemap-profiles, articleMarkdown, BlogArticle and SubmitReview head tests, crawl-directive assertions and a verify:schema check for increment_article_view.
+
+---
+
+## Site improvement loop 2, in one paragraph
+
+Fifteen stories, US-248 to US-262, from five parallel audits. Each was built
+in its own worktree and then integrated here one at a time. The first six
+were doors and money:
+- an anonymous generate-marketing-post that would fetch any URL and spend
+  the Claude budget;
+- social sign-in that failed past the first 50 users, trusted unverified
+  emails and accepted forged state;
+- lead emails and account erasures sent to a runtime that serves nothing,
+  with deleted accounts still being billed;
+- Stripe events that could reopen a cancelled plan;
+- Ctrl+S marking listings Sold;
+- a Zillow import that never worked.
+
+The middle six closed a lead-paywall bypass, took Sentry out of the entry
+chunk, stopped a sign-out leaking the last agent's data, kept edits in the
+modals and on the Theme page, confirmed plan changes and checkouts, and kept
+PII out of the logs and spam out of team invites. The last three made the
+public page lighter and calmer, gave forms names, and put agents' pages in a
+sitemap.
+
+Final state: tsc clean, 1500 unit tests (from 1254), all checks passing at
+each integration.
+
+Owner actions:
+- Apply migrations 20261101000011, 000012, 000016 (deploy with the frontend),
+  000021 and 000024.
+- Rebuild the functions.agentbio.net Coolify app. It ships generate-marketing-post,
+  oauth-proxy, sso-callback, stripe-webhook, submit-lead, scheduled-maintenance,
+  process-account-deletions, gdpr-deletion, pii-crypto, teams, notify-lead
+  and every function that uses _shared/email.ts.
+- Set OAUTH_STATE_SECRET there. Confirm STRIPE_SECRET_KEY and FUNCTIONS_URL
+  are set there too.
+- Deploy Cloudflare Pages, then submit /sitemap-profiles.xml to Google Search
+  Console and Bing.
