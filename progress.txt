@@ -4889,3 +4889,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - Nine function-to-function calls built `${SUPABASE_URL}/functions/v1`, a runtime that serves nothing; they now use getFunctionsUrl(), and function-urls.test.ts fails on any `/functions/v1` in function source.
 - scheduled-maintenance runs account erasures in-process via the shared processDueDeletions(); requesting deletion sets Stripe cancel_at_period_end (restored on cancel), and erasure cancels the live subscription first or holds the deletion and logs it.
 - Migration 20261101000012: process_scheduled_account_deletions() refuses to erase an account with a live subscription and pins search_path; new verify-schema check plus 15 vitest cases and a DeleteAccount copy test.
+
+## Site improvement loop 2 — iteration 5/15 — US-252: cmd/ctrl+s marked every selected listing sold, and a deleted link came back
+
+- Dashboard shortcuts matched bare keys with no modifier check, so Ctrl/Cmd+S ran "Mark Sold" and Ctrl+A on Listings jumped to Analytics; a shared guard (src/lib/keyboardShortcuts.ts) now skips modifier chords, typing fields/widgets and open dialogs, "?" opens help, and the help dialog can turn single-key shortcuts off.
+- useSoftDelete cancelled pending deletes on unmount and kept the row visible until the timer fired; it now flushes them on unmount and pagehide and tracks pending ids in state so the row disappears at once.
+- Overview sorted the cached links array in place; linkOrder gains byPosition/topByClicks (copy-sorts) used by Overview and Links.
+- Tests: useSoftDelete.test.ts, KeyboardShortcutsHelper.test.tsx, keyboardShortcuts.test.ts, linkOrder display-order block.
