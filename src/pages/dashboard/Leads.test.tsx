@@ -28,7 +28,8 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
-  useAuthStore: () => ({ user: { id: mockLeadRow.user_id } }),
+  useAuthStore: <T,>(select: (s: { user: { id: string } }) => T) =>
+    select({ user: { id: mockLeadRow.user_id } }),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({

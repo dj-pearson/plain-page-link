@@ -39,7 +39,7 @@ const toNotification = (row: NotificationRow): AppNotification => ({
 });
 
 export function useNotifications() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const userId = user?.id;
 

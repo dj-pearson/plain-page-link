@@ -28,7 +28,7 @@ export function toCampaignRows(raw: unknown): CampaignRow[] {
 }
 
 export const useCampaignConversion = (since: Date) => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const sinceIso = since.toISOString().slice(0, 10);
   const { data, isLoading } = useQuery({
     queryKey: ['campaign-conversion', user?.id, sinceIso],

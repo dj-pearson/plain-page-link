@@ -184,7 +184,7 @@ function localTimeZone(): string {
 }
 
 export function useAnalytics(timeRange: TimeRange = '30d') {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
 
   // Calculate date cutoff based on time range
   const getCutoffDate = (range: TimeRange) => {

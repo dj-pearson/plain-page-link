@@ -16,7 +16,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 vi.mock('@/stores/useAuthStore', () => ({
-  useAuthStore: () => ({ user: authUser }),
+  useAuthStore: <T>(select: (s: { user: typeof authUser }) => T) => select({ user: authUser }),
 }));
 
 vi.mock('@/lib/audit', () => ({ logAuditEvent: vi.fn() }));

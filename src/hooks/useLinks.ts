@@ -18,7 +18,7 @@ export interface Link {
 }
 
 export function useLinks() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 

@@ -31,7 +31,7 @@ interface DeletionRequestResponse {
 }
 
 export function useGDPR() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isExporting, setIsExporting] = useState(false);

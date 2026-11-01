@@ -71,7 +71,7 @@ export function formatOpenHouseAddress(l: {
 }
 
 export function useOpenHouses() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -188,7 +188,7 @@ export function useOpenHouses() {
 
 /** The visitors who signed in at one open house, contact details decrypted. */
 export function useOpenHouseVisitors(openHouseId: string | null | undefined) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   return useQuery({
     queryKey: ['open-house-visitors', openHouseId],
     queryFn: async (): Promise<Lead[]> => {

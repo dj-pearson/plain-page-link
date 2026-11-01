@@ -5,6 +5,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import type { Json } from '@/integrations/supabase/types';
@@ -429,9 +430,13 @@ export function useLeadsActivitySummaries(leadIds: string[]) {
  */
 export function useDueLeadTasks(dueBefore?: Date) {
   const cutoff = (dueBefore ?? endOfToday()).toISOString();
+  // US-256: keyed by agent, so one agent's cached tasks are never served to
+  // the next one to sign in on the same device.
+  const userId = useAuthStore((s) => s.user?.id ?? null);
 
   return useQuery({
-    queryKey: ['lead-tasks', 'due', cutoff.slice(0, 10)],
+    queryKey: ['lead-tasks', 'due', userId, cutoff.slice(0, 10)],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('lead_activities')

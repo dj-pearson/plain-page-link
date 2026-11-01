@@ -35,7 +35,7 @@ export type NewListing = Omit<Database['public']['Tables']['listings']['Insert']
 export type ListingUpdate = Database['public']['Tables']['listings']['Update'];
 
 export function useListings() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const {

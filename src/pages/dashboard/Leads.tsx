@@ -74,7 +74,7 @@ export default function Leads() {
   const [isBulkActing, setIsBulkActing] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date');
   const { toast } = useToast();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const { subscription } = useSubscriptionLimits();
   const { scoreLeadObject } = useMLLeadScoring();
 

@@ -111,7 +111,7 @@ export async function fetchAllLeads(
 const LEAD_DEPENDENT_KEYS = [['leads'], ['analytics-leads'], ['conversion-funnel'], ['lead-stats']];
 
 export function useLeads(filters: LeadFilters = {}) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const status = filters.status && filters.status !== 'all' ? filters.status : undefined;

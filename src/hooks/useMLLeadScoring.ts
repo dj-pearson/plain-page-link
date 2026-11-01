@@ -93,7 +93,7 @@ export function useMLLeadScoring(options: UseMLLeadScoringOptions = {}) {
   // scores are never persisted. Left destructured out rather than silently
   // implying support.
   const { autoLoadModel = true } = options;
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   // Get singleton scorer instance

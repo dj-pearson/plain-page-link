@@ -100,7 +100,7 @@ const RISK_COLORS: Record<string, string> = {
 };
 
 export function useAuditLog(options: UseAuditLogOptions = {}) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const {
     action,

@@ -248,12 +248,31 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
 
+          // US-256: auth-js fires SIGNED_IN on every tab-visibility change and
+          // TOKEN_REFRESHED hourly, for the user who is already signed in.
+          // Writing a fresh `user` object then re-ran every effect keyed on
+          // `user` (Theme and the display settings reset unsaved edits from the
+          // profile) and refetched the profile and roles for nothing. For the
+          // same user only the session (new tokens) changes; the user reference
+          // is kept. USER_UPDATED is a real change and still applies.
+          const current = get().user;
+          const sameUser = !!session?.user && current?.id === session.user.id;
+
           if (event === 'TOKEN_REFRESHED') {
-            set({ session, user: session?.user ?? null });
+            set(sameUser ? { session } : { session, user: session?.user ?? null });
             return;
           }
 
-          set({ session, user: session?.user ?? null });
+          if (event === 'SIGNED_IN' && sameUser && get().profile?.id === current?.id) {
+            set({ session });
+            return;
+          }
+
+          set(
+            sameUser && event !== 'USER_UPDATED'
+              ? { session }
+              : { session, user: session?.user ?? null }
+          );
 
           if (!session?.user) {
             set({ profile: null, role: null });

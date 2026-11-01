@@ -40,7 +40,8 @@ const AVAILABLE_FONTS = [
 
 export default function Theme() {
   const { toast } = useToast();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const userId = user?.id;
   const [selectedTheme, setSelectedTheme] = useState<ThemeConfig>(getCurrentTheme());
   const [customColors, setCustomColors] = useState(selectedTheme.colors);
   const [customFonts, setCustomFonts] = useState(selectedTheme.fonts);
@@ -51,10 +52,13 @@ export default function Theme() {
   const { subscription } = useSubscriptionLimits();
   const { hasFeature } = usePlanUsage();
 
-  // Load saved theme from database
+  // Load saved theme from database. Keyed on the user id, not the user
+  // object (US-256): auth-js re-emits the session on every tab switch, and
+  // reloading here then threw away colours the agent had not saved yet.
   useEffect(() => {
-    loadSavedTheme();
-  }, [user]);
+    void loadSavedTheme();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   const loadSavedTheme = async () => {
     if (!user) return;

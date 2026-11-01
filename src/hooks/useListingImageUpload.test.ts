@@ -28,7 +28,9 @@ const { storageMock, invokeMock, validateMock } = vi.hoisted(() => ({
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: { storage: { from: () => storageMock } },
 }));
-vi.mock('@/stores/useAuthStore', () => ({ useAuthStore: () => ({ user: { id: 'u1' } }) }));
+vi.mock('@/stores/useAuthStore', () => ({
+  useAuthStore: <T>(select: (s: { user: { id: string } }) => T) => select({ user: { id: 'u1' } }),
+}));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('@/lib/edgeFunctions', () => ({ edgeFunctions: { invoke: invokeMock } }));
 vi.mock('@/lib/fileValidation', () => ({ validateUpload: validateMock }));

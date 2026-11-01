@@ -41,7 +41,7 @@ export function useFeatureFlags() {
  * Defaults to false while loading or if the flag is missing (fail-closed).
  */
 export function useFeatureFlag(flagName: string): { enabled: boolean; isLoading: boolean } {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const { data: flags, isLoading } = useFeatureFlags();
 
   const flag = flags?.find((f) => f.name === flagName);

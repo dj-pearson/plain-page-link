@@ -42,9 +42,9 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 // Mock auth store
 vi.mock('@/stores/useAuthStore', () => ({
-  useAuthStore: vi.fn(() => ({
-    user: { id: 'test-user-123' },
-  })),
+  useAuthStore: vi.fn(<T>(select: (s: { user: { id: string } }) => T) =>
+    select({ user: { id: 'test-user-123' } })
+  ),
 }));
 
 // Import after mocks

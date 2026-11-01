@@ -180,7 +180,9 @@ export interface AccessCheckOptions {
  * ```
  */
 export function useSecurity(): UseSecurityResult {
-  const { user, session, role: _storeRole, isLoading: authLoading } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const session = useAuthStore((s) => s.session);
+  const authLoading = useAuthStore((s) => s.isLoading);
   const [context, setContext] = useState<SecurityContext | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
