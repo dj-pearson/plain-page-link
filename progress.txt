@@ -4869,3 +4869,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - Now requireAdmin runs before the body is read, a per-admin fail-closed rate limit (10/hour) runs before Claude, the webhook is looked up by id in social_media_webhooks and delivered through safeFetch, and only delivered/status comes back. The admin UI sends webhookId.
 - Posts are saved as drafts and marked posted only after the webhook accepts them.
 - Tests: request.test.ts (parse, header filtering, delivery outcome); admin-gate.test.ts GATED entry plus rate-limit ordering checks; smoke script moved to ADMIN_ONLY. Follow-up: test-social-webhook and the browser-side retry still fetch webhooks unguarded.
+
+## Site improvement loop 2 — iteration 2/15 — US-249: returning Google/Apple users past the first 50 accounts could not sign in, and a forged state was trusted
+
+- oauth-proxy and sso-callback looked up existing accounts in the first page of listUsers() (50 users), so later users fell through to createUser and got create_user_failed; oauth-proxy also trusted unverified emails and an unsigned btoa state carrying the PKCE verifier.
+- New service-role-only RPC auth_user_id_by_email (migration 20261101000011) via _shared/auth-user-lookup.ts; a concurrent email_exists is treated as an existing user.
+- State is now HMAC-SHA256 signed with a nonce and 10-minute expiry, the PKCE verifier is derived from the nonce, the id_token's iss/aud/exp/email_verified are checked, redirect_to is limited to a same-site path, and failed token exchanges log only the error code.
+- Tests: oauth.test.ts (20). Owner: apply the migration, redeploy the edge functions server, set OAUTH_STATE_SECRET (32+ chars; falls back to a key derived from the service role key).
