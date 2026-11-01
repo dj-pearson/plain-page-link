@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
+import { maskEmails } from '../_shared/log-redaction.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -124,11 +125,12 @@ serve(async (req) => {
 
 async function sendEmail(alert: any, recipients?: string[], customMessage?: string): Promise<boolean> {
   // In production, integrate with email service (SendGrid, Resend, etc.)
+  // US-259: this printed the recipient addresses and the whole alert.
+  const audience = recipients ? maskEmails(recipients) : `user ${alert.user_id}`;
   console.log('Email notification:', {
-    to: recipients || [alert.user_id],
+    audience,
     subject: `SEO Alert: ${alert.alert_type} - ${alert.severity}`,
-    body: customMessage || alert.message,
-    alert: alert,
+    hasCustomMessage: Boolean(customMessage),
   });
 
   // For now, just log (would need actual email service integration)

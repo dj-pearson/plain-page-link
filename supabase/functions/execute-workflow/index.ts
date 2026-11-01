@@ -4,6 +4,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { safeFetch } from '../_shared/ssrf-guard.ts';
 import { assertLeadOwnedBy, taskAssignee } from './ownership.ts';
+import { maskEmail } from '../_shared/log-redaction.ts';
 
 /**
  * Execute Workflow - Multi-Step Workflow Orchestration
@@ -48,7 +49,7 @@ const nodeExecutors: Record<string, (node: WorkflowNode, context: ExecutionConte
     // was never sent, and the step reported success. Until the workflow runtime
     // sends mail for real (US-136, which must charge consume_plan_quota when it
     // does), the step says plainly that it did nothing and costs nothing.
-    console.log(`[execute-workflow] email step skipped (not sending yet): ${resolvedTo}: ${resolvedSubject}`);
+    console.log(`[execute-workflow] email step skipped (not sending yet): ${maskEmail(resolvedTo)}`);
     return {
       success: false,
       skipped: true,

@@ -3,6 +3,7 @@ import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { sendEmail } from '../_shared/email.ts'
+import { maskEmail } from '../_shared/log-redaction.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { safeHtmlText } from '../_shared/public-email.ts';
 
@@ -105,7 +106,7 @@ serve(async (req) => {
               .eq('id', capture.id)
           }
         } catch (error) {
-          console.error(`Failed to send email ${sequenceToSend} to ${capture.email}:`, error)
+          console.error(`Failed to send email ${sequenceToSend} to capture ${capture.id} (${maskEmail(capture.email)}):`, error)
         }
       }
     }

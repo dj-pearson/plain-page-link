@@ -2,6 +2,7 @@
 // Uses Resend API - you can swap for SendGrid or another provider
 
 import { getSiteUrl } from './env.ts';
+import { maskEmail } from './log-redaction.ts';
 
 export interface EmailOptions {
   to: string
@@ -92,7 +93,7 @@ export async function sendEmail(options: EmailOptions): Promise<SendEmailResult>
     }
 
     const body = (await response.json().catch(() => null)) as { id?: string } | null
-    console.log(`[email] sent to ${options.to}${body?.id ? ` (${body.id})` : ''}`)
+    console.log(`[email] sent to ${maskEmail(options.to)}${body?.id ? ` (${body.id})` : ''}`)
     return { ok: true, providerId: body?.id }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

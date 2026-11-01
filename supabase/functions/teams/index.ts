@@ -2,10 +2,22 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
-import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { successResponse, errorResponse, rateLimitResponse, handleUnexpectedError } from '../_shared/response.ts';
+import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
 import { sendEmail, escapeHtml } from '../_shared/email.ts';
 import { getSiteUrl } from '../_shared/env.ts';
-import { generateInviteToken, hashInviteToken, inviteAcceptUrl, INVITE_TOKEN_RE } from './invites.ts';
+import { maskEmail } from '../_shared/log-redaction.ts';
+import {
+  generateInviteToken,
+  hashInviteToken,
+  inviteAcceptUrl,
+  INVITE_TOKEN_RE,
+  INVITE_LIMITS,
+  MAX_TEAMS_PER_OWNER,
+  isInvitableEmail,
+  normaliseTeamName,
+  teamNameForEmail,
+} from './invites.ts';
 
 /**
  * Teams CRUD + membership.
@@ -45,8 +57,19 @@ serve(async (req) => {
     };
 
     if (action === 'create') {
-      const name = (body.name as string)?.trim();
+      const name = normaliseTeamName(body.name);
       if (!name) return errorResponse('Team name is required', 'REQUEST_VALIDATION_FAILED', req);
+
+      // US-259: one team per owner. Each team carried its own seat cap and its
+      // own invite allowance, so creating teams on a loop multiplied both.
+      const { count: owned, error: ownedError } = await service
+        .from('teams')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_id', user.id);
+      if (ownedError) throw ownedError;
+      if ((owned ?? 0) >= MAX_TEAMS_PER_OWNER) {
+        return errorResponse('You already have a team', 'TEAM_ALREADY_EXISTS', req, 409);
+      }
 
       const { data: team, error } = await service
         .from('teams')
@@ -70,6 +93,7 @@ serve(async (req) => {
     if (action === 'invite') {
       const { teamId, email, role } = body;
       if (!teamId || !email) return errorResponse('teamId and email are required', 'REQUEST_VALIDATION_FAILED', req);
+      if (!isInvitableEmail(email)) return errorResponse('Enter a single email address', 'REQUEST_VALIDATION_FAILED', req);
       if (!(await isAdmin(teamId))) return errorResponse('Forbidden', 'FORBIDDEN', req, 403);
 
       // Seat limit check.
@@ -97,8 +121,27 @@ serve(async (req) => {
       // US-226: the invite used to stop here — a row nobody was told about and
       // no page could accept. It now carries a one-time token (stored hashed)
       // and the invitee gets a link to /team/accept.
+      const inviteEmail = email.trim().toLowerCase();
+
+      // US-259: every invite is an email from our domain to an address the
+      // caller chose. Cap it per sender and per recipient, failing closed — an
+      // unavailable limiter must not turn this into an open relay. The
+      // recipient is keyed by its hash so rate_limit_entries holds no address.
+      const bySender = await checkRateLimitDb(service, user.id, 'teams-invite', INVITE_LIMITS.perSender);
+      if (!bySender.allowed) {
+        return rateLimitResponse(bySender.retryAfterSeconds, req, 'Daily invitation limit reached. Try again tomorrow.');
+      }
+      const byRecipient = await checkRateLimitDb(
+        service,
+        await hashInviteToken(inviteEmail),
+        'teams-invite-recipient',
+        INVITE_LIMITS.perRecipient
+      );
+      if (!byRecipient.allowed) {
+        return rateLimitResponse(byRecipient.retryAfterSeconds, req, 'This address has been invited too many times today.');
+      }
+
       const token = generateInviteToken();
-      const inviteEmail = String(email).trim().toLowerCase();
       const { data: member, error } = await service
         .from('team_members')
         .insert({
@@ -114,7 +157,8 @@ serve(async (req) => {
       if (error) throw error;
 
       const { data: teamRow } = await service.from('teams').select('name').eq('id', teamId).maybeSingle();
-      const teamName = (teamRow?.name as string | undefined) ?? 'their team';
+      // US-259: the name is the caller's text in our mail; links are stripped.
+      const teamName = teamNameForEmail((teamRow?.name as string | undefined) ?? '');
       const link = inviteAcceptUrl(getSiteUrl(), teamId, token);
       const sent = await sendEmail({
         to: inviteEmail,
@@ -122,7 +166,7 @@ serve(async (req) => {
         body: `${user.email} invited you to join ${teamName} on AgentBio.\n\nAccept the invitation: ${link}\n\nIf you weren't expecting this, you can ignore it.`,
         html: `<p>${escapeHtml(user.email ?? 'A teammate')} invited you to join <strong>${escapeHtml(teamName)}</strong> on AgentBio.</p><p><a href="${escapeHtml(link)}">Accept the invitation</a></p><p>If you weren't expecting this, you can ignore it.</p>`,
       });
-      if (!sent.ok) console.error(`[teams] invite email to ${inviteEmail} failed: ${sent.error}`);
+      if (!sent.ok) console.error(`[teams] invite email to ${maskEmail(inviteEmail)} failed: ${sent.error}`);
 
       return successResponse({ member, emailed: sent.ok }, req);
     }

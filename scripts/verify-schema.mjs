@@ -2714,6 +2714,79 @@ check('no secret-shaped column is reachable by anon', () =>
 );
 
 // ---------------------------------------------------------------------------
+// 12b. A team owner cannot raise their own seat cap or hand the team away, and
+//      a team admin cannot write an accepted roster row (US-259).
+//
+//      "Owner modifies team" was FOR ALL with owner_id = auth.uid(), so an owner
+//      could PATCH teams.max_seats to any number from the browser and skip the
+//      plan's seat limit; "Admins manage roster" was FOR ALL too, so an admin
+//      could INSERT a team_members row with accepted_at already set — a seat
+//      nobody was invited to, past the cap the teams function enforces. Every
+//      write to these tables goes through the teams edge function (service role).
+// ---------------------------------------------------------------------------
+check('team owners cannot change max_seats/owner_id and admins cannot insert accepted members', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-0000000e2591';
+  const other = '00000000-dead-beef-0000-0000000e2592';
+  const team = '00000000-dead-beef-0000-0000000e2593';
+  const as = (sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${owner}'; ${sql}`);
+  const refused = (label, sql) => {
+    try {
+      as(sql);
+    } catch {
+      return; // an error is a refusal
+    }
+    return label;
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${owner}', 'teamown@example.test'), ('${other}', 'teamother@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.teams (id, owner_id, name, max_seats) VALUES ('${team}', '${owner}', 'Seat Check', 5);
+       INSERT INTO public.team_members (team_id, user_id, email, role, accepted_at)
+         VALUES ('${team}', '${owner}', 'teamown@example.test', 'owner', now());`);
+
+    const [seen] = as(`SELECT count(*) FROM public.teams WHERE id = '${team}';`);
+    if (seen !== '1') out.push('the owner can no longer read their own team');
+    const [roster] = as(`SELECT count(*) FROM public.team_members WHERE team_id = '${team}';`);
+    if (roster !== '1') out.push('the owner can no longer read their own roster');
+
+    refused('', `UPDATE public.teams SET max_seats = 1000 WHERE id = '${team}';`);
+    refused('', `UPDATE public.teams SET owner_id = '${other}' WHERE id = '${team}';`);
+    const [after] = q(`SELECT max_seats || '|' || owner_id FROM public.teams WHERE id = '${team}';`);
+    if (after !== `5|${owner}`) out.push(`the owner rewrote their team to max_seats|owner_id = ${after}`);
+
+    const ins = refused(
+      'the owner inserted a second team with max_seats 1000 directly',
+      `INSERT INTO public.teams (owner_id, name, max_seats) VALUES ('${owner}', 'Bypass', 1000);`
+    );
+    if (ins) out.push(ins);
+
+    const mem = refused(
+      'a team admin inserted an already-accepted team_members row directly',
+      `INSERT INTO public.team_members (team_id, user_id, email, role, accepted_at)
+         VALUES ('${team}', '${other}', 'teamother@example.test', 'member', now());`
+    );
+    if (mem) out.push(mem);
+
+    refused('', `UPDATE public.team_members SET role = 'admin', accepted_at = now() WHERE team_id = '${team}';`);
+    const [roleNow] = q(`SELECT role FROM public.team_members WHERE team_id = '${team}' AND user_id = '${owner}';`);
+    if (roleNow !== 'owner') out.push(`a team admin rewrote a roster row's role to ${roleNow}`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.team_members WHERE team_id IN (SELECT id FROM public.teams WHERE owner_id = '${owner}');
+         DELETE FROM public.teams WHERE owner_id = '${owner}';
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 13. Every bucket named in storage.from() must be created by a migration.
 //     There are no storage.buckets rows and no storage.objects policies in the
 //     applied schema at all — bucket creation lives only in the unapplied
