@@ -4924,3 +4924,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - A same-user SIGNED_IN (fired on every tab refocus) or TOKEN_REFRESHED now only updates the session, keeping the user reference and skipping the profile/roles refetch; Theme and ProfileDisplaySettings reload only when the user id changes.
 - useSubscription drops its private ['session'] query, due-task keys include the user id, and auth-store reads in src/hooks and MobileNav use selectors.
 - Tests: same-user listener events, cache clearing on every sign-out path and account switch, Theme unsaved-colour survival, ProfileDisplaySettings reload rules.
+
+## Site improvement loop 2 — iteration 10/15 — US-257: an agent editing a listing or testimonial lost what they had typed whenever the page re-rendered
+
+- EditListingModal and EditTestimonialModal reset their form from an `initialData` object rebuilt inline on every render; the reset effect is gone, callers key each modal by record id, and both are now Radix dialogs (named, Escape closes, focus trapped). A duplicate `id="description"` textarea was removed.
+- The shortcuts panel (already a Dialog from US-252) now wraps its floating button in a DialogTrigger so focus returns to it on close; theme tokens replace the gray literals.
+- Listings grid: Edit/Delete visible on touch and on keyboard focus with aria-labels and 44px targets; named grid/list toggles (aria-pressed) and Add chevron (aria-expanded); a loading skeleton replaces the empty-state flash; Move earlier/later buttons reorder through US-253's full-list reorderListings mutation.
+- Tests: EditModals.test.tsx (5), Listings.grid.test.tsx (4), a focus-return test in KeyboardShortcutsHelper.test.tsx; full suite 1399 passed, 1 skipped.
