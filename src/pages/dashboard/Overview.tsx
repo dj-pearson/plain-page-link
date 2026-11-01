@@ -3,19 +3,16 @@ import {
   Users,
   MousePointerClick,
   TrendingUp,
-  PartyPopper,
-  Check,
   Copy,
   ExternalLink,
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useLinks } from '@/hooks/useLinks';
 import { useProfile } from '@/hooks/useProfile';
-import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,25 +23,16 @@ import { DueFollowUps } from '@/components/dashboard/DueFollowUps';
 import { ComingUp } from '@/components/dashboard/ComingUp';
 import { PlanUsageCard } from '@/components/dashboard/PlanUsageCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { getPlanById } from '@/config/pricing-plans';
 import { topByClicks } from '@/lib/linkOrder';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { CHECKOUT_RETURN_PATH, CHECKOUT_STATUS_PARAM } from '@/lib/checkoutReturn';
 
 export default function Overview() {
   const { stats, recentLeads, isLoading, isError, refetch } = useAnalytics();
   const { links } = useLinks();
   const { profile } = useProfile();
-  const { subscription } = useSubscription();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const totalLinkClicks = links.reduce((sum, link) => sum + (link.click_count || 0), 0);
 
@@ -58,51 +46,16 @@ export default function Overview() {
     ? "Let's get your profile set up and start attracting clients"
     : "Here's what's happening with your profile";
 
-  // Check for subscription success parameter
+  // US-258: Pricing used to send Checkout back to /dashboard?subscription=success,
+  // where a modal congratulated the agent on whatever plan the webhook had
+  // recorded so far — usually still Free. Checkout now returns to the
+  // subscription page, which waits for the plan to change; a session opened
+  // before that deploy still lands here, so it is passed along.
   useEffect(() => {
     if (searchParams.get('subscription') === 'success') {
-      setShowSuccessModal(true);
-      // Remove the query parameter
-      navigate('/dashboard', { replace: true });
+      navigate(`${CHECKOUT_RETURN_PATH}?${CHECKOUT_STATUS_PARAM}=success`, { replace: true });
     }
   }, [searchParams, navigate]);
-
-  // Get features from pricing config based on plan
-  const getUnlockedFeatures = (planName: string | undefined) => {
-    const planId = planName?.toLowerCase() || 'free';
-    const plan = getPlanById(planId);
-
-    if (!plan) return [];
-
-    const features: string[] = [];
-    const limits = plan.limits;
-
-    // Add limits-based features
-    features.push(
-      limits.listings === -1 ? 'Unlimited listings' : `${limits.listings} active listings`
-    );
-    features.push(limits.links === -1 ? 'Unlimited custom links' : `${limits.links} custom links`);
-    features.push(
-      limits.testimonials === -1 ? 'Unlimited testimonials' : `${limits.testimonials} testimonials`
-    );
-    features.push(
-      limits.analyticsRetentionDays === -1
-        ? 'Unlimited analytics history'
-        : `${limits.analyticsRetentionDays}-day analytics`
-    );
-
-    // Add feature-based unlocks
-    if (plan.features.customDomain) features.push('Custom domain support');
-    if (plan.features.customThemes) features.push('Premium themes');
-    if (plan.features.prioritySupport) features.push('Priority support');
-    if (plan.features.leadScoring) features.push('Lead scoring');
-    if (plan.features.aiListingDescriptions) features.push('AI listing descriptions');
-    // US-224: 'Follow-up sequences' (workflows do not run yet, US-136) and
-    // 'Predictive analytics' (no such feature) were listed here as reasons to
-    // upgrade. They come back when they exist.
-
-    return features.slice(0, 7); // Return top 7 features
-  };
 
   if (isLoading) {
     return (
@@ -318,48 +271,6 @@ export default function Overview() {
       </div>
 
       {/* Subscription Success Modal */}
-      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mx-auto mb-4">
-              <PartyPopper className="w-8 h-8 text-green-600" />
-            </div>
-            <DialogTitle className="text-center text-2xl">
-              🎉 Welcome to {subscription?.plan_name}!
-            </DialogTitle>
-            <DialogDescription className="text-center pt-2">
-              Your subscription is now active. Here's what you just unlocked:
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="bg-muted/50 rounded-lg p-4 my-4">
-            <h4 className="font-semibold mb-3 flex items-center gap-2">
-              <Check className="w-5 h-5 text-green-600" />
-              New Features Available:
-            </h4>
-            <ul className="space-y-2">
-              {getUnlockedFeatures(subscription?.plan_name).map((feature, index) => (
-                <li key={index} className="flex items-start gap-2 text-sm">
-                  <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
-              A confirmation email with your receipt has been sent to your email address.
-            </p>
-            <button
-              onClick={() => setShowSuccessModal(false)}
-              className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
-            >
-              Get Started
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

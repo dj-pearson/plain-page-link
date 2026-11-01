@@ -55,6 +55,8 @@ export interface UserSubscription {
   features: Record<string, any>;
   status: string;
   current_period_end?: string;
+  /** Set to end at current_period_end rather than renew (get_user_plan). */
+  cancel_at_period_end?: boolean;
 }
 
 export const useSubscription = () => {

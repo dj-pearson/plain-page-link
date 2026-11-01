@@ -111,6 +111,26 @@ describe('Settings billing block', () => {
     renderWithProviders(<Settings />);
 
     expect(await screen.findByText('Professional')).toBeInTheDocument();
+    expect(screen.getByText('Renews')).toBeInTheDocument();
+  });
+
+  it("says 'Ends' instead of 'Renews' when the subscription is set to cancel (US-258)", async () => {
+    subscriptionMock.mockReturnValue({
+      subscription: {
+        plan_name: 'professional',
+        status: 'active',
+        cancel_at_period_end: true,
+        current_period_end: '2027-02-15T00:00:00.000Z',
+        limits: {},
+        features: {},
+      },
+      isLoading: false,
+    });
+
+    renderWithProviders(<Settings />);
+
+    expect(await screen.findByText('Ends')).toBeInTheDocument();
+    expect(screen.queryByText('Renews')).toBeNull();
   });
 
   it('links to the subscription page instead of buttons that do nothing', async () => {

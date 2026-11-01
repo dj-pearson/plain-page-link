@@ -7,7 +7,7 @@
  * these tests are about what Overview does with useAnalytics.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderWithProviders, screen, userEvent } from '@/test/test-utils';
+import { renderWithProviders, screen, userEvent, waitFor } from '@/test/test-utils';
 
 const { analytics, refetchMock } = vi.hoisted(() => ({
   analytics: { current: {} as Record<string, unknown> },
@@ -80,5 +80,19 @@ describe('Overview', () => {
 
     expect(screen.getByText('Cleo Phone')).toBeInTheDocument();
     expect(screen.getByText('+1-555-0199')).toBeInTheDocument();
+  });
+
+  it('passes a pre-US-258 checkout return on to the subscription page, which waits for the plan', async () => {
+    window.history.pushState({}, '', '/dashboard?subscription=success');
+    renderWithProviders(<Overview />);
+
+    await waitFor(() =>
+      expect(window.location.pathname + window.location.search).toBe(
+        '/dashboard/subscription?checkout_status=success'
+      )
+    );
+    // No "Welcome to <plan>" modal built from a plan the webhook has not set yet.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    window.history.pushState({}, '', '/');
   });
 });

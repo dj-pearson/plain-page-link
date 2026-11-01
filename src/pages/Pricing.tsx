@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { AddOnWaitlist } from '@/components/pricing/AddOnWaitlist';
 import { registerUrlForPlan } from '@/lib/signupIntent';
+import { CHECKOUT_RETURN_PATH, checkoutSuccessUrl } from '@/lib/checkoutReturn';
 import { useToast } from '@/hooks/use-toast';
 import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -200,19 +201,34 @@ export default function Pricing() {
         return;
       }
 
+      // Already paying: the change would be applied to the live subscription
+      // at once (US-217), so it goes through the subscription page's confirm
+      // dialog instead of happening on this click (US-258).
+      const currentPlan = (subscription?.plan_name ?? 'free').toLowerCase();
+      if (currentPlan !== 'free') {
+        const params = new URLSearchParams({
+          checkout: planName.toLowerCase(),
+          interval: isYearly ? 'year' : 'month',
+        });
+        navigate(`${CHECKOUT_RETURN_PATH}?${params.toString()}`);
+        return;
+      }
+
       const { data, error } = await edgeFunctions.invoke('create-checkout-session', {
         body: {
           priceId,
-          successUrl: `${window.location.origin}/dashboard?subscription=success`,
+          // The one success URL, which the subscription page handles (US-258).
+          successUrl: checkoutSuccessUrl(window.location.origin, planName),
           cancelUrl: `${window.location.origin}/pricing`,
         },
       });
 
       if (error) throw error;
       if (data?.url) window.location.href = data.url;
-      // Already subscribed: the existing subscription was changed in place
-      // rather than a second one opened (US-217).
-      else if (data && 'changed' in data) window.location.href = '/dashboard/subscription';
+      // A subscription Stripe knows about and our copy did not: it was
+      // changed in place (US-217); the success URL shows it arriving.
+      else if (data && 'changed' in data)
+        window.location.href = checkoutSuccessUrl(window.location.origin, planName);
     } catch (error) {
       toast({
         title: 'Error',
