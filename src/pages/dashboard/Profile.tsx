@@ -414,13 +414,19 @@ export default function Profile() {
             <h2 className="text-lg font-semibold text-foreground mb-4">Basic Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Full Name</label>
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-full_name"
+                >
+                  Full Name
+                </label>
                 <input
+                  id="profile-full_name"
                   type="text"
                   name="full_name"
                   value={formData.full_name}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               {/* Read-only. There were two username editors: this one, a plain
@@ -455,33 +461,42 @@ export default function Profile() {
                 </p>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-title"
+                >
                   Professional Title
                 </label>
                 <input
+                  id="profile-title"
                   type="text"
                   name="title"
                   value={formData.title}
                   onChange={handleChange}
                   placeholder="e.g., Real Estate Agent, Broker, Team Lead"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
           </div>
 
           <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Professional Bio</h2>
+            <h2 id="profile-bio-heading" className="text-lg font-semibold text-foreground mb-4">
+              Professional Bio
+            </h2>
             <textarea
+              id="profile-bio"
+              aria-labelledby="profile-bio-heading"
+              aria-describedby="profile-bio-count"
               name="bio"
               value={formData.bio}
               onChange={handleChange}
               rows={6}
               maxLength={500}
               placeholder="Tell potential clients about your experience, specialties, and what makes you unique..."
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
-            <p className="text-sm text-muted-foreground mt-2">
+            <p id="profile-bio-count" className="text-sm text-muted-foreground mt-2">
               {formData.bio.length}/500 characters
             </p>
           </div>
@@ -493,70 +508,90 @@ export default function Profile() {
             <h2 className="text-lg font-semibold text-foreground mb-4">License & Brokerage</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-license_number"
+                >
                   License Number
                 </label>
                 <input
+                  id="profile-license_number"
                   type="text"
                   name="license_number"
                   value={formData.license_number}
                   onChange={handleChange}
                   placeholder="12345678"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-license_state"
+                >
                   License State
                 </label>
                 <input
+                  id="profile-license_state"
                   type="text"
                   name="license_state"
                   value={formData.license_state}
                   onChange={handleChange}
                   placeholder="CA"
                   maxLength={2}
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-brokerage_name"
+                >
                   Brokerage Name
                 </label>
                 <input
+                  id="profile-brokerage_name"
                   type="text"
                   name="brokerage_name"
                   value={formData.brokerage_name}
                   onChange={handleChange}
                   placeholder="ABC Realty"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-years_experience"
+                >
                   Years of Experience
                 </label>
                 <input
+                  id="profile-years_experience"
                   type="number"
                   name="years_experience"
                   value={formData.years_experience || ''}
                   onChange={handleChange}
                   min="0"
                   placeholder="0"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-brokerage_logo"
+                >
                   Brokerage Logo URL
                 </label>
                 <input
+                  id="profile-brokerage_logo"
                   type="url"
                   name="brokerage_logo"
                   value={formData.brokerage_logo}
                   onChange={handleChange}
                   placeholder="https://example.com/logo.png"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
@@ -568,15 +603,17 @@ export default function Profile() {
               <div className="flex gap-2">
                 <input
                   type="text"
+                  aria-label="Add a specialty"
                   value={specialtyInput}
                   onChange={(e) => setSpecialtyInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialty())}
                   placeholder="e.g., First-Time Buyers, Luxury Homes"
-                  className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <button
                   type="button"
                   onClick={addSpecialty}
+                  aria-label="Add a specialty"
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
@@ -592,6 +629,7 @@ export default function Profile() {
                     <button
                       type="button"
                       onClick={() => removeSpecialty(index)}
+                      aria-label={`Remove ${specialty}`}
                       className="hover:text-blue-900"
                     >
                       <X className="h-3 w-3" />
@@ -608,15 +646,17 @@ export default function Profile() {
               <div className="flex gap-2">
                 <input
                   type="text"
+                  aria-label="Add a certification"
                   value={certificationInput}
                   onChange={(e) => setCertificationInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCertification())}
                   placeholder="e.g., ABR, CRS, GRI"
-                  className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <button
                   type="button"
                   onClick={addCertification}
+                  aria-label="Add a certification"
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
@@ -632,6 +672,7 @@ export default function Profile() {
                     <button
                       type="button"
                       onClick={() => removeCertification(index)}
+                      aria-label={`Remove ${cert}`}
                       className="hover:text-green-900"
                     >
                       <X className="h-3 w-3" />
@@ -663,7 +704,7 @@ export default function Profile() {
                   onChange={handlePhoneChange}
                   placeholder="(555) 123-4567"
                   aria-describedby={profile?.phoneUnavailable ? 'profile-phone-note' : undefined}
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 {profile?.phoneUnavailable && (
                   <p id="profile-phone-note" className="mt-2 text-sm text-muted-foreground">
@@ -673,45 +714,57 @@ export default function Profile() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-email_display"
+                >
                   Public Display Email
                 </label>
                 <input
+                  id="profile-email_display"
                   type="email"
                   name="email_display"
                   value={formData.email_display}
                   onChange={handleChange}
                   placeholder="agent@example.com"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Optional - shown on your public profile
                 </p>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-website_url"
+                >
                   Website URL
                 </label>
                 <input
+                  id="profile-website_url"
                   type="url"
                   name="website_url"
                   value={formData.website_url}
                   onChange={handleChange}
                   placeholder="https://yourwebsite.com"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-calendly_url"
+                >
                   Calendly Booking URL
                 </label>
                 <input
+                  id="profile-calendly_url"
                   type="url"
                   name="calendly_url"
                   value={formData.calendly_url}
                   onChange={handleChange}
                   placeholder="https://calendly.com/yourname/30min"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Add your Calendly link to enable "Book a Showing" on your listings
@@ -729,15 +782,17 @@ export default function Profile() {
               <div className="flex gap-2">
                 <input
                   type="text"
+                  aria-label="Add a service city"
                   value={cityInput}
                   onChange={(e) => setCityInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCity())}
                   placeholder="e.g., Los Angeles, Beverly Hills"
-                  className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <button
                   type="button"
                   onClick={addCity}
+                  aria-label="Add a service city"
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
@@ -753,6 +808,7 @@ export default function Profile() {
                     <button
                       type="button"
                       onClick={() => removeCity(index)}
+                      aria-label={`Remove ${city}`}
                       className="hover:text-purple-900"
                     >
                       <X className="h-3 w-3" />
@@ -769,15 +825,17 @@ export default function Profile() {
               <div className="flex gap-2">
                 <input
                   type="text"
+                  aria-label="Add a service ZIP code"
                   value={zipInput}
                   onChange={(e) => setZipInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addZip())}
                   placeholder="e.g., 90210, 90211"
-                  className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <button
                   type="button"
                   onClick={addZip}
+                  aria-label="Add a service ZIP code"
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
@@ -793,6 +851,7 @@ export default function Profile() {
                     <button
                       type="button"
                       onClick={() => removeZip(index)}
+                      aria-label={`Remove ${zip}`}
                       className="hover:text-orange-900"
                     >
                       <X className="h-3 w-3" />
@@ -810,92 +869,122 @@ export default function Profile() {
             <h2 className="text-lg font-semibold text-foreground mb-4">Social Media Links</h2>
             <div className="grid grid-cols-1 gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-facebook_url"
+                >
                   Facebook URL
                 </label>
                 <input
+                  id="profile-facebook_url"
                   type="url"
                   name="facebook_url"
                   value={formData.facebook_url}
                   onChange={handleChange}
                   placeholder="https://facebook.com/yourpage"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-instagram_url"
+                >
                   Instagram URL
                 </label>
                 <input
+                  id="profile-instagram_url"
                   type="url"
                   name="instagram_url"
                   value={formData.instagram_url}
                   onChange={handleChange}
                   placeholder="https://instagram.com/yourusername"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-linkedin_url"
+                >
                   LinkedIn URL
                 </label>
                 <input
+                  id="profile-linkedin_url"
                   type="url"
                   name="linkedin_url"
                   value={formData.linkedin_url}
                   onChange={handleChange}
                   placeholder="https://linkedin.com/in/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">TikTok URL</label>
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-tiktok_url"
+                >
+                  TikTok URL
+                </label>
                 <input
+                  id="profile-tiktok_url"
                   type="url"
                   name="tiktok_url"
                   value={formData.tiktok_url}
                   onChange={handleChange}
                   placeholder="https://tiktok.com/@yourusername"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-youtube_url"
+                >
                   YouTube URL
                 </label>
                 <input
+                  id="profile-youtube_url"
                   type="url"
                   name="youtube_url"
                   value={formData.youtube_url}
                   onChange={handleChange}
                   placeholder="https://youtube.com/@yourchannel"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-zillow_url"
+                >
                   Zillow Profile URL
                 </label>
                 <input
+                  id="profile-zillow_url"
                   type="url"
                   name="zillow_url"
                   value={formData.zillow_url}
                   onChange={handleChange}
                   placeholder="https://zillow.com/profile/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-realtor_com_url"
+                >
                   Realtor.com Profile URL
                 </label>
                 <input
+                  id="profile-realtor_com_url"
                   type="url"
                   name="realtor_com_url"
                   value={formData.realtor_com_url}
                   onChange={handleChange}
                   placeholder="https://realtor.com/realestateagents/yourprofile"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
@@ -915,15 +1004,21 @@ export default function Profile() {
             <div className="space-y-6">
               {/* SEO Title */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">SEO Title</label>
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-seo_title"
+                >
+                  SEO Title
+                </label>
                 <input
+                  id="profile-seo_title"
                   type="text"
                   name="seo_title"
                   value={formData.seo_title}
                   onChange={handleChange}
                   maxLength={60}
                   placeholder={`${formData.full_name || 'Your Name'} - Real Estate Agent`}
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-xs text-muted-foreground">
@@ -941,17 +1036,21 @@ export default function Profile() {
 
               {/* Meta Description */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label
+                  className="block text-sm font-medium text-foreground mb-2"
+                  htmlFor="profile-seo_description"
+                >
                   Meta Description
                 </label>
                 <textarea
+                  id="profile-seo_description"
                   name="seo_description"
                   value={formData.seo_description}
                   onChange={handleChange}
                   maxLength={160}
                   rows={3}
                   placeholder={`Professional real estate services by ${formData.full_name || 'Your Name'}. Specializing in ${formData.service_cities.join(', ') || 'your area'}. Contact me today for all your real estate needs.`}
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-xs text-muted-foreground">

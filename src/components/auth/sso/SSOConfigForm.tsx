@@ -150,16 +150,28 @@ export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProp
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Organization Name *</label>
-            <Input {...register('organization_name')} placeholder="Acme Corporation" />
+            <label htmlFor="sso-organization-name" className="text-sm font-medium text-gray-700">
+              Organization Name *
+            </label>
+            <Input
+              id="sso-organization-name"
+              {...register('organization_name')}
+              placeholder="Acme Corporation"
+            />
             {errors.organization_name && (
               <p className="text-sm text-red-600">{errors.organization_name.message}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Email Domain *</label>
-            <Input {...register('organization_domain')} placeholder="acme.com" />
+            <label htmlFor="sso-organization-domain" className="text-sm font-medium text-gray-700">
+              Email Domain *
+            </label>
+            <Input
+              id="sso-organization-domain"
+              {...register('organization_domain')}
+              placeholder="acme.com"
+            />
             {errors.organization_domain && (
               <p className="text-sm text-red-600">{errors.organization_domain.message}</p>
             )}
@@ -167,14 +179,16 @@ export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProp
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">SSO Provider *</label>
+          <label htmlFor="sso-provider" className="text-sm font-medium text-gray-700">
+            SSO Provider *
+          </label>
           <Select
             value={provider}
             onValueChange={(value) =>
               setValue('sso_provider', value as SSOConfigFormData['sso_provider'])
             }
           >
-            <SelectTrigger>
+            <SelectTrigger id="sso-provider">
               <SelectValue placeholder="Select provider" />
             </SelectTrigger>
             <SelectContent>
@@ -194,26 +208,44 @@ export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProp
           <h3 className="font-medium text-gray-900">SAML Configuration</h3>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">IdP Entity ID *</label>
+            <label htmlFor="sso-saml-entity-id" className="text-sm font-medium text-gray-700">
+              IdP Entity ID *
+            </label>
             <Input
+              id="sso-saml-entity-id"
               {...register('saml_entity_id')}
               placeholder="https://idp.example.com/saml/metadata"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">IdP SSO URL *</label>
-            <Input {...register('saml_sso_url')} placeholder="https://idp.example.com/saml/sso" />
+            <label htmlFor="sso-saml-sso-url" className="text-sm font-medium text-gray-700">
+              IdP SSO URL *
+            </label>
+            <Input
+              id="sso-saml-sso-url"
+              {...register('saml_sso_url')}
+              placeholder="https://idp.example.com/saml/sso"
+            />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">IdP SLO URL (optional)</label>
-            <Input {...register('saml_slo_url')} placeholder="https://idp.example.com/saml/slo" />
+            <label htmlFor="sso-saml-slo-url" className="text-sm font-medium text-gray-700">
+              IdP SLO URL (optional)
+            </label>
+            <Input
+              id="sso-saml-slo-url"
+              {...register('saml_slo_url')}
+              placeholder="https://idp.example.com/saml/slo"
+            />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">X.509 Certificate *</label>
+            <label htmlFor="sso-saml-certificate" className="text-sm font-medium text-gray-700">
+              X.509 Certificate *
+            </label>
             <Textarea
+              id="sso-saml-certificate"
               {...register('saml_certificate')}
               placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
               rows={6}
@@ -222,8 +254,11 @@ export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Metadata URL (optional)</label>
+            <label htmlFor="sso-saml-metadata-url" className="text-sm font-medium text-gray-700">
+              Metadata URL (optional)
+            </label>
             <Input
+              id="sso-saml-metadata-url"
               {...register('saml_metadata_url')}
               placeholder="https://idp.example.com/saml/metadata.xml"
             />
@@ -241,16 +276,24 @@ export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProp
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Client ID *</label>
-              <Input {...register('oidc_client_id')} placeholder="your-client-id" />
+              <label htmlFor="sso-oidc-client-id" className="text-sm font-medium text-gray-700">
+                Client ID *
+              </label>
+              <Input
+                id="sso-oidc-client-id"
+                {...register('oidc_client_id')}
+                placeholder="your-client-id"
+              />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
+              <label htmlFor="sso-oidc-client-secret" className="text-sm font-medium text-gray-700">
                 Client Secret {isEditing ? '(leave blank to keep)' : '*'}
               </label>
               <Input
+                id="sso-oidc-client-secret"
                 type="password"
+                autoComplete="off"
                 {...register('oidc_client_secret')}
                 placeholder="your-client-secret"
               />
@@ -258,31 +301,50 @@ export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Issuer URL *</label>
-            <Input {...register('oidc_issuer')} placeholder="https://accounts.google.com" />
+            <label htmlFor="sso-oidc-issuer" className="text-sm font-medium text-gray-700">
+              Issuer URL *
+            </label>
+            <Input
+              id="sso-oidc-issuer"
+              {...register('oidc_issuer')}
+              placeholder="https://accounts.google.com"
+            />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Authorization Endpoint *</label>
+            <label
+              htmlFor="sso-oidc-authorization-endpoint"
+              className="text-sm font-medium text-gray-700"
+            >
+              Authorization Endpoint *
+            </label>
             <Input
+              id="sso-oidc-authorization-endpoint"
               {...register('oidc_authorization_endpoint')}
               placeholder="https://accounts.google.com/o/oauth2/v2/auth"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Token Endpoint *</label>
+            <label htmlFor="sso-oidc-token-endpoint" className="text-sm font-medium text-gray-700">
+              Token Endpoint *
+            </label>
             <Input
+              id="sso-oidc-token-endpoint"
               {...register('oidc_token_endpoint')}
               placeholder="https://oauth2.googleapis.com/token"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="sso-oidc-userinfo-endpoint"
+              className="text-sm font-medium text-gray-700"
+            >
               UserInfo Endpoint (optional)
             </label>
             <Input
+              id="sso-oidc-userinfo-endpoint"
               {...register('oidc_userinfo_endpoint')}
               placeholder="https://openidconnect.googleapis.com/v1/userinfo"
             />
@@ -295,12 +357,14 @@ export const SSOConfigForm = ({ config, onSuccess, onCancel }: SSOConfigFormProp
         <h3 className="font-medium text-gray-900">Settings</h3>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">Default Role</label>
+          <label htmlFor="sso-default-role" className="text-sm font-medium text-gray-700">
+            Default Role
+          </label>
           <Select
             value={watch('default_role')}
             onValueChange={(value) => setValue('default_role', value as 'user' | 'admin')}
           >
-            <SelectTrigger>
+            <SelectTrigger id="sso-default-role">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

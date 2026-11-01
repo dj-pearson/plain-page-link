@@ -123,7 +123,7 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
             <div className="space-y-4 py-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label>Paste Listing Details</Label>
+                  <Label htmlFor="url-import-pasted">Paste Listing Details</Label>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -135,6 +135,7 @@ export function URLImportDialog({ open, onOpenChange, onImport }: URLImportDialo
                   </Button>
                 </div>
                 <Textarea
+                  id="url-import-pasted"
                   value={pastedText}
                   onChange={(e) => setPastedText(e.target.value)}
                   placeholder={`Paste the listing details here. Our smart parser will extract:

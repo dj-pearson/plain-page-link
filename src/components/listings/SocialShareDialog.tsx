@@ -159,8 +159,11 @@ export function SocialShareDialog({ open, onOpenChange, listing }: SocialShareDi
 
           {/* Post Text Editor */}
           <div>
-            <label className="block text-sm font-semibold mb-2">Post Caption</label>
+            <label htmlFor="social-share-caption" className="block text-sm font-semibold mb-2">
+              Post Caption
+            </label>
             <Textarea
+              id="social-share-caption"
               value={postText}
               onChange={(e) => setPostText(e.target.value)}
               rows={12}

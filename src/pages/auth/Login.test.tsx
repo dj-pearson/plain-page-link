@@ -51,6 +51,21 @@ describe('Login page', () => {
     expect(signIn).not.toHaveBeenCalled();
   });
 
+  // US-261: the error text was a sibling <p> with no id, so a screen reader
+  // landing on the field heard nothing about why it was refused.
+  it('marks invalid fields and describes them with their error text', async () => {
+    renderWithProviders(<Login />);
+    const password = screen.getByLabelText('Password');
+    expect(password).not.toHaveAttribute('aria-invalid');
+    await userEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+    await waitFor(() => expect(password).toHaveAttribute('aria-invalid', 'true'));
+    expect(password).toHaveAccessibleDescription('Password is required');
+    const email = screen.getByLabelText('Email address');
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    const emailError = document.getElementById(email.getAttribute('aria-describedby') ?? '');
+    expect(emailError?.textContent?.trim()).toBeTruthy();
+  });
+
   it('calls signIn with normalized credentials on valid submit', async () => {
     signIn.mockResolvedValue(undefined);
     renderWithProviders(<Login />);

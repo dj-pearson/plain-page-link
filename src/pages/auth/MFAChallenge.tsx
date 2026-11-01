@@ -32,11 +32,15 @@ export const MFAChallenge = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12 focus:outline-none"
+    >
       <div className="w-full max-w-md bg-white rounded-xl shadow-sm border p-8">
         <NativeMFAVerification onSuccess={handleSuccess} onCancel={handleCancel} />
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -125,7 +125,8 @@ export const WorkflowsListPage = () => {
               send (US-136) — say so rather than let agents believe leads are
               being nurtured. */}
           <p className="text-gray-600 mt-1">
-            Design follow-up steps. Workflows run only when you start them, and email steps don&apos;t send yet.
+            Design follow-up steps. Workflows run only when you start them, and email steps
+            don&apos;t send yet.
           </p>
         </div>
         <Button onClick={handleCreateNew}>
@@ -141,8 +142,13 @@ export const WorkflowsListPage = () => {
       {/* Filters */}
       <div className="flex items-center gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search
+            aria-hidden="true"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+          />
           <Input
+            type="search"
+            aria-label="Search workflows"
             placeholder="Search workflows..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -151,7 +157,7 @@ export const WorkflowsListPage = () => {
         </div>
 
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-48" aria-label="Filter by category">
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
@@ -165,7 +171,7 @@ export const WorkflowsListPage = () => {
         </Select>
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40" aria-label="Filter by status">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
