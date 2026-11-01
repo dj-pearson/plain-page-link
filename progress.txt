@@ -4876,3 +4876,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - New service-role-only RPC auth_user_id_by_email (migration 20261101000011) via _shared/auth-user-lookup.ts; a concurrent email_exists is treated as an existing user.
 - State is now HMAC-SHA256 signed with a nonce and 10-minute expiry, the PKCE verifier is derived from the nonce, the id_token's iss/aud/exp/email_verified are checked, redirect_to is limited to a same-site path, and failed token exchanges log only the error code.
 - Tests: oauth.test.ts (20). Owner: apply the migration, redeploy the edge functions server, set OAUTH_STATE_SECRET (32+ chars; falls back to a key derived from the service role key).
+
+## Site improvement loop 2 — iteration 3/15 — US-251: a late or re-delivered stripe event reopened a cancelled subscription and granted the paid plan forever
+
+- Out-of-order or retried invoice.paid / customer.subscription.updated(active) arriving after customer.subscription.deleted set the row back to 'active', and get_user_plan grants 'active' with no period check.
+- stripe-webhook now re-reads the subscription from Stripe (syncSubscription) on updated, deleted and invoice-paid events and writes Stripe's current state; a canceled row's period end is clipped to ended_at, trialing is stored as trialing in both tables, and a late payment_failed no longer moves a canceled row to past_due.
+- 9 new tests in supabase/functions/stripe-webhook/handler.test.ts, all failing before the fix; one existing test adjusted to mock the Stripe read.
+- Owner: redeploy the stripe-webhook edge function; optionally resend events for subscriptions canceled before the fix that still show 'active'.
