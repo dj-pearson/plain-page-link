@@ -4001,8 +4001,8 @@
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "pii-crypto/index.ts:211-215 lock check only for decrypt_leads, :186-194 decrypts any contact ciphertext; contacts FOR ALL owner policy 20260923000001:68-71; no column grant on leads. useLeads.ts:23, useAnalytics.ts:105,272 select then strip ciphertext."
+      "passes": true,
+      "notes": "pii-crypto/index.ts:211-215 lock check only for decrypt_leads, :186-194 decrypts any contact ciphertext; contacts FOR ALL owner policy 20260923000001:68-71; no column grant on leads. useLeads.ts:23, useAnalytics.ts:105,272 select then strip ciphertext. DONE: All audit claims checked in code and confirmed. leads had no column grant (anon and authenticated held table-wide SELECT); pii-crypto applied the lock check only for decrypt_leads and decrypted any contact's ciphertext. New migration 20261101000016 revokes SELECT on leads from anon/authenticated and grants authenticated every column except encrypted_email/encrypted_phone (US-235 pattern); adds service-role-only SECURITY DEFINER locked_lead_ciphertexts(_user_id, _values). New src/lib/leadColumns.ts (LEAD_COLUMNS, LEAD_COLUMN_SET keyed on LeadReadRow so tsc catches drift); useLeads, useOpenHouses, useAnalytics and sample-data-service now select explicit columns (no '*', no bare .select() after writes). pii-crypto decrypt_contacts refuses (locked:true, email/phone null) a contact whose ciphertext matches one of the owner's locked leads, one RPC per batch, fail-open on DB error like the lead lock. New verify:schema check; contactLock.test.ts and leadColumns.test.ts added; types.ts regenerated; CLAUDE.md leads note. DEVIATIONS: The column grant applies to authenticated only; anon gets no SELECT on leads (no policy is satisfiable without auth.uid()). LEAD_COLUMNS still includes email_hash and update_token_hash (neither decrypts anything). useContacts does not show a locked state for refused contacts; they read as having no email/phone. Deno type-check not run (deno not installed)."
     },
     {
       "id": "US-255",

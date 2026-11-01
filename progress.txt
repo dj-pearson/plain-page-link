@@ -4903,3 +4903,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - Reorder now computes positions over the full list (src/lib/listingOrder.ts) and writes only the changed rows through one reorderListings mutation, with an optimistic update, rollback, one audit event and one invalidation. The dashboard and public profile break sort_order ties by created_at desc, then id.
 - The types generator emits generated columns as `?: never` in Insert/Update, so tsc now refuses beds/baths/sqft writes. That also caught the same bug in useSecureListings.
 - Tests: listingImport, listingOrder, URLImportDialog, useListings reorder plus a @ts-expect-error guard, and a schema-references check that every GENERATED column is never-typed.
+
+## Site improvement loop 2 — iteration 7/15 — US-254: an agent over the lead allowance could unlock a locked lead by copying its ciphertext into a contact
+
+- The browser could read leads.encrypted_email/encrypted_phone, paste them into an owned contact, and pii-crypto's decrypt_contacts would decrypt them without checking the allowance.
+- Migration 20261101000016 replaces table-wide SELECT on leads with a column grant to authenticated that omits the two ciphertext columns; every client read of leads now names its columns (LEAD_COLUMNS, held to types.ts by tsc).
+- pii-crypto refuses to decrypt a contact whose ciphertext matches one of the owner's locked leads, via service-role-only locked_lead_ciphertexts().
+- Tests: contactLock.test.ts, leadColumns.test.ts, and a verify:schema check that authenticated/anon cannot read the ciphertext and cannot call the new function.
