@@ -75,7 +75,7 @@ export default function DeleteAccount() {
     toast({
       title: 'Account deletion scheduled',
       description:
-        'Your account and data will be deleted in 30 days. You can cancel any time before then.',
+        'Your account and data will be deleted in 30 days, and your subscription will not renew. You can cancel any time before then.',
     });
     setConfirmText('');
     void fetchStatus();
@@ -135,6 +135,10 @@ export default function DeleteAccount() {
                 : ''}
               . You can cancel before then to keep your account.
             </CardDescription>
+            <p className="text-sm text-gray-700 pt-2">
+              Your subscription will not renew, and it is cancelled when the account is deleted.
+              Cancelling the deletion turns renewal back on.
+            </p>
           </CardHeader>
           <CardContent>
             <Button variant="outline" onClick={handleCancelDeletion} disabled={submitting}>
@@ -159,6 +163,11 @@ export default function DeleteAccount() {
               and testimonials. Your account is scheduled for deletion and permanently removed after
               a 30-day grace period, during which you can cancel to keep your account.
             </CardDescription>
+            <p className="text-sm text-gray-700 pt-2">
+              If you have a paid plan, your subscription stops renewing as soon as you request
+              deletion and is cancelled when the account is deleted, so you will not be charged
+              again. Cancelling the deletion turns renewal back on.
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">

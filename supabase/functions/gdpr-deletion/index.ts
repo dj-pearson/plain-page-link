@@ -4,9 +4,24 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
+import {
+  pauseBillingForDeletion,
+  restoreBillingAfterCancel,
+  supabaseDeletionStore,
+  type DeletionDeps,
+} from '../_shared/account-deletion.ts';
+import { createSubscriptionApi } from '../_shared/stripe-subscriptions.ts';
+
+function billingDeps(db: SupabaseClient): DeletionDeps {
+  const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+  return {
+    store: supabaseDeletionStore(db),
+    stripe: stripeKey ? createSubscriptionApi(stripeKey) : null,
+  };
+}
 
 interface DeletionRequest {
   action: 'request' | 'cancel' | 'status';
@@ -120,6 +135,10 @@ serve(async (req: Request) => {
           throw new Error(error.message);
         }
 
+        // US-250: stop the subscription renewing. The deletion is already
+        // scheduled; if Stripe fails here the erasure cancels it outright.
+        const billing = await pauseBillingForDeletion(billingDeps(serviceSupabase), user.id);
+
         const scheduledFor = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
         return new Response(
@@ -127,6 +146,8 @@ serve(async (req: Request) => {
             success: true,
             message: 'Account deletion scheduled',
             requestId,
+            subscription: billing.subscription,
+            subscriptionEndsAt: billing.subscription === 'ends_at_period_end' ? billing.periodEnd : null,
             scheduledFor: scheduledFor.toISOString(),
             daysRemaining: 30,
             canCancel: true,
@@ -140,6 +161,13 @@ serve(async (req: Request) => {
       }
 
       case 'cancel': {
+        // Read what the request changed at Stripe before the row is cancelled.
+        const deps = billingDeps(serviceSupabase);
+        const pending = await deps.store.pendingDeletion(user.id).catch((pendingError: unknown) => {
+          console.error('[gdpr-deletion] could not read pending deletion:', pendingError);
+          return null;
+        });
+
         // Cancel account deletion
         const { data: cancelled, error } = await serviceSupabase
           .rpc('cancel_account_deletion', {
@@ -164,10 +192,14 @@ serve(async (req: Request) => {
           );
         }
 
+        // US-250: put the subscription's renewal back as it was.
+        const billing = await restoreBillingAfterCancel(deps, user.id, pending);
+
         return new Response(
           JSON.stringify({
             success: true,
             message: 'Account deletion cancelled successfully',
+            subscription: billing.subscription,
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -119,8 +119,10 @@ export type Database = {
           gdpr_request_id: string | null;
           id: string;
           ip_address: string | null;
+          prior_cancel_at_period_end: boolean | null;
           reason: string | null;
           scheduled_for: string;
+          stripe_subscription_id: string | null;
           user_id: string;
         };
         Insert: {
@@ -135,8 +137,10 @@ export type Database = {
           gdpr_request_id?: string | null;
           id?: string;
           ip_address?: string | null;
+          prior_cancel_at_period_end?: boolean | null;
           reason?: string | null;
           scheduled_for: string;
+          stripe_subscription_id?: string | null;
           user_id: string;
         };
         Update: {
@@ -151,8 +155,10 @@ export type Database = {
           gdpr_request_id?: string | null;
           id?: string;
           ip_address?: string | null;
+          prior_cancel_at_period_end?: boolean | null;
           reason?: string | null;
           scheduled_for?: string;
+          stripe_subscription_id?: string | null;
           user_id?: string;
         };
         Relationships: [

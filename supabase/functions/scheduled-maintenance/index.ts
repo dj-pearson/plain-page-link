@@ -7,6 +7,8 @@ import { getAgentContact } from '../_shared/agent-contact.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 import { runDigests } from './digests.ts';
+import { processDueDeletions, supabaseDeletionStore } from '../_shared/account-deletion.ts';
+import { createSubscriptionApi } from '../_shared/stripe-subscriptions.ts';
 
 /**
  * Scheduled maintenance.
@@ -173,24 +175,25 @@ serve(async (req) => {
     // ---------------------------------------------------------------------
     // 2. Account deletions. process-account-deletions had no caller at all,
     //    so a requested deletion sat in the queue indefinitely — a GDPR
-    //    commitment nothing honoured.
+    //    commitment nothing honoured. US-103 then called it over HTTP through
+    //    the Supabase edge runtime, which serves no functions (500 on every
+    //    name), so it still never ran. US-250: processed here directly, and
+    //    each account's live Stripe subscription is cancelled first.
     // ---------------------------------------------------------------------
     results.push(
       await run('account_deletions', async () => {
-        const response = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-account-deletions`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            },
-            body: JSON.stringify({}),
-          }
-        );
-        const text = await response.text();
-        if (!response.ok) throw new Error(`${response.status}: ${text}`);
-        return text.slice(0, 200);
+        const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+        const report = await processDueDeletions({
+          store: supabaseDeletionStore(supabase),
+          stripe: stripeKey ? createSubscriptionApi(stripeKey) : null,
+        });
+        const summary = `processed ${report.processed}, held for retry ${report.blocked}`;
+        // Held deletions are retried next run, but the task is reported failed
+        // so the 207 says someone's card is still being charged.
+        if (report.blocked > 0) {
+          throw new Error(`${summary}: ${report.errors.join('; ').slice(0, 500)}`);
+        }
+        return summary;
       })
     );
 

@@ -1847,6 +1847,51 @@ check('account deletion and session reads are refused for another user', () => {
   return out;
 });
 
+check('an account with a live Stripe subscription is not erased until it is cancelled', () => {
+  // US-250: erasing auth.users cascaded away user_subscriptions — the only
+  // record of the Stripe subscription — while the subscription kept charging.
+  const out = [];
+  const user = '00000000-dead-beef-0000-0000000de250';
+  try {
+    q(`
+      INSERT INTO auth.users (id, email) VALUES ('${user}', 'billed@example.test') ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.profiles (id, username) VALUES ('${user}', 'verifybilled') ON CONFLICT (id) DO NOTHING;
+      INSERT INTO public.user_subscriptions (user_id, stripe_subscription_id, status)
+        VALUES ('${user}', 'sub_verify_250', 'active');
+      INSERT INTO public.account_deletion_scheduled (user_id, scheduled_for)
+        VALUES ('${user}', now() - interval '1 day');
+    `);
+    q(`SELECT public.process_scheduled_account_deletions();`);
+    const [kept] = q(`SELECT count(*) FROM auth.users WHERE id = '${user}';`);
+    if (kept !== '1') out.push('an account with a live subscription was erased');
+    const [logged] = q(`SELECT count(*) FROM public.account_deletion_log
+                         WHERE user_id = '${user}' AND status = 'failed' AND error_detail LIKE '%sub_verify_250%';`);
+    if (logged !== '1') out.push(`the held erasure was not logged (${logged} rows)`);
+
+    q(`UPDATE public.user_subscriptions SET status = 'canceled' WHERE user_id = '${user}';`);
+    const [erased] = q(`SELECT public.process_scheduled_account_deletions();`);
+    const [gone] = q(`SELECT count(*) FROM auth.users WHERE id = '${user}';`);
+    if (gone !== '0' || erased !== '1') {
+      const [why] = q(`SELECT coalesce(max(error_detail), '') FROM public.account_deletion_log
+                        WHERE user_id = '${user}' AND status = 'failed' AND error_detail NOT LIKE '%sub_verify_250%';`);
+      out.push(`the account was not erased once its subscription was cancelled ${why}`.trim());
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.account_deletion_scheduled WHERE user_id = '${user}';
+         DELETE FROM public.user_subscriptions WHERE user_id = '${user}';
+         DELETE FROM public.account_deletion_log WHERE user_id = '${user}';
+         DELETE FROM public.profiles WHERE id = '${user}';
+         DELETE FROM auth.users WHERE id = '${user}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 check('is_sample cannot be written by an agent, and samples are never public', () => {
   const out = [];
   const uid = '00000000-dead-beef-0000-0000005a3b1e';

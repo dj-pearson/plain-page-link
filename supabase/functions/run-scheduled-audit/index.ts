@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
+import { getFunctionsUrl } from '../_shared/env.ts';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -178,7 +179,7 @@ async function runFullAudit(supabase: any, schedule: any): Promise<any[]> {
 
   for (const url of urls) {
     try {
-      const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/seo-audit`, {
+      const response = await fetch(`${getFunctionsUrl()}/seo-audit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -203,7 +204,7 @@ async function runCoreWebVitals(supabase: any, schedule: any): Promise<any[]> {
 
   for (const url of urls) {
     try {
-      const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/check-core-web-vitals`, {
+      const response = await fetch(`${getFunctionsUrl()}/check-core-web-vitals`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -228,7 +229,7 @@ async function runBrokenLinksCheck(supabase: any, schedule: any): Promise<any[]>
 
   for (const url of urls) {
     try {
-      const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/check-broken-links`, {
+      const response = await fetch(`${getFunctionsUrl()}/check-broken-links`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,7 +254,7 @@ async function runContentOptimization(supabase: any, schedule: any): Promise<any
 
   for (const url of urls) {
     try {
-      const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/analyze-content`, {
+      const response = await fetch(`${getFunctionsUrl()}/analyze-content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -278,7 +279,7 @@ async function runSecurityCheck(supabase: any, schedule: any): Promise<any[]> {
 
   for (const url of urls) {
     try {
-      const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/check-security-headers`, {
+      const response = await fetch(`${getFunctionsUrl()}/check-security-headers`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -303,7 +304,7 @@ async function runImageOptimization(supabase: any, schedule: any): Promise<any[]
 
   for (const url of urls) {
     try {
-      const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/analyze-images`, {
+      const response = await fetch(`${getFunctionsUrl()}/analyze-images`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -379,7 +380,7 @@ async function checkAlertRules(supabase: any, schedule: any, results: any): Prom
         // which alerting works should not also be the first in which every
         // historical rule fires a notification at once.
         if (rule.conditions?.notify === true) {
-          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-seo-notification`, {
+          await fetch(`${getFunctionsUrl()}/send-seo-notification`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
