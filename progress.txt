@@ -4910,3 +4910,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - Migration 20261101000016 replaces table-wide SELECT on leads with a column grant to authenticated that omits the two ciphertext columns; every client read of leads now names its columns (LEAD_COLUMNS, held to types.ts by tsc).
 - pii-crypto refuses to decrypt a contact whose ciphertext matches one of the owner's locked leads, via service-role-only locked_lead_ciphertexts().
 - Tests: contactLock.test.ts, leadColumns.test.ts, and a verify:schema check that authenticated/anon cannot read the ciphertext and cannot call the new function.
+
+## Site improvement loop 2 — iteration 8/15 — US-255: every page downloaded the Sentry SDK and Session Replay (~81 KB gzip) before it could render
+
+- With VITE_SENTRY_DSN set, src/lib/sentry.ts imported @sentry/react and replayIntegration statically, so the entry chunk was 145,889 B gzip against 65,053 B without a DSN.
+- sentry.ts is now an SDK-free facade: the SDK (sentry-sdk.ts) loads by dynamic import at idle after `load`, Replay (sentry-replay.ts) after that; earlier calls are buffered (cap 50) and replayed with the same event ids, early errors/rejections are caught and handed over. Entry with a DSN is now 62,806 B gzip.
+- check-bundle-size.mjs fails if Sentry code is on the first-paint graph (and if a DSN build has no SDK chunk at all); CI's bundle-size job builds with a dummy DSN. Unused exports (SentryErrorBoundary, SentryProfiler, startTransaction) removed.
+- src/lib/sentry.test.ts adds 9 tests; full suite 1377 passed, 1 skipped.
