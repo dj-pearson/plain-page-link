@@ -4938,3 +4938,10 @@ SubmitReview/NotFound blue-purple gradients; team member removal unconfirmed.
 - Paying agents now confirm an Upgrade/Downgrade in PlanChangeConfirmDialog (price, proration, withdrawn cancellation, limits they would exceed) before Stripe is touched; Pricing routes them through it.
 - Subscription and Settings say "Ends" instead of "Renews" when cancel_at_period_end is set.
 - Tests: SubscriptionPage (7, incl. no checkout call until confirm), useCheckoutReturn fake-timer suite (6), Settings "Ends", Overview legacy redirect.
+
+## Site improvement loop 2 — iteration 12/15 — US-259: lead emails sat in function logs and any account could mass-mail team invites
+
+- Edge functions logged lead, visitor, agent and invitee emails, a token-exchange response and raw bodies in plaintext; they now log masked or minimal values via `_shared/log-redaction.ts`, and a source-scan test fails if a console call brings any back.
+- Team invites are rate-limited per sender (20/day) and per recipient (3/day, keyed by SHA-256), owners are limited to one team, and links are stripped from team names in the email.
+- Migration 20261101000021 drops the FOR ALL policies on teams/team_members and revokes client writes, so an owner can no longer raise max_seats and an admin can no longer insert an accepted member; verify-schema check 12b proves it.
+- Integration: the generate-marketing-post and oauth-proxy conflicts kept the US-248/US-249 rewrites, which already log nothing sensitive.
