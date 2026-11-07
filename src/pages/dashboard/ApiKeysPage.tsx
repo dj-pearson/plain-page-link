@@ -43,6 +43,11 @@ export default function ApiKeysPage() {
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
+  // `copied` flips back after 2s for the icon; this one remembers that the key
+  // left the page at least once (button or a manual Ctrl+C), so 'Done' knows
+  // whether dismissing would destroy the only copy.
+  const [keySaved, setKeySaved] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<ApiKeyRecord | null>(null);
   const keyTextRef = useRef<HTMLElement>(null);
 
@@ -73,6 +78,7 @@ export default function ApiKeysPage() {
       setCreatedKey(data.key);
       setCopied(false);
       setCopyFailed(false);
+      setKeySaved(false);
       setNewName('');
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
     },
@@ -123,6 +129,7 @@ export default function ApiKeysPage() {
       await navigator.clipboard.writeText(createdKey);
       setCopyFailed(false);
       setCopied(true);
+      setKeySaved(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (e) {
       logger.warn('API key copy to clipboard failed', {
@@ -132,6 +139,20 @@ export default function ApiKeysPage() {
       setCopyFailed(true);
       selectKeyText();
     }
+  };
+
+  const dismissCreatedKey = () => {
+    setCreatedKey(null);
+    setConfirmDiscard(false);
+    setCopied(false);
+    setCopyFailed(false);
+    setKeySaved(false);
+  };
+
+  /** 'Done' destroys the one-time key; ask first if it never left the page. */
+  const handleDone = () => {
+    if (keySaved) dismissCreatedKey();
+    else setConfirmDiscard(true);
   };
 
   const activeKeys = (keys ?? []).filter((k) => !k.revoked_at);
@@ -154,13 +175,14 @@ export default function ApiKeysPage() {
         <CardContent>
           {createdKey ? (
             <div className="space-y-3">
-              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="rounded-lg border border-warning-border bg-warning p-3 text-sm text-warning-foreground">
                 Copy this key now — you won't be able to see it again.
               </div>
               <div className="flex items-center gap-2">
                 <code
                   ref={keyTextRef}
                   data-testid="created-api-key"
+                  onCopy={() => setKeySaved(true)}
                   className="flex-1 select-all break-all rounded bg-muted px-3 py-2 font-mono text-sm"
                 >
                   {createdKey}
@@ -186,7 +208,7 @@ export default function ApiKeysPage() {
                     ? 'Your browser blocked automatic copying. The key is selected — copy it with Ctrl+C (⌘C on Mac), or press and hold it on a phone.'
                     : ''}
               </p>
-              <Button variant="outline" onClick={() => setCreatedKey(null)}>
+              <Button variant="outline" onClick={handleDone}>
                 Done
               </Button>
             </div>
@@ -287,6 +309,22 @@ export default function ApiKeysPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close without copying the key?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You haven’t copied this key yet. Once you close it, it can’t be shown again — you
+              would have to revoke it and create a new one.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back and copy it</AlertDialogCancel>
+            <AlertDialogAction onClick={dismissCreatedKey}>I’ve saved it — close</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!revokeTarget}
