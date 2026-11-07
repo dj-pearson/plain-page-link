@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail } from '../_shared/email.ts';
@@ -7,6 +7,12 @@ import { getAgentContact } from '../_shared/agent-contact.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 import { runDigests } from './digests.ts';
+import {
+  chaseOverdueLeads,
+  summarizeOverdueReport,
+  OVERDUE_NOTIFICATION_TYPE,
+  type OverdueStore,
+} from './overdue.ts';
 import { processDueDeletions, supabaseDeletionStore } from '../_shared/account-deletion.ts';
 import { createSubscriptionApi } from '../_shared/stripe-subscriptions.ts';
 
@@ -29,11 +35,60 @@ import { createSubscriptionApi } from '../_shared/stripe-subscriptions.ts';
  * others, so each is caught and reported in the response rather than thrown.
  */
 
-/** How long a new lead may sit unanswered before the agent is chased. */
-const DEFAULT_SLA_HOURS = 2;
-
-/** Never chase the same lead twice, however often this runs. */
-const OVERDUE_NOTIFICATION_TYPE = 'lead_overdue';
+/** The overdue-lead chaser's reads and writes, over the service-role client. */
+function overdueStore(supabase: SupabaseClient): OverdueStore {
+  return {
+    async listCandidates(from, to, offset, limit) {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('id, user_id, name, created_at, lead_type')
+        .eq('status', 'new')
+        .is('first_responded_at', null)
+        .gte('created_at', from)
+        .lt('created_at', to)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(offset, offset + limit - 1);
+      if (error) throw new Error(`reading overdue leads: ${error.message}`);
+      return data ?? [];
+    },
+    async listChasedLeadIds(userIds, since) {
+      const ids = new Set<string>();
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('id, data')
+          .eq('type', OVERDUE_NOTIFICATION_TYPE)
+          .in('user_id', userIds)
+          .gte('created_at', since)
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw new Error(`reading chased leads: ${error.message}`);
+        for (const row of data ?? []) {
+          const leadId = (row.data as { lead_id?: unknown } | null)?.lead_id;
+          if (typeof leadId === 'string') ids.add(leadId);
+        }
+        if ((data ?? []).length < pageSize) break;
+      }
+      return ids;
+    },
+    async getAgent(userId) {
+      const contact = await getAgentContact(supabase, userId);
+      return contact
+        ? { email: contact.email, preferences: contact.notificationPreferences }
+        : null;
+    },
+    async claim(notification) {
+      const { error } = await supabase.from('notifications').insert(notification);
+      if (!error) return 'claimed';
+      // idx_notifications_lead_overdue_once: someone already chased this lead.
+      if (error.code === '23505') return 'duplicate';
+      throw new Error(error.message);
+    },
+    sendEmail: (email) => sendEmail(email),
+  };
+}
 
 interface TaskResult {
   task: string;
@@ -71,104 +126,22 @@ serve(async (req) => {
     const results: TaskResult[] = [];
 
     // ---------------------------------------------------------------------
-    // 1. Chase leads that have gone unanswered past the agent's own SLA.
+    // 1. Chase leads that have gone unanswered past the agent's own SLA
+    //    (overdue.ts: at most once per lead, missed runs made up within a week).
     // ---------------------------------------------------------------------
     results.push(
       await run('overdue_leads', async () => {
-        // Cast the net at the SHORTEST configurable window and check each
-        // lead against its own agent's setting below. Filtering at the longest
-        // window here would silently exclude every agent who chose a tighter
-        // one, which is the setting that matters most.
-        const cutoff = new Date(Date.now() - DEFAULT_SLA_HOURS * 3_600_000).toISOString();
-
-        const { data: leads, error } = await supabase
-          .from('leads')
-          .select('id, user_id, name, created_at, lead_type')
-          .eq('status', 'new')
-          .is('first_responded_at', null)
-          .lt('created_at', cutoff)
-          .order('created_at', { ascending: true })
-          .limit(500);
-        if (error) throw error;
-        if (!leads?.length) return 'no overdue leads';
-
-        // Group by agent so each agent's SLA is read once, not per lead.
-        const byAgent = new Map<string, typeof leads>();
-        for (const lead of leads) {
-          const list = byAgent.get(lead.user_id) ?? [];
-          list.push(lead);
-          byAgent.set(lead.user_id, list);
+        const report = await chaseOverdueLeads(overdueStore(supabase), {
+          now: new Date(),
+          siteUrl: getSiteUrl(),
+        });
+        const summary = summarizeOverdueReport(report);
+        // Unclaimed leads are retried next run; the task is reported failed so
+        // the 207 shows that some agent was not chased.
+        if (report.errors.length > 0) {
+          throw new Error(`${summary}: ${report.errors.join('; ').slice(0, 500)}`);
         }
-
-        let notified = 0;
-        let skipped = 0;
-
-        for (const [agentId, agentLeads] of byAgent) {
-          const contact = await getAgentContact(supabase, agentId);
-          const prefs = (contact?.notificationPreferences ?? {}) as {
-            leads?: string;
-            sla_hours?: number;
-          };
-          if (prefs.leads === 'off') {
-            skipped += agentLeads.length;
-            continue;
-          }
-          const slaMs = (prefs.sla_hours ?? DEFAULT_SLA_HOURS) * 3_600_000;
-
-          for (const lead of agentLeads) {
-            const age = Date.now() - new Date(lead.created_at).getTime();
-            if (age < slaMs) {
-              skipped++;
-              continue;
-            }
-
-            // At most once per lead, ever. A notifications row is the record —
-            // cheaper than a dedicated table and visible to the agent either
-            // way.
-            const { data: already } = await supabase
-              .from('notifications')
-              .select('id')
-              .eq('user_id', agentId)
-              .eq('type', OVERDUE_NOTIFICATION_TYPE)
-              .contains('data', { lead_id: lead.id })
-              .maybeSingle();
-            if (already) {
-              skipped++;
-              continue;
-            }
-
-            const hours = Math.floor(age / 3_600_000);
-            const { error: notifyError } = await supabase.from('notifications').insert({
-              user_id: agentId,
-              type: OVERDUE_NOTIFICATION_TYPE,
-              title: `${lead.name} is still waiting`,
-              message: `This ${lead.lead_type ?? 'lead'} has had no response for ${hours}h.`,
-              data: { lead_id: lead.id, hours_waiting: hours },
-            });
-            if (notifyError) {
-              console.error(
-                `[scheduled-maintenance] could not notify for lead ${lead.id}: ${notifyError.message}`
-              );
-              continue;
-            }
-
-            if (contact?.email) {
-              const siteUrl = getSiteUrl();
-              await sendEmail({
-                to: contact.email,
-                subject: `${lead.name} has been waiting ${hours}h`,
-                body:
-                  `${lead.name} sent you a ${lead.lead_type ?? 'lead'} ${hours} hours ago and ` +
-                  `has not heard back.\n\n` +
-                  `Open the lead: ${siteUrl}/dashboard/leads?lead=${lead.id}\n\n` +
-                  `You can change how long to wait, or turn these off, in Settings.`,
-              });
-            }
-            notified++;
-          }
-        }
-
-        return `notified ${notified}, skipped ${skipped}`;
+        return summary;
       })
     );
 
