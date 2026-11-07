@@ -177,7 +177,7 @@ const ENTRY_MUST_NOT_INCLUDE = {
   "form-vendor":
     "react-hook-form + zod. No public profile has a form on first paint; " +
     "auth pages and dashboard forms are lazy routes.",
-  "charts-vendor": "recharts. Dashboard analytics only.",
+  "charts-vendor": "recharts. Admin screens only (the agent Analytics chart is plain SVG since US-395).",
   "three-vendor": "Three.js. Only a 3D theme or the 3D hero needs it.",
   "markdown-vendor": "react-markdown. Blog article rendering only.",
   // US-255: with VITE_SENTRY_DSN set, the SDK and Session Replay were 81 KB
@@ -298,7 +298,7 @@ const PROFILE_MUST_NOT_INCLUDE = {
     "Radix primitives. The profile's modals are lazy; nothing on first paint " +
     "needs them (UpcomingOpenHouses uses a plain disclosure).",
   "three-vendor": "Three.js. 3D themes load it after load + idle (useDeferred3D).",
-  "charts-vendor": "recharts. Dashboard analytics only.",
+  "charts-vendor": "recharts. Admin screens only (the agent Analytics chart is plain SVG since US-395).",
   "form-vendor": "react-hook-form + zod. The lead forms are lazy modals.",
 };
 

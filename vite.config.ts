@@ -18,7 +18,7 @@ import { vendorChunkFor } from './src/config/vendor-chunks';
 //                            loaded on hero sections, never on first paint)
 //   export-vendor  594 KB  (jspdf/html2canvas; lazy, under vendor budget)
 //   index          407 KB  (entry)
-//   charts-vendor  402 KB  (recharts; lazy, dashboard only)
+//   charts-vendor  402 KB  (recharts; lazy, admin screens only since US-395)
 //   supabase       175 KB  | react-vendor 164 KB | animation-vendor 185 KB
 // ANALYZE=true `vite build` writes dist/stats.html and opens it.
 const ANALYZE = process.env.ANALYZE === 'true';
