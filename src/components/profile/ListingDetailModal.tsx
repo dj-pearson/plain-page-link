@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import type { PublicProfileListing } from '@/types';
 import { realEstateListingSchema } from '@/lib/structured-data';
 import { currentListingShareUrl } from '@/lib/listingShare';
+import { sanitizeExternalUrl } from '@/utils/sanitize';
 
 import { listingStatusBadgeClass } from '@/lib/listingStatus';
 interface ListingDetailModalProps {
@@ -105,7 +106,8 @@ export default function ListingDetailModal({
   const propertyType = listing.property_type || '';
   const mlsNumber = listing.mls_number || '';
   const lotSize = listing.lot_size_acres;
-  const virtualTourUrl = listing.virtual_tour_url;
+  // US-268: an agent-entered (or CSV-imported) URL; only http(s) is linked.
+  const virtualTourUrl = sanitizeExternalUrl(listing.virtual_tour_url);
   const daysOnMarket = listing.days_on_market;
   const highlights = listing.highlights;
 

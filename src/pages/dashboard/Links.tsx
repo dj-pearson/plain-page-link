@@ -43,6 +43,7 @@ import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
 import { byPosition, moveAndRenumber } from '@/lib/linkOrder';
+import { sanitizeUrl } from '@/utils/sanitize';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -358,7 +359,7 @@ export default function Links() {
                       </h3>
                     </div>
                     <a
-                      href={link.url}
+                      href={sanitizeUrl(link.url) || undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs sm:text-sm text-muted-foreground hover:text-primary flex items-center gap-1 truncate"

@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
+import { sanitizeUrl } from '@/utils/sanitize';
 
 /**
  * The subset of a `links` row usePublicProfile selects.
@@ -84,8 +85,14 @@ const ICON_COLORS: Record<string, string> = {
 
 export default function CustomLinks({ links, onLinkClick }: CustomLinksProps) {
   // Only show active links, sorted by position
+  // US-268: links.url is whatever the agent (or any API caller) wrote, and
+  // React renders a javascript: href as-is. A link whose URL is not http(s),
+  // mailto, tel or a same-site path is left off the page rather than shown
+  // as a button that does something other than open a page.
   const activeLinks = links
     .filter((link) => link.is_active)
+    .map((link) => ({ ...link, url: sanitizeUrl(link.url) }))
+    .filter((link) => link.url !== '')
     .sort((a, b) => a.position - b.position);
 
   if (activeLinks.length === 0) {
