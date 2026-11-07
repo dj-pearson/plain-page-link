@@ -25,6 +25,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SRC = join(process.cwd(), 'src');
+const FUNCTIONS = join(process.cwd(), 'supabase', 'functions');
 
 /** Files that legitimately contain these shapes. */
 const ALLOWED_FILES = [
@@ -114,6 +115,31 @@ const RULES: { rule: string; pattern: RegExp }[] = [
     rule: 'a testimonial attributed to a first-name-plus-initial, with or without a dash',
     pattern: />\s*[A-Z][a-z]+\s+[A-Z]\.\s*</,
   },
+  // --- US-415 (US-406) ----------------------------------------------------
+  // Until US-415 this scan read src/ only, so the free-tool drip emails in
+  // supabase/functions were never checked. Pointing it there found the named
+  // testimonial and the percentages above, and three shapes no rule knew:
+  //   "4,200+ agents trust AgentBio"                — a count after the number
+  //   "I analyzed data from 2,847 real estate agents" / "We analyzed 47,000
+  //    real estate listings"                       — a study nobody ran
+  //   "20% off ... (expires tonight)", "expires in 12 hours", ?coupon=BIO20 —
+  //    a discount on a coupon no Stripe account holds, with a fake deadline
+  {
+    rule: 'a customer count stated as a fact about AgentBio',
+    pattern:
+      /\b[0-9][0-9,.]*\+?\s*(agents|realtors|users|customers|professionals)\s+(trust|use|love|rely on|choose)\b/i,
+  },
+  {
+    rule: 'a study of agents or listings nobody ran',
+    pattern:
+      /\b(analy[sz]ed|studied|surveyed)\s+(data\s+from\s+)?[0-9][0-9,.]*\+?\s*(real estate\s+)?(agents|realtors|listings|homes|profiles)\b/i,
+  },
+  {
+    rule: 'a coupon or deadline offer that checkout does not honour',
+    pattern:
+      // Not "the link will expire in 1 hour" — a reset link really does.
+      /\bexpires?\s+(tonight|at midnight)\b|\b(offer|discount|deal)\s+expires?\b|[?&]coupon=|\buse\s+code\s+[A-Z0-9]{4,}\b/i,
+  },
 ];
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -166,9 +192,9 @@ function commentMask(lines: string[]): boolean[] {
 function scan(): Finding[] {
   const findings: Finding[] = [];
 
-  for (const file of walk(SRC)) {
+  for (const file of [...walk(SRC), ...walk(FUNCTIONS)]) {
     const rel = file
-      .slice(SRC.length + 1)
+      .slice(process.cwd().length + 1)
       .split('\\')
       .join('/');
     if (ALLOWED_FILES.some((allowed) => rel.endsWith(allowed))) continue;
@@ -212,6 +238,20 @@ describe('marketing claims', () => {
       '— Sarah M., Beverly Hills',
       'Used by agents at Keller Williams, Coldwell Banker, RE/MAX',
       '<span className="text-primary">15 leads/month</span>',
+      // US-415: the drip-email shapes, verbatim.
+      'No credit card required • Cancel anytime • 4,200+ agents trust AgentBio',
+      'I analyzed data from 2,847 real estate agents using Instagram.',
+      '<p>We analyzed 47,000 real estate listings that sold in under 30 days.</p>',
+      '— Jennifer M., Top 1% Agent, Austin',
+      '"AgentBio saves me 8-10 hours per week on content creation."',
+      'Optimal: 400-600 words. Too short (under 200) = 23% fewer showings.',
+      'get 2.4x more responses than generic endings',
+      'subject: "The Instagram bio mistake 73% of agents make",',
+      'Average Agent: ~7 leads/month',
+      '${firstName}, final call: 20% off + free setup (expires tonight)',
+      'This offer expires in 12 hours',
+      'Claim Your 20% Discount: ${siteUrl}/auth/register?coupon=BIO20',
+      'Use code LISTING20 at checkout',
     ];
 
     for (const sample of samples) {
@@ -404,5 +444,40 @@ describe('feature claims', () => {
       out
     );
     expect(out).toEqual([]);
+  });
+});
+
+/**
+ * US-415: the listing-generator emails sent every "Create Your Free Page"
+ * button to `${SITE_URL}/register`. There is no such route — App.tsx has
+ * /auth/register, and "register" is a reserved username, so /register fell to
+ * the profile route and rendered the 404 page. Every click from the one email
+ * that actually sends was lost.
+ */
+describe('email call-to-action links', () => {
+  const BARE_AUTH_LINK = /(?:SITE_URL|siteUrl|getSiteUrl\(\))\}\/(?:register|signup|login)\b/;
+
+  it('send sign-up links to /auth/register, not a path that 404s', () => {
+    const findings: string[] = [];
+    for (const file of walk(FUNCTIONS)) {
+      const rel = file
+        .slice(process.cwd().length + 1)
+        .split('\\')
+        .join('/');
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          if (BARE_AUTH_LINK.test(line)) {
+            findings.push(`${rel}:${i + 1}  ${line.trim().slice(0, 100)}`);
+          }
+        });
+    }
+    expect(findings).toEqual([]);
+  });
+
+  it('is actually able to fail', () => {
+    expect(BARE_AUTH_LINK.test('<a href="${SITE_URL}/register?utm_source=x">')).toBe(true);
+    expect(BARE_AUTH_LINK.test('Create Your Free Page: ${siteUrl}/signup')).toBe(true);
+    expect(BARE_AUTH_LINK.test('<a href="${SITE_URL}/auth/register">')).toBe(false);
   });
 });
