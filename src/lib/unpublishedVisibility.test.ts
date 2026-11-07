@@ -82,4 +82,19 @@ describe('an unpublished agent is hidden from visitors (US-308)', () => {
     const body = newestFunction('public_agent_response_hours');
     expect(body).toMatch(/\(p\.is_published IS TRUE OR p\.id = auth\.uid\(\)\)/);
   });
+
+  // US-396 (US-317): the click counter is SECURITY DEFINER, so it bypasses the
+  // links policy above and has to apply the same rule itself.
+  it("increment_link_clicks counts only a link a visitor can see, or the agent's own", () => {
+    const body = newestFunction('increment_link_clicks');
+    expect(body).toMatch(/l\.user_id = auth\.uid\(\)/);
+    expect(body).toMatch(/l\.is_active IS TRUE AND NOT l\.is_sample AND p\.is_published IS TRUE/);
+    // The visibility test runs before the rate-limit bucket is written, so a
+    // made-up link id costs nothing.
+    expect(body.indexOf('IF NOT COALESCE(v_countable, false)')).toBeGreaterThan(-1);
+    expect(body.indexOf('IF NOT COALESCE(v_countable, false)')).toBeLessThan(
+      body.indexOf('check_rate_limit')
+    );
+    expect(body).toMatch(/SET search_path = public, extensions, pg_temp/);
+  });
 });

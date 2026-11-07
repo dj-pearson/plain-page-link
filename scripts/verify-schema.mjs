@@ -1618,6 +1618,77 @@ check("an unpublished agent's listings, links, reviews and open houses are hidde
 });
 
 // ---------------------------------------------------------------------------
+// 7b3. Link clicks count only on links a visitor can see (US-396 / US-317).
+//
+//      increment_link_clicks is SECURITY DEFINER and callable by anon, so it
+//      bypasses the US-308 links policy. It must refuse — quietly, without
+//      writing a rate-limit bucket — a link on an unpublished page or a link
+//      the agent switched off, while the owner and a published page still
+//      count.
+// ---------------------------------------------------------------------------
+check('increment_link_clicks counts only links a visitor can see', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000039601';
+  const live = '00000000-dead-beef-0000-0000003960a1';
+  const off = '00000000-dead-beef-0000-0000003960a2';
+  const click = (role, sub, link) =>
+    q(`SET ROLE ${role}; ${sub ? `SET request.jwt.claim.sub = '${sub}';` : ''}
+       SELECT public.increment_link_clicks('${link}', 'us396-visitor');`);
+  const counts = () =>
+    q(`SELECT (SELECT click_count FROM public.links WHERE id = '${live}')
+           || '|' || (SELECT click_count FROM public.links WHERE id = '${off}')
+           || '|' || (SELECT count(*) FROM public.rate_limit_entries WHERE identifier LIKE 'us396-visitor%');`)[0];
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${agent}', 'us396@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.profiles (id, username, full_name, is_published)
+         VALUES ('${agent}', 'us396agent', 'Link Click Agent', false)
+         ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, is_published = false;
+       INSERT INTO public.links (id, user_id, title, url, position, is_active, click_count) VALUES
+         ('${live}', '${agent}', 'Live', 'https://example.test/a', 1, true, 0),
+         ('${off}', '${agent}', 'Off', 'https://example.test/b', 2, false, 0);
+       DELETE FROM public.rate_limit_entries WHERE identifier LIKE 'us396-visitor%';`);
+
+    click('anon', null, live);
+    click('anon', null, off);
+    click('anon', null, '00000000-dead-beef-0000-0000003960ff');
+    let seen = counts();
+    if (seen !== '0|0|0')
+      out.push(`unpublished: anon clicks left "${seen}" (live|off|rate-limit rows); expected "0|0|0"`);
+
+    q(`UPDATE public.profiles SET is_published = NULL WHERE id = '${agent}';`);
+    click('anon', null, live);
+    seen = counts();
+    if (seen !== '0|0|0') out.push(`is_published NULL: anon click left "${seen}"; expected "0|0|0"`);
+
+    click('authenticated', agent, live);
+    seen = counts();
+    if (!seen.startsWith('1|0|'))
+      out.push(`unpublished: the owner's click left "${seen}"; expected live=1 (owner exempt)`);
+
+    q(`UPDATE public.profiles SET is_published = true WHERE id = '${agent}';`);
+    click('anon', null, live);
+    click('anon', null, off);
+    seen = counts();
+    if (!seen.startsWith('2|0|'))
+      out.push(`published: anon clicks left "${seen}"; expected live=2, off=0 — an inactive link must not count`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.rate_limit_entries WHERE identifier LIKE 'us396-visitor%';
+         DELETE FROM public.links WHERE user_id = '${agent}';
+         DELETE FROM public.profiles WHERE id = '${agent}';
+         DELETE FROM auth.users WHERE id = '${agent}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 7c. Plan limits hold (20260923000002).
 //
 //     A tier is only real if the database refuses the thing the tier does not
