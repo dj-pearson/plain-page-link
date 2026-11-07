@@ -6,7 +6,8 @@ import { sendEmail } from '../_shared/email.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getSiteUrl } from '../_shared/env.ts';
-import { runDigests } from './digests.ts';
+import { digestSchedule, runDigests, summarizeDigestReport } from './digests.ts';
+import { supabaseDigestStore } from './digest-store.ts';
 import {
   chaseOverdueLeads,
   summarizeOverdueReport,
@@ -193,11 +194,30 @@ serve(async (req) => {
 
     // ---------------------------------------------------------------------
     // 4. The morning email (US-230): new leads, follow-ups due today and
-    //    clients' upcoming dates, once a day in DIGEST_HOUR_UTC. POST
-    //    {"force_digest": true} runs it now (still once per agent per day).
+    //    clients' upcoming dates, once a day from DIGEST_HOUR_UTC. Runs up to
+    //    DIGEST_CATCHUP_HOURS later make up a missed run (US-331); digest_log
+    //    keeps it to one per agent per day. POST {"force_digest": true} runs
+    //    it now (still once per agent per day).
     // ---------------------------------------------------------------------
     const body = (await req.json().catch(() => ({}))) as { force_digest?: boolean };
-    results.push(await run('digests', () => runDigests(supabase, { force: body.force_digest === true })));
+    results.push(
+      await run('digests', async () => {
+        const schedule = digestSchedule(new Date(), {
+          hour: Number.parseInt(Deno.env.get('DIGEST_HOUR_UTC') ?? '', 10),
+          catchUpHours: Number.parseInt(Deno.env.get('DIGEST_CATCHUP_HOURS') ?? '', 10),
+          force: body.force_digest === true,
+        });
+        if (!schedule) return 'outside the digest window';
+        const report = await runDigests(supabaseDigestStore(supabase), { schedule, siteUrl: getSiteUrl() });
+        const summary = summarizeDigestReport(report);
+        // Agents still owed today's edition are retried by the next run in
+        // the window, but the task is reported failed so the 207 says so.
+        if (report.errors.length > 0) {
+          throw new Error(`${summary}: ${report.errors.slice(0, 10).join('; ').slice(0, 500)}`);
+        }
+        return summary;
+      })
+    );
 
     const failed = results.filter((r) => !r.ok);
     console.log(
