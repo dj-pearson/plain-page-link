@@ -112,6 +112,16 @@ export async function restoreBillingAfterCancel(
   // Only undo what the request did: it changed nothing if the flag was already set.
   if (!subscriptionId || pending?.priorCancelAtPeriodEnd !== false) return { subscription: 'unchanged' };
   try {
+    // US-353: only touch a subscription that is this user's own. The schedule
+    // row is the pointer, and until 20261107000353 its owner could rewrite it
+    // through PostgREST — pointing it at someone else's subscription turned
+    // this call into "switch renewal back on for any Stripe subscription".
+    // The row is now system-written only; this is the second lock.
+    const own = await deps.store.liveSubscriptionIds(userId);
+    if (!own.includes(subscriptionId)) {
+      logOf(deps)(`[account-deletion] refused to restore renewal for ${userId}: ${subscriptionId} is not on their subscription row`);
+      return { subscription: 'unchanged', error: 'subscription does not belong to this account' };
+    }
     if (!deps.stripe) throw new Error('STRIPE_SECRET_KEY is not set');
     const current = await deps.stripe.retrieve(subscriptionId);
     if (!current || ENDED_SUBSCRIPTION_STATUSES.has(current.status)) return { subscription: 'none' };

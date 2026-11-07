@@ -2703,6 +2703,100 @@ check('an agent can mark a notification read but not rewrite it', () => {
   return out;
 });
 
+// ---------------------------------------------------------------------------
+// US-353: the deletion schedule and GDPR request rows are system-written.
+//   "Users can cancel own deletion" let the owner rewrite a pending
+//   account_deletion_scheduled row, including stripe_subscription_id — which
+//   gdpr-deletion's cancel path hands to Stripe to switch renewal back on —
+//   and gdpr_request_id, which the erasure marks completed. The owner could
+//   also insert or rewrite their own gdpr_data_requests. The browser now
+//   reads both tables and writes neither.
+// ---------------------------------------------------------------------------
+check('the deletion schedule and GDPR requests are not writable by their subject', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000353a01';
+  const other = '00000000-dead-beef-0000-000000353a02';
+  const theirReq = '00000000-dead-beef-0000-000000353b02';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${agent}', 'us353a@example.test'), ('${other}', 'us353b@example.test')
+       ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.gdpr_data_requests (id, user_id, request_type, status)
+         VALUES ('${theirReq}', '${other}', 'export', 'pending');
+       SET request.jwt.claim.role = 'service_role';
+       SELECT public.request_account_deletion('${agent}', 'leaving', NULL, NULL, 30);
+       UPDATE public.account_deletion_scheduled
+          SET stripe_subscription_id = 'sub_own_353', prior_cancel_at_period_end = false
+        WHERE user_id = '${agent}';`);
+
+    // The owner still reads their own schedule (gdpr-deletion's status read).
+    const [seen] = as(agent, `SELECT count(*) FROM public.account_deletion_scheduled WHERE user_id = '${agent}';`);
+    if (seen !== '1') out.push(`the owner saw ${seen} rows of their own deletion schedule`);
+
+    for (const [col, val] of [
+      ['stripe_subscription_id', `'sub_victim_353'`],
+      ['prior_cancel_at_period_end', 'true'],
+      ['gdpr_request_id', `'${theirReq}'`],
+      ['scheduled_for', `now()`],
+      ['cancelled', 'true'],
+    ]) {
+      if (!refused(() => as(agent, `UPDATE public.account_deletion_scheduled SET ${col} = ${val} WHERE user_id = '${agent}';`)))
+        out.push(`the owner could update account_deletion_scheduled.${col}`);
+    }
+    const [row] = q(`SELECT stripe_subscription_id || '|' || cancelled FROM public.account_deletion_scheduled WHERE user_id = '${agent}';`);
+    if (row !== 'sub_own_353|false') out.push(`the schedule row changed to ${row}`);
+    if (!refused(() => as(agent, `DELETE FROM public.account_deletion_scheduled WHERE user_id = '${agent}';`)))
+      out.push('the owner could delete their deletion schedule directly');
+    if (!refused(() => as(agent, `INSERT INTO public.account_deletion_scheduled (user_id, scheduled_for) VALUES ('${agent}', now());`)))
+      out.push('the owner could insert a deletion schedule directly');
+
+    // GDPR requests: no direct insert (e.g. one born 'completed'), no rewrite.
+    if (
+      !refused(() =>
+        as(agent, `INSERT INTO public.gdpr_data_requests (user_id, request_type, status, file_url)
+                   VALUES ('${agent}', 'export', 'completed', 'https://example.test/x');`)
+      )
+    )
+      out.push('the owner could insert a gdpr_data_requests row directly');
+    if (!refused(() => as(agent, `UPDATE public.gdpr_data_requests SET file_url = 'https://example.test/x' WHERE user_id = '${agent}';`)))
+      out.push('the owner could update their gdpr_data_requests');
+    const [ownReqs] = as(agent, `SELECT count(*) FROM public.gdpr_data_requests WHERE user_id = '${agent}';`);
+    if (ownReqs !== '1') out.push(`the owner saw ${ownReqs} of their own GDPR requests, expected the 1 the system wrote`);
+
+    // Cancelling still works the supported way, through the definer function.
+    q(`SET request.jwt.claim.role = 'service_role'; SELECT public.cancel_account_deletion('${agent}', 'stayed');`);
+    const [cancelled] = q(`SELECT cancelled FROM public.account_deletion_scheduled WHERE user_id = '${agent}';`);
+    if (cancelled !== 't') out.push('cancel_account_deletion no longer cancels the schedule');
+
+    for (const t of ['account_deletion_scheduled', 'gdpr_data_requests']) {
+      if (!refused(() => q(`SET ROLE anon; UPDATE public.${t} SET user_id = user_id;`))) out.push(`anon could update ${t}`);
+    }
+    const [theirStatus] = q(`SELECT status FROM public.gdpr_data_requests WHERE id = '${theirReq}';`);
+    if (theirStatus !== 'pending') out.push(`another user's GDPR request became ${theirStatus}`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.account_deletion_scheduled WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.gdpr_data_requests WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${agent}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${agent}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 check('an assignee works a lead but cannot take it or hand it away', () => {
   const out = [];
   const owner = '00000000-dead-beef-0000-000000236b01';
