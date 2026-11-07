@@ -8,6 +8,19 @@ import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
 import { FaqSection, faqPageSchema, type FaqEntry } from '@/components/seo/FaqSection';
+import { PRICING_PLANS } from '@/config/pricing-plans';
+
+/**
+ * The AgentBio cell of the comparison table, from the plans we actually sell.
+ * It was a hard-coded 39 dollars, which is not the price of any plan (the same
+ * figure US-157 removed from the homepage's JSON-LD).
+ */
+const AGENTBIO_PRICE_CELL = (() => {
+  const paid = PRICING_PLANS.filter((p) => p.price_monthly > 0);
+  const hasFree = PRICING_PLANS.some((p) => p.price_monthly === 0);
+  const from = `from $${paid[0].price_monthly}`;
+  return hasFree ? `Free, or ${from}` : from;
+})();
 
 const FAQ_ENTRIES: FaqEntry[] = [
   {
@@ -18,7 +31,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: 'What features does AgentBio include for real estate agents?',
     answer:
-      'AgentBio includes property listing galleries with photos and pricing, buyer and seller lead capture forms, calendar integration for showing appointments, testimonial display, sold properties showcase, MLS compliance features, and real estate-specific analytics.',
+      'AgentBio includes property listing galleries with photos and pricing, buyer and seller lead capture forms, Calendly booking for showing appointments, testimonial display, sold properties showcase, Equal Housing and license display, and real estate-specific analytics.',
   },
 ];
 
@@ -202,19 +215,19 @@ export default function ForRealEstateAgents() {
               <FeatureCard
                 icon={<Calendar />}
                 title="Appointment Booking"
-                description="Integrated Calendly and Google Calendar support. Buyers can self-schedule showing appointments without phone tag. Time zone detection for out-of-area buyers."
+                description="Connect your Calendly link and buyers self-schedule showings from your page, without phone tag. Every booking is saved as a lead."
               />
 
               <FeatureCard
                 icon={<Star />}
                 title="Testimonial Showcase"
-                description="Display client reviews and success stories prominently. Add video testimonials for maximum social proof. Show 5-star ratings to build immediate credibility with new visitors."
+                description="Collect reviews through your own review link and approve each one before it shows. Star ratings appear with every review to build credibility with new visitors."
               />
 
               <FeatureCard
                 icon={<TrendingUp />}
                 title="Real Estate Analytics"
-                description="Track which listings get the most views, where leads come from (Instagram Story vs Post), and which properties generate inquiries. Lead scoring shows hot/warm/cold prospects."
+                description="Track which listings get the most views, where each lead came from (campaign, referring site, device), and which properties generate inquiries. Each lead is rated hot, warm or cold from its answers."
               />
             </div>
           </div>
@@ -280,7 +293,7 @@ export default function ForRealEstateAgents() {
                     { feature: 'MLS Compliance', agentbio: true, linktree: false, beacons: false },
                     {
                       feature: 'Price (monthly)',
-                      agentbio: '$39',
+                      agentbio: AGENTBIO_PRICE_CELL,
                       linktree: '$24',
                       beacons: '$10',
                     },
