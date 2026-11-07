@@ -22,6 +22,12 @@ Each lane is one agent per round. A lane only looks inside its own scope.
 | `seo` | Technical SEO and GEO (being cited by AI answer engines): prerender, sitemaps, structured data, metadata, llms.txt, content structure |
 | `mobile` | PWA on iOS and Android: installability, manifest, service worker, offline, touch targets, safe areas, push, path to store builds |
 
+## Owner decisions
+
+- 2026-11-07: **No native iOS/Android apps yet.** Phones use the installed
+  PWA. The `mobile` lane improves the PWA only; do not add Capacitor or any
+  other native shell, and do not open stories for store builds.
+
 ## One improvement per lane per round
 
 1. Read `prd.json` for stories tagged with your `lane` that are not passing.
