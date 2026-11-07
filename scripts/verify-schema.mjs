@@ -2229,6 +2229,48 @@ check('lead_stats counts every lead the caller owns, and only those', () => {
   return out;
 });
 
+check('leads.status holds only the one vocabulary (US-428)', () => {
+  const out = [];
+  const me = '00000000-dead-beef-0000-000000428001';
+  const refused = (sql) => {
+    try {
+      q(sql);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${me}', 'status428@example.test') ON CONFLICT (id) DO NOTHING;`);
+    for (const s of ['new', 'contacted', 'qualified', 'nurturing', 'converted', 'closed', 'lost']) {
+      if (refused(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, status)
+                     VALUES ('${me}', 'buyer', 'S', 'enc', '${s}');`)) {
+        out.push(`status '${s}' is refused`);
+      }
+    }
+    const [dflt] = q(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email)
+                        VALUES ('${me}', 'buyer', 'D', 'enc') RETURNING status;`);
+    if (dflt !== 'new') out.push(`an insert without a status stored '${dflt}', expected 'new'`);
+    for (const [label, value] of [['spam', `'spam'`], ['Contacted', `'Contacted'`], ['NULL', 'NULL']]) {
+      if (!refused(`INSERT INTO public.leads (user_id, lead_type, name, encrypted_email, status)
+                      VALUES ('${me}', 'buyer', 'X', 'enc', ${value});`)) {
+        out.push(`status ${label} is accepted`);
+      }
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.leads WHERE user_id = '${me}';
+         DELETE FROM public.profiles WHERE id = '${me}';
+         DELETE FROM auth.users WHERE id = '${me}';`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 check('a routed lead reaches the accepted teammate, who can read it and is notified', () => {
   const out = [];
   const owner = '00000000-dead-beef-0000-00000007ea01';

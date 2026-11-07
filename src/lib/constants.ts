@@ -73,34 +73,6 @@ export const US_STATES = [
   { value: 'WY', label: 'Wyoming' },
 ] as const;
 
-// Lead Form Types
-export const LEAD_FORM_TYPES = [
-  { value: 'buyer_inquiry', label: 'Buyer Inquiry' },
-  { value: 'seller_inquiry', label: 'Seller Inquiry' },
-  { value: 'home_valuation', label: 'Home Valuation' },
-  { value: 'general_contact', label: 'General Contact' },
-  { value: 'showing_request', label: 'Showing Request' },
-] as const;
-
-// Contact Methods
-export const CONTACT_METHODS = [
-  { value: 'email', label: 'Email' },
-  { value: 'phone', label: 'Phone' },
-  { value: 'sms', label: 'Text/SMS' },
-  { value: 'video', label: 'Video Call' },
-] as const;
-
-// Lead Status
-export const LEAD_STATUSES = [
-  { value: 'new', label: 'New', color: 'blue' },
-  { value: 'contacted', label: 'Contacted', color: 'yellow' },
-  { value: 'qualified', label: 'Qualified', color: 'green' },
-  { value: 'nurturing', label: 'Nurturing', color: 'purple' },
-  { value: 'converted', label: 'Converted', color: 'emerald' },
-  { value: 'closed', label: 'Closed', color: 'gray' },
-  { value: 'spam', label: 'Spam', color: 'red' },
-] as const;
-
 // Listing Status
 export const LISTING_STATUSES = [
   { value: 'draft', label: 'Draft', color: 'gray' },
