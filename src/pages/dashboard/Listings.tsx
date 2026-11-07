@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, useState } from 'react';
 import {
   Plus,
   Search,
@@ -33,11 +33,10 @@ import { CLOSED_LISTING_STATUSES, LISTING_STATUSES } from '@/lib/listingStatus';
 import { todayCalendarDate } from '@/lib/localDate';
 import { buildImportedListing } from '@/lib/listingImport';
 import { reorderWithinView, sortOrderChanges } from '@/lib/listingOrder';
-import { AddListingModal } from '@/components/modals/AddListingModal';
-import { EditListingModal, EditListingFormData } from '@/components/modals/EditListingModal';
+import type { EditListingFormData } from '@/components/modals/EditListingModal';
 import type { ListingFormData } from '@/components/modals/AddListingModal';
-import { CSVUploadDialog } from '@/components/listings/CSVUploadDialog';
-import { URLImportDialog } from '@/components/listings/URLImportDialog';
+import { LazyModal } from '@/components/profile/LazyModal';
+import { useMountOnFirstOpen } from '@/hooks/useMountOnFirstOpen';
 import { useToast } from '@/hooks/use-toast';
 import { useListings, type Listing, type NewListing } from '@/hooks/useListings';
 import { useListingViewStats } from '@/hooks/useListingViewStats';
@@ -49,9 +48,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
-import { UpgradeModal } from '@/components/UpgradeModal';
 import { PlanLimitNotice } from '@/components/PlanLimitNotice';
-import { SocialShareDialog } from '@/components/listings/SocialShareDialog';
 import { useProfile } from '@/hooks/useProfile';
 import { KeyboardShortcutsHelper } from '@/components/dashboard/KeyboardShortcutsHelper';
 import { QuickStatusUpdate } from '@/components/dashboard/QuickStatusUpdate';
@@ -59,6 +56,44 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { parsePrice, formatPrice } from '@/lib/format';
 import { fallBackToOriginal, getImageUrl } from '@/lib/images';
+
+/*
+ * The dialogs load when they are first opened, not with the page (US-412).
+ * Statically imported, they put react-hook-form and zod (form-vendor, 23 KB
+ * gzip) and the add, edit, import and share UIs on the route of an agent who
+ * only came to look at their listings. Each loader is also called on intent
+ * (hovering or focusing the button that opens it), so the chunk is usually
+ * there by the time the click lands.
+ */
+const loadAddListingModal = () => import('@/components/modals/AddListingModal');
+const loadCSVUploadDialog = () => import('@/components/listings/CSVUploadDialog');
+const loadURLImportDialog = () => import('@/components/listings/URLImportDialog');
+const AddListingModal = lazy(() =>
+  loadAddListingModal().then((m) => ({ default: m.AddListingModal }))
+);
+const CSVUploadDialog = lazy(() =>
+  loadCSVUploadDialog().then((m) => ({ default: m.CSVUploadDialog }))
+);
+const URLImportDialog = lazy(() =>
+  loadURLImportDialog().then((m) => ({ default: m.URLImportDialog }))
+);
+const EditListingModal = lazy(() =>
+  import('@/components/modals/EditListingModal').then((m) => ({ default: m.EditListingModal }))
+);
+const loadSocialShareDialog = () => import('@/components/listings/SocialShareDialog');
+const SocialShareDialog = lazy(() =>
+  loadSocialShareDialog().then((m) => ({ default: m.SocialShareDialog }))
+);
+const UpgradeModal = lazy(() =>
+  import('@/components/UpgradeModal').then((m) => ({ default: m.UpgradeModal }))
+);
+
+/** Warm the chunks behind the Add menu; a failed prefetch is retried by the click. */
+const preloadAddDialogs = () => {
+  void loadAddListingModal().catch(() => undefined);
+  void loadCSVUploadDialog().catch(() => undefined);
+  void loadURLImportDialog().catch(() => undefined);
+};
 
 type ViewMode = 'grid' | 'list';
 type StatusFilter = 'all' | (typeof LISTING_STATUSES)[number]['value'];
@@ -79,6 +114,11 @@ export default function Listings() {
   const [listingToDelete, setListingToDelete] = useState<{ id: string; address: string } | null>(
     null
   );
+  const addModal = useMountOnFirstOpen(isAddModalOpen);
+  const csvDialog = useMountOnFirstOpen(isCSVDialogOpen);
+  const urlDialog = useMountOnFirstOpen(isURLDialogOpen);
+  const upgradeModal = useMountOnFirstOpen(showUpgradeModal);
+  const shareDialog = useMountOnFirstOpen(showSocialShareDialog);
   const { toast } = useToast();
   const {
     listings,
@@ -158,6 +198,8 @@ export default function Listings() {
   };
 
   const handleAddListing = async (data: ListingFormData) => {
+    // The share dialog opens when this succeeds; fetch it while the save runs.
+    void loadSocialShareDialog().catch(() => undefined);
     try {
       // uploadListingImages throws now, so a failure lands in the catch below
       // and is rethrown — the modal stays open with the form intact. This used
@@ -440,6 +482,8 @@ export default function Listings() {
           <div className="flex gap-1 w-full sm:w-auto">
             <button
               onClick={handleAddClick}
+              onPointerEnter={preloadAddDialogs}
+              onFocus={preloadAddDialogs}
               className="flex-1 sm:flex-none inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-l-lg hover:bg-primary/90 active:scale-[0.98] transition-all font-medium min-h-[44px] justify-center shadow-sm"
             >
               <Plus className="h-4 w-4" />
@@ -448,6 +492,8 @@ export default function Listings() {
             <button
               type="button"
               onClick={() => setShowAddMenu(!showAddMenu)}
+              onPointerEnter={preloadAddDialogs}
+              onFocus={preloadAddDialogs}
               aria-label="More ways to add a property"
               aria-haspopup="true"
               aria-expanded={showAddMenu}
@@ -992,7 +1038,11 @@ export default function Listings() {
             Add your first property listing manually, import from a CSV file, or paste listing
             details from any real estate website.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div
+            className="flex flex-col sm:flex-row gap-3 justify-center"
+            onPointerEnter={preloadAddDialogs}
+            onFocus={preloadAddDialogs}
+          >
             <button
               onClick={handleAddClick}
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all font-medium shadow-md min-h-[44px]"
@@ -1016,74 +1066,119 @@ export default function Listings() {
       )}
 
       {/* Modals */}
-      <AddListingModal
-        open={isAddModalOpen}
-        onOpenChange={setIsAddModalOpen}
-        onSave={handleAddListing}
-      />
-      <CSVUploadDialog
-        open={isCSVDialogOpen}
-        onOpenChange={setIsCSVDialogOpen}
-        onImport={handleCSVImport}
-      />
-      <URLImportDialog
-        open={isURLDialogOpen}
-        onOpenChange={setIsURLDialogOpen}
-        onImport={handleURLImport}
-      />
-
-      {editingListing && (
-        <EditListingModal
-          // Keyed so a different listing mounts a fresh form; the modal no
-          // longer resets its state from initialData (US-257).
-          key={editingListing.id}
-          isOpen={!!editingListing}
-          onClose={() => setEditingListing(null)}
-          onSubmit={handleEditListing}
-          listingId={editingListing.id}
-          initialData={{
-            address: editingListing.address,
-            city: editingListing.city,
-            price: editingListing.price,
-            bedrooms: editingListing.bedrooms,
-            bathrooms: editingListing.bathrooms,
-            square_feet: editingListing.square_feet ?? undefined,
-            status: editingListing.status ?? 'active',
-            photos: Array.isArray(editingListing.photos)
-              ? (editingListing.photos as string[])
-              : editingListing.image
-                ? [editingListing.image]
-                : [],
-            state: editingListing.state ?? undefined,
-            zip_code: editingListing.zip_code ?? undefined,
-            lot_size_acres: editingListing.lot_size_acres ?? undefined,
-            virtual_tour_url: editingListing.virtual_tour_url ?? undefined,
-            highlights: Array.isArray(editingListing.highlights)
-              ? (editingListing.highlights as string[]).join(', ')
-              : undefined,
-            is_featured: editingListing.is_featured ?? false,
-            description: editingListing.description ?? undefined,
-            mls_number: editingListing.mls_number ?? undefined,
-            property_type: editingListing.property_type ?? undefined,
+      {addModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsAddModalOpen(false);
+            addModal.unmount();
           }}
-        />
+        >
+          <AddListingModal
+            open={isAddModalOpen}
+            onOpenChange={setIsAddModalOpen}
+            onSave={handleAddListing}
+          />
+        </LazyModal>
+      )}
+      {csvDialog.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsCSVDialogOpen(false);
+            csvDialog.unmount();
+          }}
+        >
+          <CSVUploadDialog
+            open={isCSVDialogOpen}
+            onOpenChange={setIsCSVDialogOpen}
+            onImport={handleCSVImport}
+          />
+        </LazyModal>
+      )}
+      {urlDialog.mounted && (
+        <LazyModal
+          onClose={() => {
+            setIsURLDialogOpen(false);
+            urlDialog.unmount();
+          }}
+        >
+          <URLImportDialog
+            open={isURLDialogOpen}
+            onOpenChange={setIsURLDialogOpen}
+            onImport={handleURLImport}
+          />
+        </LazyModal>
       )}
 
-      <UpgradeModal
-        open={showUpgradeModal}
-        onOpenChange={setShowUpgradeModal}
-        feature="listings"
-        currentPlan={subscription?.plan_name || 'Free'}
-        requiredPlan="Starter"
-      />
+      {editingListing && (
+        <LazyModal onClose={() => setEditingListing(null)}>
+          <EditListingModal
+            // Keyed so a different listing mounts a fresh form; the modal no
+            // longer resets its state from initialData (US-257).
+            key={editingListing.id}
+            isOpen={!!editingListing}
+            onClose={() => setEditingListing(null)}
+            onSubmit={handleEditListing}
+            listingId={editingListing.id}
+            initialData={{
+              address: editingListing.address,
+              city: editingListing.city,
+              price: editingListing.price,
+              bedrooms: editingListing.bedrooms,
+              bathrooms: editingListing.bathrooms,
+              square_feet: editingListing.square_feet ?? undefined,
+              status: editingListing.status ?? 'active',
+              photos: Array.isArray(editingListing.photos)
+                ? (editingListing.photos as string[])
+                : editingListing.image
+                  ? [editingListing.image]
+                  : [],
+              state: editingListing.state ?? undefined,
+              zip_code: editingListing.zip_code ?? undefined,
+              lot_size_acres: editingListing.lot_size_acres ?? undefined,
+              virtual_tour_url: editingListing.virtual_tour_url ?? undefined,
+              highlights: Array.isArray(editingListing.highlights)
+                ? (editingListing.highlights as string[]).join(', ')
+                : undefined,
+              is_featured: editingListing.is_featured ?? false,
+              description: editingListing.description ?? undefined,
+              mls_number: editingListing.mls_number ?? undefined,
+              property_type: editingListing.property_type ?? undefined,
+            }}
+          />
+        </LazyModal>
+      )}
 
-      {newlyCreatedListing && (
-        <SocialShareDialog
-          open={showSocialShareDialog}
-          onOpenChange={setShowSocialShareDialog}
-          listing={newlyCreatedListing}
-          agentName={profile?.full_name ?? undefined}
-        />
+      {upgradeModal.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowUpgradeModal(false);
+            upgradeModal.unmount();
+          }}
+        >
+          <UpgradeModal
+            open={showUpgradeModal}
+            onOpenChange={setShowUpgradeModal}
+            feature="listings"
+            currentPlan={subscription?.plan_name || 'Free'}
+            requiredPlan="Starter"
+          />
+        </LazyModal>
+      )}
+
+      {newlyCreatedListing && shareDialog.mounted && (
+        <LazyModal
+          onClose={() => {
+            setShowSocialShareDialog(false);
+            shareDialog.unmount();
+          }}
+        >
+          <SocialShareDialog
+            open={showSocialShareDialog}
+            onOpenChange={setShowSocialShareDialog}
+            listing={newlyCreatedListing}
+            agentName={profile?.full_name ?? undefined}
+          />
+        </LazyModal>
       )}
 
       <AlertDialog
