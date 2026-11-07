@@ -65,3 +65,33 @@ describe('ProfileHeader trust badges', () => {
     expect(screen.queryByText(/Available Now/i)).not.toBeInTheDocument();
   });
 });
+
+describe('ProfileHeader service area (US-281)', () => {
+  const withCities = (service_cities: string[]) =>
+    ({ ...profile, service_cities }) as unknown as PublicProfile;
+
+  it('names a single city', () => {
+    renderWithProviders(<ProfileHeader profile={withCities(['Austin'])} />);
+    expect(screen.getByText(/^Serving/)).toHaveTextContent('Serving Austin');
+  });
+
+  it('names both of two cities', () => {
+    renderWithProviders(<ProfileHeader profile={withCities(['Austin', 'Round Rock'])} />);
+    expect(screen.getByText(/^Serving/)).toHaveTextContent('Serving Austin and Round Rock');
+  });
+
+  it('names every one of three or more cities instead of "+N more"', () => {
+    renderWithProviders(
+      <ProfileHeader profile={withCities(['Austin', 'Round Rock', 'Cedar Park'])} />
+    );
+    expect(screen.getByText(/^Serving/)).toHaveTextContent(
+      'Serving Austin, Round Rock and Cedar Park'
+    );
+    expect(screen.queryByText(/more$/)).not.toBeInTheDocument();
+  });
+
+  it('shows nothing when the list is empty or only blanks', () => {
+    renderWithProviders(<ProfileHeader profile={withCities(['', '  '])} />);
+    expect(screen.queryByText(/^Serving/)).not.toBeInTheDocument();
+  });
+});

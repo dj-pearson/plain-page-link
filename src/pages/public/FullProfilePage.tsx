@@ -40,6 +40,7 @@ import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
 import { getSafeOrigin } from '@/lib/utils';
+import { areaServedSchema, cleanServiceCities } from '@/lib/serviceAreas';
 import { getBaseUrl } from '@/config/seo.config';
 import { websiteId } from '@/config/site-entities';
 import { needsCanonicalRedirect, normalizeUsername } from '@/lib/username';
@@ -212,6 +213,10 @@ export default function FullProfilePage() {
     `Browse properties and connect with ${profile.full_name || profile.username}, a trusted real estate professional.`;
   const currentUrl = `${origin}/${slug}`;
 
+  // Every service city, cleaned once, for the address, areaServed and keywords (US-281).
+  const serviceCities = cleanServiceCities(profile.service_cities);
+  const areaServed = areaServedSchema(serviceCities);
+
   // Generate comprehensive structured data for SEO (dual schema for better coverage)
   const personSchema = {
     '@context': 'https://schema.org',
@@ -227,12 +232,10 @@ export default function FullProfilePage() {
         image: profile.avatar_url,
         url: currentUrl,
         address:
-          Array.isArray(profile.service_cities) &&
-          profile.service_cities[0] &&
-          profile.license_state
+          serviceCities[0] && profile.license_state
             ? {
                 '@type': 'PostalAddress',
-                addressLocality: profile.service_cities[0] as string,
+                addressLocality: serviceCities[0],
                 addressRegion: profile.license_state,
                 addressCountry: 'US',
               }
@@ -249,13 +252,7 @@ export default function FullProfilePage() {
           profile.specialties.length > 0 && {
             knowsAbout: profile.specialties,
           }),
-        ...(Array.isArray(profile.service_cities) &&
-          profile.service_cities.length > 0 && {
-            areaServed: (profile.service_cities as string[]).map((city: string) => ({
-              '@type': 'City',
-              name: city,
-            })),
-          }),
+        ...(areaServed && { areaServed }),
         ...(profile.brokerage_name && {
           memberOf: {
             '@type': 'Organization',
@@ -282,16 +279,16 @@ export default function FullProfilePage() {
         telephone: profile.phone,
         email: profile.email_display,
         url: currentUrl,
-        ...(Array.isArray(profile.service_cities) &&
-          profile.service_cities[0] &&
+        ...(serviceCities[0] &&
           profile.license_state && {
             address: {
               '@type': 'PostalAddress',
-              addressLocality: profile.service_cities[0] as string,
+              addressLocality: serviceCities[0],
               addressRegion: profile.license_state,
               addressCountry: 'US',
             },
           }),
+        ...(areaServed && { areaServed }),
         priceRange: '$$',
         ...(testimonials.length > 0 && {
           aggregateRating: {
@@ -413,7 +410,7 @@ export default function FullProfilePage() {
             'real estate agent',
             profile.license_state || '',
             ...(Array.isArray(profile.specialties) ? profile.specialties : []),
-            ...(Array.isArray(profile.service_cities) ? profile.service_cities : []),
+            ...serviceCities,
           ].filter(Boolean) as string[]
         }
         schema={personSchema}

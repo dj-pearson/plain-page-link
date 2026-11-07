@@ -1,6 +1,7 @@
 import { MapPin, Award, ShieldCheck, Zap, Star, Building2, CheckCircle2 } from 'lucide-react';
 import type { PublicProfile } from '@/types/profile';
 import { cn } from '@/lib/utils';
+import { formatServiceCities } from '@/lib/serviceAreas';
 
 interface ProfileHeaderProps {
   profile: PublicProfile;
@@ -42,6 +43,9 @@ function TrustBadge({
 }
 
 export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
+  // Every city, in words (US-281). "Austin +2 more" hid the very town a
+  // visitor was checking for.
+  const serviceArea = formatServiceCities(profile.service_cities);
   return (
     <div className="relative bg-white rounded-xl shadow-lg overflow-hidden">
       {/* Background Pattern */}
@@ -173,15 +177,12 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
 
             {/* Quick Info */}
             <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4 justify-center md:justify-start">
-              {profile.service_cities && profile.service_cities.length > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium">{profile.service_cities[0]}</span>
-                  {profile.service_cities.length > 1 && (
-                    <span className="text-blue-600 font-semibold">
-                      +{profile.service_cities.length - 1} more
-                    </span>
-                  )}
+              {serviceArea && (
+                <div className="flex items-start gap-1.5 max-w-prose">
+                  <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" aria-hidden="true" />
+                  <span>
+                    Serving <span className="font-medium">{serviceArea}</span>
+                  </span>
                 </div>
               )}
               {profile.license_number && profile.license_state && (
