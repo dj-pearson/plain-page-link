@@ -9389,6 +9389,10 @@ export type Database = {
         Args: { _user_id: string };
         Returns: Record<string, unknown>[];
       };
+      listing_view_stats: {
+        Args: Record<PropertyKey, never>;
+        Returns: Record<string, unknown>[];
+      };
       locked_lead_ciphertexts: {
         Args: { _user_id: string; _values: string[] };
         Returns: string[];

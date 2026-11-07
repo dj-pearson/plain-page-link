@@ -2236,6 +2236,64 @@ check('analytics_summary counts past the old row caps, inside the plan history w
   return out;
 });
 
+// US-263: listing_view events were recorded and never read back. The per-listing
+// aggregate must count only the caller's own listings (a visitor can insert an
+// event with any target_id), split 7 and 30 days, and refuse anon.
+check('listing_view_stats counts views per own listing, and nothing else', () => {
+  const out = [];
+  const me = '00000000-dead-beef-0000-0000000a2631';
+  const other = '00000000-dead-beef-0000-0000000a2632';
+  const mine = '00000000-dead-beef-0000-00000a263a01';
+  const quiet = '00000000-dead-beef-0000-00000a263a02';
+  const theirs = '00000000-dead-beef-0000-00000a263a03';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${me}', 'lvs1@example.test'), ('${other}', 'lvs2@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.listings (id, user_id, address, city, price, status) VALUES
+         ('${mine}', '${me}', '1 Viewed St', 'Austin', '500000', 'active'),
+         ('${quiet}', '${me}', '2 Quiet St', 'Austin', '400000', 'active'),
+         ('${theirs}', '${other}', '3 Theirs St', 'Austin', '300000', 'active');
+       -- One visitor per row: throttle_analytics_event caps a single visitor's burst.
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_id, occurred_at)
+         SELECT '${me}', 'lv' || (g % 4), 'listing_view', '${mine}', now() - make_interval(hours => g)
+           FROM generate_series(1, 3) g;
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_id, occurred_at)
+         SELECT '${me}', 'lw' || g, 'listing_view', '${mine}', now() - interval '20 days'
+           FROM generate_series(1, 2) g;
+       -- Outside 30 days, another agent's listing filed under me, and a non-view event.
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_id, occurred_at) VALUES
+         ('${me}', 'old', 'listing_view', '${mine}', now() - interval '45 days'),
+         ('${me}', 'forged', 'listing_view', '${theirs}', now()),
+         ('${other}', 'theirs', 'listing_view', '${theirs}', now()),
+         ('${me}', 'click', 'link_click', '${mine}', now());`);
+    const rows = q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}';
+      SELECT listing_id || '|' || views_7d || '|' || views_30d || '|' || visitors_30d FROM public.listing_view_stats();`);
+    if (rows.length !== 1) out.push(`returned ${rows.length} rows, expected 1 (only my viewed listing): ${rows.join(', ')}`);
+    const [, v7, v30, vis] = (rows.find((r) => r.startsWith(mine)) ?? '').split('|');
+    if (v7 !== '3') out.push(`views_7d is ${v7}, expected 3`);
+    if (v30 !== '5') out.push(`views_30d is ${v30}, expected 5 (none older than 30 days, no link_click)`);
+    if (vis !== '5') out.push(`visitors_30d is ${vis}, expected 5`);
+    try {
+      q(`SET ROLE anon; SELECT * FROM public.listing_view_stats();`);
+      out.push('anon can call listing_view_stats');
+    } catch {
+      /* expected */
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.analytics_events WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.listings WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${me}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${me}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // US-236: lead ownership and lead dates are not the agent's to rewrite.
 //   * locked_lead_ids() ranks a month's leads by created_at, and plan_usage()
