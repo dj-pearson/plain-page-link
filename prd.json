@@ -4129,6 +4129,338 @@
       "priority": 3,
       "passes": true,
       "notes": "scripts/prerender.mts:545-573 writeSitemap prerendered routes only; public/robots.txt; functions/[username].ts:151-153 query shape; functions/_lib/social-meta.ts isReservedSegment. generate-article/index.ts:262,381-417; BlogArticle.tsx:55-63 view_count update (admin-only policy, bumps updated_at), :191, :245-337. ReviewInvite.tsx:28; SubmitReview.tsx no Helmet; public/_headers. DONE: (1) functions/sitemap-profiles.xml.ts is a thin route over functions/_lib/profile-sitemap.ts. It queries profiles?select=username&is_published=is.true&order=username.asc with the anon key, the same is_published filter [username].ts uses. It pages limit=1000/offset until a short page, capped at 50k URLs. Usernames are normalised, de-duplicated, reserved segments are skipped, and each one is encodeURIComponent'd. The 200 response has cache-control s-maxage=3600 and no <lastmod>, because profiles.updated_at is not anon-readable. Any page failure, network error, non-list body, missing binding or empty result returns 503 with Retry-After and no-store, never an empty or partial 200. robots.txt has a second Sitemap line. 'sitemap-profiles.xml' is added to RESERVED_SEGMENTS (the dot rule already caught it) and to the social-meta test. Tests in functions/_tests/sitemap-profiles.test.ts use a stubbed global fetch. (2) New src/lib/articleMarkdown.ts: stripLeadingTitle removes only a leading ATX \"# Title\" line and handles a BOM and CRLF; a \"#hashtag\" line is not treated as a heading. A rehype step (rehypeArticleHeadings) demotes h1 to h2 and gives every heading an id: the text nodes are slugified and de-duplicated (x, x-1, ...). It runs on the tree rather than in the render components so ids stay stable across re-renders. The old ids for headings containing bold were \"why-,[object-object],-matter\". BlogArticle uses it. Tests are in articleMarkdown.test.ts and BlogArticle.test.tsx. (3) scripts/lib/seo-audit.mjs countH1 and auditPages: more than one <h1> fails any page, and no <h1> fails an indexable page. noindex pages may have none, because /auth/mfa and /auth/sso/callback legitimately have no h1. The tests' goodPage now includes an h1. One fixture article now opens with \"# Title\" so CI's verify:seo exercises that shape. (4) SubmitReview renders SEOHead in all four branches: the title \"Leave a review for <name> | AgentBio\", noindex,follow, and no canonical. public/_headers has `/:username/review  X-Robots-Tag: noindex, follow`. crawl-directives.test.ts asserts the header, that robots.txt has no Disallow for it, and that no prerendered static route has the shape /<x>/review, which the placeholder would also catch. (5) Migration 20261101000024_article_view_counter.sql: a new articles_touch_updated_at trigger keeps OLD.updated_at when only view_count changed (a jsonb comparison, so columns added later are covered). It also adds increment_article_view(p_article_id, p_visitor_id): SECURITY DEFINER, search_path pinned, published rows only, check_rate_limit 3 per hour per visitor and article, EXECUTE revoked from PUBLIC and granted to anon, authenticated and service_role. It is listed in DEFINER_CALLABLE with its reason. A new verify:schema check runs as anon and asserts that the count moves, updated_at does not, a draft is untouched, the throttle holds, and a real edit still moves updated_at. types.ts was regenerated (types:check is up to date). The prerender stubs the new RPC so a build never counts a view. DEVIATIONS: Two judgement calls: an empty published-profile list also returns 503 rather than 200, which is what \"never empty 200\" asks for; and noindex pages are exempt from \"has no h1\", which is needed for verify:seo to pass on /auth/mfa and /auth/sso/callback. generate-article itself still asks for and stores \"# Title\", which is left alone: the renderer handles it and existing rows already have it. A blog article whose slug is exactly \"review\" would also be noindexed by the /:username/review placeholder; this is noted in the test. verify:seo at HEAD already reports 23 \"FAQPage answer is not on the page\" failures on /for/* pages in a fixture build, unrelated to this story."
+    },
+    {
+      "id": "LEAP-001",
+      "title": "Switch in 60 seconds: import a Linktree, Beacons, Direct.me or UniLink page into a ready AgentBio profile",
+      "description": "As an agent on Linktree or another bio link, I want to paste my current URL and get an AgentBio page with my links, photo and bio already filled, so switching costs me nothing. AgentBio has 9 registered users, 0 new in the last 30 days and 0 signed in within 30 days (hub /api users read, 2026-11-07), so acquisition and activation outrank every retention feature. The /vs/linktree page (src/pages/landing/VsLinktree.tsx, US-156) and the profile_badge ref (US-232) bring a visitor to the door; nothing removes the work of rebuilding a page they already have. US-127 covers listing import from Zillow, not bio-page import, and no PRD story plans this.",
+      "acceptanceCriteria": [
+        "New edge function import-bio-page accepts a public linktr.ee, beacons.ai, direct.me or uni.link URL, fetches it through supabase/functions/_shared/ssrf-guard.ts with a timeout and a response size cap, and extracts display name, avatar URL, bio text and links; any other host returns a named refusal (tests for each refusal)",
+        "Extraction is covered by committed fixture HTML per provider; a fixture with a missing section yields a partial import that names the missing parts, never a silent empty result (test per provider)",
+        "Imported links are created through the existing links insert path so enforce_plan_limit (20260923000002) applies; links over the plan limit are returned as 'not imported - over your plan's link limit' and shown, not dropped",
+        "The onboarding wizard gets an 'Import from my current link in bio' first step; the extracted result is shown for review and nothing is saved until the agent confirms (component test)",
+        "The avatar is re-uploaded to the avatars bucket through the useAvatarUpload path with magic-number validation (US-076), never hotlinked",
+        "Rate limited per IP and per account through _shared/rate-limiter.ts; only public pages are fetched and no login or cookie is ever sent",
+        "New prerendered /switch/linktree page links the importer from VsLinktree.tsx; verify:seo passes",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 160,
+      "passes": false,
+      "notes": "Size: M. Success metric: signups that start with an import, and import-to-published rate (is_published true within 7 days). Competitive rationale: Linktree is the default tool agents are already on; a zero-effort move is the lever against it. Cited by the draft and not re-verified here: Linktree suspension complaints (https://www.trustpilot.com/review/linktr.ee?page=6), Linktree price changes (https://u2l.ai/blog/linktree-pricing). The claim that no real-estate bio competitor offers an importer was not verified; drop it from public copy unless checked. Publish controls are US-142; until it lands, the review step should say the page goes live on save."
+    },
+    {
+      "id": "LEAP-002",
+      "title": "Listing Launch Kit: one listing becomes a description, five social posts and a share image from the agent's dashboard",
+      "description": "As an agent, when I add or change a listing I need the marketing for it written for me (description; Just Listed, Open House, Price Reduced and Sold posts for Instagram, Facebook and LinkedIn; a 1080x1350 share image) without leaving AgentBio. Today no dashboard screen calls generate-listing-description: its only caller is the public free tool (src/pages/tools/ListingDescriptionGenerator.tsx:98), and the dashboard wrapper edgeFunctions.generateListingDescription (src/lib/edgeFunctions.ts:271-283) has no caller and sends the listing as the body while the function reads propertyDetails. generate-social-post calls requireAdmin (index.ts:32) and is reached only from admin/SocialMediaManager.tsx via useSocialMedia.ts. So the ai_listing_descriptions_per_month quota sold on paid plans, already charged by consume_plan_quota inside the function (index.ts:133-174), is unreachable for a paying agent. Realty.bio's App Store listing offers AI titles and descriptions from photos and details; a bio link with no listing record (Linktree, Beacons) cannot generate from one.",
+      "acceptanceCriteria": [
+        "src/pages/dashboard/Listings.tsx and the listing edit modal gain a 'Launch kit' action backed by a new hook src/hooks/useListingLaunchKit.ts; the requireAdmin gate on generate-social-post is not loosened, and an agent-scoped mode lives in a new function generate-launch-kit that verifies the caller owns the listing",
+        "edgeFunctions.generateListingDescription sends { propertyDetails } (the shape the function reads) and has a test pinning the request body",
+        "Each post carries the listing URL (listingShare.ts, ?listing=<id> until US-141 lands) with utm_source=<channel>&utm_medium=social&utm_campaign=launch-<listingId>; a unit test on the URL builder, and src/lib/leadAttribution.ts labels the campaign on a lead",
+        "Social posts are metered through consume_plan_quota with a new key ai_social_posts_per_month added to src/lib/planLimits.ts, pricing-plans.ts and subscription_plans in one migration; at the limit the UI shows the upgrade path and a failed generation refunds the charge (tests for allowed, exhausted and refund)",
+        "Generated text passes a server-side check that refuses invented statistics and the banned-phrase list (no 'game-changer', no emoji used as structure); a test fails on a seeded violation",
+        "Share image rendered server-side at 1080x1350 from the listing's first photo, price, beds/baths and agent name; downloadable, and each post has a copy button",
+        "New table listing_marketing_assets (listing_id, user_id, channel, kind, body, created_at) with owner-only RLS; verify:schema passes and types.ts is regenerated",
+        "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
+      ],
+      "priority": 161,
+      "passes": false,
+      "notes": "Size: L. Success metric: share of agents who generate a kit within 7 days of adding a listing; leads with utm_campaign=launch-*. Competitive rationale: Realty.bio gives AI listing copy free (https://apps.apple.com/us/app/id6759394709, verified 2026-11-07 against its App Store listing). Luxury Presence AI content inside custom-quoted plans is cited by the draft and not re-verified (https://news.inman.com/2026/05/06/luxury-presence-launches-unified-ai-platform-for-agents/). AgentBio's edge is attribution of every post back to a lead. LEAP-012, LEAP-017 and LEAP-020 build on this story."
+    },
+    {
+      "id": "LEAP-003",
+      "title": "AI search visibility per agent: llms.txt, richer RealEstateAgent and Review JSON-LD, and a 'what AI says about you' check",
+      "description": "As an agent, I want ChatGPT, Gemini and Perplexity to quote my AgentBio page when a buyer asks for an agent in my area, and to see what they say about me now. The crawler prerender already emits RealEstateAgent JSON-LD with name, url, image, description, worksFor and areaServed (functions/_lib/social-meta.ts:205-214) and profiles are in sitemap-profiles.xml (US-262); what is missing is a per-agent machine-readable summary, review markup from moderated testimonials, and any way for the agent to see whether it works. Zillow put a buyer-facing app inside ChatGPT, so buyers are asking assistants who to call.",
+      "acceptanceCriteria": [
+        "Pages Function functions/[username]/llms.txt.ts serves a per-agent llms.txt from the published profile, service_cities, active listings and approved testimonials only; 404 for an unpublished or reserved username (functions/_lib/social-meta.ts isReservedSegment); test with stubbed fetch",
+        "buildProfileTags in functions/_lib/social-meta.ts adds sameAs from the agent's public links and telephone only when the agent's visibility settings make the phone public (US-073, US-110); social-meta.test.ts covers both",
+        "AggregateRating and Review are emitted only from approved testimonials rows; the block is omitted at zero reviews and ratingValue/reviewCount come from the database (tests for 0 and for N); validate-structured-data passes on a fixture profile",
+        "New page /dashboard/visibility shows weekly results of a new edge function ai-visibility-check that runs a fixed prompt set ('best real estate agent in <city>', '<agent name> realtor') against configured model APIs and stores model, prompt, mentioned, cited_url and checked_at in ai_visibility_checks (owner-only RLS)",
+        "A model whose API key is unset renders 'Not checked - <MODEL> is not configured', never 'not mentioned'; a failed call renders 'Unavailable - <reason>' (tests)",
+        "Check frequency is a plan quota (Free monthly, paid weekly) through consume_plan_quota with a new key in planLimits.ts",
+        "Typecheck, verify:seo and the existing tests pass"
+      ],
+      "priority": 162,
+      "passes": false,
+      "notes": "Size: L. Success metric: share of published agents with at least one mention or agentbio.net citation after 60 days; upgrades attributed to the Visibility page. Competitive rationale: Zillow in ChatGPT (https://www.zillowgroup.com/news/zillow-becomes-first-real-estate-app-in-chatgpt). Cited by the draft and not re-verified: NAR on AI referrals (https://www.nar.realtor/news/real-estate-news/technology/find-your-geo-to-land-your-next-referral-from-ai), Luxury Presence GEO agents (https://www.housingwire.com/articles/new-luxury-presence-platform-combines-ai-tools-and-marketing/). Prerender must be live in production (US-146 owner actions). Correction to the draft: RealEstateAgent JSON-LD already exists, so this extends it rather than adding it."
+    },
+    {
+      "id": "LEAP-004",
+      "title": "Listings that keep themselves current: sync the agent's own listings from their MLS through a RESO Web API feed",
+      "description": "As an agent, I want my active, pending and sold listings to appear and update on AgentBio from my MLS, so my page is never stale and I never type a listing twice. Today every listing is entered by hand or pasted as text (US-253); the Zillow URL import was a fake (US-127), and 'MLS integration' is a waitlist button on Pricing (src/components/pricing/AddOnWaitlist.tsx, feature_waitlist 'mls_integration' in 20260930000004) with nothing behind it. A stale listing page is the main reason an agent stops sharing the link, and every downstream story here (launch kit, reels, market reports, concierge) runs on the listing record.",
+      "acceptanceCriteria": [
+        "New table mls_connections (user_id, provider, mls_name, agent_mls_id, office_mls_id, credential ref encrypted with the pii-crypto pattern, status, last_sync_at, last_error) with owner-only RLS; credentials never returned to the client",
+        "New edge function sync-mls-listings pulls only listings where ListAgentMlsId or CoListAgentMlsId equals the connected agent id, maps RESO Data Dictionary fields (ListPrice, StandardStatus, BedroomsTotal, BathroomsTotalInteger, LivingArea, Media) onto listings, and upserts by (user_id, mls_listing_key); a mapping test runs on a committed RESO fixture",
+        "A synced listing is marked source='mls'; fields the agent edited by hand are kept and the conflict is shown, never silently overwritten (test)",
+        "StandardStatus Closed sets status sold with sold_date and close price so it appears in recent sales; a listing that leaves the feed is marked off-market, not deleted (test)",
+        "Synced rows go through the same listings insert path so enforce_plan_limit applies; listings over the limit are listed as 'not synced - over your plan's listing limit'",
+        "Sync runs as a task in scheduled-maintenance (independent of the other tasks, idempotent across runs) and on demand from a Settings 'Sync now' button; a failed sync shows the provider's error text",
+        "The MLS display rules each feed requires (attribution line, listing brokerage name) are rendered on synced listings and the requirement source is recorded in docs",
+        "feature_waitlist entries for mls_integration are emailed once when the feature ships (manual, documented); typecheck and the existing tests pass"
+      ],
+      "priority": 163,
+      "passes": false,
+      "notes": "Size: L. Replaces the draft's free-tools loop story (old LEAP-009), whose nurture-email half is already planned in US-136 and whose remainder (UTM on share links, a result page) is polish. Success metric: share of active agents with an MLS connection; manual listing edits per agent per month (should fall). Competitive rationale: website platforms for agents sell IDX/MLS feeds as a core feature; bio links have no listing record to sync. No competitor URL is cited because none was verified in this review. Before building: choose a feed aggregator the operator can license and confirm per-MLS terms; the first build can support one aggregator and one MLS."
+    },
+    {
+      "id": "LEAP-005",
+      "title": "Speed-to-lead: an AI-drafted first reply ready within a minute, approved by the agent in one tap from the notification",
+      "description": "As an agent, when a lead arrives I want a ready-to-send reply drafted from the lead's form answers and my matching listings, so I can answer in seconds from my phone. Today notify-lead alerts the agent and the lead gets a generic auto-response whose replies now reach the agent (US-229); src/lib/leadNextStep.ts suggests a next step but writes nothing. No PRD story drafts a reply. The CRMs that sell AI messaging (Lofty, Follow Up Boss with Zillow) are priced well above AgentBio's $29-$49 plans.",
+      "acceptanceCriteria": [
+        "After submit-lead succeeds, a new edge function draft-lead-reply builds a draft server-side from the lead fields (decrypted through pii-crypto, never sent to the browser), the agent's profile and up to 3 active listings matching price and city; stored in lead_reply_drafts (lead_id, user_id, body, reason_line, status) with owner-only RLS",
+        "Every draft carries a one-line reason ('Asked about 3-bed under $400k; 2 of your listings fit') shown above it; a test asserts the reason is present and names only listings that exist",
+        "The notify-lead email gains Approve-and-send and Edit links carrying a hashed single-use token that expires in 24h (the pattern of leads.update_token_hash, 20260930000008); tests for valid, expired and reused tokens",
+        "Approve sends through supabase/functions/_shared/email.ts with the agent's name as sender name and reply-to as the agent (US-229), and writes a lead_activities row",
+        "Nothing is sent without the agent's approval: a test asserts draft creation makes no outbound email call",
+        "A lead whose PII is locked by the plan allowance gets no draft, and the notification says why",
+        "Metered by a new ai_lead_replies_per_month key in planLimits.ts through consume_plan_quota",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 164,
+      "passes": false,
+      "notes": "Size: M. Success metric: median time from lead created to first agent reply (lead_activities), before vs after; share of drafts approved unedited. Competitive rationale, cited by the draft and not re-verified: Lofty AOS (https://lofty.com/news/lofty-launches-first-agentic-ai-operating-system), Lofty reviews (https://www.capterra.com/p/157457/Lofty/reviews/), Follow Up Boss review (https://learn.realscout.com/academy/follow-up-boss-crm-review/). If US-135's per-agent sender lands first, use it and its suppression list instead of a second path."
+    },
+    {
+      "id": "LEAP-006",
+      "title": "Tracked print kit: yard-sign riders, flyers and business cards with short-link QR codes that count scans, not just leads",
+      "description": "As an agent, I want every sign, flyer and card to carry a QR code that tells me how many people scanned it and which became leads. US-188 attribution only sees a scan once it becomes a form submission, and Analytics.tsx:506 itself names 'a QR code on a yard sign' as a source it cannot separate. qrcode.react is already used (QRCodeSVG in src/pages/dashboard/OpenHouses.tsx:12,526) and US-137 plans an open-house flyer and yard-sign variant; neither counts scans or covers business cards and listing riders. On free plans each printed piece carries the 'Made with AgentBio' badge with the ref (US-232), putting acquisition on the street.",
+      "acceptanceCriteria": [
+        "New tables short_links (code unique, user_id, target_url, artifact_kind CHECK IN ('yard_sign','flyer','card','other'), label, listing_id nullable, created_at) and scan_events (code, scanned_at, ua_class, country) with owner-only read RLS and no client insert on scan_events",
+        "Pages Function functions/q/[code].ts records a scan and 302-redirects to target_url with utm_source=<artifact_kind>&utm_medium=print&utm_campaign=<code>; unknown code returns 404; known bot user agents are redirected but not counted (tests)",
+        "'q' is added to RESERVED_SEGMENTS in functions/_lib/social-meta.ts and to its test, so no agent can claim the username",
+        "/dashboard/print generates print-ready PDFs (18x24 rider, letter flyer, 3.5x2 card) with the QR, agent photo and listing details, reusing the QR helper and flyer layout from US-137 when it has landed; free-plan PDFs carry 'Made with AgentBio' plus ?ref=<username>",
+        "Analytics.tsx shows scans and leads per short link, joined on utm_campaign through src/lib/leadAttribution.ts; a link with no scans shows 0, a failed read shows 'Unavailable - <reason>' (tests for both)",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 165,
+      "passes": false,
+      "notes": "Size: M. Success metric: scans per active agent per month; scan-to-lead rate; signups with a ref from print. Competitive rationale, cited by the draft and not re-verified: open-house apps offer QR sign-in (https://theclose.com/open-house-apps/). The draft's second citation (hunted.space) was dropped as unverifiable. Correction to the draft: qrcode.react is not unused. Distinct from US-137 (one flyer per open house, no scan counting) and US-127 (a checklist QR); build on both rather than adding a second QR component."
+    },
+    {
+      "id": "LEAP-007",
+      "title": "Answer every home-valuation lead with a branded CMA the agent builds in minutes",
+      "description": "As an agent, when a seller asks what their home is worth, I want to pick comps and send back a branded CMA report the same day. The valuation capture already exists: HomeValuationForm and HomeValuationDialog (src/components/forms/), lead_type 'valuation' accepted by submit-lead (supabase/functions/_shared/validation.ts:198) and shown in LeadDetailModal. What happens after the form is nothing: the agent replies by hand. Meanwhile Professional and Team are sold cmaGenerator with cma_reports_per_month already declared and enforced in src/lib/planLimits.ts and nothing that consumes it. US-143 would remove the claim; this builds it instead.",
+      "acceptanceCriteria": [
+        "New dashboard flow /dashboard/cma/:leadId opened from a valuation lead in LeadDetailModal lets the agent pick comps from their own sold_properties or enter them manually (address, sold price, sold date, sqft, beds, baths)",
+        "No third-party AVM is called, and the report never shows a value the agent did not enter; a test asserts the PDF's suggested range equals the agent's input",
+        "New edge function generate-cma writes the narrative (market summary, adjustment rationale) only from the entered comps; a test fails if the narrative contains a number not present in the input",
+        "The branded PDF (agent photo, logo, brokerage) is stored in a private cma-reports bucket created by migration with owner-only policies, shared by signed URL",
+        "Each report is charged through consume_plan_quota with the existing cma_reports_per_month key and refunded if generation fails; Free sees the upgrade prompt (tests for allowed, exhausted, refund)",
+        "Sending the CMA logs a lead_activities row and, when US-131 deals exist, moves the sell-side deal to stage cma_sent",
+        "Tests: PDF generated for a fixture with 3 comps; typecheck and the existing tests pass"
+      ],
+      "priority": 166,
+      "passes": false,
+      "notes": "Size: L. Rescoped from the draft: its 'home_valuation block' half is already built (HomeValuationForm, lead_type 'valuation'), so the story now starts at the lead. Success metric: valuation leads answered with a CMA within 24h; CMAs sent per month; paid conversion among agents who receive a valuation lead. Competitive rationale: realtor link-in-bio guides recommend a valuation form (https://www.unilink.us/blog/link-in-bio-for-real-estate-agents, found 2026-11-07); Homebot's seller model is cited by the draft and not re-verified (https://homebot.ai/rea-demo). Coordinate with US-143 so cmaGenerator stays in the matrix once this ships."
+    },
+    {
+      "id": "LEAP-008",
+      "title": "Pay out the referral badge: a month of Starter for every referred agent who publishes a page",
+      "description": "As an agent, I want to see how many agents signed up from my 'Powered by AgentBio' badge and earn free plan time for each one who publishes. US-232 writes profiles.referred_by from ?ref=<username> (20260930000010_signup_referral.sql), and the admin reads it (supabase/functions/admin-users/index.ts:45, HealthDashboard); the referring agent sees nothing and earns nothing. US-232's own notes name the reward as the follow-up. US-134's referred_by_contact_id is client referrals, a different thing.",
+      "acceptanceCriteria": [
+        "New table referral_rewards (referrer_id, referred_id unique, qualified_at, reward_kind, stripe_ref, status) with RLS so a referrer reads only rows where they are the referrer; verify:schema passes",
+        "A referral qualifies only when the referred profile is_published and has at least one listing or link, and is not self-referral (same auth user, same verified email, or same Stripe card fingerprint is refused); qualification runs as an independent task in scheduled-maintenance and re-running grants nothing twice (test)",
+        "Reward is granted by a new edge function grant-referral-reward: a Stripe customer balance credit of one Starter month for paying referrers, or a one-month 100%-off coupon applied at next checkout for free referrers; stripe-webhook stays the only writer of plan state",
+        "src/pages/dashboard/Overview.tsx shows 'You referred N agents, M qualified, X months earned' and a copyable referral link; a failed read renders 'Unavailable - <reason>' and a real 0 renders 0 (tests for both)",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 167,
+      "passes": false,
+      "notes": "Size: M. Success metric: qualified referrals per month; share of new signups with referred_by set. Ranked below acquisition work because AgentBio has 9 users and 0 signed in within 30 days (hub users read, 2026-11-07): a referral loop multiplies an active base it does not yet have. Correction to the draft: 'nothing reads referred_by' was wrong (admin-users reads it), so the admin AC was removed. The badge-led growth citations in the draft (a Sacra chat link and a Product Hunt story) were dropped as unverifiable. Reads src/lib/signupIntent.ts and src/hooks/useProfileShowsBranding.ts."
+    },
+    {
+      "id": "LEAP-009",
+      "title": "Native lead delivery to Follow Up Boss and any CRM by signed webhook",
+      "description": "As an agent who already pays for a CRM, I want every AgentBio lead to appear there instantly with source and campaign, so AgentBio is my top of funnel instead of another inbox. Today only a Zapier modal exists (src/components/integrations/ZapierIntegrationModal.tsx) and 'CRM connectors' is a waitlist entry (feature_waitlist 'crm_connectors', 20260930000004). Being the front door to the CRM an agent already uses is safer than competing with it.",
+      "acceptanceCriteria": [
+        "New table crm_connections (user_id, provider CHECK IN ('followupboss','webhook'), encrypted credential ref, status, last_delivery_at, last_error) with owner-only RLS; credentials encrypted with the pii-crypto pattern and never returned to the client",
+        "New edge function deliver-lead-to-crm runs after submit-lead succeeds; Follow Up Boss uses its Events API with source 'AgentBio' and the lead's utm fields as read by src/lib/leadAttribution.ts (payload mapping test)",
+        "The generic webhook signs the JSON body with HMAC-SHA256 and a per-connection secret, documented with a verification snippet; target URLs pass _shared/ssrf-guard.ts; retries 3 times with backoff, then marks the delivery failed and shows it in the dashboard (tests for signature and retry exhaustion)",
+        "Settings gets an Integrations section to connect, send a test lead and disconnect; a failed test shows the provider's error text",
+        "Deliveries are logged in crm_deliveries; a lead whose PII is locked by the plan allowance is not delivered and the log says why",
+        "Plan gating: Starter one connection, Professional and Team unlimited; the crm_connectors waitlist button is replaced by the real control",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 168,
+      "passes": false,
+      "notes": "Size: M. Success metric: share of paying agents with an active connection; delivery success rate. Competitive rationale, cited by the draft and not re-verified: Follow Up Boss pricing (https://www.capterra.com/p/130020/Follow-Up-Boss/pricing), platform consolidation (https://www.housingwire.com/articles/luxury-presence-raises-37m-to-push-crm-platform-development/). Lofty was dropped from the provider list: no public lead API was confirmed in this review; add it when one is. The draft's 'free acquisition from the FUB integrations directory' is a hope, not a fact; listing there is an operator task to check."
+    },
+    {
+      "id": "LEAP-010",
+      "title": "Verified, portable reviews: token-verified client reviews, an embeddable widget and an email-signature badge",
+      "description": "As an agent, I want reviews from real clients marked 'verified client' and shown on my brokerage site and email signature, because reviews I collect over years are reputation I keep. submit-review stores reviews in testimonials with moderation (US-074) and deliberately collects no client email (submit-review/index.ts:32), so a review cannot be tied to a client today. US-132 already schedules the review request after a close; this story adds what that request lacks: verification and a way for reviews to leave the page.",
+      "acceptanceCriteria": [
+        "The review request (US-132's, or a manual 'Request a review' on a contact) carries a single-use hashed token in /:username/review?t=<token>; a review submitted with a valid token is stored with verified=true and the contact id (tests for valid, expired and reused tokens)",
+        "Moderation keeps working; only approved reviews are public, and an unverified review never shows the verified mark",
+        "Embeddable widget served from functions/embed/reviews/[username].js renders approved reviews in a shadow-DOM container with a link back to the profile; 'embed' is added to RESERVED_SEGMENTS with a test",
+        "A static image badge (rating and count from the database) for email signatures; zero reviews renders no badge rather than '0.0'",
+        "Review JSON-LD (LEAP-003) marks nothing as verified unless the token path was used",
+        "Dashboard shows request sent / opened / submitted per client",
+        "Plan gating: Free 5 requests per month, paid unlimited; typecheck and the existing tests pass"
+      ],
+      "priority": 169,
+      "passes": false,
+      "notes": "Size: M. Depends on US-128 contacts (table exists in 20260923000001) and reuses US-132's request rather than building a second one. Success metric: approved reviews per active agent; unique referrer domains for the widget. Competitive rationale: biobar's review blocks are described in a 2026 comparison (https://www.unum.la/blog/best-link-in-bio-real-estate-agents, found 2026-11-07); the NAR GEO article is cited by the draft and not re-verified. Embeds on brokerage domains are also the backlinks US-158 says the domain lacks."
+    },
+    {
+      "id": "LEAP-011",
+      "title": "An AI concierge on every agent page that answers buyer questions from the agent's listings and books the showing",
+      "description": "As a buyer on an agent's page at 10pm, I want to ask 'Does the Maple St house have a garage?' or 'Anything under $350k near Ankeny?' and get an answer from that agent's listings, then book a showing. As the agent, I want the conversation to arrive as a lead with the transcript. A bio link with no listing data (Linktree, Beacons) has nothing to ground an assistant on; AgentBio has listings, service areas and a showing flow (US-221).",
+      "acceptanceCriteria": [
+        "New edge function profile-concierge answers only from the agent's published listings, profile, service_cities and FAQ; it refuses price predictions, legal or lending advice and fair-housing-sensitive steering, with a test suite of refusal prompts (schools 'for families like us', neighborhood demographics, religion, national origin)",
+        "Every answer names the listing it used; when nothing matches it says so and offers the contact form",
+        "Contact capture in the chat posts to submit-lead with lead_type 'contact' and source 'concierge' (validation.ts accepted types unchanged, or extended with a test), and attaches the transcript as a lead_activities row; booking uses the US-221 showing flow",
+        "The widget on FullProfilePage.tsx is lazy-loaded and the performance budget check (US-212) still passes",
+        "Per-page rate limit through _shared/rate-limiter.ts and spam-guard; monthly conversation quota per plan in planLimits.ts (Free off, paid on)",
+        "Transcripts retained 90 days and included in gdpr-export and gdpr-deletion",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 170,
+      "passes": false,
+      "notes": "Size: L. Success metric: concierge sessions per 100 profile views; concierge-to-lead rate; leads captured outside 9-6. Competitive rationale, cited by the draft and not re-verified: Lofty Cowork (https://www.rismedia.com/2026/07/28/lofty-expands-agentic-ai-os-real-estate-cowork/), Luxury Presence AI agents (inman, above). Fair-housing guardrails are a launch blocker. Correction: the draft's lead_type 'concierge' is not an accepted value in _shared/validation.ts:198."
+    },
+    {
+      "id": "LEAP-012",
+      "title": "Publish Launch Kit posts to Instagram and Facebook on a schedule the agent approves",
+      "description": "As an agent, I want the Launch Kit posts to go to my Instagram and Facebook pages on a schedule I approve, without copying and pasting. Instagram now allows several links in a profile, which removes the basic reason to use a bio link; being where the agent posts every day is the answer. Bio links link to Instagram; none found in this review publish listing content to it.",
+      "acceptanceCriteria": [
+        "Meta OAuth (Instagram professional account via Facebook Login) stored in social_connections with encrypted tokens and expiry; the agent is prompted to reconnect 7 days before expiry",
+        "Table social_posts (listing_id, user_id, channel, body, media_url, scheduled_for, status, platform_post_id, approved_at); a post is published only after explicit approval and only by a scheduled-maintenance task",
+        "A 2xx with no platform post id is recorded failed, not published (test); media the platform would refuse is refused before the approval is consumed (test)",
+        "Text over the platform limit is refused, never truncated, counting code points (test)",
+        "Published posts carry the tracked link from LEAP-002 so leads attribute to the post",
+        "Plan gating: Professional and above; typecheck and the existing tests pass"
+      ],
+      "priority": 171,
+      "passes": false,
+      "notes": "Size: L. Depends on LEAP-002. Requires Meta app review; plan the review as part of the story. Success metric: posts published per active agent per month; leads with utm_source=instagram or facebook and utm_campaign=launch-*. The draft's tlinky citation is not re-verified."
+    },
+    {
+      "id": "LEAP-013",
+      "title": "Neighborhood market reports: an indexable monthly page per agent service area",
+      "description": "As an agent, I want a monthly market report page for each area I serve (median price, days on market, inventory, my recent sales) that ranks in search, gets quoted by AI assistants and can be sent to my sphere. Professional is sold marketReports with market_reports_per_month declared and enforced in src/lib/planLimits.ts and nothing consuming it. Unlike the noindexed templated /for/:city pages (US-153), these carry real data and the agent's own inventory.",
+      "acceptanceCriteria": [
+        "Market data comes from a declared public dataset with attribution (for example the Redfin Data Center ZIP or metro tables) loaded monthly into market_stats with source and as-of date; an area with no coverage gets no page",
+        "Route /:username/market/:areaSlug is prerendered with Dataset and Place JSON-LD, the agent's sold_properties in that area and a lead form, and is listed in sitemap-profiles.xml; 'market' handling covered in the username-route test",
+        "The AI narrative is written from the numbers only; a test fails if any number in the text is absent from the source row",
+        "A page is indexable only with at least one agent sale or listing in the area, otherwise noindex (test)",
+        "Monthly regeneration runs as a scheduled-maintenance task and each generated report is charged to market_reports_per_month",
+        "The agent can share the page, or email it through LEAP-014's consented path; typecheck, verify:seo and the existing tests pass"
+      ],
+      "priority": 172,
+      "passes": false,
+      "notes": "Size: L. Success metric: organic clicks to /market pages; leads from them; AI citations seen by LEAP-003 checks. Competitive rationale, cited by the draft and not re-verified: local specificity in AI referrals (https://learn.realscout.com/academy/seo-aeo-geo-real-estate/), Luxury Presence content agents (housingwire, above). Check the dataset's license before launch."
+    },
+    {
+      "id": "LEAP-014",
+      "title": "'Your home this quarter': a co-branded homeowner report past clients open, and a seller signal when they engage",
+      "description": "As an agent, I want every past client to get a quarterly email from me with their area's home value trend and my recent nearby sales, and to know when one engages, because that is the earliest sign of a future listing. In NAR's 2025 Profile, 43% of buyers used an agent they found by referral and 66% of sellers used a referred or previous agent. Homebot sells this habit as a separate subscription. US-133/134 remind the agent to reach out; nothing sends the client a reason to reply.",
+      "acceptanceCriteria": [
+        "The value trend comes from a declared public index (FHFA HPI by ZIP3 or metro) loaded into hpi_index with source and as-of date shown in the email; a home with no coverage is skipped and listed for the agent, never given a number",
+        "The nearby-sales section uses only the agent's own sold_properties in the area and is omitted when there are none",
+        "Recipients are contacts with recorded email consent (basis, source, when) who are not unsubscribed or suppressed; the send is bounded to the audience at approval time (test: a contact who unsubscribes after approval is excluded)",
+        "The agent previews and approves each quarterly batch; nothing sends automatically",
+        "Opens and clicks are recorded per contact; a click on 'What could I sell for?' creates a lead_type 'valuation' lead that feeds LEAP-007 and appears in the US-230 digest",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 173,
+      "passes": false,
+      "notes": "Size: L. Depends on US-128 contacts, US-132 closing dates and US-135 consented sending; reuse that sender, do not build a second one. Success metric: open rate and valuation leads per 100 past clients per quarter. Competitive rationale: NAR 2025 referral figures via Virginia Realtors (https://virginiarealtors.org/2025/12/08/key-takeaways-from-nars-2025-profile-of-home-buyers-and-sellers, secondary source, found 2026-11-07); Homebot (https://homebot.ai/rea-demo) cited by the draft and not re-verified."
+    },
+    {
+      "id": "LEAP-015",
+      "title": "Brokerage plan: per-seat billing, a public roster page and an office lead view",
+      "description": "As a brokerage owner or team lead, I want every agent's page under one brand, a public roster page and one view of where every lead went, priced per seat. Team is a flat $99 (src/config/pricing-plans.ts) and create-checkout-session always sends quantity: 1 (index.ts:189), while teams.max_seats is enforced on invite (supabase/functions/teams/index.ts:100-105) with no billing tied to it. Teams, invites and routing exist (US-045, US-055, US-226); seats, roster and office view do not.",
+      "acceptanceCriteria": [
+        "subscription_plans gains a Brokerage plan with a base price plus a per-seat Stripe price (quantity = accepted members); create-checkout-session and stripe-webhook handle quantity changes when members are added or removed through the teams function (tests for seat add and remove)",
+        "A seat change shows the prorated amount in SubscriptionPage.tsx before the agent confirms",
+        "New public route /b/:brokerageSlug lists member agents with photo, city and link, prerendered and in a sitemap; 'b' added to RESERVED_SEGMENTS with a test; brand lock applies the brokerage logo and colours to member pages when enabled",
+        "Office view /dashboard/team/leads shows each member's lead counts, routing rule hit (US-055) and first-response time without decrypting PII the member has not shared",
+        "remove_branding applies to every member on the Brokerage plan",
+        "RLS tests: a member cannot read another member's leads unless a team rule allows; verify:schema passes; typecheck and the existing tests pass"
+      ],
+      "priority": 174,
+      "passes": false,
+      "notes": "Size: L. Success metric: brokerage accounts and seats per account; ARPA vs single-agent plans. Ranked mid-list because one sale adds several profiles, but with 9 users there is no brokerage pipeline yet. Competitive rationale, cited by the draft and not re-verified: Follow Up Boss per-seat pricing (https://costbench.com/software/real-estate-crm/follow-up-boss/hidden-costs/), AgentFire setup fees (https://toolradar.com/tools/agentfire/pricing)."
+    },
+    {
+      "id": "LEAP-016",
+      "title": "AgentBio API v1: the API keys agents can already create finally open a real API",
+      "description": "As an agent or a brokerage's developer, I want to read my leads and create or update listings over a documented REST API with the key I generated in ApiKeysPage.tsx. authenticateApiKey in supabase/functions/_shared/api-auth.ts has no caller anywhere in supabase/functions or src, so the dashboard issues keys to nothing (US-044 built the keys, not the API). An API puts AgentBio inside brokerage tooling and Zapier/Make without per-tool integrations.",
+      "acceptanceCriteria": [
+        "New edge function api-v1 routes GET /leads, GET /leads/:id, GET/POST/PATCH /listings and GET /profile, authenticated with authenticateApiKey and scoped to the key's owner and its permissions (read:leads, write:listings)",
+        "Lead PII is decrypted only for keys with read:leads; locked leads return locked:true with no PII (test)",
+        "Per-key rate limit returning 429 with Retry-After; every call written to audit_log with the key id",
+        "An OpenAPI 3.1 spec is committed and served at /api/docs; a contract test validates responses against it",
+        "Writes go through the same tables and triggers, so enforce_plan_limit applies; a limit breach returns 402 naming the limit",
+        "Plan gating: Professional and above; typecheck and the existing tests pass"
+      ],
+      "priority": 175,
+      "passes": false,
+      "notes": "Size: M. Success metric: keys making calls per week; listings created via API. Coordinate with US-124's dead-code sweep, which would otherwise delete api-auth.ts for having no importers. The draft's competitive citations were generic; the case here rests on the repo fact that keys are sold with no API."
+    },
+    {
+      "id": "LEAP-017",
+      "title": "AgentBio in ChatGPT and Claude: an MCP connector so agents run their page and leads from the assistant they use",
+      "description": "As an agent who works in ChatGPT or Claude, I want to say 'add my new listing at 12 Oak St and draft the Instagram post' or 'who are my hot leads this week' and have it happen in AgentBio. Zillow put buyers inside ChatGPT; no agent-side bio or CRM tool found in this review has put the agent there. Connector directories are also a distribution surface.",
+      "acceptanceCriteria": [
+        "New remote MCP server (HTTP, OAuth 2.1 with PKCE against Supabase auth) exposing tools that wrap API v1 (LEAP-016): list_leads, get_lead, create_listing, update_listing, generate_launch_kit (LEAP-002)",
+        "No delete tool and no billing or plan tool; a test asserts the exact tool list",
+        "Write tools return a preview and need a confirm parameter on a second call; nothing is written on the first call (test)",
+        "Lead PII redacted unless the grant includes read:leads",
+        "Per-user rate limit and an audit_log row per tool call",
+        "Setup docs for ChatGPT connectors and Claude; Professional and above; typecheck and the existing tests pass"
+      ],
+      "priority": 176,
+      "passes": false,
+      "notes": "Size: L. Depends on LEAP-016 and LEAP-002. Success metric: weekly active connected agents; listings and kits created via MCP. Competitive rationale: Zillow in ChatGPT (zillowgroup.com, above); Lofty AOS cited by the draft and not re-verified. The callsphere.ai citation was dropped as unverifiable."
+    },
+    {
+      "id": "LEAP-018",
+      "title": "AI credit packs: pay-as-you-go generation for agents past their plan and for free-tool users who never need a page",
+      "description": "As an agent who hits my monthly AI limit mid-launch, or a visitor who only wants listing descriptions, I want to buy credits instead of changing plans. USAGE_PRICING (src/config/pricing-plans.ts:309) and report-stripe-usage exist and nothing sells them; US-057 deleted the old usage-metering client (usageTracking.ts) because it was written against a schema that never existed. This opens revenue from the free-tool audience that will not pay $29 for a page.",
+      "acceptanceCriteria": [
+        "New append-only table ai_credit_ledger (user_id, delta, reason, stripe_payment_intent unique, created_at); the balance is derived by a SECURITY DEFINER function with search_path pinned and EXECUTE revoked from PUBLIC and granted per CLAUDE.md",
+        "create-checkout-session supports one-time payment mode for three packs; stripe-webhook credits the ledger idempotently on checkout.session.completed (test for a duplicate event)",
+        "consume_plan_quota falls through to credits when the plan allowance is exhausted, for the AI keys (ai_listing_descriptions_per_month, ai_social_posts_per_month, cma_reports_per_month, ai_lead_replies_per_month); the UI says which source paid (tests)",
+        "The free-tool pages offer packs to signed-in users without a paid plan",
+        "Unused credits survive plan changes and appear in gdpr-export",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 177,
+      "passes": false,
+      "notes": "Size: M. Success metric: credit revenue per month; share of buyers who later subscribe. Competitive rationale, cited by the draft and not re-verified: Beacons credit-metered AI (https://pricingsaas.com/companies/beacons). Conflicts with US-143, which plans to remove per-use pricing and drop feature_catalog/feature_usage: decide which wins before either ships. Correction: usageTracking.ts no longer exists."
+    },
+    {
+      "id": "LEAP-019",
+      "title": "Two-way texting: leads text the agent's AgentBio number and every message lands on the lead timeline",
+      "description": "As an agent, I want a local business number leads can text from my page, with every message on the lead's timeline and an optional after-hours auto-reply. Professional is sold smsPerMonth: 500 and sms_per_month is declared and enforced in src/lib/planLimits.ts, with no provider behind it; 'SMS' is a waitlist entry (feature_waitlist 'sms_notifications'). US-143 plans to remove the claim; this builds it instead.",
+      "acceptanceCriteria": [
+        "Provision a number per agent through a messaging provider with A2P 10DLC brand and campaign registration tracked in sms_numbers (status pending, approved, rejected); sending is blocked until approved",
+        "The inbound webhook verifies the provider signature, matches or creates the lead and writes lead_activities; STOP and HELP are handled and STOP adds a suppression row that blocks every later send (test)",
+        "Outbound send from the lead detail is charged to sms_per_month through consume_plan_quota; at the limit the send is refused naming the limit",
+        "Lead forms gain an explicit, unticked 'Text me about this property' consent stored with timestamp and source; no SMS without it (test)",
+        "After-hours auto-reply configurable, off by default",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 178,
+      "passes": false,
+      "notes": "Size: XL (carrier registration is weeks of calendar time and per-number cost). Success metric: share of leads with a two-way thread; reply time on text vs email. Competitive rationale: Realty.bio's listing mentions buyer conversations from the phone (App Store, above); Follow Up Boss texting cited by the draft and not re-verified. Coordinate with US-143's SMS removal."
+    },
+    {
+      "id": "LEAP-020",
+      "title": "Listing reels: a captioned vertical video generated from listing photos for Reels and TikTok",
+      "description": "As an agent, I want a 15-30 second vertical video of each listing (photo motion, price, beds/baths, captions, my branding) generated for me, because short video is where listings get seen. Professional and Team are sold videoTours with video_tours_per_month declared and enforced in src/lib/planLimits.ts and nothing consuming it.",
+      "acceptanceCriteria": [
+        "A render worker (container job, not an edge function) builds a 1080x1920 MP4 from up to 10 listing photos with pan/zoom and text overlays; stored in a listing-videos bucket created by migration with owner write and public read of finished files",
+        "Triggered from the Launch Kit (LEAP-002) and charged to the existing video_tours_per_month key",
+        "Render status (queued, rendering, done, failed with reason) shown on the listing; a failed render refunds the quota (test)",
+        "Captions burned in and also exported as .srt",
+        "The video plays in the public listing modal and can be attached to LEAP-012 posts",
+        "Typecheck and the existing tests pass"
+      ],
+      "priority": 179,
+      "passes": false,
+      "notes": "Size: XL. Last because rendering video on the shared Coolify box competes with 167 containers on 16 cores; size a CPU budget or an external render service before choosing. Success metric: reels per active agent; leads attributed to reel posts. Competitive rationale cited by the draft and not re-verified (Luxury Presence via inman, above)."
     }
   ]
 }
