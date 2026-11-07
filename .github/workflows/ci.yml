@@ -41,6 +41,13 @@ jobs:
         # ordinary check is the stronger one, so the ratchet is gone.
         run: npx tsc --noEmit
 
+      - name: Type check build config
+        # tsconfig.json covers src/ and functions/ only, so vite.config.ts —
+        # which decides vendor chunks and stamps the service worker version —
+        # was never type-checked. tsconfig.node.json had failed (TS6307,
+        # TS18028) for months without anyone seeing it (US-365).
+        run: npx tsc --noEmit -p tsconfig.node.json
+
   test:
     name: Test
     needs: typecheck
