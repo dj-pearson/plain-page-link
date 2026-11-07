@@ -115,6 +115,15 @@ describe('_headers', () => {
     ).toBeGreaterThan(jsIndex);
   });
 
+  it('does not let the immutable rule reach the unhashed scripts in public/scripts (US-272)', () => {
+    const scriptsIndex = rules.indexOf('/scripts/*');
+    expect(scriptsIndex, '/scripts/* needs its own rule').toBeGreaterThan(-1);
+    expect(scriptsIndex).toBeGreaterThan(rules.indexOf('/*.js'));
+    const block = source.slice(source.indexOf('\n/scripts/*\n') + 1).split('\n\n')[0];
+    expect(block).toMatch(/Cache-Control: public, max-age=0, must-revalidate/);
+    expect(block).not.toMatch(/immutable/);
+  });
+
   it('never declares source code to be executable script', () => {
     // The narrow property, rather than "every rule matches something today".
     // A rule for /*.jpg that nothing currently matches costs nothing and is
@@ -191,7 +200,8 @@ describe('Content-Security-Policy allows what the public profile embeds', () => 
   ] as const) {
     it(`${name} allows Calendly and video embeds`, () => {
       for (const [directive, sources] of Object.entries(required)) {
-        for (const source of sources) expect(policy[directive] ?? [], `${directive} ${source}`).toContain(source);
+        for (const source of sources)
+          expect(policy[directive] ?? [], `${directive} ${source}`).toContain(source);
       }
     });
   }
@@ -206,6 +216,8 @@ describe('Sentry reaches production', () => {
     const src = readFileSync(join(ROOT, 'src/lib/sentry.ts'), 'utf8');
     expect(src).toMatch(/tunnel:\s*SENTRY_TUNNEL/);
     expect(src).toMatch(/SENTRY_TUNNEL\s*=\s*'\/api\/sentry'/);
-    expect(readFileSync(join(ROOT, 'functions/api/sentry.ts'), 'utf8')).toMatch(/export async function onRequestPost/);
+    expect(readFileSync(join(ROOT, 'functions/api/sentry.ts'), 'utf8')).toMatch(
+      /export async function onRequestPost/
+    );
   });
 });

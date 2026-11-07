@@ -115,6 +115,15 @@
   Content-Type: text/html; charset=utf-8
   Cache-Control: public, max-age=0, must-revalidate
 
+# public/scripts/ is copied verbatim, so its file names carry no content hash
+# and the /*.js rule above was telling browsers and Cloudflare to keep
+# /scripts/analytics.js for a year without asking again (US-272). That file is
+# the cookie-consent gate in front of Google Analytics: a fix to it reached a
+# returning visitor a year late. Revalidating costs a 304. After /*.js for the
+# same reason /sw.js is: a later rule wins for a header both set.
+/scripts/*
+  Cache-Control: public, max-age=0, must-revalidate
+
 # The service workers, last on purpose.
 #
 # A service worker decides what a returning visitor is served, and its URL never

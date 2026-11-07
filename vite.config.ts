@@ -1,8 +1,11 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { HOMEPAGE_SEO } from './src/config/homepage-seo';
+import { buildIdFromFileNames, stampServiceWorkerVersion } from './src/config/sw-version';
 // Cache bust: 2026-01-02 - Performance optimization
 
 // Bundle size baseline (2026-05-17, production build, minified, pre-gzip).
@@ -257,6 +260,22 @@ export default defineConfig(({ mode }) => {
             res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
             next();
           });
+        },
+      },
+      // Gives dist/sw.js a VERSION that changes with the deployed code (US-272).
+      // Without it the worker is byte-identical on every deploy, the browser
+      // never installs a new one, and the precached offline shell stays the
+      // copy from a visitor's first visit. See src/config/sw-version.ts.
+      {
+        name: 'sw-build-version',
+        apply: 'build' as const,
+        writeBundle(options: { dir?: string }, bundle: Record<string, unknown>) {
+          const target = path.join(options.dir ?? path.resolve(__dirname, 'dist'), 'sw.js');
+          if (!existsSync(target)) return;
+          const buildId = buildIdFromFileNames(Object.keys(bundle), (input) =>
+            createHash('sha256').update(input).digest('hex')
+          );
+          writeFileSync(target, stampServiceWorkerVersion(readFileSync(target, 'utf8'), buildId));
         },
       },
       // Bundle visualizer — only when ANALYZE=true (off in CI/normal builds)
