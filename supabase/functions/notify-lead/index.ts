@@ -8,6 +8,7 @@ import { getAgentContact } from '../_shared/agent-contact.ts';
 import { decryptSecret } from '../_shared/encryption.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 import { maskEmail } from '../_shared/log-redaction.ts';
+import { buildLeadNotificationDetails, type NotifiableLead } from '../_shared/lead-notification.ts';
 
 /**
  * Notify Lead
@@ -44,7 +45,16 @@ interface LeadRecord {
   lead_type?: string | null;
   listing_id?: string | null;
   referrer_url?: string | null;
+  property_address?: string | null;
+  price_range?: string | null;
+  timeline?: string | null;
+  preapproved?: boolean | null;
+  form_data?: NotifiableLead['form_data'];
 }
+
+/** Every column this function reads; the email is built from these alone. */
+const LEAD_NOTIFY_COLUMNS =
+  'id, user_id, name, encrypted_email, encrypted_phone, message, lead_type, listing_id, referrer_url, property_address, price_range, timeline, preapproved, form_data';
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
@@ -83,7 +93,11 @@ serve(async (req) => {
       return errorResponse('A lead_id is required', 'REQUEST_VALIDATION_FAILED', req);
     }
 
-    const { data: leadRow } = await supabase.from('leads').select('*').eq('id', leadId).single();
+    const { data: leadRow } = await supabase
+      .from('leads')
+      .select(LEAD_NOTIFY_COLUMNS)
+      .eq('id', leadId)
+      .single();
     const lead = leadRow as LeadRecord | null;
 
     if (!lead || !lead.user_id) {
@@ -164,6 +178,19 @@ serve(async (req) => {
       .maybeSingle();
     const leadScore = (scoreRow as { score?: number } | null)?.score ?? null;
 
+    // US-409: which listing they asked about. Best effort — a deleted listing
+    // or a failed read leaves the row out, never the email.
+    const { data: listingRow } = lead.listing_id
+      ? await supabase
+          .from('listings')
+          .select('address, city')
+          .eq('id', lead.listing_id)
+          .eq('user_id', lead.user_id)
+          .maybeSingle()
+      : { data: null };
+
+    const details = buildLeadNotificationDetails(lead, listingRow, siteUrl);
+
     const email = createLeadNotificationEmail({
       agentEmail,
       name: lead.name,
@@ -171,9 +198,12 @@ serve(async (req) => {
       phone: leadPhone ?? undefined,
       message: lead.message ?? undefined,
       listing: listingLabel,
+      listingAddress: details.listingAddress,
+      propertyAddress: details.propertyAddress,
+      answers: details.answers,
       sourcePage: lead.referrer_url ?? undefined,
       leadScore: leadScore,
-      dashboardUrl: `${siteUrl}/dashboard/leads`,
+      dashboardUrl: details.dashboardUrl,
       locked,
       upgradeUrl: `${siteUrl}/dashboard/subscription`,
     });
