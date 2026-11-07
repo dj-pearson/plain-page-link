@@ -9595,6 +9595,10 @@ export type Database = {
         Args: { p_trigger_data?: Json; p_trigger_type: string; p_workflow_id: string };
         Returns: string;
       };
+      top_listings: {
+        Args: { p_limit?: number; p_since: string };
+        Returns: Record<string, unknown>[];
+      };
       top_slow_queries: {
         Args: { p_limit?: number };
         Returns: Record<string, unknown>[];

@@ -37,6 +37,8 @@ import { useCampaignConversion } from '@/hooks/useCampaignConversion';
 import { useMLLeadScoring } from '@/hooks/useMLLeadScoring';
 import { ConversionFunnel } from '@/components/analytics/ConversionFunnel';
 import { LeadSourceBreakdown } from '@/components/analytics/LeadSourceBreakdown';
+import { TopListingsCard } from '@/components/analytics/TopListingsCard';
+import { useTopListings } from '@/hooks/useTopListings';
 import { InsightsPanel } from '@/components/analytics/InsightsPanel';
 import { ReportBuilder, type ReportConfig } from '@/components/analytics/ReportBuilder';
 import {
@@ -70,6 +72,8 @@ export default function Analytics() {
     error,
     refetch,
   } = useAnalytics(dateRange);
+  // US-325: the most-opened listings in the range, counted by top_listings().
+  const topListings = useTopListings(dateRange);
   const { leads } = useLeads();
   const { scoreLeadObject } = useMLLeadScoring();
   // US-225: range-bound totals over ALL of the agent's leads. The funnel and
@@ -587,7 +591,8 @@ export default function Analytics() {
                 </table>
               ) : (
                 <p className="text-xs sm:text-sm text-muted-foreground text-center py-6">
-                  No visits in this period yet. Add ?utm_source=instagram to the link in your bio to see it here.
+                  No visits in this period yet. Add ?utm_source=instagram to the link in your bio to
+                  see it here.
                 </p>
               )}
             </CardContent>
@@ -653,6 +658,20 @@ export default function Analytics() {
                 </div>
               </CardContent>
             </Card>
+
+            <TopListingsCard
+              listings={topListings.listings}
+              isLoading={topListings.isLoading}
+              isError={topListings.isError}
+              onRetry={() => void topListings.refetch()}
+              rangeLabel={
+                dateRange === '7d'
+                  ? 'the last 7 days'
+                  : dateRange === '30d'
+                    ? 'the last 30 days'
+                    : 'the last 90 days'
+              }
+            />
           </div>
 
           {/* Criterion 4: say what these numbers are. Visitors are identified by

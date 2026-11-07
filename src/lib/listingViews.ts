@@ -75,3 +75,47 @@ export function describeListingViews(stats: ListingViewStats | undefined): strin
     'visitors'
   )} in the last 30 days; ${plural(stats.views7d, 'view', 'views')} in the last 7 days`;
 }
+
+/** One row of top_listings() — a listing ranked by views in the chosen range (US-325). */
+export interface TopListing {
+  listingId: string;
+  address: string;
+  city: string;
+  status: string | null;
+  views: number;
+  visitors: number;
+  lastViewedAt: string | null;
+}
+
+/**
+ * Parse top_listings() rows, keeping the database's ranking. Rows without an
+ * id are skipped, and so are rows with no views (the function never returns
+ * one, but a zero would read as "most viewed: 0 views").
+ */
+export function toTopListings(rows: unknown): TopListing[] {
+  if (!Array.isArray(rows)) return [];
+  const out: TopListing[] = [];
+  for (const row of rows) {
+    if (!isRecord(row) || typeof row.listing_id !== 'string' || !row.listing_id) continue;
+    const views = toCount(row.views);
+    if (views === 0) continue;
+    out.push({
+      listingId: row.listing_id,
+      address:
+        typeof row.address === 'string' && row.address.trim()
+          ? row.address.trim()
+          : 'Untitled listing',
+      city: typeof row.city === 'string' ? row.city.trim() : '',
+      status: typeof row.status === 'string' && row.status ? row.status : null,
+      views,
+      visitors: toCount(row.visitors),
+      lastViewedAt: typeof row.last_viewed_at === 'string' ? row.last_viewed_at : null,
+    });
+  }
+  return out;
+}
+
+/** "12 views · 9 visitors" for a ranked row. */
+export function formatTopListingCounts(listing: Pick<TopListing, 'views' | 'visitors'>): string {
+  return `${plural(listing.views, 'view', 'views')} · ${plural(listing.visitors, 'visitor', 'visitors')}`;
+}

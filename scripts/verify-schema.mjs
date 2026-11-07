@@ -2386,6 +2386,81 @@ check('listing_view_stats counts views per own listing, and nothing else', () =>
   return out;
 });
 
+// US-325: top_listings ranks the caller's own listings by views since p_since.
+// A 90-day request on the free plan's 30-day window must count 30 days only,
+// a forged target_id and non-view events must not count, and anon is refused.
+check('top_listings ranks own listings by range, inside the plan history window', () => {
+  const out = [];
+  const me = '00000000-dead-beef-0000-0000000a3251';
+  const other = '00000000-dead-beef-0000-0000000a3252';
+  const recent = '00000000-dead-beef-0000-00000a325a01';
+  const steady = '00000000-dead-beef-0000-00000a325a02';
+  const theirs = '00000000-dead-beef-0000-00000a325a03';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES ('${me}', 'top1@example.test'), ('${other}', 'top2@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.listings (id, user_id, address, city, price, status) VALUES
+         ('${recent}', '${me}', '1 Recent St', 'Austin', '500000', 'active'),
+         ('${steady}', '${me}', '2 Steady St', 'Austin', '400000', 'sold'),
+         ('${theirs}', '${other}', '3 Theirs St', 'Austin', '300000', 'active');
+       -- One visitor per row: throttle_analytics_event caps a single visitor's burst.
+       -- recent: 3 views this week.  steady: 1 this week, 4 at 20 days.
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_id, occurred_at)
+         SELECT '${me}', 'tr' || g, 'listing_view', '${recent}', now() - make_interval(days => g)
+           FROM generate_series(1, 3) g;
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_id, occurred_at)
+         VALUES ('${me}', 'ts0', 'listing_view', '${steady}', now() - interval '3 days');
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_id, occurred_at)
+         SELECT '${me}', 'ts' || g, 'listing_view', '${steady}', now() - interval '20 days'
+           FROM generate_series(1, 4) g;
+       -- At 60 days (past the free plan's 30-day window, though inside a 90-day
+       -- request), a forged id for another agent's listing, and a non-view event.
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_id, occurred_at)
+         SELECT '${me}', 'told' || g, 'listing_view', '${recent}', now() - interval '60 days'
+           FROM generate_series(1, 5) g;
+       INSERT INTO public.analytics_events (user_id, visitor_id, event_type, target_id, occurred_at) VALUES
+         ('${me}', 'tforged', 'listing_view', '${theirs}', now()),
+         ('${other}', 'ttheirs', 'listing_view', '${theirs}', now()),
+         ('${me}', 'tclick', 'link_click', '${recent}', now());`);
+    const as = (sql) =>
+      q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${me}'; ${sql}`);
+    const week = as(`SELECT listing_id || '|' || views || '|' || visitors
+      FROM public.top_listings(now() - interval '7 days');`);
+    if (week.join(',') !== `${recent}|3|3,${steady}|1|1`) {
+      out.push(`7 days returned [${week.join(', ')}]; expected recent 3 then steady 1`);
+    }
+    const quarter = as(`SELECT listing_id || '|' || views || '|' || status
+      FROM public.top_listings(now() - interval '90 days', 5);`);
+    if (quarter.join(',') !== `${steady}|5|sold,${recent}|3|active`) {
+      out.push(
+        `90 days on a 30-day plan returned [${quarter.join(', ')}]; expected steady 5 then recent 3 (the 60-day views hidden, no forged listing)`
+      );
+    }
+    const one = as(`SELECT listing_id FROM public.top_listings(now() - interval '90 days', 1);`);
+    if (one.length !== 1) out.push(`p_limit 1 returned ${one.length} rows`);
+    const capped = as(`SELECT count(*) FROM public.top_listings(now() - interval '90 days', 100000);`);
+    if (capped[0] !== '2') out.push(`a huge p_limit returned ${capped[0]} rows, expected 2`);
+    try {
+      q(`SET ROLE anon; SELECT * FROM public.top_listings(now() - interval '7 days');`);
+      out.push('anon can call top_listings');
+    } catch {
+      /* expected */
+    }
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.analytics_events WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.listings WHERE user_id IN ('${me}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${me}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${me}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 // ---------------------------------------------------------------------------
 // US-236: lead ownership and lead dates are not the agent's to rewrite.
 //   * locked_lead_ids() ranks a month's leads by created_at, and plan_usage()
