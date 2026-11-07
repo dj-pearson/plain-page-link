@@ -8,24 +8,33 @@ import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 
 export default function CalendarBooking() {
+  // What ships (US-332, slice 3 of US-143): the agent pastes a Calendly link
+  // into their profile; each listing on the public page then offers
+  // "Schedule a Showing", which opens that Calendly inside the page
+  // (CalendlyModal), and a confirmed booking is recorded as a lead through
+  // submit-lead. Open houses get "Add to calendar" (an .ics file and a Google
+  // Calendar link, openHouseCalendar.ts). There is no Google Calendar
+  // integration, no availability engine of our own, no approval step and no
+  // SMS provider, so this page claims none of them. src/features-claims.test.ts
+  // holds the old phrases out.
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    name: 'Calendar Booking Integration for Real Estate Agents - AgentBio',
+    name: 'Showing Booking with Calendly for Real Estate Agents - AgentBio',
     description:
-      'Let buyers self-schedule showing appointments with integrated Calendly and Google Calendar. Stop playing phone tag and book more showings automatically.',
+      'Add your Calendly link and every listing on your AgentBio page gets a Schedule a Showing button. Buyers book inside your page, and each booking lands in your leads.',
   };
 
   return (
     <>
       <SEOHead
-        title="Calendar Booking for Real Estate Showings | Schedule Appointments Automatically"
-        description="Let buyers self-schedule showing appointments with integrated Calendly and Google Calendar. Stop playing phone tag and book more showings automatically."
+        title="Showing Booking for Real Estate Agents | Calendly on Every Listing"
+        description="Add your Calendly link and every listing on your AgentBio page gets a Schedule a Showing button. Buyers book inside your page, and each booking lands in your leads."
         keywords={[
           'real estate calendar booking',
           'showing appointment scheduling',
           'Calendly for realtors',
-          'automated showing scheduling',
+          'schedule a showing button',
           'real estate appointment booking',
         ]}
         canonicalUrl={getCanonicalUrl('/features/calendar-booking')}
@@ -40,14 +49,13 @@ export default function CalendarBooking() {
             <div className="max-w-4xl mx-auto">
               <p className="text-base md:text-lg glass-body leading-relaxed">
                 <strong>
-                  AgentBio's calendar booking integration lets real estate agents enable
-                  self-scheduling
+                  AgentBio puts your Calendly booking page behind a Schedule a Showing button on
+                  every listing.
                 </strong>{' '}
-                for showing appointments through Calendly and Google Calendar connections. Buyers
-                can book appointments directly from property listings without phone tag,
-                automatically syncing to your calendar with property details, lead information, and
-                showing preferences—all while you maintain full control over availability and buffer
-                times between appointments.
+                A buyer gives their name and email, picks a time from your Calendly without leaving
+                your page, and the confirmed booking is saved to your AgentBio leads with the
+                listing address attached. Your availability, buffers and reminders stay exactly as
+                you set them in Calendly.
               </p>
             </div>
           </div>
@@ -55,11 +63,11 @@ export default function CalendarBooking() {
 
         {/* Hero */}
         <HeroSectionLazy
-          title="Calendar Booking Integration"
-          subtitle="Stop Playing Phone Tag—Let Buyers Book Showings Automatically"
-          description="Integrated Calendly and Google Calendar support. Buyers self-schedule showings while you stay in control of your availability."
+          title="Showing Booking with Calendly"
+          subtitle="Stop Playing Phone Tag: Let Buyers Book the Showing Themselves"
+          description="Paste your Calendly link once. Every listing on your page offers a showing time, and every booking becomes a lead you can follow up."
           primaryCta={{
-            text: 'Connect Your Calendar Free',
+            text: 'Add Your Calendly Free',
             href: '/auth/register',
           }}
           secondaryCta={{
@@ -68,7 +76,7 @@ export default function CalendarBooking() {
           }}
           badge={{
             icon: <Calendar className="h-4 w-4" aria-hidden="true" />,
-            text: 'Calendly & Google Calendar',
+            text: 'Works with Calendly',
           }}
           showStats={false}
         />
@@ -85,65 +93,27 @@ export default function CalendarBooking() {
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="p-6 rounded-xl bg-red-500/5 border border-red-500/20">
-                  <h3 className="text-xl font-light text-red-700 mb-4">
-                    ❌ Without Automated Booking:
-                  </h3>
-                  <ul className="space-y-3 text-sm glass-body">
-                    <li className="flex items-start gap-2">
-                      <span className="text-red-700 flex-shrink-0">1.</span>
-                      <span>Buyer sees listing, calls/texts to schedule</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-red-700 flex-shrink-0">2.</span>
-                      <span>You're showing another property, miss the call</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-red-700 flex-shrink-0">3.</span>
-                      <span>You call back 2 hours later, they don't answer</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-red-700 flex-shrink-0">4.</span>
-                      <span>Back-and-forth texts trying to find a time</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-red-700 flex-shrink-0">5.</span>
-                      <span>By the time you connect, they've moved on</span>
-                    </li>
-                  </ul>
-                  <p className="text-sm text-red-700 mt-6 font-light">
-                    Result: Lost showing, lost sale
-                  </p>
+                  <h3 className="text-xl font-light text-red-700 mb-4">Without a booking button</h3>
+                  <ol className="space-y-3 text-sm glass-body list-decimal pl-5">
+                    <li>Buyer sees a listing and calls or texts to ask for a time</li>
+                    <li>You're at another showing and miss the call</li>
+                    <li>You call back later and they don't answer</li>
+                    <li>A string of texts trying to find a time that works</li>
+                    <li>By the time you connect, they may have moved on</li>
+                  </ol>
                 </div>
 
                 <div className="p-6 rounded-xl bg-green-500/5 border border-green-500/20">
                   <h3 className="text-xl font-light text-green-700 mb-4">
-                    ✓ With AgentBio Calendar Booking:
+                    With your Calendly on AgentBio
                   </h3>
-                  <ul className="space-y-3 text-sm glass-body">
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-700 flex-shrink-0">1.</span>
-                      <span>Buyer sees listing, clicks "Schedule Showing"</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-700 flex-shrink-0">2.</span>
-                      <span>Your available times appear instantly</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-700 flex-shrink-0">3.</span>
-                      <span>They book a time that works for both of you</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-700 flex-shrink-0">4.</span>
-                      <span>Confirmation email sent to both parties</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-700 flex-shrink-0">5.</span>
-                      <span>Showing booked—you get notification with details</span>
-                    </li>
-                  </ul>
-                  <p className="text-sm text-green-700 mt-6 font-light">
-                    Result: Showing booked in 60 seconds
-                  </p>
+                  <ol className="space-y-3 text-sm glass-body list-decimal pl-5">
+                    <li>Buyer opens a listing and taps "Schedule a Showing"</li>
+                    <li>They enter their name and email</li>
+                    <li>Your Calendly opens inside the page with those details filled in</li>
+                    <li>They pick one of the times you've made available</li>
+                    <li>The booking is saved to your leads with the listing address</li>
+                  </ol>
                 </div>
               </div>
             </div>
@@ -155,47 +125,47 @@ export default function CalendarBooking() {
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">How Calendar Booking Works</span>
+                <span className="glass-heading">How Showing Booking Works</span>
               </h2>
             </header>
 
             <div className="max-w-3xl mx-auto space-y-6">
               <StepCard
                 number={1}
-                title="Connect Your Calendar (One-Time Setup)"
-                description="Link your Calendly or Google Calendar account to AgentBio. Takes 2 minutes. Set your availability, buffer times, and showing duration."
+                title="Paste Your Calendly Link"
+                description="Add your Calendly scheduling link in your AgentBio profile settings. There is nothing else to connect."
               />
 
               <StepCard
                 number={2}
-                title="Add Booking Button to Listings"
-                description="Every property listing gets a 'Schedule Showing' button. Buyers can book appointments directly from the listing they're interested in."
+                title="Listings Offer a Showing Time"
+                description="Each listing on your public page shows a 'Schedule a Showing' button. Without a Calendly link it reads 'Request a Showing' and opens a showing request form instead."
               />
 
               <StepCard
                 number={3}
-                title="Buyer Selects Available Time"
-                description="Your calendar shows only available slots. Buyer picks a time, enters their info, and confirms. Takes 30 seconds."
+                title="Buyer Books Inside Your Page"
+                description="The buyer gives their name and email, then picks a time in your Calendly, embedded in your page, with those details already filled in."
               />
 
               <StepCard
                 number={4}
-                title="Both Parties Get Confirmation"
-                description="Appointment syncs to your calendar with property address, buyer contact info, and showing details. Buyer gets email and SMS reminder."
+                title="The Booking Becomes a Lead"
+                description="When Calendly confirms the booking, AgentBio records it as a lead with the listing address, so it sits in your lead list and counts in your analytics. Calendly sends its own confirmation and adds the event to whichever calendar you connected to Calendly."
               />
             </div>
           </div>
         </section>
 
-        {/* Features You Control */}
+        {/* What carries over */}
         <section className="py-20 bg-background/50">
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">Stay in Control of Your Schedule</span>
+                <span className="glass-heading">Your Calendly Rules Still Apply</span>
               </h2>
               <p className="text-xl glass-body max-w-3xl mx-auto">
-                Set your availability rules, buffer times, and showing preferences
+                AgentBio shows your Calendly as it is. Anything you have set there carries over.
               </p>
             </header>
 
@@ -203,49 +173,38 @@ export default function CalendarBooking() {
               {[
                 {
                   icon: <Clock />,
-                  title: 'Set Availability Windows',
+                  title: 'Availability and Buffers',
                   description:
-                    "Define exactly when you're available for showings. Different hours for weekdays vs weekends. Block out personal time.",
-                },
-                {
-                  icon: <Calendar />,
-                  title: 'Buffer Time Between Showings',
-                  description:
-                    'Automatically add 15-30 minutes between appointments for travel time. Never double-book yourself.',
-                },
-                {
-                  icon: <MapPin />,
-                  title: 'Showing Duration Control',
-                  description:
-                    'Set default showing length (30, 45, or 60 minutes). Customize per property type (open house vs private showing).',
+                    'The hours you offer, the gaps between appointments and how much notice you need are all set in Calendly, and buyers only see the times it allows.',
                 },
                 {
                   icon: <Phone />,
-                  title: 'Require Phone Number',
+                  title: 'Contact Details Up Front',
                   description:
-                    'Make phone numbers required so you can call/text if buyer is late or needs to reschedule.',
+                    'AgentBio asks for a name and email before the calendar opens, so a buyer who books is a lead you can reach.',
+                },
+                {
+                  icon: <MapPin />,
+                  title: 'Tied to the Listing',
+                  description:
+                    'A booking made from a listing carries that listing with it, so you know which property the showing is for.',
                 },
                 {
                   icon: <Check />,
-                  title: 'Same-Day Booking Cutoff',
+                  title: 'Counted in Your Analytics',
                   description:
-                    'Prevent last-minute bookings by requiring X hours notice. Maintain control of your schedule.',
+                    'Completed bookings count as conversions in your AgentBio analytics, alongside form submissions.',
                 },
-                {
-                  icon: <Calendar />,
-                  title: 'Manual Approval Option',
-                  description:
-                    'Choose to auto-confirm or manually approve each showing request. Perfect for high-end listings.',
-                },
-              ].map((feature, i) => (
+              ].map((feature) => (
                 <div
-                  key={i}
+                  key={feature.title}
                   className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 text-[#0f766e]">
+                    <div className="flex-shrink-0 p-3 rounded-lg bg-[#80d0c7]/10 text-[#0f766e]">
                       {React.cloneElement(feature.icon as React.ReactElement, {
                         className: 'h-5 w-5',
+                        'aria-hidden': true,
                       })}
                     </div>
                     <div>
@@ -261,67 +220,22 @@ export default function CalendarBooking() {
           </div>
         </section>
 
-        {/* Integration Options */}
+        {/* Open houses */}
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">Works with Your Existing Tools</span>
+                <span className="glass-heading">Open Houses Go on Their Calendar Too</span>
               </h2>
             </header>
 
-            <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
-              <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                <div className="mb-6">
-                  <Calendar className="h-12 w-12 text-[#0f766e] mb-4" />
-                  <h3 className="text-2xl font-light text-foreground mb-2">Calendly Integration</h3>
-                  <p className="glass-body text-muted-foreground">
-                    Already use Calendly? Connect your account in one click. Your existing
-                    availability rules sync automatically.
-                  </p>
-                </div>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm glass-body">One-click connection</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm glass-body">Syncs both ways</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm glass-body">All Calendly features work</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                <div className="mb-6">
-                  <Calendar className="h-12 w-12 text-[#0f766e] mb-4" />
-                  <h3 className="text-2xl font-light text-foreground mb-2">
-                    Google Calendar Integration
-                  </h3>
-                  <p className="glass-body text-muted-foreground">
-                    Use Google Calendar? Direct integration available. Showings appear in your
-                    calendar with all details.
-                  </p>
-                </div>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm glass-body">OAuth secure connection</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm glass-body">Respects existing appointments</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm glass-body">Mobile & desktop sync</span>
-                  </li>
-                </ul>
-              </div>
+            <div className="max-w-3xl mx-auto p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
+              <p className="glass-body leading-relaxed">
+                Open houses you schedule in AgentBio appear on your public page with an "Add to
+                calendar" option: an .ics file for Apple Calendar, Outlook and most phones, or a
+                Google Calendar link. Visitors keep the date, time and address without writing them
+                down.
+              </p>
             </div>
           </div>
         </section>
@@ -342,22 +256,22 @@ export default function CalendarBooking() {
             is the thing that feature exists to make unnecessary. */}
 
         {/* CTA */}
-        <section className="py-20 bg-background">
+        <section className="py-20 bg-background/50">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-4">
-              <span className="glass-heading">Stop Playing Phone Tag—Start Booking Showings</span>
+              <span className="glass-heading">Stop Playing Phone Tag: Start Booking Showings</span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Let buyers self-schedule showing appointments while you stay in control
+              Let buyers book a showing from the listing they are looking at
             </p>
             <Link
               to="/auth/register"
               className="inline-flex items-center gap-2 px-8 py-4 bg-glass-background backdrop-blur-md border border-glass-border rounded-xl font-light tracking-tight transition-all hover:border-[#80d0c7] hover:shadow-lg hover:shadow-[#80d0c7]/20"
             >
-              <span className="glass-accent">Connect Your Calendar Free</span>
+              <span className="glass-accent">Add Your Calendly Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
-              No credit card required • Calendly & Google Calendar supported
+              No credit card required • Works with your existing Calendly account
             </p>
           </div>
         </section>
@@ -379,7 +293,7 @@ function StepCard({
 }) {
   return (
     <div className="flex items-start gap-6 p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center text-white text-xl font-light">
+      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#0f766e] flex items-center justify-center text-white text-xl font-light">
         {number}
       </div>
       <div>

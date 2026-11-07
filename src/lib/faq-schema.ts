@@ -110,55 +110,60 @@ export const FEATURE_FAQS = {
         "Yes, each property listing on AgentBio generates structured data markup that helps search engines understand your listings. This improves visibility in local real estate searches and Google's property listings features.",
     },
   ],
+  // analytics, testimonials and calendarBooking were rewritten in US-332 to
+  // match what ships: there is no engagement-time metric, no live feed, no
+  // Google Calendar sync and no appointment types of our own, and clients can
+  // submit reviews (/:username/review). src/features-claims.test.ts scans
+  // this file for the removed phrases.
   analytics: [
     {
       question: 'What analytics does AgentBio track?',
       answer:
-        'AgentBio tracks comprehensive analytics including page views, unique visitors, link clicks, lead form submissions, and engagement time. You can see which listings get the most views and which content drives the most leads.',
+        'AgentBio tracks page views, unique visitors, clicks on each link, Call, Email and Text taps, lead form opens and submissions, and views per listing. It shows your visitor-to-lead conversion rate and leads by type for the last 7, 30 or 90 days.',
     },
     {
       question: 'Can I see where my traffic comes from?',
       answer:
-        'Yes, AgentBio analytics show traffic sources including direct visits, social media referrals, and search engine traffic. This helps you understand which marketing channels drive the most engagement.',
+        'Yes. AgentBio separates campaign visits (links tagged with a source such as ?utm_source=instagram), referrals from other websites and direct visits, and shows page views, lead form opens and leads for each campaign source.',
     },
     {
       question: 'How often are analytics updated?',
       answer:
-        'AgentBio analytics update in real-time. You can see visitor activity as it happens and track daily, weekly, and monthly trends from your dashboard.',
+        'Visits, taps and leads are recorded as they happen and appear in your dashboard the next time it loads. You can export the numbers as CSV or a PDF report.',
     },
   ],
   testimonials: [
     {
       question: 'How do I add client testimonials to AgentBio?',
       answer:
-        "You can add client testimonials directly from your AgentBio dashboard. Enter the client's name, their review text, and optionally their photo. Testimonials appear on your public bio page with proper schema markup for search engines.",
+        "Add them from your AgentBio dashboard with the client's name, star rating, review text and an optional photo, or send clients your review link so they can write it themselves. Published testimonials appear on your public bio page with review markup for search engines.",
     },
     {
       question: 'Do testimonials help with Google rankings?',
       answer:
-        'Yes, AgentBio generates Review and AggregateRating schema markup for your testimonials. This can help your profile appear with star ratings in Google search results, increasing click-through rates.',
+        'AgentBio adds Review and AggregateRating markup built from your published testimonials. That makes the reviews readable to search engines; Google decides whether to show star ratings in its results.',
     },
     {
       question: 'Can clients leave testimonials directly?',
       answer:
-        'Currently, testimonials are added by the agent through the dashboard. This gives you control over which reviews appear on your public profile.',
+        'Yes. Each agent has a review page at agentbio.net/yourname/review. A submitted review notifies you and stays hidden until you publish it, so you control what appears on your profile.',
     },
   ],
   calendarBooking: [
     {
       question: 'How does calendar booking work on AgentBio?',
       answer:
-        "AgentBio's calendar booking lets visitors schedule appointments directly from your bio page. You set your availability, and clients can book showings, consultations, or listing appointments at times that work for both of you.",
+        'Add your Calendly link to your profile and every listing on your page gets a Schedule a Showing button. The visitor enters their name and email, books a time in your Calendly inside your page, and the booking is saved to your leads.',
     },
     {
       question: 'Does AgentBio sync with my existing calendar?',
       answer:
-        'AgentBio integrates with Google Calendar to sync your availability and prevent double-bookings. When someone books an appointment, it automatically appears on your calendar.',
+        'AgentBio does not connect to your calendar itself. Bookings go through Calendly, which checks and updates whichever calendar you have connected to your Calendly account.',
     },
     {
       question: 'Can I set different appointment types?',
       answer:
-        'Yes, you can create different appointment types with varying durations. For example, 15-minute phone consultations, 30-minute buyer consultations, or 1-hour listing presentations.',
+        'Appointment types, durations, buffers and notice periods are set in Calendly. AgentBio opens the Calendly link you give it, so whatever you configure there applies.',
     },
   ],
 } as const;
