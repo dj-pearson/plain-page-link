@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Save, Plus, X } from 'lucide-react';
+import { Camera, Save, Plus, X, ImagePlus } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { useAvatarUpload } from '@/hooks/useAvatarUpload';
+import { useBrokerageLogoUpload } from '@/hooks/useBrokerageLogoUpload';
 import { useToast } from '@/hooks/use-toast';
 import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -129,7 +130,9 @@ export default function Profile() {
   const { profile, isLoading, updateProfile } = useProfile();
   const { uploadAvatar, uploading } = useAvatarUpload();
   const { toast } = useToast();
+  const { uploadLogo, uploading: uploadingLogo } = useBrokerageLogoUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<ProfileForm>(emptyForm);
   // What the server holds, as the form spells it — the baseline for "unsaved".
   const [savedForm, setSavedForm] = useState<ProfileForm>(emptyForm);
@@ -257,6 +260,23 @@ export default function Profile() {
       setSavedForm((prev) => ({ ...prev, avatar_url: url }));
     }
   };
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Clear the input so picking the same file again still fires onChange.
+    e.target.value = '';
+    if (!file) return;
+
+    const url = await uploadLogo(file);
+    if (url) {
+      // Saved by the upload, like the avatar: not an unsaved change.
+      setFormData((prev) => ({ ...prev, brokerage_logo: url }));
+      setSavedForm((prev) => ({ ...prev, brokerage_logo: url }));
+    }
+  };
+
+  // Removing is an ordinary edit, persisted by Save like any other field.
+  const removeLogo = () => setFormData((prev) => ({ ...prev, brokerage_logo: '' }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -578,21 +598,68 @@ export default function Profile() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label
+                <span
                   className="block text-sm font-medium text-foreground mb-2"
-                  htmlFor="profile-brokerage_logo"
+                  id="brokerage-logo-label"
                 >
-                  Brokerage Logo URL
-                </label>
-                <input
-                  id="profile-brokerage_logo"
-                  type="url"
-                  name="brokerage_logo"
-                  value={formData.brokerage_logo}
-                  onChange={handleChange}
-                  placeholder="https://example.com/logo.png"
-                  className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                  Brokerage Logo
+                </span>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-border bg-background p-2">
+                    {formData.brokerage_logo ? (
+                      <img
+                        src={formData.brokerage_logo}
+                        alt={
+                          formData.brokerage_name
+                            ? `${formData.brokerage_name} logo`
+                            : 'Brokerage logo'
+                        }
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <ImagePlus className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={uploadingLogo}
+                        aria-describedby="brokerage-logo-help"
+                        className="min-h-[44px] px-4 py-2 bg-background border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium disabled:opacity-50"
+                      >
+                        {uploadingLogo
+                          ? 'Uploading...'
+                          : formData.brokerage_logo
+                            ? 'Replace Logo'
+                            : 'Upload Logo'}
+                      </button>
+                      {formData.brokerage_logo && (
+                        <button
+                          type="button"
+                          onClick={removeLogo}
+                          disabled={uploadingLogo}
+                          className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <p id="brokerage-logo-help" className="text-sm text-muted-foreground">
+                      JPG, PNG or WEBP. Max size 2MB. Shown beside your brokerage name on your page.
+                    </p>
+                  </div>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleLogoChange}
+                    aria-labelledby="brokerage-logo-label"
+                    data-testid="brokerage-logo-input"
+                    className="hidden"
+                  />
+                </div>
               </div>
             </div>
           </div>
