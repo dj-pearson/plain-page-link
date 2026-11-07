@@ -88,7 +88,9 @@ describe('ProfileRoute', () => {
         expect.arrayContaining(['listings', 'testimonials', 'links', 'user_settings'])
       )
     );
-    await waitFor(() => expect(client.getQueryData(['public-profile', 'janedoe'])).toBeDefined());
+    await waitFor(() =>
+      expect(client.getQueryData(['public-profile', 'janedoe', null])).toBeDefined()
+    );
   });
 
   it('shows the profile skeleton, not a generic spinner, while the chunk loads', () => {
