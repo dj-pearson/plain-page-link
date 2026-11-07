@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { fireEvent } from '@testing-library/react';
 import { renderWithProviders, screen, waitFor } from '@/test/test-utils';
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -111,5 +112,74 @@ describe('ApiKeysPage', () => {
     await userEvent.click(copy);
     expect(await screen.findByText(/browser blocked automatic copying/i)).toBeInTheDocument();
     expect(window.getSelection()?.toString()).toBe('ab_secret_value');
+  });
+
+  describe('Done (US-351)', () => {
+    it('asks before throwing away a key that was never copied', async () => {
+      await createKey();
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+      expect(await screen.findByText('Close without copying the key?')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Go back and copy it' }));
+      await waitFor(() =>
+        expect(screen.queryByText('Close without copying the key?')).not.toBeInTheDocument()
+      );
+      expect(screen.getByTestId('created-api-key')).toHaveTextContent('ab_secret_value');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+      await userEvent.click(await screen.findByRole('button', { name: /i’ve saved it — close/i }));
+      await waitFor(() => expect(screen.queryByTestId('created-api-key')).not.toBeInTheDocument());
+      expect(screen.getByLabelText('API key name')).toBeInTheDocument();
+    });
+
+    it('closes straight away once the copy button worked', async () => {
+      const copy = await createKey();
+      setClipboard({ writeText: vi.fn().mockResolvedValue(undefined) });
+      await userEvent.click(copy);
+      expect(await screen.findByText('Copied to your clipboard.')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expect(screen.queryByText('Close without copying the key?')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('created-api-key')).not.toBeInTheDocument();
+    });
+
+    it('counts a manual copy of the selected key as saved', async () => {
+      await createKey();
+      fireEvent.copy(screen.getByTestId('created-api-key'));
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expect(screen.queryByText('Close without copying the key?')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('created-api-key')).not.toBeInTheDocument();
+    });
+
+    it('still asks after a refused clipboard write', async () => {
+      const copy = await createKey();
+      setClipboard({ writeText: vi.fn().mockRejectedValue(new Error('NotAllowedError')) });
+      await userEvent.click(copy);
+      await screen.findByText(/browser blocked automatic copying/i);
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expect(await screen.findByText('Close without copying the key?')).toBeInTheDocument();
+    });
+
+    it('asks again for the next key after an earlier one was copied', async () => {
+      const copy = await createKey();
+      setClipboard({ writeText: vi.fn().mockResolvedValue(undefined) });
+      await userEvent.click(copy);
+      await screen.findByText('Copied to your clipboard.');
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+      await userEvent.type(screen.getByLabelText('API key name'), 'Make');
+      await userEvent.click(screen.getByRole('button', { name: /create key/i }));
+      await screen.findByTestId('created-api-key');
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expect(await screen.findByText('Close without copying the key?')).toBeInTheDocument();
+    });
+  });
+
+  it('draws the copy-now warning from the theme tokens, so it has a dark variant', async () => {
+    await createKey();
+    const box = screen.getByText(/copy this key now/i);
+    expect(box.className).toContain('bg-warning');
+    expect(box.className).toContain('text-warning-foreground');
+    expect(box.className).not.toMatch(/amber-/);
   });
 });
