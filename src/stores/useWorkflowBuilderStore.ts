@@ -37,7 +37,6 @@ interface WorkflowBuilderStore {
   // Actions
   setWorkflow: (workflow: Workflow) => void;
   loadWorkflow: (workflowId: string) => Promise<void>;
-  loadUserWorkflows: () => Promise<Workflow[]>;
   loadNodeTemplates: () => Promise<void>;
   createNewWorkflow: (name: string, category?: WorkflowCategory) => void;
 
@@ -155,7 +154,7 @@ function toJson(value: unknown): Json {
  * the columns really are nullable in the schema, and the domain type says they
  * are not.
  */
-function rowToWorkflow(row: WorkflowRow): Workflow {
+export function rowToWorkflow(row: WorkflowRow): Workflow {
   return {
     id: row.id,
     userId: row.user_id,
@@ -232,29 +231,6 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderStore>((set, get) =
       logger.error('Failed to load workflow', error as Error);
       toast.error('Failed to load workflow');
       throw error;
-    }
-  },
-
-  // Load all user workflows
-  loadUserWorkflows: async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('workflows')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
-
-      return (data || []).map(rowToWorkflow);
-    } catch (error) {
-      logger.error('Failed to load workflows', error as Error);
-      return [];
     }
   },
 
