@@ -5,7 +5,7 @@
 
 import { PRICING_PLANS } from '@/config/pricing-plans';
 import { SAME_AS } from '@/config/social-profiles';
-import { ORGANIZATION_LOGO } from '@/config/og-image';
+import { organizationId, organizationLogo, publisherOrganization } from '@/config/site-entities';
 import { PageConfig } from '@/types/pageBuilder';
 import type { BlockConfig } from '@/types/pageBuilder';
 import { getSafeOrigin } from '@/lib/utils';
@@ -176,17 +176,12 @@ export const generateEnhancedOrganizationSchema = (): Record<string, any> => {
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    '@id': `${baseUrl}/#organization`,
+    '@id': organizationId(baseUrl),
     name: 'AgentBio',
     legalName: 'AgentBio Intelligence',
     url: baseUrl,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${baseUrl}${ORGANIZATION_LOGO.path}`,
-      // Was width '512', height '512' for a 946x436 file (US-178).
-      width: String(ORGANIZATION_LOGO.width),
-      height: String(ORGANIZATION_LOGO.height),
-    },
+    // Was width '512', height '512' for a 946x436 file (US-178).
+    logo: organizationLogo(baseUrl),
     image: `${baseUrl}/Cover.png`,
     description:
       'AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.',
@@ -237,10 +232,7 @@ export const generateEnhancedLocalBusinessSchema = (): Record<string, any> => {
     description:
       'AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.',
     url: baseUrl,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${baseUrl}/logo.png`,
-    },
+    logo: organizationLogo(baseUrl),
     image: `${baseUrl}/Cover.png`,
     priceRange: '$$$',
     // aggregateRating removed (US-157). It claimed ratingValue 4.8 over 523
@@ -502,11 +494,7 @@ export const generateSoftwareApplicationSchema = (options?: {
           },
         }
       : {}),
-    publisher: {
-      '@type': 'Organization',
-      name: 'AgentBio',
-      url: baseUrl,
-    },
+    publisher: publisherOrganization(baseUrl),
   };
 
   if (opts.features.length > 0) {

@@ -1,6 +1,7 @@
 import { Helmet } from 'react-helmet-async';
 import { SAME_AS } from '@/config/social-profiles';
-import { DEFAULT_SOCIAL_IMAGE, ORGANIZATION_LOGO, isDefaultSocialImage } from '@/config/og-image';
+import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
+import { organizationId, organizationLogo, websiteId } from '@/config/site-entities';
 import { getBaseUrl } from '@/config/seo.config';
 
 interface FAQItem {
@@ -52,17 +53,12 @@ export function PageSEO({
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    '@id': `${siteUrl}#organization`,
+    '@id': organizationId(siteUrl),
     name: 'AgentBio',
     legalName: 'AgentBio Intelligence',
     url: siteUrl,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${siteUrl}${ORGANIZATION_LOGO.path}`,
-      // Was width '512', height '512' for a 946x436 file (US-178).
-      width: String(ORGANIZATION_LOGO.width),
-      height: String(ORGANIZATION_LOGO.height),
-    },
+    // Was width '512', height '512' for a 946x436 file (US-178).
+    logo: organizationLogo(siteUrl),
     image: `${siteUrl}/Cover.png`,
     description:
       'AI-powered real estate agent bio page builder. Purpose-built platform for real estate professionals to showcase properties, capture leads, and convert Instagram followers into clients.',
@@ -104,11 +100,11 @@ export function PageSEO({
     name: title,
     description: description,
     publisher: {
-      '@id': `${siteUrl}#organization`,
+      '@id': organizationId(siteUrl),
     },
     isPartOf: {
       '@type': 'WebSite',
-      '@id': `${siteUrl}#website`,
+      '@id': websiteId(siteUrl),
       name: siteName,
       url: siteUrl,
     },
@@ -131,12 +127,12 @@ export function PageSEO({
   const webSiteSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    '@id': `${siteUrl}#website`,
+    '@id': websiteId(siteUrl),
     url: siteUrl,
     name: siteName,
     description: 'Link-in-bio platform for real estate agents',
     publisher: {
-      '@id': `${siteUrl}#organization`,
+      '@id': organizationId(siteUrl),
     },
     // No potentialAction. A SearchAction is what Google reads to offer a
     // sitelinks searchbox, and this one pointed at /search?q=, a route that has

@@ -1,6 +1,7 @@
 import { Helmet } from 'react-helmet-async';
 import { X_HANDLE } from '@/config/social-profiles';
 import { DEFAULT_SOCIAL_IMAGE, isDefaultSocialImage } from '@/config/og-image';
+import { publisherOrganization } from '@/config/site-entities';
 import { getBaseUrl } from '@/config/seo.config';
 import type { ArticleAuthor } from '@/lib/articleAuthor';
 
@@ -81,15 +82,10 @@ export function ArticleSEO({
     author: author
       ? { '@type': 'Person', name: author.name, ...(author.url ? { url: author.url } : {}) }
       : { '@type': 'Organization', name: siteName, url: siteUrl },
-    publisher: {
-      '@type': 'Organization',
-      name: siteName,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${siteUrl}/Cover.png`,
-      },
-      url: siteUrl,
-    },
+    // The same Organization, by the same @id and with the same logo, as the
+    // site-wide Organization node. This gave the 1536x1024 social banner as
+    // the publisher's logo (US-346, US-356).
+    publisher: publisherOrganization(siteUrl),
     mainEntityOfPage: {
       '@type': 'WebPage',
       '@id': fullUrl,

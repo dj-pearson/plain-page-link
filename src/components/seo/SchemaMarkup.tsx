@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { getBaseUrl } from '@/config/seo.config';
+import { organizationId, publisherOrganization, websiteId } from '@/config/site-entities';
 import {
   generateBreadcrumbSchema,
   generateEnhancedOrganizationSchema,
@@ -66,14 +67,7 @@ export function SchemaMarkup({ type, data = {}, additionalSchemas = [] }: Schema
             '@type': 'Person',
             name: data.author || 'AgentBio Team',
           },
-          publisher: {
-            '@type': 'Organization',
-            name: 'AgentBio',
-            logo: {
-              '@type': 'ImageObject',
-              url: `${siteUrl}/logo.png`,
-            },
-          },
+          publisher: publisherOrganization(siteUrl),
           mainEntityOfPage: {
             '@type': 'WebPage',
             '@id': data.url || siteUrl,
@@ -135,12 +129,12 @@ export function SchemaMarkup({ type, data = {}, additionalSchemas = [] }: Schema
         return {
           '@context': 'https://schema.org',
           '@type': 'WebSite',
-          '@id': `${siteUrl}#website`,
+          '@id': websiteId(siteUrl),
           url: siteUrl,
           name: 'AgentBio',
           description: 'Purpose-built link-in-bio platform for real estate agents',
           publisher: {
-            '@id': `${siteUrl}/#organization`,
+            '@id': organizationId(siteUrl),
           },
           // No potentialAction. A SearchAction is what Google reads to offer a
           // sitelinks searchbox, and this one pointed at /search?q=, a route that has
@@ -159,11 +153,11 @@ export function SchemaMarkup({ type, data = {}, additionalSchemas = [] }: Schema
           name: data.title || 'AgentBio',
           description: data.description || '',
           publisher: {
-            '@id': `${siteUrl}/#organization`,
+            '@id': organizationId(siteUrl),
           },
           isPartOf: {
             '@type': 'WebSite',
-            '@id': `${siteUrl}#website`,
+            '@id': websiteId(siteUrl),
           },
           inLanguage: 'en-US',
           ...(data.dateModified && { dateModified: data.dateModified }),

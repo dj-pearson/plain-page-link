@@ -697,3 +697,84 @@ describe('FAQPage answers', () => {
     expect(problems.some((p) => p.startsWith('FAQPage answer is not on the page'))).toBe(true);
   });
 });
+
+/**
+ * Proof that the US-356 rules have teeth: the BlogPosting publisher gave the
+ * social banner as its logo, and PageSEO named the Organization
+ * `https://agentbio.net#organization` while other components wrote
+ * `https://agentbio.net/#organization`.
+ */
+describe('site entity identity', () => {
+  const page = (blocks: unknown[]) =>
+    `<!DOCTYPE html><html><head><title>t</title><meta name="description" content="d"/>` +
+    `<link rel="canonical" href="https://agentbio.net/x"/>` +
+    `<meta property="og:image" content="https://agentbio.net/Cover.png"/>` +
+    blocks.map((b) => `<script type="application/ld+json">${JSON.stringify(b)}</script>`).join('') +
+    `</head><body><div id="root">${'x'.repeat(900)}</div></body></html>`;
+  const problemsFor = (blocks: unknown[]) =>
+    auditStructuredData('/x', page(blocks)).map((p) => p.problem);
+
+  it('rejects the social banner as a publisher logo', () => {
+    const problems = problemsFor([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: 'x',
+        publisher: {
+          '@type': 'Organization',
+          name: 'AgentBio',
+          logo: { '@type': 'ImageObject', url: 'https://agentbio.net/Cover.png' },
+        },
+      },
+    ]);
+    expect(problems.some((p) => p.includes('gives the social banner'))).toBe(true);
+  });
+
+  it('accepts the organisation logo', () => {
+    expect(
+      problemsFor([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          '@id': 'https://agentbio.net/#organization',
+          logo: { '@type': 'ImageObject', url: 'https://agentbio.net/logo.png' },
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it('rejects one node named by two @id spellings', () => {
+    const problems = problemsFor([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        '@id': 'https://agentbio.net#organization',
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        '@id': 'https://agentbio.net/x',
+        publisher: { '@id': 'https://agentbio.net/#organization' },
+      },
+    ]);
+    expect(problems.some((p) => p.includes('2 different @id spellings'))).toBe(true);
+  });
+
+  it('accepts a reference that matches its node exactly', () => {
+    expect(
+      problemsFor([
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          '@id': 'https://agentbio.net/#organization',
+        },
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          '@id': 'https://agentbio.net/x',
+          publisher: { '@id': 'https://agentbio.net/#organization' },
+        },
+      ])
+    ).toEqual([]);
+  });
+});
