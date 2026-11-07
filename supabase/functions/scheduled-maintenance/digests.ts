@@ -40,6 +40,7 @@
  */
 import {
   buildDigest,
+  type DigestInput,
   type DigestKeyDate,
   type DigestLead,
   type DigestTask,
@@ -111,6 +112,11 @@ export interface DigestProfile {
 
 export type DigestKeyDateRow = DigestKeyDate & { user_id: string };
 
+export interface DigestAgent {
+  email: string | null;
+  fullName: string | null;
+}
+
 /** Everything the digest touches. Each method throws on a failed read or write. */
 export interface DigestStore {
   /** Profiles with id > afterId (all when null), ordered by id. */
@@ -123,8 +129,11 @@ export interface DigestStore {
   listDueTasks(userIds: string[], dueBy: string, offset: number, limit: number): Promise<(DigestTask & { user_id: string })[]>;
   listKeyDates(userIds: string[], offset: number, limit: number): Promise<DigestKeyDateRow[]>;
   weeklyStats(userId: string, from: string, to: string): Promise<WeeklyStats>;
-  /** Null when the agent cannot be read. */
-  getAgent(userId: string): Promise<{ email: string | null; fullName: string | null } | null>;
+  /**
+   * Address and name for each of these agents, in one read (US-378). An agent
+   * absent from the map could not be read. Throws when the read fails.
+   */
+  getAgents(userIds: string[]): Promise<Map<string, DigestAgent>>;
   /** Insert into digest_log. 'duplicate' when this edition was already claimed. */
   claim(userId: string, day: string, kind: DigestKind): Promise<'claimed' | 'duplicate'>;
   /** Undo a claim after a failed send, so the next run can retry. */
@@ -303,10 +312,15 @@ async function sendPage(
   const tasksBy = groupBy(tasks);
   const datesBy = groupBy(dates);
 
+  // Decide on content first, so no address is read for an agent with nothing
+  // to say; then read every remaining address in one go (US-378: this was two
+  // round trips per agent).
+  type Content = Omit<DigestInput, 'to' | 'agentName'>;
+  const worth: { profile: DigestProfile; kind: DigestKind; content: Content }[] = [];
   for (const { profile, kind } of pending) {
     try {
       const weekly = kind === 'weekly' ? await store.weeklyStats(profile.id, w.since7d, w.anchorIso) : undefined;
-      const content = {
+      const content: Content = {
         siteUrl: w.siteUrl,
         newLeads: leadsBy.get(profile.id) ?? [],
         dueTasks: tasksBy.get(profile.id) ?? [],
@@ -314,16 +328,37 @@ async function sendPage(
         weekly,
         today: w.anchor,
       };
-      // Decide on content before spending two lookups on the agent's address.
       if (!buildDigest({ ...content, to: 'check@invalid', agentName: 'there' })) {
         report.nothingToSend++;
         continue;
       }
+      worth.push({ profile, kind, content });
+    } catch (error) {
+      report.failed++;
+      report.errors.push(`agent ${short(profile.id)}: ${message(error)}`);
+    }
+  }
+  if (worth.length === 0) return;
 
-      const agent = await store.getAgent(profile.id);
+  const agents = new Map<string, DigestAgent>();
+  const readFailed = new Set<string>();
+  for (const part of chunk(worth.map((x) => x.profile.id), ID_CHUNK)) {
+    try {
+      for (const [id, agent] of await store.getAgents(part)) agents.set(id, agent);
+    } catch (error) {
+      // One error for the chunk; its agents count as failed below. Nothing
+      // was claimed, so the next run retries them.
+      for (const id of part) readFailed.add(id);
+      report.errors.push(`reading the addresses of ${part.length} agents: ${message(error)}`);
+    }
+  }
+
+  for (const { profile, kind, content } of worth) {
+    try {
+      const agent = agents.get(profile.id);
       if (!agent) {
         report.failed++;
-        report.errors.push(`agent ${short(profile.id)} could not be read`);
+        if (!readFailed.has(profile.id)) report.errors.push(`agent ${short(profile.id)} could not be read`);
         continue;
       }
       if (!agent.email) {

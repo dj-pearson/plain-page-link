@@ -7,6 +7,7 @@ import {
   dueCutoffDay,
   runDigests,
   summarizeDigestReport,
+  ID_CHUNK,
   PROFILE_PAGE_SIZE,
   ROW_PAGE_SIZE,
   type DigestKind,
@@ -110,11 +111,12 @@ function memoryStore(opts: {
   failWeekly?: boolean;
   failMarkerRead?: boolean;
   failMarkerWrite?: boolean;
+  failAgentsRead?: boolean;
 }) {
   const log = [...(opts.log ?? [])];
   const runs = new Map<string, { profiles: number; sent: number }>();
   const sent: { to: string; subject: string; body: string }[] = [];
-  const calls = { listProfiles: 0, listNewLeads: 0, getAgent: 0, maxIds: 0 };
+  const calls = { listProfiles: 0, listNewLeads: 0, getAgents: 0, agentIdsRead: 0, maxIds: 0 };
   let leadsReadFailures = opts.failLeadsReadOnce ? 1 : 0;
   const sorted = [...opts.profiles].sort((a, b) => a.id.localeCompare(b.id));
 
@@ -148,10 +150,17 @@ function memoryStore(opts: {
       if (opts.failWeekly) throw new Error('weekly numbers: boom');
       return { views: 0, leads: 0, linkClicks: 0 };
     },
-    async getAgent(userId) {
-      calls.getAgent++;
-      const email = opts.emails ? opts.emails[userId] : `${userId.slice(-4)}@example.com`;
-      return email === undefined ? null : { email, fullName: null };
+    async getAgents(userIds) {
+      calls.getAgents++;
+      calls.agentIdsRead += userIds.length;
+      calls.maxIds = Math.max(calls.maxIds, userIds.length);
+      if (opts.failAgentsRead) throw new Error('reading agent contacts: timeout');
+      const found = new Map<string, { email: string | null; fullName: string | null }>();
+      for (const userId of userIds) {
+        const email = opts.emails ? opts.emails[userId] : `${userId.slice(-4)}@example.com`;
+        if (email !== undefined) found.set(userId, { email, fullName: null });
+      }
+      return found;
     },
     async claim(userId, day, kind) {
       if (log.some((r) => r.user_id === userId && r.digest_date === day && r.kind === kind)) return 'duplicate';
@@ -247,7 +256,7 @@ describe('runDigests (US-331)', () => {
     const report = await runDigests(env.store, { schedule: SCHEDULE, siteUrl: SITE });
     expect(report.sent).toBe(1);
     expect(report.alreadySent).toBe(1);
-    expect(env.calls.getAgent).toBe(1);
+    expect(env.calls.agentIdsRead).toBe(1);
   });
 
   it('does not look up the address of an agent with nothing to say', async () => {
@@ -255,7 +264,7 @@ describe('runDigests (US-331)', () => {
     const report = await runDigests(env.store, { schedule: SCHEDULE, siteUrl: SITE });
     expect(report.nothingToSend).toBe(1);
     expect(report.off).toBe(1);
-    expect(env.calls.getAgent).toBe(0);
+    expect(env.calls.getAgents).toBe(0);
   });
 
   it('one page’s failed read is an error, and later pages still send', async () => {
@@ -316,6 +325,38 @@ describe('runDigests (US-331)', () => {
     expect(report.failed).toBe(1);
     expect(report.noEmail).toBe(1);
     expect(summarizeDigestReport(report)).toContain('failed 1 (of 2 profiles)');
+  });
+});
+
+describe('runDigests address lookup (US-378)', () => {
+  it('reads a page of agents’ addresses in one call per chunk, not one per agent', async () => {
+    const profiles = Array.from({ length: 250 }, (_, i) => profile(i + 1));
+    const leads = profiles.map((_, i) => leadFor(i + 1));
+    const env = memoryStore({ profiles, leads });
+    const report = await runDigests(env.store, { schedule: SCHEDULE, siteUrl: SITE });
+
+    expect(report.sent).toBe(250);
+    expect(env.calls.getAgents).toBe(Math.ceil(250 / ID_CHUNK));
+    expect(env.calls.agentIdsRead).toBe(250);
+    expect(env.calls.maxIds).toBeLessThanOrEqual(ID_CHUNK);
+  });
+
+  it('a failed address read is one error, claims nothing, and the next run sends', async () => {
+    const env = memoryStore({ profiles: [profile(1), profile(2)], leads: [leadFor(1), leadFor(2)], failAgentsRead: true });
+    const report = await runDigests(env.store, { schedule: SCHEDULE, siteUrl: SITE });
+    expect(report.failed).toBe(2);
+    expect(report.sent).toBe(0);
+    expect(report.errors).toEqual(['reading the addresses of 2 agents: reading agent contacts: timeout']);
+    expect(env.log).toHaveLength(0);
+
+    const healthy = memoryStore({ profiles: [profile(1), profile(2)], leads: [leadFor(1), leadFor(2)] });
+    expect((await runDigests(healthy.store, { schedule: SCHEDULE, siteUrl: SITE })).sent).toBe(2);
+  });
+
+  it('the store reads addresses in bulk, never per agent', () => {
+    const store = readFileSync(resolve(__dirname, 'digest-store.ts'), 'utf8');
+    expect(store).toMatch(/getAgentContacts\(supabase, userIds\)/);
+    expect(store).not.toMatch(/getAgentContact\(/);
   });
 });
 

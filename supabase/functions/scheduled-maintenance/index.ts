@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { sendEmail } from '../_shared/email.ts';
-import { getAgentContact } from '../_shared/agent-contact.ts';
+import { getAgentContacts } from '../_shared/agent-contact.ts';
 import { successResponse, errorResponse, handleUnexpectedError } from '../_shared/response.ts';
 import { getSiteUrl } from '../_shared/env.ts';
 import { digestSchedule, runDigests, summarizeDigestReport } from './digests.ts';
@@ -74,11 +74,12 @@ function overdueStore(supabase: SupabaseClient): OverdueStore {
       }
       return ids;
     },
-    async getAgent(userId) {
-      const contact = await getAgentContact(supabase, userId);
-      return contact
-        ? { email: contact.email, preferences: contact.notificationPreferences }
-        : null;
+    async getAgents(userIds) {
+      const agents = new Map<string, { email: string | null; preferences: Record<string, unknown> | null }>();
+      for (const [id, c] of await getAgentContacts(supabase, userIds)) {
+        agents.set(id, { email: c.email, preferences: c.notificationPreferences });
+      }
+      return agents;
     },
     async claim(notification) {
       const { error } = await supabase.from('notifications').insert(notification);
