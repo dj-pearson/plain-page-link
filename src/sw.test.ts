@@ -77,6 +77,7 @@ function loadWorker(
     },
   };
   const fetched: string[] = [];
+  const fetchInits = new Map<string, RequestInit | undefined>();
   const self = {
     location: new URL(ORIGIN),
     addEventListener: (type: string, fn: Listener) => {
@@ -88,8 +89,9 @@ function loadWorker(
   const context = vm.createContext({
     self,
     caches,
-    fetch: (req: Request) => {
+    fetch: (req: Request, init?: RequestInit) => {
       fetched.push(req.url);
+      fetchInits.set(req.url, init);
       return network(req);
     },
     Response,
@@ -141,7 +143,7 @@ function loadWorker(
     return response;
   }
 
-  return { stores, fetched, lifecycle, request };
+  return { stores, fetched, fetchInits, lifecycle, request };
 }
 
 async function defaultNetwork(req: Request) {
@@ -188,6 +190,15 @@ describe('service worker caching (public/sw.js)', () => {
     expect(await (await sw.request('/scripts/analytics.js'))!.text()).toBe('consent gate v1');
     deployed = 'consent gate v2';
     expect(await (await sw.request('/scripts/analytics.js'))!.text()).toBe('consent gate v2');
+  });
+
+  it('revalidates analytics.js past a year-long immutable HTTP-cache entry', async () => {
+    // Visitors who loaded analytics.js under the old /*.js header hold it with
+    // max-age=31536000, immutable; a default-mode fetch would be answered from
+    // that entry. cache: 'no-cache' forces a conditional request to the server.
+    const sw = loadWorker();
+    await sw.request('/scripts/analytics.js');
+    expect(sw.fetchInits.get(`${ORIGIN}/scripts/analytics.js`)?.cache).toBe('no-cache');
   });
 
   it('still serves the cached analytics.js when offline', async () => {

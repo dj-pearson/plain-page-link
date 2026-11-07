@@ -89,6 +89,13 @@ function isHashedAsset(url) {
  * Google Analytics: a fix to it never reached anyone who already had the
  * worker. NetworkFirst serves the deployed copy whenever there is a network
  * and keeps the cached one for offline.
+ *
+ * The network fetch is made with cache: 'no-cache'. Until /scripts/* got its
+ * own header, analytics.js was served under the /*.js rule with
+ * `max-age=31536000, immutable`, so every visitor who loaded it before then
+ * holds that copy in the browser HTTP cache. A plain fetch() from the worker
+ * is answered from that entry for up to a year; 'no-cache' makes the browser
+ * revalidate with the server first, so the deployed copy reaches them too.
  */
 function isUnhashedCode(url) {
   return /\.(?:js|mjs|css)$/.test(url.pathname);
@@ -174,7 +181,8 @@ async function cacheFirst(event, request, cacheName) {
 
 async function networkFirst(event, request, cacheName) {
   try {
-    const response = await fetch(request);
+    // Revalidate past any year-long immutable HTTP-cache entry (see isUnhashedCode).
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response && response.ok) {
       event.waitUntil(store(cacheName, request, response.clone()));
     }
