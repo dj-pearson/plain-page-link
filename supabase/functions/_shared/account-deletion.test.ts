@@ -136,13 +136,34 @@ describe('restoreBillingAfterCancel', () => {
   it('turns renewal back on when the request had turned it off', async () => {
     const subs = { sub_1: sub('sub_1', { cancel_at_period_end: true }) };
     const stripe = fakeStripe(subs);
-    const { store } = fakeStore();
+    const { store } = fakeStore({ live: { u1: ['sub_1'] } });
     const outcome = await restoreBillingAfterCancel({ store, stripe }, 'u1', {
       stripeSubscriptionId: 'sub_1',
       priorCancelAtPeriodEnd: false,
     });
     expect(outcome).toEqual({ subscription: 'restored' });
     expect(subs.sub_1.cancel_at_period_end).toBe(false);
+  });
+
+  // US-353: the schedule row names the subscription. If it names one that is
+  // not on this user's subscription row, Stripe is not touched at all.
+  it("refuses to switch renewal back on for a subscription that is not the user's", async () => {
+    const subs = {
+      sub_mine: sub('sub_mine', { cancel_at_period_end: true }),
+      sub_victim: sub('sub_victim', { cancel_at_period_end: true }),
+    };
+    const stripe = fakeStripe(subs);
+    const { store } = fakeStore({ live: { u1: ['sub_mine'], u2: ['sub_victim'] } });
+    const log = vi.fn();
+    const outcome = await restoreBillingAfterCancel({ store, stripe, log }, 'u1', {
+      stripeSubscriptionId: 'sub_victim',
+      priorCancelAtPeriodEnd: false,
+    });
+    expect(outcome).toMatchObject({ subscription: 'unchanged' });
+    expect(stripe.retrieve).not.toHaveBeenCalled();
+    expect(stripe.setCancelAtPeriodEnd).not.toHaveBeenCalled();
+    expect(subs.sub_victim.cancel_at_period_end).toBe(true);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('sub_victim'));
   });
 
   it('leaves a subscriber who had already chosen to cancel cancelling', async () => {
