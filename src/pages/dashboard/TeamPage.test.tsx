@@ -145,4 +145,62 @@ describe('TeamPage', () => {
       )
     );
   });
+  // US-394: there was no control for the teams updateRole action.
+  it('changes a member to admin through updateRole and says so', async () => {
+    invoke.mockResolvedValue({ data: { updated: true }, error: null });
+    renderWithProviders(<TeamPage />);
+
+    expect(screen.queryByRole('combobox', { name: 'Role for owner@acme.test' })).toBeNull();
+    const select = await screen.findByRole('combobox', { name: 'Role for jo@acme.test' });
+    expect(select).toHaveValue('member');
+
+    await userEvent.selectOptions(select, 'admin');
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('teams', {
+        body: { action: 'updateRole', teamId: 't1', memberId: 'm1', role: 'admin' },
+      })
+    );
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith({ title: 'jo@acme.test is now an admin' })
+    );
+  });
+
+  it('reports a failed role change and leaves the shown role as the server has it', async () => {
+    invoke.mockResolvedValue({ data: null, error: { message: 'Forbidden' } });
+    renderWithProviders(<TeamPage />);
+
+    const select = await screen.findByRole('combobox', { name: 'Role for jo@acme.test' });
+    await userEvent.selectOptions(select, 'admin');
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Couldn’t change jo@acme.test’s role',
+          description: 'Forbidden',
+          variant: 'destructive',
+        })
+      )
+    );
+    expect(select).toHaveValue('member');
+  });
+
+  it('sends the chosen role with an invite', async () => {
+    invoke.mockResolvedValue({ data: { data: { emailed: true } }, error: null });
+    renderWithProviders(<TeamPage />);
+
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: 'Email address to invite' }),
+      'new@acme.test'
+    );
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Role for the new member' }),
+      'admin'
+    );
+    await userEvent.click(screen.getByRole('button', { name: /invite$/i }));
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('teams', {
+        body: { action: 'invite', teamId: 't1', email: 'new@acme.test', role: 'admin' },
+      })
+    );
+    expect(screen.getByRole('combobox', { name: 'Role for the new member' })).toHaveValue('member');
+  });
 });

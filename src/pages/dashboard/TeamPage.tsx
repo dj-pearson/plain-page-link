@@ -51,6 +51,17 @@ interface TeamMember {
   accepted_at: string | null;
 }
 
+type AssignableRole = Exclude<TeamMember['role'], 'owner'>;
+
+/** The roles the teams edge function's invite and updateRole actions accept. */
+export const ASSIGNABLE_ROLES: { value: AssignableRole; label: string }[] = [
+  { value: 'member', label: 'Member' },
+  { value: 'admin', label: 'Admin' },
+];
+
+const SELECT_CLASS =
+  'h-11 rounded-md border border-input bg-background px-3 text-base sm:h-10 sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+
 /** How a member is named in the list, the remove button and the confirmation. */
 export function memberLabel(m: Pick<TeamMember, 'email' | 'user_id'>): string {
   return m.email ?? m.user_id ?? 'this member';
@@ -86,6 +97,7 @@ export default function TeamPage() {
   const queryClient = useQueryClient();
   const [teamName, setTeamName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<AssignableRole>('member');
   const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
 
   // US-328: a failed load used to fall through to "Create your team", which
@@ -143,9 +155,9 @@ export default function TeamPage() {
   });
 
   const invite = useMutation({
-    mutationFn: async (email: string) => {
+    mutationFn: async ({ email, role }: { email: string; role: AssignableRole }) => {
       const { data, error } = await edgeFunctions.invoke('teams', {
-        body: { action: 'invite', teamId: team!.id, email },
+        body: { action: 'invite', teamId: team!.id, email, role },
       });
       if (error) throw new Error(error.message);
       // US-226: the invite is emailed with an accept link now; say if it failed.
@@ -153,6 +165,7 @@ export default function TeamPage() {
     },
     onSuccess: (emailed) => {
       setInviteEmail('');
+      setInviteRole('member');
       queryClient.invalidateQueries({ queryKey: ['team-members', team?.id] });
       toast(
         emailed
@@ -189,6 +202,32 @@ export default function TeamPage() {
     onError: (e, member) =>
       toast({
         title: `Couldn’t remove ${memberLabel(member)}`,
+        description: e instanceof Error ? e.message : 'Please try again.',
+        variant: 'destructive',
+      }),
+  });
+
+  // US-394: the teams edge function has always had updateRole, but there
+  // was no control for it, so a member could never be made an admin.
+  const changeRole = useMutation({
+    mutationFn: async ({ member, role }: { member: TeamMember; role: AssignableRole }) => {
+      const { error } = await edgeFunctions.invoke('teams', {
+        body: { action: 'updateRole', teamId: team!.id, memberId: member.id, role },
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: (_data, { member, role }) => {
+      queryClient.invalidateQueries({ queryKey: ['team-members', team?.id] });
+      toast({
+        title:
+          role === 'admin'
+            ? `${memberLabel(member)} is now an admin`
+            : `${memberLabel(member)} is now a member`,
+      });
+    },
+    onError: (e, { member }) =>
+      toast({
+        title: `Couldn’t change ${memberLabel(member)}’s role`,
         description: e instanceof Error ? e.message : 'Please try again.',
         variant: 'destructive',
       }),
@@ -259,11 +298,11 @@ export default function TeamPage() {
 
   const roleIcon = (role: string) =>
     role === 'owner' ? (
-      <Crown className="h-4 w-4 text-amber-500" />
+      <Crown className="h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
     ) : role === 'admin' ? (
-      <Shield className="h-4 w-4 text-blue-500" />
+      <Shield className="h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
     ) : (
-      <Users className="h-4 w-4 text-muted-foreground" />
+      <Users className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
     );
 
   return (
@@ -281,7 +320,10 @@ export default function TeamPage() {
       <Card>
         <CardHeader>
           <CardTitle>Invite a member</CardTitle>
-          <CardDescription>They'll join your team once they accept.</CardDescription>
+          <CardDescription>
+            They'll join your team once they accept. Admins can also invite and remove members and
+            change roles.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 sm:flex-row">
           <Input
@@ -292,8 +334,20 @@ export default function TeamPage() {
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
           />
+          <select
+            aria-label="Role for the new member"
+            className={SELECT_CLASS}
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value as AssignableRole)}
+          >
+            {ASSIGNABLE_ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
           <Button
-            onClick={() => invite.mutate(inviteEmail.trim())}
+            onClick={() => invite.mutate({ email: inviteEmail.trim(), role: inviteRole })}
             disabled={!inviteEmail.trim() || invite.isPending}
           >
             {invite.isPending ? (
@@ -325,32 +379,55 @@ export default function TeamPage() {
             />
           ) : (
             <ul className="divide-y divide-border">
-              {memberList.map((m) => (
-                <li key={m.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    {roleIcon(m.role)}
-                    <div className="min-w-0">
-                      <div className="truncate font-medium text-foreground">{memberLabel(m)}</div>
-                      <div className="text-xs capitalize text-muted-foreground">
-                        {m.role}
-                        {!m.accepted_at && ' · pending'}
+              {memberList.map((m) => {
+                const roleChanging =
+                  changeRole.isPending && changeRole.variables?.member.id === m.id;
+                return (
+                  <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {roleIcon(m.role)}
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-foreground">{memberLabel(m)}</div>
+                        <div className="text-xs capitalize text-muted-foreground">
+                          {m.role}
+                          {!m.accepted_at && ' · pending'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  {m.role !== 'owner' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      aria-label={`Remove ${memberLabel(m)}`}
-                      disabled={removeMember.isPending && removeMember.variables?.id === m.id}
-                      onClick={() => setRemoveTarget(m)}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  )}
-                </li>
-              ))}
+                    {m.role !== 'owner' && (
+                      <div className="flex shrink-0 items-center gap-1">
+                        <select
+                          aria-label={`Role for ${memberLabel(m)}`}
+                          className={SELECT_CLASS}
+                          value={m.role}
+                          disabled={roleChanging}
+                          aria-busy={roleChanging || undefined}
+                          onChange={(e) => {
+                            const role = e.target.value as AssignableRole;
+                            if (role !== m.role) changeRole.mutate({ member: m, role });
+                          }}
+                        >
+                          {ASSIGNABLE_ROLES.map((r) => (
+                            <option key={r.value} value={r.value}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-11 w-11 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`Remove ${memberLabel(m)}`}
+                          disabled={removeMember.isPending && removeMember.variables?.id === m.id}
+                          onClick={() => setRemoveTarget(m)}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>
