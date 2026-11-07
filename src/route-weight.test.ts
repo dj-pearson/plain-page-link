@@ -38,14 +38,44 @@ describe('route-weight header policy (US-212)', () => {
     expect(headersFor(rules, '/')['Cache-Control']).toMatch(/max-age=0/);
   });
 
-  it('lets a later rule win for a header it repeats', () => {
-    // How Pages resolves /* against /*.js, and the reason headersFor merges in
-    // file order rather than taking the first match.
-    const assetPolicy = headersFor(rules, '/assets/x.js')['Cache-Control'];
-    const documentPolicy = headersFor(rules, '/index.html')['Cache-Control'];
-    expect(assetPolicy).not.toBe(documentPolicy);
+  it('resolves the deployed file to one clean policy per path (US-381)', () => {
+    expect(headersFor(rules, '/assets/x.js')['Cache-Control']).toBe(
+      'public, max-age=31536000, immutable'
+    );
+    expect(headersFor(rules, '/index.html')['Cache-Control']).toBe(
+      'public, max-age=0, must-revalidate'
+    );
     // The security headers from /* still apply to an asset.
     expect(headersFor(rules, '/assets/x.js')['X-Content-Type-Options']).toBe('nosniff');
+  });
+
+  describe('Cloudflare Pages semantics (US-381)', () => {
+    // developers.cloudflare.com/pages/configuration/headers, and workers-sdk
+    // pages-shared/asset-server/handler.ts: every matching rule applies in file
+    // order, a repeated header is appended, and `! Name` detaches.
+    it('joins a header two matching rules both set, rather than letting the later win', async () => {
+      const joined = await parseHeaders(
+        '/*\n  Cache-Control: max-age=0\n\n/*.js\n  Cache-Control: max-age=31536000\n'
+      );
+      expect(headersFor(joined, '/a.js')['Cache-Control']).toBe('max-age=0, max-age=31536000');
+      expect(headersFor(joined, '/a.css')['Cache-Control']).toBe('max-age=0');
+    });
+
+    it('lets a later rule replace a header only by detaching it first', async () => {
+      const detached = await parseHeaders(
+        '/*\n  Cache-Control: max-age=0\n  X-A: 1\n\n/assets/*\n  ! Cache-Control\n  Cache-Control: immutable\n'
+      );
+      expect(headersFor(detached, '/assets/a.js')).toEqual({
+        'Cache-Control': 'immutable',
+        'X-A': '1',
+      });
+      expect(headersFor(detached, '/other.js')['Cache-Control']).toBe('max-age=0');
+    });
+
+    it('matches a :placeholder to exactly one path segment', () => {
+      expect(matches('/:username/review', '/jane/review')).toBe(true);
+      expect(matches('/:username/review', '/a/b/review')).toBe(false);
+    });
   });
 
   it('is wired into CI', () => {

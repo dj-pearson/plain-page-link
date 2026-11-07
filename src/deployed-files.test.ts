@@ -20,9 +20,13 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { headersFor, parseHeaders } from '../scripts/check-route-weight.mjs';
 
 const ROOT = process.cwd();
 const PUBLIC = join(ROOT, 'public');
+
+/** public/_headers resolved with Cloudflare Pages' semantics (US-381). */
+const resolved = await parseHeaders();
 
 /** Extensions a browser fetches as part of this site. */
 const SERVED = new Set([
@@ -105,23 +109,73 @@ describe('_headers', () => {
     expect(firstBlock).toMatch(/Cache-Control:/);
   });
 
-  it('does not let the immutable rule reach a service worker', () => {
-    const swIndex = rules.indexOf('/sw.js');
-    const jsIndex = rules.indexOf('/*.js');
-    expect(swIndex, '/sw.js needs its own rule').toBeGreaterThan(-1);
-    expect(
-      swIndex,
-      'a later rule wins for a repeated header, so /sw.js must come after /*.js'
-    ).toBeGreaterThan(jsIndex);
+  // What Cloudflare Pages actually sends, resolved the way Pages resolves it:
+  // every matching rule, repeated headers joined with a comma, `! Name`
+  // detaching (US-381). The earlier checks here compared rule positions on the
+  // belief that a later rule wins, which is not how Pages works.
+  const REVALIDATE = 'public, max-age=0, must-revalidate';
+  const YEAR = 'public, max-age=31536000, immutable';
+  const cacheControl = (path: string): string | undefined =>
+    headersFor(resolved, path)['Cache-Control'];
+
+  it('never sends a path two cache policies at once (US-381)', () => {
+    const paths = [
+      ...deployed.map((f) => `/${f}`),
+      '/',
+      '/pricing',
+      '/jane-agent',
+      '/assets/index-abc123.js',
+      '/assets/index-abc123.css',
+      '/assets/hero-abc123.webp',
+      '/assets/inter-abc123.woff2',
+    ];
+    for (const path of paths) {
+      const policy = cacheControl(path) ?? '';
+      expect(policy.match(/max-age=/g)?.length, `${path}: ${policy}`).toBe(1);
+      const type = headersFor(resolved, path)['Content-Type'] ?? '';
+      expect(type.includes(','), `${path} Content-Type sent twice: ${type}`).toBe(false);
+    }
   });
 
-  it('does not let the immutable rule reach the unhashed scripts in public/scripts (US-272)', () => {
-    const scriptsIndex = rules.indexOf('/scripts/*');
-    expect(scriptsIndex, '/scripts/* needs its own rule').toBeGreaterThan(-1);
-    expect(scriptsIndex).toBeGreaterThan(rules.indexOf('/*.js'));
-    const block = source.slice(source.indexOf('\n/scripts/*\n') + 1).split('\n\n')[0];
-    expect(block).toMatch(/Cache-Control: public, max-age=0, must-revalidate/);
-    expect(block).not.toMatch(/immutable/);
+  it('gives content-hashed /assets/ files, and only those, an immutable year', () => {
+    for (const path of [
+      '/assets/index-abc123.js',
+      '/assets/index-abc123.css',
+      '/assets/hero-abc123.png',
+      '/assets/hero-abc123.webp',
+      '/assets/inter-abc123.woff2',
+    ]) {
+      expect(cacheControl(path), path).toBe(YEAR);
+    }
+    for (const file of deployed) {
+      expect(cacheControl(`/${file}`) ?? '', file).not.toMatch(/immutable/);
+    }
+  });
+
+  it('lets a new icon or social image reach returning visitors and installed apps (US-301)', () => {
+    const images = deployed.filter((f) => /\.(?:png|webp|jpe?g|svg)$/i.test(f));
+    expect(images, 'the manifest icons are in public/icons').toContain('icons/icon-192.png');
+    expect(images).toContain('Icon.png');
+    expect(images).toContain('Cover.png');
+    for (const image of images) {
+      const policy = cacheControl(`/${image}`) ?? '';
+      const maxAge = Number(/max-age=(\d+)/.exec(policy)?.[1]);
+      expect(maxAge, `${image}: ${policy}`).toBeLessThanOrEqual(86400);
+    }
+  });
+
+  it('revalidates the service worker and the unhashed scripts on every load (US-183, US-272)', () => {
+    expect(rules, '/sw.js needs its own rule').toContain('/sw.js');
+    expect(rules, '/scripts/* needs its own rule').toContain('/scripts/*');
+    expect(cacheControl('/sw.js')).toBe(REVALIDATE);
+    expect(cacheControl('/scripts/analytics.js')).toBe(REVALIDATE);
+    expect(headersFor(resolved, '/sw.js')['Content-Type']).toBe('application/javascript');
+  });
+
+  it('revalidates documents and the manifest on every load', () => {
+    for (const path of ['/', '/pricing', '/index.html', '/offline.html', '/manifest.json']) {
+      expect(cacheControl(path), path).toBe(REVALIDATE);
+    }
   });
 
   it('never declares source code to be executable script', () => {
@@ -139,7 +193,7 @@ describe('_headers', () => {
     expect(offenders, 'source files are not assets and must not be typed as script').toEqual([]);
   });
 
-  it('covers every asset type the build actually emits', () => {
+  it('declares a rule for every asset type the build actually emits', () => {
     const present = new Set([
       ...deployed.map((f) => {
         const dot = f.lastIndexOf('.');
@@ -147,15 +201,16 @@ describe('_headers', () => {
       }),
       ...BUILT,
     ]);
-    // Types that benefit from an explicit long cache. .txt, .xml and .json are
-    // deliberately left on the /* floor: robots.txt, sitemap.xml and
+    // Types that get an explicit rule (a Content-Type, and for images the
+    // short cache of US-301; the year comes from /assets/*). .txt, .xml and
+    // .json are deliberately left on the /* floor: robots.txt, sitemap.xml and
     // manifest.json all change without their URLs changing.
     const wantsLongCache = ['.png', '.webp', '.svg', '.js', '.css'].filter((e) => present.has(e));
     const declared = new Set(
       rules.filter((rule) => rule.startsWith('/*.')).map((r) => r.slice(2).toLowerCase())
     );
     const uncovered = wantsLongCache.filter((extension) => !declared.has(extension));
-    expect(uncovered, 'these ship on every page and revalidate on every visit').toEqual([]);
+    expect(uncovered, 'these ship on every page and need an explicit rule').toEqual([]);
   });
 });
 
