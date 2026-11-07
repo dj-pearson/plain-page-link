@@ -61,6 +61,7 @@ const PROFILE_ROW = {
 
 const LISTING_ROW = {
   id: 'abc-123',
+  status: 'active',
   address: '412 Maple Avenue',
   city: 'Salt Lake City',
   state: 'UT',
@@ -106,6 +107,8 @@ beforeEach(() => {
     const url = String(input);
     if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
     if (url.includes('/rest/v1/listings')) return Response.json([LISTING_ROW]);
+    // No settings row: the defaults, which show every listing.
+    if (url.includes('/rest/v1/user_settings')) return Response.json([]);
     return new Response('[]', { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -363,5 +366,86 @@ describe('/:username/listing/:listingId (US-275)', () => {
   it('points the legacy ?listing= card at the listing page too', async () => {
     const html = await (await call({ path: '/jane?listing=abc-123' }).promise).text();
     expect(html).toContain('https://agentbio.net/jane/listing/abc-123');
+  });
+
+  describe('visibility toggles (US-382)', () => {
+    const AGENT_TITLE = '<title>Jane Doe — Associate Broker at Summit Realty</title>';
+    const LISTING_TITLE = '412 Maple Avenue, Salt Lake City, UT — $525,000';
+
+    const serve = (
+      listing: Record<string, unknown>,
+      settings: Record<string, unknown>[] | 'error'
+    ) => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+        if (url.includes('/rest/v1/listings')) return Response.json([listing]);
+        if (url.includes('/rest/v1/user_settings')) {
+          return settings === 'error'
+            ? new Response('{}', { status: 500 })
+            : Response.json(settings);
+        }
+        return new Response('[]', { status: 404 });
+      });
+    };
+
+    const listingHtml = async () =>
+      (await callListing({ path: '/jane/listing/abc-123' }).promise).text();
+
+    it("reads only the agent's two public toggles, scoped to the agent", async () => {
+      await listingHtml();
+      const settingsUrl = fetchMock.mock.calls
+        .map(([input]) => String(input))
+        .find((url) => url.includes('/rest/v1/user_settings'));
+      expect(settingsUrl).toContain('select=show_listings,show_sold_properties');
+      expect(settingsUrl).toContain('user_id=eq.profile-jane');
+    });
+
+    it('keeps the agent card when the agent hides their listings', async () => {
+      serve(LISTING_ROW, [{ show_listings: false, show_sold_properties: true }]);
+      const html = await listingHtml();
+      expect(html).toContain(AGENT_TITLE);
+      expect(html).not.toContain('412 Maple Avenue');
+      expect(html).not.toContain('412-maple.jpg');
+    });
+
+    it('keeps the agent card for a sold home while sold properties are hidden', async () => {
+      serve({ ...LISTING_ROW, status: 'sold' }, [
+        { show_listings: true, show_sold_properties: false },
+      ]);
+      const html = await listingHtml();
+      expect(html).toContain(AGENT_TITLE);
+      expect(html).not.toContain('412 Maple Avenue');
+    });
+
+    it('describes a sold home while sold properties are shown', async () => {
+      serve({ ...LISTING_ROW, status: 'sold' }, [
+        { show_listings: true, show_sold_properties: true },
+      ]);
+      expect(await listingHtml()).toContain(LISTING_TITLE);
+    });
+
+    it('describes an available home when only sold properties are hidden', async () => {
+      serve({ ...LISTING_ROW, status: 'pending' }, [
+        { show_listings: true, show_sold_properties: false },
+      ]);
+      expect(await listingHtml()).toContain(LISTING_TITLE);
+    });
+
+    it('withholds the listing when the settings read fails, rather than guess', async () => {
+      serve(LISTING_ROW, 'error');
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain(AGENT_TITLE);
+      expect(html).not.toContain('412 Maple Avenue');
+    });
+
+    it('applies the same rules to the legacy ?listing= link', async () => {
+      serve(LISTING_ROW, [{ show_listings: false, show_sold_properties: true }]);
+      const html = await (await call({ path: '/jane?listing=abc-123' }).promise).text();
+      expect(html).toContain(AGENT_TITLE);
+      expect(html).not.toContain('412 Maple Avenue');
+    });
   });
 });

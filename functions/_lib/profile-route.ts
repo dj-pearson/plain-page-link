@@ -15,6 +15,7 @@ import {
   type ProfileMeta,
 } from './social-meta';
 import { needsCanonicalRedirect, normalizeUsername } from '../../src/lib/username';
+import { selectListingForPage } from '../../src/lib/publicListingVisibility';
 
 export interface Env {
   /** Same values the SPA build uses; set in the Pages project's variables. */
@@ -39,7 +40,16 @@ type ProfileRow = ProfileMeta & { id: string };
 const PROFILE_COLUMNS =
   'id,username,full_name,bio,avatar_url,og_image,seo_title,seo_description,title,brokerage_name,service_cities';
 const LISTING_COLUMNS =
-  'id,address,city,state,price,bedrooms,bathrooms,square_feet,description,photos,image';
+  'id,status,address,city,state,price,bedrooms,bathrooms,square_feet,description,photos,image';
+/** The two toggles that decide whether a listing is public (anon holds SELECT on these). */
+const SETTINGS_COLUMNS = 'show_listings,show_sold_properties';
+
+type ListingRow = ListingMeta & { id: string; status?: string | null };
+
+interface VisibilitySettings {
+  show_listings?: boolean | null;
+  show_sold_properties?: boolean | null;
+}
 
 /** The upstream must answer quickly or not at all; a crawler will not wait. */
 const UPSTREAM_TIMEOUT_MS = 4000;
@@ -98,6 +108,42 @@ async function notFoundResponse(context: PagesContext): Promise<Response> {
   } catch {
     return next();
   }
+}
+
+/**
+ * The listing a crawler may describe, or null.
+ *
+ * Scoped to this agent: without user_id, /jane?listing=<anyone's id> unfurled
+ * another agent's property under Jane's name and URL (US-242).
+ *
+ * And held to the rule the listing page and the sitemap apply,
+ * selectListingForPage (US-382). Before this, an agent who switched "Show
+ * listings" off — or "Show sold properties" off — still had a full share card,
+ * photo, price and address, served for every hidden home whose URL had ever
+ * been shared, while the page itself said the home was not listed.
+ *
+ * If the settings read fails the listing is withheld: a database blip may cost
+ * a listing its card for five minutes, but must not publish a home the agent
+ * chose to hide. No settings row means the defaults, which show everything.
+ */
+async function fetchVisibleListing(
+  base: string,
+  apiKey: string,
+  profileId: string,
+  listingId: string
+): Promise<ListingRow | null> {
+  const [listings, settings] = await Promise.all([
+    fetchJson<ListingRow>(
+      `${base}/rest/v1/listings?select=${LISTING_COLUMNS}&id=eq.${encodeURIComponent(listingId)}&user_id=eq.${encodeURIComponent(profileId)}&limit=1`,
+      apiKey
+    ),
+    fetchJson<VisibilitySettings>(
+      `${base}/rest/v1/user_settings?select=${SETTINGS_COLUMNS}&user_id=eq.${encodeURIComponent(profileId)}&limit=1`,
+      apiKey
+    ),
+  ]);
+  if (!listings || !settings) return null;
+  return selectListingForPage(listings, listingId, settings[0] ?? null);
 }
 
 /** A single route parameter, whichever shape Pages hands it over in. */
@@ -187,15 +233,9 @@ export async function serveProfileRoute(
   let tags = buildProfileTags(profile, origin);
 
   if (listingId) {
-    // Scoped to this agent. Without user_id, /jane?listing=<anyone's id>
-    // unfurled another agent's property under Jane's name and URL (US-242).
-    const listings = await fetchJson<ListingMeta>(
-      `${base}/rest/v1/listings?select=${LISTING_COLUMNS}&id=eq.${encodeURIComponent(listingId)}&user_id=eq.${encodeURIComponent(profile.id)}&limit=1`,
-      apiKey
-    );
-    const listing = listings?.[0];
-    // A listing that does not resolve keeps the agent's card rather than
-    // producing a broken one.
+    const listing = await fetchVisibleListing(base, apiKey, profile.id, listingId);
+    // A listing that does not resolve, or that the agent has hidden, keeps the
+    // agent's card rather than producing a broken one.
     if (listing) {
       tags = buildListingTags(profile, listing, origin);
     }
