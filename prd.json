@@ -4337,8 +4337,8 @@
         "Test covers the dedupe"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-263)"
+      "passes": true,
+      "notes": " (follow-up slice from US-263) DONE in round 2 as US-303."
     },
     {
       "id": "US-275",
@@ -4385,8 +4385,8 @@
         "LeadDetailModal tests cover each"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Before US-135 lands, only the mailto path is available. Check that the deleteActivity RLS lets the author delete. (follow-up slice from US-264)"
+      "passes": true,
+      "notes": "Before US-135 lands, only the mailto path is available. Check that the deleteActivity RLS lets the author delete. (follow-up slice from US-264) DONE in round 2 as US-304."
     },
     {
       "id": "US-278",
@@ -4460,8 +4460,8 @@
         "A test asserts no template contains literal numbers or review text"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-265)"
+      "passes": true,
+      "notes": " (follow-up slice from US-265) DONE in round 2 as US-305."
     },
     {
       "id": "US-283",
@@ -4506,8 +4506,8 @@
         "Clipboard failure falls back to selecting the key text and says so"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-266)"
+      "passes": true,
+      "notes": " (follow-up slice from US-266) DONE in round 2 as US-306."
     },
     {
       "id": "US-286",
@@ -4536,8 +4536,8 @@
         "No duplicate RPC calls on mount"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-267)"
+      "passes": true,
+      "notes": " (follow-up slice from US-267) DONE in round 2 as US-307."
     },
     {
       "id": "US-288",
@@ -4611,8 +4611,8 @@
         "The window covers missed runs without re-sending"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-269)"
+      "passes": true,
+      "notes": " (follow-up slice from US-269) DONE in round 2 as US-309."
     },
     {
       "id": "US-293",
@@ -4640,8 +4640,8 @@
         "A static test fails if specific known-false phrases come back (e.g. 'Time zone')"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-270)"
+      "passes": true,
+      "notes": " (follow-up slice from US-270) DONE in round 2 as US-310."
     },
     {
       "id": "US-295",
@@ -4730,8 +4730,8 @@
         "Covered in src/sw.test.ts"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Check that main.tsx renders by URL rather than hydrating mismatched prerendered markup before serving one route's HTML for another. (follow-up slice from US-272)"
+      "passes": true,
+      "notes": "Check that main.tsx renders by URL rather than hydrating mismatched prerendered markup before serving one route's HTML for another. (follow-up slice from US-272) DONE in round 2 as US-312."
     },
     {
       "id": "US-301",
@@ -4760,8 +4760,347 @@
         "tsc and unit tests pass"
       ],
       "priority": 1,
+      "passes": true,
+      "notes": "Found by profile lane (US-265) in round 1. DONE in round 2 as US-308."
+    },
+    {
+      "id": "US-303",
+      "lane": "listings",
+      "round": 2,
+      "title": "Reopening a listing on the public profile inflated its view count",
+      "description": "Fixes open slice US-274. trackListingView now records one listing_view per agent, listing and browser session. Before this, every open of the detail modal wrote a new event, so a visitor who opened the same property, closed it and opened it again was counted several times on the dashboard (listing_view_stats, from US-263).",
+      "acceptanceCriteria": [
+        "Re-opening the same listing in one session records one view",
+        "A different listing, or the same listing id on another agent's page, is still counted",
+        "Two opens racing each other (the effect running twice) write once",
+        "A view the server refused (throttle or RLS) or lost to a network error is retried on the next open instead of being marked counted",
+        "Dedupe still works within the page when sessionStorage throws (Safari private mode), and a corrupt stored value is ignored",
+        "The stored key list is capped at 200 entries",
+        "Tests cover the dedupe"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Base: the worktree started on stale main (80eb63c), which has no US-263 work and no US-273..276 in prd.json. Before making any change I hard-reset the worktree to the loop branch claude/continuous-improvement-loops-fx2ob1 (90ee77a), so this commit sits on top of round 1 and merges cleanly onto the loop branch.\n\nEvidence: src/pages/public/FullProfilePage.tsx:111-116 calls trackListingView whenever selectedListing?.id changes. This happens on every modal open and on every Back/Forward over the ?listing= link. Before this change trackListingView (src/lib/analyticsEvents.ts, the old one-liner near the end of the file) inserted unconditionally. The only server-side limit is a 30-per-minute-per-visitor throttle, so repeat opens counted as views in listing_view_stats.\n\nChange (src/lib/analyticsEvents.ts):\n- recordAnalyticsEvent now delegates to an internal writeAnalyticsEvent that returns true only when the row was stored. Its public signature and behaviour are unchanged (Promise<void>, never throws).\n- trackListingView is now an async function that dedupes on the key `${userId}:${listingId}`. Keys live in sessionStorage under 'listing_views_seen' (a JSON array capped at 200), with a module-level Set as fallback when storage throws.\n- The key is marked before the insert, so concurrent calls are suppressed, and unmarked if the insert fails, so the view is retried.\n- Added a test seam: resetListingViewDedupeForTests().\n\nNo migration, no schema change, no UI change. The FullProfilePage call site is unchanged.\n\nTests (src/lib/analyticsEvents.test.ts): a new 'trackListingView' describe with 11 cases: reopen dedupe, per-listing and per-agent separation, race, survives a page reload via sessionStorage, new session counts again, retry after refusal, retry after network error, storage throwing, corrupt entry, 200 cap, no agent id.\n\nVERIFIED: npx tsc --noEmit -> exit 0 (re-run after the lint-staged prettier/eslint pass in the commit hook).\nnpx vitest run src/lib/analyticsEvents.test.ts -> 1 file, 20 tests passed (9 existing + 11 new).\nnpx vitest run src/components/profile/profileReducedMotion.test.tsx src/components/profile/profileUrlSchemes.test.tsx src/lib/analyticsEvents.test.ts src/pages/public/FullProfilePage.publish.test.tsx -> 4 files, 30 tests passed.\nnpx vitest run src/lib/analyticsEvents.test.ts src/pages/public/ src/lib/listingViews -> 5 files, 43 tests passed (run before the extra cap test was added).\nNo migration, so verify:migrations was not needed.\n\nREVIEW: approve\n\nCloses US-274."
+    },
+    {
+      "id": "US-304",
+      "lane": "leads",
+      "round": 2,
+      "title": "Quick responses only filled the notes box. Follow-ups had no priority, meetings could not be logged, and wrong timeline entries could not be removed (US-277, done as US-304)",
+      "description": "Finishes open slice US-277 (US-130 slice 2) in the lead detail modal.\n\n1. Picking a quick-response template now opens an editable preview. Send email or Send text opens the agent's own mail or messages app with the reply filled in, and the timeline records the real subject and body instead of a placeholder. Save as note keeps the old behaviour.\n2. Follow-ups now have a low/medium/high priority picker.\n3. A new Log a meeting form records the meeting type, date and time, and location.\n4. Timeline entries the signed-in agent wrote (note, call, email, sms, meeting, task) can be deleted after a confirm dialog. System rows (status changes, form submissions) never get a delete button.",
+      "acceptanceCriteria": [
+        "Choosing a quick response opens an editable preview. Send email opens mailto (Send text opens sms) with the filled template, and logs an email activity (through log_lead_email) or an sms activity (through log_lead_activity) carrying the actual text",
+        "Follow-up tasks have a low/medium/high priority picker that is passed to createTask",
+        "A Log a meeting action writes meeting_type, meeting_scheduled_at and meeting_location through logMeeting, and the timeline shows the time and location",
+        "Activities the signed-in agent wrote (note/call/email/sms/meeting/task) can be deleted from the timeline after a confirm; status_change and form_submission rows, and rows written by another user, have no delete button",
+        "LeadDetailModal tests cover each, plus unit tests for the template and link helpers"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The worktree started at a stale commit (80eb63c, which does not have round 1). Before making any change I reset it to the loop branch claude/continuous-improvement-loops-fx2ob1 (90ee77a). The commit sits on top of that.\n\nWhat was wrong:\n- src/components/leads/LeadDetailModal.tsx handleSelectResponse (old ~296-302) only called setNote(fillTemplate(...)), so a template was never sent.\n- fillTemplate used String.replace, which fills only the first placeholder. It also told every non-buyer lead, valuation leads included, \"sell your property\".\n- handleAddTask (old ~256-266) never passed a priority.\n- logMeeting and deleteActivity existed in src/hooks/useLeadActivities.ts but nothing in the UI called them.\n\nWhat changed:\n- New src/lib/leadQuickResponses.ts holds the templates (each now has an email subject). fillQuickResponse fills every placeholder, greets by first name and picks the wording by lead type. quickResponseHref builds an encoded mailto link, or an sms link with only dialable characters, and returns null when the lead has no email or phone for that channel (a locked or phone-only lead).\n- src/hooks/useLeadContactAction.ts takes an optional message { subject, body }, so the logged email or sms carries what was sent. The status and contacted_at handling is the same as tapping the address. The Leads.tsx caller is unchanged.\n- LeadDetailModal: the quick-response preview, the priority select, the Log a meeting form (datetime-local input read as local time), meeting time and location in the timeline, and a \"(high priority)\" tag on high-priority tasks. canDeleteActivity(a, userId) is exported. The delete button is 44px and opens an AlertDialog to confirm. All of the new form state resets when the lead changes, as US-101 requires.\n\nRLS check: lead_activities has \"Users can delete own activities\" FOR DELETE USING (auth.uid() = user_id) (squashed baseline line 14034), so the author can delete. That policy would also let the lead owner delete system rows, which carry the owner's user_id. Only the UI stops that today.\n\nlogMeeting inserts directly into lead_activities. The INSERT policy (baseline line 13988) requires the lead owner.\n\nVERIFIED: - `npx tsc --noEmit`: passes, run again after the prettier pass.\n- `npx vitest run src/components/leads src/lib/leadQuickResponses.test.ts src/components/dashboard/DueFollowUps.test.tsx src/pages/dashboard`: 15 test files passed, 95 tests passed. That includes 9 new LeadDetailModal tests and 6 new leadQuickResponses tests; the existing US-101/US-102/US-240/US-264 modal tests still pass.\n- The pre-commit hook (lint-staged: eslint --fix and prettier) passed.\n- No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve\n\nCloses US-277."
+    },
+    {
+      "id": "US-313",
+      "lane": "leads",
+      "round": 2,
+      "title": "System timeline rows should be undeletable in the database, not just hidden in the UI",
+      "description": "The 'Users can delete own activities' policy on lead_activities only checks auth.uid() = user_id. status_change and form_submission rows carry the lead owner's user_id, so the owner can delete their audit trail straight through the REST API with the shipped anon key and their session. Narrow the policy to agent-authored activity types.",
+      "acceptanceCriteria": [
+        "A migration replaces the DELETE policy on lead_activities with USING (auth.uid() = user_id AND activity_type IN ('note','call','email','sms','meeting','task'))",
+        "verify:migrations and verify:schema pass",
+        "canDeleteActivity in LeadDetailModal.tsx and the policy use the same type list (comment cross-reference or a shared constant)"
+      ],
+      "priority": 2,
       "passes": false,
-      "notes": "Found by profile lane (US-265) in round 1."
+      "notes": "Policy is in squashed baseline line 14034; 20260902000006 rebuilt only SELECT/UPDATE. (follow-up from US-304)"
+    },
+    {
+      "id": "US-314",
+      "lane": "leads",
+      "round": 2,
+      "title": "Assigned agents cannot log calls, emails or notes on leads routed to them",
+      "description": "log_lead_activity, log_lead_call and log_lead_email (20260902000004) check leads.user_id = auth.uid() only. The lead-activities INSERT policy has the same check. After 20260902000006, an assignee (leads.assigned_to) can see and update a routed lead, but every contact action, note, follow-up or meeting they record fails with 'Lead not found or access denied', and the hook shows a generic error.",
+      "acceptanceCriteria": [
+        "The RPCs and the lead_activities INSERT policy accept the lead owner or the assignee",
+        "A verify:schema assertion or a test covers an assignee logging a call"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs a migration that follows the SECURITY DEFINER rules: search_path is already pinned, so keep the grants as they are. (follow-up from US-304)"
+    },
+    {
+      "id": "US-305",
+      "lane": "profile",
+      "round": 2,
+      "title": "Page-builder templates published invented sales figures and fake client reviews under the agent's name",
+      "description": "US-282 (US-142 slice 4). The Premium Showcase and Modern Minimal templates put made-up numbers on an agent's public page: \"200+ Homes Sold\", \"98% Client Satisfaction\", \"$50M in Sales\", \"5 Star Rating\" and \"10+ Years\". Premium Showcase also added three five-star reviews from clients who do not exist (\"Sold our home in just 5 days above asking price\"). All of it showed up on /:username through CustomBlocksSection. Template stat items now point at a real figure through a `source` field (sold listings, active listings, years of experience, review count, average rating), and a figure the agent does not have yet stays hidden. Template testimonial blocks use `source: 'profile'` and show the agent's published testimonials. Pages already built from the old templates still store the invented entries, so the blocks recognise those exact entries and never show them. The editor says why they are hidden.",
+      "acceptanceCriteria": [
+        "Stats blocks in templates show the agent's real figures (sold listings, years_experience, published review count and average rating); a figure that is missing or zero is hidden, never shown as 0 or guessed",
+        "Testimonial blocks in templates read the testimonials table (published rows only); when there are none, visitors see nothing and the editor shows an empty state",
+        "Invented stats and reviews already saved in custom_pages.blocks by the old templates, by the pre-US-111 Stats default, or by the settings panel's old Add placeholder are never shown on the public page or in the editor preview",
+        "A test checks that no template stat has a literal value, prefix or suffix, that template testimonial blocks have no entries, and that no template headline, title or description text contains a digit"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence of the bug: src/lib/pageTemplates.ts:454-457 and 659-661 (literal stats) and 509-533 (three made-up reviews). Applying a template (PageList.tsx:78-80) saved them into custom_pages.blocks, and CustomBlocksSection rendered them on /:username through BlockRenderer.\n\nWhat changed:\n- New src/lib/agentPageFacts.ts. resolveAgentStat returns null for zero or missing figures. shownStats and shownManualTestimonials pick what a block shows. isTemplateFabricatedStat and isTemplateFabricatedTestimonial match the exact value+label+prefix+suffix or name+content of every invented entry ever shipped: both templates, the pre-US-111 Stats default (150 Homes Sold...), and the settings panel's old \"0 / New Stat\" and \"Client Name / Working with this agent...\" placeholders. A figure the agent typed, such as \"200 Homes Sold\" without the template's \"+\", is kept. buildAgentPageFacts turns the fetched rows into the figures and testimonials.\n- New src/hooks/useAgentPageFacts.ts. One shared query per agent: profiles.years_experience (a public column); head counts of sold and active listings with is_sample=false; published testimonials. A visitor could already read all of these. No schema change.\n- src/types/pageBuilder.ts: adds AgentStatSource, StatItem.source? and TestimonialBlockConfig.source?.\n- StatsBlock: shows live figures and keeps the agent's own typed ones. On the public page it renders nothing when there is nothing to show; in the editor it explains hidden template figures and live figures that are not available yet. BlockRenderer now passes userId to StatsBlock.\n- TestimonialBlock: source 'profile' reads the agent's published testimonials. Visitors no longer see an empty \"Testimonials\" box. I also fixed things I touched while in there: the slider buttons and dots now have names, stars have an aria-label, and the slide index is clamped. I dropped shadow-sm under the 1px border to meet the craft floor.\n- pageTemplates.ts: live stat bindings and testimonial source 'profile'. I also replaced copy that made claims for the agent: \"With over 15 years of experience\" and \"proven track record\". In pageBuilder.ts, a newly added Testimonials block now defaults to source 'profile'.\n- BlockSettings: a Show selector (My published testimonials or Entries I type here), and \"Add a figure from your data\" for stats. Live items show where their number comes from and have no value inputs. Template entries are labelled \"Template example — hidden on your page\". The Add buttons now start empty instead of with a sample review or \"0 New Stat\".\n\nlint-staged ran eslint and prettier during the commit and reformatted the files. I re-ran tsc and the tests on the formatted code and both pass. I did not edit prd.json or progress.txt and did not push.\n\nVERIFIED: `npx tsc --noEmit` ran before and after the lint-staged reformat with no errors.\n`npx vitest run src/lib/agentPageFacts.test.ts src/lib/pageTemplates.test.ts src/components/pageBuilder`: 5 files, 31 tests passed (re-run after the reformat).\n`npx vitest run src/components/profile src/profile-bundle.test.ts src/lib src/components/pageBuilder src/pages/public`: 71 files, 640 tests passed.\nNo migration, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Deploy Cloudflare Pages (frontend only; no migration, no edge function change)\n\nCloses US-282."
+    },
+    {
+      "id": "US-315",
+      "lane": "profile",
+      "round": 2,
+      "title": "Page-builder template link buttons promise downloads that do not exist",
+      "description": "First-Time Buyer template has a '📚 First-Time Buyer Guide (Free Download)' link and Investor template a '📊 Market Analysis Report' link, both url '#' (src/lib/pageTemplates.ts ~163-171 and ~276-284). Applied unchanged they publish a dead button promising a free download on the agent's page.",
+      "acceptanceCriteria": [
+        "A link block whose url is empty or '#' renders nothing publicly and shows 'Add a link' in the editor",
+        "Templates ship no link block that promises a resource the agent has not provided (or ship it with an empty url)",
+        "Test covers LinkBlock with '#' and empty url"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-305)"
+    },
+    {
+      "id": "US-316",
+      "lane": "profile",
+      "round": 2,
+      "title": "Reuse the public profile's already-fetched figures in page-builder blocks",
+      "description": "On /:username, usePublicProfile already fetches published testimonials and listings, but Stats and Testimonial blocks issue their own 4 requests through useAgentPageFacts. Seed the ['agent-page-facts', userId] query from the public-profile result (or pass facts through CustomBlocksSection) so it costs no extra round trips.",
+      "acceptanceCriteria": [
+        "Visiting a profile with stats and testimonial blocks makes no extra listings or testimonials request",
+        "Editor preview still fetches on its own"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-305)"
+    },
+    {
+      "id": "US-306",
+      "lane": "uiux",
+      "round": 2,
+      "title": "API keys page: a failed load looked like 'no keys', the buttons had no names, and a blocked copy lost the one-time key without saying so",
+      "description": "This fixes open slice US-285 in src/pages/dashboard/ApiKeysPage.tsx. If the key list fails to load, the page now shows an error with a Try again button instead of 'No active API keys yet'. The copy and revoke buttons now have accessible names, and the revoke confirmation names the key. If the browser blocks the clipboard, or has no clipboard API, the page selects the key and tells the agent how to copy it by hand. The full key is shown only once, so a copy that failed silently meant losing it.",
+      "acceptanceCriteria": [
+        "A failed list shows an error box (role=alert) with a Try again button that refetches; 'No active API keys yet' is not shown, and the '(0)' count is hidden while loading or after a failure",
+        "The copy button is named 'Copy API key' ('API key copied' after it works), the revoke button is named 'Revoke <name>', both are 44px (h-11 w-11) and their icons are aria-hidden",
+        "The revoke dialog title names the key",
+        "If the clipboard API is missing or refuses, the error is logged with logger.warn, the key text is selected, and a polite live region tells the agent how to copy it by hand; a successful copy is announced the same way"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "I chose US-285 over US-284 because US-284 (TeamPage) overlaps the enterprise lane, its prd notes say to coordinate first, and one of its criteria (whether members who are not the owner can see the team) needs an owner decision.\n\nWhat the old code did, at the original line numbers in ApiKeysPage.tsx:\n- 46-53 and 172-180: the query threw on error, but the render only checked isLoading and then activeKeys.length, so a failure looked like an empty list.\n- 127 and 197-204: the copy and revoke buttons were icon-only, with no name.\n- 93-98: there was no try/catch around navigator.clipboard.writeText.\n\nWhat changed:\n- The query now also reads error, refetch and isFetching, and the render has a listError branch.\n- copyKey checks that navigator.clipboard?.writeText exists and wraps the call in try/catch. On failure it logs with logger.warn, then selects the key text through a ref (selectNodeContents) and shows a message.\n- The key text also has the select-all class, so one tap selects the whole key.\n- The revoke dialog now holds the whole key record instead of only its id, so it can show the name. onOpenChange closes it only when open is false.\n- The revoke button for a key is disabled while that key is being revoked.\n\nThe error box copies the existing pattern at OpenHouses.tsx:366-377 (AlertCircle, RefreshCw, 'Try again').\n\nNew test file src/pages/dashboard/ApiKeysPage.test.tsx (5 tests):\n- a failed list shows the error, not the empty state, and Try again recovers it\n- the revoke button and dialog are named, and confirming calls revoke with the right id\n- a successful copy is announced\n- a refused writeText selects the key and shows the message\n- a missing clipboard API does the same\n\nThe pre-commit hook ran eslint and prettier; I re-ran tsc and the tests afterwards.\n\nVERIFIED: npx tsc --noEmit: passed with no output, both before and after the pre-commit prettier run. npx vitest run src/test/a11y src/pages/dashboard/ApiKeysPage.test.tsx: 2 files, 12 of 12 tests passed. After the commit, npx vitest run src/pages/dashboard/ApiKeysPage.test.tsx: 5 of 5 passed. npx impeccable detect src/pages/dashboard/ApiKeysPage.tsx found nothing, but it only did regex matching; the element rules need a running page and did not run. There is no migration, so verify:migrations does not apply.\n\nREVIEW: approve\n\nCloses US-285."
+    },
+    {
+      "id": "US-307",
+      "lane": "performance",
+      "round": 2,
+      "title": "Public profile no longer waits a third round trip for branding and open houses",
+      "description": "US-287 done, frontend only. profile_shows_branding and list_public_open_houses used to start only after the profile query had resolved and FullProfilePage had rendered. On every /:username visit that made them a third serial round trip: first the profile row, then the six related reads, then these two. publicProfileQueryOptions now prefetches both under the hooks' own query keys as soon as it has the profile id, so they go out with the six related reads. useProfileShowsBranding and usePublicOpenHouses then join the request already in flight, or read the cached answer, so mounting does not send the RPC a second time.",
+      "acceptanceCriteria": [
+        "The profile_shows_branding and list_public_open_houses RPCs are issued in the same batch as listings/testimonials (test asserts both are called while the related reads are still held open and the profile query is pending)",
+        "No duplicate RPC calls on mount (tests: hooks mounted after the prefetch finished and while it was in flight each leave the RPC count at 1)",
+        "Entry graph stays light: the query options live in src/lib/publicProfileSideQueries.ts (supabase client, react-query, logger only); check-bundle-size passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Base: the worktree started on stale main (80eb63c), which has neither US-286..288 nor LANES.md. Before any edit I reset it to the loop branch head e2ae1d4 (claude/continuous-improvement-loops-fx2ob1).\n\nWhy US-287: it is the open performance slice that fits one session without a migration. US-286 needs a migration plus a real Postgres for verify:schema. US-288 is build/CI config with less user impact.\n\nEvidence before the change:\n- src/hooks/useProfileShowsBranding.ts ran its own useQuery, enabled only once data?.profile?.id existed (FullProfilePage.tsx:148).\n- usePublicOpenHouses (src/hooks/useOpenHouses.ts, around line 221) ran only when UpcomingOpenHouses mounted (FullProfilePage.tsx:596).\n- Both therefore waited for the whole profile queryFn in usePublicProfile.ts.\n\nChanges:\n- New src/lib/publicProfileSideQueries.ts holds profileShowsBrandingQueryOptions and publicOpenHousesQueryOptions. The keys ['profile-shows-branding', id] and ['public-open-houses', id], the staleTimes and the error handling are unchanged. The PublicOpenHouse type moved here and useOpenHouses re-exports it.\n- usePublicProfile.ts: the queryFn takes ({ client }) (TanStack 5.90 passes the client in the context). Right after the profile row resolves it calls `void client.prefetchQuery(...)` for both, before the Promise.all of the six reads. The profile does not wait on them, and prefetchQuery never throws. A fresh cached answer is not fetched again and an in-flight one is joined. The existing invalidateQueries(['public-open-houses']) in useOpenHouses still matches.\n- useProfileShowsBranding and usePublicOpenHouses are now just useQuery(sharedOptions(agentId)). The now-unused logger import was removed from useOpenHouses.\n\nMeasured with vite build:\n- Entry index chunk: 214.65 KB (gzip 61.75) before, 215.19 KB (gzip 61.92) after.\n- FullProfilePage chunk: 84.03 KB (gzip 23.73) before, 83.87 KB (gzip 23.65) after.\n- check-bundle-size passes before and after: entry graph 4 chunks, profile graph 52.\n\nNew test src/hooks/usePublicProfile.sideQueries.test.tsx has 3 tests. I confirmed all 3 fail when the two prefetch lines are commented out.\n\nVERIFIED: - `npx tsc --noEmit`: passes.\n- `npx vitest run src/hooks/usePublicProfile.sideQueries.test.tsx src/hooks/usePublicProfile.test.tsx`: 2 files, 5 tests passed.\n- `npx vitest run src/hooks src/components/profile src/pages/public`: 32 files, 175 tests passed.\n- Regression check: with the prefetch lines commented out, the new test file fails 3/3.\n- `npx vite build`: OK (sizes in notes).\n- `node scripts/check-bundle-size.mjs`: OK, 246 chunks within budget, entry and profile graphs clean.\n- eslint on the touched files: no output. The lint-staged pre-commit (eslint --fix plus prettier) also passed.\n- Re-ran the new test after the commit's prettier pass: 3 passed.\n\nREVIEW: approve\n\nCloses US-287."
+    },
+    {
+      "id": "US-308",
+      "lane": "security",
+      "round": 2,
+      "title": "An unpublished agent's listings, links, reviews and open houses were still readable by anyone",
+      "description": "US-302 (story US-308): when an agent turns their page off, visitors can no longer read its listings, links, testimonials, open houses or response-time figure. The owner can still see all of it, so the US-265 preview and the open-house sign-in kiosk keep working.",
+      "acceptanceCriteria": [
+        "A visitor (anon), or another signed-in agent, running SELECT on listings, links or testimonials gets nothing for an agent whose page is unpublished, including when is_published is NULL. The owner still sees their own rows.",
+        "list_public_open_houses and get_public_open_house return nothing for an unpublished agent unless the caller is that agent. public_agent_response_hours returns NULL in the same case.",
+        "A new verify:schema check covers all three tables and all three functions, for a visitor, another agent and the owner, with the page unpublished, NULL and published.",
+        "tsc passes, the full unit suite passes and verify:migrations passes."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Setup: the worktree started on main (80eb63c), which is behind the loop branch. It was clean, so I reset it to claude/continuous-improvement-loops-fx2ob1 (e2ae1d4), where the other r2 lanes start from. The commit sits on that base.\n\nEvidence of the bug:\n- The visitor policies were last recreated in supabase/migrations/20260930000002_is_sample_is_not_client_writable.sql:60-74. They checked only status, is_active or is_published on the row itself, plus is_sample. They never looked at profiles.is_published, and had no TO clause, so they applied to PUBLIC.\n- The open-house functions (20260923000001_client_sphere_and_open_houses.sql:302 and :350) used `is_published IS NOT FALSE`, which lets NULL through. The profile row policy (20260808000002:145) treats NULL as unpublished.\n- public_agent_response_hours (20260902000010:31) answered for any user id.\n\nThe fix is in supabase/migrations/20261107000308_unpublished_agent_content_private.sql:\n- The three visitor policies now also require `EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = <table>.user_id AND p.is_published IS TRUE)`, and are scoped TO anon, authenticated. This check runs with the caller's own rights. It only needs what anon and authenticated can already read: published profile rows, plus the id and is_published columns. So no new SECURITY DEFINER function was needed.\n- The owner keeps access through the existing own-row policies, which are ORed with these.\n- The open-house functions now use `(p.is_published IS TRUE OR o.user_id = auth.uid())`. Their bodies and return types are otherwise unchanged, and grants are restated.\n- public_agent_response_hours gets the same check, and returns NULL otherwise.\n- The migration can be re-run safely (DROP IF EXISTS / CREATE OR REPLACE).\n\nCode that reads these tables:\n- usePublicProfile already filters on is_active and is_published on the client.\n- functions/[username].ts reads listings with the anon key, so it now respects unpublishing too, which is what we want.\n- submit-lead uses the service role and is not affected.\n- No application code needed changing. The Settings unpublish copy (\"Your listings, links and reviews are kept\", PublishProfileCard.tsx:134) is still accurate.\n\nTests and docs:\n- New verify:schema check: scripts/verify-schema.mjs, right before check 7c, named \"an unpublished agent's listings, links, reviews and open houses are hidden from visitors\".\n- New unit test: src/lib/unpublishedVisibility.test.ts. It checks that the newest definition of each policy and function in the migrations includes the published check, so a later migration that copies an older version fails without needing a database.\n- CLAUDE.md: one RLS bullet saying new public content on an agent's page must apply the same check.\n\nHow I verified it without a database server: starting a Postgres cluster needed su or runuser or an edit to pg_hba, and the sandbox refused all three. Instead I applied scripts/supabase-prelude.sql plus all 57 migrations to PGlite 0.5.11 (Postgres in WASM), with uuid_ossp and pgcrypto, in my scratchpad. Then I ran the new check and its neighbours through a small harness that imitates psql.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output.\n- `npx vitest run` (full suite): 199 test files passed, 1655 tests passed and 1 skipped.\n- `npx vitest run src/lib/unpublishedVisibility.test.ts src/lib/profilePublishing.test.ts src/components/settings/PublishProfileCard.test.tsx src/hooks/usePublicProfile.test.tsx src/schema-references.test.ts src/repo-hygiene.test.ts`: 6 files, 43 tests passed.\n- With the new migration file temporarily moved out, unpublishedVisibility.test.ts fails 6 of 6. So the test does catch the bug.\n- `npm run verify:migrations`: \"[migrations] OK — 57 migration files structurally valid.\"\n- PGlite run of the new verify:schema check:\n  - Against the old policies and functions it FAILS. A visitor sees \"1|1|1|0|0|2.0\" (listings|links|reviews|open houses|kiosk|response hours) for an unpublished agent. With is_published NULL a visitor sees \"1|1|1|1|1|2.0\". The owner gets no open houses while unpublished.\n  - With the migration applied it passes.\n- PGlite run of the existing checks: 'client sphere…open houses hide private notes', 'is_sample cannot be written…never public', 'view and click counters…', 'reviews reach testimonials only through submit-review', 'anon reads visibility toggles…' and 'listing_view_stats…' all pass.\n- Two checks did not give a usable result in PGlite:\n  - 'plan limits are enforced' gives the same harness errors with and without my migration, so it is the harness, not this change.\n  - 'no undeclared over-permissive RLS policy' and 'SECURITY DEFINER functions are not callable…unless allowed' could not be run because they are written as single expressions my harness cannot convert.\n- The full `npm run verify:schema` still needs to run in CI against a real Postgres.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration 20261107000308_unpublished_agent_content_private.sql. It contains only policies and SQL functions, so it can go before or after the frontend deploy. Nothing needs redeploying. | Make sure the verify-backend CI job runs on this branch. The full verify:schema could not run in this sandbox; the new check was only exercised against PGlite.\n\nCloses US-302."
+    },
+    {
+      "id": "US-317",
+      "lane": "security",
+      "round": 2,
+      "title": "increment_link_clicks should not count clicks for an unpublished page",
+      "description": "increment_link_clicks is SECURITY DEFINER and can be called by anon. It still raises click_count for links on an unpublished page if a caller already knows the link id. Gate it the same way as the US-308 functions, owner exempt. US-265 already skips counting for the owner on the client.",
+      "acceptanceCriteria": [
+        "When the profile is unpublished, anon calling increment_link_clicks leaves click_count unchanged",
+        "verify:schema covers this"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-308)"
+    },
+    {
+      "id": "US-309",
+      "lane": "enterprise",
+      "round": 2,
+      "title": "Overdue-lead chaser stopped chasing once 500 old leads piled up, re-sent reminders hourly, and ignored the 1-hour SLA",
+      "description": "Picks up open slice US-292. The hourly overdue-lead chaser in scheduled-maintenance now reads every unanswered lead from 1 hour to 7 days old, in pages. It chases each lead at most once, with a unique index backing that up. A failed read now fails the task instead of sending the reminder again. Each agent gets one email per run instead of one per lead. A missed run is made up by the next one, as long as the lead is inside the 7-day window.",
+      "acceptanceCriteria": [
+        "A lead is chased at most once, across any number of runs and when two runs overlap: the notification insert is the claim, and a second claim (23505 on idx_notifications_lead_overdue_once) is treated as already chased and not emailed",
+        "If the already-chased read fails, the task fails; it does not send again",
+        "The window covers leads created between 7 days and 1 hour ago, so a missed run is made up by the next run, and leads older than 7 days are never chased (no flood on first deploy)",
+        "A backlog of chased-but-unanswered leads cannot starve new ones: the whole window is read in pages of 1,000, up to 10,000 rows, and the summary says if that ceiling is hit",
+        "An agent on a 1-hour SLA is chased after 1 hour; an sla_hours value Settings does not offer falls back to 2",
+        "One email per agent per run lists all leads claimed in that run (10 named, then 'and N more')",
+        "An agent whose profile cannot be read is left unclaimed and retried next run, and the task reports failed (207)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Setup: this worktree started at main (80eb63c), which is behind the loop branch. I hard-reset it to claude/continuous-improvement-loops-fx2ob1 (21c8b0d) before starting, so it holds US-263..US-302 and the round-1 work. node_modules is symlinked to the main checkout.\n\nWhat was wrong, in the old supabase/functions/scheduled-maintenance/index.ts (before this commit):\n- Lines 85-91: `.eq('status','new').is('first_responded_at',null).lt('created_at',cutoff).order('created_at',asc).limit(500)`. A lead nobody answers stays `new` forever, so once 500 of them existed across all agents, every run re-read the same already-chased backlog and no newer lead was ever chased again. There was also no lower bound, so the first run, or an agent turning chasing back on, emailed about leads that were months old.\n- Line 82: the net was cast at DEFAULT_SLA_HOURS = 2, but Settings offers [1,2,4,8,24] (src/components/settings/LeadNotificationPreferences.tsx:26). An agent on 1 hour was chased an hour late. The comment there claimed it used the shortest window.\n- Lines 128-134: the dedupe read ignored its `error` and used `.maybeSingle()`, which errors when it finds two rows. Either way `already` came back null and the lead was chased again, every hour, adding more duplicates each time. There was also a race between that check and the insert.\n- Lines 156-165: one email per lead. sla_hours was used unvalidated.\n\nWhat changed:\n- New file supabase/functions/scheduled-maintenance/overdue.ts, with no Deno globals:\n  - an OverdueStore interface;\n  - chaseOverdueLeads, which pages the window, loads the chased set in bulk per 200 agents (a failed read throws), claims each lead by inserting its notification, and sends one email per agent for the leads it claimed;\n  - helpers slaHoursFor, candidateWindow, buildChaseEmail and summarizeOverdueReport.\n- index.ts:\n  - adds an overdueStore() adapter over the service-role client: candidates are ordered by created_at then id and read with range(); the notifications read is paged; claim maps error 23505 to 'duplicate';\n  - the overdue_leads task throws when report.errors is non-empty, matching how the account_deletions task reports failure;\n  - the inline chaser and its constants are gone.\n- New migration supabase/migrations/20261107000309_lead_overdue_once.sql:\n  - deletes duplicate lead_overdue notifications, keeping the earliest per (user_id, data->>'lead_id');\n  - creates the unique partial index idx_notifications_lead_overdue_once ON notifications (user_id, (data->>'lead_id')) WHERE type='lead_overdue'.\n  - No function, policy or grant changes.\n- Until the migration is applied the code still works: the bulk pre-check does the deduping, and the index only closes the race between overlapping runs.\n\nTested against a real Postgres 16 (a throwaway cluster, since deleted):\n- the DELETE removed the later duplicate and left non-lead_overdue rows alone;\n- the index was built;\n- a duplicate insert raised a unique violation on idx_notifications_lead_overdue_once.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, before and after the pre-commit eslint/prettier pass.\n- Standalone strict tsc over overdue.ts and overdue.test.ts: no errors.\n- `npx vitest run supabase/functions/scheduled-maintenance`: 2 files, 25 tests passed (23 of them in the new overdue.test.ts). Re-run after the pre-commit hook: same result.\n- `npx vitest run supabase/functions/scheduled-maintenance supabase/functions/_shared src/schema-references.test.ts src/edge-function-routing.test.ts`: 23 files, 232 tests passed.\n- `npm run verify:migrations`: OK, 57 migration files structurally valid.\n- Migration on a local Postgres 16: DELETE 1, CREATE INDEX, then a duplicate insert was rejected with a unique violation as expected.\n- Not run: deno check of index.ts, because deno is not installed here (CI runs it), and verify:schema, because no Postgres with the full baseline is available.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration 20261107000309_lead_overdue_once.sql. It deletes duplicate lead_overdue notification rows, keeping the earliest per lead, then adds a unique partial index | Rebuild the functions.agentbio.net Coolify app so scheduled-maintenance ships with the new overdue.ts\n\nCloses US-292."
+    },
+    {
+      "id": "US-318",
+      "lane": "enterprise",
+      "round": 2,
+      "title": "Overdue chaser: honour the agent's quiet hours and timezone",
+      "description": "The chaser emails at any hour of the day or night. Once agents have a stored timezone, hold the email until local working hours while still claiming the notification in-app.",
+      "acceptanceCriteria": [
+        "No chase email between 21:00 and 07:00 in the agent's own timezone",
+        "The in-app notification is still created on time"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs a product decision on quiet hours, and a timezone column if one does not exist yet. (follow-up from US-309)"
+    },
+    {
+      "id": "US-310",
+      "lane": "marketing",
+      "round": 2,
+      "title": "The homepage and /for-real-estate-agents advertised time-zone detection, video testimonials, behaviour-based lead scoring and a $39 price, none of which exist",
+      "description": "Slice 2 of US-143, which closes open story US-294. I checked every feature-card claim on the homepage, the benefits block on the homepage and /for-real-estate-agents against the code. False claims were removed or reworded. docs/product/FEATURES_README.md was a stale quick-start guide for a billing system the repo never had. It is now a table that maps each claim to the file that implements it. A static test keeps the removed phrases out and checks that every file the table names exists.",
+      "acceptanceCriteria": [
+        "Each feature-card claim on Landing.tsx, AgentTestimonials.tsx and ForRealEstateAgents.tsx maps to an implementing file listed in docs/product/FEATURES_README.md",
+        "Claims with no implementation are removed or reworded: time zone detection, Google Calendar support, video testimonials, property videos, Story vs Post tracking, scoring 'based on behavior', MLS attribution, timed load claims, the 43% stat, 'verified credentials', 'Top Agents'",
+        "The comparison-table price comes from PRICING_PLANS, not a hard-coded $39",
+        "src/landing-claims.test.ts fails if a known-false phrase returns or a file named in the table is deleted"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Base: the worktree started on main (80eb63c), which predates the loop branch. Before making any change I reset it to claude/continuous-improvement-loops-fx2ob1 (21c8b0d), the base the other r2 lanes use.\n\nEvidence (line numbers before the change):\n- src/pages/public/Landing.tsx:314 and :471 said \"Time zone (auto-)detection for out-of-area buyers\". No AgentBio code detects a visitor's time zone. Calendly does, but that is Calendly's feature.\n- Landing.tsx:461 said \"Lead scoring: Hot/Warm/Cold based on behavior\". src/lib/ml-lead-scoring.ts:27-36 says the behavioural inputs were removed in US-105 because nothing records them. The same line claimed \"Instagram Story vs Post vs DM\" tracking. src/lib/leadAttribution.ts reads UTM tags and the referrer only.\n- Landing.tsx:476 and ForRealEstateAgents.tsx:211 claimed video testimonials. The testimonials Row in types.ts has no video column. Landing.tsx:304 claimed \"property videos\"; listings has virtual_tour_url and nothing for video.\n- ForRealEstateAgents.tsx:205 claimed \"Google Calendar support\". The only Google Calendar link is the open-house add-to-calendar in src/lib/openHouseCalendar.ts.\n- Landing.tsx:466 claimed \"MLS attribution\" and \"Fair Housing disclaimers\". Only the MLS number (ListingDetailModal.tsx:251) and the Equal Housing statement (FullProfilePage.tsx:673-714) exist.\n- Landing.tsx:342 had an unsourced statistic (\"43% of real estate referrals...\"). Landing.tsx:352, :371, :378 and :481 made timing claims nobody measured (\"under 2 seconds\", \"Instant load\", \"5+ seconds\").\n- AgentTestimonials.tsx said \"verified credentials\", but nothing verifies a license number. The showcase heading said \"See How Top Agents Use AgentBio\", but DemoProfilesShowcase shows any published profile.\n- ForRealEstateAgents.tsx comparison table: agentbio '$39'. No plan costs $39 (PRICING_PLANS has 0/29/49/99/299). The cell now reads \"Free, or from $29\", computed from PRICING_PLANS.\n\nThe claims that stayed were checked and are kept, each with its file in the FEATURES_README table: Calendly booking saved as a lead (CalendlyModal.tsx), listing view stats (useListingViewStats.ts), lead origin (leadAttribution.ts), hot/warm/cold rating (ml-lead-scoring.ts), review link with approval (SubmitReview.tsx, useTestimonials.ts), star ratings (TestimonialCard.tsx), sticky contact bar, and the pre-qualification questions (leadFormSchema.ts).\n\nFiles changed: src/pages/public/Landing.tsx, src/pages/landing/ForRealEstateAgents.tsx, src/components/landing/AgentTestimonials.tsx, docs/product/FEATURES_README.md (rewritten), src/landing-claims.test.ts (new, 5 tests). One mishap: my first draft of the test overwrote the existing src/marketing-claims.test.ts. I restored that file from HEAD before committing, and my test lives in the new landing-claims.test.ts. The committed diff does not touch marketing-claims.test.ts.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output.\n- `npx vitest run src/landing-claims.test.ts src/marketing-claims.test.ts src/config/seo-origin-sources.test.ts src/no-clipped-text.test.ts src/config/pricing-plans.test.ts src/route-weight.test.ts src/test/a11y`: 7 files, 32 tests, all passed.\n- landing-claims.test.ts failed while my own comment still quoted '$39'; after rewording the comment it passed. That failure shows the guard actually fires.\n- `npx eslint` on the 4 changed TS/TSX files: 0 errors and 12 warnings, all no-unescaped-entities style warnings in pre-existing JSX text.\n- The pre-commit hook (eslint --fix plus prettier) passed.\n- No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve\n\nCloses US-294."
+    },
+    {
+      "id": "US-319",
+      "lane": "marketing",
+      "round": 2,
+      "title": "Competitor prices on /for-real-estate-agents are hard-coded and unsourced",
+      "description": "The ForRealEstateAgents comparison table states Linktree $24 and Beacons $10 a month, with nothing behind either figure. Competitor pricing changes and is a comparative-advertising risk. Source and date the figures, or remove the price row for competitors.",
+      "acceptanceCriteria": ["Each competitor price is removed, or shown with a source and a date"],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-310)"
+    },
+    {
+      "id": "US-311",
+      "lane": "seo",
+      "round": 2,
+      "title": "City-page FAQ answers match the page, and stop claiming an MLS sync",
+      "description": "Fixes the open finding that verify:seo fails 23 /for/{city} pages with \"FAQPage answer is not on the page\". LocationTemplate wrote its five FAQ answers twice, once as FAQPage JSON-LD and once as JSX, and the two copies drifted apart. US-157 corrected the pricing answer in the schema, but the visible answer still said there was a free trial and that every plan had unlimited listings. Neither is true. Google was being shown an answer that visitors could not see on the page. Separately, the MLS answer said AgentBio \"integrates with major MLS and IDX providers\" and can \"automatically sync\" listings. No MLS or IDX integration exists. That claim appeared on 26 city pages and inside a rich result.",
+      "acceptanceCriteria": [
+        "Every /for/{city} page's FAQPage JSON-LD questions and answers are byte-identical to the visible FAQ section (one source list)",
+        "The real auditStructuredData FAQPage rule reports no problems for any of the LOCATIONS pages",
+        "No city-page answer claims MLS/IDX integration, a free trial, or unlimited listings on all plans",
+        "Plan facts in the pricing/customisation answers derive from PRICING_PLANS",
+        "marketing-claims guard catches 'integrates with (major) MLS/IDX'"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence: in src/pages/landing/LocationTemplate.tsx at HEAD, the FAQPage mainEntity (around lines 129-178) says \"free plan with 3 active listings ... Paid plans start at $29/month\". The visible FAQ section (around lines 584-592) said \"pricing starts at $29/month with a free trial. All plans include unlimited property listings\". The rule that fails is scripts/lib/seo-audit.mjs:384-391 (answer probe). The MLS answer was at lines 153-157 and 576-582 at HEAD. The only listing import is CSV (src/components/listings/CSVUploadDialog.tsx, which has an mls_number column). Free plan listings=3, Starter $29 without customDomain, Professional with customDomain, Starter+ customThemes (src/config/pricing-plans.ts:81-221).\n\nWhat changed:\n1. New src/pages/landing/locationFaq.ts. buildLocationFaqs(city) returns {question, answer}[]. Plan facts come from PRICING_PLANS: free listing count, cheapest paid price, first plan with a custom domain, first plan with custom themes. The MLS answer now honestly says listings are added by hand or imported from CSV. The customisation answer no longer promises fonts and backgrounds on every plan. It now says premium themes come with Starter and above.\n2. LocationTemplate.tsx builds both the FAQPage mainEntity and the rendered FAQ section from this one list (faqs.map), so the two can no longer drift.\n3. New scripts/lib/location-faq.test.ts renders every LOCATIONS city page in jsdom with HelmetProvider and MemoryRouter. It waits until Helmet has written the JSON-LD, so a page with no schema cannot pass by default. It then runs the real auditStructuredData and asserts there are no FAQPage problems. It also checks that the schema and the visible answers are identical, that there is exactly one FAQPage node, and that the plan facts are derived from PRICING_PLANS. Run against the old template, it fails 24 of 29 tests with exactly \"FAQPage answer is not on the page: \\\"AgentBio has a free plan with 3 active listin…\\\"\", the same message verify:seo gives.\n4. src/marketing-claims.test.ts: the MLS rule now also matches \"integrates with (major|popular) MLS/IDX\", and the line from the old template is added as a must-fail sample. The old rule only matched \"MLS integration\".\n\nVERIFIED: npx tsc --noEmit: exit 0 (also re-run after the lint-staged prettier pass, still exit 0).\nnpx vitest run scripts/lib/location-faq.test.ts: 29/29 passed. Against the HEAD LocationTemplate: 24 failed, 5 passed, with the verify:seo message.\nnpx vitest run scripts/lib src/spa-routes.test.ts src/no-clipped-text.test.ts src/config: 12 files, 153 passed, 1 skipped.\nnpx vitest run src/pages/landing src/lib: 53 files, 548 passed.\nnpx vitest run src/marketing-claims.test.ts: 4/4 passed.\nAfter the commit: npx vitest run scripts/lib/location-faq.test.ts src/marketing-claims.test.ts scripts/lib/seo-audit.test.ts: 3 files, 84 passed.\nNot run: a full `npm run build` + `npm run verify:seo` (that needs the Chromium prerender). The new test runs the same auditStructuredData rule over the rendered page instead.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-320",
+      "lane": "seo",
+      "round": 2,
+      "title": "City-page 'direct answer' paragraph claims CRM integrations and per-neighbourhood analytics",
+      "description": "The GEO 'Direct Answer' paragraph on every /for/{city} page (src/pages/landing/LocationTemplate.tsx, the section after the hero) says the platform 'integrates with popular CRM systems used by {city} real estate professionals' and 'provides detailed analytics to track which {city} neighborhoods and property types generate the most engagement'. AI answer engines are likely to quote this paragraph. The only CRM hand-off is a Zapier webhook (profiles.zapier_webhook_url), and analytics are not broken down by neighbourhood. Rewrite it to match what ships, and add a guard pattern.",
+      "acceptanceCriteria": [
+        "Direct-answer paragraph names only shipped capabilities (Zapier hand-off, not CRM integrations; no per-neighbourhood analytics)",
+        "marketing-claims guard catches 'integrates with popular CRM'",
+        "tsc and vitest pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Found while doing US-311; left out of scope to keep that change to the FAQ. (follow-up from US-311)"
+    },
+    {
+      "id": "US-312",
+      "lane": "mobile",
+      "round": 2,
+      "title": "The installed app opened offline to the homepage, or a blank screen after a deploy, instead of the route the agent had already visited",
+      "description": "US-300 slice, done as US-312. The service worker in public/sw.js now saves the HTML of every same-origin page that loads successfully. It goes in a capped cache, agentbio-sw-pages-v1, keyed by path. When offline, a page is served in this order: the copy saved for that exact path, then the precached /index.html, then /offline.html, then a 503. Separately, src/lib/sw-cleanup.ts now logs through logger instead of console.",
+      "acceptanceCriteria": [
+        "Successful same-origin navigations are saved in agentbio-sw-pages-v1, capped at 30 entries with the oldest dropped first (tested)",
+        "Offline order is the exact path, then '/index.html', then '/offline.html', then 503 (tested)",
+        "Redirected, non-200, non-HTML and Cache-Control no-store responses are never saved. Navigations under /auth go straight to the network and are never saved (tested)",
+        "The cache key is origin + path with the query string dropped, so utm/ref/session_id variants share one entry (tested)",
+        "The pages cache survives a new worker version and is trimmed on activate (tested)",
+        "sw-cleanup.ts has no console calls; everything goes through logger (tested)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Setup: the worktree started at 80eb63c, which is older than round 1. Before working I fast-forwarded it to claude/continuous-improvement-loops-fx2ob1 (21c8b0d), the same base the other round-2 lanes use. US-300 and US-301 were only in /home/user/plain-page-link/prd.json, not in the stale worktree copy.\n\nWhy it matters: before this change, networkFirstNavigation in public/sw.js answered every offline navigation with caches.match(request) or '/index.html'. The worker only precaches APP_SHELL ('/', '/index.html', '/offline.html', '/manifest.json'), not the JS files that page loads. So after any deploy, the precached /index.html points at a new entry file the phone has never downloaded, and opening the installed app offline gave a blank screen. A page's own saved HTML points at the JS files that loaded with it, and those sit in agentbio-sw-runtime-v1 (US-272).\n\nThe note on US-300 asked me to check main.tsx: it mounts with ReactDOM.createRoot(...).render (src/main.tsx, around line 76) and never calls hydrateRoot. So serving one route's saved HTML is safe, because React renders whatever URL it is on.\n\nChanges:\n- /home/user/plain-page-link/.claude/worktrees/wf_00174b25-d3a-10/public/sw.js:\n  - Adds the PAGES cache with a cap of 30 in MAX_ENTRIES.\n  - New pageKey() builds the key from origin + path.\n  - New isCacheablePage() saves only a 200 HTML response that was not redirected, is basic or default, and is not marked no-store.\n  - networkFirstNavigation(event, request, url) saves pages through event.waitUntil(store(...)) and uses the new offline order.\n  - activate keeps PAGES and trims it. It is unversioned, like RUNTIME and IMAGES.\n- /home/user/plain-page-link/.claude/worktrees/wf_00174b25-d3a-10/src/sw.test.ts: 9 new tests in 'offline pages for visited routes (US-312)'. The request() helper now strips mode and destination before calling new Request, because Node rejects mode 'navigate'.\n- /home/user/plain-page-link/.claude/worktrees/wf_00174b25-d3a-10/src/lib/sw-cleanup.ts: console.log/error replaced with logger.debug/info/error, with the URL passed as context.\n- /home/user/plain-page-link/.claude/worktrees/wf_00174b25-d3a-10/src/lib/sw-cleanup.test.ts (new):\n  - The app worker and its agentbio-sw-* caches, including pages-v1, are kept; the legacy firebase worker and the workbox cache are removed.\n  - console.log is never called.\n  - A failure goes to logger.error and returns false.\n\nI did not edit prd.json or progress.txt, and did not push.\n\nVERIFIED: - npx tsc --noEmit: exit 0, before and after lint-staged reformatted the files at commit.\n- npx vitest run src/sw.test.ts: 21/21 passed (12 before, 9 new).\n- npx vitest run src/lib/sw-cleanup.test.ts src/sw.test.ts src/deployed-files.test.ts src/lib/register-sw: 4 files, 40 tests passed.\n- npx vitest run src/lib src/sw.test.ts src/deployed-files.test.ts src/pages/auth: 63 files, 631 tests passed.\n- After the commit-time format, npx vitest run src/sw.test.ts src/lib/sw-cleanup.test.ts src/deployed-files.test.ts: 36 passed.\n- No migration, so verify:migrations was not run.\n- git branch -f loop/r2-mobile HEAD points at 003b097f82eeec7001f6921806a919dda5a47dc5.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages. The next build stamps a new sw.js VERSION, so installed PWAs pick up the new worker. Nothing else to apply.\n\nCloses US-300."
+    },
+    {
+      "id": "US-321",
+      "lane": "mobile",
+      "round": 2,
+      "title": "Precache the shell's own entry JS and CSS so a never-visited route also opens offline after a deploy",
+      "description": "The worker precaches '/index.html' but not the /assets entry files it points at. After a deploy, a route the visitor never opened still falls back to an /index.html whose entry file was never downloaded, which gives a blank screen. At install time, parse the precached index.html for its module script and stylesheet hrefs (or have the sw-build-version plugin inject the entry file names) and add them to PRECACHE.",
+      "acceptanceCriteria": [
+        "After install, PRECACHE holds index.html plus every /assets file its <script type=module> and <link rel=stylesheet|modulepreload> tags name",
+        "Offline navigation to a route never visited renders the app, not a blank page (covered in src/sw.test.ts)",
+        "A file that fails to download does not fail the install"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-312)"
+    },
+    {
+      "id": "US-322",
+      "lane": "security",
+      "round": 2,
+      "title": "Agents can rewrite the data of their own notification rows",
+      "description": "The baseline policy 'Users update own notifications' lets an agent UPDATE any column of their notifications, including data written by the system (e.g. lead_overdue payloads). Restrict updates to read/dismiss state.",
+      "acceptanceCriteria": [
+        "Owner can mark read/dismiss only; other columns refused",
+        "verify:schema check",
+        "tsc and tests pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Finding from round 2."
+    },
+    {
+      "id": "US-323",
+      "lane": "mobile",
+      "round": 2,
+      "title": "The service worker treats any route starting with /auth as never-cache, including agent pages like /authorname",
+      "description": "public/sw.js isNeverCache uses p.startsWith('/auth'); match '/auth' or '/auth/' only.",
+      "acceptanceCriteria": [
+        "/authorname is cached like any profile; /auth and /auth/* are not",
+        "test"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Finding from round 2."
+    },
+    {
+      "id": "US-324",
+      "lane": "marketing",
+      "round": 2,
+      "title": "US-143 slice: Landing FAQ and hero copy still lean on vague 'MLS compliance features'",
+      "description": "LANDING_FAQS in src/pages/public/Landing.tsx (the first and third answers, which also go out in FAQPage JSON-LD) and the ForRealEstateAgents comparison row 'MLS Compliance' say 'MLS compliance'. What ships is the MLS number on each listing, the Equal Housing logo and statement, and the license number. Reword them to name those, and keep the visible FAQ text and the JSON-LD in sync.",
+      "acceptanceCriteria": [
+        "No marketing page says 'MLS compliance' without naming what it consists of",
+        "FAQPage JSON-LD answers match the visible text"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-310)"
     }
   ]
 }

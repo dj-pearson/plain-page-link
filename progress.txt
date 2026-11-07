@@ -5109,3 +5109,75 @@ Other findings (not yet stories):
 
 Owner decision 2026-11-07: no native iOS/Android apps yet; the mobile lane works on the PWA only (recorded in docs/improvement-loops/LANES.md).
 Owner decisions 2026-11-07: push notifications removed (leftovers deleted: sw-cleanup allowlist, _headers rule, functions README, CLAUDE.md, deploy audit); silent service-worker updates stay as they are.
+
+---
+
+## Continuous improvement loop — round 2 — 2026-11-07 (US-303 to US-312 done)
+
+Ten lanes, one improvement each, all approved by an independent reviewer with
+no fix-ups needed. Closed open slices US-274, US-277, US-282, US-285, US-287, US-292, US-294, US-300, US-302.
+Three lane worktrees (profile, seo, uiux) started from main instead of the
+loop branch; their single commits still merged cleanly and the full suite
+passes. The round script now resets each worktree onto the loop branch first.
+Final: tsc clean, 1778 unit tests pass (from 1649), verify:migrations OK,
+vite build OK. verify:schema runs in CI only.
+
+- US-303 [listings] Reopening a listing on the public profile inflated its view count
+- US-304 [leads] Quick responses only filled the notes box. Follow-ups had no priority, meetings could not be logged, and wrong timeline entries could not be removed (US-277, done as US-304)
+- US-305 [profile] Page-builder templates published invented sales figures and fake client reviews under the agent's name
+- US-306 [uiux] API keys page: a failed load looked like 'no keys', the buttons had no names, and a blocked copy lost the one-time key without saying so
+- US-307 [performance] Public profile no longer waits a third round trip for branding and open houses
+- US-308 [security] An unpublished agent's listings, links, reviews and open houses were still readable by anyone
+- US-309 [enterprise] Overdue-lead chaser stopped chasing once 500 old leads piled up, re-sent reminders hourly, and ignored the 1-hour SLA
+- US-310 [marketing] The homepage and /for-real-estate-agents advertised time-zone detection, video testimonials, behaviour-based lead scoring and a $39 price, none of which exist
+- US-311 [seo] City-page FAQ answers match the page, and stop claiming an MLS sync
+- US-312 [mobile] The installed app opened offline to the homepage, or a blank screen after a deploy, instead of the route the agent had already visited
+
+Owner actions:
+- US-305: Deploy Cloudflare Pages (frontend only; no migration, no edge function change)
+- US-308: Apply migration 20261107000308_unpublished_agent_content_private.sql. It contains only policies and SQL functions, so it can go before or after the frontend deploy. Nothing needs redeploying.
+- US-308: Make sure the verify-backend CI job runs on this branch. The full verify:schema could not run in this sandbox; the new check was only exercised against PGlite.
+- US-309: Apply migration 20261107000309_lead_overdue_once.sql. It deletes duplicate lead_overdue notification rows, keeping the earliest per lead, then adds a unique partial index
+- US-309: Rebuild the functions.agentbio.net Coolify app so scheduled-maintenance ships with the new overdue.ts
+- US-312: Redeploy Cloudflare Pages. The next build stamps a new sw.js VERSION, so installed PWAs pick up the new worker. Nothing else to apply.
+
+Opened:
+- US-313 [leads] System timeline rows should be undeletable in the database, not just hidden in the UI
+- US-314 [leads] Assigned agents cannot log calls, emails or notes on leads routed to them
+- US-315 [profile] Page-builder template link buttons promise downloads that do not exist
+- US-316 [profile] Reuse the public profile's already-fetched figures in page-builder blocks
+- US-317 [security] increment_link_clicks should not count clicks for an unpublished page
+- US-318 [enterprise] Overdue chaser: honour the agent's quiet hours and timezone
+- US-319 [marketing] Competitor prices on /for-real-estate-agents are hard-coded and unsourced
+- US-320 [seo] City-page 'direct answer' paragraph claims CRM integrations and per-neighbourhood analytics
+- US-321 [mobile] Precache the shell's own entry JS and CSS so a never-visited route also opens offline after a deploy
+- US-322 [security] Agents can rewrite the data of their own notification rows
+- US-323 [mobile] The service worker treats any route starting with /auth as never-cache, including agent pages like /authorname
+
+Other findings:
+- [listings] The dedupe is client-side only. Someone who rotates visitor_id or calls the REST endpoint directly can still insert up to 30 listing_view events per minute (supabase/migrations/20260902000012_analytics_counters.sql:172-178). listing_view_stats also reports visitors_30d (distinct visitor_id), which resists this, so a server-side once-per-visitor-per-listing-per-day check in the throttle trigger would be the hardening step if inflation is ever seen in data.
+- [leads] src/hooks/useLeadActivities.ts:299-323 logMeeting builds its title with nested ternaries and does not update leads.contacted_at, unlike log_lead_activity, which does for 'meeting'. A logged meeting therefore does not count as first contact. Routing it through log_lead_activity, or setting contacted_at, would make it consistent.
+- [leads] src/hooks/useLeadActivities.ts:132 fetches lead_activities with select('*'). That is allowed (no column grants), but it goes against the CLAUDE.md guideline to select only the columns needed.
+- [leads] Quick responses stay hard-coded in src/lib/leadQuickResponses.ts. Agent-editable templates would need a table and a product decision on whether they are per-agent or per-team.
+- [leads] US-278 (one status vocabulary, CHECK on leads.status) is still blocked on the owner deciding whether 'nurturing' and 'closed' are real statuses.
+- [profile] Every template's contact form tells the visitor 'Thank you! I'll be in touch within 24 hours.' (src/lib/pageTemplates.ts:109, ~596). That is a response-time promise made on the agent's behalf. Consider neutral copy, or tie it to public_agent_response_hours.
+- [profile] src/components/pageBuilder/blocks/ListingsBlock.tsx runs select('*') on listings from the public page (around line 72); it should name its columns like usePublicProfile does.
+- [profile] StatsBlock 'cards' and other page-builder blocks still have a few craft-floor tells (stat labels used uppercase tracking, which I removed in StatsBlock; HeroBlock and CTABlock use a gradient variant). Worth an impeccable detect pass in the uiux lane.
+- [uiux] src/pages/dashboard/ApiKeysPage.tsx: the warning box above a new key uses hard-coded amber-50/amber-300/amber-800 colours with no dark-mode variant, so it shows as a bright patch in dark mode. It should use theme tokens.
+- [uiux] src/pages/dashboard/ApiKeysPage.tsx: 'Done' throws away the one-time key without warning, even if it was never copied. It should confirm when the key was never copied.
+- [performance] The list_public_open_houses prefetch runs even when the agent hides listings (settings.show_listings === false, FullProfilePage.tsx:595), where UpcomingOpenHouses never mounts. That costs one small RPC, cached for 5 minutes, in exchange for not waiting on settings. Making it conditional would bring the serial wait back.
+- [security] src/components/admin/CreateSocialPostDialog.tsx:42-48 selects listings with status = active and no user_id filter. It is an admin screen, so admin RLS gives it every agent's rows, but it is the only browser query that lists listings across agents.
+- [security] src/hooks/useSecureListings.ts:69 and src/components/pageBuilder/blocks/ListingsBlock.tsx:73 use select('*') on listings, which goes against the CLAUDE.md rule to select only the columns you need. This is a performance issue, not a security one.
+- [security] The owner's preview of an unpublished page (usePublicProfile) does not filter out is_sample rows, so an owner who has sample data sees it in the preview. Visitors never do.
+- [enterprise] supabase/functions/scheduled-maintenance/digests.ts:52-71: profiles are read with .limit(5000) and leads/tasks with .limit(5000) and no error-free paging. Leads and tasks are global queries across all agents, so a busy day silently drops some agents' digest items (US-293).
+- [enterprise] Users can UPDATE their own notifications rows, data included (baseline policy 'Users update own notifications'). An agent could rewrite a lead_overdue row's data.lead_id and get that lead chased again. That only affects the agent themselves, so I left it, but a column-limited UPDATE grant (read_at only) would be tidier.
+- [enterprise] The chaser's 7-day look-back is a constant (LOOKBACK_HOURS in overdue.ts). If the scheduler is down for more than about 6 days, leads that crossed their SLA in that gap are never chased. That seems right: they are no longer news.
+- [marketing] src/pages/public/Landing.tsx (demo section) and src/components/landing/DemoProfilesShowcase.tsx both render an h2 and a section with id="demo-profiles". That gives the page duplicate ids and two stacked headings ('Agent Pages on AgentBio' then 'Meet Our Agents'). This is the uiux/seo lanes' scope.
+- [marketing] DemoProfilesShowcase.tsx shows the agent's raw theme key as a badge (profile.theme) on the public homepage. That looks like a code name leaking into the UI, the same class of problem US-270 fixed on the pricing cards.
+- [marketing] src/lib/geo.ts:210 cites '43% of buyers find agents through online sources (NAR, 2025)'. It has a source, but someone should confirm the NAR figure.
+- [marketing] US-295 (/features/* overclaims), US-296 (dead USAGE_PRICING in pricing-plans.ts, which also prices SMS) and US-297 (emails_per_month meter) are still open in this lane.
+- [seo] src/pages/landing/LocationTemplate.tsx direct-answer section: 'integrates with popular CRM systems' and per-neighbourhood engagement analytics are not shipped features (only a Zapier webhook exists).
+- [seo] src/pages/landing/LocationTemplate.tsx: the marketing-claims guard (src/marketing-claims.test.ts) scans one line at a time, so the old visible 'with a free\n trial' got past it because JSX wrapped it onto two lines. Other multi-line JSX copy can slip through the same way.
+- [mobile] public/sw.js isNeverCache uses p.startsWith('/auth'), which also matches any public route beginning with /auth, e.g. a username 'authorname' at /authorname. Such pages are never cached and fall back to /index.html offline. Matching '/auth/' or '/auth' exactly would be stricter. I left it alone because it is existing behaviour.
+- [mobile] src/lib/sw-cleanup.ts cleanupAndReload, called from src/pages/auth/Login.tsx, reloads the page whenever a non-agentbio cache exists. Any third-party cache on the origin would trigger a reload on every login visit until it is deleted. It is deleted on the first pass, so this is low risk.
+- US-324 [marketing] US-143 slice: Landing FAQ and hero copy still lean on vague 'MLS compliance features'
