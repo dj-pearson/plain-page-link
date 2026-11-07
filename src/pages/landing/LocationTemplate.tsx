@@ -6,6 +6,7 @@ import { Helmet } from 'react-helmet-async';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { SEO_CONFIG, getBaseUrl, getOgImageUrl } from '@/config/seo.config';
 import { getFeaturedLocations, type LocationData } from '@/data/locations';
+import { buildLocationFaqs } from './locationFaq';
 
 // Re-export LocationData for backward compatibility
 export type { LocationData } from '@/data/locations';
@@ -36,6 +37,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
 
   // Get related locations for internal linking
   const featuredLocations = getFeaturedLocations(slug, 6);
+
+  // One list for the FAQPage schema and the visible FAQ section.
+  const faqs = buildLocationFaqs(city);
 
   // Enhanced schema with more structured data
   const schema = {
@@ -130,48 +134,11 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
       {
         '@type': 'FAQPage',
         '@id': `${canonicalUrl}#faq`,
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: `How do ${city} real estate agents use AgentBio?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `${city} real estate agents use AgentBio as their Instagram link in bio to showcase ${city} property listings, capture local buyer and seller leads, and book consultations. The platform is optimized for mobile traffic from Instagram and includes features specifically for real estate professionals.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            name: `Can I showcase ${city} property listings on AgentBio?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `Yes! AgentBio allows ${city} agents to display property listing cards with photos, addresses, prices, and details. You can update listings instantly when properties go pending or sell, ensuring your ${city} followers always see current inventory.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            name: `Does AgentBio work with ${city} MLS systems?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `AgentBio integrates with major MLS and IDX providers used in ${city}. You can automatically sync your active ${city} listings or manually add properties with photos and details.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            name: `How much does AgentBio cost for ${city} agents?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `AgentBio has a free plan with 3 active listings, lead capture forms and analytics. Paid plans start at $${SEO_CONFIG.pricing.startingPrice}/month and add more listings, a custom domain and a longer analytics history—perfect for growing ${city} real estate businesses.`,
-            },
-          },
-          {
-            '@type': 'Question',
-            name: `Can I customize my AgentBio page for ${city} branding?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `Absolutely! You can customize colors, fonts, logos, and background images to match your personal brand or brokerage guidelines. Many ${city} agents maintain consistent branding across Instagram, their website, and AgentBio.`,
-            },
-          },
-        ],
+        mainEntity: faqs.map(({ question, answer }) => ({
+          '@type': 'Question',
+          name: question,
+          acceptedAnswer: { '@type': 'Answer', text: answer },
+        })),
       },
     ],
   };
@@ -546,62 +513,15 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
               Frequently Asked Questions
             </h2>
 
+            {/* Rendered from the same list as the FAQPage schema, so the
+                answer Google is shown is the answer on the page (US-311). */}
             <div className="space-y-6">
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  How do {city} real estate agents use AgentBio?
-                </h3>
-                <p className="text-muted-foreground">
-                  {city} real estate agents use AgentBio as their Instagram link in bio to showcase{' '}
-                  {city} property listings, capture local buyer and seller leads, and book
-                  consultations. The platform is optimized for mobile traffic from Instagram and
-                  includes features specifically for real estate professionals.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Can I showcase {city} property listings on AgentBio?
-                </h3>
-                <p className="text-muted-foreground">
-                  Yes! AgentBio allows {city} agents to display property listing cards with photos,
-                  addresses, prices, and details. You can update listings instantly when properties
-                  go pending or sell, ensuring your {city} followers always see current inventory.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Does AgentBio work with {city} MLS systems?
-                </h3>
-                <p className="text-muted-foreground">
-                  AgentBio integrates with major MLS and IDX providers used in {city}. You can
-                  automatically sync your active {city} listings or manually add properties with
-                  photos and details.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  How much does AgentBio cost for {city} agents?
-                </h3>
-                <p className="text-muted-foreground">
-                  AgentBio pricing starts at ${SEO_CONFIG.pricing.startingPrice}/month with a free
-                  trial. All plans include unlimited property listings, lead capture forms, calendar
-                  booking, and analytics—perfect for growing {city} real estate businesses.
-                </p>
-              </div>
-
-              <div className="glass-panel p-6">
-                <h3 className="font-bold text-lg mb-2">
-                  Can I customize my AgentBio page for {city} branding?
-                </h3>
-                <p className="text-muted-foreground">
-                  Absolutely! You can customize colors, fonts, logos, and background images to match
-                  your personal brand or brokerage guidelines. Many {city} agents maintain
-                  consistent branding across Instagram, their website, and AgentBio.
-                </p>
-              </div>
+              {faqs.map(({ question, answer }) => (
+                <div key={question} className="glass-panel p-6">
+                  <h3 className="font-bold text-lg mb-2">{question}</h3>
+                  <p className="text-muted-foreground">{answer}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
