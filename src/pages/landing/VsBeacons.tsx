@@ -13,7 +13,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: "What's the difference between AgentBio and Beacons for real estate agents?",
     answer:
-      "AgentBio is built specifically for real estate agents with property listing galleries, real estate lead capture forms, calendar booking for showings, and MLS compliance. Beacons is designed for content creators and influencers with email marketing and store features that aren't relevant for real estate workflows.",
+      "AgentBio is built specifically for real estate agents with property listing galleries, real estate lead capture forms, calendar booking for showings, and the MLS number on each listing. Beacons is designed for content creators and influencers with email marketing and store features that aren't relevant for real estate workflows.",
   },
   {
     question: 'Is AgentBio better than Beacons for realtors?',
@@ -53,7 +53,7 @@ export default function VsBeacons() {
         url: getCanonicalUrl('/vs/beacons'),
         name: 'AgentBio vs Beacons for Real Estate Agents: Detailed Comparison',
         description:
-          'Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and MLS compliance.',
+          'Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and Equal Housing, license and MLS number disclosures.',
       },
       faqPageSchema(FAQ_ENTRIES),
     ],
@@ -63,7 +63,7 @@ export default function VsBeacons() {
     <>
       <SEOHead
         title="AgentBio vs Beacons for Real Estate Agents: Which to Choose?"
-        description="Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and MLS compliance."
+        description="Compare AgentBio and Beacons for real estate agents. While Beacons offers creator tools, AgentBio provides real estate-specific features like property listings, lead capture, and Equal Housing, license and MLS number disclosures."
         keywords={[
           'AgentBio vs Beacons',
           'Beacons for real estate agents',
@@ -83,12 +83,12 @@ export default function VsBeacons() {
             <div className="max-w-4xl mx-auto">
               <p className="text-base md:text-lg glass-body leading-relaxed">
                 <strong>AgentBio is better than Beacons for real estate agents</strong> because it's
-                purpose-built for real estate workflows with property listing galleries, MLS
-                compliance, real estate-specific lead capture forms, and showing appointment
-                booking. While Beacons offers advanced features like email marketing and online
-                stores, these creator-focused tools aren't relevant for real estate agents who need
-                to showcase properties and capture buyer/seller leads, not sell digital products or
-                courses.
+                purpose-built for real estate workflows with property listing galleries, the MLS
+                number on each listing, real estate-specific lead capture forms, and showing
+                appointment booking. While Beacons offers advanced features like email marketing and
+                online stores, these creator-focused tools aren't relevant for real estate agents
+                who need to showcase properties and capture buyer/seller leads, not sell digital
+                products or courses.
               </p>
             </div>
           </div>
@@ -164,10 +164,10 @@ export default function VsBeacons() {
                     description="Showcase active & sold listings with photos, prices, beds/baths"
                   />
                   <ComparisonRow
-                    feature="MLS Compliance"
+                    feature="Listing Disclosures"
                     agentbio={true}
                     beacons={false}
-                    description="Equal Housing logo, license number display, MLS attribution"
+                    description="Equal Housing logo, license number display, MLS number on each listing"
                   />
                   <ComparisonRow
                     feature="Real Estate Lead Forms"
@@ -330,8 +330,9 @@ export default function VsBeacons() {
                       intent information.
                     </p>
                     <p className="glass-body leading-relaxed">
-                      <strong>No MLS compliance:</strong> Missing Equal Housing logo, license number
-                      display, and proper attributions can create legal compliance issues.
+                      <strong>No listing disclosures:</strong> No Equal Housing logo, no license
+                      number display and no place for an MLS number, which most advertising rules
+                      expect you to show.
                     </p>
                   </div>
                 </div>
@@ -343,9 +344,9 @@ export default function VsBeacons() {
                   </h3>
                   <div className="pl-9 space-y-3">
                     <p className="glass-body leading-relaxed">
-                      <strong>Purpose-built property galleries:</strong> Showcase unlimited listings
-                      with full photo galleries, prices, bed/bath counts, square footage, and "Just
-                      Listed" or "Sold" badges.
+                      <strong>Purpose-built property galleries:</strong> Showcase your listings with
+                      full photo galleries, prices, bed/bath counts, square footage, and Active,
+                      Pending or Sold badges.
                     </p>
                     <p className="glass-body leading-relaxed">
                       <strong>Real estate-specific lead forms:</strong> Capture buyer budget,
@@ -357,9 +358,9 @@ export default function VsBeacons() {
                       book showing times directly. No more phone tag or missed opportunities.
                     </p>
                     <p className="glass-body leading-relaxed">
-                      <strong>MLS compliance built-in:</strong> Automatic Equal Housing logo,
-                      customizable license number placement, and proper broker attribution keep you
-                      compliant.
+                      <strong>Disclosures on your page:</strong> The Equal Housing Opportunity logo
+                      and statement, your license number and state, and the MLS number on each
+                      listing. Your broker and MLS have the final word on anything else.
                     </p>
                   </div>
                 </div>
@@ -421,7 +422,7 @@ export default function VsBeacons() {
                     <li>• Real estate agents showcasing listings</li>
                     <li>• Capturing qualified buyer/seller leads</li>
                     <li>• Booking showing appointments</li>
-                    <li>• MLS compliance requirements</li>
+                    <li>• Equal Housing, license and MLS number disclosures</li>
                     <li>• Real estate-specific analytics</li>
                   </ul>
                 </div>

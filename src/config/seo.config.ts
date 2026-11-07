@@ -211,7 +211,7 @@ export const PAGE_SEO_TEMPLATES = {
     beacons: {
       title: 'AgentBio vs Beacons | Real Estate Bio Page Comparison',
       description:
-        'Compare AgentBio to Beacons for real estate agents. Property listings, lead capture, and MLS compliance built for real estate.',
+        'Compare AgentBio to Beacons for real estate agents. Property listings, lead capture, and the disclosures real estate pages need.',
       keywords: ['AgentBio vs Beacons', 'Beacons alternative', 'bio page for real estate agents'],
     },
     later: {
@@ -237,8 +237,7 @@ export const PRICING_TIERS = [
   },
   {
     name: 'Professional',
-    description:
-      'Unlimited listings, lead capture forms, calendar booking, and advanced analytics for growing agents.',
+    description: `${PRICING_PLANS.find((plan) => plan.name === 'Professional')?.limits.listings ?? 0} listings, lead capture forms, calendar booking, and advanced analytics for growing agents.`,
     // Was '39' on a node named "Professional". Professional is 49. Schema
     // that names a plan and misprices it is a false claim about our own
     // product, published to search (US-157).
@@ -246,7 +245,7 @@ export const PRICING_TIERS = [
     priceCurrency: 'USD',
     billingPeriod: 'P1M',
     features: [
-      'Unlimited property listings',
+      `${PRICING_PLANS.find((plan) => plan.name === 'Professional')?.limits.listings ?? 0} property listings`,
       'Lead capture forms',
       'Calendar booking integration',
       'Advanced analytics',
@@ -303,7 +302,7 @@ export const COMPARISON_DATA = {
     agentbio: {
       name: 'AgentBio',
       description:
-        'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
+        'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and Equal Housing, license and MLS number disclosures.',
       url: 'https://agentbio.net',
       price: SEO_STARTING_PRICE,
       rating: '4.8',
@@ -321,7 +320,7 @@ export const COMPARISON_DATA = {
     agentbio: {
       name: 'AgentBio',
       description:
-        'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
+        'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and Equal Housing, license and MLS number disclosures.',
       url: 'https://agentbio.net',
       price: SEO_STARTING_PRICE,
       rating: '4.8',
@@ -339,7 +338,7 @@ export const COMPARISON_DATA = {
     agentbio: {
       name: 'AgentBio',
       description:
-        'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and MLS compliance.',
+        'Purpose-built link-in-bio platform for real estate agents with property galleries, lead capture, calendar booking, and Equal Housing, license and MLS number disclosures.',
       url: 'https://agentbio.net',
       price: SEO_STARTING_PRICE,
       rating: '4.8',

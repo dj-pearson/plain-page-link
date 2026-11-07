@@ -290,7 +290,12 @@ export default function ForRealEstateAgents() {
                       linktree: false,
                       beacons: false,
                     },
-                    { feature: 'MLS Compliance', agentbio: true, linktree: false, beacons: false },
+                    {
+                      feature: 'MLS # on each listing',
+                      agentbio: true,
+                      linktree: false,
+                      beacons: false,
+                    },
                     {
                       feature: 'Price (monthly)',
                       agentbio: AGENTBIO_PRICE_CELL,

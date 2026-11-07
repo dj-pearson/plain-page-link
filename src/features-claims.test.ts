@@ -83,7 +83,39 @@ const PAGE_FALSE: Record<string, Array<{ pattern: RegExp; why: string }>> = {
     { pattern: /industry average/i, why: 'unsourced benchmark' },
     { pattern: /Maria Lopez|David Kim/, why: 'invented agents' },
   ],
+  // US-355: the last /features slice of US-295.
+  'PropertyListings.tsx': [
+    {
+      pattern: /unlimited (properties|property listings|listings on pro)|pro plan/i,
+      why: 'Professional allows 25 listings; only Team and above are unlimited',
+    },
+    { pattern: /monthly payment/i, why: 'the listing shows no payment estimate' },
+    { pattern: /price reduc|just listed/i, why: 'there is no price-reduced or just-listed badge' },
+    { pattern: /year built|HOA/i, why: 'year built and HOA fees are not shown on the page' },
+    { pattern: /neighbo(u)?rhood information|amenities/i, why: 'no neighbourhood data' },
+    { pattern: /close dates|before\/after/i, why: 'sold_date is not shown; no before/after view' },
+    { pattern: /MLS attribution|fair housing disclaimer/i, why: 'neither is rendered' },
+    { pattern: /GDPR/i, why: 'not an attestation anyone has made' },
+  ],
 };
+
+/**
+ * "MLS compliance" promised something nobody could point at (US-324). What the
+ * public page shows is the Equal Housing Opportunity logo and statement, the
+ * license number and state, and the MLS number on each listing; marketing copy
+ * names those instead.
+ */
+const MLS_COMPLIANCE_FILES = [
+  'src/pages/public/Landing.tsx',
+  'src/pages/public/Press.tsx',
+  'src/pages/landing/ForRealEstateAgents.tsx',
+  'src/pages/landing/VsBeacons.tsx',
+  'src/pages/landing/VsLinktree.tsx',
+  'src/pages/landing/VsLater.tsx',
+  'src/pages/landing/LocationTemplate.tsx',
+  'src/config/seo.config.ts',
+  'src/lib/faq-schema.ts',
+];
 
 const FAQ_FALSE: Array<{ pattern: RegExp; why: string }> = [
   { pattern: /integrates with google calendar/i, why: 'no Google Calendar integration' },
@@ -94,6 +126,11 @@ const FAQ_FALSE: Array<{ pattern: RegExp; why: string }> = [
     why: 'clients can submit reviews at /:username/review',
   },
   { pattern: /create different appointment types/i, why: 'appointment types live in Calendly' },
+  {
+    pattern: /unlimited (property )?listings/i,
+    why: 'listings are a plan limit; the allowance comes from listingAllowanceSummary()',
+  },
+  { pattern: /\$39/, why: 'no plan costs $39; prices come from PRICING_PLANS' },
 ];
 
 const find = (text: string, rules: Array<{ pattern: RegExp; why: string }>) =>
@@ -121,6 +158,14 @@ describe('/features/* pages claim only what ships', () => {
     const text = visibleText(readFileSync(join(ROOT, 'src/lib/faq-schema.ts'), 'utf8'));
     expect(find(text, [...ALL_PAGES_FALSE, ...FAQ_FALSE])).toEqual([]);
   });
+
+  for (const file of [...MLS_COMPLIANCE_FILES, 'src/pages/features/PropertyListings.tsx']) {
+    it(`${file} does not say "MLS compliance" without naming what it is`, () => {
+      const text = visibleText(readFileSync(join(ROOT, file), 'utf8'));
+      const hits = [...text.matchAll(/.{0,60}MLS complian.{0,40}/gi)].map((m) => m[0]);
+      expect(hits).toEqual([]);
+    });
+  }
 
   it('strips comments but keeps copy JSX wrapped across lines', () => {
     const src = `{/* SMS was here */}\n// SMS too\n<p>Buyer gets email and\n  SMS reminder</p> https://x.test`;

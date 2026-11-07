@@ -5,6 +5,29 @@
  * (Google SGE, Perplexity, ChatGPT) extract and cite answers.
  */
 
+import { PRICING_PLANS, listingAllowanceSummary } from '@/config/pricing-plans';
+
+/*
+ * Plan facts in these answers come from PRICING_PLANS (US-355). The answers
+ * said "unlimited property listings" (Professional allows 25, only Team and
+ * above are unlimited), "Paid plans start at $39/month" (Starter is $29) and
+ * "the $39/month Professional plan" (it is $49).
+ */
+const planPrice = (id: string): number => {
+  const plan = PRICING_PLANS.find((p) => p.id === id);
+  if (!plan) throw new Error(`faq-schema: no pricing plan "${id}"`);
+  return plan.price_monthly;
+};
+const FREE_PLAN = PRICING_PLANS.find((p) => p.price_monthly === 0);
+const FIRST_PAID_PRICE = Math.min(
+  ...PRICING_PLANS.filter((p) => p.price_monthly > 0).map((p) => p.price_monthly)
+);
+const LISTING_ALLOWANCE = listingAllowanceSummary();
+
+/** What the public page shows that an MLS or state advertising rule usually asks for. */
+const DISCLOSURES =
+  'the Equal Housing Opportunity logo and statement, your license number and the MLS number on each listing';
+
 export interface FAQItem {
   question: string;
   answer: string;
@@ -96,8 +119,7 @@ export const FEATURE_FAQS = {
   propertyListings: [
     {
       question: 'How many property listings can I showcase on AgentBio?',
-      answer:
-        'AgentBio allows real estate agents to showcase unlimited property listings on their bio page. You can display active listings, pending sales, and sold properties to demonstrate your market activity and success.',
+      answer: `It depends on your plan: ${LISTING_ALLOWANCE}. You can display active listings, pending sales, and sold properties to demonstrate your market activity and success.`,
     },
     {
       question: 'Can I sync my MLS listings with AgentBio?',
@@ -180,8 +202,7 @@ export const HOMEPAGE_FAQS: FAQItem[] = [
   },
   {
     question: 'How much does AgentBio cost?',
-    answer:
-      'AgentBio offers a free plan with 3 listings and 5 links. Paid plans start at $39/month with unlimited listings, lead capture forms, calendar integration, and analytics. Enterprise plans with white-label and custom domain are $299/month.',
+    answer: `AgentBio offers a free plan with ${FREE_PLAN?.limits.listings} listings and ${FREE_PLAN?.limits.links} links. Paid plans start at $${FIRST_PAID_PRICE}/month and raise the allowances: ${LISTING_ALLOWANCE}. Enterprise, with white-label branding and a custom domain, is $${planPrice('enterprise')}/month.`,
   },
   {
     question: 'How is AgentBio different from Linktree?',
@@ -190,8 +211,7 @@ export const HOMEPAGE_FAQS: FAQItem[] = [
   },
   {
     question: 'Can I showcase property listings on AgentBio?',
-    answer:
-      'Yes. AgentBio lets you showcase unlimited property listings (on paid plans) with full photo galleries, pricing, square footage, beds/baths, MLS numbers, property descriptions, and virtual tour links. Mark properties as active, pending, or sold.',
+    answer: `Yes. AgentBio lets you showcase property listings (${LISTING_ALLOWANCE}) with full photo galleries, pricing, square footage, beds/baths, MLS numbers, property descriptions, and virtual tour links. Mark properties as active, pending, or sold.`,
   },
   {
     question: 'Does AgentBio capture leads?',
@@ -211,13 +231,11 @@ export const HOMEPAGE_FAQS: FAQItem[] = [
 export const PRICING_FAQS: FAQItem[] = [
   {
     question: 'Is there a free plan for AgentBio?',
-    answer:
-      "Yes. AgentBio's free plan includes 3 property listings, 5 custom links, basic analytics, and a mobile-optimized bio page. No credit card required to get started.",
+    answer: `Yes. AgentBio's free plan includes ${FREE_PLAN?.limits.listings} property listings, ${FREE_PLAN?.limits.links} custom links, basic analytics, and a mobile-optimized bio page. No credit card required to get started.`,
   },
   {
-    question: "What's included in the $39/month Professional plan?",
-    answer:
-      'The Professional plan includes unlimited property listings, lead capture forms for buyers/sellers/valuations, calendar booking integration, advanced analytics, custom branding, and QR code generation for marketing materials.',
+    question: `What's included in the $${planPrice('professional')}/month Professional plan?`,
+    answer: `The Professional plan includes ${PRICING_PLANS.find((p) => p.id === 'professional')?.limits.listings} property listings, unlimited links, lead capture forms for buyers/sellers/valuations, calendar booking, advanced analytics, custom branding, and QR code generation for marketing materials.`,
   },
   {
     question: 'Can I cancel my AgentBio subscription anytime?',
@@ -226,8 +244,7 @@ export const PRICING_FAQS: FAQItem[] = [
   },
   {
     question: 'Is AgentBio cheaper than a traditional real estate website?',
-    answer:
-      'Yes. Traditional real estate websites cost $3,000-$15,000 upfront plus $100-$300/month for hosting and maintenance. AgentBio starts at $39/month with no setup fees and includes hosting, updates, and support.',
+    answer: `Yes. Traditional real estate websites cost $3,000-$15,000 upfront plus $100-$300/month for hosting and maintenance. AgentBio's paid plans start at $${FIRST_PAID_PRICE}/month with no setup fees and include hosting, updates, and support.`,
   },
 ];
 
@@ -238,8 +255,7 @@ export const COMPARISON_FAQS = {
   linktree: [
     {
       question: 'Is AgentBio better than Linktree for real estate agents?',
-      answer:
-        "Yes. AgentBio is purpose-built for real estate with property galleries, lead forms, and MLS compliance. Linktree is a generic link tool that doesn't support listing photos, buyer inquiries, or appointment booking — features critical for real estate lead generation.",
+      answer: `Yes. AgentBio is purpose-built for real estate with property galleries, lead forms, and ${DISCLOSURES}. Linktree is a generic link tool that doesn't support listing photos, buyer inquiries, or appointment booking — features critical for real estate lead generation.`,
     },
     {
       question: 'Can Linktree display property listings like AgentBio?',
@@ -256,7 +272,7 @@ export const COMPARISON_FAQS = {
     {
       question: 'How does AgentBio compare to Beacons for real estate?',
       answer:
-        "Beacons is designed for content creators and e-commerce. AgentBio is built specifically for real estate agents with property galleries, MLS compliance, lead scoring, and appointment booking — features Beacons doesn't offer.",
+        "Beacons is designed for content creators and e-commerce. AgentBio is built specifically for real estate agents with property galleries, the MLS number on each listing, lead scoring, and appointment booking — features Beacons doesn't offer.",
     },
     {
       question: 'Can Beacons handle property listings?',

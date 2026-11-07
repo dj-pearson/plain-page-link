@@ -29,7 +29,7 @@ const LANDING_FAQS = [
   {
     question: 'What is a real estate bio page?',
     answer:
-      'A real estate bio page is a mobile-optimized landing page specifically designed for real estate agents to showcase their property listings, capture buyer and seller leads, and book showing appointments. Unlike generic link-in-bio tools, real estate bio pages include features like property galleries, lead capture forms, MLS compliance, and appointment booking\u2014all optimized for converting social media followers into qualified leads.',
+      'A real estate bio page is a mobile-optimized landing page specifically designed for real estate agents to showcase their property listings, capture buyer and seller leads, and book showing appointments. Unlike generic link-in-bio tools, real estate bio pages include features like property galleries, lead capture forms, the Equal Housing Opportunity logo with your license number, and appointment booking\u2014all optimized for converting social media followers into qualified leads.',
   },
   {
     question: 'How do real estate agents use Instagram for leads?',
@@ -39,7 +39,7 @@ const LANDING_FAQS = [
   {
     question: "What's the difference between AgentBio and Linktree?",
     answer:
-      'Linktree is a generic link organization tool, while AgentBio is purpose-built for real estate agents. AgentBio includes property listing galleries, lead capture forms with pre-qualification questions, sold property showcase, client testimonials, MLS compliance features, and appointment booking integration. You also get lead tracking, analytics on which listings get the most interest, and mobile optimization specifically designed for real estate marketing.',
+      'Linktree is a generic link organization tool, while AgentBio is purpose-built for real estate agents. AgentBio includes property listing galleries, lead capture forms with pre-qualification questions, sold property showcase, client testimonials, the Equal Housing Opportunity logo, your license number and the MLS number on each listing, and appointment booking integration. You also get lead tracking, analytics on which listings get the most interest, and mobile optimization specifically designed for real estate marketing.',
   },
   {
     question: 'How much does a real estate agent website cost?',
@@ -49,7 +49,7 @@ const LANDING_FAQS = [
   {
     question: 'Can I showcase sold properties on my bio page?',
     answer:
-      'Yes! Showcasing sold properties is one of the most powerful social proof elements for real estate agents. AgentBio lets you create a dedicated sold properties section with photos, addresses, sale prices, and closing dates. This demonstrates your track record and expertise to potential clients browsing your Instagram bio page.',
+      'Yes! Showcasing sold properties is one of the most powerful social proof elements for real estate agents. AgentBio lets you show sold properties alongside your active listings, each with its photos, address and sale price. This demonstrates your track record and expertise to potential clients browsing your Instagram bio page.',
   },
   {
     question: 'How do I capture leads with AgentBio?',
@@ -460,7 +460,7 @@ export default function Landing() {
               />
               <FeatureCard
                 icon={<Target className="h-8 w-8" aria-hidden="true" />}
-                title="MLS Compliance"
+                title="Listing Disclosures"
                 description="Equal Housing Opportunity logo and statement on your page. License number and state displayed. MLS number shown on each listing."
               />
               <FeatureCard

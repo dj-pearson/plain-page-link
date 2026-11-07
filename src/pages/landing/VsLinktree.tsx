@@ -15,7 +15,7 @@ const FAQ_ENTRIES: FaqEntry[] = [
   {
     question: "What's the difference between AgentBio and Linktree for real estate agents?",
     answer:
-      'AgentBio includes property listing galleries with photos and pricing, real estate-specific lead capture forms, calendar booking for showings, testimonials display, and MLS compliance features. Linktree only offers basic link organization without these real estate features.',
+      'AgentBio includes property listing galleries with photos and pricing, real estate-specific lead capture forms, calendar booking for showings, testimonials display, and the Equal Housing logo with your license number and the MLS number on each listing. Linktree only offers basic link organization without these real estate features.',
   },
   {
     question: 'Is AgentBio better than Linktree for realtors?',
@@ -82,10 +82,10 @@ export default function VsLinktree() {
                 <strong>AgentBio is better than Linktree for real estate agents</strong> because it
                 includes property listing galleries with photos and pricing, real estate-specific
                 lead capture forms, calendar booking for showing appointments, testimonials display,
-                and MLS compliance features—capabilities that generic link-in-bio tools like
-                Linktree simply don't offer. Linktree works for general link organization, but
-                AgentBio is purpose-built for converting Instagram followers into qualified buyer
-                and seller leads.
+                and the Equal Housing logo with your license number—capabilities that generic
+                link-in-bio tools like Linktree simply don't offer. Linktree works for general link
+                organization, but AgentBio is purpose-built for converting Instagram followers into
+                qualified buyer and seller leads.
               </p>
             </div>
           </div>
@@ -204,10 +204,10 @@ export default function VsLinktree() {
                       description: 'Prioritize leads based on engagement',
                     },
                     {
-                      feature: 'MLS Compliance',
+                      feature: 'Listing Disclosures',
                       agentbio: true,
                       linktree: false,
-                      description: 'Equal Housing logo, license number display',
+                      description: 'Equal Housing logo, license number, MLS # on each listing',
                     },
                     {
                       feature: 'Virtual Tour Integration',
@@ -330,7 +330,7 @@ export default function VsLinktree() {
               <ReasonCard
                 icon={<Home />}
                 title="No Real Estate-Specific Features"
-                description="MLS compliance, sold properties showcase, testimonials, and virtual tour integration are all missing from generic link tools. AgentBio includes everything real estate agents need."
+                description="Equal Housing and license disclosures, sold properties showcase, testimonials, and virtual tour integration are all missing from generic link tools. AgentBio includes everything real estate agents need."
               />
 
               <ReasonCard
