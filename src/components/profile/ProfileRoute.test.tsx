@@ -44,7 +44,14 @@ vi.mock('@/stores/useAuthStore', () => ({
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: (table: string) => builder(table),
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    // A database without get_public_profile_page (US-329): the table-read
+    // fallback, whose request order is what these tests pin down.
+    rpc: (name: string) =>
+      Promise.resolve(
+        name === 'get_public_profile_page'
+          ? { data: null, error: { code: 'PGRST202', message: 'Could not find the function' } }
+          : { data: null, error: null }
+      ),
   },
 }));
 

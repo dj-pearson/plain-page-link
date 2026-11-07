@@ -50,6 +50,13 @@ vi.mock('@/integrations/supabase/client', () => {
       from: (table: string) => (table === 'profiles' ? profiles() : related(table)),
       rpc: async (name: string) => {
         h.calls.push(`rpc:${name}`);
+        // These cases cover the table-read fallback (no get_public_profile_page
+        // on the database); usePublicProfile.rpc.test.tsx covers the one call.
+        if (name === 'get_public_profile_page')
+          return {
+            data: null,
+            error: { code: 'PGRST202', message: 'Could not find the function' },
+          };
         if (name === 'profile_shows_branding') return { data: h.showsBranding, error: null };
         if (name === 'list_public_open_houses') return { data: h.openHouses, error: null };
         return { data: null, error: null };
@@ -103,7 +110,8 @@ describe('public profile side reads (US-307)', () => {
 
     // Both come after the profile row (they need its id) and alongside the
     // six related reads, not after them.
-    expect(h.calls[0]).toBe('profiles');
+    expect(h.calls[0]).toBe('rpc:get_public_profile_page');
+    expect(h.calls[1]).toBe('profiles');
 
     h.release?.();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

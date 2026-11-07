@@ -13,6 +13,10 @@
  * the hooks find the request already in flight (or finished) and do not issue
  * another.
  *
+ * Since US-329 both answers normally arrive inside get_public_profile_page's
+ * single payload, and usePublicProfile seeds them under these keys instead;
+ * the prefetch above remains for the table-read fallback.
+ *
  * This module is imported by usePublicProfile, which is in the entry graph.
  * Keep it as light as that file: the Supabase client, react-query and the
  * logger only — no edge-function, pii or lead helpers.
