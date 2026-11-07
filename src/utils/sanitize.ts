@@ -143,8 +143,8 @@ const BARE_HOST =
  * test as a protocol-relative URL to another host.
  *
  * Now the value is cleaned the way the browser cleans it, then parsed, and
- * only http(s), mailto and tel survive. A same-site path ("/blog") is kept; a
- * bare host gets https:// in front.
+ * only http(s), mailto and tel survive. A same-site path ("/blog") and a
+ * same-page fragment ("#contact") are kept; a bare host gets https:// in front.
  *
  * @param url - Untrusted URL string
  * @returns A safe URL, or an empty string when the input must not be used
@@ -159,6 +159,10 @@ export const sanitizeUrl = (url: string | null | undefined): string => {
   if (cleaned.startsWith('/')) {
     return /^\/[/\\]/.test(cleaned) ? '' : cleaned;
   }
+
+  // A same-page fragment ("#contact", the page-builder CTA default). It
+  // cannot change the scheme or the origin, so it is kept as-is.
+  if (cleaned.startsWith('#')) return cleaned;
 
   let candidate = '';
   if (/^[a-z][a-z0-9+.-]*:/i.test(cleaned) && !BARE_HOST.test(cleaned)) {

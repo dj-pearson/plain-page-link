@@ -54,6 +54,15 @@ describe('sanitizeUrl', () => {
     expect(sanitizeUrl('/blog/first-home')).toBe('/blog/first-home');
   });
 
+  it('keeps a same-page fragment (the page-builder CTA default)', () => {
+    expect(sanitizeUrl('#contact')).toBe('#contact');
+    expect(sanitizeUrl('  #contact  ')).toBe('#contact');
+  });
+
+  it('does not treat a fragment as an external URL', () => {
+    expect(sanitizeExternalUrl('#contact')).toBe('');
+  });
+
   it('trims surrounding whitespace', () => {
     expect(sanitizeUrl('  https://example.com/x  ')).toBe('https://example.com/x');
   });
