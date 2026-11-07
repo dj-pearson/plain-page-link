@@ -115,6 +115,15 @@ describe('_headers', () => {
     ).toBeGreaterThan(jsIndex);
   });
 
+  it('does not let the immutable rule reach the unhashed scripts in public/scripts (US-272)', () => {
+    const scriptsIndex = rules.indexOf('/scripts/*');
+    expect(scriptsIndex, '/scripts/* needs its own rule').toBeGreaterThan(-1);
+    expect(scriptsIndex).toBeGreaterThan(rules.indexOf('/*.js'));
+    const block = source.slice(source.indexOf('\n/scripts/*\n') + 1).split('\n\n')[0];
+    expect(block).toMatch(/Cache-Control: public, max-age=0, must-revalidate/);
+    expect(block).not.toMatch(/immutable/);
+  });
+
   it('never declares source code to be executable script', () => {
     // The narrow property, rather than "every rule matches something today".
     // A rule for /*.jpg that nothing currently matches costs nothing and is

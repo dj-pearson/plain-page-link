@@ -1,26 +1,49 @@
-/* AgentBio Service Worker (US-027)
+/* AgentBio Service Worker (US-027, US-272)
  *
  * Implemented with the native Cache Storage API rather than the bundled
  * Workbox runtime: the index.html CSP `script-src` does not allow the
- * Workbox CDN and this Vite setup has no service-worker build step
- * (files in public/ are served verbatim, not processed). The strategies
- * below mirror Workbox's CacheFirst / StaleWhileRevalidate / NetworkFirst.
- * The workbox-* packages are installed for a future build-time
- * injectManifest approach.
+ * Workbox CDN and this Vite setup has no service-worker bundling step
+ * (files in public/ are served verbatim; the only build-time change is the
+ * VERSION stamp below). The strategies mirror Workbox's CacheFirst /
+ * StaleWhileRevalidate / NetworkFirst.
  *
  * SAFETY (critical): this SW NEVER caches authentication or Supabase
  * traffic. A prior production incident was caused by a service worker
- * caching auth requests (see repo root AUTH_BROKEN_*.md). Anything that
+ * caching auth requests (the write-up is no longer in the repo). Anything that
  * looks like auth/Supabase/an authorized request is passed straight to
  * the network with no caching. sw-cleanup.ts allowlists this SW and its
  * caches while still purging unknown/legacy service workers.
+ *
+ * src/sw.test.ts runs this file against a fake Cache Storage.
  */
 
 const CACHE_PREFIX = 'agentbio-sw-';
-const VERSION = 'v1';
+
+// Replaced with a per-build id by the `sw-build-version` plugin in
+// vite.config.ts (US-272). public/ is copied verbatim, so before that this
+// file was byte-identical on every deploy: the browser never saw a new
+// service worker, the precached '/' and '/index.html' stayed the copies from
+// the day a visitor first installed it, and the offline fallback served a
+// homepage naming chunks several deploys gone. A new VERSION on each deploy
+// makes the browser install a new worker, which re-precaches the shell and
+// drops the previous precache on activate. 'dev' is what an unbuilt copy
+// carries.
+const VERSION = 'dev';
 const PRECACHE = `${CACHE_PREFIX}precache-${VERSION}`;
-const RUNTIME = `${CACHE_PREFIX}runtime-${VERSION}`;
-const IMAGES = `${CACHE_PREFIX}images-${VERSION}`;
+
+// The runtime caches are deliberately NOT per-deploy. A tab opened before a
+// deploy still lazy-loads the old build's chunks, and Cloudflare Pages stops
+// serving those the moment the new deploy is live, so the cached copy can be
+// the only one left. They are kept across versions and bounded by entry count
+// instead (trimCache) — which is what they were missing: every hashed chunk of
+// every deploy a visitor had loaded stayed on their phone for good. The names
+// are unchanged from US-027 so existing caches are adopted and trimmed rather
+// than orphaned.
+const RUNTIME = `${CACHE_PREFIX}runtime-v1`;
+const IMAGES = `${CACHE_PREFIX}images-v1`;
+
+/** Entry caps. The entry and route chunks of one build an agent touches is ~60. */
+const MAX_ENTRIES = { [RUNTIME]: 150, [IMAGES]: 80 };
 
 const APP_SHELL = ['/', '/index.html', '/offline.html', '/manifest.json'];
 
@@ -48,11 +71,60 @@ function isNeverCache(request, url) {
   );
 }
 
-function isStaticAsset(url) {
-  return (
-    url.pathname.startsWith('/assets/') ||
-    /\.(?:js|css|woff2?|ttf|otf)$/.test(url.pathname)
-  );
+/**
+ * Vite's output under /assets/ carries a content hash in its name, so a
+ * cached copy can never be stale. Only these are CacheFirst.
+ */
+function isHashedAsset(url) {
+  return url.pathname.startsWith('/assets/');
+}
+
+/**
+ * Same-origin scripts and stylesheets whose URL does NOT change when their
+ * content does — /scripts/analytics.js is the one that ships today.
+ *
+ * These used to be CacheFirst alongside the hashed chunks, so a returning
+ * visitor ran the first copy of analytics.js their browser ever saw, for as
+ * long as the worker lived. That file is the cookie-consent gate in front of
+ * Google Analytics: a fix to it never reached anyone who already had the
+ * worker. NetworkFirst serves the deployed copy whenever there is a network
+ * and keeps the cached one for offline.
+ *
+ * The network fetch is made with cache: 'no-cache'. Until /scripts/* got its
+ * own header, analytics.js was served under the /*.js rule with
+ * `max-age=31536000, immutable`, so every visitor who loaded it before then
+ * holds that copy in the browser HTTP cache. A plain fetch() from the worker
+ * is answered from that entry for up to a year; 'no-cache' makes the browser
+ * revalidate with the server first, so the deployed copy reaches them too.
+ */
+function isUnhashedCode(url) {
+  return /\.(?:js|mjs|css)$/.test(url.pathname);
+}
+
+function isFont(url) {
+  return /\.(?:woff2?|ttf|otf)$/.test(url.pathname);
+}
+
+/**
+ * Drop the oldest entries past the cap. Cache.keys() returns entries in
+ * insertion order, so this is first-in-first-out: the chunks of the build
+ * running now were put most recently and are the last to go.
+ */
+async function trimCache(cacheName) {
+  const max = MAX_ENTRIES[cacheName];
+  if (!max) return;
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  const excess = keys.length - max;
+  for (let i = 0; i < excess; i++) {
+    await cache.delete(keys[i]);
+  }
+}
+
+async function store(cacheName, request, response) {
+  const cache = await caches.open(cacheName);
+  await cache.put(request, response);
+  await trimCache(cacheName);
 }
 
 self.addEventListener('install', (event) => {
@@ -80,6 +152,9 @@ self.addEventListener('activate', (event) => {
             .map((k) => caches.delete(k))
         )
       )
+      // A visitor who installed the worker before US-272 carries an unbounded
+      // runtime cache; bring it under the cap now rather than at the next put.
+      .then(() => Promise.all([trimCache(RUNTIME), trimCache(IMAGES)]))
       .then(() => self.clients.claim())
   );
 });
@@ -91,26 +166,46 @@ self.addEventListener('message', (event) => {
   }
 });
 
-async function cacheFirst(request, cacheName) {
+// Each strategy hands its cache write to event.waitUntil. A write nothing
+// waits on can be cut off when the browser stops an idle worker, and the trim
+// after it would never run.
+async function cacheFirst(event, request, cacheName) {
   const cached = await caches.match(request);
   if (cached) return cached;
   const response = await fetch(request);
   if (response && response.ok) {
-    const cache = await caches.open(cacheName);
-    cache.put(request, response.clone());
+    event.waitUntil(store(cacheName, request, response.clone()));
   }
   return response;
 }
 
-async function staleWhileRevalidate(request, cacheName) {
+async function networkFirst(event, request, cacheName) {
+  try {
+    // Revalidate past any year-long immutable HTTP-cache entry (see isUnhashedCode).
+    const response = await fetch(request, { cache: 'no-cache' });
+    if (response && response.ok) {
+      event.waitUntil(store(cacheName, request, response.clone()));
+    }
+    return response;
+  } catch (error) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    throw error;
+  }
+}
+
+async function staleWhileRevalidate(event, request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
   const network = fetch(request)
     .then((response) => {
-      if (response && response.ok) cache.put(request, response.clone());
+      if (response && response.ok) {
+        return store(cacheName, request, response.clone()).then(() => response);
+      }
       return response;
     })
     .catch(() => cached);
+  event.waitUntil(network.then(() => undefined));
   return cached || network;
 }
 
@@ -147,12 +242,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (isStaticAsset(url)) {
-    event.respondWith(cacheFirst(request, RUNTIME));
+  if (isHashedAsset(url)) {
+    event.respondWith(cacheFirst(event, request, RUNTIME));
+    return;
+  }
+
+  if (isFont(url)) {
+    event.respondWith(staleWhileRevalidate(event, request, RUNTIME));
+    return;
+  }
+
+  if (isUnhashedCode(url)) {
+    event.respondWith(networkFirst(event, request, RUNTIME));
     return;
   }
 
   if (request.destination === 'image') {
-    event.respondWith(staleWhileRevalidate(request, IMAGES));
+    event.respondWith(staleWhileRevalidate(event, request, IMAGES));
   }
 });
