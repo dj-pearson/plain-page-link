@@ -33,8 +33,10 @@ const ALLOWED_FILES = [
   'components/tools/instagram-bio-analyzer/BioAnalyzerForm.tsx',
   'components/tools/instagram-bio-analyzer/EmailCaptureModal.tsx',
   'components/tools/listing-description-generator/EmailCaptureModal.tsx',
-  // Describes what the testimonial widget can display, not our rating.
-  'pages/features/Testimonials.tsx',
+  // pages/features/Testimonials.tsx was exempt here ("describes what the
+  // testimonial widget can display"). The exemption hid four unsourced
+  // statistics, a "3x more" claim about AgentBio and two invented, named
+  // "Real Testimonial Examples". US-332 removed them and the exemption.
   // Blog FAQ copy about the housing market — "school districts command premium
   // prices (10-20% higher)", "FSBO sells for about 10% higher with an agent".
   // These are claims about real estate, not about AgentBio, and the rules here

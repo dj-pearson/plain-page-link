@@ -1,26 +1,34 @@
 import * as React from 'react';
 import { getCanonicalUrl } from '@/config/seo.config';
 import { Link } from 'react-router-dom';
-import { Star, Users, Video, MessageSquare, Check, Trophy } from 'lucide-react';
+import { Star, Link2, MessageSquare, Check, ShieldCheck } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
 
 export default function Testimonials() {
+  // Every capability below is something the testimonials feature does today
+  // (US-332, slice 3 of US-143): star rating and average, name / photo / title,
+  // review text, transaction and property type, date, featured-first ordering,
+  // the /:username/review submission link (submit-review, unpublished until the
+  // agent approves it) and Review markup on the public page. There is no video
+  // column, no "success story" format, and the testimonial count is a plan
+  // limit, so none of those is claimed. The four unsourced statistics and the
+  // two named "Real Testimonial Examples" that stood on this page are gone.
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
     name: 'Client Testimonials & Reviews Feature - AgentBio',
     description:
-      'Showcase client reviews, 5-star ratings, and success stories on your real estate bio page. Build instant credibility with social proof.',
+      'Show star-rated client reviews on your real estate bio page, and let clients submit them from your own review link.',
   };
 
   return (
     <>
       <SEOHead
         title="Client Testimonials & Reviews | Build Trust with Social Proof"
-        description="Showcase client reviews, 5-star ratings, and success stories on your real estate bio page. Build instant credibility with social proof."
+        description="Show star-rated client reviews on your real estate bio page, and let clients submit them from your own review link."
         keywords={[
           'real estate testimonials',
           'agent bio with testimonials',
@@ -41,12 +49,12 @@ export default function Testimonials() {
               <p className="text-base md:text-lg glass-body leading-relaxed">
                 <strong>
                   AgentBio's testimonial showcase feature lets real estate agents display client
-                  reviews, 5-star ratings, and success stories
+                  reviews and star ratings
                 </strong>{' '}
-                prominently on their bio page to build instant credibility with new visitors. Unlike
-                generic platforms, AgentBio includes dedicated testimonial sections with photo
-                display, star ratings, client attribution, and video testimonial embedding—all
-                optimized for mobile viewing from Instagram and social media traffic.
+                on their bio page. Clients can submit a review from the agent's own review link; it
+                stays hidden until the agent approves it. The page shows the average star rating and
+                review count, client names, photos and transaction details, laid out for visitors
+                arriving on a phone from Instagram and other social apps.
               </p>
             </div>
           </div>
@@ -56,87 +64,28 @@ export default function Testimonials() {
         <HeroSectionLazy
           title="Client Testimonials & Reviews"
           subtitle="Turn Social Proof into Your Most Powerful Sales Tool"
-          description="Display 5-star reviews, client success stories, and video testimonials that convert skeptical visitors into confident clients."
+          description="Show star ratings and written reviews from past clients, collected from a link you send them and published only when you approve."
           primaryCta={{
             text: 'Start Showcasing Reviews Free',
             href: '/auth/register',
           }}
           secondaryCta={{
-            text: 'See Examples',
-            href: '#examples',
+            text: 'How to Collect Reviews',
+            href: '#collect-reviews',
           }}
           badge={{
             icon: <Star className="h-4 w-4" aria-hidden="true" />,
-            text: 'Unlimited Testimonials',
+            text: 'Client-Submitted Reviews',
           }}
           showStats={false}
         />
 
-        {/* Why Testimonials Matter */}
-        <section className="py-20 bg-background/50">
-          <div className="container mx-auto px-4">
-            <header className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">Why Testimonials Are Your Secret Weapon</span>
-              </h2>
-              <p className="text-xl glass-body max-w-3xl mx-auto">
-                88% of consumers trust online reviews as much as personal recommendations
-              </p>
-            </header>
-
-            <div className="max-w-4xl mx-auto">
-              <div className="grid md:grid-cols-2 gap-8">
-                <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                  <div className="mb-4">
-                    <div className="flex items-center gap-1 mb-2">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                      ))}
-                    </div>
-                    <p className="text-3xl font-light text-foreground">92%</p>
-                  </div>
-                  <p className="glass-body">
-                    of home buyers research agents online before making contact. Your testimonials
-                    are often the first impression.
-                  </p>
-                </div>
-
-                <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                  <div className="mb-4">
-                    <Trophy className="h-12 w-12 text-[#0f766e] mb-2" />
-                    <p className="text-3xl font-light text-foreground">3x</p>
-                  </div>
-                  <p className="glass-body">
-                    Agents with displayed testimonials convert Instagram followers into leads 3x
-                    more than agents without social proof.
-                  </p>
-                </div>
-
-                <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                  <div className="mb-4">
-                    <MessageSquare className="h-12 w-12 text-[#0f766e] mb-2" />
-                    <p className="text-3xl font-light text-foreground">72%</p>
-                  </div>
-                  <p className="glass-body">
-                    of buyers say positive reviews make them trust a business more. Testimonials
-                    overcome the skepticism barrier.
-                  </p>
-                </div>
-
-                <div className="p-8 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                  <div className="mb-4">
-                    <Users className="h-12 w-12 text-[#0f766e] mb-2" />
-                    <p className="text-3xl font-light text-foreground">63%</p>
-                  </div>
-                  <p className="glass-body">
-                    of consumers are more likely to purchase from a site with reviews and ratings.
-                    Testimonials drive action.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* A "Why Testimonials Are Your Secret Weapon" section stood here: four
+            statistics (88%, 92%, 72%, 63%) with no source, and "Agents with
+            displayed testimonials convert Instagram followers into leads 3x
+            more", which is a claim about AgentBio that no query produces.
+            Removed in US-332; this file was exempt from marketing-claims.test.ts,
+            which is how they survived. */}
 
         {/* Testimonial Display Options */}
         <section className="py-20 bg-background">
@@ -153,10 +102,10 @@ export default function Testimonials() {
                 title="5-Star Rating Display"
                 description="Show your overall rating at the top of your profile"
                 features={[
-                  'Aggregate rating from all testimonials',
-                  'Star display (4.8/5.0, 4.9/5.0, etc.)',
-                  'Total review count for credibility',
-                  'Automatically updates as you add reviews',
+                  'Average rating across your published testimonials',
+                  'Shown to one decimal place beside a star',
+                  'Total review count',
+                  'Updates as you publish reviews',
                 ]}
               />
 
@@ -165,35 +114,33 @@ export default function Testimonials() {
                 title="Written Testimonials"
                 description="Full client reviews with names and photos"
                 features={[
-                  'Client name and photo (optional)',
-                  'Full testimonial text',
-                  'Property address or transaction type',
-                  'Date of transaction for recency',
-                  'Direct quotes with formatting',
+                  'Client name, with an optional photo and title',
+                  'Full testimonial text and star rating',
+                  'Transaction type (bought, sold) and property type',
+                  'Date, so visitors can see how recent it is',
+                  'Mark a testimonial as featured to show it first',
                 ]}
               />
 
               <TestimonialType
-                icon={<Video />}
-                title="Video Testimonials"
-                description="Embed video reviews for maximum impact"
+                icon={<Link2 />}
+                title="Client-Submitted Reviews"
+                description="Send clients your review link and let them write it themselves"
                 features={[
-                  'Upload or link to YouTube/Vimeo',
-                  'Thumbnail preview with play button',
-                  'Mobile-optimized video player',
-                  'Video testimonials, for the clients willing to record one',
+                  'Your own review page at agentbio.net/yourname/review',
+                  'Clients choose a star rating and write their review',
+                  'You are notified when a new review arrives',
+                  'Nothing appears on your page until you publish it',
                 ]}
               />
 
               <TestimonialType
-                icon={<Trophy />}
-                title="Success Story Highlights"
-                description="Before/after stories that showcase your results"
+                icon={<ShieldCheck />}
+                title="Search-Ready Markup"
+                description="Reviews on your page are described to search engines"
                 features={[
-                  'Challenge → Solution → Result format',
-                  'Include property photos',
-                  'Specific outcomes (sold in X days, $Y over asking)',
-                  'Turn testimonials into case studies',
+                  'Review and aggregate rating markup built from your published testimonials',
+                  'Only real reviews count: the markup is computed, never typed in',
                 ]}
               />
             </div>
@@ -261,7 +208,7 @@ export default function Testimonials() {
         </section>
 
         {/* How to Request Testimonials */}
-        <section className="py-20 bg-background">
+        <section className="py-20 bg-background" id="collect-reviews">
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
@@ -290,8 +237,8 @@ export default function Testimonials() {
 
               <StepCard
                 number={4}
-                title="Offer Video Option"
-                description="Record a quick video testimonial on their phone. A face and a voice carry more than a paragraph of text."
+                title="Approve and Publish"
+                description="New reviews arrive hidden. Read each one in your dashboard, then publish it to your page when you're happy with it."
               />
 
               <StepCard
@@ -303,67 +250,10 @@ export default function Testimonials() {
           </div>
         </section>
 
-        {/* Examples */}
-        <section className="py-20 bg-background/50" id="examples">
-          <div className="container mx-auto px-4">
-            <header className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">Real Testimonial Examples</span>
-              </h2>
-            </header>
-
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                <div className="flex items-center gap-1 mb-4">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <p className="glass-body italic mb-4">
-                  "We were first-time homebuyers completely overwhelmed by the Austin market. Sarah
-                  not only found us the perfect house in our budget, but she negotiated $12K off the
-                  asking price and got the seller to cover closing costs. She answered our panicked
-                  texts at 10pm and walked us through every confusing document. We can't imagine
-                  having done this with anyone else."
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center text-white font-light">
-                    JM
-                  </div>
-                  <div>
-                    <p className="text-sm font-light text-foreground">John & Mary Thompson</p>
-                    <p className="text-xs text-muted-foreground">Closed March 2024 • Austin, TX</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-                <div className="flex items-center gap-1 mb-4">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <p className="glass-body italic mb-4">
-                  "Mike sold our house in 6 days for $25K over asking with multiple offers. His
-                  staging advice and professional photos made our home stand out. What impressed us
-                  most was his communication—daily updates, quick responses, and honest advice. If
-                  you want results, not excuses, call Mike."
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center text-white font-light">
-                    RC
-                  </div>
-                  <div>
-                    <p className="text-sm font-light text-foreground">Robert Chen</p>
-                    <p className="text-xs text-muted-foreground">
-                      Closed January 2024 • San Francisco, CA
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* A "Real Testimonial Examples" section stood here, quoting "John & Mary
+            Thompson, Closed March 2024, Austin TX" and "Robert Chen, Closed
+            January 2024, San Francisco CA". Neither review was real, and the
+            heading said they were. Removed in US-332. */}
 
         {/* CTA */}
         <section className="py-20 bg-background">
@@ -381,7 +271,7 @@ export default function Testimonials() {
               <span className="glass-accent">Add Your Testimonials Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
-              No credit card required • Unlimited testimonials • Video support
+              No credit card required • Clients submit reviews from your link
             </p>
           </div>
         </section>
