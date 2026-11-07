@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   ChevronLeft,
@@ -26,7 +27,12 @@ import { currentListingShareUrl } from '@/lib/listingShare';
 import { listingStatusBadgeClass } from '@/lib/listingStatus';
 interface FeaturedListingsCarouselProps {
   listings: PublicProfileListing[];
-  onViewDetails?: (listing: PublicProfileListing) => void;
+  /**
+   * The listing's own page (US-408). "View Details" is a real link to it, so
+   * the featured homes are discoverable by a crawler and can be opened in a new
+   * tab. It was a <button> that navigated in an onClick handler.
+   */
+  listingHref?: (listing: PublicProfileListing) => string;
   autoRotate?: boolean;
   interval?: number;
 }
@@ -69,7 +75,7 @@ const unsaveListing = (listingId: string): void => {
 
 export function FeaturedListingsCarousel({
   listings,
-  onViewDetails,
+  listingHref,
   autoRotate = true,
   interval = 4000,
 }: FeaturedListingsCarouselProps) {
@@ -339,13 +345,16 @@ export function FeaturedListingsCarousel({
                 transition={{ delay: 0.5 }}
                 className="flex flex-wrap gap-3"
               >
-                <button
-                  onClick={() => onViewDetails?.(currentListing)}
-                  className="bg-white text-gray-900 px-6 py-3 md:px-8 md:py-4 rounded-lg font-semibold text-sm md:text-base hover:bg-gray-100 transition-all flex items-center gap-2 shadow-lg"
-                >
-                  <Eye className="h-4 w-4 md:h-5 md:w-5" />
-                  View Details
-                </button>
+                {listingHref && (
+                  <Link
+                    to={listingHref(currentListing)}
+                    className="bg-white text-gray-900 px-6 py-3 md:px-8 md:py-4 rounded-lg font-semibold text-sm md:text-base hover:bg-gray-100 transition-all flex items-center gap-2 shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                  >
+                    <Eye className="h-4 w-4 md:h-5 md:w-5" aria-hidden="true" />
+                    View Details
+                    <span className="sr-only">: {currentListing.address || 'this property'}</span>
+                  </Link>
+                )}
                 <button
                   onClick={handleShareClick}
                   className="bg-white/10 backdrop-blur-md text-white px-6 py-3 md:px-8 md:py-4 rounded-lg font-semibold text-sm md:text-base hover:bg-white/20 transition-all border border-white/20 flex items-center gap-2"

@@ -138,10 +138,12 @@ test.describe('Listing page (US-275)', () => {
     await setupMocks(page);
     await page.goto(`/${AGENT.username}`);
 
-    await page
-      .getByRole('button', { name: new RegExp(`View listing:\\s*${FIRST.address}`) })
-      .first()
-      .click();
+    // A real <a href> (US-408): crawlable, and openable in a new tab.
+    const card = page
+      .getByRole('link', { name: new RegExp(`View listing:\\s*${FIRST.address}`) })
+      .first();
+    await expect(card).toHaveAttribute('href', `/${AGENT.username}/listing/${FIRST.id}`);
+    await card.click();
 
     await expect(page).toHaveURL(new RegExp(`/${AGENT.username}/listing/${FIRST.id}$`));
     await expect(heading(page)).toContainText(FIRST.address);

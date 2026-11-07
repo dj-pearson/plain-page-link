@@ -11,6 +11,7 @@
  * variables and this section has to follow that theme.
  */
 import { useEffect, useId, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { format, isSameYear } from 'date-fns';
 import { CalendarPlus, ChevronDown, MapPin } from 'lucide-react';
 import { formatOpenHouseAddress, usePublicOpenHouses } from '@/hooks/useOpenHouses';
@@ -23,7 +24,12 @@ interface UpcomingOpenHousesProps {
   agentId: string;
   agentName?: string | null;
   profileUrl?: string;
-  onViewListing?(listingId: string): void;
+  /**
+   * The page for an open house's listing, or null when it has none to show
+   * (US-408). "View home" is a real link to it; it was a <button> that
+   * navigated in an onClick handler.
+   */
+  listingHref?(listingId: string): string | null;
   /** Only this listing's open houses — the listing page (US-275). */
   listingId?: string;
 }
@@ -175,7 +181,7 @@ export function UpcomingOpenHouses({
   agentId,
   agentName,
   profileUrl,
-  onViewListing,
+  listingHref,
   listingId,
 }: UpcomingOpenHousesProps) {
   const { data } = usePublicOpenHouses(agentId);
@@ -198,6 +204,9 @@ export function UpcomingOpenHouses({
       .join('\n\n'),
     url: profileUrl,
   });
+
+  const homeHref = (oh: UpcomingOpenHouse): string | null =>
+    (oh.listingId && listingHref?.(oh.listingId)) || null;
 
   return (
     <section
@@ -260,14 +269,14 @@ export function UpcomingOpenHouses({
                   Get directions
                 </a>
 
-                {onViewListing && oh.listingId && (
-                  <button
-                    type="button"
-                    onClick={() => oh.listingId && onViewListing(oh.listingId)}
+                {homeHref(oh) && (
+                  <Link
+                    to={homeHref(oh)!}
                     className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     View home
-                  </button>
+                    <span className="sr-only">: {oh.address}</span>
+                  </Link>
                 )}
               </div>
             </div>

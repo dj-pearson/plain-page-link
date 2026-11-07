@@ -6,7 +6,8 @@ import type { PublicProfileListing } from '@/types';
 
 interface SoldPropertiesProps {
   listings: PublicProfileListing[];
-  onListingClick?: (listing: PublicProfileListing) => void;
+  /** Each card's link target — the listing's own page (US-408). */
+  listingHref?: (listing: PublicProfileListing) => string;
   /**
    * Render the "Recent Success Stories" summary above the grid.
    *
@@ -20,7 +21,7 @@ interface SoldPropertiesProps {
 
 export default function SoldProperties({
   listings,
-  onListingClick,
+  listingHref,
   showStats = false,
 }: SoldPropertiesProps) {
   // Every hook before the early return — a hook after it runs on some renders
@@ -93,7 +94,7 @@ export default function SoldProperties({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {(showAll ? soldListings : soldListings.slice(0, 6)).map((listing) => (
             <div key={listing.id} className="relative">
-              <ListingCard listing={listing} onClick={() => onListingClick?.(listing)} />
+              <ListingCard listing={listing} href={listingHref?.(listing)} />
               {/* Sold overlay */}
               <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center pointer-events-none">
                 <div className="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-bold text-2xl transform -rotate-12 shadow-xl">

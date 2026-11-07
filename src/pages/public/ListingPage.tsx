@@ -13,8 +13,8 @@
  * costs no round trip, and arriving cold costs the one read the profile makes
  * (ProfileRoute starts it while this chunk downloads).
  */
-import { lazy, useCallback, useEffect, useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { lazy, useEffect, useState } from 'react';
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ListingDetails, { listingPhotos } from '@/components/profile/ListingDetails';
@@ -69,7 +69,6 @@ export default function ListingPage() {
     listingId: string;
   }>();
   const location = useLocation();
-  const navigate = useNavigate();
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
 
@@ -102,11 +101,6 @@ export default function ListingPage() {
       }
     }
   }, [listingId]);
-
-  const openListing = useCallback(
-    (other: PublicProfileListing) => navigate(listingPagePath(username, other.id)),
-    [navigate, username]
-  );
 
   // One listing, one URL: /JaneDoe/listing/x becomes /janedoe/listing/x.
   if (needsCanonicalRedirect(rawUsername) && listingId) {
@@ -293,7 +287,11 @@ export default function ListingPage() {
               </div>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {moreListings.map((other) => (
-                  <ListingCard key={other.id} listing={other} onClick={() => openListing(other)} />
+                  <ListingCard
+                    key={other.id}
+                    listing={other}
+                    href={listingPagePath(username, other.id)}
+                  />
                 ))}
               </div>
             </section>

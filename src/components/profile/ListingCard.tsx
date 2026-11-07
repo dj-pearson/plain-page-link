@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Bed, Bath, Maximize, MapPin, Heart, Eye, Share2, Star } from 'lucide-react';
 import { formatPrice, parsePrice, formatNumber } from '@/lib/format';
 import { fallBackToOriginal, LISTING_CARD_IMAGE_SIZES, responsiveImage } from '@/lib/images';
@@ -10,7 +11,14 @@ import { currentListingShareUrl } from '@/lib/listingShare';
 import { listingStatusBadgeClass } from '@/lib/listingStatus';
 interface ListingCardProps {
   listing: PublicProfileListing;
-  onClick?: () => void;
+  /**
+   * The listing's own page (`listingPagePath`). The card's control is a real
+   * link to it, so a crawler can follow it from the profile and a visitor can
+   * middle-click or open it in a new tab (US-408). It was a <button> that
+   * navigated in an onClick handler, which offered neither. Without an href the
+   * card renders as a non-interactive summary.
+   */
+  href?: string;
 }
 
 const statusLabels: Record<string, string> = {
@@ -23,7 +31,7 @@ const statusLabels: Record<string, string> = {
 
 const SAVED_LISTINGS_KEY = 'agentbio_saved_listings';
 
-export default function ListingCard({ listing, onClick }: ListingCardProps) {
+export default function ListingCard({ listing, href }: ListingCardProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
@@ -94,17 +102,18 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
   };
 
   return (
-    // A plain container, NOT role="button".
-    //
-    // It was a role=button with two real <button>s nested inside it — invalid,
-    // and a screen reader announces the inner controls as part of a button
-    // whose own label describes the listing. The card's own click target is now
-    // the address link below, so the interactive elements are siblings rather
-    // than nested. The div keeps the click for pointer users (a large target is
-    // genuinely useful) but no longer claims to be a control (US-113).
+    // A plain container, NOT role="button" (US-113): nesting the save and share
+    // buttons inside a control was invalid. The card's one control is the
+    // address link below. Its ::after is stretched over the whole card
+    // (`relative` here, `after:absolute after:inset-0` on the link), so the
+    // large pointer target survives without a click handler on the div — and a
+    // middle-click or long-press anywhere on the card acts on a real link. The
+    // save/share buttons sit above it (z-10) and stay siblings, not children.
     <div
-      onClick={onClick}
-      className="group bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
+      className={cn(
+        'group relative bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm transition-all duration-300',
+        href && 'hover:shadow-xl'
+      )}
     >
       {/* Image Container */}
       <div className="relative h-52 sm:h-56 overflow-hidden">
@@ -164,7 +173,7 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
             exist on a touch device — there is no hover to trigger them — and a
             keyboard user could focus an invisible control. focus-within keeps
             them visible while either is focused (US-113). */}
-        <div className="absolute bottom-3 right-3 flex gap-2 transition-all duration-300 md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:focus-within:translate-y-0 md:focus-within:opacity-100">
+        <div className="absolute bottom-3 right-3 z-10 flex gap-2 transition-all duration-300 md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:focus-within:translate-y-0 md:focus-within:opacity-100">
           <button
             onClick={handleSave}
             className={cn(
@@ -198,22 +207,21 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
         <div className="flex items-start gap-1.5 mb-3">
           <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
           <div className="min-w-0">
-            {/* The card's real control: one button, keyboard-operable by
-                default — so Space works, which the hand-rolled onKeyDown on the
-                container never handled (it checked Enter only). Nothing is
-                nested inside it (US-113). */}
+            {/* The card's real control: one link, nothing nested inside it.
+                Its ::after covers the card, so it is the click target
+                everywhere except the save and share buttons. */}
             <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate group-hover:text-blue-600 transition-colors">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClick?.();
-                }}
-                className="text-left w-full truncate focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
-              >
-                <span className="sr-only">View listing: </span>
-                {address}
-              </button>
+              {href ? (
+                <Link
+                  to={href}
+                  className="block w-full truncate rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 after:absolute after:inset-0 after:content-['']"
+                >
+                  <span className="sr-only">View listing: </span>
+                  {address}
+                </Link>
+              ) : (
+                address
+              )}
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
               {city}
@@ -249,9 +257,19 @@ export default function ListingCard({ listing, onClick }: ListingCardProps) {
 
         {/* View Details prompt */}
         <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-          <span className="text-xs text-gray-600 group-hover:text-blue-600 transition-colors flex items-center gap-1">
-            <Eye className="h-3.5 w-3.5" /> View Details
-          </span>
+          {/* A cue only: the stretched link above is what the click lands on.
+              aria-hidden, or a screen reader reads "View Details" as text that
+              looks like a second control. */}
+          {href ? (
+            <span
+              aria-hidden="true"
+              className="text-xs text-gray-600 group-hover:text-blue-600 transition-colors flex items-center gap-1"
+            >
+              <Eye className="h-3.5 w-3.5" /> View Details
+            </span>
+          ) : (
+            <span />
+          )}
           {sqft > 0 && price > 0 && (
             <span className="text-xs text-gray-600">${Math.round(price / sqft)}/sqft</span>
           )}

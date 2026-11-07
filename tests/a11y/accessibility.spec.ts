@@ -363,9 +363,10 @@ test.describe('Accessibility (axe-core)', () => {
     await assertAppRendered(page, '/demo');
 
     // The card's address is the interactive element (US-113 unnested the two
-    // buttons that used to sit inside a role=button container).
+    // buttons that used to sit inside a role=button container), and a real
+    // link to the listing page since US-408.
     await page
-      .getByRole('button', { name: /View listing:/ })
+      .getByRole('link', { name: /View listing:/ })
       .first()
       .click();
     // A listing opens its own page (US-275), with the address as its h1.
