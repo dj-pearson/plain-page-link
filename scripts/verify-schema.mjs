@@ -2953,6 +2953,122 @@ check('api keys cannot be minted, un-revoked or deleted by their owner', () => {
   return out;
 });
 
+// ---------------------------------------------------------------------------
+// US-413 (US-367): user_mfa_settings and user_sessions are written by edge
+//   functions only. With an aal1 JWT (a password is enough) the owner UPDATE
+//   policies let anyone switch a legacy second factor off, plant backup codes,
+//   reset the TOTP lockout, or un-revoke a session. The browser also no longer
+//   reads totp_secret, backup_codes or session_token_hash.
+// ---------------------------------------------------------------------------
+check('MFA settings and sessions cannot be written by their owner, and their secrets are not browser-readable', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000413a01';
+  const other = '00000000-dead-beef-0000-000000413a02';
+  const sess = '00000000-dead-beef-0000-000000413b01';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${agent}', 'us413a@example.test'), ('${other}', 'us413b@example.test')
+       ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.user_mfa_settings (user_id, mfa_enabled, mfa_method, totp_secret, backup_codes, verified_at, failed_attempts, locked_until)
+         VALUES ('${agent}', true, 'totp', 'enc:v1:us413', ARRAY['h1','h2'], now(), 5, now() + interval '15 minutes');
+       INSERT INTO public.user_sessions (id, user_id, session_token_hash, expires_at, revoked, revoked_at, ip_address)
+         VALUES ('${sess}', '${agent}', 'hash_us413', now() + interval '1 day', true, now(), '203.0.113.7');`);
+
+    // The reads the browser actually makes still work for the owner only.
+    const [mfa] = as(agent, `SELECT mfa_enabled || '|' || (verified_at IS NOT NULL) FROM public.user_mfa_settings WHERE user_id = '${agent}';`);
+    if (mfa !== 'true|true') out.push(`the owner read mfa_enabled/verified_at as ${mfa}`);
+    const [theirs] = as(other, `SELECT count(*) FROM public.user_mfa_settings WHERE user_id = '${agent}';`);
+    if (theirs !== '0') out.push(`another user saw ${theirs} of the agent's MFA rows`);
+    const [sessions] = as(agent, `SELECT count(*) FROM public.user_sessions WHERE user_id = '${agent}';`);
+    if (sessions !== '1') out.push(`the owner saw ${sessions} of their own sessions, expected 1`);
+
+    for (const col of ['totp_secret', 'backup_codes', 'phone_number', 'failed_attempts', 'locked_until']) {
+      if (!refused(() => as(agent, `SELECT ${col} FROM public.user_mfa_settings WHERE user_id = '${agent}';`)))
+        out.push(`the owner could select user_mfa_settings.${col}`);
+    }
+    if (!refused(() => as(agent, `SELECT * FROM public.user_mfa_settings;`)))
+      out.push('the owner could select * from user_mfa_settings');
+    if (!refused(() => as(agent, `SELECT session_token_hash FROM public.user_sessions;`)))
+      out.push('the owner could select user_sessions.session_token_hash');
+
+    for (const [col, val] of [
+      ['mfa_enabled', 'false'],
+      ['backup_codes', `ARRAY['chosen']`],
+      ['failed_attempts', '0'],
+      ['locked_until', 'NULL'],
+      ['totp_secret', `'enc:v1:chosen'`],
+    ]) {
+      if (!refused(() => as(agent, `UPDATE public.user_mfa_settings SET ${col} = ${val} WHERE user_id = '${agent}';`)))
+        out.push(`the owner could update user_mfa_settings.${col}`);
+    }
+    if (!refused(() => as(agent, `DELETE FROM public.user_mfa_settings WHERE user_id = '${agent}';`)))
+      out.push('the owner could delete their MFA row');
+    if (
+      !refused(() =>
+        as(other, `INSERT INTO public.user_mfa_settings (user_id, mfa_enabled, verified_at) VALUES ('${other}', true, now());`)
+      )
+    )
+      out.push('a user could insert their own MFA row');
+
+    for (const [col, val] of [
+      ['revoked', 'false'],
+      ['revoked_at', 'NULL'],
+      ['ip_address', `'198.51.100.1'`],
+      ['expires_at', `now() + interval '10 years'`],
+    ]) {
+      if (!refused(() => as(agent, `UPDATE public.user_sessions SET ${col} = ${val} WHERE id = '${sess}';`)))
+        out.push(`the owner could update user_sessions.${col}`);
+    }
+    if (!refused(() => as(agent, `DELETE FROM public.user_sessions WHERE id = '${sess}';`)))
+      out.push('the owner could delete a session row');
+    if (
+      !refused(() =>
+        as(agent, `INSERT INTO public.user_sessions (user_id, session_token_hash, expires_at) VALUES ('${agent}', 'x', now() + interval '1 day');`)
+      )
+    )
+      out.push('the owner could insert a session row');
+    if (!refused(() => q(`SET ROLE anon; UPDATE public.user_mfa_settings SET mfa_enabled = false;`)))
+      out.push('anon could update user_mfa_settings');
+
+    const [mfaRow] = q(
+      `SELECT mfa_enabled || '|' || failed_attempts || '|' || array_to_string(backup_codes, ',') FROM public.user_mfa_settings WHERE user_id = '${agent}';`
+    );
+    if (mfaRow !== 'true|5|h1,h2') out.push(`the MFA row changed to ${mfaRow}`);
+    const [sessRow] = q(`SELECT revoked || '|' || host(ip_address) FROM public.user_sessions WHERE id = '${sess}';`);
+    if (sessRow !== 'true|203.0.113.7') out.push(`the revoked session changed to ${sessRow}`);
+
+    // The service role (the edge functions) still writes both tables.
+    q(`SET ROLE service_role;
+       UPDATE public.user_mfa_settings SET failed_attempts = 0, locked_until = NULL WHERE user_id = '${agent}';
+       INSERT INTO public.user_sessions (user_id, session_token_hash, expires_at)
+         VALUES ('${agent}', 'hash_us413_fn', now() + interval '1 day');
+       UPDATE public.user_sessions SET revoked = true, revoked_at = now() WHERE session_token_hash = 'hash_us413_fn';`);
+    const [fnRow] = q(`SELECT revoked FROM public.user_sessions WHERE session_token_hash = 'hash_us413_fn';`);
+    if (fnRow !== 't') out.push('the service role could not record and revoke a session');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.user_sessions WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.user_mfa_settings WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${agent}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${agent}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 check('an assignee works a lead but cannot take it or hand it away', () => {
   const out = [];
   const owner = '00000000-dead-beef-0000-000000236b01';
