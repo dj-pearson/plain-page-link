@@ -2,7 +2,8 @@
  * API Keys management page.
  *
  * Lets users create, list, and revoke API keys for programmatic access
- * (CRM integrations etc.). The full key is shown exactly once on creation.
+ * (CRM integrations etc.). The full key is shown exactly once on creation,
+ * so leaving it behind (Done, a link, a reload) asks first until it is copied.
  */
 
 import { useRef, useState } from 'react';
@@ -11,6 +12,7 @@ import { AlertCircle, Copy, Check, KeyRound, Loader2, Trash2, Plus, RefreshCw } 
 import { logger } from '@/lib/logger';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { useToast } from '@/hooks/use-toast';
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +38,9 @@ interface ApiKeyRecord {
   created_at: string;
 }
 
+const UNCOPIED_KEY_LEAVE_MESSAGE =
+  "You haven't copied your new API key, and it can't be shown again. Leave this page anyway?";
+
 export default function ApiKeysPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -50,6 +55,11 @@ export default function ApiKeysPage() {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<ApiKeyRecord | null>(null);
   const keyTextRef = useRef<HTMLElement>(null);
+
+  // The key lives only in this component's state, so a reload, a closed tab or
+  // a sidebar link destroys it as silently as 'Done' used to (US-364). Browser
+  // back/forward is not covered: without a data router a popstate cannot be held.
+  useUnsavedChangesWarning(!!createdKey && !keySaved, UNCOPIED_KEY_LEAVE_MESSAGE);
 
   const {
     data: keys,
