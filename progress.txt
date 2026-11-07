@@ -5004,3 +5004,105 @@ Owner actions:
   are set there too.
 - Deploy Cloudflare Pages, then submit /sitemap-profiles.xml to Google Search
   Console and Bing.
+
+---
+
+## Continuous improvement loop — round 1 — 2026-11-07 (US-263 to US-272 done, US-273 to US-302 opened)
+
+Ten lanes ran in parallel, one improvement each, each in its own worktree,
+each read by an independent reviewer (two needed a fix-up). Protocol:
+docs/improvement-loops/LANES.md. Integrated one at a time; two merge
+conflicts resolved (public profile query key now carries the viewer AND is
+prefetched from the entry chunk; CSP test). Final: tsc clean, 1649 unit
+tests pass (from 1500), verify:migrations OK. verify:schema and
+route-weight could not run in the sandbox (no non-root initdb, no
+Playwright headless shell); CI runs both.
+
+- US-263 [listings] Agents could not see which of their listings visitors open
+- US-264 [leads] The lead detail showed almost nothing the visitor told the agent, and never which listing they asked about
+- US-265 [profile] Agents could not publish, unpublish or preview their public page
+- US-266 [uiux] Workflows list: a failed load said "No workflows yet", and Duplicate and Delete did nothing
+- US-267 [performance] The public profile page waited for its own code to download before it asked for any data
+- US-268 [security] Agents' URLs went into links and page navigation without a real scheme check, and the CSP allowed scripts from esm.sh
+- US-269 [enterprise] Data export showed failed queries as empty sections, stopped at 1,000 rows, and left out lead activity, pages, workflows and billing
+- US-270 [marketing] The public pricing page showed agents raw code names ("CustomThemes", "AiListingDescriptions") on its plan cards, and would have advertised any feature a migration added, even ones that are not built
+- US-271 [seo] Blog articles never named who wrote them: articles.author_id now resolves to a real byline (US-181)
+- US-272 [mobile] The installed app never got a new offline shell, kept every old code chunk on the phone forever, and kept running an old copy of the cookie-consent script
+
+Owner actions:
+- US-263: Apply migration supabase/migrations/20261107000263_listing_view_stats.sql (deploy it with or before the frontend; until then the Listings page just shows no views line, because the RPC errors and isReady stays false).
+- US-265: Deploy Cloudflare Pages (frontend only; no migration, no edge function change)
+- US-268: Deploy Cloudflare Pages, so the new _headers CSP (without esm.sh) and the frontend changes go live. There are no migrations and no function redeploys.
+- US-269: Rebuild/redeploy the functions.agentbio.net Coolify app so the gdpr-export change ships (no migration, no new secret).
+- US-272: Redeploy Cloudflare Pages (the new _headers rule and a stamped sw.js take effect on the next deploy; nothing else to apply)
+
+Opened for later rounds (lane picks its open slice first):
+- US-273 [listings] US-141 slice: 'Top listings' on the Analytics page
+- US-274 [listings] US-141 slice: throttle repeat listing_view events per visitor
+- US-275 [listings] US-141 slice: per-listing page route /:username/listing/:id
+- US-276 [listings] US-141 slice: 'Viewed N listings before contacting you' on leads
+- US-277 [leads] US-130 slice 2: quick responses send, task priority, Log meeting, delete own activities
+- US-278 [leads] US-130 slice 3: one status vocabulary, drop leads.notes, delete LegacyLead types
+- US-279 [leads] US-130 slice 4: the Leads filter row wraps on phones
+- US-280 [profile] US-142 slice 2: brokerage logo upload instead of a URL field
+- US-281 [profile] US-142 slice 3: render every service city and list them in areaServed
+- US-282 [profile] US-142 slice 4: no invented stats or reviews in page-builder templates
+- US-283 [profile] US-142 slice 5: custom_css decision, theme-colour agreement, completion widget
+- US-284 [uiux] TeamPage: a failed load offers to create a second team, and members are removed with one unconfirmed click
+- US-285 [uiux] ApiKeysPage: a failed list reads as 'No active API keys yet', and the copy/revoke buttons are unnamed
+- US-286 [performance] Get the public profile in one round trip instead of two
+- US-287 [performance] Remove the third round trip on the profile: branding and open houses wait for profile.id
+- US-288 [performance] Finish US-125: match Radix by prefix, and add an eslint warning ratchet
+- US-289 [security] Enforce URL schemes in the database for agent-written URL columns
+- US-290 [security] Validate profile URL fields when the agent saves Profile
+- US-291 [enterprise] Data export: queue large exports instead of building them in one request
+- US-292 [enterprise] Overdue-lead chaser: SLA window and dedupe
+- US-293 [enterprise] Digest catch-up window and paging past 5,000 profiles
+- US-294 [marketing] US-143 slice 2: Landing feature cards claim things that do not exist
+- US-295 [marketing] US-143 slice 3: /features/* pages overclaim
+- US-296 [marketing] US-143 slice 4: pricing-plans.ts carries unsold keys and USAGE_PRICING
+- US-297 [marketing] Dashboard meters 'automated emails' that never send
+- US-298 [seo] Optional: FK from articles.author_id to profiles so the author can be embedded in one round-trip
+- US-299 [seo] Author byline on blog index and category cards
+- US-300 [mobile] Offline pages for routes a visitor has already opened
+- US-301 [mobile] Unhashed public images cached as immutable for a year
+- US-302 [security] Unpublished agent data still anon-readable
+
+Other findings (not yet stories):
+- [listings] prd.json US-145 (listing photos) is fixed in code but still passes=false only because migration 20260903000002_repair_double_encoded_listing_photos.sql has not been applied to production (see its notes). That is an owner action, not code.
+- [listings] src/pages/dashboard/Listings.tsx:724 still draws the Featured badge with bg-purple-600, a hard-coded colour rather than a theme token. Minor craft-floor item for the uiux lane.
+- [listings] Landing.tsx:461 also claims 'Lead scoring: Hot/Warm/Cold based on behavior'. The behavioural inputs (listingViews, hasViewedMultipleListings) are never measured (src/lib/lead-scoring.ts:134-145); the 'Viewed N listings before contacting you' slice above would make it true.
+- [leads] src/test/fixtures/lead.ts:21 mockLead.form_data carries listing_id: 1 and budget, which no current form writes. describeLeadAnswers skips listing_id, but the fixture describes a shape production does not produce.
+- [leads] src/components/pageBuilder/blocks/ContactBlock.tsx:103-114 sends only name/email/phone/message. Any other page-builder field the agent configures (config.fields) is dropped and never reaches form_data, so custom-form answers are lost at capture, not just at display. Fixing it needs keys bounded by submit-lead's sanitizeFormData; once they are captured, describeLeadAnswers already shows them.
+- [leads] src/pages/public/OpenHouseSignIn.tsx:35 stores timeline as display text ('0-3 months') while the buyer and seller forms store slugs ('1-3-months'). Lead scoring and routing that read leads.timeline see two vocabularies.
+- [profile] Security/privacy: unpublishing hides the profile row, but anon can still read the agent's listings, active links and published testimonials straight from the REST API with the shipped anon key. The policies are "Public can view active listings without user tracking" (baseline 13692), "Anyone can view active links" (13539) and "Anyone can view published testimonials" (13567); none joins to profiles.is_published. Each needs an EXISTS on a published profile, plus an owner bypass. This belongs to the security lane and needs a migration plus verify:schema.
+- [profile] US-142's 'Powered by AgentBio' item is already handled: FullProfilePage uses useProfileShowsBranding (plan removeBranding). Re-check that AC against the Subscription page row rather than redoing it.
+- [profile] Settings.tsx Profile Visibility (around lines 530-630) hand-rolls five checkbox switches with peer-* classes instead of ui/switch. That is inconsistent with the new Publish card; uiux lane.
+- [uiux] src/pages/dashboard/workflows/WorkflowsListPage.tsx: the 'draft' status filter means !isPublished but 'inactive' means !isActive, so a draft appears under both 'Inactive' and 'Draft'. Left as is because the filter vocabulary is a product decision.
+- [uiux] src/stores/useWorkflowBuilderStore.ts saveWorkflow (~line 600) checks existence with .select('id').eq('id').single(), which reports an error on a new workflow (no row). The error is ignored and the insert runs, so it works, but it costs an extra round-trip and logs a 406 in the network panel. An upsert would be cleaner.
+- [uiux] Workflows have no nav link check here: confirm /dashboard/workflows is reachable from DashboardLayout/MobileNav (not audited this round).
+- [uiux] src/pages/dashboard/TeamPage.tsx:60 uses select('*') on teams through an untyped cast, because teams and team_members are described as missing from the generated types. Verify against src/integrations/supabase/types.ts and drop the cast if they are there.
+- [performance] scripts/check-route-weight.mjs needs Playwright chromium (/opt/pw-browsers/chromium_headless_shell-1200), which is missing in this sandbox, so route weight cannot be checked locally here. It runs in CI only.
+- [performance] The vite.config.ts:8-18 baseline comment is stale. It cites export-vendor 594 KB and index 407 KB; export-vendor no longer exists after US-162, and index is now about 214 KB. This is part of US-125's remaining acceptance criteria.
+- [performance] The public profile has no server-rendered or prerendered HTML: /:slug serves the SPA shell, so LCP depends on JS plus data. Prerendering or edge-rendering agent pages (a Pages Function that inlines the profile JSON or HTML) would be the next big Core Web Vitals win. It needs an owner decision on cache invalidation when an agent edits their page.
+- [security] src/utils/validation.ts:105-106 (sanitizeInput strips 'javascript:' with a regex) and :167 sanitizeURL (used by Login.tsx:51 for the redirect param) use the same deny-list style. Login also uses validateRedirectPath, so it is probably safe, but these helpers should be consolidated onto src/utils/sanitize.ts.
+- [security] src/lib/security/validation.ts:88 has a third sanitizeUrl. It has the same deny-list shape and should be replaced with the one in src/utils/sanitize.ts.
+- [security] src/components/integrations/CalendlyModal.tsx:101-107 passes the agent's calendly_url to the Calendly widget without a scheme check. CSP frame-src limits where the iframe can point, so the risk is low.
+- [security] connect-src lists https://raw.githack.com and https://raw.githubusercontent.com. They look like drei/three environment-map fetches. Confirm they are needed or remove them (public/_headers:18, index.html:16).
+- [security] The index.html meta CSP has no fonts.googleapis.com or fonts.gstatic.com while _headers does (this was already noted in progress.txt). Since browsers enforce both policies, Google Fonts stay blocked.
+- [enterprise] Team member removal is still unconfirmed (progress.txt:4861). It is a small enterprise-lane UI slice for the next round.
+- [enterprise] Leads assigned to the agent through team routing (leads.assigned_to) but owned by another user are not in the assignee's export. Whether they belong in it is a product/legal decision.
+- [enterprise] Five other sections (sessions, MFA settings, mfa_trusted_devices, sso_user_mappings, user_activity_log) are user-keyed tables that are still not exported. They are worth reviewing for SAR completeness.
+- [marketing] Lead scoring is shown as a plan differentiator: features.leadScoring is false on Free in seed 20260902000014, and SubscriptionPage.tsx:57 shows a dash for Free, but nothing in src or the functions gates scoring by plan. The owner needs to decide whether to gate it or drop it from the plan matrix.
+- [marketing] Priority support is sold on Team and Enterprise (SubscriptionPage.tsx:58 and now the /pricing cards), but no code or support process for it exists in the repo. The owner should confirm it is a real service promise.
+- [marketing] Pre-existing lint warnings in src/pages/Pricing.tsx:233 ('error' is defined but never used) and :242 (explicit any).
+- [marketing] The yearly toggle on /pricing hard-codes '(Save 17%)' (Pricing.tsx, near the billing switch) rather than working it out from price_monthly and price_yearly. It is correct for the current seed (290 vs 348) but can drift.
+- [seo] verify:seo currently fails on 23 /for/{city} pages: "FAQPage answer is not on the page" for the answer built at src/pages/landing/LocationTemplate.tsx:163 ('AgentBio has a free plan with 3 active listings… Paid plans start at $29/month…'). The JSON-LD answer text no longer matches what the page shows, so CI's verify:seo step would be red. This is an SEO-lane item for the next round, and it is not caused by this change.
+- [seo] The Playwright Chromium download is blocked in this sandbox; /usr/bin/google-chrome is installed. scripts/lib/chromium.mts:93 could try `channel: 'chrome'` before downloading, which would make the prerender runnable offline.
+- [seo] ArticleSEO's publisher.logo still points to /Cover.png (src/components/blog/ArticleSEO.tsx, publisher block), while US-178 corrected the Organization logo to /logo.png elsewhere. Worth aligning.
+- [seo] US-182 (two anonymous WebPage nodes on /features/lead-capture and /features/analytics) and US-175 (the 3:2, 577 KB Cover.png og:image) remain open in this lane.
+- [mobile] Push notifications are gone from the client: src/lib/push-notifications.ts and public/firebase-messaging-sw.js do not exist, yet src/lib/sw-cleanup.ts still keeps 'firebase-messaging-sw.js' in KEEP_SW (and hasInterferingServiceWorkers checks for it), and public/_headers still has a /firebase-messaging-sw.js rule. CLAUDE.md still describes client-side FCM token registration. Either restore push or remove the dead references; the owner has to decide which.
+- [mobile] src/lib/sw-cleanup.ts uses console.log/console.error throughout, which goes against CLAUDE.md's 'use logger, not console'.
+- [mobile] sw.js calls skipWaiting during install, so the 'A new version is available' toast in src/lib/register-sw.ts (the 'waiting' event) practically never fires. Each deploy now silently takes over open tabs, which is the same behaviour as before, now on every deploy. Decide whether updates should wait for the agent to tap Refresh.
+- [mobile] Native iOS/Android store builds (Capacitor or similar) are not in this repo. Adding them is a product and vendor decision for the owner, so this lane did not take it on.
+- [mobile] The /:username public profile's offline experience and the offline-storage/sync-manager libraries were not audited this round.
