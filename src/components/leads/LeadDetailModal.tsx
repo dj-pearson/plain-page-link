@@ -58,21 +58,11 @@ import { calendarDateInDays, dueDateToIso, taskDueAt } from '@/lib/localDate';
 import { describeLeadOrigin } from '@/lib/leadAttribution';
 import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButton';
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
-
-/**
- * Lead plus the one field the modal shows that is not a column.
- *
- * `property_address` used to be redeclared here as an "extra"; it is a real
- * column on `leads` and is inherited, so restating it only risked disagreeing
- * with the schema. `budget` genuinely is not a column — it is read out of
- * form_data — so it stays.
- */
-interface LeadWithExtras extends Lead {
-  budget?: string | null;
-}
+import { LeadListingCard } from '@/components/leads/LeadListingCard';
+import { describeLeadAnswers } from '@/lib/leadFormSchema';
 
 interface LeadDetailModalProps {
-  lead: LeadWithExtras | null;
+  lead: Lead | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLeadUpdated?: () => void;
@@ -318,6 +308,10 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
     : '';
 
   const origin = describeLeadOrigin(lead);
+  // Shown for a locked lead too: the allowance withholds contact details
+  // (pii-crypto), not the qualifying answers — and "cash buyer, ASAP" behind
+  // a lock is the clearest reason to upgrade.
+  const answers = describeLeadAnswers(lead);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -499,32 +493,58 @@ export function LeadDetailModal({ lead, open, onOpenChange, onLeadUpdated }: Lea
             </div>
           )}
 
+          {/* The property they asked about (US-264). listing_id has been
+              written since US-096 and was never shown. */}
+          {lead.listing_id && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Asked about
+              </h3>
+              <LeadListingCard
+                listingId={lead.listing_id}
+                fallbackAddress={lead.property_address}
+              />
+            </div>
+          )}
+
+          {/* What they told you (US-264). Every answer the form collected,
+              columns and form_data alike; this used to show source, address
+              and a budget key no form writes. */}
+          {answers.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                What they told you
+              </h3>
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+                {answers.map((answer) => (
+                  <div key={answer.key} className="min-w-0">
+                    <dt className="text-xs text-muted-foreground">{answer.label}</dt>
+                    <dd className="font-medium break-words">{answer.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
           {/* Lead Source & Details */}
-          {(lead.source || lead.property_address || lead.budget) && (
+          {(lead.source || (lead.property_address && !lead.listing_id)) && (
             <div className="space-y-2">
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
                 Additional Details
               </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 {lead.source && (
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                     <span className="text-muted-foreground">Source:</span>
-                    <span className="font-medium">{lead.source}</span>
+                    <span className="font-medium truncate">{lead.source}</span>
                   </div>
                 )}
-                {lead.property_address && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                {lead.property_address && !lead.listing_id && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MapPin className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                     <span className="text-muted-foreground">Property:</span>
-                    <span className="font-medium">{lead.property_address}</span>
-                  </div>
-                )}
-                {lead.budget && (
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Budget:</span>
-                    <span className="font-medium">{lead.budget}</span>
+                    <span className="font-medium break-words">{lead.property_address}</span>
                   </div>
                 )}
               </div>

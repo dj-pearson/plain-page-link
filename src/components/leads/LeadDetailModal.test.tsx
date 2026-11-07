@@ -259,3 +259,120 @@ describe('LeadDetailModal', () => {
     expect(tel).toHaveClass('min-h-[44px]');
   });
 });
+
+/**
+ * US-264: the modal showed source, address and a `budget` key no form writes.
+ * The buyer's price range, timeline, financing, property type and bedrooms —
+ * columns and form_data alike — reached the database and were never shown,
+ * and leads.listing_id was never read at all.
+ */
+describe('LeadDetailModal — what the form captured', () => {
+  const noop = () => undefined;
+
+  /** listings and profiles answer maybeSingle with the given rows. */
+  const stubRows = (rows: Record<string, unknown>) => {
+    fromMock.mockImplementation((table: string) => {
+      const builder: Record<string, unknown> = {};
+      for (const m of ['select', 'eq', 'update', 'insert', 'order', 'in']) {
+        builder[m] = vi.fn(() => builder);
+      }
+      builder.maybeSingle = vi.fn(() =>
+        Promise.resolve({ data: rows[table] ?? null, error: null })
+      );
+      builder.single = vi.fn(() => Promise.resolve({ data: { id: 'x' }, error: null }));
+      builder.then = (resolve: (v: unknown) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(resolve);
+      return builder;
+    });
+  };
+
+  beforeEach(() => {
+    activitiesMock.current = [];
+    fromMock.mockReset();
+    rpcMock.mockReset();
+    rpcMock.mockResolvedValue({ data: null, error: null });
+    stubRows({});
+  });
+
+  it('lists every answer a buyer gave, under agent-facing labels', async () => {
+    const buyer = makeLead({
+      id: 'lead-buyer',
+      name: 'Dana Buyer',
+      lead_type: 'buyer',
+      price_range: '750k-1m',
+      timeline: 'immediate',
+      preapproved: true,
+      form_data: { propertyType: 'single-family', bedrooms: '4', preApprovalStatus: 'cash' },
+    });
+    renderWithProviders(<LeadDetailModal lead={buyer} open onOpenChange={noop} />);
+
+    expect(await screen.findByText('What they told you')).toBeInTheDocument();
+    expect(screen.getByText('$750k - $1M')).toBeInTheDocument();
+    expect(screen.getByText('ASAP (0-30 days)')).toBeInTheDocument();
+    expect(screen.getByText('Cash buyer')).toBeInTheDocument();
+    expect(screen.getByText('Single Family Home')).toBeInTheDocument();
+    expect(screen.getByText('4 Beds')).toBeInTheDocument();
+  });
+
+  it('shows the listing they asked about, with its status and a link to it', async () => {
+    stubRows({
+      listings: {
+        id: 'listing-1',
+        user_id: 'u1',
+        address: '123 Main St',
+        city: 'Austin',
+        state: 'TX',
+        price: '625000',
+        status: 'pending',
+        photos: ['https://example.com/a.jpg'],
+        image: null,
+      },
+      profiles: { username: 'janedoe' },
+    });
+    const enquiry = makeLead({
+      id: 'lead-listing',
+      name: 'Eli Enquirer',
+      lead_type: 'buyer',
+      listing_id: 'listing-1',
+      property_address: '123 Main St',
+    });
+    renderWithProviders(<LeadDetailModal lead={enquiry} open onOpenChange={noop} />);
+
+    expect(await screen.findByText('Asked about')).toBeInTheDocument();
+    expect(await screen.findByText('$625,000')).toBeInTheDocument();
+    expect(screen.getByText('Austin, TX')).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /123 Main St on the public page/ });
+    expect(link.getAttribute('href')).toMatch(/\/janedoe\?listing=listing-1$/);
+    // The address is not repeated as a loose "Property:" line.
+    expect(screen.queryByText('Property:')).toBeNull();
+  });
+
+  it('says so when the listing has since been deleted', async () => {
+    const enquiry = makeLead({
+      id: 'lead-gone',
+      name: 'Fay Gone',
+      listing_id: 'listing-deleted',
+      property_address: '9 Elm Rd',
+    });
+    renderWithProviders(<LeadDetailModal lead={enquiry} open onOpenChange={noop} />);
+    expect(
+      await screen.findByText('9 Elm Rd — this listing has since been removed.')
+    ).toBeInTheDocument();
+  });
+
+  it('renders no answers block for a lead that gave none', async () => {
+    const bare = makeLead({
+      id: 'lead-bare',
+      name: 'Gus Bare',
+      lead_type: 'contact',
+      price_range: null,
+      timeline: null,
+      preapproved: null,
+      form_data: null,
+    });
+    renderWithProviders(<LeadDetailModal lead={bare} open onOpenChange={noop} />);
+    expect(await screen.findByText('Gus Bare')).toBeInTheDocument();
+    expect(screen.queryByText('What they told you')).toBeNull();
+  });
+});
