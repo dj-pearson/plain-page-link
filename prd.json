@@ -4354,7 +4354,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": " (follow-up slice from US-263)"
+      "notes": " (follow-up slice from US-263) First slice (route, redirect, page) done in round 4 as US-348."
     },
     {
       "id": "US-276",
@@ -4551,8 +4551,8 @@
         "CI eslint fails when the warning count rises"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-267)"
+      "passes": true,
+      "notes": " (follow-up slice from US-267) DONE in round 4 as US-352."
     },
     {
       "id": "US-289",
@@ -4656,7 +4656,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": " (follow-up slice from US-270) REMAINING SLICE: US-295 slice: /features/property-listings and its FAQ claim unlimited listings and vague 'MLS compliance features' — FEATURE_FAQS.propertyListings (src/lib/faq-schema.ts, the first answer) says agents can show 'unlimited property listings', but listings are plan-limited (BEFORE trigger on listings, pricing-plans.ts limits). PropertyListings.tsx:62 and :210-219 say 'MLS compliance features' and 'Stay compliant with MLS rules and Fair Housing requirements automatically'. What ships is the MLS number on each listing, the Equal Housing logo and statement, and the license number. Overlaps US-324. REMAINING SLICE: US-295 slice: /features/lead-capture overstates notifications and CRM integration — FEATURE_FAQS.leadCapture says every lead triggers an instant email with all details. Locked leads (past the monthly allowance) are emailed without contact details (notify-lead / locked_lead_ids). LeadCapture.tsx:33 lists 'CRM integration ready' and :256 says 'Export to your CRM anytime'. What exists is a CSV export and a Zapier webhook, with no CRM integration. Reword both to match, and check the hot/warm/cold scoring description against src/lib/lead-scoring.ts. Partially done in round 3 as US-332 (calendar-booking, testimonials, analytics pages)."
+      "notes": " (follow-up slice from US-270) REMAINING SLICE: US-295 slice: /features/property-listings and its FAQ claim unlimited listings and vague 'MLS compliance features' — FEATURE_FAQS.propertyListings (src/lib/faq-schema.ts, the first answer) says agents can show 'unlimited property listings', but listings are plan-limited (BEFORE trigger on listings, pricing-plans.ts limits). PropertyListings.tsx:62 and :210-219 say 'MLS compliance features' and 'Stay compliant with MLS rules and Fair Housing requirements automatically'. What ships is the MLS number on each listing, the Equal Housing logo and statement, and the license number. Overlaps US-324. REMAINING SLICE: US-295 slice: /features/lead-capture overstates notifications and CRM integration — FEATURE_FAQS.leadCapture says every lead triggers an instant email with all details. Locked leads (past the monthly allowance) are emailed without contact details (notify-lead / locked_lead_ids). LeadCapture.tsx:33 lists 'CRM integration ready' and :256 says 'Export to your CRM anytime'. What exists is a CSV export and a Zapier webhook, with no CRM integration. Reword both to match, and check the hot/warm/cold scoring description against src/lib/lead-scoring.ts. Partially done in round 3 as US-332 (calendar-booking, testimonials, analytics pages). property-listings slice done in round 4 as US-355; lead-capture slice remains."
     },
     {
       "id": "US-296",
@@ -4811,8 +4811,8 @@
         "canDeleteActivity in LeadDetailModal.tsx and the policy use the same type list (comment cross-reference or a shared constant)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Policy is in squashed baseline line 14034; 20260902000006 rebuilt only SELECT/UPDATE. (follow-up from US-304)"
+      "passes": true,
+      "notes": "Policy is in squashed baseline line 14034; 20260902000006 rebuilt only SELECT/UPDATE. (follow-up from US-304) DONE in round 4 as US-349."
     },
     {
       "id": "US-314",
@@ -5099,8 +5099,8 @@
         "FAQPage JSON-LD answers match the visible text"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-310)"
+      "passes": true,
+      "notes": " (follow-up from US-310) DONE in round 4 as US-355."
     },
     {
       "id": "US-325",
@@ -5148,8 +5148,8 @@
         "AGENT_AUTHORED_ACTIVITY_TYPES in LeadDetailModal.tsx and the SQL list point to each other"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Fits with US-313 in one migration. (follow-up from US-326)"
+      "passes": true,
+      "notes": "Fits with US-313 in one migration. (follow-up from US-326) DONE in round 4 as US-349."
     },
     {
       "id": "US-336",
@@ -5196,8 +5196,8 @@
         "Tests cover both"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "The templates and block defaults use '#contact', which is usable and has a target on /:username (FullProfilePage.tsx:608). (follow-up from US-327)"
+      "passes": true,
+      "notes": "The templates and block defaults use '#contact', which is usable and has a target on /:username (FullProfilePage.tsx:608). (follow-up from US-327) DONE in round 4 as US-350."
     },
     {
       "id": "US-328",
@@ -5241,8 +5241,8 @@
         "The warning box reads correctly in dark mode, using theme tokens"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-328)"
+      "passes": true,
+      "notes": " (follow-up from US-328) DONE in round 4 as US-351."
     },
     {
       "id": "US-329",
@@ -5363,8 +5363,8 @@
         "A pass that ended with errors does not write the marker"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Needs a migration with a TO service_role policy, plus a types.ts entry. (follow-up from US-331)"
+      "passes": true,
+      "notes": "Needs a migration with a TO service_role policy, plus a types.ts entry. (follow-up from US-331) DONE in round 4 as US-354."
     },
     {
       "id": "US-332",
@@ -5426,8 +5426,8 @@
         "A test pins it"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-333)"
+      "passes": true,
+      "notes": " (follow-up from US-333) DONE in round 4 as US-356."
     },
     {
       "id": "US-334",
@@ -5458,8 +5458,375 @@
         "Tested in src/lib/sw-cleanup.test.ts"
       ],
       "priority": 2,
+      "passes": true,
+      "notes": " (follow-up from US-334) DONE in round 4 as US-357."
+    },
+    {
+      "id": "US-348",
+      "lane": "listings",
+      "round": 4,
+      "title": "Listings had no page of their own: a shared home opened as a modal over the profile that search engines could not index",
+      "description": "First slice of US-275. Each listing now has a full page at /:username/listing/:id, and the old ?listing= links redirect to it. The page shows the gallery and facts, that home's open houses, \"More from <agent>\" and the same compliance footer as the profile. It counts a listing_view, sets a canonical URL and JSON-LD, and gives crawlers the listing's own share card. Profile cards and every share button now go to the page.",
+      "acceptanceCriteria": [
+        "/:username/listing/:listingId renders the listing as a page (address is the h1): gallery, facts, the open houses for this listing only, 'More from <agent>' (other available listings, at most 6, never the current or a sold one) and the compliance footer",
+        "The page emits listing_view via trackListingView, except when the owner previews an unpublished page",
+        "/:username?listing=<id> redirects (replace) to /:username/listing/<id> and keeps the other query parameters",
+        "Clicking a listing card on the profile navigates to its page; share buttons copy the page URL",
+        "An unknown listing, a hidden one (show_listings=false) or a sold one with show_sold_properties=false shows a noindex 'This home is no longer listed' page that links to the profile",
+        "A mixed-case username redirects to the lowercase listing URL, both in the SPA and in the Pages Function (301)",
+        "public/_redirects serves the new path (spa-routes test passes); crawlers get the listing's og tags with og:url set to the page URL",
+        "'listing' is a reserved username",
+        "Coming Back to the profile from a listing page does not record a second profile view"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What was done (file:line evidence before the change: the modal was driven by ?listing= at src/pages/public/FullProfilePage.tsx:89-137, and the old route table ended at src/App.tsx:339-340):\n\n- New page `src/pages/public/ListingPage.tsx`. It is lazy-loaded and its route element is `ProfileRoute`, which now also reads the `username` param (`src/components/profile/ProfileRoute.tsx`). So the profile query starts while the chunk downloads, and arriving from the profile is a cache hit.\n- `src/components/profile/ListingDetailModal.tsx` was moved with git mv to `ListingDetails.tsx` and the Radix Dialog removed.\n  - The address is now the h1.\n  - The arrow keys only page photos while the gallery has focus. The window-wide listener was fine in a modal but would steal arrow keys on a page.\n  - There is no Showing button on a sold home.\n  - The JSON-LD moved into the page's SEOHead.\n  - The gradient tour card was replaced with a plain bordered one.\n- The compliance footer was extracted to `src/components/profile/ProfileComplianceFooter.tsx`. The theme effect and the main-element style were extracted to `src/hooks/useProfileTheme.ts`. FullProfilePage uses both, with no change in behaviour.\n- `src/lib/listingShare.ts`: `listingPagePath`, `buildListingShareUrl` (now returns the path form) and `legacyListingRedirect`.\n- `src/lib/publicListingVisibility.ts`: `selectListingForPage`, so a listing the profile hides cannot be reached at its own URL either.\n- `UpcomingOpenHouses` takes an optional `listingId` filter.\n- Pages Functions: the logic in `functions/[username].ts` moved to `functions/_lib/profile-route.ts`, unchanged except that it takes the listing id as an argument. A new route, `functions/[username]/listing/[listingId].ts`, reuses it. The listing share card's url (`functions/_lib/social-meta.ts`) now points at the page.\n- `public/_redirects`: added `/:username/listing/:listingId /index.html 200`. Without it the route would have been a 404 in production; the spa-routes test caught this.\n- `src/hooks/useProfileTracking.ts`: added an in-memory dedupe per page session. Without it, Back from a listing page remounts the profile and inserts another analytics_views row: a visitor who browses 5 homes would read as 6 profile views. The US-092 trigger allows 30 a minute, so it would not have caught this.\n- Playwright: I updated `tests/e2e/listing-deep-link.spec.ts` (page, redirect, removed listing, navigation and Back, share URL) and `tests/a11y/accessibility.spec.ts` (the old listing-modal case is now a listing-page case with baseline 0). I could not run either here because no Playwright browsers are installed (~/.cache/ms-playwright is missing). CI must run them.\n\nVERIFIED: - `npx tsc --noEmit`: passes. Run again after the commit, which included lint-staged's eslint --fix and prettier.\n- `npx vitest run` (full suite): 218 files passed, 1909 tests passed, 1 skipped.\n- Targeted runs during development: ListingPage.test.tsx 11/11; functions plus src/spa-routes.test.ts 414 passed, 1 skipped; useProfileTracking plus src/pages/public 35/35.\n- The first full run had two failures, both fixed:\n  - `spa-routes`: the new route had no `_redirects` rule.\n  - `landing-claims`: FEATURES_README.md still referenced ListingDetailModal.tsx.\n- `npx impeccable detect` on ListingPage.tsx and ListingDetails.tsx: no findings. It ran regex rules only.\n- Not run: the Playwright e2e and a11y specs (no browsers in the sandbox), `vite build`, and the route-weight check. There is no migration, so `verify:migrations` does not apply.\n\nREVIEW: approve\n\nOWNER ACTIONS: Deploy Cloudflare Pages: it picks up public/_redirects (new rule /:username/listing/:listingId) and the new Pages Function functions/[username]/listing/[listingId].ts. The new route does not work in production without this deploy. | No migrations, no edge functions to redeploy, no secrets."
+    },
+    {
+      "id": "US-358",
+      "lane": "listings",
+      "round": 4,
+      "title": "US-275 slice: listing pages in the prerender and the agent sitemap",
+      "description": "Add /:username/listing/:id for each published agent's public listings to functions/sitemap-profiles.xml.ts (functions/_lib/profile-sitemap.ts), applying the selectListingForPage rules (hidden listings and sold-when-hidden are excluded). Decide whether scripts/prerender.mts writes listing pages or the crawler Pages Function is enough.",
+      "acceptanceCriteria": [
+        "The sitemap emits one <url> per visible listing, with lastmod taken from listings.updated_at",
+        "Listings hidden by show_listings or show_sold_properties are not emitted",
+        "The sitemap tests cover it"
+      ],
+      "priority": 2,
       "passes": false,
-      "notes": " (follow-up from US-334)"
+      "notes": "The crawler share card already works through functions/[username]/listing/[listingId].ts. (follow-up from US-348)"
+    },
+    {
+      "id": "US-359",
+      "lane": "listings",
+      "round": 4,
+      "title": "Listing cards link to the listing page with a real <a href>",
+      "description": "ListingCard, FeaturedListingsCarousel, SoldProperties and the 'View home' button in UpcomingOpenHouses navigate with an onClick handler on a <button>. Give them a Link to listingPagePath(...) instead, so crawlers can discover listing pages from the profile and visitors can middle-click or open them in a new tab.",
+      "acceptanceCriteria": [
+        "Each card's primary control is an <a> pointing at /:username/listing/:id",
+        "Keyboard and a11y tests still pass, and no interactive elements are nested"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-348)"
+    },
+    {
+      "id": "US-360",
+      "lane": "listings",
+      "round": 4,
+      "title": "Run the updated Playwright listing-page specs in CI and fix anything they find",
+      "description": "tests/e2e/listing-deep-link.spec.ts and the 'public profile listing page' case in tests/a11y/accessibility.spec.ts were rewritten for the page but never run, because the sandbox has no browsers.",
+      "acceptanceCriteria": [
+        "Both specs pass in CI",
+        "The axe baseline for 'public profile listing page' stays at 0"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-348)"
+    },
+    {
+      "id": "US-361",
+      "lane": "listings",
+      "round": 4,
+      "title": "Sticky contact bar on the listing page for mobile",
+      "description": "On a phone, the Showing CTA sits below the description in ListingDetails. The only action above the fold is the 'Ask about this home' button in the header. Consider reusing StickyActionBar with the listing attached.",
+      "acceptanceCriteria": [
+        "A Showing/Contact action stays visible while scrolling on viewports under 640px",
+        "The lead it creates carries listing_id"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-348)"
+    },
+    {
+      "id": "US-349",
+      "lane": "leads",
+      "round": 4,
+      "title": "The lead timeline's system rows (status changes, lead created) can no longer be forged, rewritten or deleted through the API",
+      "description": "Closes US-335 and US-313, and the round-3 finding about the UPDATE policy. Before this change, a lead owner or assignee could use the shipped anon key and their own session to do three things. (1) Forge 'status_change' or 'form_submission' rows, through log_lead_activity or by inserting directly. (2) Delete the real system rows, because those rows carry the owner's user_id. (3) Rewrite any row on the lead through an UPDATE policy that had no type check, no WITH CHECK, and UPDATE granted on the whole table. The database now enforces one list of agent-authored types, the same list the UI uses.",
+      "acceptanceCriteria": [
+        "log_lead_activity raises check_violation for any activity type outside note/call/email/sms/meeting/task (or null), before it inserts anything",
+        "The lead_activities INSERT policy (TO authenticated) also requires an agent-authored activity_type",
+        "The DELETE policy (TO authenticated) requires auth.uid() = user_id AND an agent-authored type (US-313)",
+        "UPDATE: revoked from PUBLIC/anon/authenticated; authenticated may UPDATE (task_completed_at) only; the policy allows owner or assignee, on task rows only, with both USING and WITH CHECK",
+        "The SECURITY DEFINER triggers still log lead creation and status changes",
+        "AGENT_AUTHORED_ACTIVITY_TYPES in src/lib/leadActivityTypes.ts is the shared list; canDeleteActivity and LogActivityParams use it, and a unit test fails if the SQL list drifts from it",
+        "A verify:schema check shows that forged status_change and form_submission rows are refused (by RPC and by direct insert, for owner and assignee), that system rows cannot be deleted or rewritten, and that notes, follow-ups, follow-up completion by the assignee, and deleting your own note all still work"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence for the gaps that existed before:\n- supabase/migrations/20261107000326_assignee_logs_lead_activity.sql:57-63: log_lead_activity inserted any _activity_type it was given.\n- Same file, :175-185: the INSERT policy had no type check.\n- supabase/migrations/20260806000005_squashed_baseline.sql:14034: DELETE was USING (auth.uid() = user_id) only.\n- supabase/migrations/20260902000006_zip_routing_and_assignee_access.sql:154-162: the UPDATE policy let the owner or assignee update any row, with no WITH CHECK.\n- The system rows are written by auto_log_lead_creation and auto_log_lead_status_change. Both are SECURITY DEFINER (baseline:235, :271), so RLS does not apply to them. notify-lead and execute-workflow write as the service role.\n\nChanges:\n- New migration: supabase/migrations/20261107000349_lead_timeline_system_rows_tamper_proof.sql.\n  - Redefines log_lead_activity with the type guard. It keeps the US-326 owner-or-assignee check, the pinned search_path and the existing ACL.\n  - Drops every lead_activities INSERT, UPDATE and DELETE policy (polcmd a/w/d), whatever its name, and recreates them TO authenticated with the type rules.\n  - Adds a column-level UPDATE grant on task_completed_at only, the same pattern as US-322 used for notifications. completeTask in useLeadActivities.ts is the only UPDATE the browser makes.\n- New src/lib/leadActivityTypes.ts holds the shared list and types.\n  - src/hooks/useLeadActivities.ts now re-exports ActivityType from it, and LogActivityParams.activityType is narrowed to AgentAuthoredActivityType, so the compiler refuses a system type.\n  - src/components/leads/LeadDetailModal.tsx canDeleteActivity now uses isAgentAuthoredActivityType, and its comment points at the policy.\n- Tests:\n  - New src/lib/leadTimelineIntegrity.test.ts checks the migration's function and policies, and checks that the SQL list matches the TS list.\n  - src/lib/leadAssigneeActivity.test.ts: its \"latest definition of the three RPCs\" check now excludes the US-349 file, which redefines only log_lead_activity and is covered by the new test.\n- scripts/verify-schema.mjs: new check \"a lead's system timeline rows cannot be forged, rewritten or deleted\".\n\nVERIFIED: - `npx tsc --noEmit`: passed, no output. Re-run after the commit hook's prettier pass: TSC_OK.\n- `npx vitest run src/lib/leadTimelineIntegrity.test.ts src/lib/leadAssigneeActivity.test.ts src/components/leads src/hooks`: Test Files 24 passed (24), Tests 166 passed (166). Run before and after the commit, same result.\n- `npm run verify:migrations`: \"[migrations] OK — 63 migration files structurally valid.\"\n- `node --check scripts/verify-schema.mjs`: syntax OK.\n- verify:schema itself was NOT run. Postgres 16 binaries exist, but initdb refuses root and the sandbox blocks su/runuser, so no real database could be started. CI's verify-backend.yml has to run the new check.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000349_lead_timeline_system_rows_tamper_proof.sql to production. No edge function redeploy is needed. The frontend change only tightens types, so the order of deploy does not matter. | Make sure the verify-backend CI job runs on this branch, so the new verify:schema check is exercised against a real Postgres. It could not be run in this sandbox."
+    },
+    {
+      "id": "US-362",
+      "lane": "leads",
+      "round": 4,
+      "title": "Only the author can edit the content of a timeline row",
+      "description": "There is no edit UI today. Content edits are now impossible anyway, because only task_completed_at is grantable. If an edit-note feature is added, it needs its own column grant and an author-only policy (auth.uid() = user_id). The owner-or-assignee rule should not be reused for it.",
+      "acceptanceCriteria": ["Any future content edit is author-only and agent-authored-only"],
+      "priority": 2,
+      "passes": false,
+      "notes": "This is a design guard, not current work. (follow-up from US-349)"
+    },
+    {
+      "id": "US-350",
+      "lane": "profile",
+      "round": 4,
+      "title": "Hero and CTA blocks no longer publish a button that goes nowhere (closes US-337)",
+      "description": "HeroBlock (ctaUrl) and CTABlock (buttonUrl) used sanitizeUrl, which lets '#' and example.com through. So a saved placeholder showed a dead button on /:username. Both now use usableLinkUrl, the same check LinkBlock has used since US-327. A hero keeps its headline and drops only the button. A CTA block is nothing but a button, so the whole block stays off the public page, and CustomBlocksSection filters it out so it leaves no empty gap. The editor preview and the block settings both tell the agent why.",
+      "acceptanceCriteria": [
+        "HeroBlock hides its CTA button on the public page when ctaUrl is not usable ('#', '', example.com, javascript:, missing), and keeps the headline",
+        "CTABlock renders nothing on the public page when buttonUrl is not usable, and CustomBlocksSection leaves no wrapper for it",
+        "The editor preview shows a role=note 'hidden on your public page' message for both blocks; the settings for both URL fields have an aria-describedby hint, and the placeholder no longer suggests example.com",
+        "The template default '#contact' still publishes and shows no warning",
+        "Tests cover both blocks, the section filter, and the blockHasDestination helper"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-337, the newest open profile slice.\n\nChanges:\n- src/lib/blockLinkTarget.ts: new blockHasDestination(block). It is safe on malformed jsonb. It returns false for link and cta blocks that have no usable URL, and true for every other type.\n- src/components/profile/CustomBlocksSection.tsx: the inline link-only filter is replaced with .filter(blockHasDestination), so dead CTA blocks are dropped too.\n- src/components/pageBuilder/blocks/HeroBlock.tsx:\n  - safeUrl = usableLinkUrl(config.ctaUrl).\n  - The button shows only when there is ctaText and either the block is being edited or safeUrl is set.\n  - In the editor, a role=note appears when there is ctaText but no usable URL.\n  - Anchor and external click behaviour is unchanged.\n- src/components/pageBuilder/blocks/CTABlock.tsx: returns null on the public page when buttonUrl is not usable; in the editor it shows a role=note.\n- src/components/pageBuilder/BlockSettings.tsx (hero-cta-url and cta-button-url inputs):\n  - Added an aria-describedby hint.\n  - Changed the placeholder from https://example.com (which is itself a refused host) to '#contact or https://yourwebsite.com'.\n- Tests: new src/components/pageBuilder/blocks/HeroCtaBlocks.test.tsx (17 cases), and a blockHasDestination describe added to src/lib/blockLinkTarget.test.ts.\n\nThe templates still pass the existing pageTemplates.test URL check, because '#contact' is usable.\n\nDesign choice: a CTA block with no destination is hidden entirely rather than shown with its button removed. Its headline is a call to act, and without a button there is no way to act on it.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run src/components/pageBuilder src/lib/blockLinkTarget.test.ts src/lib/pageTemplates.test.ts src/components/profile`: 19 files, 119 tests passed. A stack trace also appears in the output; it comes from LazyModal.test, which makes an import fail on purpose.\n- After the pre-commit eslint/prettier reformat, re-ran `npx vitest run src/components/pageBuilder/blocks src/lib/blockLinkTarget.test.ts src/lib/pageTemplates.test.ts`: 71 tests passed.\n- No migration, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-363",
+      "lane": "profile",
+      "round": 4,
+      "title": "Type BlockRenderer and BlockSettings without `as any`",
+      "description": "src/components/pageBuilder/BlockSettings.tsx casts every config `as any` (lines 37-61), and each *Settings function takes `{ config, onUpdate }: any` (for example HeroSettings around line 666 and CTASettings around line 1045). BlockRenderer does the same. Replace these with discriminated-union narrowing on PageBlockConfig, and give each settings component typed props such as `{ config: HeroBlockConfig; onUpdate: (u: Partial<HeroBlockConfig>) => void }`.",
+      "acceptanceCriteria": [
+        "No `as any` or `: any` left in BlockRenderer.tsx or BlockSettings.tsx",
+        "tsc passes",
+        "The existing pageBuilder tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "This is the lane finding. The change is mechanical but touches about 15 settings components, so it fits one session on its own. (follow-up from US-350)"
+    },
+    {
+      "id": "US-351",
+      "lane": "uiux",
+      "round": 4,
+      "title": "API keys page: 'Done' threw away a new key that was never copied, and the 'copy this key now' warning box had no dark mode",
+      "description": "Closes US-339. The one-time API key on src/pages/dashboard/ApiKeysPage.tsx used to disappear the moment the agent clicked 'Done', even if they had never copied it. Getting it back meant revoking it and making a new one. Now 'Done' first asks for confirmation (\"Close without copying the key?\") unless the key has already been copied. A copy counts when the Copy button succeeds or when the agent copies the selected key text by hand (onCopy on the key's code element). A refused clipboard write does not count. The amber warning box used hard-coded amber-50/300/800 classes and showed as a bright patch on the dark dashboard. It now uses new theme tokens (--warning, --warning-foreground, --warning-border), with a light and a dark value for each.",
+      "acceptanceCriteria": [
+        "'Done' asks for confirmation when the key was never copied (copy button failed or unused, and no manual copy)",
+        "'Done' closes immediately once the key was copied by the button or by a manual copy of the key text, even after the copied icon resets",
+        "Each newly created key starts uncopied, so the next key is guarded again",
+        "The warning box uses bg-warning / text-warning-foreground / border-warning-border tokens that have :root and .dark values; text clears 4.5:1 on the surface in both themes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-339 (open uiux story, self-contained). Skipped US-338 because prd.json says it needs an owner decision and an RLS check for members reading teams/team_members.\n\nChanges:\n- src/pages/dashboard/ApiKeysPage.tsx: new keySaved state. It is needed because `copied` resets after 2s and only drives the icon. keySaved is set by a successful copyKey or by onCopy on the <code data-testid=\"created-api-key\">, and reset when a key is created. Done calls handleDone, which closes the key if it was copied and otherwise opens a confirmation dialog (\"Go back and copy it\" / \"I've saved it — close\"). The warning div now uses border-warning-border bg-warning text-warning-foreground instead of amber-300/50/800.\n- src/index.css: --warning, --warning-foreground and --warning-border, with light values in :root and dark values in .dark (comments reference US-351).\n- tailwind.config.ts: a warning colour group (DEFAULT, foreground, border).\n- Tests: src/pages/dashboard/ApiKeysPage.test.tsx gets 6 new tests (confirm then go back keeps the key; confirm then close shows the name input again; button copy closes straight away; manual copy event closes straight away; a refused clipboard write still asks; the next key asks again; the warning box uses tokens with no amber). src/destructiveContrast.test.ts gets 5 new tests. They read the tokens from index.css and check that warning-foreground on warning is at least 4.5:1 and the surface is under 1.5:1 against the page background, in both themes. A control test checks that the old amber-50 measures as glaring on the dark background.\n\nVERIFIED: npx tsc --noEmit: no output (passes). npx vitest run src/pages/dashboard/ApiKeysPage.test.tsx src/destructiveContrast.test.ts: 2 files, 33 tests passed. Re-run after the lint-staged eslint/prettier pre-commit hook: same, 33 passed, working tree clean. npx impeccable detect src/pages/dashboard/ApiKeysPage.tsx: no findings (regex rules only on .tsx). No migration.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-364",
+      "lane": "uiux",
+      "round": 4,
+      "title": "ApiKeysPage: warn before leaving the page while an uncopied key is on screen",
+      "description": "The new confirmation covers 'Done' only. Clicking a sidebar link, closing the tab or reloading while an uncopied key is shown still destroys it silently, because the key lives only in component state. Add a beforeunload handler and a react-router navigation blocker while createdKey is set and keySaved is false.",
+      "acceptanceCriteria": [
+        "Reloading or closing the tab with an uncopied key shows the browser's leave-page prompt",
+        "In-app navigation with an uncopied key asks for confirmation",
+        "No prompt once the key was copied or dismissed"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Check whether the router is a data router (useBlocker requires createBrowserRouter). (follow-up from US-351)"
+    },
+    {
+      "id": "US-352",
+      "lane": "performance",
+      "round": 4,
+      "title": "Every @radix-ui package now goes to ui-vendor by prefix, and the eslint warning limit drops to the current count (US-288)",
+      "description": "Finishes the open performance slice US-288. In vite.config.ts, manualChunks listed 13 Radix components by name. About 25 internal Radix primitives were routed by no rule at all: react-dismissable-layer, focus-scope, popper, presence, portal, primitive, number and others. They ended up in ui-vendor only because Rollup merged each one into the single manual chunk that imported it. If the entry or a page imported one of them directly, Rollup would have put it in that chunk instead and split Radix across chunks. Any new Radix component would also have had to be added to the list by hand. The vendor table and its matching rule now live in src/config/vendor-chunks.ts, which the build imports and which is unit-tested directly. An entry ending in '/' means every package in that scope, so ui-vendor is ['@radix-ui/']. Slot and compose-refs stay in react-vendor because the first matching entry wins. The CI eslint limit drops from 673 to 653, the current warning count.",
+      "acceptanceCriteria": [
+        "manualChunks sends @radix-ui/* to ui-vendor by prefix, and @radix-ui/react-slot and react-compose-refs still go to react-vendor",
+        "check-bundle-size passes, with ui-vendor in neither the entry graph nor the profile graph",
+        "CI eslint --max-warnings is set to the current count (653), so any new warning fails CI",
+        "The chunk rule vite.config.ts uses is the one the tests import, not a regex copy of it"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- New src/config/vendor-chunks.ts. It holds VENDOR_CHUNKS (moved out of vite.config.ts unchanged except that ui-vendor is now ['@radix-ui/']), packageOf, chunkForPackage (an entry ending in '/' matches every package in that scope, and the first match wins) and vendorChunkFor(id).\n- vite.config.ts:9 imports vendorChunkFor. manualChunks still sends the preload helper to react-vendor first, then returns vendorChunkFor(id). This follows the existing pattern of the config importing ./src/config/sw-version.\n- src/profile-bundle.test.ts used to evaluate VENDOR_CHUNKS out of vite.config.ts with a regex and new Function, and repeated the matching logic in the test. It now imports the real module. New tests cover:\n  - the config really uses vendorChunkFor;\n  - packageOf on first-party, scoped and nested module ids (recharts' nested d3-scale is not pulled into charts-vendor);\n  - the internal Radix primitives, @radix-ui/number and a package not used yet (react-tooltip) all go to ui-vendor;\n  - Slot goes to react-vendor;\n  - a lookalike scope such as '@radix-uix/' is not matched;\n  - no package is filed into two chunks, except the two intended Radix exceptions.\n- .github/workflows/ci.yml:228 and :255: --max-warnings changed from 673 to 653. The measured count is 653 warnings and 0 errors.\n\nBefore and after (vite build, measured with a gzip script over dist/): the output is identical. ui-vendor-Dr0GtY8t.js has the same hash and the same 36,369 B gzip; there are 248 JS chunks and 1,507,867 B gzip in total both times. The Radix internals already sat in ui-vendor through Rollup's merging, so this change protects that placement rather than saving bytes today. The eslint step is the part that tightens anything right now.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, run before and after the commit's lint-staged prettier pass.\n- `npx vitest run src/profile-bundle.test.ts src/repo-hygiene.test.ts src/env-example.test.ts src/config scripts`: 14 files, 194 tests, all passed. profile-bundle on its own: 10/10, re-run after the prettier reformat.\n- `npx vite build`: exit 0, before and after.\n- `node scripts/check-bundle-size.mjs`: \"Entry graph: 4 chunk(s) on first paint, none of the 6 that must not be. Profile graph: 51 chunk(s), none of the 4 that must not be. OK — 246 chunks within budget (1 documented exception(s))\", before and after.\n- `npx eslint src/ --max-warnings=653`: exit 0, \"653 problems (0 errors, 653 warnings)\".\n- `npx tsc -p tsconfig.node.json` still fails with TS6307 for every existing ./src/config import (homepage-seo, sw-version) and with vitest .d.ts errors. That failure was there before this change, and CI does not run that command.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-365",
+      "lane": "performance",
+      "round": 4,
+      "title": "Bring tsconfig.node.json up to date so vite.config.ts type-checks",
+      "description": "`tsc -p tsconfig.node.json` fails with TS6307 because vite.config.ts imports ./src/config/{homepage-seo,sw-version,vendor-chunks}, none of which are in its include list. It also fails on vitest .d.ts files, because no target is set. Add those files (or src/config/*.ts) to the include list, set target ES2020 and skipLibCheck, and run it in CI.",
+      "acceptanceCriteria": ["npx tsc --noEmit -p tsconfig.node.json exits 0", "CI runs it"],
+      "priority": 2,
+      "passes": false,
+      "notes": "Pre-existing problem, found while verifying US-352. (follow-up from US-352)"
+    },
+    {
+      "id": "US-353",
+      "lane": "security",
+      "round": 4,
+      "title": "An agent could rewrite their own pending account-deletion row and use it to switch billing back on for another customer's Stripe subscription",
+      "description": "This follows up the round-3 finding that other baseline `FOR UPDATE USING (owner)` policies might let owners rewrite columns the system writes. I swept the owner UPDATE policies; the worst case is `account_deletion_scheduled`.\n\nBaseline policy `\"Users can cancel own deletion\"` (squashed_baseline.sql:13974) has no TO clause and no WITH CHECK. Table-wide UPDATE is still granted to the browser roles. So while a deletion is pending, the owner could rewrite any column.\n\nThrough PostgREST, an agent could:\n1. Request deletion.\n2. Set `stripe_subscription_id` to another customer's sub id and `prior_cancel_at_period_end` to false.\n3. Cancel the deletion.\n\nOn cancel, gdpr-deletion (index.ts:166-192) reads that row. `restoreBillingAfterCancel` (_shared/account-deletion.ts) then uses the platform Stripe key to switch renewal back on for that subscription. A customer who had chosen to leave keeps being charged.\n\nThe same policy also let the owner repoint `gdpr_request_id`. `process_scheduled_account_deletions()` marks that request completed, so this could close another user's GDPR request.\n\n`gdpr_data_requests` had the same problem. The owner could insert rows, including one already marked completed with any `file_url`, and could rewrite pending rows. It is the compliance record for subject access and erasure requests.\n\nNothing in `src/` writes either table. All writes go through SECURITY DEFINER functions (`request_account_deletion`, `cancel_account_deletion`, `request_gdpr_data_export`) or the service role.",
+      "acceptanceCriteria": [
+        "anon/authenticated cannot INSERT, UPDATE, DELETE or TRUNCATE account_deletion_scheduled or gdpr_data_requests; the owner still SELECTs their own rows",
+        "The owner write policies 'Users can cancel own deletion', 'Users can cancel own pending GDPR requests' and 'Users can create own GDPR requests' are dropped",
+        "cancel_account_deletion (via gdpr-deletion) still cancels a schedule",
+        "restoreBillingAfterCancel leaves Stripe alone when the subscription id on the schedule row is not on the caller's own user_subscriptions row",
+        "verify:schema has a check covering all of the above; npm run verify:migrations passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Changes:\n- New migration /home/user/plain-page-link/.claude/worktrees/wf_c12867ba-1a3-6/supabase/migrations/20261107000353_deletion_schedule_system_written.sql. It revokes INSERT/UPDATE/DELETE/TRUNCATE on both tables from PUBLIC, anon and authenticated. TRUNCATE is included because RLS does not apply to it. It drops the three owner write policies and adds table comments. The SELECT policies and the service_role manage policies are unchanged; gdpr-deletion's GET reads the row with the caller's JWT.\n- A second lock in code, in supabase/functions/_shared/account-deletion.ts `restoreBillingAfterCancel`: it now requires the subscription id to be in `store.liveSubscriptionIds(userId)`. Otherwise it logs, returns `unchanged` and never calls Stripe.\n- New test in supabase/functions/_shared/account-deletion.test.ts: \"refuses to switch renewal back on for a subscription that is not the user's\". The existing \"restored\" test now gives the user that subscription on their row.\n- New check in scripts/verify-schema.mjs: \"the deletion schedule and GDPR requests are not writable by their subject\". It covers the owner trying each sensitive column, plus direct INSERT and DELETE, a GDPR insert born 'completed', a GDPR UPDATE, anon UPDATE, and that cancelling through `cancel_account_deletion` still works.\n\nNot verified live: I could not run verify:schema here. The sandbox refuses `su`/`runuser` and initdb will not run as root, so there was no local Postgres. CI verify-backend.yml will run the new check.\n\nThe rest of the sweep, for the record:\n- Every other owner UPDATE policy reaches only the agent's own data, with no cross-tenant effect: listings, testimonials, profiles counters, user_sessions, lead_scores, ml_model_weights, mortgage_calculations.\n- leads and notifications were already fixed by US-236/US-322.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no errors.\n- `npx vitest run supabase/functions/_shared/account-deletion.test.ts`: 16/16 passed.\n- `npx vitest run src/schema-references.test.ts src/pages/dashboard/DeleteAccount.test.tsx supabase/functions/gdpr-export/collect.test.ts supabase/functions/_shared/account-deletion.test.ts src/hooks/useNotifications.test.ts`: 5 files, 40/40 passed.\n- `npm run verify:migrations`: \"[migrations] OK — 63 migration files structurally valid.\"\n- `node --check scripts/verify-schema.mjs`: OK.\n- verify:schema itself was not run (no Postgres in this sandbox).\n- The commit's pre-commit hook ran eslint --fix and prettier, both clean.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000353_deletion_schedule_system_written.sql | Redeploy edge functions that bundle _shared/account-deletion.ts (gdpr-deletion, scheduled-maintenance / process-account-deletions) on functions.agentbio.net"
+    },
+    {
+      "id": "US-366",
+      "lane": "security",
+      "round": 4,
+      "title": "Make api_keys writable only through the api-keys edge function",
+      "description": "Baseline policies 'Users can create own api_keys' (INSERT WITH CHECK owner) and 'Users can update own api_keys' (FOR UPDATE USING owner, no WITH CHECK) still leave table-wide writes open to the browser. An owner can INSERT a key_hash they chose, which gets past the 10-key cap and the audit log in supabase/functions/api-keys/index.ts:66-115. They can also un-revoke a revoked key by setting revoked_at = null, or change its permissions or expiry. src/pages/dashboard/ApiKeysPage.tsx only calls the edge function. The impact is latent today: nothing calls authenticateApiKey (supabase/functions/_shared/api-auth.ts). It becomes real as soon as API-key auth is wired up.",
+      "acceptanceCriteria": [
+        "REVOKE INSERT, UPDATE, DELETE, TRUNCATE on api_keys from PUBLIC, anon, authenticated; drop the owner INSERT and UPDATE policies (keep SELECT, and decide on DELETE)",
+        "verify:schema proves an owner cannot insert a key or clear revoked_at",
+        "ApiKeysPage tests still pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-353)"
+    },
+    {
+      "id": "US-367",
+      "lane": "security",
+      "round": 4,
+      "title": "Audit user_mfa_settings and user_sessions owner UPDATE policies",
+      "description": "'Users can update own MFA settings' (baseline:14322) and 'Users can revoke own sessions' (baseline:14299) leave table-wide UPDATE open. Native MFA (US-085) enforces through the aal claim, so these legacy rows mostly affect only the owner. Still, user_sessions revocation and failed_attempts/locked_until on MFA rows are security state the system writes. Consider column-level grants: is_active/revoked only on sessions, and nothing on MFA settings.",
+      "acceptanceCriteria": [
+        "The browser can only revoke its own sessions, not un-revoke them or rewrite metadata",
+        "The browser cannot write user_mfa_settings directly (the setup/verify/disable functions use the service role)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-353)"
+    },
+    {
+      "id": "US-354",
+      "lane": "enterprise",
+      "round": 4,
+      "title": "Digest catch-up runs re-read every profile each hour after everyone was already sent (US-344)",
+      "description": "After a complete digest pass with no errors, the job now writes one digest_runs row for that day. Later hourly runs in the catch-up window that day return before they read any profile. Before this, each of those runs re-read every profile, every digest_log row, all new leads, due tasks and key dates. On Mondays it also ran three count queries per agent. All of that work only confirmed that everyone had been sent already or had nothing to send. Closes the open enterprise slice US-344.",
+      "acceptanceCriteria": [
+        "After one complete pass, later runs that day do no profile reads (test: 'after one complete pass, later runs that day read no profiles')",
+        "A pass that ended with errors does not write the marker (tests: failed page read, failed send, unreadable marker)",
+        "Forced runs (force_digest) neither skip nor write the marker",
+        "If the migration is not applied yet, the job falls back to the old full pass and the task does not fail"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- supabase/migrations/20261107000354_digest_runs.sql (new): adds the table public.digest_runs(digest_date date PK, completed_at, profiles, sent). RLS is enabled. ALL is revoked from PUBLIC, anon and authenticated, and the only policy is FOR ALL TO service_role.\n- supabase/functions/scheduled-maintenance/digests.ts:\n  - DigestStore has two new methods, hasCompletedRun(day) and markRunCompleted(day, totals). DigestReport has a new field, skipped.\n  - runDigests takes a new option, useRunMarker. When it is on, the job checks the marker before the profile loop and returns skipped=true if the day is already done.\n  - After the loop it writes the marker only when errors is empty and failed is 0.\n  - If the marker cannot be read, the job still does the full pass. digest_log still prevents a double send, and the read failure is reported as an error.\n  - If the marker cannot be written, that is reported as an error after every email has gone out.\n  - summarizeDigestReport returns 'already completed today' for a skipped run.\n- supabase/functions/scheduled-maintenance/digest-store.ts:\n  - Implements the two new methods with maybeSingle and upsert using ignoreDuplicates.\n  - Adds isMissingTable (42P01 / PGRST205), so a deploy that happens before the migration falls back to the full pass instead of failing every hour.\n- supabase/functions/scheduled-maintenance/index.ts: passes useRunMarker: body.force_digest !== true. A forced run may anchor on now, before the digest hour, so it never records a marker that would block the on-time edition.\n- src/integrations/supabase/types.ts: adds a digest_runs entry by hand. Nothing could regenerate it here because no Postgres was available.\n\nAccepted trade-off (written in the digests.ts header comment): once a clean pass has run, some agents are not looked at again until tomorrow's edition. That covers agents who had nothing to send at that pass, switched the digest on after it, signed up after it, or got a task due today after it. This matches what an on-time run with no catch-up window always did.\n\nTests: supabase/functions/scheduled-maintenance/digests.test.ts has a new describe block, 'runDigests per-day run marker (US-354)', with 7 cases, plus a wiring check on index.ts and digest-store.ts.\n\nVERIFIED: npx tsc --noEmit: exit 0, run before and after the commit (the pre-commit hook ran prettier and eslint).\nnpx vitest run supabase/functions/scheduled-maintenance: 2 files, 52 tests passed, re-run after the commit.\nnpx vitest run (full suite): 217 files passed, 1885 tests passed, 1 skipped.\nnpm run verify:migrations: OK, 63 migration files structurally valid.\nnpm run verify:schema: not run. It needs a Postgres URL and no Postgres server exists in this sandbox.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000354_digest_runs.sql. It can go before or after the function redeploy: until it is applied, the job does the full pass every run, as it does today. | Redeploy the edge functions server (functions.agentbio.net, the Coolify app built from the root Dockerfile) so scheduled-maintenance picks up the run marker. | Make sure the verify-backend CI job (verify:schema against real Postgres) runs on this branch. It was not run here because there was no Postgres server."
+    },
+    {
+      "id": "US-368",
+      "lane": "enterprise",
+      "round": 4,
+      "title": "Bulk agent email lookup for the digest and overdue chaser",
+      "description": "_shared/agent-contact.ts getAgentContact makes two calls per agent: a profile select plus auth.admin.getUserById. The digest and the overdue chaser each call it once per agent per run. Add a service-role-only SECURITY DEFINER RPC returning (id, email, full_name) for an array of ids, and use it once per page.",
+      "acceptanceCriteria": [
+        "A digest page with N agents to email makes one contact lookup, not 2N",
+        "The RPC is revoked from PUBLIC, anon and authenticated and pins search_path"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Finding recorded in progress.txt; supabase/functions/_shared/agent-contact.ts:41 (follow-up from US-354)"
+    },
+    {
+      "id": "US-355",
+      "lane": "marketing",
+      "round": 4,
+      "title": "/features/property-listings and the marketing pages promised unlimited listings and \"MLS compliance\" that the product does not deliver",
+      "description": "This finishes the property-listings slice of US-295 and US-324. /features/property-listings, the landing FAQ (which is also published as FAQPage JSON-LD), /vs/beacons, /vs/linktree, /for-real-estate-agents, seo.config, FEATURE_FAQS and the Press page made claims the public profile page does not support. They said \"Unlimited Listings on Pro Plan\" (Professional allows 25), \"MLS compliance built-in\", MLS attribution, a Fair Housing disclaimer on every page, \"GDPR standards met\", estimated monthly payments, price-reduced badges, year built / HOA, neighbourhood data, close dates and before/after photos. They now name what ships: the Equal Housing Opportunity logo and statement, the license number and state, and the MLS number on each listing. The listing allowance is now built from PRICING_PLANS. The guard test was widened to keep these claims out.",
+      "acceptanceCriteria": [
+        "/features/property-listings claims only what the public page shows (FullProfilePage, ListingDetailModal, ProfileHeader, UpcomingOpenHouses)",
+        "No listed marketing file says 'MLS compliance'; each page names the Equal Housing logo/statement, license number and MLS number instead",
+        "Listing allowance copy comes from PRICING_PLANS via listingAllowanceSummary(), so it moves with the plans",
+        "Landing FAQ visible text and its FAQPage JSON-LD are still one array (LANDING_FAQS), so they stay in sync",
+        "Press calendar-booking capability names the agent's Calendly; the Press FAQ no longer says paid plans 'add' lead capture and booking (Free has both)",
+        "src/features-claims.test.ts holds the removed phrases out; tsc and the vitest suites pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence for what the product has. Plan listing limits (src/config/pricing-plans.ts): Free 3, Starter 10, Professional 25, Team and Enterprise -1 (unlimited). Equal Housing logo and statement: src/pages/public/FullProfilePage.tsx:673-710. License number and state: src/components/profile/ProfileHeader.tsx:100,187-191. MLS number and price per sq ft: src/components/profile/ListingDetailModal.tsx:251,410-414,530. listings Row (types.ts) has year_built, garage_spaces and sold_date, but no public component shows them (grep sold_date: only dashboard/Listings.tsx). Nothing renders a mortgage/monthly payment, price-reduced/just-listed badges or neighbourhood data. Free plan includes leads (leadsPerMonth 10), so the Press FAQ claim \"Paid plans add ... lead capture\" was false.\n\nChanges:\n- src/config/pricing-plans.ts: new listingAllowanceSummary() (\"3 listings on Free, 10 on Starter, 25 on Professional and unlimited from Team\") and firstUnlimitedListingsPlan().\n- src/pages/features/PropertyListings.tsx: rewrote the schema featureList, meta description, direct answer, hero badge (now \"Unlimited listings on Team\", derived from the plans), feature cards and the active/sold lists. The 'MLS Compliance Built-In' grid became 'The Disclosures Your Page Shows', listing the 3 real items plus a note that the broker or MLS has the final word. The step circle's teal-to-blue gradient is now solid teal (craft floor).\n- src/lib/faq-schema.ts: answers that state plan facts now build them from PRICING_PLANS. This also corrected '$39' (Starter is $29, Professional $49) in HOMEPAGE_FAQS and PRICING_FAQS. \"MLS compliance\" is replaced in COMPARISON_FAQS.\n- Landing.tsx: LANDING_FAQS answers 1, 3 and 5 changed. \"Closing dates\" was dropped because sold_date is not shown. The feature card title is now 'Listing Disclosures'.\n- ForRealEstateAgents.tsx: comparison row is now 'MLS # on each listing'.\n- VsBeacons.tsx and VsLinktree.tsx: MLS-compliance wording, \"unlimited listings\" and \"Just Listed\" badges changed.\n- seo.config.ts: COMPARISON_DATA/PRICING_TIERS descriptions changed. These are unused, but the claims tests scan them.\n- Press.tsx: changed the calendar capability (a brief finding) and the free-plan FAQ.\n\nTests:\n- features-claims.test.ts: new PropertyListings.tsx rules; a bare /MLS complian/ check across 10 files that reports only the matched snippet; \"unlimited (property )?listings\" and \"$39\" added to the FAQ rules.\n- pricing-plans.test.ts: 3 tests for the new helpers.\n\nNot touched:\n- LeadCapture CRM wording, because seo-lane US-345 covers it explicitly.\n- The lead-capture notification wording in FEATURE_FAQS.leadCapture.\n\nVERIFIED: npx tsc --noEmit: clean (exit 0, no output), run both before the commit and again after the final Press.tsx edit.\nnpx vitest run src/features-claims.test.ts src/config/pricing-plans.test.ts src/landing-claims.test.ts src/marketing-claims.test.ts src/llms-txt.test.ts src/routes.test.ts src/schema-references.test.ts: 7 files, 57 tests passed.\nnpx vitest run src/config src/no-clipped-text.test.ts src/lib/planLimits.test.ts src/social-profiles.test.ts functions/_tests/username-route.test.ts scripts/lib/location-faq.test.ts src/pages: 30 files, 225 tests passed.\nRe-run after the final edit: features-claims, pricing-plans, landing-claims and marketing-claims passed (38 tests).\nAt commit, lint-staged ran eslint --fix and prettier on the 11 files.\nverify:seo (needs a build/prerender) was not run.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-369",
+      "lane": "marketing",
+      "round": 4,
+      "title": "Delete or correct dead marketing-claim modules",
+      "description": "src/lib/geo.ts GEO_FAQS (still says 'Paid plans start at $39/month with unlimited listings' and 'MLS compliance'), seo.config.ts COMPARISON_DATA (an agentbio rating '4.8' with no reviews behind it) and PRICING_TIERS, and faq-schema.ts HOMEPAGE_FAQS/PRICING_FAQS/COMPARISON_FAQS/FEATURE_FAQS.propertyListings are imported nowhere. Delete them, or wire them up and bring them under the claims tests, so they cannot be revived with false claims.",
+      "acceptanceCriteria": [
+        "No unused export carries a price, rating or plan claim",
+        "Anything kept is rendered and covered by features-claims/marketing-claims"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-355)"
+    },
+    {
+      "id": "US-356",
+      "lane": "seo",
+      "round": 4,
+      "title": "Blog article JSON-LD named the social banner as AgentBio's logo, and AgentBio's entity ids were spelled two ways",
+      "description": "Closes US-346. Every blog article's BlogPosting.publisher.logo was set to /Cover.png, which is the 1536x1024 social banner. The site's Organization node uses /logo.png at 946x436. The publisher is now built by one shared helper. It uses the same Organization @id, name, url and measured logo ImageObject as the Organization node.\n\nThe same new module, src/config/site-entities.ts, also builds the Organization and WebSite node ids (${origin}/#organization and ${origin}/#website) for every generator that names them. PageSEO and SchemaMarkup had been writing them without the slash before the #.\n\nseo-audit.mjs gets two new rules:\n- A logo field may not point at the social banner.\n- An entity id (one with a #fragment) may not be written two different ways on one page.",
+      "acceptanceCriteria": [
+        "BlogPosting publisher.logo is deep-equal to the Organization node's logo (/logo.png, 946x436), never /Cover.png",
+        "The BlogPosting publisher carries the Organization @id ${origin}/#organization",
+        "Organization and WebSite ids are built in one place (site-entities.ts) and spelled ${origin}/#organization and ${origin}/#website everywhere",
+        "seo-audit flags a logo that names /Cover.png(.webp), and flags one entity id written two ways on a page",
+        "A source guard fails if `}#organization`, `.net#organization` or the #website forms come back anywhere under src/",
+        "tsc passes; the related vitest suites pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Defect: src/components/blog/ArticleSEO.tsx:84-91 (before) set publisher.logo.url to `${siteUrl}/Cover.png`. The Organization nodes (src/lib/seo.ts:183, PageSEO.tsx:59) use ORGANIZATION_LOGO, which is /logo.png at 946x436.\n\nChanges:\n- New src/config/site-entities.ts with organizationId(), websiteId(), organizationLogo() and publisherOrganization(). Each strips a trailing slash from the origin.\n- ArticleSEO.tsx: publisher is now publisherOrganization(siteUrl). This page is live on every /blog/:slug.\n- src/lib/seo.ts: the Organization @id and logo now come from the helper. The ProfessionalService logo (generateEnhancedLocalBusinessSchema, rendered by Landing.tsx) now states its width and height; it had stated neither. The SoftwareApplication publisher now refers to the Organization by @id and includes the logo.\n- PageSEO.tsx and SchemaMarkup.tsx: ids now use the slash form, and the SchemaMarkup article publisher uses the helper. Both components are currently imported by nothing in src, so in practice the id-spelling split was in unused code. They are aligned so that whoever revives them does not bring it back.\n- scripts/lib/seo-audit.mjs: two new rules inside auditStructuredData. (1) A node whose logo points at /Cover.png or /Cover.webp is reported. (2) Every @id containing a # on the page is grouped by new URL().href, and any group with more than one raw spelling is reported. Ids without a # are deliberately left out, so breadcrumb rungs such as `https://agentbio.net` against `https://agentbio.net/` do not trip the build gate.\n\nTests:\n- src/config/site-entities.test.tsx renders ArticleSEO and PageSEO through HelmetProvider in server mode (canUseDOM=false). It checks that publisher.logo deep-equals generateEnhancedOrganizationSchema().logo, that the publisher @id matches the Organization @id, and that every PageSEO reference resolves to an id declared on the page. It also includes the source-scan guard.\n- scripts/lib/seo-audit.test.ts has a new 'site entity identity' describe block with two failing and two passing cases.\n\nVERIFIED: - `npx tsc --noEmit` exited 0, both before and after lint-staged reformatted the commit.\n- `npx vitest run src/config scripts/lib src/lib/seo.test.ts src/social-profiles.test.ts src/pages/BlogArticle.test.tsx src/components/blog`: 15 files, 203 tests, all passed.\n- `npx vitest run scripts/lib/seo-audit.test.ts`: 55 passed.\n- `npx vitest run src/config/site-entities.test.tsx`: 8 passed.\n- No migration, so verify:migrations does not apply.\n- The full build-level `npm run verify:seo` (prerender with chromium) was not run. Its id-spelling rule only looks at ids with a #, and the live pages already use the slash form, so no new failures are expected. CI or the integrator should confirm.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages (frontend only). The prerendered /blog/* pages pick up the corrected publisher logo on the next build. No migration, no edge function."
+    },
+    {
+      "id": "US-370",
+      "lane": "seo",
+      "round": 4,
+      "title": "Delete or wire up the unused PageSEO and SchemaMarkup components",
+      "description": "src/components/seo/PageSEO.tsx and src/components/seo/SchemaMarkup.tsx are imported by nothing in src (grep for '<PageSEO' and 'seo/SchemaMarkup' finds only the new test). They are a second structured-data implementation that drifts from the live one; the slashless @id spelling fixed in US-356 lived only there.",
+      "acceptanceCriteria": [
+        "Either removed, with site-entities.test.tsx updated, or used by a route with the duplication against SEOHead resolved",
+        "tsc and vitest pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "The seo-origin-sources test lists src/components/seo as part of the SEO layer; update it if the files go. (follow-up from US-356)"
+    },
+    {
+      "id": "US-371",
+      "lane": "seo",
+      "round": 4,
+      "title": "Route the remaining hand-written Organization/WebSite references through site-entities",
+      "description": "LocationTemplate.tsx:75,113, Landing.tsx:103-109, Pricing.tsx:118, FullProfilePage.tsx:408, BlogCategory.tsx:408 and the seven legal pages build ids by hand. All use the correct slash form today, but these are exactly the copies that drift. FullProfilePage and Landing use a browser-origin variable, so on a preview host they can name a WebSite id that differs from the canonical one.",
+      "acceptanceCriteria": [
+        "Each uses organizationId/websiteId with getBaseUrl()",
+        "No page builds an entity id from window.location"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-356)"
+    },
+    {
+      "id": "US-357",
+      "lane": "mobile",
+      "round": 4,
+      "title": "A failed sign-in on a flaky phone connection reloaded the page and wiped the login form whenever the browser held any cache the app does not own",
+      "description": "This closes US-347. `cleanupServiceWorkers` now returns three separate facts: how many legacy workers it unregistered, how many caches it deleted, and whether a worker other than /sw.js still controls the page. `cleanupAndReload` now reloads in only two cases: it unregistered a legacy worker, or one still controls the page. A legacy worker can still control the page when App.tsx has already unregistered it on mount, because unregistering does not release a page that worker already controls. Deleting a stray cache, or finding nothing to clean, no longer reloads, so a failed sign-in on a flaky connection keeps what was typed into the form. The Login toast now says the sign-in service could not be reached, instead of blaming the browser cache.",
+      "acceptanceCriteria": [
+        "cleanupServiceWorkers reports separately whether it unregistered a worker and whether it deleted caches",
+        "Login reloads only after it unregistered a legacy worker (or one still controls the page)",
+        "Tested in src/lib/sw-cleanup.test.ts"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The bug: in the old src/lib/sw-cleanup.ts (lines 44-55), cleanedUp was set to true whenever any cache name lacked the 'agentbio-sw-' prefix. src/pages/auth/Login.tsx (lines 139-141) then called cleanupAndReload 3 seconds after every sign-in network error, which reloaded the page.\n\nWhat changed:\n- /home/user/plain-page-link/.claude/worktrees/wf_c12867ba-1a3-10/src/lib/sw-cleanup.ts now returns a `ServiceWorkerCleanupResult` with three fields: `unregisteredWorkers`, `controlledByLegacyWorker` and `deletedCaches`.\n- It adds `cleanupNeedsReload(result)`, which is true when a worker was unregistered or a legacy worker still controls the page.\n- `cleanupAndReload()` now returns a boolean saying whether it reloaded, and reloads only when `cleanupNeedsReload` is true.\n- The scan also checks the waiting and installing script URLs, not just the active one.\n- The caller in src/App.tsx:160 ignores the return value, so it needed no change.\n- /home/user/plain-page-link/.claude/worktrees/wf_c12867ba-1a3-10/src/pages/auth/Login.tsx has new toast copy and a comment; the 3-second timer is kept.\n- /home/user/plain-page-link/.claude/worktrees/wf_c12867ba-1a3-10/src/lib/sw-cleanup.test.ts now has 8 tests. They cover: a foreign cache is deleted with no reload; nothing to clean means no reload; a legacy worker is unregistered and the page reloads; a page still controlled by a legacy worker reloads; and the failure path.\n\nI chose this over US-323 and US-301 because it causes data loss (typed form input) on a core flow.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx vitest run src/lib/sw-cleanup.test.ts src/pages/auth/Login.test.tsx: 2 files, 13 tests passed. I ran this again after the pre-commit hook's eslint and prettier reformatted the files, and it passed again.\nnpx vitest run src/lib src/pages/auth: 67 files, 681 tests passed.\nThere is no migration, so I did not run verify:migrations.\n\nREVIEW: approve"
     }
   ]
 }

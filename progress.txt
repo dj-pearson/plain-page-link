@@ -5264,3 +5264,83 @@ Other findings:
 - [seo] The per-line commentMask/RULES scan in the first describe block (numeric claims) still checks one line at a time. scanLines could be reused there too, but its findings need checking against existing wrapped copy first.
 - [mobile] public/sw.js: the APP_SHELL addAll is all-or-nothing. If '/manifest.json' or '/offline.html' fails, the whole shell precache (including /index.html) is skipped, though install still completes. Making it per-file like the entry assets would be sturdier.
 - [mobile] src/App.tsx:160 runs cleanupServiceWorkers() on every app mount and deletes every cache whose name does not start with 'agentbio-sw-'. That is harmless today, but anything added later that uses Cache Storage (for example a library cache) would be wiped on each load.
+
+---
+
+## Continuous improvement loop — round 4 — 2026-11-07 (US-348 to US-357 done)
+
+Ten lanes, all approved with no fix-ups. Closed US-313, US-288, US-324, US-335, US-337, US-339, US-344, US-346, US-347; first slice of US-275; part of US-295.
+Final: tsc clean, 1994 unit tests pass (from 1877), verify:migrations OK (65 files), vite build OK, eslint 645 warnings (CI ratchet tightened 653 -> 645).
+Playwright e2e/a11y listing-page specs were rewritten but not run (no browsers here); CI runs them.
+
+- US-348 [listings] Listings had no page of their own: a shared home opened as a modal over the profile that search engines could not index
+- US-349 [leads] The lead timeline's system rows (status changes, lead created) can no longer be forged, rewritten or deleted through the API
+- US-350 [profile] Hero and CTA blocks no longer publish a button that goes nowhere (closes US-337)
+- US-351 [uiux] API keys page: 'Done' threw away a new key that was never copied, and the 'copy this key now' warning box had no dark mode
+- US-352 [performance] Every @radix-ui package now goes to ui-vendor by prefix, and the eslint warning limit drops to the current count (US-288)
+- US-353 [security] An agent could rewrite their own pending account-deletion row and use it to switch billing back on for another customer's Stripe subscription
+- US-354 [enterprise] Digest catch-up runs re-read every profile each hour after everyone was already sent (US-344)
+- US-355 [marketing] /features/property-listings and the marketing pages promised unlimited listings and "MLS compliance" that the product does not deliver
+- US-356 [seo] Blog article JSON-LD named the social banner as AgentBio's logo, and AgentBio's entity ids were spelled two ways
+- US-357 [mobile] A failed sign-in on a flaky phone connection reloaded the page and wiped the login form whenever the browser held any cache the app does not own
+
+Owner actions:
+- US-348: Deploy Cloudflare Pages: it picks up public/_redirects (new rule /:username/listing/:listingId) and the new Pages Function functions/[username]/listing/[listingId].ts. The new route does not work in production without this deploy.
+- US-349: Apply migration supabase/migrations/20261107000349_lead_timeline_system_rows_tamper_proof.sql to production. No edge function redeploy is needed. The frontend change only tightens types, so the order of deploy does not matter.
+- US-349: Make sure the verify-backend CI job runs on this branch, so the new verify:schema check is exercised against a real Postgres. It could not be run in this sandbox.
+- US-353: Apply migration supabase/migrations/20261107000353_deletion_schedule_system_written.sql
+- US-353: Redeploy edge functions that bundle _shared/account-deletion.ts (gdpr-deletion, scheduled-maintenance / process-account-deletions) on functions.agentbio.net
+- US-354: Apply migration supabase/migrations/20261107000354_digest_runs.sql. It can go before or after the function redeploy: until it is applied, the job does the full pass every run, as it does today.
+- US-354: Redeploy the edge functions server (functions.agentbio.net, the Coolify app built from the root Dockerfile) so scheduled-maintenance picks up the run marker.
+- US-354: Make sure the verify-backend CI job (verify:schema against real Postgres) runs on this branch. It was not run here because there was no Postgres server.
+- US-356: Redeploy Cloudflare Pages (frontend only). The prerendered /blog/* pages pick up the corrected publisher logo on the next build. No migration, no edge function.
+
+Opened:
+- US-358 [listings] US-275 slice: listing pages in the prerender and the agent sitemap
+- US-359 [listings] Listing cards link to the listing page with a real <a href>
+- US-360 [listings] Run the updated Playwright listing-page specs in CI and fix anything they find
+- US-361 [listings] Sticky contact bar on the listing page for mobile
+- US-362 [leads] Only the author can edit the content of a timeline row
+- US-363 [profile] Type BlockRenderer and BlockSettings without `as any`
+- US-364 [uiux] ApiKeysPage: warn before leaving the page while an uncopied key is on screen
+- US-365 [performance] Bring tsconfig.node.json up to date so vite.config.ts type-checks
+- US-366 [security] Make api_keys writable only through the api-keys edge function
+- US-367 [security] Audit user_mfa_settings and user_sessions owner UPDATE policies
+- US-368 [enterprise] Bulk agent email lookup for the digest and overdue chaser
+- US-369 [marketing] Delete or correct dead marketing-claim modules
+- US-370 [seo] Delete or wire up the unused PageSEO and SchemaMarkup components
+- US-371 [seo] Route the remaining hand-written Organization/WebSite references through site-entities
+
+Other findings:
+- [listings] functions/_lib/profile-route.ts (moved from functions/[username].ts): the crawler listing lookup filters on id and user_id but not on status. A crawler can still get a share card for a draft listing, or one hidden by show_listings, if anon RLS on listings lets that row through. Worth checking against the listings SELECT policy.
+- [listings] src/components/profile/ListingCard.tsx:146 and FeaturedListingsCarousel still use a purple 'Featured' badge and a gradient overlay. These are craft-floor tells and belong to the uiux/profile lanes.
+- [listings] US-276 (listing views on the lead) is still open and spans the leads lane (submit-lead and the lead detail). It is the next listings-lane slice after the sitemap work.
+- [leads] src/hooks/useLeadContactAction.ts:36 calls useLeadActivities(undefined), so after a contact action from the list its success handlers invalidate ['lead-activities', undefined] and an open lead's timeline does not refresh. Still open, carried over from round 3.
+- [leads] US-279 (Leads filter row overflows at 375px) is still open. US-278 is still blocked on the owner's decision about the lead status vocabulary.
+- [leads] The hook's error toasts are generic ('Failed to log activity'). A forged-type refusal now raises check_violation, and a reassigned assignee gets 'Lead not found or access denied'. Clearer messages, for example 'This lead is no longer assigned to you', would help.
+- [leads] auto_log_lead_creation (baseline:236) still pins SET search_path TO 'public' only, not 'public, extensions, pg_temp'. That is security-lane territory; check whether verify:schema's search_path rule covers trigger functions.
+- [profile] The hero and CTA URL inputs in src/components/pageBuilder/BlockSettings.tsx use type="url", so the browser marks the template default '#contact' as invalid. It is a usable same-page anchor, so a text input with inputMode="url" may suit it better. The link-url input has the same issue.
+- [profile] HeroBlock.tsx still uses a purple/blue gradient for its default background, its 'gradient' overlay and its empty editor state (from-blue-50 to-purple-50). That is a craft-floor tell; it was left alone because this change was not about it.
+- [profile] CTABlock's 'gradient' variant uses the same primary-to-accent gradient (#2563eb to #7c3aed by default).
+- [uiux] US-338 (TeamPage shown read-only to invited members) is still blocked on an owner decision and a check of what RLS lets members read on teams/team_members. There is also still no UI for changing a member's role (teams updateRole) — it belongs in the same story.
+- [uiux] src/pages/dashboard/ApiKeysPage.tsx revoke button and the error icon use hard-coded red-600 / hover:bg-red-50 rather than the destructive token; the hover:bg-red-50 is a light patch in dark mode. The confirm action uses bg-red-600 too.
+- [uiux] The new --warning tokens could replace other hard-coded amber callouts, e.g. src/components/profile/UnpublishedPreviewBanner.tsx:15 (amber-50/950, no dark variant).
+- [performance] US-341 (crawler profile read through get_public_profile_page) is still open and was not audited this round. Check functions/ for the profile handler.
+- [performance] US-340 was skipped as instructed: it needs the US-329 migration confirmed live in production first.
+- [security] supabase/functions/_shared/api-auth.ts:44 and webhook-auth.ts:38 disagree on revocation: api-auth checks revoked_at, while webhook-auth checks is_active, which the api-keys revoke action (api-keys/index.ts:122-127) never sets. When webhook-auth is wired up, a revoked key would still authenticate through it.
+- [security] supabase/functions/api-keys/index.ts:97 stores body.permissions unvalidated. Any JSON the caller sends becomes the key's permissions.
+- [security] Open lane stories still untouched: US-317 (increment_link_clicks on unpublished pages), US-289 (DB CHECK on URL schemes), US-290 (Profile URL validation) and US-342 (select('*') on listings).
+- [enterprise] supabase/functions/scheduled-maintenance/digests.ts sendPage: weekly stats are still three count queries per weekly agent (digest-store.ts weeklyStats). A single grouped RPC per page would cut Monday's load further.
+- [enterprise] US-291 (queue large GDPR exports) is still the largest open enterprise item. It needs a private bucket, a job and email, so it is more than one session.
+- [marketing] src/config/seo.config.ts COMPARISON_DATA.agentbio.rating '4.8' (and the competitor ratings) is an unsourced star rating. It is unused today; marketing-claims.test's '/5' rule does not catch a bare '4.8' string.
+- [marketing] src/lib/geo.ts:176,220 GEO_FAQS still says '$39/month with unlimited listings' and 'MLS compliance'. The module is imported nowhere.
+- [marketing] src/pages/landing/VsBeacons.tsx comparison row 'Showing Appointment Booking' says 'Calendly/Google Calendar integration', and migration step 5 says 'Integrate Calendly or Google Calendar'. Only Calendly exists (US-332 evidence). The 'Testimonials Display' row says 'verified badges and success stories', and the FAQ quotes 'agents report 15-25 qualified leads per month' and says 'You can integrate AgentBio with your existing email platform'. All are unsourced or unshipped.
+- [marketing] src/pages/features/PropertyListings.tsx FeatureCard icon tile still uses bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 (craft-floor tell, uiux lane). VsBeacons MigrationStep circle uses a teal-to-blue gradient.
+- [marketing] Open brief findings not done this round: duplicate id="demo-profiles" (Landing.tsx and DemoProfilesShowcase.tsx) and the raw profile.theme key badge in DemoProfilesShowcase.tsx. Also still open: US-296, US-297, US-319.
+- [seo] src/lib/seo.ts:190 and :244 still set Organization.image / ProfessionalService.image to /Cover.png. That is allowed (image is not logo), but it ties into US-175's open decision on the cover artwork.
+- [seo] US-182 (two anonymous WebPage nodes on /features/lead-capture and /features/analytics) is still open. It is the natural next seo slice, and the new id-grouping code in seo-audit.mjs is a starting point for its 'anonymous duplicate of a singular type' rule.
+- [seo] Pricing.tsx:99 and VsLater.tsx:44 give a bare {'@type':'Organization', name:'AgentBio'} as seller/author without an @id, so they do not link to the site Organization node. publisherOrganization() could be used there.
+- [mobile] US-323 is still open: public/sw.js isNeverCache uses p.startsWith('/auth'), so a profile like /authorname is never cached. The fix is to match '/auth' or the '/auth/' prefix only, with a test.
+- [mobile] US-301 is still open: _headers marks unhashed /icons/* and root brand PNGs immutable for a year, so installed PWAs keep stale home-screen icons.
+- [mobile] Round-3 finding, not checked this round: the APP_SHELL precache in public/sw.js (around line 234) uses cache.addAll, which fails as a whole if any single URL fails. One missing asset makes the install fail and leaves the device on the old worker.
+- [mobile] src/App.tsx:160 runs cleanupServiceWorkers on every load and deletes every cache not prefixed 'agentbio-sw-', including caches other code on the origin might create. That is harmless today because nothing else creates caches, but it is worth knowing before anything adds one.
