@@ -31,7 +31,13 @@
  * Columns read alongside: price_range, timeline, preapproved.
  */
 
-import type { Json } from '@/integrations/supabase/types';
+/**
+ * Structurally the Json of src/integrations/supabase/types.ts, declared here
+ * rather than imported so this file has no imports at all: notify-lead runs
+ * an exact copy (supabase/functions/_shared/leadFormSchema.ts, held to this
+ * file by a parity test) and the edge container cannot reach src/.
+ */
+type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface QualifierField {
   /** Key in the answers bag; see splitFormData for the ones with a column. */
