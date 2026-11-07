@@ -267,6 +267,25 @@ describe('feature claims', () => {
       rule: 'native CRM integrations, which do not exist (the hand-off is a Zapier webhook)',
       pattern: /\bintegrates?\s+with\s+(?:major\s+|popular\s+|leading\s+|your\s+)?CRMs?\b/i,
     },
+    // US-398 (US-387, US-388): the two rules above missed "MLS/IDX Integration —
+    // Auto-sync active listings from MLS" in the /vs/later comparison table,
+    // "Auto-updated listings from your MLS" in the bio analyzer's first email
+    // (the one that actually sends) and on its results page, and "CRM
+    // integration (auto-sync leads)", "Auto-send leads to Follow Up Boss,
+    // LionDesk" and "CRM Built-In" across /vs/later and the landing page.
+    // Listings are typed in by the agent; the CRM hand-off is a Zapier webhook.
+    // "No CRM integration" and "There is no built-in CRM integration" are the
+    // honest forms and stay allowed.
+    {
+      rule: 'listings that sync from the MLS, which nothing does (listings are entered by hand)',
+      pattern:
+        /\bMLS\s*\/\s*IDX\s+integration\b|\bauto[- ]?(?:updat\w*|sync\w*)\b[^.]{0,40}\bMLS\b/i,
+    },
+    {
+      rule: 'a CRM integration or sync, which does not exist (the hand-off is a Zapier webhook)',
+      pattern:
+        /(?<!\bno\s(?:built-in\s)?)\bCRM\s+(?:integrations?|sync(?:ing)?|built-in)\b|\bauto-?(?:sync|send)(?:ed|s)?\s+leads\b|\bconnect\s+(?:it\s+)?to\s+your\s+CRM\b/i,
+    },
     {
       rule: 'analytics broken down by neighbourhood, which nothing records',
       pattern:
@@ -327,6 +346,17 @@ describe('feature claims', () => {
       'accelerates deals with market intelligence',
       'The platform integrates with popular CRM systems used by {city} real estate professionals',
       'track which {city} neighborhoods and property types generate the most engagement',
+      // US-398
+      'description="Auto-sync active listings from MLS"',
+      'feature="MLS/IDX Integration"',
+      '→ Auto-updated listings from your MLS',
+      "'Auto-updated MLS listings',",
+      '<span>CRM integration (auto-sync leads)</span>',
+      'description="Auto-send leads to Follow Up Boss, LionDesk, etc."',
+      "highlight: 'CRM Built-In',",
+      '→ CRM integration (Follow Up Boss, Salesforce, etc.)',
+      'and home valuation request. Connect to your CRM.',
+      'buyer and seller qualification questions, and CRM syncing.',
     ]) {
       expect(
         FEATURE_RULES.some(({ pattern }) => pattern.test(sample)),
@@ -358,6 +388,14 @@ describe('feature claims', () => {
       "Every new lead can be sent on to the agent's CRM through a Zapier webhook or, on paid plans, exported",
       'the dashboard shows how many people viewed each listing, clicked each link and which',
       'campaign sources turned into leads.',
+      // US-398: the honest forms of the CRM and MLS rules.
+      '<span>No CRM integration</span>',
+      'There is no built-in CRM integration. You can connect a Zapier webhook',
+      "{ key: 'crm_connectors', name: 'CRM connectors', blurb: 'Send leads to Follow Up Boss and others' },",
+      "{ key: 'mls_integration', name: 'MLS sync', blurb: 'Listings that update from your MLS' },",
+      'MLS sync is on the roadmap, and you can ask to be notified on the pricing page.',
+      '<span>New leads passed to your CRM via a Zapier webhook</span>',
+      '<li>Connect your CRM (Salesforce, HubSpot, etc.) as the action</li>',
     ];
     scanLines(
       lines,

@@ -53,7 +53,7 @@ export default function VsLater() {
             name: "What's the main difference between AgentBio and Later?",
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'AgentBio is built specifically for real estate agents with features like property listings, lead capture forms, and CRM integration. Later is primarily a social media scheduling tool with a link in bio feature as a secondary offering. AgentBio focuses on lead generation, while Later focuses on content scheduling.',
+              text: 'AgentBio is built specifically for real estate agents with features like property listings, buyer and seller lead capture forms, and open house sign-in. Later is primarily a social media scheduling tool with a link in bio feature as a secondary offering. AgentBio focuses on lead generation, while Later focuses on content scheduling.',
             },
           },
           {
@@ -61,7 +61,7 @@ export default function VsLater() {
             name: 'Can I use Later for real estate link in bio?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: "Yes, but Later's link in bio feature lacks real estate-specific capabilities like property listing cards, MLS integration, buyer/seller forms, and CRM syncing. Most real estate agents find they need additional tools to capture and convert leads effectively.",
+              text: "Yes, but Later's link in bio feature lacks real estate-specific capabilities like property listing cards and buyer/seller lead forms. Most real estate agents find they need additional tools to capture and convert leads effectively.",
             },
           },
           {
@@ -178,13 +178,14 @@ export default function VsLater() {
                 Later is primarily a social media scheduling tool with a basic link in bio feature.
               </strong>{' '}
               The key difference: AgentBio includes property listing showcases, built-in lead
-              capture forms, CRM integration, calendar booking, and real estate templates designed
-              to convert Instagram followers into clients. Later's link in bio is a secondary
-              feature focused on driving traffic to scheduled posts rather than capturing leads.
-              AgentBio's lead capture is built around what a real estate enquiry needs: MLS details,
-              buyer and seller qualification questions, and CRM syncing. If your priority is
-              scheduling Instagram content, Later excels. If your priority is converting followers
-              into qualified real estate leads, AgentBio is purpose-built for that goal.
+              capture forms, calendar booking, and real estate templates designed to convert
+              Instagram followers into clients. Later's link in bio is a secondary feature focused
+              on driving traffic to scheduled posts rather than capturing leads. AgentBio's lead
+              capture is built around what a real estate enquiry needs: buyer and seller
+              qualification questions, and each new lead can be passed on to your CRM through a
+              Zapier webhook. If your priority is scheduling Instagram content, Later excels. If
+              your priority is converting followers into qualified real estate leads, AgentBio is
+              purpose-built for that goal.
             </p>
           </div>
         </section>
@@ -219,7 +220,7 @@ export default function VsLater() {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>CRM integration (auto-sync leads)</span>
+                    <span>New leads passed to your CRM via a Zapier webhook</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
@@ -277,10 +278,6 @@ export default function VsLater() {
                     <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
                     <span>No property listing features</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <X className="h-5 w-5 text-red-700 mt-0.5 flex-shrink-0" />
-                    <span>No CRM integration</span>
-                  </li>
                 </ul>
 
                 <div className="bg-muted p-4 rounded-lg">
@@ -325,22 +322,16 @@ export default function VsLater() {
                       description="Showcase listings with photos, prices, and details"
                     />
                     <ComparisonRow
-                      feature="MLS/IDX Integration"
-                      agentbio={true}
-                      later={false}
-                      description="Auto-sync active listings from MLS"
-                    />
-                    <ComparisonRow
                       feature="Lead Capture Forms"
                       agentbio={true}
                       later={false}
                       description="Built-in buyer/seller qualification forms"
                     />
                     <ComparisonRow
-                      feature="CRM Integration"
-                      agentbio={true}
+                      feature="Leads Sent to Your CRM"
+                      agentbio="Via Zapier"
                       later={false}
-                      description="Auto-send leads to Follow Up Boss, LionDesk, etc."
+                      description="Each new lead is posted to your Zapier webhook; CSV export on paid plans"
                     />
                     <ComparisonRow
                       feature="Calendar Booking"
@@ -431,8 +422,8 @@ export default function VsLater() {
                 <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg">
                   <p className="font-semibold text-primary">✓ Choose AgentBio</p>
                   <p className="text-sm mt-1">
-                    Purpose-built for lead capture with forms, CRM sync, property showcases, and
-                    calendar booking.
+                    Purpose-built for lead capture with forms, property showcases, open house
+                    sign-in, and calendar booking.
                   </p>
                 </div>
               </div>
@@ -545,7 +536,7 @@ export default function VsLater() {
                   step: '4',
                   title: 'Create Lead Capture Forms',
                   description:
-                    'Set up buyer questionnaire, seller consultation form, and home valuation request. Connect to your CRM.',
+                    'Set up buyer questionnaire, seller consultation form, and home valuation request. Add a Zapier webhook if you want each new lead sent on to your CRM.',
                 },
                 {
                   step: '5',
@@ -598,9 +589,10 @@ export default function VsLater() {
                 </h3>
                 <p className="text-muted-foreground">
                   AgentBio is built specifically for real estate agents with features like property
-                  listings, lead capture forms, and CRM integration. Later is primarily a social
-                  media scheduling tool with a link in bio feature as a secondary offering. AgentBio
-                  focuses on lead generation, while Later focuses on content scheduling.
+                  listings, buyer and seller lead capture forms, and open house sign-in. Later is
+                  primarily a social media scheduling tool with a link in bio feature as a secondary
+                  offering. AgentBio focuses on lead generation, while Later focuses on content
+                  scheduling.
                 </p>
               </div>
 
@@ -610,8 +602,8 @@ export default function VsLater() {
                 </h3>
                 <p className="text-muted-foreground">
                   Yes, but Later's link in bio feature lacks real estate-specific capabilities like
-                  property listing cards, buyer/seller forms, and a built-in lead inbox. Most
-                  real estate agents find they need additional tools to capture and convert leads
+                  property listing cards, buyer/seller forms, and a built-in lead inbox. Most real
+                  estate agents find they need additional tools to capture and convert leads
                   effectively.
                 </p>
               </div>

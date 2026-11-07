@@ -48,7 +48,7 @@ export function AgentTestimonials() {
       title: 'Lead Management',
       description:
         'Capture buyer inquiries, seller leads, and home valuation requests in one place. Follow up faster with organized lead tracking.',
-      highlight: 'CRM Built-In',
+      highlight: 'One Lead Inbox',
     },
   ];
 
