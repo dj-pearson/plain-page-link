@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeFunctions } from '@/lib/edgeFunctions';
 import { AddOnWaitlist } from '@/components/pricing/AddOnWaitlist';
 import { registerUrlForPlan } from '@/lib/signupIntent';
+import { planCardLines } from '@/lib/planCardCopy';
 import { CHECKOUT_RETURN_PATH, checkoutSuccessUrl } from '@/lib/checkoutReturn';
 import { useToast } from '@/hooks/use-toast';
 import { SEOHead } from '@/components/SEOHead';
@@ -332,88 +333,17 @@ export default function Pricing() {
 
                     <CardContent>
                       <ul className="space-y-3">
-                        {plan.limits.listings !== undefined && (
-                          <li className="flex items-start gap-2">
-                            <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                            <span className="text-sm">
-                              {plan.limits.listings === -1 ? 'Unlimited' : plan.limits.listings}{' '}
-                              active listings
-                            </span>
+                        {/* Worded and filtered by planCardLines: raw feature
+                            keys used to render here as "CustomThemes". */}
+                        {planCardLines(plan).map((line) => (
+                          <li key={line} className="flex items-start gap-2">
+                            <Check
+                              className="w-5 h-5 text-primary shrink-0 mt-0.5"
+                              aria-hidden="true"
+                            />
+                            <span className="text-sm">{line}</span>
                           </li>
-                        )}
-                        {plan.limits.contacts !== undefined && (
-                          <li className="flex items-start gap-2">
-                            <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                            <span className="text-sm">
-                              {plan.limits.contacts === -1
-                                ? 'Unlimited'
-                                : plan.limits.contacts.toLocaleString()}{' '}
-                              clients with key dates
-                            </span>
-                          </li>
-                        )}
-                        {plan.limits.open_houses_per_month !== undefined &&
-                          plan.limits.open_houses_per_month !== 0 && (
-                            <li className="flex items-start gap-2">
-                              <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                              <span className="text-sm">
-                                {plan.limits.open_houses_per_month === -1
-                                  ? 'Unlimited open houses'
-                                  : `${plan.limits.open_houses_per_month} open house${plan.limits.open_houses_per_month === 1 ? '' : 's'} a month`}{' '}
-                                with sign-in kiosk
-                              </span>
-                            </li>
-                          )}
-                        {plan.limits.leads_per_month !== undefined && (
-                          <li className="flex items-start gap-2">
-                            <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                            <span className="text-sm">
-                              {plan.limits.leads_per_month === -1
-                                ? 'Unlimited leads'
-                                : `${plan.limits.leads_per_month} leads a month`}
-                            </span>
-                          </li>
-                        )}
-                        {plan.limits.links !== undefined && (
-                          <li className="flex items-start gap-2">
-                            <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                            <span className="text-sm">
-                              {plan.limits.links === -1 ? 'Unlimited' : plan.limits.links} custom
-                              links
-                            </span>
-                          </li>
-                        )}
-                        {plan.limits.testimonials !== undefined && plan.limits.testimonials > 0 && (
-                          <li className="flex items-start gap-2">
-                            <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                            <span className="text-sm">
-                              {plan.limits.testimonials === -1
-                                ? 'Unlimited'
-                                : plan.limits.testimonials}{' '}
-                              testimonials
-                            </span>
-                          </li>
-                        )}
-                        {plan.limits.analytics_days && (
-                          <li className="flex items-start gap-2">
-                            <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                            <span className="text-sm">
-                              {plan.limits.analytics_days === -1
-                                ? 'Unlimited'
-                                : `${plan.limits.analytics_days}-day`}{' '}
-                              analytics
-                            </span>
-                          </li>
-                        )}
-                        {Object.entries(plan.features).map(([key, value]) =>
-                          // Open houses are listed with their monthly count above.
-                          value && key !== 'openHouseManagement' ? (
-                            <li key={key} className="flex items-start gap-2">
-                              <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                              <span className="text-sm capitalize">{key.replace(/_/g, ' ')}</span>
-                            </li>
-                          ) : null
-                        )}
+                        ))}
                       </ul>
                     </CardContent>
 
