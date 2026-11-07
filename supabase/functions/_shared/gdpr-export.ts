@@ -11,9 +11,13 @@
  * pages, workflows, invoices, notifications, API keys and team memberships
  * were not exported at all.
  *
- * This module has no Deno globals and no URL imports so the unit suite can
- * run it. index.ts adapts the service-role client to {@link ExportReader}.
+ * This module has no Deno globals and no URL runtime imports so the unit
+ * suite can run it. It is shared by gdpr-export (the immediate GET download)
+ * and scheduled-maintenance (queued exports, US-397), so both hand out the
+ * same document.
  */
+
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 export const PAGE_SIZE = 1000;
 
@@ -195,4 +199,111 @@ export function sectionCounts(collected: CollectedSections): Record<string, numb
 /** A login attempt's device fingerprint is reported as present, not handed back. */
 export function maskLoginAttempt(attempt: Row): Row {
   return { ...attempt, device_fingerprint: attempt.device_fingerprint ? '[PRESENT]' : null };
+}
+
+/** {@link ExportReader} over a service-role client. */
+export function supabaseExportReader(supabase: SupabaseClient): ExportReader {
+  return {
+    page: (spec, userId, from, to) =>
+      supabase
+        .from(spec.table)
+        .select(spec.columns)
+        .eq(spec.ownerColumn, userId)
+        .order('id', { ascending: true })
+        .range(from, to) as unknown as PromiseLike<ReadResult<Row[]>>,
+    one: (spec, userId) =>
+      supabase
+        .from(spec.table)
+        .select(spec.columns)
+        .eq(spec.ownerColumn, userId)
+        .maybeSingle() as unknown as PromiseLike<ReadResult<Row>>,
+  };
+}
+
+/** The auth.users fields the export reports. */
+export interface ExportSubject {
+  id: string;
+  email?: string | null;
+  created_at?: string | null;
+  last_sign_in_at?: string | null;
+}
+
+/** decryptSecret, injected so this module stays free of Deno globals. */
+export type Decrypt = (value: string | null) => Promise<string | null | undefined>;
+
+/**
+ * The export document. Lead and contact PII is decrypted for the subject's own
+ * copy: encrypted_* are the only store since US-086, so an export that handed
+ * back ciphertext would not be an export at all.
+ */
+export async function buildExportDocument(
+  subject: ExportSubject,
+  collected: CollectedSections,
+  decrypt: Decrypt,
+  now: Date = new Date()
+): Promise<Record<string, unknown>> {
+  const { rows, singles } = collected;
+  const decryptPii = (list: Row[] = []) =>
+    Promise.all(
+      list.map(async (row) => {
+        const { encrypted_phone, encrypted_email, ...rest } = row;
+        const [email, phone] = await Promise.all([
+          decrypt((encrypted_email as string | null) ?? null),
+          decrypt((encrypted_phone as string | null) ?? null),
+        ]);
+        return { ...rest, email: email ?? null, phone: phone ?? null };
+      })
+    );
+  const [leads, contacts] = await Promise.all([decryptPii(rows.leads), decryptPii(rows.contacts)]);
+
+  return {
+    exportedAt: now.toISOString(),
+    user: {
+      id: subject.id,
+      email: subject.email || '',
+      createdAt: subject.created_at || '',
+      lastSignIn: subject.last_sign_in_at || null,
+    },
+    profile: singles.profile ?? null,
+    settings: singles.settings ?? null,
+    listings: rows.listings ?? [],
+    openHouses: rows.openHouses ?? [],
+    leads,
+    leadActivities: rows.leadActivities ?? [],
+    contacts,
+    contactKeyDates: rows.contactKeyDates ?? [],
+    contactInteractions: rows.contactInteractions ?? [],
+    testimonials: rows.testimonials ?? [],
+    links: rows.links ?? [],
+    customPages: rows.customPages ?? [],
+    blogPosts: rows.blogPosts ?? [],
+    workflows: rows.workflows ?? [],
+    notifications: rows.notifications ?? [],
+    billing: {
+      subscriptions: rows.subscriptions ?? [],
+      invoices: rows.invoices ?? [],
+    },
+    teams: {
+      memberships: rows.teamMemberships ?? [],
+      roles: rows.roles ?? [],
+    },
+    analytics: {
+      profileViews: rows.profileViews ?? [],
+      events: rows.analyticsEvents ?? [],
+    },
+    security: {
+      sessions: rows.sessions ?? [],
+      loginAttempts: (rows.loginAttempts ?? []).map(maskLoginAttempt),
+      mfaSettings: singles.mfaSettings ?? null,
+      apiKeys: rows.apiKeys ?? [],
+      auditLogs: rows.auditLogs ?? [],
+    },
+    gdprRequests: rows.gdprRequests ?? [],
+    meta: {
+      counts: sectionCounts(collected),
+      // Sections that hit the per-section ceiling. Named so a partial
+      // section is never mistaken for a complete one.
+      truncated: collected.truncated,
+    },
+  };
 }

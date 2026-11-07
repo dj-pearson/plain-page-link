@@ -16,6 +16,13 @@ import {
 } from './overdue.ts';
 import { processDueDeletions, supabaseDeletionStore } from '../_shared/account-deletion.ts';
 import { createSubscriptionApi } from '../_shared/stripe-subscriptions.ts';
+import { decryptSecret } from '../_shared/encryption.ts';
+import {
+  processExportQueue,
+  purgeExpiredExports,
+  summarizeExportQueueReport,
+  supabaseExportQueueStore,
+} from '../_shared/gdpr-export-queue.ts';
 
 /**
  * Scheduled maintenance.
@@ -166,6 +173,33 @@ serve(async (req) => {
         // Held deletions are retried next run, but the task is reported failed
         // so the 207 says someone's card is still being charged.
         if (report.blocked > 0) {
+          throw new Error(`${summary}: ${report.errors.join('; ').slice(0, 500)}`);
+        }
+        return summary;
+      })
+    );
+
+    // ---------------------------------------------------------------------
+    // 2b. Queued data exports (US-397). gdpr-export's POST queued a request
+    //     that nothing processed. Each is built into the private gdpr-exports
+    //     bucket and the subject emailed a link that expires; expired files
+    //     are deleted.
+    // ---------------------------------------------------------------------
+    results.push(
+      await run('data_exports', async () => {
+        const store = supabaseExportQueueStore(supabase, {
+          decrypt: (value) => decryptSecret(value),
+          sendEmail: (email) => sendEmail(email),
+        });
+        const report = await processExportQueue(store, { now: new Date(), siteUrl: getSiteUrl() });
+        const purged = await purgeExpiredExports(store, new Date()).catch((error) => {
+          report.errors.push(`purging expired exports: ${error instanceof Error ? error.message : String(error)}`);
+          return 0;
+        });
+        const summary = summarizeExportQueueReport(report, purged);
+        // Retried requests run again next hour; reported failed so the 207
+        // says some subject is still waiting for their data.
+        if (report.errors.length > 0) {
           throw new Error(`${summary}: ${report.errors.join('; ').slice(0, 500)}`);
         }
         return summary;
