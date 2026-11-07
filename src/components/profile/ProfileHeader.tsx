@@ -119,14 +119,18 @@ export default function ProfileHeader({ profile, stats }: ProfileHeaderProps) {
               {profile.title && (
                 <p className="text-base md:text-lg text-blue-600 font-semibold">{profile.title}</p>
               )}
-              {/* Brokerage */}
-              {profile.brokerage_name && (
+              {/* Brokerage. Either field is enough on its own: the row used to
+                  sit inside `brokerage_name &&`, so an agent who uploaded a
+                  logo but left the name blank had it silently dropped from
+                  their page (US-383). The logo stands in for the name, so its
+                  alt text is the name when there is one. */}
+              {(profile.brokerage_name || profile.brokerage_logo) && (
                 <div className="flex items-center justify-center md:justify-start gap-2 text-gray-600 mt-2">
-                  <Building2 className="h-4 w-4" />
+                  <Building2 className="h-4 w-4" aria-hidden="true" />
                   {profile.brokerage_logo ? (
                     <img
                       src={profile.brokerage_logo}
-                      alt={profile.brokerage_name}
+                      alt={profile.brokerage_name || 'Brokerage logo'}
                       className="h-5 object-contain"
                     />
                   ) : (

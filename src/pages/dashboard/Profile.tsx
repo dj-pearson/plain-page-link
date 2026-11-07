@@ -647,7 +647,8 @@ export default function Profile() {
                       )}
                     </div>
                     <p id="brokerage-logo-help" className="text-sm text-muted-foreground">
-                      JPG, PNG or WEBP. Max size 2MB. Shown beside your brokerage name on your page.
+                      JPG, PNG or WEBP. Max size 2MB. Shown under your name on your page, in place
+                      of the brokerage name.
                     </p>
                   </div>
                   <input
