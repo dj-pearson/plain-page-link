@@ -4144,7 +4144,7 @@
         "New prerendered /switch/linktree page links the importer from VsLinktree.tsx; verify:seo passes",
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
-      "priority": 160,
+      "priority": 1.05,
       "passes": false,
       "notes": "Size: M. Success metric: signups that start with an import, and import-to-published rate (is_published true within 7 days). Competitive rationale: Linktree is the default tool agents are already on; a zero-effort move is the lever against it. Cited by the draft and not re-verified here: Linktree suspension complaints (https://www.trustpilot.com/review/linktr.ee?page=6), Linktree price changes (https://u2l.ai/blog/linktree-pricing). The claim that no real-estate bio competitor offers an importer was not verified; drop it from public copy unless checked. Publish controls are US-142; until it lands, the review step should say the page goes live on save."
     },
@@ -4162,7 +4162,7 @@
         "New table listing_marketing_assets (listing_id, user_id, channel, kind, body, created_at) with owner-only RLS; verify:schema passes and types.ts is regenerated",
         "Typecheck passes (tsc --noEmit) and the existing unit tests still pass"
       ],
-      "priority": 161,
+      "priority": 1.1,
       "passes": false,
       "notes": "Size: L. Success metric: share of agents who generate a kit within 7 days of adding a listing; leads with utm_campaign=launch-*. Competitive rationale: Realty.bio gives AI listing copy free (https://apps.apple.com/us/app/id6759394709, verified 2026-11-07 against its App Store listing). Luxury Presence AI content inside custom-quoted plans is cited by the draft and not re-verified (https://news.inman.com/2026/05/06/luxury-presence-launches-unified-ai-platform-for-agents/). AgentBio's edge is attribution of every post back to a lead. LEAP-012, LEAP-017 and LEAP-020 build on this story."
     },
@@ -4179,7 +4179,7 @@
         "Check frequency is a plan quota (Free monthly, paid weekly) through consume_plan_quota with a new key in planLimits.ts",
         "Typecheck, verify:seo and the existing tests pass"
       ],
-      "priority": 162,
+      "priority": 1.14,
       "passes": false,
       "notes": "Size: L. Success metric: share of published agents with at least one mention or agentbio.net citation after 60 days; upgrades attributed to the Visibility page. Competitive rationale: Zillow in ChatGPT (https://www.zillowgroup.com/news/zillow-becomes-first-real-estate-app-in-chatgpt). Cited by the draft and not re-verified: NAR on AI referrals (https://www.nar.realtor/news/real-estate-news/technology/find-your-geo-to-land-your-next-referral-from-ai), Luxury Presence GEO agents (https://www.housingwire.com/articles/new-luxury-presence-platform-combines-ai-tools-and-marketing/). Prerender must be live in production (US-146 owner actions). Correction to the draft: RealEstateAgent JSON-LD already exists, so this extends it rather than adding it."
     },
@@ -4197,7 +4197,7 @@
         "The MLS display rules each feed requires (attribution line, listing brokerage name) are rendered on synced listings and the requirement source is recorded in docs",
         "feature_waitlist entries for mls_integration are emailed once when the feature ships (manual, documented); typecheck and the existing tests pass"
       ],
-      "priority": 163,
+      "priority": 1.19,
       "passes": false,
       "notes": "Size: L. Replaces the draft's free-tools loop story (old LEAP-009), whose nurture-email half is already planned in US-136 and whose remainder (UTM on share links, a result page) is polish. Success metric: share of active agents with an MLS connection; manual listing edits per agent per month (should fall). Competitive rationale: website platforms for agents sell IDX/MLS feeds as a core feature; bio links have no listing record to sync. No competitor URL is cited because none was verified in this review. Before building: choose a feed aggregator the operator can license and confirm per-MLS terms; the first build can support one aggregator and one MLS."
     },
@@ -4215,7 +4215,7 @@
         "Metered by a new ai_lead_replies_per_month key in planLimits.ts through consume_plan_quota",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 164,
+      "priority": 1.24,
       "passes": false,
       "notes": "Size: M. Success metric: median time from lead created to first agent reply (lead_activities), before vs after; share of drafts approved unedited. Competitive rationale, cited by the draft and not re-verified: Lofty AOS (https://lofty.com/news/lofty-launches-first-agentic-ai-operating-system), Lofty reviews (https://www.capterra.com/p/157457/Lofty/reviews/), Follow Up Boss review (https://learn.realscout.com/academy/follow-up-boss-crm-review/). If US-135's per-agent sender lands first, use it and its suppression list instead of a second path."
     },
@@ -4231,7 +4231,7 @@
         "Analytics.tsx shows scans and leads per short link, joined on utm_campaign through src/lib/leadAttribution.ts; a link with no scans shows 0, a failed read shows 'Unavailable - <reason>' (tests for both)",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 165,
+      "priority": 1.29,
       "passes": false,
       "notes": "Size: M. Success metric: scans per active agent per month; scan-to-lead rate; signups with a ref from print. Competitive rationale, cited by the draft and not re-verified: open-house apps offer QR sign-in (https://theclose.com/open-house-apps/). The draft's second citation (hunted.space) was dropped as unverifiable. Correction to the draft: qrcode.react is not unused. Distinct from US-137 (one flyer per open house, no scan counting) and US-127 (a checklist QR); build on both rather than adding a second QR component."
     },
@@ -4248,7 +4248,7 @@
         "Sending the CMA logs a lead_activities row and, when US-131 deals exist, moves the sell-side deal to stage cma_sent",
         "Tests: PDF generated for a fixture with 3 comps; typecheck and the existing tests pass"
       ],
-      "priority": 166,
+      "priority": 1.33,
       "passes": false,
       "notes": "Size: L. Rescoped from the draft: its 'home_valuation block' half is already built (HomeValuationForm, lead_type 'valuation'), so the story now starts at the lead. Success metric: valuation leads answered with a CMA within 24h; CMAs sent per month; paid conversion among agents who receive a valuation lead. Competitive rationale: realtor link-in-bio guides recommend a valuation form (https://www.unilink.us/blog/link-in-bio-for-real-estate-agents, found 2026-11-07); Homebot's seller model is cited by the draft and not re-verified (https://homebot.ai/rea-demo). Coordinate with US-143 so cmaGenerator stays in the matrix once this ships."
     },
@@ -4263,7 +4263,7 @@
         "src/pages/dashboard/Overview.tsx shows 'You referred N agents, M qualified, X months earned' and a copyable referral link; a failed read renders 'Unavailable - <reason>' and a real 0 renders 0 (tests for both)",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 167,
+      "priority": 1.38,
       "passes": false,
       "notes": "Size: M. Success metric: qualified referrals per month; share of new signups with referred_by set. Ranked below acquisition work because AgentBio has 9 users and 0 signed in within 30 days (hub users read, 2026-11-07): a referral loop multiplies an active base it does not yet have. Correction to the draft: 'nothing reads referred_by' was wrong (admin-users reads it), so the admin AC was removed. The badge-led growth citations in the draft (a Sacra chat link and a Product Hunt story) were dropped as unverifiable. Reads src/lib/signupIntent.ts and src/hooks/useProfileShowsBranding.ts."
     },
@@ -4280,7 +4280,7 @@
         "Plan gating: Starter one connection, Professional and Team unlimited; the crm_connectors waitlist button is replaced by the real control",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 168,
+      "priority": 1.43,
       "passes": false,
       "notes": "Size: M. Success metric: share of paying agents with an active connection; delivery success rate. Competitive rationale, cited by the draft and not re-verified: Follow Up Boss pricing (https://www.capterra.com/p/130020/Follow-Up-Boss/pricing), platform consolidation (https://www.housingwire.com/articles/luxury-presence-raises-37m-to-push-crm-platform-development/). Lofty was dropped from the provider list: no public lead API was confirmed in this review; add it when one is. The draft's 'free acquisition from the FUB integrations directory' is a hope, not a fact; listing there is an operator task to check."
     },
@@ -4297,7 +4297,7 @@
         "Dashboard shows request sent / opened / submitted per client",
         "Plan gating: Free 5 requests per month, paid unlimited; typecheck and the existing tests pass"
       ],
-      "priority": 169,
+      "priority": 1.48,
       "passes": false,
       "notes": "Size: M. Depends on US-128 contacts (table exists in 20260923000001) and reuses US-132's request rather than building a second one. Success metric: approved reviews per active agent; unique referrer domains for the widget. Competitive rationale: biobar's review blocks are described in a 2026 comparison (https://www.unum.la/blog/best-link-in-bio-real-estate-agents, found 2026-11-07); the NAR GEO article is cited by the draft and not re-verified. Embeds on brokerage domains are also the backlinks US-158 says the domain lacks."
     },
@@ -4314,7 +4314,7 @@
         "Transcripts retained 90 days and included in gdpr-export and gdpr-deletion",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 170,
+      "priority": 1.52,
       "passes": false,
       "notes": "Size: L. Success metric: concierge sessions per 100 profile views; concierge-to-lead rate; leads captured outside 9-6. Competitive rationale, cited by the draft and not re-verified: Lofty Cowork (https://www.rismedia.com/2026/07/28/lofty-expands-agentic-ai-os-real-estate-cowork/), Luxury Presence AI agents (inman, above). Fair-housing guardrails are a launch blocker. Correction: the draft's lead_type 'concierge' is not an accepted value in _shared/validation.ts:198."
     },
@@ -4330,7 +4330,7 @@
         "Published posts carry the tracked link from LEAP-002 so leads attribute to the post",
         "Plan gating: Professional and above; typecheck and the existing tests pass"
       ],
-      "priority": 171,
+      "priority": 1.57,
       "passes": false,
       "notes": "Size: L. Depends on LEAP-002. Requires Meta app review; plan the review as part of the story. Success metric: posts published per active agent per month; leads with utm_source=instagram or facebook and utm_campaign=launch-*. The draft's tlinky citation is not re-verified."
     },
@@ -4346,7 +4346,7 @@
         "Monthly regeneration runs as a scheduled-maintenance task and each generated report is charged to market_reports_per_month",
         "The agent can share the page, or email it through LEAP-014's consented path; typecheck, verify:seo and the existing tests pass"
       ],
-      "priority": 172,
+      "priority": 1.62,
       "passes": false,
       "notes": "Size: L. Success metric: organic clicks to /market pages; leads from them; AI citations seen by LEAP-003 checks. Competitive rationale, cited by the draft and not re-verified: local specificity in AI referrals (https://learn.realscout.com/academy/seo-aeo-geo-real-estate/), Luxury Presence content agents (housingwire, above). Check the dataset's license before launch."
     },
@@ -4362,7 +4362,7 @@
         "Opens and clicks are recorded per contact; a click on 'What could I sell for?' creates a lead_type 'valuation' lead that feeds LEAP-007 and appears in the US-230 digest",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 173,
+      "priority": 1.67,
       "passes": false,
       "notes": "Size: L. Depends on US-128 contacts, US-132 closing dates and US-135 consented sending; reuse that sender, do not build a second one. Success metric: open rate and valuation leads per 100 past clients per quarter. Competitive rationale: NAR 2025 referral figures via Virginia Realtors (https://virginiarealtors.org/2025/12/08/key-takeaways-from-nars-2025-profile-of-home-buyers-and-sellers, secondary source, found 2026-11-07); Homebot (https://homebot.ai/rea-demo) cited by the draft and not re-verified."
     },
@@ -4378,7 +4378,7 @@
         "remove_branding applies to every member on the Brokerage plan",
         "RLS tests: a member cannot read another member's leads unless a team rule allows; verify:schema passes; typecheck and the existing tests pass"
       ],
-      "priority": 174,
+      "priority": 1.71,
       "passes": false,
       "notes": "Size: L. Success metric: brokerage accounts and seats per account; ARPA vs single-agent plans. Ranked mid-list because one sale adds several profiles, but with 9 users there is no brokerage pipeline yet. Competitive rationale, cited by the draft and not re-verified: Follow Up Boss per-seat pricing (https://costbench.com/software/real-estate-crm/follow-up-boss/hidden-costs/), AgentFire setup fees (https://toolradar.com/tools/agentfire/pricing)."
     },
@@ -4394,7 +4394,7 @@
         "Writes go through the same tables and triggers, so enforce_plan_limit applies; a limit breach returns 402 naming the limit",
         "Plan gating: Professional and above; typecheck and the existing tests pass"
       ],
-      "priority": 175,
+      "priority": 1.76,
       "passes": false,
       "notes": "Size: M. Success metric: keys making calls per week; listings created via API. Coordinate with US-124's dead-code sweep, which would otherwise delete api-auth.ts for having no importers. The draft's competitive citations were generic; the case here rests on the repo fact that keys are sold with no API."
     },
@@ -4410,7 +4410,7 @@
         "Per-user rate limit and an audit_log row per tool call",
         "Setup docs for ChatGPT connectors and Claude; Professional and above; typecheck and the existing tests pass"
       ],
-      "priority": 176,
+      "priority": 1.81,
       "passes": false,
       "notes": "Size: L. Depends on LEAP-016 and LEAP-002. Success metric: weekly active connected agents; listings and kits created via MCP. Competitive rationale: Zillow in ChatGPT (zillowgroup.com, above); Lofty AOS cited by the draft and not re-verified. The callsphere.ai citation was dropped as unverifiable."
     },
@@ -4426,7 +4426,7 @@
         "Unused credits survive plan changes and appear in gdpr-export",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 177,
+      "priority": 1.86,
       "passes": false,
       "notes": "Size: M. Success metric: credit revenue per month; share of buyers who later subscribe. Competitive rationale, cited by the draft and not re-verified: Beacons credit-metered AI (https://pricingsaas.com/companies/beacons). Conflicts with US-143, which plans to remove per-use pricing and drop feature_catalog/feature_usage: decide which wins before either ships. Correction: usageTracking.ts no longer exists."
     },
@@ -4442,7 +4442,7 @@
         "After-hours auto-reply configurable, off by default",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 178,
+      "priority": 1.9,
       "passes": false,
       "notes": "Size: XL (carrier registration is weeks of calendar time and per-number cost). Success metric: share of leads with a two-way thread; reply time on text vs email. Competitive rationale: Realty.bio's listing mentions buyer conversations from the phone (App Store, above); Follow Up Boss texting cited by the draft and not re-verified. Coordinate with US-143's SMS removal."
     },
@@ -4458,7 +4458,7 @@
         "The video plays in the public listing modal and can be attached to LEAP-012 posts",
         "Typecheck and the existing tests pass"
       ],
-      "priority": 179,
+      "priority": 1.95,
       "passes": false,
       "notes": "Size: XL. Last because rendering video on the shared Coolify box competes with 167 containers on 16 cores; size a CPU budget or an external render service before choosing. Success metric: reels per active agent; leads attributed to reel posts. Competitive rationale cited by the draft and not re-verified (Luxury Presence via inman, above)."
     }
