@@ -14,21 +14,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders, screen, userEvent, waitFor, fireEvent } from '@/test/test-utils';
 import { mockProfile } from '@/test/fixtures/profile';
 
-const { profileMock, mutateAsync, uploadAvatar } = vi.hoisted(() => ({
+const { profileMock, mutateAsync, uploadAvatar, uploadLogo } = vi.hoisted(() => ({
   profileMock: vi.fn(),
   mutateAsync: vi.fn(),
   uploadAvatar: vi.fn(),
+  uploadLogo: vi.fn(),
 }));
 
 vi.mock('@/hooks/useProfile', () => ({ useProfile: () => profileMock() }));
 vi.mock('@/hooks/useAvatarUpload', () => ({
   useAvatarUpload: () => ({ uploadAvatar, uploading: false }),
 }));
+vi.mock('@/hooks/useBrokerageLogoUpload', () => ({
+  useBrokerageLogoUpload: () => ({ uploadLogo, uploading: false }),
+}));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 import Profile from './Profile';
 
 const NEW_AVATAR = 'https://example.com/avatars/new.jpg';
+const NEW_LOGO = 'https://example.com/brokerage-logos/u1/logo-1.png';
 
 function hookState(profile: Record<string, unknown>) {
   return {
@@ -48,6 +53,7 @@ describe('Profile editor', () => {
   beforeEach(() => {
     mutateAsync.mockReset().mockResolvedValue({ id: mockProfile.id });
     uploadAvatar.mockReset().mockResolvedValue(NEW_AVATAR);
+    uploadLogo.mockReset().mockResolvedValue(NEW_LOGO);
     profileMock.mockReturnValue(hookState({ ...mockProfile, phoneUnavailable: false }));
   });
 
@@ -99,6 +105,72 @@ describe('Profile editor', () => {
         full_name: 'Typed Before Upload',
         avatar_url: NEW_AVATAR,
       });
+    });
+  });
+
+  describe('brokerage logo (US-374)', () => {
+    async function openProfessionalTab() {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('tab', { name: 'Professional' }));
+      return user;
+    }
+
+    it('offers an upload, not a free-text URL field', async () => {
+      const { container } = renderWithProviders(<Profile />);
+      await openProfessionalTab();
+
+      expect(container.querySelector('input[name="brokerage_logo"]')).toBeNull();
+      expect(screen.queryByText(/Brokerage Logo URL/)).toBeNull();
+      expect(screen.getByRole('button', { name: 'Upload Logo' })).toBeInTheDocument();
+    });
+
+    it('shows the uploaded logo and does not count it as an unsaved change', async () => {
+      renderWithProviders(<Profile />);
+      const user = await openProfessionalTab();
+
+      await user.upload(
+        screen.getByTestId('brokerage-logo-input'),
+        new File(['x'], 'logo.png', { type: 'image/png' })
+      );
+
+      expect(uploadLogo).toHaveBeenCalledTimes(1);
+      await waitFor(() =>
+        expect(screen.getByAltText(`${mockProfile.brokerage_name} logo`).getAttribute('src')).toBe(
+          NEW_LOGO
+        )
+      );
+      expect(screen.getByRole('button', { name: 'Replace Logo' })).toBeInTheDocument();
+      expect(screen.getAllByText('All changes saved').length).toBeGreaterThan(0);
+    });
+
+    it('keeps the previous state when the upload is rejected', async () => {
+      uploadLogo.mockResolvedValue(null);
+      renderWithProviders(<Profile />);
+      const user = await openProfessionalTab();
+
+      await user.upload(
+        screen.getByTestId('brokerage-logo-input'),
+        new File(['x'], 'logo.png', { type: 'image/png' })
+      );
+
+      await waitFor(() => expect(uploadLogo).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole('button', { name: 'Upload Logo' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+    });
+
+    it('removing the logo is saved with the form', async () => {
+      profileMock.mockReturnValue(
+        hookState({ ...mockProfile, brokerage_logo: NEW_LOGO, phoneUnavailable: false })
+      );
+      const { container } = renderWithProviders(<Profile />);
+      const user = await openProfessionalTab();
+
+      await user.click(screen.getByRole('button', { name: 'Remove' }));
+      expect(screen.getByRole('button', { name: 'Upload Logo' })).toBeInTheDocument();
+
+      fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+      expect(mutateAsync.mock.calls[0][0]).toMatchObject({ brokerage_logo: '' });
     });
   });
 

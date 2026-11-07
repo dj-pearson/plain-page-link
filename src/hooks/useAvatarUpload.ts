@@ -1,126 +1,22 @@
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/stores/useAuthStore';
-import { useToast } from '@/hooks/use-toast';
-import { logger } from '@/lib/logger';
-import { validateUpload } from '@/lib/fileValidation';
+import { useProfileImageUpload } from '@/hooks/useProfileImageUpload';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB, the avatars bucket limit
 const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
+/**
+ * The agent's headshot. Validation (US-076), the timestamped object name
+ * (US-107) and the cache patch (US-237) live in useProfileImageUpload, shared
+ * with the brokerage logo (US-374).
+ */
 export function useAvatarUpload() {
-  const user = useAuthStore((s) => s.user);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [uploading, setUploading] = useState(false);
+  const { upload, uploading, acceptedTypes, maxSize } = useProfileImageUpload({
+    bucket: 'avatars',
+    column: 'avatar_url',
+    filePrefix: 'avatar',
+    accept: ACCEPTED_FILE_TYPES,
+    maxBytes: MAX_FILE_SIZE,
+    label: 'profile picture',
+  });
 
-  // US-076: file.type is inferred from the extension and a caller can set it to
-  // anything, so this now sniffs the magic number too.
-  const validateFile = (file: File): Promise<string | null> =>
-    validateUpload(file, { accept: ACCEPTED_FILE_TYPES, maxBytes: MAX_FILE_SIZE });
-
-  const uploadAvatar = async (file: File): Promise<string | null> => {
-    if (!user?.id) {
-      toast({
-        title: 'Error',
-        description: 'You must be logged in to upload an avatar',
-        variant: 'destructive',
-      });
-      return null;
-    }
-
-    const validationError = await validateFile(file);
-    if (validationError) {
-      toast({
-        title: 'Invalid file',
-        description: validationError,
-        variant: 'destructive',
-      });
-      return null;
-    }
-
-    setUploading(true);
-    try {
-      // Timestamped, not a fixed `avatar.<ext>`.
-      //
-      // The old name was stable and the object is served with
-      // cacheControl: 3600, so replacing a headshot kept serving the previous
-      // one — from the CDN and from every browser that had it — for an hour.
-      // The agent uploaded a new photo, saw the old one, and uploaded again
-      // (US-107). A new path is a new URL, so the change is visible at once.
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
-
-      // Delete old avatar if exists
-      const { data: existingFiles } = await supabase.storage.from('avatars').list(user.id);
-
-      if (existingFiles && existingFiles.length > 0) {
-        await supabase.storage
-          .from('avatars')
-          .remove(existingFiles.map((f) => `${user.id}/${f.name}`));
-      }
-
-      // Upload new avatar
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: true,
-      });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('avatars').getPublicUrl(fileName);
-
-      // Update profile with new avatar URL
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', user.id)
-        .select('id')
-        .single();
-
-      if (updateError) throw updateError;
-
-      // Without this the dashboard header and profile preview go on rendering
-      // the cached avatar_url until something else refetches.
-      //
-      // US-237: patch avatar_url in the cached profile rather than
-      // invalidating it. The refetch an invalidate caused handed the profile
-      // editor a new object, and its hydrate effect reset every field the
-      // agent had typed but not saved. Only avatar_url changed, so only
-      // avatar_url moves.
-      queryClient.setQueryData<{ avatar_url: string | null } | null | undefined>(
-        ['profile', user.id],
-        (old) => (old ? { ...old, avatar_url: publicUrl } : old)
-      );
-      queryClient.invalidateQueries({ queryKey: ['public-profile'] });
-
-      toast({
-        title: 'Success',
-        description: 'Profile picture updated successfully',
-      });
-
-      return publicUrl;
-    } catch (error) {
-      logger.error('Error uploading avatar', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to upload profile picture. Please try again.',
-        variant: 'destructive',
-      });
-      return null;
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return {
-    uploadAvatar,
-    uploading,
-    acceptedTypes: ACCEPTED_FILE_TYPES.join(', '),
-    maxSize: MAX_FILE_SIZE,
-  };
+  return { uploadAvatar: upload, uploading, acceptedTypes, maxSize };
 }
