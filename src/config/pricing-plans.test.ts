@@ -15,7 +15,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PRICING_PLANS } from './pricing-plans';
+import {
+  PRICING_PLANS,
+  firstUnlimitedListingsPlan,
+  listingAllowanceSummary,
+  type PricingTier,
+} from './pricing-plans';
 
 const MIGRATION = join(
   process.cwd(),
@@ -92,5 +97,40 @@ describe('pricing config matches the seeded plans', () => {
     const source = readFileSync(join(process.cwd(), 'src/config/pricing-plans.ts'), 'utf8');
     const declared = source.match(/stripe_price_id\w*:\s*'[^']+'/g) ?? [];
     expect(declared).toEqual([]);
+  });
+});
+
+describe('listing allowance copy (US-355)', () => {
+  const plan = (id: string, price: number, listings: number): PricingTier => ({
+    ...PRICING_PLANS[0],
+    id,
+    name: id[0].toUpperCase() + id.slice(1),
+    price_monthly: price,
+    limits: { ...PRICING_PLANS[0].limits, listings },
+  });
+
+  it('states every capped plan and the first unlimited one, cheapest first', () => {
+    expect(
+      listingAllowanceSummary([
+        plan('team', 99, -1),
+        plan('free', 0, 3),
+        plan('pro', 49, 25),
+        plan('enterprise', 299, -1),
+      ])
+    ).toBe('3 listings on Free, 25 on Pro and unlimited from Team');
+  });
+
+  it('never says unlimited when no plan is', () => {
+    expect(listingAllowanceSummary([plan('free', 0, 3), plan('pro', 49, 25)])).toBe(
+      '3 listings on Free and 25 on Pro'
+    );
+    expect(firstUnlimitedListingsPlan([plan('free', 0, 3)])).toBeUndefined();
+  });
+
+  it('matches the real plans: Professional is capped, Team is the first unlimited plan', () => {
+    const professional = PRICING_PLANS.find((p) => p.id === 'professional');
+    expect(professional?.limits.listings).toBeGreaterThan(0);
+    expect(listingAllowanceSummary()).toContain(`${professional?.limits.listings} on Professional`);
+    expect(firstUnlimitedListingsPlan()?.id).toBe('team');
   });
 });

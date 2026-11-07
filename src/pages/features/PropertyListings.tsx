@@ -6,24 +6,49 @@ import { SEOHead } from '@/components/SEOHead';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { HeroSectionLazy } from '@/components/hero';
+import {
+  PRICING_PLANS,
+  firstUnlimitedListingsPlan,
+  listingAllowanceSummary,
+} from '@/config/pricing-plans';
+
+/*
+ * Every claim here must be something the public page shows (US-355, the last
+ * /features slice of US-295). The page used to promise "unlimited" listings
+ * (Professional allows 25; the allowance now comes from PRICING_PLANS),
+ * "MLS compliance built-in" with "MLS attribution" and a Fair Housing
+ * disclaimer on every page, "GDPR standards met", an estimated monthly
+ * payment, price-reduction and "Just Listed" badges, year built and HOA fees,
+ * neighbourhood information, close dates and before/after photos. What the
+ * public page shows: photos, price, price per square foot, beds, baths,
+ * square feet, lot size, property type, days on market, the agent's
+ * highlights, a virtual tour link, the MLS number, the status badge, upcoming
+ * open houses, and the Equal Housing Opportunity logo and statement with the
+ * agent's license number and state (FullProfilePage, ListingDetailModal,
+ * ProfileHeader, UpcomingOpenHouses).
+ */
+const ALLOWANCE = listingAllowanceSummary();
+const UNLIMITED_PLAN = firstUnlimitedListingsPlan();
+const FREE_LISTINGS = PRICING_PLANS.find((plan) => plan.price_monthly === 0)?.limits.listings;
+const DESCRIPTION =
+  'Show active and sold listings on your bio page with photo galleries, price, beds/baths, square footage and the MLS number on each one.';
 
 export default function PropertyListings() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
     name: 'Property Listing Galleries - AgentBio Feature',
-    description:
-      'Showcase your real estate listings with full photo galleries, pricing, and details. Display active and sold properties with MLS compliance built-in.',
+    description: DESCRIPTION,
     mainEntity: {
       '@type': 'SoftwareApplication',
       name: 'AgentBio Property Listings',
       applicationCategory: 'BusinessApplication',
       featureList: [
-        'Unlimited property listings with photo galleries',
+        `Property listings with photo galleries (${ALLOWANCE})`,
         'Property details: price, beds/baths, square footage, MLS#',
         'Status badges: Active, Pending, Sold',
-        'Virtual tour integration',
-        'MLS compliance features',
+        'Virtual tour links',
+        'Equal Housing Opportunity logo and statement, license number and MLS number shown',
         'Mobile-optimized property browsing',
       ],
     },
@@ -33,13 +58,13 @@ export default function PropertyListings() {
     <>
       <SEOHead
         title="Property Listing Galleries | Showcase Real Estate on Your Bio Page"
-        description="Showcase your real estate listings with full photo galleries, pricing, and details. Display active and sold properties with MLS compliance built-in."
+        description={DESCRIPTION}
         keywords={[
           'property listing gallery',
           'showcase real estate listings',
           'link in bio with property listings',
           'real estate portfolio page',
-          'MLS compliant listing display',
+          'real estate listings on instagram bio',
         ]}
         canonicalUrl={getCanonicalUrl('/features/property-listings')}
         schema={schema}
@@ -53,14 +78,14 @@ export default function PropertyListings() {
             <div className="max-w-4xl mx-auto">
               <p className="text-base md:text-lg glass-body leading-relaxed">
                 <strong>
-                  AgentBio's property listing galleries let real estate agents showcase unlimited
-                  properties
+                  AgentBio's property listing galleries let real estate agents show their active and
+                  sold properties
                 </strong>{' '}
                 with full photo galleries, pricing, beds/baths, square footage, MLS numbers, and
                 property descriptions directly on their bio page. Unlike generic link-in-bio tools,
-                each listing includes status badges (active, pending, sold), virtual tour
-                integration, and MLS compliance features—all optimized for mobile browsing from
-                Instagram and social media.
+                each listing carries a status badge (active, pending, sold) and an optional virtual
+                tour link, and your page shows the Equal Housing Opportunity logo and your license
+                number, all laid out for phones arriving from Instagram. Plans allow {ALLOWANCE}.
               </p>
             </div>
           </div>
@@ -70,7 +95,7 @@ export default function PropertyListings() {
         <HeroSectionLazy
           title="Property Listing Galleries"
           subtitle="Showcase Your Real Estate Portfolio Like Never Before"
-          description="Display unlimited properties with full photo galleries, pricing, and details. Turn your Instagram bio into a mobile-optimized real estate showroom."
+          description="Display your properties with full photo galleries, pricing, and details. Turn your Instagram bio into a mobile-optimized real estate showroom."
           primaryCta={{
             text: 'Start Showcasing Properties Free',
             href: '/auth/register',
@@ -81,7 +106,9 @@ export default function PropertyListings() {
           }}
           badge={{
             icon: <Home className="h-4 w-4" aria-hidden="true" />,
-            text: 'Unlimited Listings on Pro Plan',
+            text: UNLIMITED_PLAN
+              ? `Unlimited listings on ${UNLIMITED_PLAN.name}`
+              : 'Active and sold listings',
           }}
           showStats={false}
         />
@@ -102,25 +129,25 @@ export default function PropertyListings() {
               <FeatureCard
                 icon={<Image />}
                 title="Full Photo Galleries"
-                description="Upload unlimited photos per listing. Buyers can swipe through all property images without leaving your bio page. Support for both landscape and portrait photos."
+                description="Upload as many photos as each listing needs and put them in order. Buyers swipe through every image without leaving your bio page."
               />
 
               <FeatureCard
                 icon={<DollarSign />}
-                title="Complete Pricing Information"
-                description="Display asking price, price per square foot, estimated monthly payment. Show recent price reductions to attract buyer attention."
+                title="Pricing Information"
+                description="Asking price on every card, and price per square foot worked out for you in the listing detail."
               />
 
               <FeatureCard
                 icon={<Home />}
                 title="Property Details"
-                description="Beds, baths, square footage, lot size, year built, HOA fees. Add custom details like pool, garage, school district, and more."
+                description="Beds, baths, square footage, lot size, property type and days on market. Add your own highlights, such as a pool, a new roof or the school district."
               />
 
               <FeatureCard
                 icon={<MapPin />}
                 title="Location & MLS Info"
-                description="Full address or area display. MLS number for compliance. Neighborhood information and nearby amenities."
+                description="Street address and city on each listing, with the MLS number shown in the listing detail."
               />
             </div>
           </div>
@@ -154,7 +181,7 @@ export default function PropertyListings() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
-                    <span className="glass-body">Mark as "Just Listed" or "Price Reduced"</span>
+                    <span className="glass-body">Feature a listing so it leads your page</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
@@ -179,15 +206,15 @@ export default function PropertyListings() {
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
-                    <span className="glass-body">Display sale prices and close dates</span>
+                    <span className="glass-body">Keep the sold price on each sold listing</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
-                    <span className="glass-body">Show before/after photos</span>
+                    <span className="glass-body">Keep the full photo gallery after the sale</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
-                    <span className="glass-body">Add client success stories</span>
+                    <span className="glass-body">Pair them with reviews from your clients</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-blue-700 flex-shrink-0 mt-0.5" />
@@ -199,15 +226,16 @@ export default function PropertyListings() {
           </div>
         </section>
 
-        {/* MLS Compliance Built-In */}
+        {/* What the public page shows for compliance */}
         <section className="py-20 bg-background/50">
           <div className="container mx-auto px-4">
             <header className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
-                <span className="glass-heading">MLS Compliance Built-In</span>
+                <span className="glass-heading">The Disclosures Your Page Shows</span>
               </h2>
               <p className="text-xl glass-body max-w-3xl mx-auto">
-                Stay compliant with MLS rules and Fair Housing requirements automatically
+                The basics most MLS and state advertising rules ask for. Your broker and MLS have
+                the final word on what else your advertising needs.
               </p>
             </header>
 
@@ -215,28 +243,16 @@ export default function PropertyListings() {
               <div className="grid md:grid-cols-3 gap-6">
                 {[
                   {
-                    title: 'Equal Housing Logo',
-                    description: 'Automatically included on all listing displays',
-                  },
-                  {
-                    title: 'MLS Attribution',
-                    description: 'Display MLS source and listing ID when required',
+                    title: 'Equal Housing Opportunity',
+                    description: 'The logo and statement appear at the foot of your public page',
                   },
                   {
                     title: 'License Number',
-                    description: 'Your license number appears on your profile',
+                    description: 'Your license number and state appear on your profile',
                   },
                   {
-                    title: 'Fair Housing Disclaimer',
-                    description: 'Included in footer of all pages',
-                  },
-                  {
-                    title: 'Status Accuracy',
-                    description: 'Mark listings as Active, Pending, or Sold accurately',
-                  },
-                  {
-                    title: 'Privacy Compliance',
-                    description: 'GDPR and data protection standards met',
+                    title: 'MLS Number',
+                    description: 'Shown on each listing that has one',
                   },
                 ].map((item, i) => (
                   <div
@@ -265,7 +281,7 @@ export default function PropertyListings() {
               <StepCard
                 number={1}
                 title="Upload Property Photos"
-                description="Drag and drop photos or upload from your device. Add as many photos as you want—unlimited on Pro plan."
+                description="Drag and drop photos or upload from your device, as many as the listing needs."
               />
 
               <StepCard
@@ -290,7 +306,7 @@ export default function PropertyListings() {
               <span className="glass-heading">Ready to Showcase Your Listings?</span>
             </h2>
             <p className="text-xl mb-8 glass-body max-w-2xl mx-auto">
-              Create your professional real estate portfolio with unlimited property listings
+              Create your professional real estate portfolio: {ALLOWANCE}
             </p>
             <Link
               to="/auth/register"
@@ -299,7 +315,7 @@ export default function PropertyListings() {
               <span className="glass-accent">Start Free</span>
             </Link>
             <p className="text-sm text-muted-foreground font-light mt-4">
-              No credit card required • 3 free listings • Upgrade anytime
+              No credit card required • {FREE_LISTINGS} free listings • Upgrade anytime
             </p>
           </div>
         </section>
@@ -343,7 +359,7 @@ function StepCard({
 }) {
   return (
     <div className="flex items-start gap-6 p-6 rounded-xl bg-glass-background backdrop-blur-md border border-glass-border">
-      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd] flex items-center justify-center text-white text-xl font-light">
+      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#0f766e] flex items-center justify-center text-white text-xl font-light">
         {number}
       </div>
       <div>

@@ -384,6 +384,37 @@ export function getPlanById(planId: string): PricingTier | undefined {
 }
 
 /**
+ * How many active listings each plan allows, in one sentence for marketing
+ * copy (US-355). The /features/property-listings page said "unlimited
+ * listings" and "Unlimited Listings on Pro Plan"; Professional allows 25 and
+ * only Team and above are unlimited. Copy built from this moves with the plans.
+ *
+ * e.g. "3 listings on Free, 10 on Starter, 25 on Professional and unlimited from Team"
+ */
+export function listingAllowanceSummary(plans: PricingTier[] = PRICING_PLANS): string {
+  const ordered = [...plans].sort((a, b) => a.price_monthly - b.price_monthly);
+  const unlimitedIndex = ordered.findIndex((plan) => plan.limits.listings === -1);
+  const capped = unlimitedIndex === -1 ? ordered : ordered.slice(0, unlimitedIndex);
+  const parts = capped.map((plan, i) =>
+    i === 0
+      ? `${plan.limits.listings} listings on ${plan.name}`
+      : `${plan.limits.listings} on ${plan.name}`
+  );
+  if (unlimitedIndex !== -1) parts.push(`unlimited from ${ordered[unlimitedIndex].name}`);
+  if (parts.length <= 1) return parts.join('');
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+/** The cheapest plan whose listing allowance is unlimited, if any. */
+export function firstUnlimitedListingsPlan(
+  plans: PricingTier[] = PRICING_PLANS
+): PricingTier | undefined {
+  return [...plans]
+    .sort((a, b) => a.price_monthly - b.price_monthly)
+    .find((plan) => plan.limits.listings === -1);
+}
+
+/**
  * Get usage pricing for a feature
  */
 export function getUsagePricing(featureKey: string): UsagePricing | undefined {
