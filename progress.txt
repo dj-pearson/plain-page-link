@@ -5344,3 +5344,75 @@ Other findings:
 - [mobile] US-301 is still open: _headers marks unhashed /icons/* and root brand PNGs immutable for a year, so installed PWAs keep stale home-screen icons.
 - [mobile] Round-3 finding, not checked this round: the APP_SHELL precache in public/sw.js (around line 234) uses cache.addAll, which fails as a whole if any single URL fails. One missing asset makes the install fail and leaves the device on the old worker.
 - [mobile] src/App.tsx:160 runs cleanupServiceWorkers on every load and deletes every cache not prefixed 'agentbio-sw-', including caches other code on the origin might create. That is harmless today because nothing else creates caches, but it is worth knowing before anything adds one.
+
+---
+
+## Continuous improvement loop — round 5 — 2026-11-07 (US-372 to US-381 done)
+
+Ten lanes, all approved with no fix-ups. Closed US-280, US-295, US-301, US-336, US-358, US-364, US-365, US-366, US-368; slice of US-371.
+Final: tsc clean (app and tsconfig.node.json), 2056 unit tests pass (from 1994), verify:migrations OK (68 files), vite build OK, eslint 645 warnings.
+
+- US-372 [listings] Listing pages were in no sitemap, so crawlers could not find them
+- US-373 [leads] Logged meetings did not count as first contact (closes US-336)
+- US-374 [profile] Agents can upload a brokerage logo instead of typing a URL (closes US-280)
+- US-375 [uiux] API keys page: reloading or leaving the page threw away an uncopied key without asking
+- US-376 [performance] vite.config.ts was never type-checked: tsconfig.node.json failed and CI never ran it (US-365)
+- US-377 [security] Agents could mint, un-revoke, re-scope or delete their own API keys directly against the database, bypassing the api-keys edge function
+- US-378 [enterprise] The morning digest and overdue-lead chaser made two lookups per agent to find their email address
+- US-379 [marketing] /features/lead-capture promised CRM integration, emails with every lead detail, and scoring by timeline band
+- US-380 [seo] US-380: Organization/WebSite structured-data ids were hand-built, one from window.location, and legal/blog-category pages hard-coded the production host
+- US-381 [mobile] Hashed chunks and PWA icons were sent two conflicting cache policies, so neither the asset year nor any icon policy worked as written (closes US-301)
+
+Owner actions:
+- US-372: Redeploy Cloudflare Pages so functions/sitemap-profiles.xml.ts picks up the listing entries. No migration, no edge function redeploy.
+- US-373: Apply migration supabase/migrations/20261107000373_log_lead_meeting.sql to production before deploying the frontend. The new logMeeting calls log_lead_meeting, so 'Log meeting' fails with 'Failed to log meeting' until the function exists.
+- US-377: Apply migration supabase/migrations/20261107000377_api_keys_system_written.sql to production
+- US-377: Redeploy the api-keys edge function, since revoke now also sets is_active=false. Rebuild the functions.agentbio.net image so the _shared/webhook-auth.ts change ships
+- US-378: Apply migration supabase/migrations/20261107000378_get_agent_contacts.sql.
+- US-378: Redeploy the functions.agentbio.net Coolify app so scheduled-maintenance picks up the change. Until the migration is applied it falls back to the old per-agent lookup, so the order does not matter.
+
+Opened:
+- US-382 [listings] Crawler listing share card applies the same visibility rules as the sitemap
+- US-383 [profile] Brokerage logo shows even without a brokerage name
+- US-384 [security] Backfill is_active=false on api_keys already revoked
+- US-385 [security] Merge the two API-key validators into one
+- US-386 [enterprise] Use get_agent_contacts in the other per-lead callers where they batch
+- US-387 [marketing] VsLater comparison page claims 'CRM integration (auto-sync leads)'
+- US-388 [marketing] Instagram bio analyzer drip emails promise CRM integration with Follow Up Boss and Salesforce
+- US-389 [seo] Use the configured base URL for the profile page's canonical, WebPage and breadcrumb URLs, unless custom domains need the serving host
+- US-390 [mobile] If one app-shell file fails during service worker install, the installed app loses its offline fallback until the next deploy
+
+Other findings:
+- [listings] functions/_lib/profile-route.ts:192-200: the crawler listing lookup does not apply show_listings or show_sold_properties, so it disagrees with the SPA ListingPage and the sitemap about hidden listings. Listed above as a next slice.
+- [listings] US-358's sitemap index: past 50,000 URLs (profiles plus listings), entries are cut off at MAX_URLS. A sitemap index split across several files will be needed once listing volume grows. Not urgent at current scale.
+- [listings] Still open from earlier rounds: US-276 (viewed listings on a lead) spans the leads lane. US-360 (Playwright listing specs in CI) needs browsers that this sandbox lacks.
+- [leads] src/hooks/useLeadActivities.ts createTaskMutation (around line 285) still inserts follow-ups into lead_activities directly. That is fine, because a task is not contact, but it is now the only direct insert path left. If a future check wants all agent writes to go through RPCs, it needs a log_lead_task.
+- [leads] src/hooks/useLeadContactAction.ts:36 calls useLeadActivities(undefined), so contact actions from the list invalidate ['lead-activities', undefined] and an open lead's timeline does not refresh. Carried over from rounds 3 and 4, still open.
+- [leads] US-279 (the Leads filter row overflows at 375px) is still open and is the next leads-lane slice. US-278 is still blocked on the owner's decision about the status vocabulary. US-362 is a design guard and needs no work now.
+- [leads] The meeting form lets an agent pick a future time, and logging one sets contacted_at to NOW(). This matches log_lead_activity('meeting'). Arranging a meeting implies contact has already happened, but the owner may want scheduled-but-not-held meetings handled differently.
+- [profile] src/components/profile/ProfileHeader.tsx:118-131: the brokerage logo renders only when brokerage_name is set (the brokerage_name && branch), so a logo uploaded without a name never appears.
+- [profile] Remove sets brokerage_logo to '' on save but leaves the object in the brokerage-logos bucket until the next upload cleans the folder. Avatars had the same behaviour already.
+- [profile] US-363 (removing `as any` from BlockSettings/BlockRenderer), US-283 (custom_css decision, theme-colour agreement, completion widget) and US-316 (reusing the profile's already-fetched figures in page-builder blocks) are still open in the profile lane.
+- [uiux] US-338 is still blocked on an owner decision. TeamPage shows only teams the user owns, so an accepted admin or member sees 'Create your team'. It needs a decision on read-only member access and a check of the team_members/teams RLS, and it overlaps the enterprise lane.
+- [uiux] Lane finding, not re-verified this round: TeamPage has no UI for the teams edge function's updateRole action, and its role icons use hard-coded colours instead of theme tokens. A good next uiux/enterprise slice once US-338's scope is settled.
+- [uiux] useUnsavedChangesWarning (src/hooks/useUnsavedChangesWarning.ts) does not cover browser back/forward because the app uses <BrowserRouter> (src/main.tsx:78). Moving to createBrowserRouter would enable useBlocker for Profile and ApiKeys. That is an app-wide router change.
+- [uiux] ApiKeysPage.tsx: the revoke button uses hard-coded text-red-600/hover:bg-red-50 and bg-red-600 instead of destructive tokens, so it has no dark-mode variant; the list-error icon also uses text-red-600.
+- [performance] US-341 can be closed as already satisfied: functions/_lib/profile-route.ts:178 makes a single PostgREST request per profile. The listing unfurl's second request (profile-route.ts:208) cannot be folded into it by embedding, because listings.user_id references auth.users (types.ts:3234-3238). Using get_public_profile_page instead would return a larger payload and depends on the unconfirmed US-329 migration.
+- [performance] A possible saving on the listing unfurl, not done: profile-route.ts:208 could start the listing fetch in parallel with the profile fetch and drop it if user_id does not match the profile's id. That cuts one serial round trip from listing unfurls (crawler timeout is 4s, profile-route.ts:46). It costs one wasted listing read for unknown usernames.
+- [performance] functions/ is type-checked by the root tsconfig (include ['src','functions']) with DOM lib rather than Workers types. That is fine today but would hide Workers-only API misuse.
+- [security] US-317 is still open and small: increment_link_clicks (SECURITY DEFINER, callable by anon) still counts clicks on unpublished profiles. It needs the same gate as the US-308 functions.
+- [security] The owner SELECT policy on api_keys still exposes key_hash to the owner via PostgREST. It is a SHA-256 of a 256-bit random key, so the risk is low. A column-level SELECT grant that excludes key_hash would tighten it; the edge function's list action never returns key_hash.
+- [security] The api-keys edge function revoke (supabase/functions/api-keys/index.ts:121-128) returns {revoked:true} even when no row matched the id/user_id. That is harmless, but it hides a bad id from the UI.
+- [security] US-367 (owner UPDATE on user_mfa_settings and user_sessions) follows the same pattern and is the natural next security slice.
+- [enterprise] supabase/functions/gdpr-export/index.ts:83-104: the POST branch returns 202 'Processing will begin shortly', but nothing ever processes the row (US-291). No UI calls POST; useGDPR.ts:64 uses GET only.
+- [enterprise] supabase/functions/scheduled-maintenance/digest-store.ts weeklyStats runs three count queries per agent on the Monday edition. That is another per-agent round-trip pattern a later slice could batch.
+- [marketing] src/lib/lead-scoring.ts:88 (legacy LeadScoringSystem) still recommends 'Add to nurture campaign'. It is used only by its own test and Analytics.tsx; this overlaps US-369 (dead modules).
+- [marketing] src/lib/geo.ts:203 still says leads 'can be exported to your CRM' and that they can be sorted by score before export. The module is imported nowhere (US-369).
+- [marketing] LeadCapture.tsx still uses gradient icon tiles and step circles (bg-gradient-to-br from-[#80d0c7] to-[#a1c4fd], at FormTypeCard and StepCard). That is a craft-floor tell for the uiux lane. The FAQCard is a clickable div with no button role or keyboard handler, which is an accessibility gap.
+- [marketing] The brief findings were not touched this round: duplicate id="demo-profiles" in Landing.tsx and DemoProfilesShowcase.tsx, the raw theme key badge in DemoProfilesShowcase.tsx, and the Press.tsx calendar claim. US-296, US-297 and US-319 are also still open.
+- [seo] src/pages/Pricing.tsx:~95 offers[].seller is an inline Organization {name:'AgentBio'} with no @id. It could use publisherOrganization(baseUrl) so it resolves to the Organization node.
+- [seo] src/pages/legal/PrivacyPolicy.tsx and TermsOfService.tsx (and the other legal pages) set dateModified to new Date().toLocaleDateString(): a render-time, locale-formatted date. That is the same false-freshness and nondeterminism problem the LocationTemplate comment describes, and it is not ISO 8601.
+- [seo] src/pages/legal/DMCAPolicy.tsx contains an example URL https://agentbio.net/agent/username/photo-123 in prose. /agent/ is not a real route; profiles live at /:username.
+- [mobile] The task brief says App.tsx runs cleanupServiceWorkers on every mount. I did not examine this in this session. src/lib/sw-cleanup.ts allowlists the AgentBio worker, so the remaining cost is probably the extra getRegistrations/caches.keys work on each load. Worth a look in the mobile or performance lane.
+- [mobile] public/sw.js:179-198: the isUnhashedCode comment says analytics.js was served under '/*.js immutable'. In practice it was always joined behind the max-age=0 floor. The cache:'no-cache' fetch is still harmless and right to keep, but the history in the comment is inaccurate.
+- [mobile] Any other repo in the Pearson Media stack that deploys to Cloudflare Pages with an extension rule layered over a `/*` Cache-Control floor has the same joined, conflicting Cache-Control defect. Worth a vault note.

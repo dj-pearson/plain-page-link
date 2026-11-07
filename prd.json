@@ -4430,8 +4430,8 @@
         "ProfileHeader still renders the logo; tests cover upload success and rejection"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-265)"
+      "passes": true,
+      "notes": " (follow-up slice from US-265) DONE in round 5 as US-374."
     },
     {
       "id": "US-281",
@@ -4655,8 +4655,8 @@
         "A test holds the known-false phrases out"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-270) REMAINING SLICE: US-295 slice: /features/property-listings and its FAQ claim unlimited listings and vague 'MLS compliance features' — FEATURE_FAQS.propertyListings (src/lib/faq-schema.ts, the first answer) says agents can show 'unlimited property listings', but listings are plan-limited (BEFORE trigger on listings, pricing-plans.ts limits). PropertyListings.tsx:62 and :210-219 say 'MLS compliance features' and 'Stay compliant with MLS rules and Fair Housing requirements automatically'. What ships is the MLS number on each listing, the Equal Housing logo and statement, and the license number. Overlaps US-324. REMAINING SLICE: US-295 slice: /features/lead-capture overstates notifications and CRM integration — FEATURE_FAQS.leadCapture says every lead triggers an instant email with all details. Locked leads (past the monthly allowance) are emailed without contact details (notify-lead / locked_lead_ids). LeadCapture.tsx:33 lists 'CRM integration ready' and :256 says 'Export to your CRM anytime'. What exists is a CSV export and a Zapier webhook, with no CRM integration. Reword both to match, and check the hot/warm/cold scoring description against src/lib/lead-scoring.ts. Partially done in round 3 as US-332 (calendar-booking, testimonials, analytics pages). property-listings slice done in round 4 as US-355; lead-capture slice remains."
+      "passes": true,
+      "notes": " (follow-up slice from US-270) REMAINING SLICE: US-295 slice: /features/property-listings and its FAQ claim unlimited listings and vague 'MLS compliance features' — FEATURE_FAQS.propertyListings (src/lib/faq-schema.ts, the first answer) says agents can show 'unlimited property listings', but listings are plan-limited (BEFORE trigger on listings, pricing-plans.ts limits). PropertyListings.tsx:62 and :210-219 say 'MLS compliance features' and 'Stay compliant with MLS rules and Fair Housing requirements automatically'. What ships is the MLS number on each listing, the Equal Housing logo and statement, and the license number. Overlaps US-324. REMAINING SLICE: US-295 slice: /features/lead-capture overstates notifications and CRM integration — FEATURE_FAQS.leadCapture says every lead triggers an instant email with all details. Locked leads (past the monthly allowance) are emailed without contact details (notify-lead / locked_lead_ids). LeadCapture.tsx:33 lists 'CRM integration ready' and :256 says 'Export to your CRM anytime'. What exists is a CSV export and a Zapier webhook, with no CRM integration. Reword both to match, and check the hot/warm/cold scoring description against src/lib/lead-scoring.ts. Partially done in round 3 as US-332 (calendar-booking, testimonials, analytics pages). property-listings slice done in round 4 as US-355; lead-capture slice remains. DONE in round 5 as US-379."
     },
     {
       "id": "US-296",
@@ -4744,8 +4744,8 @@
         "deployed-files.test.ts holds the ordering"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-272)"
+      "passes": true,
+      "notes": " (follow-up slice from US-272) DONE in round 5 as US-381."
     },
     {
       "id": "US-302",
@@ -5162,8 +5162,8 @@
         "A hook test covers this"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-326)"
+      "passes": true,
+      "notes": " (follow-up from US-326) DONE in round 5 as US-373."
     },
     {
       "id": "US-327",
@@ -5494,8 +5494,8 @@
         "The sitemap tests cover it"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "The crawler share card already works through functions/[username]/listing/[listingId].ts. (follow-up from US-348)"
+      "passes": true,
+      "notes": "The crawler share card already works through functions/[username]/listing/[listingId].ts. (follow-up from US-348) DONE in round 5 as US-372."
     },
     {
       "id": "US-359",
@@ -5629,8 +5629,8 @@
         "No prompt once the key was copied or dismissed"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Check whether the router is a data router (useBlocker requires createBrowserRouter). (follow-up from US-351)"
+      "passes": true,
+      "notes": "Check whether the router is a data router (useBlocker requires createBrowserRouter). (follow-up from US-351) DONE in round 5 as US-375."
     },
     {
       "id": "US-352",
@@ -5656,8 +5656,8 @@
       "description": "`tsc -p tsconfig.node.json` fails with TS6307 because vite.config.ts imports ./src/config/{homepage-seo,sw-version,vendor-chunks}, none of which are in its include list. It also fails on vitest .d.ts files, because no target is set. Add those files (or src/config/*.ts) to the include list, set target ES2020 and skipLibCheck, and run it in CI.",
       "acceptanceCriteria": ["npx tsc --noEmit -p tsconfig.node.json exits 0", "CI runs it"],
       "priority": 2,
-      "passes": false,
-      "notes": "Pre-existing problem, found while verifying US-352. (follow-up from US-352)"
+      "passes": true,
+      "notes": "Pre-existing problem, found while verifying US-352. (follow-up from US-352) DONE in round 5 as US-376."
     },
     {
       "id": "US-353",
@@ -5688,8 +5688,8 @@
         "ApiKeysPage tests still pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-353)"
+      "passes": true,
+      "notes": " (follow-up from US-353) DONE in round 5 as US-377."
     },
     {
       "id": "US-367",
@@ -5732,8 +5732,8 @@
         "The RPC is revoked from PUBLIC, anon and authenticated and pins search_path"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Finding recorded in progress.txt; supabase/functions/_shared/agent-contact.ts:41 (follow-up from US-354)"
+      "passes": true,
+      "notes": "Finding recorded in progress.txt; supabase/functions/_shared/agent-contact.ts:41 (follow-up from US-354) DONE in round 5 as US-378."
     },
     {
       "id": "US-355",
@@ -5811,7 +5811,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": " (follow-up from US-356)"
+      "notes": " (follow-up from US-356) Slice done in round 5 as US-380."
     },
     {
       "id": "US-357",
@@ -5827,6 +5827,297 @@
       "priority": 2,
       "passes": true,
       "notes": "The bug: in the old src/lib/sw-cleanup.ts (lines 44-55), cleanedUp was set to true whenever any cache name lacked the 'agentbio-sw-' prefix. src/pages/auth/Login.tsx (lines 139-141) then called cleanupAndReload 3 seconds after every sign-in network error, which reloaded the page.\n\nWhat changed:\n- /home/user/plain-page-link/.claude/worktrees/wf_c12867ba-1a3-10/src/lib/sw-cleanup.ts now returns a `ServiceWorkerCleanupResult` with three fields: `unregisteredWorkers`, `controlledByLegacyWorker` and `deletedCaches`.\n- It adds `cleanupNeedsReload(result)`, which is true when a worker was unregistered or a legacy worker still controls the page.\n- `cleanupAndReload()` now returns a boolean saying whether it reloaded, and reloads only when `cleanupNeedsReload` is true.\n- The scan also checks the waiting and installing script URLs, not just the active one.\n- The caller in src/App.tsx:160 ignores the return value, so it needed no change.\n- /home/user/plain-page-link/.claude/worktrees/wf_c12867ba-1a3-10/src/pages/auth/Login.tsx has new toast copy and a comment; the 3-second timer is kept.\n- /home/user/plain-page-link/.claude/worktrees/wf_c12867ba-1a3-10/src/lib/sw-cleanup.test.ts now has 8 tests. They cover: a foreign cache is deleted with no reload; nothing to clean means no reload; a legacy worker is unregistered and the page reloads; a page still controlled by a legacy worker reloads; and the failure path.\n\nI chose this over US-323 and US-301 because it causes data loss (typed form input) on a core flow.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx vitest run src/lib/sw-cleanup.test.ts src/pages/auth/Login.test.tsx: 2 files, 13 tests passed. I ran this again after the pre-commit hook's eslint and prettier reformatted the files, and it passed again.\nnpx vitest run src/lib src/pages/auth: 67 files, 681 tests passed.\nThere is no migration, so I did not run verify:migrations.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-372",
+      "lane": "listings",
+      "round": 5,
+      "title": "Listing pages were in no sitemap, so crawlers could not find them",
+      "description": "US-358 slice (recorded as US-372). /sitemap-profiles.xml now lists each published agent's visible listing pages (/:username/listing/:id) right after the agent's own URL, with <lastmod> taken from listings.updated_at. Listings hidden by show_listings, and sold listings hidden by show_sold_properties, are left out by reusing selectListingForPage, the same rule the listing page applies. If any of the three anon reads (profiles, listings, user_settings) fails, the sitemap answers 503 instead of a partial list. Decision on prerender: listing pages are not prerendered. Their crawler half is the request-time Pages Function functions/[username]/listing/[listingId].ts, the same way profiles are served, so a build-time file would only go stale.",
+      "acceptanceCriteria": [
+        "The sitemap emits one <url> per visible listing, with lastmod taken from listings.updated_at (only when it parses as a date)",
+        "Listings hidden by show_listings or show_sold_properties are not emitted; agents with no user_settings row default to showing everything, as the profile page does",
+        "A failed listings or settings read gives a 503, never a sitemap that guesses visibility",
+        "The sitemap tests cover it"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- functions/_lib/profile-sitemap.ts: the route reads three tables in parallel with the anon key:\n  - profiles?select=id,username&is_published=is.true&order=username.asc\n  - listings?select=id,user_id,status,updated_at&status=in.(active,pending,under_contract,sold)&order=id.asc\n  - user_settings?select=user_id,show_listings,show_sold_properties&order=user_id.asc\n  Each read is paged by 1000 through a shared fetchAllRows helper. The new sitemapEntries() places each agent's visible listings right after the agent's URL, using listingPagePath from src/lib/listingShare.ts and selectListingForPage from src/lib/publicListingVisibility.ts. Listing entries have priority 0.5 and profile entries 0.6. The whole list is still capped at MAX_URLS (50,000).\n- src/lib/publicListingVisibility.ts:10: the import of listingStatus is now relative instead of '@/'. The Pages Functions bundle does not resolve the Vite alias, and functions/ already imports src/lib this way (profile-sitemap.ts → ../../src/lib/username). I checked by hand that listingStatus, listingShare and username import nothing else.\n- functions/_tests/sitemap-profiles.test.ts: the fetch stub now answers by table name, because the reads run in parallel. The US-262 cases are kept. New cases cover: listing ordering and lastmod, the query shape for listings and settings, both visibility toggles, a 503 on a failed listings or settings read, drafts and unknown agents, reserved usernames, encoding, and duplicate rows.\n\nWhy the schema allows these reads:\n- The anon SELECT policy on listings (migration 20261107000308:50-61) already limits rows to public statuses, NOT is_sample, and published agents. There is no column grant on listings, so updated_at is readable.\n- Anon is granted SELECT on exactly user_id, show_listings and show_sold_properties on user_settings, for published agents only (20260902000009). user_id is unique (baseline:8203), so it is safe to order the paging by it.\n- profiles.id is among the anon-granted columns.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run functions/ src/lib/publicListingVisibility.test.ts src/lib/listingShare.test.ts`: 37 files, 433 tests, all passed. The `functions/` path also matched supabase/functions.\n- `npx vitest run src/pages/public src/lib/publicListingVisibility.test.ts src/lib/listingShare.test.ts functions/_tests`: 10 files, 101 tests, all passed.\n- After the lint-staged eslint and prettier pass at commit: `npx vitest run functions/_tests/sitemap-profiles.test.ts src/lib/publicListingVisibility.test.ts`: 30 tests passed.\n- No migration, so verify:migrations does not apply.\n- I could not bundle the Pages Function locally because esbuild and wrangler are not installed. I checked the imports by hand instead.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages so functions/sitemap-profiles.xml.ts picks up the listing entries. No migration, no edge function redeploy."
+    },
+    {
+      "id": "US-382",
+      "lane": "listings",
+      "round": 5,
+      "title": "Crawler listing share card applies the same visibility rules as the sitemap",
+      "description": "functions/_lib/profile-route.ts:192-200 looks up a listing by id and user_id only. A listing hidden by show_listings, or a sold one hidden by show_sold_properties, still gets a full listing share card when a crawler requests it, even though the SPA page and now the sitemap treat it as not found. Read the agent's user_settings toggles and apply selectListingForPage before building listing tags.",
+      "acceptanceCriteria": [
+        "A hidden listing's URL gets the agent's profile card (or 404 semantics), not the listing's",
+        "username-route tests cover both toggles"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-372)"
+    },
+    {
+      "id": "US-373",
+      "lane": "leads",
+      "round": 5,
+      "title": "Logged meetings did not count as first contact (closes US-336)",
+      "description": "Agents use the \"Log meeting\" form on a lead to record a meeting. It saved the meeting to the timeline, but it never set leads.contacted_at. So a lead whose first contact was a meeting still showed as never contacted, and the response-time numbers counted it as unanswered. Meetings now go through a new SECURITY DEFINER RPC, log_lead_meeting. It works the same way as log_lead_call and log_lead_email: only the lead's owner or current assignee can call it, the row is saved under the caller's id, and contacted_at is set once and never moved after that.",
+      "acceptanceCriteria": [
+        "Logging a meeting on an uncontacted lead sets leads.contacted_at; a later meeting does not move it (log_lead_meeting uses COALESCE(contacted_at, NOW()); verify-schema check 'log_lead_meeting records the meeting and first contact')",
+        "useLeadActivities.logMeeting calls supabase.rpc('log_lead_meeting') and no longer inserts into lead_activities (hook test src/hooks/useLeadActivities.meeting.test.ts)",
+        "Only the lead owner or its current assignee can log a meeting. A stranger is refused, and so is a meeting type outside in_person/video/phone",
+        "The function pins search_path = public, extensions, pg_temp. EXECUTE is revoked from PUBLIC/anon/authenticated and granted to authenticated and service_role. It is listed in DEFINER_CALLABLE"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence: before this change, src/hooks/useLeadActivities.ts:251-270 (logMeetingMutation) wrote straight to the table with supabase.from('lead_activities').insert({... activity_type: 'meeting' ...}) and never touched leads.contacted_at. Every other contact path does set it: log_lead_call, log_lead_email, and log_lead_activity for email/call/meeting/sms (supabase/migrations/20261107000326_assignee_logs_lead_activity.sql, 20261107000349_...sql). log_lead_activity could not be reused because it has no parameters for meeting_type, meeting_location or meeting_scheduled_at.\n\nChanges:\n- supabase/migrations/20261107000373_log_lead_meeting.sql: new public.log_lead_meeting(_lead_id uuid, _meeting_type text, _location text, _scheduled_at timestamptz, _notes text). It rejects an unknown meeting_type with check_violation, then applies the owner-or-current-assignee guard. It inserts the meeting row with user_id = auth.uid(), the meeting columns, is_internal=false and metadata, and sets contacted_at = COALESCE(contacted_at, NOW()). It follows the REVOKE/GRANT pattern in CLAUDE.md.\n- src/hooks/useLeadActivities.ts: logMeeting calls the RPC. Its onSuccess still refreshes ['leads'], so the lead stops showing as uncontacted.\n- src/integrations/supabase/types.ts: added the Functions.log_lead_meeting Args/Returns entry by hand, in the format the generator uses.\n- scripts/verify-schema.mjs: added log_lead_meeting to DEFINER_CALLABLE, plus a new real-Postgres check. The check confirms that an unknown type and a stranger are refused, that a refused call leaves contacted_at unset, that the assignee can log a meeting, that the row lands with the right user_id and meeting details, that contacted_at is set, and that a later meeting from the owner does not move it.\n- Tests: src/hooks/useLeadActivities.meeting.test.ts covers the exact RPC arguments, that nothing calls insert, the refresh of ['leads'], optional fields passed as undefined, and the error toast on refusal. src/lib/leadMeetingFirstContact.test.ts checks the migration text: the guard, the definer search_path, the grants, the DEFINER_CALLABLE entry, that this is the latest definition, and that the hook no longer inserts.\n\nNot run: verify:schema and types:check against a real database. Postgres refuses to start as root, and starting it as the postgres user (su/runuser) was blocked by the worktree isolation guard. CI's verify-backend job runs both.\n\nVERIFIED: npx tsc --noEmit: passed, no errors.\nnpx vitest run src/hooks/useLeadActivities.meeting.test.ts src/lib/leadMeetingFirstContact.test.ts src/lib/leadAssigneeActivity.test.ts src/lib/leadTimelineIntegrity.test.ts src/components/leads/LeadDetailModal.test.tsx src/pages/dashboard/Leads.test.tsx: 6 files, 68 tests passed.\nnpx vitest run src/config/pricing-plans.test.ts src/schema-references.test.ts src/lib/planCardCopy.test.ts src/lib/planLimits.test.ts src/lib/unpublishedVisibility.test.ts src/lib/leadOwnership.test.ts src/lib/leadColumns.test.ts src/repo-hygiene.test.ts plus the 2 new files: 10 files, 95 tests passed.\nAfter the commit (lint-staged ran prettier), the 2 new files were re-run: 12 tests passed.\nnpm run verify:migrations: \"[migrations] OK — 66 migration files structurally valid.\"\nnpx eslint on the touched TS files: clean.\nnode --check scripts/verify-schema.mjs: ok.\nNot run locally: npm run verify:schema and types:check, because no Postgres could be started in this sandbox.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000373_log_lead_meeting.sql to production before deploying the frontend. The new logMeeting calls log_lead_meeting, so 'Log meeting' fails with 'Failed to log meeting' until the function exists."
+    },
+    {
+      "id": "US-374",
+      "lane": "profile",
+      "round": 5,
+      "title": "Agents can upload a brokerage logo instead of typing a URL (closes US-280)",
+      "description": "The profile editor's free-text \"Brokerage Logo URL\" field is gone. The logo is now uploaded into the brokerage-logos bucket, with a preview and Replace and Remove buttons. The avatar and the logo share one upload hook, useProfileImageUpload. That hook also fixes an ordering bug: the avatar upload used to delete the old image before the new one was in place.",
+      "acceptanceCriteria": [
+        "Brokerage logo is uploaded through the shared avatar path (useProfileImageUpload) with magic-number validation via validateUpload (US-076); 2MB, JPG/PNG/WEBP only, no SVG, matching the brokerage-logos bucket in 20260808000005",
+        "The URL text input is removed from src/pages/dashboard/Profile.tsx",
+        "ProfileHeader still renders profile.brokerage_logo, unchanged; tests cover upload success, a rejected file, a failed storage upload, a failed profile update, and Remove being saved with the form"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence before the change: src/pages/dashboard/Profile.tsx (around 580-595, at HEAD a08504b) took brokerage_logo as `<input type=\"url\">`. That meant hot-linked, unvalidated third-party images on the public page, and most agents have no hosted URL to give. Migration 20260808000005 already creates a public 'brokerage-logos' bucket (2MB, no SVG) with owner-scoped write policies keyed on the first path segment, which is the user's id. Nothing in the app used that bucket.\n\nWhat changed:\n- New src/hooks/useProfileImageUpload.ts, holding the shared logic:\n  - validate the file, then upload to `<uid>/<prefix>-<ts>.<ext>`\n  - update the column with `.select('id').single()` (no bare select on profiles, US-235)\n  - remove the old objects only after that update succeeds, best effort, with logger.warn on failure\n  - patch just that column in the ['profile', uid] cache (US-237) and invalidate public-profile\n- Bug fixed along the way: useAvatarUpload used to delete every object in the folder before uploading. A failed upload or profile update therefore left avatar_url pointing at a deleted file. The shared hook deletes only after the profile points at the new file.\n- src/hooks/useAvatarUpload.ts is now a thin wrapper. It keeps its return shape { uploadAvatar, uploading, acceptedTypes, maxSize }, so its callers are unchanged.\n- New src/hooks/useBrokerageLogoUpload.ts: brokerage-logos bucket, column brokerage_logo, prefix 'logo', 2MB.\n- Profile.tsx, Professional tab:\n  - logo preview with a fixed-size frame and an ImagePlus placeholder\n  - Upload/Replace and Remove buttons, both 44px touch targets\n  - help text tied to the button with aria-describedby\n  - a hidden file input, cleared after each pick so picking the same file again still works\n  - an upload saves immediately and does not show as an unsaved change, like the avatar; Remove is a normal form edit that Save sends as brokerage_logo: ''\n- No migration is needed.\n\nVERIFIED: npx tsc --noEmit -p . passed with no output.\n\nnpx vitest run src/hooks/useProfileImageUpload.test.ts src/pages/dashboard/Profile.test.tsx src/components/profile src/pages/public: 18 files, 99 tests, all passed.\n- useProfileImageUpload.test.ts has 7 new tests: correct bucket, path and column; validation limits; rejection without touching storage; old logo removed only after the update; no delete when the upload fails; no delete when the update fails; avatar still uses the avatars bucket.\n- Profile.test.tsx has 4 new tests: no URL field; upload shows the logo and counts as saved; a rejected upload keeps the previous state; Remove is saved with the form.\n\nnpx eslint on the 6 touched files: 0 errors. Profile.tsx has the same 7 no-unescaped-entities warnings as before the change (checked against HEAD over stdin).\n\nThe lint-staged pre-commit hook (eslint --fix and prettier) passed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-383",
+      "lane": "profile",
+      "round": 5,
+      "title": "Brokerage logo shows even without a brokerage name",
+      "description": "ProfileHeader.tsx:118-131 renders the logo only inside the `profile.brokerage_name &&` branch. An agent who uploads a logo but leaves the name empty sees nothing on their page. The editor's help text says the logo is shown beside the name. Either render the logo on its own or block the upload until a name is set.",
+      "acceptanceCriteria": [
+        "A profile with brokerage_logo and no brokerage_name shows the logo with sensible alt text, or the editor explains why it does not",
+        "ProfileHeader test covers it"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-374)"
+    },
+    {
+      "id": "US-375",
+      "lane": "uiux",
+      "round": 5,
+      "title": "API keys page: reloading or leaving the page threw away an uncopied key without asking",
+      "description": "Closes US-364. A new API key is shown only once and lives only in component state. Since US-351, clicking 'Done' asks first, but reloading, closing the tab or clicking a sidebar link still destroyed the key without any prompt. ApiKeysPage now calls the existing useUnsavedChangesWarning hook (from US-237) whenever a key is on screen and has not been saved. Saved means copied with the button or by hand, which is the same keySaved flag 'Done' uses. A reload or closed tab gets the browser's leave-page prompt. An in-app link click asks window.confirm and stays on the page if the agent cancels. Nothing prompts once the key has been copied or dismissed.",
+      "acceptanceCriteria": [
+        "Reloading or closing the tab with an uncopied key shows the browser's leave-page prompt (beforeunload is preventDefault-ed)",
+        "In-app navigation with an uncopied key asks for confirmation; cancelling keeps the key on screen",
+        "No prompt once the key was copied (button or manual copy) or dismissed via Done",
+        "A refused clipboard write keeps the warning active"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-364 over US-338. US-364 is an open uiux story that fits one slice. US-338 says in prd.json that it needs an owner decision and an RLS check, and it overlaps the enterprise lane.\n\nRouter check: src/main.tsx:78 mounts <BrowserRouter>, not a data router, so useBlocker is not available. src/hooks/useUnsavedChangesWarning.ts (US-237, already used by Profile.tsx) handles this with a beforeunload listener plus a capture-phase click listener on same-origin links. I reused it and wrote no new blocking code.\n\nChanges:\n- src/pages/dashboard/ApiKeysPage.tsx: imports the hook and adds a module-level UNCOPIED_KEY_LEAVE_MESSAGE. After keyTextRef it calls `useUnsavedChangesWarning(!!createdKey && !keySaved, UNCOPIED_KEY_LEAVE_MESSAGE)`, with a comment that browser back/forward is not covered. The header doc comment is updated.\n- src/pages/dashboard/ApiKeysPage.test.tsx: new describe block 'leaving the page with an uncopied key (US-364)' with 7 tests: no warning before a key exists; beforeunload is prevented while the key is uncopied; a link click asks and is cancelled when the agent declines, and the key stays on screen; the link goes through when the agent confirms; no warning after a copy; the warning stays after a refused clipboard write; no warning after Done is dismissed.\n\nPre-commit lint-staged (eslint --fix, prettier) ran clean.\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx vitest run src/pages/dashboard/ApiKeysPage.test.tsx src/pages/dashboard/Profile.test.tsx: 2 files passed, 27 tests passed. jsdom printed 'Not implemented: navigation to another Document' for links the tests let through; this is expected and harmless.\nRe-ran npx vitest run src/pages/dashboard/ApiKeysPage.test.tsx after the commit: 18 passed.\nnpx eslint on both files: 0 errors and 3 warnings (react/no-unescaped-entities on lines 183 and 189). Those lines are existing JSX text this change did not touch.\nNo migration.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-376",
+      "lane": "performance",
+      "round": 5,
+      "title": "vite.config.ts was never type-checked: tsconfig.node.json failed and CI never ran it (US-365)",
+      "description": "Completes US-365. vite.config.ts sets the vendor chunks and stamps the service worker version, but nothing type-checked it. The root tsconfig.json includes only src and functions. `tsc -p tsconfig.node.json` failed with TS6307: the composite project did not list the src/config files that vite.config.ts imports. It also failed with TS18028 on vitest .d.ts files, because no target was set. CI never ran that command. tsconfig.node.json is now a strict no-emit project and CI runs it.",
+      "acceptanceCriteria": [
+        "npx tsc --noEmit -p tsconfig.node.json exits 0",
+        "CI runs it (.github/workflows/ci.yml typecheck job, step 'Type check build config')",
+        "npx tsc --noEmit (root) still exits 0",
+        "An error in vite.config.ts or in an imported src/config module makes the check fail"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- tsconfig.node.json: dropped composite and noEmit:false. Now noEmit:true, target and lib ES2022, skipLibCheck, strict, noUnusedLocals, noUnusedParameters, types [\"node\"]. The include list stays vite.config.ts and vitest.config.ts. Without composite, imported files such as src/config/{homepage-seo,sw-version,vendor-chunks}.ts are pulled in automatically, so they do not need to be listed. A future ./src/config import also cannot bring back TS6307.\n- tsconfig.json: removed `references: [{ path: ./tsconfig.node.json }]`. It is a Vite-template leftover that does nothing for `tsc --noEmit` without -b. Once the node project shares src/config files with the root project, keeping the reference makes the root tsc fail with TS6305 (it asks for built .d.ts files). Nothing in the repo runs `tsc -b`; I searched for it.\n- vite.config.ts: under strict, the inline 'security-headers' plugin lost its contextual typing (5 errors: implicit-any on server, req, res, next, plus req unused). The fix types it as `configureServer(server: ViteDevServer)` and renames req to _req. The import changes to `import { defineConfig, loadEnv, type ViteDevServer } from 'vite'`. Runtime behaviour does not change.\n- .github/workflows/ci.yml: new step 'Type check build config' in the typecheck job, after the root tsc. It runs `npx tsc --noEmit -p tsconfig.node.json`.\n- src/repo-hygiene.test.ts: new describe block 'build config is type-checked (US-365)'. It checks three things: CI runs the command, tsconfig.node.json includes vite.config.ts with strict on, and tsconfig.json has no \"references\" (read as text, because the file has comments).\n\nUS-341 audit (not done, evidence): the crawler profile handler at functions/_lib/profile-route.ts:178 already makes one PostgREST request per profile: profiles?select=PROFILE_COLUMNS&username=eq.X&is_published=is.true&limit=1. That meets the story's first acceptance criterion as written. Only a ?listing= or /listing/:id unfurl makes a second, serial request (profile-route.ts:208). It cannot be folded into one with PostgREST embedding, because listings_user_id_fkey references auth.users and not profiles (src/integrations/supabase/types.ts:3234-3238). Moving the crawler to get_public_profile_page would return a much larger payload (links, testimonials and so on) than the 11 columns the crawler needs. It also depends on the US-329 migration being live in production, which the owner has not confirmed (US-340). I recommend closing US-341: its stated criterion is already met.\n\nVERIFIED: Before the change:\n- `npx tsc --noEmit -p tsconfig.node.json`: failed with 3x TS6307 (homepage-seo, sw-version, vendor-chunks) and 4x TS18028 (vitest .d.ts).\n\nAfter the change:\n- `npx tsc --noEmit -p tsconfig.node.json`: exit 0.\n- `npx tsc --noEmit`: exit 0.\n- Negative checks: a deliberate type error in vite.config.ts produced TS2769 plus TS6133, and an appended `export const __probe: number = \"x\"` in src/config/sw-version.ts produced TS2322. Both were reverted, and the check is clean again (exit 0).\n- `npx vitest run src/repo-hygiene.test.ts src/profile-bundle.test.ts src/sw.test.ts src/config`: 9 files, 96 tests passed.\n- `npx vite build --outDir <scratchpad>/dist`: exit 0.\n- ci.yml parses as YAML (python yaml.safe_load).\n- After the lint-staged prettier/eslint pass at commit: root tsc exit 0, node tsc exit 0, repo-hygiene 17/17 passed.\n\nNo migration, so verify:migrations was not run.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-377",
+      "lane": "security",
+      "round": 5,
+      "title": "Agents could mint, un-revoke, re-scope or delete their own API keys directly against the database, bypassing the api-keys edge function",
+      "description": "Closes US-366. Migration 20261107000377 revokes INSERT/UPDATE/DELETE/TRUNCATE on public.api_keys from PUBLIC, anon and authenticated, and drops the three baseline owner write policies. Owners keep SELECT. ApiKeysPage already lists, creates and revokes only through the api-keys edge function, which uses the service role. Revoking a key now also sets is_active=false. validateApiKey in _shared/webhook-auth.ts now refuses a key that has revoked_at set. Before, it checked only is_active, so a key revoked from the dashboard would still have authenticated through that path.",
+      "acceptanceCriteria": [
+        "REVOKE INSERT, UPDATE, DELETE, TRUNCATE on api_keys from PUBLIC, anon, authenticated; owner INSERT, UPDATE and DELETE policies dropped (DELETE decided: keys are retired by revoked_at, never deleted; account erasure cascades as table owner); SELECT kept",
+        "verify:schema proves an owner cannot insert a key with a chosen hash, clear revoked_at, flip is_active, widen permissions, extend expires_at, swap key_hash or delete a key; anon cannot update; another user cannot read the keys; the service role can still create and revoke",
+        "ApiKeysPage tests still pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence. The policies are at supabase/migrations/20260806000005_squashed_baseline.sql:14004 (INSERT WITH CHECK owner), :14041 (DELETE USING owner) and :14336 (UPDATE USING owner, no WITH CHECK). The bypassed controls are in supabase/functions/api-keys/index.ts: the cap at lines 72-84 and the audit event at 103-111. The browser writes nothing: src/pages/dashboard/ApiKeysPage.tsx:63,71,95 only call edgeFunctions.invoke('api-keys'). Every other writer of api_keys uses a service client: _shared/api-auth.ts:44-60 and _shared/webhook-auth.ts:38-62.\n\nSecond defect, found while in this code: webhook-auth.ts validateApiKey checked only is_active, but the edge-function revoke set only revoked_at. A revoked key therefore stayed valid on that path. That is latent today, since nothing calls validateApiKey or authenticateApiKey. I fixed both sides: the revoke now also sets is_active:false, and validateApiKey also rejects keys with revoked_at set.\n\nFiles changed:\n- /home/user/plain-page-link/.claude/worktrees/wf_6e753f5c-683-6/supabase/migrations/20261107000377_api_keys_system_written.sql\n- /home/user/plain-page-link/.claude/worktrees/wf_6e753f5c-683-6/scripts/verify-schema.mjs (new check 'api keys cannot be minted, un-revoked or deleted by their owner', after the US-353 check)\n- /home/user/plain-page-link/.claude/worktrees/wf_6e753f5c-683-6/supabase/functions/api-keys/index.ts\n- /home/user/plain-page-link/.claude/worktrees/wf_6e753f5c-683-6/supabase/functions/_shared/webhook-auth.ts\n\nHow I verified: I started a throwaway Postgres 16 cluster with pg_createcluster on port 55377, applied scripts/supabase-prelude.sql and every migration with ON_ERROR_STOP=1, and ran the full verify:schema. To confirm the new check catches the bug, I put the grants and the three policies back in the scratch database and re-ran it. It failed with 9 findings: insert, revoked_at, is_active, permissions, expires_at, key_hash, delete, anon update, and the row changing. I then dropped the scratch cluster. The system 'main' cluster was left down, as it was found.\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx vitest run src/pages/dashboard/ApiKeysPage.test.tsx supabase/functions/gdpr-export: 2 files, 23 tests passed.\nnpm run verify:migrations: OK, 66 migration files structurally valid.\nnode scripts/verify-schema.mjs --db-url postgresql://postgres@localhost:55377/agentbio, with all migrations applied: 49 ok, 'All schema checks passed.', including 'ok api keys cannot be minted, un-revoked or deleted by their owner'.\nNegative control, with grants and policies re-added: 'FAIL api keys cannot be minted, un-revoked or deleted by their owner (9)'.\nThe pre-commit hook (eslint --fix, prettier) passed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000377_api_keys_system_written.sql to production | Redeploy the api-keys edge function, since revoke now also sets is_active=false. Rebuild the functions.agentbio.net image so the _shared/webhook-auth.ts change ships"
+    },
+    {
+      "id": "US-384",
+      "lane": "security",
+      "round": 5,
+      "title": "Backfill is_active=false on api_keys already revoked",
+      "description": "Keys revoked before this change have revoked_at set but is_active=true. validateApiKey now checks both, so this is not exploitable, but the two columns disagree. Write a one-line data migration (UPDATE api_keys SET is_active=false WHERE revoked_at IS NOT NULL), or drop is_active and use revoked_at only.",
+      "acceptanceCriteria": [
+        "No api_keys row has revoked_at IS NOT NULL AND is_active = true",
+        "verify:schema or a migration test asserts this"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "The partial indexes idx_api_keys_key_hash and idx_api_keys_expires_at filter on is_active = true (follow-up from US-377)"
+    },
+    {
+      "id": "US-385",
+      "lane": "security",
+      "round": 5,
+      "title": "Merge the two API-key validators into one",
+      "description": "_shared/api-auth.ts authenticateApiKey and _shared/webhook-auth.ts validateApiKey each look up keys with different rules: one checks revoked_at, the other is_active. Before API-key auth is wired to any endpoint, make webhook-auth delegate to authenticateApiKey so there is a single source of truth, and add vitest coverage that runs under the Node harness.",
+      "acceptanceCriteria": [
+        "One function decides whether a key is valid",
+        "Tests cover revoked, expired and inactive keys"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-377)"
+    },
+    {
+      "id": "US-378",
+      "lane": "enterprise",
+      "round": 5,
+      "title": "The morning digest and overdue-lead chaser made two lookups per agent to find their email address",
+      "description": "Done (US-368 slice, story US-378). There is now one service-role-only RPC, get_agent_contacts(uuid[]). The digest and the overdue chaser call it once per page of agents instead of calling getAgentContact (a profiles select plus auth.admin.getUserById) once per agent. Until the migration is applied, it falls back to the old per-agent lookup.",
+      "acceptanceCriteria": [
+        "public.get_agent_contacts(uuid[]) returns (id, auth.users email, full_name, notification_preferences). It is SECURITY DEFINER with SET search_path = public, extensions, pg_temp. EXECUTE is revoked from PUBLIC, anon and authenticated and granted to service_role only. It refuses more than 1000 ids.",
+        "The digest reads addresses with one getAgents call per ID_CHUNK (100) agents. It still reads no address for an agent with nothing to send.",
+        "The overdue chaser reads every pending agent's address with one getAgents call per 200 agents. It reads none for agents whose leads were all chased already.",
+        "When a bulk read fails, it adds one error per chunk and claims nothing, so the next run retries those agents.",
+        "If the function is missing (PGRST202/42883), readAgentContacts falls back to getAgentContact per agent. Any other error throws.",
+        "types.ts lists get_agent_contacts."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Problem: supabase/functions/_shared/agent-contact.ts:39 getAgentContact makes two HTTP round trips per agent. It was called once per agent per run from scheduled-maintenance/digest-store.ts:116 (digest) and scheduled-maintenance/index.ts:77 (overdue chaser), via digests.ts:323 and overdue.ts:227. Both run inside the one hourly scheduled-maintenance invocation, which also processes account deletions and cleanups.\n\nWhat changed:\n- New migration supabase/migrations/20261107000378_get_agent_contacts.sql: profiles LEFT JOIN auth.users, service role only, as in the 20261101000011 auth_user_id_by_email pattern.\n- supabase/functions/_shared/agent-contact.ts:\n  - readAgentContacts(client, ids, fallback) can be tested without a real client: it batches 200 ids per call, removes duplicate ids, and leaves out ids with no profile.\n  - When the function is missing it falls back per agent; other errors throw.\n  - getAgentContacts(supabase, ids) wraps readAgentContacts with getAgentContact as the fallback.\n- DigestStore.getAgent and OverdueStore.getAgent became getAgents(ids) returning a Map (digests.ts, overdue.ts), and both stores were rewired (digest-store.ts, index.ts).\n- digests.ts sendPage now works in three passes: decide content, read addresses in bulk, then claim and send. overdue.ts collects pending agents first, then makes one bulk read.\n- At-most-once semantics are unchanged: claims still happen only after a successful address read.\n\nTests:\n- New supabase/functions/_shared/agent-contact.test.ts (7 tests): mapping, batching, removing duplicates, missing ids, error throws, fallback, and the migration's grant/search_path text.\n- digests.test.ts gained 3 tests: one call per chunk at 250 agents, a failed read gives one error and no claims, and the store never calls getAgentContact per agent.\n- overdue.test.ts gained 3 tests: one call for 30 agents, no read for already-chased agents, and a failed read claims nothing.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npx vitest run supabase/functions/scheduled-maintenance supabase/functions/_shared src/schema-references.test.ts`: 23 files, 264 tests passed.\n- After lint-staged/prettier reformatted the commit, `npx vitest run supabase/functions/scheduled-maintenance supabase/functions/_shared/agent-contact.test.ts`: 3 files, 65 tests passed, and tsc passed again.\n- `npm run verify:migrations`: \"OK — 66 migration files structurally valid\".\n- supabase/functions is outside the root tsconfig. I type-checked the edited Deno modules separately with `npx tsc --noEmit --strict --moduleResolution bundler --allowImportingTsExtensions ...` on the three test files and digest-store.ts. The only errors were the existing \"Cannot find name 'Deno'\" errors in _shared/email.ts and env.ts.\n- Not run: verify:schema, which needs a real Postgres.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000378_get_agent_contacts.sql. | Redeploy the functions.agentbio.net Coolify app so scheduled-maintenance picks up the change. Until the migration is applied it falls back to the old per-agent lookup, so the order does not matter."
+    },
+    {
+      "id": "US-386",
+      "lane": "enterprise",
+      "round": 5,
+      "title": "Use get_agent_contacts in the other per-lead callers where they batch",
+      "description": "submit-lead, notify-lead, submit-review and the stripe-webhook dunning path still call getAgentContact. Each handles one agent per request, so they gain little. Only switch a caller if it ever loops over agents.",
+      "acceptanceCriteria": ["No loop over agents calls getAgentContact per agent"],
+      "priority": 2,
+      "passes": false,
+      "notes": "Low priority. Recorded so the next audit does not redo the investigation. (follow-up from US-378)"
+    },
+    {
+      "id": "US-379",
+      "lane": "marketing",
+      "round": 5,
+      "title": "/features/lead-capture promised CRM integration, emails with every lead detail, and scoring by timeline band",
+      "description": "The lead-capture slice of US-295, the last open slice of the marketing lane. The /features/lead-capture page and FEATURE_FAQS.leadCapture (which also ship as FAQPage JSON-LD) now describe only what exists. That means the real form fields, what the notification email actually contains, how scoring really works, and a CSV export plus a Zapier webhook instead of a CRM integration. A guard test stops the old phrases from coming back.",
+      "acceptanceCriteria": [
+        "LeadCapture.tsx no longer says 'CRM integration ready' or 'Export to your CRM'. It names the Zapier webhook (any plan) and the CSV export (paid plans; Leads.tsx:358 sends Free to the upgrade modal)",
+        "Step 2 and the notification FAQ describe the real email: name, email, phone, message, listing or source page (notify-lead/index.ts:167-178). They mention the morning-digest setting (LeadNotificationPreferences.tsx) and say locked leads come without contact details",
+        "The form cards list only fields that exist in leadFormSchema.ts BUYER/SELLER/VALUATION_QUALIFIERS",
+        "The scoring section and FAQ describe ml-lead-scoring's real inputs (pre-approval, has timeline, lead type, phone, message length, source; DEFAULT_WEIGHTS ml-lead-scoring.ts:364). There are no 0-30/30-90/90+ bands and no budget",
+        "The two other faq-schema answers that said scoring is 'based on budget' are corrected",
+        "'nurture campaign' and '#1 lead magnet' are removed",
+        "features-claims.test.ts has a LeadCapture.tsx rule set and new FAQ_FALSE rules. Checked that they fail against the previous copy (2 failures) and pass now"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-295 because prd.json shows it as the only open marketing slice; its notes say only the lead-capture slice is left. Evidence for each false claim:\n- 'CRM integration ready' (LeadCapture.tsx:33) and 'Export to your CRM anytime' (:256): there is no CRM integration. Leads.tsx:356 has a CSV export that is paid-only (:358), and the Zapier button is at :547. Neither ZapierIntegrationModal nor submit-lead's Zapier hand-off checks the plan; only locked leads are skipped.\n- Email 'within seconds with all lead details: name, budget, timeline, pre-approval status' (LeadCapture.tsx:250, faq-schema.ts:111): createLeadNotificationEmail in _shared/email.ts:107 takes name/email/phone/message/listing/sourcePage/leadScore and no qualifiers. notify-lead respects instant/daily_digest/off (index.ts:24-30) and blanks contact details for locked leads (:143-150).\n- Form fields: leadFormSchema.ts has no best-time-to-call, home value estimate, contact preference, valuation reason/timeline or delivery email. The cards now list the real qualifiers and say name plus email-or-phone comes first.\n- Scoring: Leads.tsx uses useMLLeadScoring. Its features are isPreapproved (=yes|cash, leadSubmission.ts:83), hasTimeline, leadType, hasPhone, messageLength, source and timing (useMLLeadScoring.ts:291-300). Budget and price_range are not inputs, so faq-schema.ts:219 and :268 ('based on budget') were also fixed.\n- 'nurture campaign': workflow email steps do not send (CLAUDE.md US-224).\nFiles: /home/user/plain-page-link/.claude/worktrees/wf_6e753f5c-683-8/src/pages/features/LeadCapture.tsx, /home/user/plain-page-link/.claude/worktrees/wf_6e753f5c-683-8/src/lib/faq-schema.ts, /home/user/plain-page-link/.claude/worktrees/wf_6e753f5c-683-8/src/features-claims.test.ts. I also reworded one line so it adds no new react/no-unescaped-entities warning; the four warnings eslint still reports on LeadCapture.tsx were already there, so the ratchet is unaffected.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx vitest run src/features-claims.test.ts src/marketing-claims.test.ts src/llms-txt.test.ts src/config/pricing-plans.test.ts src/lib: 70 files, 735 tests passed.\nnpx vitest run src/profile-bundle.test.ts src/pages/public/FullProfilePage.publish.test.tsx src/pages/public/ListingPage.test.tsx: 3 files, 25 tests passed.\nNegative check: with the old LeadCapture.tsx and faq-schema.ts restored from HEAD, src/features-claims.test.ts gave 2 failed / 16 passed (the LeadCapture.tsx test and the FEATURE_FAQS test). With the new copy it gave 18/18 passed, before and after prettier.\neslint on the 3 files: 0 errors, 4 warnings, all already present. The lint-staged pre-commit hook (eslint --fix plus prettier) passed. No migration was added.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-387",
+      "lane": "marketing",
+      "round": 5,
+      "title": "VsLater comparison page claims 'CRM integration (auto-sync leads)'",
+      "description": "src/pages/landing/VsLater.tsx:56, :181, :222, :340 and :601 claim AgentBio has CRM integration with auto-sync. What exists is a Zapier webhook and a CSV export. Reword these to match and add VsLater.tsx to a 'CRM integration' guard in features-claims.test.ts (or marketing-claims.test.ts).",
+      "acceptanceCriteria": [
+        "No 'CRM integration' or 'auto-sync' claim on VsLater.tsx",
+        "The comparison row names Zapier webhook / CSV export",
+        "The guard test fails on the old copy"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Same claim family as US-379. AgentTestimonials.tsx:51 'CRM Built-In' highlight is worth checking in the same pass. (follow-up from US-379)"
+    },
+    {
+      "id": "US-388",
+      "lane": "marketing",
+      "round": 5,
+      "title": "Instagram bio analyzer drip emails promise CRM integration with Follow Up Boss and Salesforce",
+      "description": "src/lib/instagram-bio-analyzer/email-templates.ts:260 and :299 promise 'CRM integration (Follow Up Boss, Salesforce, etc.)' to people who leave their email on the free tool. No such integration exists.",
+      "acceptanceCriteria": [
+        "The email templates name only the Zapier webhook and CSV export",
+        "There is a test covering the templates"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-379)"
+    },
+    {
+      "id": "US-380",
+      "lane": "seo",
+      "round": 5,
+      "title": "US-380: Organization/WebSite structured-data ids were hand-built, one from window.location, and legal/blog-category pages hard-coded the production host",
+      "description": "Slice of US-371. Every page that references the site-wide Organization or WebSite JSON-LD node now builds the id with organizationId()/websiteId() from src/config/site-entities.ts, using getBaseUrl(). The seven legal pages and BlogCategory now build their canonical, WebPage @id and url with getCanonicalUrl() instead of the literal https://agentbio.net. A source guard stops hand-built ids from coming back.",
+      "acceptanceCriteria": [
+        "Each Organization/WebSite reference uses organizationId/websiteId with getBaseUrl()",
+        "No page builds an entity id from window.location (FullProfilePage's isPartOf no longer uses getSafeOrigin())",
+        "Legal pages and BlogCategory honour VITE_APP_URL for canonical, @id and url",
+        "A guard test fails if any file under src other than site-entities.ts contains '/#organization' or '/#website'",
+        "tsc and vitest pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-371, an open seo story that fits one session. It also fixes a real defect. At src/pages/public/FullProfilePage.tsx:317 the WebPage isPartOf was built from getSafeOrigin(), which is window.location.origin in the browser. On a preview host, every agent profile therefore pointed at a WebSite node that no page declares.\n\nChanges:\n- src/pages/public/FullProfilePage.tsx: isPartOf is now websiteId(getBaseUrl()). The comment explains why. I left currentUrl alone: it still uses getSafeOrigin(), and changing it is the profile lane's call.\n- src/pages/public/Landing.tsx:103,109: now uses websiteId(origin) and organizationId(origin). origin was already getBaseUrl().\n- src/pages/Pricing.tsx:118: now uses websiteId(baseUrl).\n- src/pages/landing/LocationTemplate.tsx:55,75,113: now uses websiteId and organizationId.\n- src/pages/BlogCategory.tsx:403-460: the @id, url, breadcrumb items and canonicalUrl all hard-coded https://agentbio.net. They now use getCanonicalUrl() and getBaseUrl(), and isPartOf uses websiteId(getBaseUrl()).\n- The seven src/pages/legal/*.tsx pages (AcceptableUse, AccessibilityStatement, CookiePolicy, DMCAPolicy, PrivacyChoices, PrivacyPolicy, TermsOfService): the WebPage @id, url, isPartOf and the SEOHead canonicalUrl now come from getCanonicalUrl() and websiteId(getBaseUrl()), not literals. Contact addresses such as legal@agentbio.net and prose are unchanged.\n- src/config/site-entities.test.tsx: three additions.\n  - A guard that no file under src except site-entities.ts contains '/#organization' or '/#website'.\n  - A guard that no quoted production URL appears in the legal pages or BlogCategory.\n  - A render test of PrivacyPolicy, through Helmet server mode the way the prerender does it, asserting isPartOf === websiteId(origin) and url/@id under getBaseUrl().\n\nReviewer note: the commit hook ran eslint and prettier on the staged files. That reformatted the whole of AcceptableUse.tsx and TermsOfService.tsx, which were double-quoted and unformatted. Their large diffs are formatting only; the substantive change in each is the same four lines as in the other legal pages.\n\nProduction output does not change when VITE_APP_URL=https://agentbio.net. The fix matters on preview hosts and for any other configured base URL.\n\nVERIFIED: - `npx tsc --noEmit` passed (exit 0), before and after the commit-hook reformat.\n- `npx vitest run src/config/site-entities.test.tsx` passed: 12 tests.\n- The related suites (landing-claims, seo-origin-sources, site-entities, profile-bundle, no-clipped-text, features-claims, Pricing.test, FullProfilePage.publish.test, ListingPage.test, marketing-claims, scripts/lib/location-faq, seo-audit, articles-categories, functions/_tests/username-route, functions/_lib/social-meta, and src/config) passed: 19 files, 235 tests.\n- The full `npx vitest run` passed: 221 files, 1998 tests, 1 skipped.\n- After the reformat, site-entities and seo-origin-sources passed again: 17 tests.\n- No migrations.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-389",
+      "lane": "seo",
+      "round": 5,
+      "title": "Use the configured base URL for the profile page's canonical, WebPage and breadcrumb URLs, unless custom domains need the serving host",
+      "description": "FullProfilePage.tsx:204-211 still builds currentUrl (the canonical, the RealEstateAgent/LocalBusiness/WebPage @ids, and the breadcrumb Home item) from getSafeOrigin(). On a preview host the profile's canonical names that host. First decide whether custom-domain profiles should canonicalise to the custom domain.",
+      "acceptanceCriteria": [
+        "Decision recorded on custom-domain canonicals",
+        "Profile canonical and node ids come from getBaseUrl() (or the custom domain), not window.location"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Profile lane overlap. (follow-up from US-380)"
+    },
+    {
+      "id": "US-381",
+      "lane": "mobile",
+      "round": 5,
+      "title": "Hashed chunks and PWA icons were sent two conflicting cache policies, so neither the asset year nor any icon policy worked as written (closes US-301)",
+      "description": "I took US-301, the open mobile slice for unhashed icons cached as immutable. Looking into it turned up a bigger fault underneath. Cloudflare Pages does not let a later _headers rule win. It applies every matching rule and joins a header that two rules both set with a comma. This is in the Cloudflare docs and in workers-sdk pages-shared/asset-server/handler.ts, which calls headers.append. public/_headers and scripts/check-route-weight.mjs both assumed \"later rule wins\". So production sent these values:\n- /assets/* chunks, /icons/* and the root brand images: `public, max-age=0, must-revalidate, public, max-age=31536000, immutable`. A cache uses the first max-age, so the immutable year never applied.\n- /sw.js: three Cache-Control policies, and `application/javascript` sent twice.\nThe route-weight budget meanwhile measured a clean year. Fix: each rule that replaces the floor now detaches the inherited value first with `! Cache-Control`. Only /assets/* is immutable. Unhashed public images get max-age=86400, so a new icon reaches returning visitors and installed PWAs. /sw.js and /scripts/* revalidate on every load. The parser now follows Pages' rules, and tests check the resolved headers for every file in public/.",
+      "acceptanceCriteria": [
+        "/icons/* and the root-level brand images (Icon, logo, Cover, placeholder-property.svg) resolve to Cache-Control `public, max-age=86400`, with no immutable",
+        "/assets/* (js, css, png, webp, woff2) resolves to exactly `public, max-age=31536000, immutable`, and no file in public/ gets immutable",
+        "/sw.js and /scripts/* resolve to exactly `public, max-age=0, must-revalidate`; /sw.js Content-Type is sent once",
+        "No deployed path is sent more than one max-age directive or a comma-joined Content-Type",
+        "scripts/check-route-weight.mjs resolves _headers the way Pages does (append, `! Name` detach, :placeholder), and the budget refuses to run unless hashed assets resolve to exactly the immutable year",
+        "deployed-files.test.ts holds all of the above for every file in public/"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence:\n- Cloudflare docs (pages/configuration/headers.mdx, line 60): \"If a header is applied twice in the _headers file, the values are joined with a comma separator\". Line 62 covers \"Detach a header\" with `! Name`.\n- workers-sdk packages/pages-shared/asset-server/handler.ts:525-537 applies the matched rules in order: delete the detached headers, then headers.append when an earlier rule already set that name.\n- workers-shared parseHeaders.ts:121 parses `! Name` into unsetHeaders.\n- I resolved the old public/_headers (git HEAD) with the corrected parser:\n  - /assets/a.js got `public, max-age=0, must-revalidate, public, max-age=31536000, immutable`\n  - /icons/icon-192.png got the same\n  - /sw.js got three policies and `application/javascript, application/javascript`\n  - After the change each of these resolves to one clean value.\n\nChanges:\n- public/_headers:\n  - The floor comment now explains the joining behaviour.\n  - The cache section is rewritten. Extension rules carry only Content-Type, except images, which detach and set max-age=86400.\n  - New /assets/* rule detaches and sets the immutable year.\n  - /*.html sets only Content-Type.\n  - /scripts/* and /sw.js detach and restate revalidate. /sw.js no longer sets Content-Type a second time.\n  - Each path appears only once, because Pages keys rules by path.\n- scripts/check-route-weight.mjs:\n  - parseHeaders(source?) also records `unset`.\n  - matches() supports :placeholder.\n  - headersFor() appends, and honours detach.\n  - main() requires the exact year string.\n- scripts/check-route-weight.d.mts: types updated to match.\n- src/deployed-files.test.ts: the position-based checks, which relied on \"later wins\", are replaced by resolved-header checks over every public/ file plus sample /assets paths.\n- src/route-weight.test.ts: added tests for the semantics (join, detach, placeholder).\n\nNot run: the route-weight budget itself (npm run route-weight). It needs a build and Chromium. In CI it should now measure real production headers.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output.\n- `npx vitest run src/deployed-files.test.ts src/route-weight.test.ts functions/_tests/crawl-directives.test.ts src/sw.test.ts src/lib/register-sw.test.ts src/lib/sw-cleanup.test.ts`: 6 files, 72 tests passed. Re-run after the pre-commit prettier pass: same result.\n- `npx eslint src/deployed-files.test.ts src/route-weight.test.ts`: exit 0.\n- scripts/check-route-weight.mjs has 20 eslint no-undef errors for console and process. They were already there: the file has the same 18 console/process references before and after, and I added none.\n- No migration, so verify:migrations is not applicable.\n- A manual resolve of the old and new _headers with a scratch script confirmed the before and after values listed in the notes.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-390",
+      "lane": "mobile",
+      "round": 5,
+      "title": "If one app-shell file fails during service worker install, the installed app loses its offline fallback until the next deploy",
+      "description": "public/sw.js:226-238: cache.addAll(APP_SHELL) succeeds or fails as a whole, and the error is swallowed before skipWaiting. If '/', '/index.html', '/offline.html' or '/manifest.json' fails once on a flaky phone connection, the new precache is left empty. activate (lines 241-262) then deletes the previous, working precache. Offline navigation to a route the visitor never opened then returns the plain-text 503. Fix: cache each shell entry on its own; if '/index.html' and '/offline.html' are missing from the new precache, copy them from the previous precache before deleting it.",
+      "acceptanceCriteria": [
+        "one failing APP_SHELL fetch does not empty the precache",
+        "the old precache's index.html/offline.html survive when the new install could not fetch them",
+        "src/sw.test.ts covers both"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-381)"
     }
   ]
 }
