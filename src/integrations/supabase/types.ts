@@ -9504,6 +9504,16 @@ export type Database = {
         Args: { _body?: string; _lead_id: string; _recipient: string; _subject: string };
         Returns: string;
       };
+      log_lead_meeting: {
+        Args: {
+          _lead_id: string;
+          _location?: string;
+          _meeting_type: string;
+          _notes?: string;
+          _scheduled_at?: string;
+        };
+        Returns: string;
+      };
       log_lead_status_change: {
         Args: { _lead_id: string; _new_status: string; _note?: string; _previous_status: string };
         Returns: string;

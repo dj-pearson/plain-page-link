@@ -1898,6 +1898,7 @@ const DEFINER_CALLABLE = new Map([
   ['log_lead_activity', { why: 'checks the caller owns or is assigned the lead (auth.uid())' }],
   ['log_lead_call', { why: 'checks the caller owns or is assigned the lead (auth.uid())' }],
   ['log_lead_email', { why: 'checks the caller owns or is assigned the lead (auth.uid())' }],
+  ['log_lead_meeting', { why: 'checks the caller owns or is assigned the lead (auth.uid())' }],
   ['start_workflow_execution', { why: 'assert_caller_is on the workflow owner' }],
   ['get_user_statistics', { why: 'assert_caller_is_admin' }],
   ['log_admin_action', { why: 'assert_caller_is_admin + assert_caller_is' }],
@@ -3006,6 +3007,70 @@ check('an assignee can log calls, emails, notes and follow-ups on a routed lead'
       out.push('a former assignee still logged a call on the lead');
     if (!refused(() => as(mate, task(mate))))
       out.push('a former assignee still added a follow-up to the lead');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}', '${third}');
+         DELETE FROM public.leads WHERE id = '${lead}';
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}', '${third}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}', '${third}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// US-373 (US-336): the Log meeting form inserted into lead_activities
+// directly, so a meeting never set leads.contacted_at and the lead stayed
+// "never contacted". log_lead_meeting must set it once, keep the meeting
+// details, write the row under the caller, and refuse an unknown type and a
+// user with no claim on the lead.
+check('log_lead_meeting records the meeting and first contact', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-000000373a01';
+  const mate = '00000000-dead-beef-0000-000000373a02';
+  const third = '00000000-dead-beef-0000-000000373a03';
+  const lead = '00000000-dead-beef-0000-000000373a04';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  const contactedAt = () =>
+    q(`SELECT coalesce(contacted_at::text, '') FROM public.leads WHERE id = '${lead}';`)[0] ?? '';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${owner}', 'meet-owner@example.test'), ('${mate}', 'meet-mate@example.test'), ('${third}', 'meet-third@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.leads (id, user_id, assigned_to, lead_type, name, encrypted_email)
+         VALUES ('${lead}', '${owner}', '${mate}', 'buyer', 'Meeting Lead', 'enc');`);
+
+    if (!refused(() => as(owner, `SELECT public.log_lead_meeting('${lead}', 'lunch');`)))
+      out.push('log_lead_meeting accepted an unknown meeting type');
+    if (!refused(() => as(third, `SELECT public.log_lead_meeting('${lead}', 'video');`)))
+      out.push('a user with no claim on the lead logged a meeting on it');
+    if (contactedAt()) out.push('a refused meeting set leads.contacted_at');
+
+    if (refused(() => as(mate, `SELECT public.log_lead_meeting('${lead}', 'in_person', '12 Oak St', now() - interval '1 hour', 'Walked the house');`)))
+      out.push('an assignee could not log a meeting on a lead assigned to them');
+    const first = contactedAt();
+    if (!first) out.push('log_lead_meeting did not set leads.contacted_at');
+
+    const [row] = q(`SELECT concat_ws('|', user_id, meeting_type, meeting_location, (meeting_scheduled_at IS NOT NULL)::text, content)
+                       FROM public.lead_activities WHERE lead_id = '${lead}' AND activity_type = 'meeting';`);
+    if (row !== `${mate}|in_person|12 Oak St|true|Walked the house`)
+      out.push(`log_lead_meeting wrote an unexpected row: ${row ?? 'none'}`);
+
+    if (refused(() => as(owner, `SELECT public.log_lead_meeting('${lead}', 'phone');`)))
+      out.push('the owner could not log a meeting on their own lead');
+    if (first && contactedAt() !== first) out.push('a later meeting moved leads.contacted_at');
   } catch (e) {
     out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
   } finally {

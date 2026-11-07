@@ -247,27 +247,18 @@ export function useLeadActivities(leadId?: string) {
     },
   });
 
-  // Log a meeting
+  // Log a meeting. Through log_lead_meeting, like calls and emails, so a
+  // meeting sets leads.contacted_at (first contact) once (US-373). The direct
+  // insert this replaced wrote the row and left the lead "never contacted".
   const logMeetingMutation = useMutation({
     mutationFn: async (params: LogMeetingParams) => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user?.id) throw new Error('User not authenticated');
-
-      const { data, error } = await supabase
-        .from('lead_activities')
-        .insert({
-          lead_id: params.leadId,
-          user_id: userData.user.id,
-          activity_type: 'meeting',
-          title: `${params.meetingType === 'in_person' ? 'In-person' : params.meetingType === 'video' ? 'Video' : 'Phone'} meeting`,
-          content: params.notes,
-          meeting_type: params.meetingType,
-          meeting_location: params.location,
-          meeting_scheduled_at: params.scheduledAt?.toISOString(),
-          is_internal: false,
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('log_lead_meeting', {
+        _lead_id: params.leadId,
+        _meeting_type: params.meetingType,
+        _location: params.location ?? undefined,
+        _scheduled_at: params.scheduledAt?.toISOString(),
+        _notes: params.notes ?? undefined,
+      });
 
       if (error) throw error;
       return data;
@@ -275,7 +266,7 @@ export function useLeadActivities(leadId?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
       queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update contacted_at
       toast.success('Meeting logged');
     },
     onError: (error) => {
