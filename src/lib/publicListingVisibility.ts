@@ -7,7 +7,9 @@
  * and ListingCard has a Pending badge ready to render. A property under offer
  * is a selling point; hiding it is the opposite of what the agent intended.
  */
-import { isPublicListingStatus } from '@/lib/listingStatus';
+// Relative, not '@/': functions/_lib/profile-sitemap.ts imports this module, and
+// the Pages Functions bundle does not resolve the Vite alias.
+import { isPublicListingStatus } from './listingStatus';
 
 /** Available statuses, in the order a visitor should meet them. */
 export const AVAILABLE_STATUS_ORDER = ['active', 'pending', 'under_contract'] as const;
