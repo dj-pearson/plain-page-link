@@ -98,22 +98,22 @@ export const FEATURE_FAQS = {
     {
       question: 'What types of lead capture forms does AgentBio offer?',
       answer:
-        'AgentBio offers three specialized lead capture forms for real estate agents: Buyer Inquiry Forms with pre-qualification questions like budget and pre-approval status, Seller Lead Forms that capture timeline and motivation to sell, and Home Valuation Request Forms that attract seller leads with free property valuations.',
+        'AgentBio offers three lead capture forms for real estate agents: a Buyer Inquiry Form with pre-qualification questions like price range, timeline and pre-approval status, a Seller Lead Form that asks for the property address, timeline and reason for selling, and a Home Valuation Request Form for homeowners who want to know what their home is worth (you prepare the valuation). Each asks for a name and an email or phone first; the qualifying questions come second and are optional.',
     },
     {
       question: "How does AgentBio's lead scoring work?",
       answer:
-        'AgentBio automatically scores leads as Hot, Warm, or Cold based on their responses. Hot leads are pre-approved buyers with 0-30 day timelines, Warm leads have 30-90 day timelines with defined budgets, and Cold leads are in early research with 90+ day timelines. This helps agents prioritize who to call first.',
+        'AgentBio scores each lead from 0 to 100 and labels it Hot, Warm, or Cold. The score weighs whether the lead is pre-approved, whether they gave a timeline, the kind of enquiry, whether they left a phone number, how much they wrote and where they came from. It is a fixed set of rules, not a trained model, and it helps agents decide who to call first.',
     },
     {
       question: 'Do I get notified when someone submits a lead form?',
       answer:
-        'Yes, AgentBio sends instant email notifications when leads submit forms. You receive all lead details including name, budget, timeline, and pre-approval status within seconds, allowing you to follow up while leads are still hot.',
+        "Yes. By default AgentBio emails you as each lead arrives, with the lead's name, email, phone, message and the listing or page they came from; their answers to the qualifying questions are on the lead in your dashboard. You can switch to a morning digest or turn the emails off. Leads beyond your plan's monthly allowance are still saved, but their contact details stay hidden in the email and the dashboard until you upgrade.",
     },
     {
       question: 'Can I export leads to my CRM?',
       answer:
-        'Yes, all leads captured through AgentBio forms are stored in your dashboard and can be exported to your CRM anytime. You can sort leads by date, type, or status before exporting.',
+        'There is no built-in CRM integration. You can connect a Zapier webhook that sends each new lead on to your CRM as it arrives, and on paid plans you can export your leads as a CSV file, filtered by status or lead type, to import yourself.',
     },
   ],
   propertyListings: [
@@ -216,7 +216,7 @@ export const HOMEPAGE_FAQS: FAQItem[] = [
   {
     question: 'Does AgentBio capture leads?',
     answer:
-      'Yes. AgentBio includes built-in lead capture forms for buyer inquiries, seller leads, and home valuation requests. Leads are automatically scored as Hot, Warm, or Cold based on responses like budget, timeline, and pre-approval status.',
+      'Yes. AgentBio includes built-in lead capture forms for buyer inquiries, seller leads, and home valuation requests. Leads are automatically scored as Hot, Warm, or Cold from signals like pre-approval status, whether a timeline was given and whether a phone number was left.',
   },
   {
     question: 'Does AgentBio work with Instagram?',
@@ -265,7 +265,7 @@ export const COMPARISON_FAQS = {
     {
       question: 'Does Linktree have lead capture for real estate?',
       answer:
-        'No. Linktree has basic email collection but no real estate-specific lead forms. AgentBio offers buyer inquiry forms, seller lead forms, and home valuation requests with automatic lead scoring based on budget, timeline, and pre-approval status.',
+        'No. Linktree has basic email collection but no real estate-specific lead forms. AgentBio offers buyer inquiry forms, seller lead forms, and home valuation requests with automatic lead scoring based on pre-approval status, timeline and contact details.',
     },
   ],
   beacons: [
