@@ -37,7 +37,12 @@ vi.mock('@/integrations/supabase/client', () => {
   return {
     supabase: {
       from: (table: string) => (table === 'profiles' ? profiles() : related()),
-      rpc: async () => ({ data: null, error: null }),
+      // No get_public_profile_page on this database (US-329): the fallback
+      // table reads, where the `or` filter lives.
+      rpc: async (name: string) =>
+        name === 'get_public_profile_page'
+          ? { data: null, error: { code: 'PGRST202', message: 'Could not find the function' } }
+          : { data: null, error: null },
     },
   };
 });

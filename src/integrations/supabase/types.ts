@@ -9311,6 +9311,7 @@ export type Database = {
         Args: { _open_house_id: string };
         Returns: Record<string, unknown>[];
       };
+      get_public_profile_page: { Args: { _username: string }; Returns: Json };
       get_scheduled_workflows: {
         Args: { p_limit?: number };
         Returns: Record<string, unknown>[];
