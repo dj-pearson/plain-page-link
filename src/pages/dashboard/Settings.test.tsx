@@ -68,6 +68,7 @@ vi.mock('@/components/auth/mfa/NativeMFASettings', () => ({ NativeMFASettings: (
 vi.mock('@/components/settings/AuditLogViewer', () => ({ AuditLogViewer: () => null }));
 vi.mock('@/components/settings/GDPRSettings', () => ({ GDPRSettings: () => null }));
 vi.mock('@/components/settings/ProfileURLCard', () => ({ ProfileURLCard: () => null }));
+vi.mock('@/components/settings/PublishProfileCard', () => ({ PublishProfileCard: () => null }));
 
 import Settings from './Settings';
 

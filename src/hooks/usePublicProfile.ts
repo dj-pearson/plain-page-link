@@ -4,14 +4,20 @@ import { toStringList } from '@/types/profile';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeUsername } from '@/lib/username';
+import { publicProfileFilter } from '@/lib/profilePublishing';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 export const usePublicProfile = (rawUsername: string) => {
   // Usernames are stored canonical (lower case); the slug comes from a URL a
   // human typed. Compare the two in the same form or `/JaneDoe` 404s.
   const username = normalizeUsername(rawUsername);
+  // The signed-in agent may see their own page while it is unpublished
+  // (US-265). The viewer is part of the key so a cached owner preview is never
+  // served after sign-out, and a cached 404 never hides the page from its owner.
+  const viewerId = useAuthStore((s) => s.user?.id ?? null);
 
   return useQuery({
-    queryKey: ['public-profile', username],
+    queryKey: ['public-profile', username, viewerId],
     queryFn: async () => {
       // Fetch profile by username - ONLY PUBLIC FIELDS
       const { data: profile, error: profileError } = await supabase
@@ -54,7 +60,10 @@ export const usePublicProfile = (rawUsername: string) => {
         `
         )
         .eq('username', username)
-        .neq('is_published', false)
+        // Published, or the viewer's own (US-265). This was
+        // `.neq('is_published', false)`, so an unpublished page was invisible
+        // to its owner too, and there was no way to preview it.
+        .or(publicProfileFilter(viewerId))
         .single();
 
       if (profileError) throw profileError;
