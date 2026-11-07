@@ -1,4 +1,4 @@
-/* AgentBio Service Worker (US-027, US-272, US-312, US-321)
+/* AgentBio Service Worker (US-027, US-272, US-312, US-321, US-400)
  *
  * Implemented with the native Cache Storage API rather than the bundled
  * Workbox runtime: the index.html CSP `script-src` does not allow the
@@ -131,6 +131,46 @@ async function precacheShellAssets(cache) {
 }
 
 /**
+ * Precache the app shell one file at a time (US-400).
+ *
+ * This used to be cache.addAll(APP_SHELL), which stores all four files or
+ * none: one failed fetch on a flaky phone connection left the new precache
+ * empty, the error was swallowed so the worker installed anyway, and activate
+ * then deleted the previous, working precache. Offline, a route the visitor
+ * had never opened got the plain-text 503 instead of the app or offline.html
+ * until the next deploy. Each file is now kept or skipped on its own; what is
+ * missing is filled from the previous precache on activate (carryShellForward).
+ */
+async function precacheAppShell(cache) {
+  await Promise.all(
+    APP_SHELL.map(async (path) => {
+      try {
+        const response = await fetch(path);
+        if (response && response.ok) await cache.put(path, response);
+      } catch {
+        // Offline or failed: carryShellForward keeps the previous copy.
+      }
+    })
+  );
+}
+
+/**
+ * Before an old precache is deleted, copy into the new precache any app-shell
+ * file the new install could not fetch. An older index.html is still a working
+ * offline fallback: adoptPrecachedAssets moves the entry chunks it names into
+ * RUNTIME in the same step. A file the new install did fetch is never replaced.
+ */
+async function carryShellForward(oldCacheName) {
+  const old = await caches.open(oldCacheName);
+  const current = await caches.open(PRECACHE);
+  for (const path of APP_SHELL) {
+    if (await current.match(path)) continue;
+    const response = await old.match(path);
+    if (response) await current.put(path, response);
+  }
+}
+
+/**
  * Before an old precache is deleted, move its /assets entries into RUNTIME.
  * A page saved in PAGES under the previous build names that build's entry
  * chunks, and once they were precached the browser served them from there
@@ -233,8 +273,7 @@ self.addEventListener('install', (event) => {
     caches
       .open(PRECACHE)
       .then((cache) =>
-        cache
-          .addAll(APP_SHELL)
+        precacheAppShell(cache)
           .then(() => precacheShellAssets(cache))
           .catch(() => undefined)
       )
@@ -247,22 +286,21 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter(
-              (k) =>
-                k.startsWith(CACHE_PREFIX) &&
-                ![PRECACHE, RUNTIME, IMAGES, PAGES].includes(k)
-            )
-            .map((k) =>
-              (k.startsWith(`${CACHE_PREFIX}precache-`)
-                ? adoptPrecachedAssets(k).catch(() => undefined)
-                : Promise.resolve()
-              ).then(() => caches.delete(k))
-            )
-        )
-      )
+      .then(async (keys) => {
+        const stale = keys.filter(
+          (k) => k.startsWith(CACHE_PREFIX) && ![PRECACHE, RUNTIME, IMAGES, PAGES].includes(k)
+        );
+        // One at a time and newest first (caches.keys() is in creation
+        // order), so when several old precaches exist the most recent one
+        // that holds a missing shell file is the one that supplies it.
+        for (const k of stale.reverse()) {
+          if (k.startsWith(`${CACHE_PREFIX}precache-`)) {
+            await carryShellForward(k).catch(() => undefined);
+            await adoptPrecachedAssets(k).catch(() => undefined);
+          }
+          await caches.delete(k);
+        }
+      })
       // A visitor who installed the worker before US-272 carries an unbounded
       // runtime cache; bring it under the cap now rather than at the next put.
       .then(() => Promise.all([trimCache(RUNTIME), trimCache(IMAGES), trimCache(PAGES)]))

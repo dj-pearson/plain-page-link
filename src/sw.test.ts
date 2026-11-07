@@ -25,7 +25,6 @@ type Listener = (event: unknown) => void;
 
 class FakeCache {
   entries = new Map<string, Response>();
-  constructor(private shell: Record<string, string> = {}) {}
   async match(request: Request | string) {
     const hit = this.entries.get(keyOf(request));
     return hit ? hit.clone() : undefined;
@@ -36,10 +35,6 @@ class FakeCache {
     // first so insertion order matches a fresh put, as the browser's does.
     this.entries.delete(key);
     this.entries.set(key, response);
-  }
-  async addAll(urls: string[]) {
-    for (const u of urls)
-      this.entries.set(new URL(u, ORIGIN).href, new Response(this.shell[u] ?? `shell ${u}`));
   }
   async keys() {
     return [...this.entries.keys()].map((k) => new Request(k));
@@ -62,7 +57,7 @@ function loadWorker(
   const stores = new Map<string, FakeCache>();
   const caches = {
     async open(name: string) {
-      if (!stores.has(name)) stores.set(name, new FakeCache(shell));
+      if (!stores.has(name)) stores.set(name, new FakeCache());
       return stores.get(name)!;
     },
     async keys() {
@@ -93,10 +88,16 @@ function loadWorker(
     self,
     caches,
     fetch: (input: Request | string, init?: RequestInit) => {
-      const req = typeof input === 'string' ? new Request(input) : input;
+      // A worker resolves a relative URL against its own location.
+      const req = typeof input === 'string' ? new Request(new URL(input, ORIGIN).href) : input;
       fetched.push(req.url);
       fetchInits.set(req.url, init);
-      return network(req);
+      // `shell` overrides the body of a successful response for those paths,
+      // so a test can hand the worker real index.html markup while the
+      // network fake still decides whether the fetch succeeds at all.
+      const body = shell[new URL(req.url).pathname];
+      if (body === undefined) return network(req);
+      return network(req).then((r) => (r.ok ? new Response(body, { status: 200 }) : r));
     },
     Response,
     Request,
@@ -296,10 +297,10 @@ describe('offline pages for visited routes (US-312)', () => {
     const { sw, state } = pagesWorker();
     await sw.lifecycle('install');
     state.online = false;
-    expect(await (await navigate(sw, '/dashboard/clients'))!.text()).toBe('shell /index.html');
+    expect(await (await navigate(sw, '/dashboard/clients'))!.text()).toBe('page /index.html');
 
     sw.stores.get('agentbio-sw-precache-dev')!.entries.delete(`${ORIGIN}/index.html`);
-    expect(await (await navigate(sw, '/dashboard/clients'))!.text()).toBe('shell /offline.html');
+    expect(await (await navigate(sw, '/dashboard/clients'))!.text()).toBe('page /offline.html');
   });
 
   it('answers 503 when nothing at all is cached', async () => {
@@ -459,6 +460,91 @@ describe('precaching the shell entry files (US-321)', () => {
     for (const path of ENTRY) expect(runtime.entries.has(`${ORIGIN}${path}`)).toBe(true);
     // Only hashed assets move; the old shell HTML does not.
     expect(runtime.entries.has(`${ORIGIN}/index.html`)).toBe(false);
+  });
+});
+
+describe('installing the app shell file by file (US-400)', () => {
+  const SHELL = ['/', '/index.html', '/offline.html', '/manifest.json'];
+
+  /** A worker whose network fails the paths in `failing` and serves the rest as `<build> <path>`. */
+  function installWorker(build: string, failing: string[] = [], online = true) {
+    return loadWorker(stampServiceWorkerVersion(SOURCE, build), async (req) => {
+      const path = new URL(req.url).pathname;
+      if (!online || failing.includes(path)) throw new TypeError('Failed to fetch');
+      return new Response(`${build} ${path}`, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    });
+  }
+
+  const precacheText = async (sw: ReturnType<typeof loadWorker>, build: string, path: string) =>
+    (await sw.stores.get(`agentbio-sw-precache-${build}`)!.match(path))?.text();
+
+  it('keeps the rest of the shell when one file fails to download', async () => {
+    const sw = installWorker('build1', ['/manifest.json']);
+    await sw.lifecycle('install');
+    expect(await precacheText(sw, 'build1', '/index.html')).toBe('build1 /index.html');
+    expect(await precacheText(sw, 'build1', '/offline.html')).toBe('build1 /offline.html');
+    expect(await precacheText(sw, 'build1', '/')).toBe('build1 /');
+    expect(await precacheText(sw, 'build1', '/manifest.json')).toBeUndefined();
+  });
+
+  it('does not store a shell file the server answered with an error', async () => {
+    const sw = loadWorker(SOURCE, async (req) =>
+      new URL(req.url).pathname === '/offline.html'
+        ? new Response('down', { status: 502 })
+        : new Response('ok')
+    );
+    await sw.lifecycle('install');
+    expect(await sw.stores.get('agentbio-sw-precache-dev')!.match('/offline.html')).toBeUndefined();
+    expect(await sw.stores.get('agentbio-sw-precache-dev')!.match('/index.html')).toBeDefined();
+  });
+
+  /** Install build1 fully, then install build2 against the same Cache Storage and activate it. */
+  async function upgrade(failing: string[], online = true) {
+    const first = installWorker('build1');
+    await first.lifecycle('install');
+    const second = installWorker('build2', failing, online);
+    for (const [name, cache] of first.stores) second.stores.set(name, cache);
+    await second.lifecycle('install');
+    await second.lifecycle('activate');
+    return second;
+  }
+
+  it('keeps the previous index.html and offline.html when the new install could not fetch them', async () => {
+    const sw = await upgrade(['/index.html', '/offline.html']);
+    expect(sw.stores.has('agentbio-sw-precache-build1')).toBe(false);
+    expect(await precacheText(sw, 'build2', '/index.html')).toBe('build1 /index.html');
+    expect(await precacheText(sw, 'build2', '/offline.html')).toBe('build1 /offline.html');
+    // Files the new install did fetch are the new build's, never the old copy.
+    expect(await precacheText(sw, 'build2', '/')).toBe('build2 /');
+    expect(await precacheText(sw, 'build2', '/manifest.json')).toBe('build2 /manifest.json');
+  });
+
+  it('still opens a never-visited route offline after an install made with no network at all', async () => {
+    const sw = await upgrade([], false);
+    for (const path of SHELL) {
+      expect(await precacheText(sw, 'build2', path)).toBe(`build1 ${path}`);
+    }
+    const page = await sw.request('/dashboard/clients', { mode: 'navigate' });
+    expect(page!.status).toBe(200);
+    expect(await page!.text()).toBe('build1 /index.html');
+  });
+
+  it('takes a missing file from the most recent of several old precaches', async () => {
+    const sw = installWorker('build3', ['/index.html']);
+    const older = new FakeCache();
+    await older.put('/index.html', new Response('build1 /index.html'));
+    const newer = new FakeCache();
+    await newer.put('/index.html', new Response('build2 /index.html'));
+    // caches.keys() lists caches in creation order.
+    sw.stores.set('agentbio-sw-precache-build1', older);
+    sw.stores.set('agentbio-sw-precache-build2', newer);
+    await sw.lifecycle('install');
+    await sw.lifecycle('activate');
+    expect(await precacheText(sw, 'build3', '/index.html')).toBe('build2 /index.html');
+    expect(sw.stores.has('agentbio-sw-precache-build1')).toBe(false);
+    expect(sw.stores.has('agentbio-sw-precache-build2')).toBe(false);
   });
 });
 
