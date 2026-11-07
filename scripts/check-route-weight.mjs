@@ -70,41 +70,78 @@ const CONTENT_TYPES = {
 };
 
 /**
- * public/_headers, as ordered rules. Cloudflare Pages applies every matching
- * rule in file order and a later one wins for a header it repeats.
+ * public/_headers, as ordered rules, read the way Cloudflare Pages reads it.
+ *
+ * Every rule whose pattern matches a request applies, in file order. A header
+ * that two matching rules both set is NOT replaced by the later one: Pages
+ * joins the values with a comma (developers.cloudflare.com/pages/configuration/
+ * headers: "If a header is applied twice in the _headers file, the values are
+ * joined with a comma separator"; workers-sdk pages-shared/asset-server/
+ * handler.ts appends). The only way to replace an inherited header is to
+ * detach it first with a `! Name` line in the later rule (US-381).
+ *
+ * This parser used to let the later rule win, which is what the comments in
+ * public/_headers assumed too. Production was sending every hashed chunk and
+ * every icon `public, max-age=0, must-revalidate, public, max-age=31536000,
+ * immutable` — two max-age directives, the first of which a cache uses —
+ * while this harness measured the clean year.
+ *
+ * `source` is for tests; by default the deployed file is read.
  */
-export async function parseHeaders() {
-  const source = await readFile(join(ROOT, 'public/_headers'), 'utf-8');
+export async function parseHeaders(source) {
+  const text = source ?? (await readFile(join(ROOT, 'public/_headers'), 'utf-8'));
   const rules = [];
   let current = null;
-  for (const line of source.split('\n')) {
+  for (const line of text.split('\n')) {
     if (!line.trim() || line.trimStart().startsWith('#')) continue;
     if (!/^\s/.test(line)) {
-      current = { pattern: line.trim(), headers: {} };
+      current = { pattern: line.trim(), headers: {}, unset: [] };
       rules.push(current);
       continue;
     }
-    const colon = line.indexOf(':');
-    if (current && colon > -1) {
-      current.headers[line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
+    if (!current) continue;
+    const trimmed = line.trim();
+    if (trimmed.startsWith('! ')) {
+      current.unset.push(trimmed.slice(2).trim());
+      continue;
+    }
+    const colon = trimmed.indexOf(':');
+    if (colon > -1) {
+      current.headers[trimmed.slice(0, colon).trim()] = trimmed.slice(colon + 1).trim();
     }
   }
   return rules;
 }
 
+/** Pages' URL matching: one greedy `*` splat, and `:name` for one path segment. */
 export function matches(pattern, path) {
   if (pattern === path) return true;
-  if (!pattern.includes('*')) return false;
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+  if (!pattern.includes('*') && !pattern.includes(':')) return false;
+  const escaped = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/:\w+/g, '[^/]+');
   return new RegExp(`^${escaped}$`).test(path);
 }
 
+/**
+ * The headers Pages sends for `path`: every matching rule in file order, each
+ * first deleting what it detaches, then setting its own headers — appended
+ * with ', ' when an earlier rule already set the same name.
+ */
 export function headersFor(rules, path) {
-  const out = {};
+  /** lower-case name -> [name as first written, value] */
+  const out = new Map();
   for (const rule of rules) {
-    if (matches(rule.pattern, path)) Object.assign(out, rule.headers);
+    if (!matches(rule.pattern, path)) continue;
+    for (const name of rule.unset ?? []) out.delete(name.toLowerCase());
+    for (const [name, value] of Object.entries(rule.headers)) {
+      const key = name.toLowerCase();
+      const existing = out.get(key);
+      out.set(key, existing ? [existing[0], `${existing[1]}, ${value}`] : [name, value]);
+    }
   }
-  return out;
+  return Object.fromEntries([...out.values()]);
 }
 
 /** Serve dist/ the way Pages does: real files first, then the SPA fallback. */
@@ -180,7 +217,7 @@ async function main() {
 
   const rules = await parseHeaders();
   const assetPolicy = headersFor(rules, '/assets/index-abc123.js')['Cache-Control'];
-  if (!assetPolicy?.includes('immutable')) {
+  if (assetPolicy !== 'public, max-age=31536000, immutable') {
     // Without this the numbers below are fiction, and quietly so.
     console.error(
       `[route-weight] public/_headers does not mark hashed assets immutable (got ${assetPolicy ?? 'nothing'}).`
