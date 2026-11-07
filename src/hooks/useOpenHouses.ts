@@ -21,12 +21,11 @@ import { LEAD_COLUMNS } from '@/lib/leadColumns';
 import { callEdgeFunction } from '@/lib/edgeFunctions';
 import { getLeadAttribution } from '@/lib/attribution';
 import { errorHandler } from '@/lib/errorHandler';
-import { logger } from '@/lib/logger';
+import { publicOpenHousesQueryOptions } from '@/lib/publicProfileSideQueries';
 import type { Lead } from '@/types/lead';
 
 type OpenHouseRow = Database['public']['Tables']['open_houses']['Row'];
-export type PublicOpenHouse =
-  Database['public']['Functions']['list_public_open_houses']['Returns'][number];
+export type { PublicOpenHouse } from '@/lib/publicProfileSideQueries';
 export type PublicOpenHouseDetail =
   Database['public']['Functions']['get_public_open_house']['Returns'][number];
 
@@ -217,23 +216,13 @@ export function useOpenHouseVisitors(openHouseId: string | null | undefined) {
   });
 }
 
-/** Upcoming public open houses for a profile page. */
+/**
+ * Upcoming public open houses for a profile page. The public profile query
+ * starts this same read alongside its own (US-307), so on a profile page it is
+ * normally already in the cache when this mounts.
+ */
 export function usePublicOpenHouses(agentId: string | null | undefined) {
-  return useQuery({
-    queryKey: ['public-open-houses', agentId],
-    queryFn: async (): Promise<PublicOpenHouse[]> => {
-      if (!agentId) return [];
-      const { data, error } = await supabase.rpc('list_public_open_houses', { _user_id: agentId });
-      if (error) {
-        // A profile page must render without this section rather than fail.
-        logger.error('Could not load public open houses', error);
-        return [];
-      }
-      return data ?? [];
-    },
-    enabled: !!agentId,
-    staleTime: 5 * 60 * 1000,
-  });
+  return useQuery(publicOpenHousesQueryOptions(agentId));
 }
 
 /** One open house for the sign-in kiosk, or null if it is not taking sign-ins. */

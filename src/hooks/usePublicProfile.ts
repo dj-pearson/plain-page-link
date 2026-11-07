@@ -6,6 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { normalizeUsername } from '@/lib/username';
 import { publicProfileFilter } from '@/lib/profilePublishing';
 import { useAuthStore } from '@/stores/useAuthStore';
+import {
+  profileShowsBrandingQueryOptions,
+  publicOpenHousesQueryOptions,
+} from '@/lib/publicProfileSideQueries';
 
 /**
  * The public profile read, as query options shared by two callers (US-267):
@@ -34,7 +38,7 @@ export const publicProfileQueryOptions = (rawUsername: string, viewerId: string 
   // served after sign-out, and a cached 404 never hides the page from its owner.
   return queryOptions({
     queryKey: ['public-profile', username, viewerId] as const,
-    queryFn: async () => {
+    queryFn: async ({ client }) => {
       // Fetch profile by username - ONLY PUBLIC FIELDS
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -94,6 +98,16 @@ export const publicProfileQueryOptions = (rawUsername: string, viewerId: string 
       // trigger on the throttled analytics_views insert, which useProfileTracking
       // makes once per mounted page. Fetching a profile is not a view: this ran
       // even for an agent whose page immediately redirects to a custom page.
+
+      // The branding and open-house reads belong to their own hooks, which
+      // mount only after this query resolves and the page renders — a third
+      // serial round trip (US-307). Start them now, under the hooks' own keys,
+      // so they travel with the six reads below. Not awaited: the profile does
+      // not wait on them, and prefetchQuery never throws. A query that is
+      // already cached and fresh is not fetched again, and one in flight is
+      // joined, so the hooks never issue a second request on mount.
+      void client.prefetchQuery(profileShowsBrandingQueryOptions(profile.id));
+      void client.prefetchQuery(publicOpenHousesQueryOptions(profile.id));
 
       // Fetch all related data in parallel instead of sequential
       const [
