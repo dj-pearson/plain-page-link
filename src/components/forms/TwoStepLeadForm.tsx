@@ -8,6 +8,7 @@ import { HoneypotField } from './HoneypotField';
 import { useSpamGuard } from '@/hooks/useSpamGuard';
 import { useFormOpenTracking } from '@/hooks/useFormOpenTracking';
 import { enrichLead, submitLead, trackFormSubmission, type LeadType } from '@/lib/leadSubmission';
+import type { QualifierField } from '@/lib/leadFormSchema';
 
 /**
  * A lead form in two steps (US-228).
@@ -20,14 +21,7 @@ import { enrichLead, submitLead, trackFormSubmission, type LeadType } from '@/li
  * offers the rest as optional and adds it to the same lead.
  */
 
-export interface QualifierField {
-  /** Key in the answers bag; see splitFormData for the ones with a column. */
-  key: string;
-  label: string;
-  kind: 'select' | 'text' | 'number' | 'textarea';
-  options?: [value: string, label: string][];
-  placeholder?: string;
-}
+export type { QualifierField } from '@/lib/leadFormSchema';
 
 interface TwoStepLeadFormProps {
   agentId: string;
@@ -91,8 +85,10 @@ export function TwoStepLeadForm({
     const phone = contact.phone.trim();
     if (!email && !phone) next.email = 'Please give an email or a phone number';
     if (email && !/^\S+@\S+\.\S+$/.test(email)) next.email = 'Please enter a valid email address';
-    if (phone && phone.replace(/\D/g, '').length < 7) next.phone = 'Please enter a valid phone number';
-    if (askAddress && contact.address.trim().length < 5) next.address = 'Please enter the property address';
+    if (phone && phone.replace(/\D/g, '').length < 7)
+      next.phone = 'Please enter a valid phone number';
+    if (askAddress && contact.address.trim().length < 5)
+      next.address = 'Please enter the property address';
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -133,7 +129,8 @@ export function TwoStepLeadForm({
     const result = await enrichLead(lead.id, lead.token, filled);
     setBusy(false);
     // The lead already exists; a failure here loses only the extras.
-    if (!result.success) setSubmitError('We got your details, but not these extras. Your agent will ask.');
+    if (!result.success)
+      setSubmitError('We got your details, but not these extras. Your agent will ask.');
     finish();
   };
 
@@ -162,12 +159,17 @@ export function TwoStepLeadForm({
           {step === 'contact' ? title : `Thanks — ${agentName} has your details`}
         </CardTitle>
         <CardDescription>
-          {step === 'contact' ? description : 'A few optional questions help them prepare. Skip any you like.'}
+          {step === 'contact'
+            ? description
+            : 'A few optional questions help them prepare. Skip any you like.'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {submitError && step === 'contact' && (
-          <div role="alert" className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
+          <div
+            role="alert"
+            className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4"
+          >
             <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" aria-hidden="true" />
             <p className="text-sm text-red-700">{submitError}</p>
           </div>
@@ -250,7 +252,12 @@ export function TwoStepLeadForm({
                       <label htmlFor={id} className="text-sm font-medium">
                         {field.label}
                       </label>
-                      <select id={id} className={selectClass} value={value} onChange={(e) => set(e.target.value)}>
+                      <select
+                        id={id}
+                        className={selectClass}
+                        value={value}
+                        onChange={(e) => set(e.target.value)}
+                      >
                         <option value="">—</option>
                         {field.options?.map(([v, label]) => (
                           <option key={v} value={v}>
@@ -275,7 +282,13 @@ export function TwoStepLeadForm({
               })}
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="ghost" className="min-h-[44px]" onClick={finish} disabled={busy}>
+              <Button
+                type="button"
+                variant="ghost"
+                className="min-h-[44px]"
+                onClick={finish}
+                disabled={busy}
+              >
                 Skip
               </Button>
               <Button type="submit" className="min-h-[44px]" disabled={busy}>

@@ -41,6 +41,7 @@ import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { ZapierIntegrationModal } from '@/components/integrations/ZapierIntegrationModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
+import { leadAddressLabel } from '@/lib/leadFormSchema';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -974,9 +975,18 @@ export default function Leads() {
                           </div>
                         )}
                         {lead.property_address && (
-                          <div className="flex items-center gap-2 min-h-[32px]">
+                          <div className="flex items-center gap-2 min-h-[32px] min-w-0">
                             <Home className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">{lead.property_address}</span>
+                            <span className="truncate">
+                              {/* Whose address this is (US-264): the listing a
+                                  buyer asked about, or a seller's own home. */}
+                              {leadAddressLabel(lead) && (
+                                <span className="text-muted-foreground">
+                                  {leadAddressLabel(lead)}{' '}
+                                </span>
+                              )}
+                              {lead.property_address}
+                            </span>
                           </div>
                         )}
                         {lead.message && !lead.contact_locked && (
