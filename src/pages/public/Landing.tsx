@@ -301,7 +301,7 @@ export default function Landing() {
               <FeatureCard
                 icon={<Home className="h-8 w-8" aria-hidden="true" />}
                 title="Showcase Your Portfolio"
-                description="Display active listings with price, photos, beds/baths. Highlight sold properties as social proof. Add virtual tours and property videos."
+                description="Display active listings with price, photos, beds/baths. Highlight sold properties as social proof. Link a virtual tour from any listing."
               />
               <FeatureCard
                 icon={<Users className="h-8 w-8" aria-hidden="true" />}
@@ -311,7 +311,7 @@ export default function Landing() {
               <FeatureCard
                 icon={<BarChart3 className="h-8 w-8" aria-hidden="true" />}
                 title="Book Appointments Fast"
-                description="Integrated Calendly for showing requests. One-tap phone & SMS contact buttons. Time zone auto-detection for out-of-area buyers."
+                description="Connect your Calendly link and buyers book showings from your page; each booking lands in your leads. One-tap call and text buttons."
               />
             </div>
           </div>
@@ -339,8 +339,8 @@ export default function Landing() {
                     <span className="text-red-700">The Problem</span>
                   </div>
                   <p className="glass-body leading-relaxed mb-6">
-                    43% of real estate referrals come through text messages and social media. But
-                    when you send clients to your traditional website:
+                    Referrals and followers arrive on a phone, from a text or a social post. But
+                    when you send them to a traditional website:
                   </p>
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
@@ -349,7 +349,7 @@ export default function Landing() {
                     </div>
                     <div className="flex items-start gap-3">
                       <span className="text-red-400 flex-shrink-0">❌</span>
-                      <p className="glass-body">Loading takes 5+ seconds on mobile</p>
+                      <p className="glass-body">Pages are slow to load on a phone</p>
                     </div>
                     <div className="flex items-start gap-3">
                       <span className="text-red-400 flex-shrink-0">❌</span>
@@ -368,14 +368,14 @@ export default function Landing() {
                     <span className="text-green-700">The Solution</span>
                   </div>
                   <p className="glass-body leading-relaxed mb-6">
-                    Your AgentBio page loads in under 2 seconds, puts your best listings front and
-                    center, and has contact buttons in thumb-reach. Everything a buyer needs to take
-                    the next step.
+                    Your AgentBio page is built for phones first: your best listings front and
+                    center, and contact buttons in thumb-reach. Everything a buyer needs to take the
+                    next step.
                   </p>
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
                       <span className="text-green-700 flex-shrink-0">✓</span>
-                      <p className="glass-body">Instant load on any mobile device</p>
+                      <p className="glass-body">One lightweight page, built for phones</p>
                     </div>
                     <div className="flex items-start gap-3">
                       <span className="text-green-700 flex-shrink-0">✓</span>
@@ -408,12 +408,10 @@ export default function Landing() {
                 id="demo-heading"
                 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4"
               >
-                <span className="glass-heading text-4xl md:text-6xl">
-                  See How Top Agents Use AgentBio
-                </span>
+                <span className="glass-heading text-4xl md:text-6xl">Agent Pages on AgentBio</span>
               </h2>
               <p className="text-xl glass-body max-w-2xl mx-auto">
-                Real examples of agents who switched from generic links to professional bio pages
+                Published pages from agents using AgentBio today
               </p>
             </header>
             <DemoProfilesShowcase />
@@ -458,27 +456,27 @@ export default function Landing() {
               <FeatureCard
                 icon={<Users className="h-8 w-8" aria-hidden="true" />}
                 title="Lead Intelligence"
-                description="See which listings visitors view most. Track where leads come from (Instagram Story vs Post vs DM). Lead scoring: Hot/Warm/Cold based on behavior."
+                description="See which listings visitors view most. See where each lead came from: campaign, referring site and device. Every lead rated hot, warm or cold from its answers: timeline, pre-approval, contact details."
               />
               <FeatureCard
                 icon={<Target className="h-8 w-8" aria-hidden="true" />}
                 title="MLS Compliance"
-                description="Equal Housing Opportunity logo auto-included. License number display for state compliance. MLS attribution when applicable. Fair Housing disclaimers."
+                description="Equal Housing Opportunity logo and statement on your page. License number and state displayed. MLS number shown on each listing."
               />
               <FeatureCard
                 icon={<BarChart3 className="h-8 w-8" aria-hidden="true" />}
                 title="Appointment Booking"
-                description="Integrated Calendly for showing requests. One-tap phone, SMS, and email buttons. Time zone detection for out-of-area buyers."
+                description="Connect Calendly and visitors book showings without leaving your page. Bookings are saved as leads. One-tap call, text, and email buttons."
               />
               <FeatureCard
                 icon={<Brain className="h-8 w-8" aria-hidden="true" />}
                 title="Client Testimonials"
-                description="Showcase reviews and success stories. Display 5-star ratings prominently. Add video testimonials for social proof."
+                description="Send clients your review link, approve each review before it shows, and display star ratings with every one."
               />
               <FeatureCard
                 icon={<Zap className="h-8 w-8" aria-hidden="true" />}
                 title="Mobile-First Design"
-                description="Loads in under 2 seconds on 4G. Thumb-friendly buttons and navigation. Optimized for how buyers actually browse on mobile."
+                description="Designed for the phone first. Thumb-friendly buttons and navigation. A sticky contact bar so buyers can reach you from anywhere on the page."
               />
             </div>
           </div>
