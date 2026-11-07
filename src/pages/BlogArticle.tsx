@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { SEO_CONFIG } from '@/config/seo.config';
+import { SEO_CONFIG, getBaseUrl } from '@/config/seo.config';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +17,11 @@ import ReactMarkdown from 'react-markdown';
 import { logger } from '@/lib/logger';
 import { getVisitorId } from '@/lib/analyticsEvents';
 import { rehypeArticleHeadings, stripLeadingTitle } from '@/lib/articleMarkdown';
+import {
+  ARTICLE_AUTHOR_COLUMNS,
+  resolveArticleAuthor,
+  type ArticleAuthorRow,
+} from '@/lib/articleAuthor';
 
 export default function BlogArticle() {
   const { slug } = useParams<{ slug: string }>();
@@ -38,6 +43,30 @@ export default function BlogArticle() {
     },
     enabled: !!slug,
   });
+
+  // Who wrote it (US-181). A separate lookup rather than an embed — see
+  // src/lib/articleAuthor.ts for why — and never fatal: an unresolved author
+  // is credited to the organisation, which is what US-180 settled on.
+  const authorId = article?.author_id ?? null;
+  const { data: authorRow, isLoading: authorLoading } = useQuery({
+    queryKey: ['article-author', authorId],
+    queryFn: async (): Promise<ArticleAuthorRow | null> => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(ARTICLE_AUTHOR_COLUMNS)
+        .eq('id', authorId as string)
+        .eq('is_published', true)
+        .maybeSingle();
+      if (error) {
+        logger.debug('Article author not resolved', { articleId: article?.id });
+        return null;
+      }
+      return (data as ArticleAuthorRow | null) ?? null;
+    },
+    enabled: !!authorId,
+    staleTime: 10 * 60 * 1000,
+  });
+  const author = useMemo(() => resolveArticleAuthor(authorRow, getBaseUrl()), [authorRow]);
 
   // Calculate reading time and word count
   const { wordCount, readingTime } = useMemo(() => {
@@ -71,7 +100,10 @@ export default function BlogArticle() {
       });
   }, [article?.id]);
 
-  if (isLoading) {
+  // Wait for the author too, so the byline and the JSON-LD never flash from
+  // the organisation to a person — and so the prerender snapshot carries the
+  // resolved author rather than the fallback.
+  if (isLoading || (!!authorId && authorLoading)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading article...</p>
@@ -102,6 +134,7 @@ export default function BlogArticle() {
         imageUrl={article.featured_image_url ?? undefined}
         publishedTime={article.published_at ?? undefined}
         modifiedTime={article.updated_at ?? undefined}
+        author={author}
         tags={article.tags || []}
         category={article.category ?? undefined}
         wordCount={wordCount}
@@ -202,18 +235,42 @@ export default function BlogArticle() {
             <div className="flex flex-wrap items-center gap-6 text-muted-foreground mb-8">
               {/* The byline said "Real Estate Expert", marked up as a
                   schema.org/Person — a job description presented as a named
-                  author, on every article. The organisation is who actually
-                  published these, and saying so is both true and a type
-                  schema.org has for it (US-180). */}
-              <div
-                className="flex items-center gap-2"
-                itemProp="author"
-                itemScope
-                itemType="https://schema.org/Organization"
-              >
-                <User className="h-4 w-4" aria-hidden="true" />
-                <span itemProp="name">{SEO_CONFIG.siteName}</span>
-              </div>
+                  author, on every article (US-180). It is now the author's
+                  name from their published profile, linking to their page
+                  (US-181), and the organisation when there is no such
+                  profile — matching ArticleSEO's JSON-LD either way. */}
+              {author ? (
+                <div
+                  className="flex items-center gap-2"
+                  itemProp="author"
+                  itemScope
+                  itemType="https://schema.org/Person"
+                >
+                  <User className="h-4 w-4" aria-hidden="true" />
+                  {author.url ? (
+                    <a
+                      href={author.url}
+                      itemProp="url"
+                      rel="author"
+                      className="underline-offset-4 hover:underline"
+                    >
+                      <span itemProp="name">{author.name}</span>
+                    </a>
+                  ) : (
+                    <span itemProp="name">{author.name}</span>
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="flex items-center gap-2"
+                  itemProp="author"
+                  itemScope
+                  itemType="https://schema.org/Organization"
+                >
+                  <User className="h-4 w-4" aria-hidden="true" />
+                  <span itemProp="name">{SEO_CONFIG.siteName}</span>
+                </div>
+              )}
               {article.published_at && (
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
