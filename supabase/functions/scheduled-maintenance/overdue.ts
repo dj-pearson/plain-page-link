@@ -82,8 +82,12 @@ export interface OverdueStore {
   listCandidates(from: string, to: string, offset: number, limit: number): Promise<OverdueLead[]>;
   /** Lead ids already chased for these agents, by notifications created at or after `since`. */
   listChasedLeadIds(userIds: string[], since: string): Promise<Set<string>>;
-  /** Null when the agent cannot be read; the chaser retries them next run. */
-  getAgent(userId: string): Promise<OverdueAgent | null>;
+  /**
+   * These agents' address and preferences in one read (US-378). An agent
+   * absent from the map could not be read; the chaser retries them next run.
+   * Throws when the read fails.
+   */
+  getAgents(userIds: string[]): Promise<Map<string, OverdueAgent>>;
   /** Insert the notification. 'duplicate' when the lead was already chased. */
   claim(notification: OverdueNotification): Promise<'claimed' | 'duplicate'>;
   sendEmail(email: { to: string; subject: string; body: string }): Promise<{ ok: boolean; error?: string }>;
@@ -214,6 +218,7 @@ export async function chaseOverdueLeads(
     for (const id of await store.listChasedLeadIds(ids, from)) chased.add(id);
   }
 
+  const pendingBy = new Map<string, OverdueLead[]>();
   for (const [agentId, agentLeads] of byAgent) {
     const pending = agentLeads.filter((lead) => {
       if (chased.has(lead.id)) {
@@ -222,12 +227,29 @@ export async function chaseOverdueLeads(
       }
       return true;
     });
-    if (pending.length === 0) continue;
+    if (pending.length > 0) pendingBy.set(agentId, pending);
+  }
 
-    const agent = await store.getAgent(agentId);
+  // Every address in one read per chunk (US-378: this was two round trips per
+  // agent). A failed chunk leaves its agents' leads unclaimed for next run.
+  const agents = new Map<string, OverdueAgent>();
+  const readFailed = new Set<string>();
+  for (const ids of chunk([...pendingBy.keys()], 200)) {
+    try {
+      for (const [id, agent] of await store.getAgents(ids)) agents.set(id, agent);
+    } catch (error) {
+      for (const id of ids) readFailed.add(id);
+      report.errors.push(
+        `reading the addresses of ${ids.length} agents: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  for (const [agentId, pending] of pendingBy) {
+    const agent = agents.get(agentId);
     if (!agent) {
       // Leave the leads unclaimed so the next run tries again.
-      report.errors.push(`agent ${agentId.slice(0, 8)} could not be read`);
+      if (!readFailed.has(agentId)) report.errors.push(`agent ${agentId.slice(0, 8)} could not be read`);
       continue;
     }
     if (agent.preferences?.leads === 'off') {

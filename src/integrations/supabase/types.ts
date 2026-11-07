@@ -9230,6 +9230,10 @@ export type Database = {
         Args: { p_user_id: string };
         Returns: Record<string, unknown>[];
       };
+      get_agent_contacts: {
+        Args: { p_user_ids: string[] };
+        Returns: Record<string, unknown>[];
+      };
       get_average_page_score: {
         Args: Record<PropertyKey, never>;
         Returns: number;

@@ -40,10 +40,12 @@ function memoryStore(opts: {
   notifications?: (OverdueNotification & { created_at: string })[];
   failChasedRead?: boolean;
   failEmail?: boolean;
+  failAgentsRead?: boolean;
 }) {
   const notifications = [...(opts.notifications ?? [])];
   const emails: { to: string; subject: string; body: string }[] = [];
   const candidateCalls: { from: string; to: string; offset: number }[] = [];
+  const agentCalls: string[][] = [];
   let clock = NOW;
 
   const store: OverdueStore = {
@@ -62,9 +64,16 @@ function memoryStore(opts: {
           .map((n) => n.data.lead_id)
       );
     },
-    async getAgent(userId) {
+    async getAgents(userIds) {
+      agentCalls.push(userIds);
+      if (opts.failAgentsRead) throw new Error('reading agent contacts: timeout');
       const agents = opts.agents ?? {};
-      return userId in agents ? agents[userId] : { email: `${userId}@example.com`, preferences: {} };
+      const found = new Map<string, OverdueAgent>();
+      for (const userId of userIds) {
+        const agent = userId in agents ? agents[userId] : { email: `${userId}@example.com`, preferences: {} };
+        if (agent) found.set(userId, agent);
+      }
+      return found;
     },
     async claim(notification) {
       const dup = notifications.some(
@@ -85,6 +94,7 @@ function memoryStore(opts: {
     notifications,
     emails,
     candidateCalls,
+    agentCalls,
     advance(hours: number) {
       clock = new Date(clock.getTime() + hours * HOUR);
       return clock;
@@ -251,6 +261,34 @@ describe('chaseOverdueLeads (US-309)', () => {
     const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
     expect(report.claimed).toBe(0);
     expect(report.errors).toHaveLength(1);
+    expect(m.notifications).toHaveLength(0);
+  });
+
+  it('reads every agent’s address in one call, not one per agent (US-378)', async () => {
+    const leads = Array.from({ length: 30 }, (_, i) => lead(`l${i}`, `u${i}`, 3));
+    const m = memoryStore({ leads });
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.agentsEmailed).toBe(30);
+    expect(m.agentCalls).toHaveLength(1);
+    expect(m.agentCalls[0]).toHaveLength(30);
+  });
+
+  it('does not read the address of an agent whose leads were all chased already', async () => {
+    const m = memoryStore({
+      leads: [lead('a', 'u1', 3), lead('b', 'u2', 3)],
+      notifications: [
+        { user_id: 'u1', type: 'lead_overdue', title: '', message: '', data: { lead_id: 'a', hours_waiting: 2 }, created_at: NOW.toISOString() },
+      ],
+    });
+    await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(m.agentCalls).toEqual([['u2']]);
+  });
+
+  it('a failed address read is one error and claims nothing, so the next run chases', async () => {
+    const m = memoryStore({ leads: [lead('a', 'u1', 3), lead('b', 'u2', 3)], failAgentsRead: true });
+    const report = await chaseOverdueLeads(m.store, { now: NOW, siteUrl: SITE });
+    expect(report.claimed).toBe(0);
+    expect(report.errors).toEqual(['reading the addresses of 2 agents: reading agent contacts: timeout']);
     expect(m.notifications).toHaveLength(0);
   });
 

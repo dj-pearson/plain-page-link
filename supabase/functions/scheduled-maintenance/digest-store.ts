@@ -6,7 +6,7 @@
  */
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { sendEmail } from '../_shared/email.ts';
-import { getAgentContact } from '../_shared/agent-contact.ts';
+import { getAgentContacts } from '../_shared/agent-contact.ts';
 import type { DigestKeyDateRow, DigestStore } from './digests.ts';
 
 /** Postgres 42P01 (undefined_table) or PostgREST's PGRST205 (not in the schema cache). */
@@ -113,9 +113,12 @@ export function supabaseDigestStore(supabase: SupabaseClient): DigestStore {
       return { views: views.count ?? 0, leads: leads.count ?? 0, linkClicks: clicks.count ?? 0 };
     },
 
-    async getAgent(userId) {
-      const contact = await getAgentContact(supabase, userId);
-      return contact ? { email: contact.email, fullName: contact.fullName } : null;
+    async getAgents(userIds) {
+      const agents = new Map<string, { email: string | null; fullName: string | null }>();
+      for (const [id, c] of await getAgentContacts(supabase, userIds)) {
+        agents.set(id, { email: c.email, fullName: c.fullName });
+      }
+      return agents;
     },
 
     async claim(userId, day, kind) {
