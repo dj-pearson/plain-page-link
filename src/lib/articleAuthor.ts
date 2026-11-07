@@ -74,3 +74,32 @@ export function resolveArticleAuthor(
   if (!username || !USERNAME.test(username)) return { name };
   return { name, url: `${siteUrl.replace(/\/+$/, '')}/${encodeURIComponent(username)}` };
 }
+
+/**
+ * The distinct author ids of a list of articles, sorted so the same list
+ * always produces the same query key and the same `in.()` filter (US-399).
+ */
+export function articleAuthorIds(articles: ReadonlyArray<{ author_id: string | null }>): string[] {
+  const ids = new Set<string>();
+  for (const article of articles) {
+    if (article.author_id) ids.add(article.author_id);
+  }
+  return [...ids].sort();
+}
+
+/**
+ * Bylines keyed by profile id, for the blog index and category cards (US-399).
+ * A row that does not resolve (no name, a role for a name) is left out, so the
+ * card shows no byline rather than a placeholder.
+ */
+export function resolveArticleAuthors(
+  rows: ReadonlyArray<ArticleAuthorRow> | null | undefined,
+  siteUrl: string
+): Map<string, ArticleAuthor> {
+  const byId = new Map<string, ArticleAuthor>();
+  for (const row of rows ?? []) {
+    const author = resolveArticleAuthor(row, siteUrl);
+    if (author) byId.set(row.id, author);
+  }
+  return byId;
+}

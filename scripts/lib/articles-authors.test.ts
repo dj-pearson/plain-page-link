@@ -3,7 +3,13 @@
  * failure to resolve them costs the build nothing but the byline.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { attachAuthors, authorsById, loadFixtureArticles, type Article } from './articles.mts';
+import {
+  answerAuthorLookup,
+  attachAuthors,
+  authorsById,
+  loadFixtureArticles,
+  type Article,
+} from './articles.mts';
 import { GENERIC_AUTHOR_NAMES } from './seo-audit.mjs';
 import { isGenericAuthorName } from '../../src/lib/articleAuthor';
 
@@ -134,5 +140,43 @@ describe('isGenericAuthorName agrees with the build guard', () => {
   it.each(names)('%s', (name) => {
     const guard = (GENERIC_AUTHOR_NAMES as RegExp[]).some((pattern) => pattern.test(name));
     expect(isGenericAuthorName(name)).toBe(guard);
+  });
+});
+
+describe('answerAuthorLookup (US-399)', () => {
+  const authors = new Map([
+    ['u1', { id: 'u1', full_name: 'Dana Okafor', username: 'dana' }],
+    ['u2', { id: 'u2', full_name: 'Sam Lee', username: 'sam' }],
+  ]);
+  const params = (query: string) => new URLSearchParams(query);
+
+  it("answers BlogArticle's single-author lookup", () => {
+    expect(answerAuthorLookup('GET', params('id=eq.u1&is_published=eq.true'), authors)).toEqual([
+      authors.get('u1'),
+    ]);
+    expect(answerAuthorLookup('GET', params('id=eq.nope&is_published=eq.true'), authors)).toEqual(
+      []
+    );
+  });
+
+  it("answers the blog list cards' batched lookup with the known rows only", () => {
+    const rows = answerAuthorLookup(
+      'GET',
+      params('select=id,full_name,username&id=in.(u1,u2,u9)&is_published=eq.true'),
+      authors
+    );
+    expect(rows?.map((r) => r.id)).toEqual(['u1', 'u2']);
+  });
+
+  it('accepts PostgREST-quoted values in an in.() list', () => {
+    const rows = answerAuthorLookup('GET', params('id=in.("u2")&is_published=eq.true'), authors);
+    expect(rows?.map((r) => r.id)).toEqual(['u2']);
+  });
+
+  it('falls through for anything that is not an author lookup', () => {
+    expect(answerAuthorLookup('GET', params('id=eq.u1'), authors)).toBeNull();
+    expect(answerAuthorLookup('POST', params('id=eq.u1&is_published=eq.true'), authors)).toBeNull();
+    expect(answerAuthorLookup('GET', params('is_published=eq.true&limit=6'), authors)).toBeNull();
+    expect(answerAuthorLookup('GET', params('id=neq.u1&is_published=eq.true'), authors)).toBeNull();
   });
 });
