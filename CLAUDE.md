@@ -714,6 +714,11 @@ the free tools (`instagram_bio_*`, `listing_*`).
 - A policy meant for the backend must say `TO service_role` explicitly.
 - `verify:schema` fails on any unconditional policy reaching
   `anon`/`authenticated` that is not declared in `PUBLIC_BY_DESIGN`.
+- A visitor policy on content that belongs to an agent's page (listings, links,
+  testimonials) also requires the owning profile to be published
+  (`EXISTS … p.is_published IS TRUE`), and a SECURITY DEFINER function serving
+  such content applies the same check, with the owner exempt (US-308). A new
+  public table or RPC for the page must do the same.
 
 **SECURITY DEFINER functions:**
 - Must pin `SET search_path = public, extensions, pg_temp`. Without it the
