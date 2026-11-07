@@ -1,4 +1,4 @@
-/* AgentBio Service Worker (US-027, US-272)
+/* AgentBio Service Worker (US-027, US-272, US-312, US-321)
  *
  * Implemented with the native Cache Storage API rather than the bundled
  * Workbox runtime: the index.html CSP `script-src` does not allow the
@@ -57,6 +57,96 @@ const PAGES = `${CACHE_PREFIX}pages-v1`;
 const MAX_ENTRIES = { [RUNTIME]: 150, [IMAGES]: 80, [PAGES]: 30 };
 
 const APP_SHELL = ['/', '/index.html', '/offline.html', '/manifest.json'];
+
+/** Upper bound on entry files taken from the shell HTML; Vite emits ~10. */
+const MAX_SHELL_ASSETS = 40;
+
+/**
+ * The /assets files the shell HTML loads before React can render: its module
+ * entry script, its stylesheets and its modulepreload hints (US-321).
+ *
+ * The worker precached '/index.html' but not these. After a deploy, opening a
+ * route the visitor had never visited offline fell back to an index.html whose
+ * entry chunk had never been downloaded, and the installed app showed a blank
+ * screen. A service worker has no DOMParser, so the tags are read with a
+ * pattern. Only same-origin /assets/ URLs are taken: they are content-hashed,
+ * so caching them can never serve stale code, and a parser mistake cannot
+ * pull a third-party or unhashed URL into the precache.
+ */
+function shellAssetsFromHtml(html, origin) {
+  const found = [];
+  const tags = String(html).match(/<(?:script|link)\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const attr = (name) => {
+      const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
+      return m ? (m[1] ?? m[2] ?? m[3]) : null;
+    };
+    let ref = null;
+    if (/^<script/i.test(tag)) {
+      if ((attr('type') || '').toLowerCase() === 'module') ref = attr('src');
+    } else {
+      const rel = (attr('rel') || '').toLowerCase().split(/\s+/);
+      if (rel.includes('stylesheet') || rel.includes('modulepreload')) ref = attr('href');
+    }
+    if (!ref) continue;
+    let url;
+    try {
+      url = new URL(ref, origin);
+    } catch {
+      continue;
+    }
+    if (url.origin !== origin || !url.pathname.startsWith('/assets/')) continue;
+    const key = url.origin + url.pathname;
+    if (!found.includes(key)) found.push(key);
+    if (found.length >= MAX_SHELL_ASSETS) break;
+  }
+  return found;
+}
+
+/**
+ * Precache the entry files named by the precached shell pages. Each file is
+ * fetched on its own and a failure is skipped: one missing chunk must not
+ * cost the visitor the rest of the shell, nor stop the worker installing.
+ */
+async function precacheShellAssets(cache) {
+  const origin = self.location.origin;
+  const urls = [];
+  for (const page of ['/index.html', '/']) {
+    const response = await cache.match(page);
+    if (!response) continue;
+    for (const u of shellAssetsFromHtml(await response.text(), origin)) {
+      if (!urls.includes(u)) urls.push(u);
+    }
+  }
+  await Promise.all(
+    urls.slice(0, MAX_SHELL_ASSETS).map(async (u) => {
+      try {
+        const response = await fetch(u);
+        if (response && response.ok) await cache.put(u, response);
+      } catch {
+        // Offline or gone: left to CacheFirst at the next online load.
+      }
+    })
+  );
+}
+
+/**
+ * Before an old precache is deleted, move its /assets entries into RUNTIME.
+ * A page saved in PAGES under the previous build names that build's entry
+ * chunks, and once they were precached the browser served them from there
+ * rather than storing a RUNTIME copy. Deleting the old precache outright
+ * would leave that saved page pointing at nothing.
+ */
+async function adoptPrecachedAssets(oldCacheName) {
+  const old = await caches.open(oldCacheName);
+  const runtime = await caches.open(RUNTIME);
+  for (const request of await old.keys()) {
+    if (!new URL(request.url).pathname.startsWith('/assets/')) continue;
+    if (await runtime.match(request)) continue;
+    const response = await old.match(request);
+    if (response) await runtime.put(request, response);
+  }
+}
 
 // Never cache (NetworkOnly): auth + Supabase + any authorized request.
 function isNeverCache(request, url) {
@@ -142,7 +232,12 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(PRECACHE)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) =>
+        cache
+          .addAll(APP_SHELL)
+          .then(() => precacheShellAssets(cache))
+          .catch(() => undefined)
+      )
       .then(() => self.skipWaiting())
       .catch(() => self.skipWaiting())
   );
@@ -160,7 +255,12 @@ self.addEventListener('activate', (event) => {
                 k.startsWith(CACHE_PREFIX) &&
                 ![PRECACHE, RUNTIME, IMAGES, PAGES].includes(k)
             )
-            .map((k) => caches.delete(k))
+            .map((k) =>
+              (k.startsWith(`${CACHE_PREFIX}precache-`)
+                ? adoptPrecachedAssets(k).catch(() => undefined)
+                : Promise.resolve()
+              ).then(() => caches.delete(k))
+            )
         )
       )
       // A visitor who installed the worker before US-272 carries an unbounded

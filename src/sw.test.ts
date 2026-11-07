@@ -25,6 +25,7 @@ type Listener = (event: unknown) => void;
 
 class FakeCache {
   entries = new Map<string, Response>();
+  constructor(private shell: Record<string, string> = {}) {}
   async match(request: Request | string) {
     const hit = this.entries.get(keyOf(request));
     return hit ? hit.clone() : undefined;
@@ -37,7 +38,8 @@ class FakeCache {
     this.entries.set(key, response);
   }
   async addAll(urls: string[]) {
-    for (const u of urls) this.entries.set(new URL(u, ORIGIN).href, new Response(`shell ${u}`));
+    for (const u of urls)
+      this.entries.set(new URL(u, ORIGIN).href, new Response(this.shell[u] ?? `shell ${u}`));
   }
   async keys() {
     return [...this.entries.keys()].map((k) => new Request(k));
@@ -53,13 +55,14 @@ function keyOf(request: Request | string) {
 
 function loadWorker(
   source = SOURCE,
-  network: (req: Request) => Promise<Response> = defaultNetwork
+  network: (req: Request) => Promise<Response> = defaultNetwork,
+  shell: Record<string, string> = {}
 ) {
   const listeners: Record<string, Listener[]> = {};
   const stores = new Map<string, FakeCache>();
   const caches = {
     async open(name: string) {
-      if (!stores.has(name)) stores.set(name, new FakeCache());
+      if (!stores.has(name)) stores.set(name, new FakeCache(shell));
       return stores.get(name)!;
     },
     async keys() {
@@ -89,7 +92,8 @@ function loadWorker(
   const context = vm.createContext({
     self,
     caches,
-    fetch: (req: Request, init?: RequestInit) => {
+    fetch: (input: Request | string, init?: RequestInit) => {
+      const req = typeof input === 'string' ? new Request(input) : input;
       fetched.push(req.url);
       fetchInits.set(req.url, init);
       return network(req);
@@ -361,6 +365,100 @@ describe('offline pages for visited routes (US-312)', () => {
     expect(await (await navigate(sw, '/dashboard'))!.text()).toBe('v2');
     state.online = false;
     expect(await (await navigate(sw, '/dashboard'))!.text()).toBe('v2');
+  });
+});
+
+describe('precaching the shell entry files (US-321)', () => {
+  // What vite build writes into dist/index.html, trimmed.
+  const SHELL_HTML = `<!doctype html><html><head>
+    <script src="/scripts/analytics.js" defer></script>
+    <script type="module" crossorigin src="/assets/index-a1b2.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-vendor-c3d4.js">
+    <link rel="modulepreload" crossorigin href="/assets/supabase-e5f6.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-0f9e.css">
+    <link rel="icon" href="/icons/icon-192.png">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/assets/x.css">
+  </head><body><div id="root"></div></body></html>`;
+  const ENTRY = [
+    '/assets/index-a1b2.js',
+    '/assets/react-vendor-c3d4.js',
+    '/assets/supabase-e5f6.js',
+    '/assets/index-0f9e.css',
+  ];
+
+  function shellWorker(
+    source = SOURCE,
+    respond: (req: Request) => Response | Promise<Response> = (req) =>
+      new Response(`network ${new URL(req.url).pathname}`)
+  ) {
+    const state = { online: true };
+    const sw = loadWorker(
+      source,
+      async (req) => {
+        if (!state.online) throw new TypeError('Failed to fetch');
+        return respond(req);
+      },
+      { '/': SHELL_HTML, '/index.html': SHELL_HTML }
+    );
+    return { sw, state };
+  }
+
+  it('precaches the module entry, its modulepreloads and stylesheets, and nothing else', async () => {
+    const { sw } = shellWorker();
+    await sw.lifecycle('install');
+    const precache = sw.stores.get('agentbio-sw-precache-dev')!;
+    for (const path of ENTRY) expect(precache.entries.has(`${ORIGIN}${path}`)).toBe(true);
+    const keys = [...precache.entries.keys()];
+    expect(keys.some((k) => k.includes('/scripts/analytics.js'))).toBe(false);
+    expect(keys.some((k) => k.includes('/icons/'))).toBe(false);
+    expect(keys.some((k) => k.includes('fonts.googleapis.com'))).toBe(false);
+    // '/' and '/index.html' name the same files; each is fetched once.
+    expect(sw.fetched.filter((u) => u.endsWith('/assets/index-a1b2.js'))).toHaveLength(1);
+  });
+
+  it('opens a route never visited offline with the entry files the shell names', async () => {
+    const { sw, state } = shellWorker();
+    await sw.lifecycle('install');
+    state.online = false;
+    const page = await sw.request('/dashboard/settings', { mode: 'navigate' });
+    expect(await page!.text()).toBe(SHELL_HTML);
+    for (const path of ENTRY) {
+      const asset = await sw.request(path);
+      expect(await asset!.text()).toBe(`network ${path}`);
+    }
+  });
+
+  it('still installs, with the rest of the shell, when one entry file fails to download', async () => {
+    const { sw } = shellWorker(SOURCE, (req) => {
+      const path = new URL(req.url).pathname;
+      if (path === '/assets/supabase-e5f6.js') throw new TypeError('Failed to fetch');
+      if (path === '/assets/react-vendor-c3d4.js') return new Response('gone', { status: 404 });
+      return new Response(`network ${path}`);
+    });
+    await sw.lifecycle('install');
+    const precache = sw.stores.get('agentbio-sw-precache-dev')!;
+    expect(precache.entries.has(`${ORIGIN}/index.html`)).toBe(true);
+    expect(precache.entries.has(`${ORIGIN}/assets/index-a1b2.js`)).toBe(true);
+    expect(precache.entries.has(`${ORIGIN}/assets/index-0f9e.css`)).toBe(true);
+    expect(precache.entries.has(`${ORIGIN}/assets/supabase-e5f6.js`)).toBe(false);
+    expect(precache.entries.has(`${ORIGIN}/assets/react-vendor-c3d4.js`)).toBe(false);
+  });
+
+  it('keeps the previous build entry files when a new version drops its precache', async () => {
+    // A page saved in PAGES under build1 names build1's entry chunks, which
+    // were served from build1's precache and never copied into RUNTIME.
+    const first = shellWorker(stampServiceWorkerVersion(SOURCE, 'build1'));
+    await first.sw.lifecycle('install');
+
+    const second = loadWorker(stampServiceWorkerVersion(SOURCE, 'build2'));
+    for (const [name, cache] of first.sw.stores) second.stores.set(name, cache);
+    await second.lifecycle('activate');
+
+    expect(second.stores.has('agentbio-sw-precache-build1')).toBe(false);
+    const runtime = second.stores.get('agentbio-sw-runtime-v1')!;
+    for (const path of ENTRY) expect(runtime.entries.has(`${ORIGIN}${path}`)).toBe(true);
+    // Only hashed assets move; the old shell HTML does not.
+    expect(runtime.entries.has(`${ORIGIN}/index.html`)).toBe(false);
   });
 });
 
