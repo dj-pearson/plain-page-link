@@ -35,7 +35,9 @@ import {
 } from '@/lib/images';
 import { logger } from '@/lib/logger';
 import type { PublicProfileListing } from '@/types';
-import NotFound from './NotFound';
+import { ProfileUnavailable } from '@/components/profile/ProfileUnavailable';
+import { UnpublishedPreviewBanner } from '@/components/profile/UnpublishedPreviewBanner';
+import { isUnpublishedPreview } from '@/lib/profilePublishing';
 import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
@@ -102,7 +104,10 @@ export default function FullProfilePage() {
 
   // US-227: a listing opened — by click or by a pasted ?listing= link — is a
   // funnel stage the agent never saw.
-  const profileId = data?.profile?.id;
+  // US-265: the owner previewing their unpublished page is not a visitor —
+  // count no view, no listing view, nothing that would show up in Analytics.
+  const isPreview = isUnpublishedPreview(data?.profile);
+  const profileId = isPreview ? undefined : data?.profile?.id;
   useEffect(() => {
     if (profileId && selectedListing) {
       void trackListingView(profileId, selectedListing.id, selectedListing.address);
@@ -138,7 +143,7 @@ export default function FullProfilePage() {
   // /p/<slug>, so an agent with a page-builder page had the view counted here
   // and the page their visitors actually saw tracked nothing at all. There is
   // no redirect any more (US-116): the blocks render below, on this page.
-  useProfileTracking(data?.profile?.id, slug || '');
+  useProfileTracking(profileId, slug || '');
   // Plans with removeBranding hide "Powered by AgentBio" (20260923000002).
   const showBranding = useProfileShowsBranding(data?.profile?.id);
 
@@ -258,11 +263,13 @@ export default function FullProfilePage() {
     if (!isMissing) {
       return <ProfileLoadError onRetry={() => refetch()} />;
     }
-    return <NotFound />;
+    // One neutral page for "no such username" and "not published" (US-265),
+    // so the response says nothing about whether an account exists.
+    return <ProfileUnavailable />;
   }
 
   if (!data) {
-    return <NotFound />;
+    return <ProfileUnavailable />;
   }
 
   const { profile, listings, testimonials, links, settings, customPage } = data;
@@ -484,6 +491,7 @@ export default function FullProfilePage() {
         description={seoDescription}
         ogImage={profile.og_image || profile.avatar_url || undefined}
         canonicalUrl={currentUrl}
+        noindex={isPreview}
         keywords={
           [
             profile.full_name || profile.username,
@@ -495,6 +503,7 @@ export default function FullProfilePage() {
         }
         schema={personSchema}
       />
+      {isPreview && <UnpublishedPreviewBanner />}
       {render3DBackground()}
       <QuickNav hasListings={activeListings.length > 0} hasTestimonials={testimonials.length > 0} />
       <main
@@ -538,7 +547,9 @@ export default function FullProfilePage() {
                 // logger.info wrote this to the visitor's own console and
                 // nowhere else, so an agent never learned that thirty people
                 // tapped Call this week (US-115).
-                onContactClick={(method) => void trackContactTap(profile.id, method)}
+                onContactClick={(method) => {
+                  if (!isPreview) void trackContactTap(profile.id, method);
+                }}
               />
             )}
 
@@ -650,6 +661,7 @@ export default function FullProfilePage() {
                 onLinkClick={async (link) => {
                   // trackLinkClick already calls increment_link_clicks;
                   // calling it again here counted every click twice.
+                  if (isPreview) return;
                   await trackLinkClick(link.id.toString(), profile.id, link.title);
                 }}
               />
