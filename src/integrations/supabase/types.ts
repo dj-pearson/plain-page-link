@@ -1247,6 +1247,27 @@ export type Database = {
           },
         ];
       };
+      digest_runs: {
+        Row: {
+          completed_at: string;
+          digest_date: string;
+          profiles: number;
+          sent: number;
+        };
+        Insert: {
+          completed_at?: string;
+          digest_date: string;
+          profiles?: number;
+          sent?: number;
+        };
+        Update: {
+          completed_at?: string;
+          digest_date?: string;
+          profiles?: number;
+          sent?: number;
+        };
+        Relationships: [];
+      };
       encrypted_pii_config: {
         Row: {
           created_at: string;

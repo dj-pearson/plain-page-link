@@ -108,8 +108,11 @@ function memoryStore(opts: {
   failRelease?: boolean;
   failLeadsReadOnce?: boolean;
   failWeekly?: boolean;
+  failMarkerRead?: boolean;
+  failMarkerWrite?: boolean;
 }) {
   const log = [...(opts.log ?? [])];
+  const runs = new Map<string, { profiles: number; sent: number }>();
   const sent: { to: string; subject: string; body: string }[] = [];
   const calls = { listProfiles: 0, listNewLeads: 0, getAgent: 0, maxIds: 0 };
   let leadsReadFailures = opts.failLeadsReadOnce ? 1 : 0;
@@ -160,13 +163,21 @@ function memoryStore(opts: {
       const i = log.findIndex((r) => r.user_id === userId && r.digest_date === day && r.kind === kind);
       if (i >= 0) log.splice(i, 1);
     },
+    async hasCompletedRun(day) {
+      if (opts.failMarkerRead) throw new Error('digest_runs: timeout');
+      return runs.has(day);
+    },
+    async markRunCompleted(day, totals) {
+      if (opts.failMarkerWrite) throw new Error('digest_runs: insert refused');
+      if (!runs.has(day)) runs.set(day, totals);
+    },
     async sendEmail(mail) {
       if (opts.failSendFor?.has(mail.to)) return { ok: false, error: 'resend 500' };
       sent.push({ to: mail.to, subject: mail.subject, body: mail.body });
       return { ok: true };
     },
   };
-  return { store, log, sent, calls };
+  return { store, log, sent, calls, runs };
 }
 
 const profile = (n: number, digest?: string): DigestProfile => ({
@@ -308,6 +319,84 @@ describe('runDigests (US-331)', () => {
   });
 });
 
+describe('runDigests per-day run marker (US-354)', () => {
+  const marked = { schedule: SCHEDULE, siteUrl: SITE, useRunMarker: true };
+
+  it('after one complete pass, later runs that day read no profiles', async () => {
+    const env = memoryStore({ profiles: [profile(1), profile(2)], leads: [leadFor(1)] });
+    const first = await runDigests(env.store, marked);
+    expect(first.sent).toBe(1);
+    expect(first.nothingToSend).toBe(1);
+    expect(env.runs.get(SCHEDULE.day)).toEqual({ profiles: 2, sent: 1 });
+
+    const readsAfterFirst = env.calls.listProfiles;
+    const later = await runDigests(env.store, { ...marked, schedule: digestSchedule(new Date('2026-11-10T16:00:00Z'))! });
+    expect(later.skipped).toBe(true);
+    expect(later.profiles).toBe(0);
+    expect(env.calls.listProfiles).toBe(readsAfterFirst);
+    expect(env.calls.listNewLeads).toBe(1);
+    expect(summarizeDigestReport(later)).toBe('already completed today');
+  });
+
+  it('a pass that ended with errors does not write the marker, so the next run retries', async () => {
+    const profiles = Array.from({ length: PROFILE_PAGE_SIZE + 3 }, (_, i) => profile(i + 1));
+    const leads = profiles.map((_, i) => leadFor(i + 1));
+    const env = memoryStore({ profiles, leads, failLeadsReadOnce: true });
+
+    const first = await runDigests(env.store, marked);
+    expect(first.errors.length).toBeGreaterThan(0);
+    expect(env.runs.size).toBe(0);
+
+    const retry = await runDigests(env.store, marked);
+    expect(retry.skipped).toBe(false);
+    expect(retry.sent).toBe(PROFILE_PAGE_SIZE);
+    expect(retry.errors).toEqual([]);
+    expect(env.runs.has(SCHEDULE.day)).toBe(true);
+  });
+
+  it('a failed send is a failure too: no marker', async () => {
+    const env = memoryStore({ profiles: [profile(1)], leads: [leadFor(1)], failSendFor: new Set([`${uid(1).slice(-4)}@example.com`]) });
+    await runDigests(env.store, marked);
+    expect(env.runs.size).toBe(0);
+  });
+
+  it('the marker is per day: tomorrow’s edition still runs', async () => {
+    const env = memoryStore({ profiles: [profile(1)], leads: [leadFor(1)] });
+    await runDigests(env.store, marked);
+    const tomorrow = { day: '2026-11-11', anchor: new Date('2026-11-11T13:00:00Z') };
+    const next = await runDigests(env.store, { ...marked, schedule: tomorrow });
+    expect(next.skipped).toBe(false);
+    expect(next.profiles).toBe(1);
+  });
+
+  it('a run without the marker (a forced run) neither skips nor records', async () => {
+    const env = memoryStore({ profiles: [profile(1)], leads: [leadFor(1)] });
+    await runDigests(env.store, marked);
+    const forced = await runDigests(env.store, { schedule: SCHEDULE, siteUrl: SITE });
+    expect(forced.skipped).toBe(false);
+    expect(forced.alreadySent).toBe(1);
+
+    const fresh = memoryStore({ profiles: [profile(1)], leads: [leadFor(1)] });
+    await runDigests(fresh.store, { schedule: SCHEDULE, siteUrl: SITE });
+    expect(fresh.runs.size).toBe(0);
+  });
+
+  it('an unreadable marker still sends everyone, reports it, and records nothing', async () => {
+    const env = memoryStore({ profiles: [profile(1)], leads: [leadFor(1)], failMarkerRead: true });
+    const report = await runDigests(env.store, marked);
+    expect(report.sent).toBe(1);
+    expect(report.errors[0]).toMatch(/run marker/);
+    expect(env.runs.size).toBe(0);
+  });
+
+  it('a failed marker write is reported after every digest went out', async () => {
+    const env = memoryStore({ profiles: [profile(1)], leads: [leadFor(1)], failMarkerWrite: true });
+    const report = await runDigests(env.store, marked);
+    expect(report.sent).toBe(1);
+    expect(report.errors).toEqual(['recording the digest run marker: digest_runs: insert refused']);
+  });
+});
+
 describe('scheduled-maintenance wiring (US-331)', () => {
   const index = readFileSync(resolve(__dirname, 'index.ts'), 'utf8');
   const store = readFileSync(resolve(__dirname, 'digest-store.ts'), 'utf8');
@@ -316,6 +405,11 @@ describe('scheduled-maintenance wiring (US-331)', () => {
     expect(index).toMatch(/digestSchedule\(/);
     expect(index).toMatch(/DIGEST_CATCHUP_HOURS/);
     expect(index).toMatch(/report\.errors\.length > 0/);
+  });
+
+  it('hourly runs use the run marker and forced runs do not (US-354)', () => {
+    expect(index).toMatch(/useRunMarker: body\.force_digest !== true/);
+    expect(store).toMatch(/from\('digest_runs'\)/);
   });
 
   it('no read in the store is capped by a bare limit', () => {
