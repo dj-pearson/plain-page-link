@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { getBaseUrl } from '@/config/seo.config';
+import { organizationId, websiteId } from '@/config/site-entities';
 import { MARKETING_COPY } from '@/config/marketing-claims';
 import { Link } from 'react-router-dom';
 import { Home, BarChart3, Users, Brain, Target, Zap, Sparkles } from 'lucide-react';
@@ -100,13 +101,13 @@ export default function Landing() {
     '@graph': [
       {
         '@type': 'WebSite',
-        '@id': `${origin}/#website`,
+        '@id': websiteId(origin),
         url: origin,
         name: 'AgentBio - Real Estate Agent Bio Page Builder',
         description:
           'Turn your Instagram into a lead-generating real estate portfolio. Showcase listings, capture inquiries & book showings from one mobile-optimized bio page.',
         publisher: {
-          '@id': `${origin}/#organization`,
+          '@id': organizationId(origin),
         },
         // No potentialAction. A SearchAction is what Google reads to offer a
         // sitelinks searchbox, and this one pointed at /search?q=, a route that has

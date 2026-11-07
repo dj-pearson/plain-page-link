@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { useState } from 'react';
 import { Check, Zap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -115,7 +116,7 @@ export default function Pricing() {
           description:
             'Choose the perfect plan for your real estate business. Start free and scale as you grow with AgentBio.',
           isPartOf: {
-            '@id': `${baseUrl}/#website`,
+            '@id': websiteId(baseUrl),
           },
         },
         // BreadcrumbList

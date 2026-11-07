@@ -1,6 +1,8 @@
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 
 export default function DMCAPolicy() {
   const lastUpdated = new Date().toLocaleDateString();
@@ -8,13 +10,13 @@ export default function DMCAPolicy() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    '@id': 'https://agentbio.net/dmca#webpage',
-    url: 'https://agentbio.net/dmca',
+    '@id': `${getCanonicalUrl('/dmca')}#webpage`,
+    url: getCanonicalUrl('/dmca'),
     name: 'DMCA Copyright Policy - AgentBio',
     description:
       'AgentBio DMCA Copyright Policy: Learn how to file copyright infringement notices, counter-notices, and our repeat infringer policy for real estate photos.',
     isPartOf: {
-      '@id': 'https://agentbio.net/#website',
+      '@id': websiteId(getBaseUrl()),
     },
     about: {
       '@type': 'Thing',
@@ -39,7 +41,7 @@ export default function DMCAPolicy() {
           'repeat infringer policy',
           'photographer rights',
         ]}
-        canonicalUrl="https://agentbio.net/dmca"
+        canonicalUrl={getCanonicalUrl('/dmca')}
         schema={schema}
       />
       <PublicHeader />
