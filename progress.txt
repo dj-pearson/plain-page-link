@@ -5416,3 +5416,75 @@ Other findings:
 - [mobile] The task brief says App.tsx runs cleanupServiceWorkers on every mount. I did not examine this in this session. src/lib/sw-cleanup.ts allowlists the AgentBio worker, so the remaining cost is probably the extra getRegistrations/caches.keys work on each load. Worth a look in the mobile or performance lane.
 - [mobile] public/sw.js:179-198: the isUnhashedCode comment says analytics.js was served under '/*.js immutable'. In practice it was always joined behind the max-age=0 floor. The cache:'no-cache' fetch is still harmless and right to keep, but the history in the comment is inaccurate.
 - [mobile] Any other repo in the Pearson Media stack that deploys to Cloudflare Pages with an extension rule layered over a `/*` Cache-Control floor has the same joined, conflicting Cache-Control defect. Worth a vault note.
+
+---
+
+## Continuous improvement loop — round 6 — 2026-11-07 (US-391 to US-400 done)
+
+Ten lanes, all approved with no fix-ups. Closed US-281, US-299, US-317, US-382, US-387, US-388, US-390; slice 1 of US-291.
+Final: tsc clean (app + node config), 2137 unit tests pass (from 2056), verify:migrations OK (70 files), vite build OK, eslint 645 warnings.
+
+- US-391 [listings] A listing the agent had hidden still showed its photo, price and address when a crawler fetched its link
+- US-392 [leads] Calls, emails and texts logged from an open lead never showed up on that lead's timeline
+- US-393 [profile] The public profile hid most of an agent's service cities behind "+N more"
+- US-394 [uiux] US-394: TeamPage: owners can make a member an admin, and choose the role when inviting
+- US-395 [performance] The agent Analytics page downloaded 107 KB of recharts to draw one chart
+- US-396 [security] Link clicks still counted on unpublished pages and switched-off links (US-317)
+- US-397 [enterprise] Data export requests sent by POST were never processed, so the subject never got their data
+- US-398 [marketing] /vs/later and the bio analyzer's live email claimed MLS sync and CRM integration that do not exist
+- US-399 [seo] Blog index and category cards never said who wrote an article
+- US-400 [mobile] One failed app-shell fetch during a service worker update no longer costs the installed app its offline fallback (US-390)
+
+Owner actions:
+- US-391: Redeploy Cloudflare Pages (the Pages Functions under functions/) for the change to take effect. No migration, edge function or secret involved.
+- US-396: Apply migration supabase/migrations/20261107000396_link_clicks_published_pages_only.sql to production. It only replaces a function: no data change and no edge-function redeploy.
+- US-397: Apply migration supabase/migrations/20261107000397_gdpr_exports_bucket.sql (creates the private gdpr-exports bucket and two indexes)
+- US-397: Rebuild/redeploy the functions.agentbio.net Coolify app so gdpr-export and scheduled-maintenance ship (both now import _shared/gdpr-export.ts; scheduled-maintenance also imports _shared/gdpr-export-queue.ts)
+- US-397: Confirm SUPABASE_URL on the functions app is the public API origin. createSignedUrl builds the emailed link from it, the same way optimize-image builds its getPublicUrl links
+- US-397: Confirm the self-hosted storage FILE_SIZE_LIMIT allows large exports (the bucket allows 500 MB). Also confirm RESEND_API_KEY is set, because a request whose email fails is retried and is not marked completed
+- US-398: Redeploy the send-bio-analyzer-email edge function (functions.agentbio.net / Coolify). Its email 1 copy changed.
+- US-399: Redeploy Cloudflare Pages (the frontend build runs the prerender) so the bylines ship. No migration and no edge function changes.
+
+Opened:
+- US-401 [performance] Cut the Listings dashboard route (109.7 KB gzip beyond the entry)
+- US-402 [performance] Measure the authenticated dashboard routes in CI
+- US-403 [enterprise] Data export: let the subject request a queued export and see its status
+- US-404 [enterprise] Data export: re-send a fresh link for a completed export that has not expired
+- US-405 [enterprise] Data export: stream large exports instead of holding the document in memory
+- US-406 [marketing] Free-tool drip emails carry a fabricated testimonial, invented agent counts and fake expiring coupons; the claims scan never reads edge functions
+- US-407 [seo] Optional: show bylines on the landing page BlogSection cards
+
+Other findings:
+- [listings] functions/_lib/profile-route.ts: on /:username/listing/:id, a listing that is missing, withdrawn or hidden still answers crawlers with 200 and the agent's card. The SPA marks the same URL noindex with its canonical pointing at the profile, so search engines see a soft 404 rather than a hard one. The deliberate choice so far ('keeps the agent's card rather than producing a broken one') favours social unfurls. Answering 404 via notFoundResponse when PostgREST answered and the listing is not visible, on the listing path only, would be better for search. That is an SEO/product call, so I did not change it.
+- [listings] US-276 (viewed N listings before contacting) depends on the leads lane (submit-lead storing visitor_id), so it needs coordination with that lane.
+- [listings] US-361 (sticky contact bar on the listing page for mobile) is still open and small: reuse StickyActionBar in src/pages/public/ListingPage.tsx.
+- [leads] src/pages/dashboard/Leads.tsx:941,956 `recordContact(lead, ...).then(() => refetch())`: recordContact awaits the status patch, but not the log mutation (mutate is fire-and-forget). The refetch can run before log_lead_call sets contacted_at. The log's own ['leads'] invalidation covers this now, so the explicit refetch is redundant but harmless.
+- [leads] src/hooks/useLeadContactAction.ts: one contact action produces two toasts ('Call logged' from the mutation, plus whatever the caller shows), and a failed log only toasts 'Failed to log call' after the dialer has already opened. Acceptable, but worth checking in a UX pass.
+- [leads] src/hooks/useLeadActivities.ts createTaskMutation is still the only direct insert into lead_activities (already recorded in round 5; a log_lead_task RPC would close it).
+- [leads] US-278 is still blocked on the owner's status-vocabulary decision (nurturing/closed).
+- [profile] US-383 is still open and small: ProfileHeader.tsx renders brokerage_logo only inside the `profile.brokerage_name &&` branch, so a logo uploaded without a brokerage name never shows.
+- [profile] src/pages/dashboard/Profile.tsx:219 blocks only an exact duplicate city. 'austin' after 'Austin', or a city with trailing spaces after trim, still gets saved. The public page now hides these, but the editor could normalise them with cleanServiceCities.
+- [profile] functions/_lib/social-meta.ts:183 (prerendered JSON-LD for crawlers) filters empty strings but does not trim or de-duplicate the way src/lib/serviceAreas.ts now does, so prerendered and client-rendered areaServed can differ on messy data.
+- [profile] src/components/landing/DemoProfilesShowcase.tsx:148 still shows only the first two cities. That is intended for the landing page cards, but noted here.
+- [uiux] [enterprise] supabase/functions/teams/index.ts:211-224: updateRole returns {updated:true} even when no row matched (wrong memberId, or the owner row), so the UI reports success for a no-op. It should .select('id').maybeSingle() and return 404 when no row matched. The remove action at :198-209 has the same problem.
+- [uiux] [enterprise] supabase/functions/teams/index.ts:211-224: any admin can demote another admin, or promote anyone, because only is_team_admin is checked. Whether only the owner should manage admin roles is an owner decision.
+- [uiux] [uiux] src/pages/dashboard/TeamPage.tsx: under each member name the row still prints the role as text ('member · pending'), which duplicates the new select for non-owners. A later polish could show only 'Pending invitation' there for non-owner rows.
+- [performance] US-341 can be closed as already satisfied (progress.txt:5400; functions/_lib/profile-route.ts:178 makes one PostgREST request per profile).
+- [performance] src/components/analytics/TimeSeriesChart.tsx and KPICards.tsx exist, but the Analytics page does not import them; they may be dead code worth checking.
+- [performance] src/pages/dashboard/Analytics.tsx:463 reads window.innerWidth during render for the chart height, so the height does not change when the window is resized. It now affects only the chart height, since the chart width tracks its container through a ResizeObserver.
+- [performance] AdminDashboard is 217.7 KB gzip beyond the entry because it statically imports SEOManager and SearchAnalyticsDashboard, which each pull in charts-vendor. Lazy-loading those tabs would help admins, but only admins open this route.
+- [security] US-384 (backfill is_active=false on revoked api_keys) is a one-line data migration and a good next small security slice.
+- [security] analytics_events link_click / contact rows inserted by trackLinkClick (src/hooks/useProfileTracking.ts, after the RPC) may still be accepted for an unpublished agent. I did not audit the analytics_events INSERT policy for an is_published gate. Worth checking alongside US-317's intent so the dated per-link breakdown matches click_count.
+- [security] The scratchpad's /tmp/claude-0 directory keeps resetting to mode 700, which blocks running a postgres-owned scratch cluster under it. Lanes that need verify:schema must chmod it in the same command that starts pg_ctl, and must use -k '' because the socket path exceeds 107 bytes.
+- [enterprise] supabase/functions/gdpr-export/index.ts: the GET path still marks the newest 'pending' export request completed with no file, which is right when the subject has just downloaded. A request the queue has already claimed is 'processing' and is not touched. No change was needed, but the next slice's status UI should show such a row as 'downloaded directly'.
+- [enterprise] supabase/functions/_shared/auth.ts:6 imports createClient and never uses it; strict noUnusedLocals flags it outside the root tsconfig (root tsc does not include supabase/functions).
+- [enterprise] US-386 (getAgentContact in loops): this change adds no loop over agents. The queue reads the subject with auth.admin.getUserById once per export, at most 3 per run.
+- [marketing] src/lib/instagram-bio-analyzer/link-strategy.ts:15 'leadsLost: 45' (and the other per-situation numbers) is an invented lead-loss percentage shown on the tool's results page.
+- [marketing] src/components/integrations/ZapierIntegrationModal.tsx:285 says 'Connect to popular CRMs (Salesforce, HubSpot, Zoho)'. That is accurate only as 'via Zapier'. It sits inside the Zapier modal, so I left it.
+- [marketing] send-bio-analyzer-email/index.ts: the HTML template uses a purple-to-pink gradient header and colored border-left callouts, both on the craft-floor list. Plain-text-only delivery since US-219 may make the HTML dead; worth confirming and deleting.
+- [marketing] Duplicate id=demo-profiles, the raw theme-key badge on the homepage, and the Press.tsx calendar claim (from the lane brief) were not examined this round.
+- [seo] US-389 / US-371 remainder: src/pages/public/FullProfilePage.tsx still builds the canonical and node ids from getSafeOrigin(). It needs the owner's decision on whether custom-domain profiles canonicalise to the custom domain.
+- [seo] US-370 is unchanged: src/config/site-entities.test.tsx:20 is still the only importer of src/components/seo/PageSEO.tsx.
+- [seo] Blog.tsx:58 and BlogCategory.tsx:365 still select('*') on articles for the list views. That works, but the list fetches full article content just to show cards, which is a performance-lane concern. The prerender intercept would need to keep answering whatever select is used.
+- [mobile] [mobile] src/App.tsx:163 calls cleanupServiceWorkers() on every app mount (src/lib/sw-cleanup.ts). It allowlists the AgentBio worker and the 'agentbio-sw-' caches, so today the cost is an extra getRegistrations() and caches.keys() pass on each load. Any future same-origin Cache Storage user would be wiped every load. Running it once per build id (for example behind a localStorage flag keyed on the SW version) would remove both problems.
+- [mobile] [mobile] public/sw.js precacheAppShell fetches shell HTML with the default cache mode, the same as the old addAll did. If the host ever serves index.html with a long max-age, a new worker could precache a stale shell from the browser HTTP cache. Worth checking the _headers rule for /index.html and '/', or fetching with cache: 'no-cache'.

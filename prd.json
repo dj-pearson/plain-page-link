@@ -4445,8 +4445,8 @@
         "Tests for 1, 2 and 3+ cities"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-265)"
+      "passes": true,
+      "notes": " (follow-up slice from US-265) DONE in round 6 as US-393."
     },
     {
       "id": "US-282",
@@ -4598,7 +4598,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "supabase/functions/gdpr-export/index.ts POST branch calls request_gdpr_data_export and returns 202 'Processing will begin shortly', but no processor exists. (follow-up slice from US-269)"
+      "notes": "supabase/functions/gdpr-export/index.ts POST branch calls request_gdpr_data_export and returns 202 'Processing will begin shortly', but no processor exists. (follow-up slice from US-269) Slice 1 (process queued POST requests) done in round 6 as US-397."
     },
     {
       "id": "US-292",
@@ -4714,8 +4714,8 @@
         "One batched profiles request per list, not one per card"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up slice from US-271)"
+      "passes": true,
+      "notes": " (follow-up slice from US-271) DONE in round 6 as US-399."
     },
     {
       "id": "US-300",
@@ -4931,8 +4931,8 @@
         "verify:schema covers this"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-308)"
+      "passes": true,
+      "notes": " (follow-up from US-308) DONE in round 6 as US-396."
     },
     {
       "id": "US-309",
@@ -5855,8 +5855,8 @@
         "username-route tests cover both toggles"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-372)"
+      "passes": true,
+      "notes": " (follow-up from US-372) DONE in round 6 as US-391."
     },
     {
       "id": "US-373",
@@ -6038,8 +6038,8 @@
         "The guard test fails on the old copy"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Same claim family as US-379. AgentTestimonials.tsx:51 'CRM Built-In' highlight is worth checking in the same pass. (follow-up from US-379)"
+      "passes": true,
+      "notes": "Same claim family as US-379. AgentTestimonials.tsx:51 'CRM Built-In' highlight is worth checking in the same pass. (follow-up from US-379) DONE in round 6 as US-398."
     },
     {
       "id": "US-388",
@@ -6052,8 +6052,8 @@
         "There is a test covering the templates"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-379)"
+      "passes": true,
+      "notes": " (follow-up from US-379) DONE in round 6 as US-398."
     },
     {
       "id": "US-380",
@@ -6116,8 +6116,282 @@
         "src/sw.test.ts covers both"
       ],
       "priority": 2,
+      "passes": true,
+      "notes": " (follow-up from US-381) DONE in round 6 as US-400."
+    },
+    {
+      "id": "US-391",
+      "lane": "listings",
+      "round": 6,
+      "title": "A listing the agent had hidden still showed its photo, price and address when a crawler fetched its link",
+      "description": "Closes US-382. functions/_lib/profile-route.ts looked up a listing by id and user_id only, ignoring the agent's visibility settings. So a hidden home still got a full share card (photo, price, address) when a crawler fetched its link. That covered listings hidden by \"Show listings\" off, and sold homes hidden by \"Show sold properties\" off. Facebook, iMessage and Slack previews are what fetch that card. Meanwhile the SPA listing page said \"This home is no longer listed\" and the sitemap left the home out. The route now reads the agent's show_listings and show_sold_properties from user_settings, in parallel with the listing. It applies selectListingForPage, the same rule the page and the sitemap use. A hidden listing keeps the agent's card. If the settings read fails, the listing card is withheld rather than guessed (fails closed).",
+      "acceptanceCriteria": [
+        "A crawler requesting /:username/listing/:id for a listing hidden by show_listings=false gets the agent's card, with no listing address or photo",
+        "A sold listing with show_sold_properties=false gets the agent's card; with it true, the listing card",
+        "An available (active/pending) listing is still described when only sold properties are hidden",
+        "No user_settings row means the defaults (all shown), the same as the profile page",
+        "If the user_settings read fails, the listing is withheld (agent card, 200), not published",
+        "The legacy /:username?listing= link follows the same rules",
+        "The settings read selects only show_listings and show_sold_properties, the columns anon is granted, and is scoped to the agent's user_id"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Base: hard-reset the worktree to claude/continuous-improvement-loops-fx2ob1 (cb91d56) before making any change.\n\nEvidence before the change: in functions/_lib/profile-route.ts (old lines 192-200), the listing query used only id=eq and user_id=eq, and LISTING_COLUMNS had no status, so the visibility rules could not be applied. The SPA applies selectListingForPage at src/pages/public/ListingPage.tsx:81, and the sitemap does too at functions/_lib/profile-sitemap.ts:156. Anon may read user_settings.show_listings and show_sold_properties for published profiles: there is a column grant and a policy in supabase/migrations/20260902000009_public_visibility_settings.sql.\n\nWhat changed:\n- functions/_lib/profile-route.ts: new fetchVisibleListing(). It runs the listing query (now including status) and a user_settings query (select=show_listings,show_sold_properties&user_id=eq.<profile id>) in parallel with Promise.all, then returns selectListingForPage(listings, listingId, settings[0] ?? null). If either read returns null (error or timeout), the function returns null, which keeps the agent card. serveProfileRoute uses it for both the listing path and the legacy ?listing= link. selectListingForPage is imported by relative path, as profile-sitemap.ts does, because the Pages bundle does not resolve '@/'.\n- functions/_tests/username-route.test.ts: LISTING_ROW now has status 'active', and the default mock returns [] for user_settings. Added 7 tests in a new 'visibility toggles (US-382)' block: the query is scoped and selects only the two columns; hidden by show_listings; sold hidden by show_sold_properties; sold shown; pending shown when only sold is hidden; settings read fails gives the agent card; the legacy ?listing= link follows the same rules.\n\nNo migration and no edge-function change. prd.json and progress.txt are untouched.\n\nVERIFIED: npx tsc --noEmit: exit 0 (tsconfig includes src and functions). npx vitest run functions/ src/lib/publicListingVisibility.test.ts: 37 files, 444 tests passed. After lint-staged (eslint --fix, prettier) reformatted the commit, npx vitest run functions/_tests/username-route.test.ts: 26 passed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages (the Pages Functions under functions/) for the change to take effect. No migration, edge function or secret involved."
+    },
+    {
+      "id": "US-392",
+      "lane": "leads",
+      "round": 6,
+      "title": "Calls, emails and texts logged from an open lead never showed up on that lead's timeline",
+      "description": "Every lead_activities mutation refreshed the lead the hook was opened with, not the lead it wrote to. useLeadContactAction calls useLeadActivities(undefined), so contact actions refreshed ['lead-activities', undefined]. That covers Call, Email, Text, the recommended next step and quick responses, from both the detail modal and the list card. Mutations now refresh the lead they actually wrote for, plus the list's activity summaries. An SMS also refreshes the lead list, because it sets contacted_at.",
+      "acceptanceCriteria": [
+        "Logging a call, email or text through an instance opened without a lead id (useLeadActivities(undefined)) refreshes ['lead-activities', <that lead>] and ['lead-activity-summary', <that lead>], never ['lead-activities', undefined]",
+        "The open lead detail's timeline query refetches when useLeadContactAction logs an activity for that lead",
+        "The Leads list's ['lead-activity-summaries'] query is refreshed after any timeline write",
+        "An sms/call/email/meeting logged via log_lead_activity refreshes ['leads']; a note does not",
+        "Complete-task and delete-activity still refresh the hook's own lead"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Open lane stories were checked first. US-279 (filter row overflows at 375px) is already fixed in code: US-246 made the toolbar wrap (src/pages/dashboard/Leads.tsx:666-670, data-testid leads-toolbar, covered by Leads.test.tsx:171). The only criterion left is the 375px Playwright test, and this sandbox has no browsers. US-362 is a design guard with no work to do, and US-278 is blocked. So I took the carried-over finding from rounds 3-5: src/hooks/useLeadContactAction.ts:36 calls useLeadActivities(undefined).\n\nThe bug: src/components/leads/LeadDetailModal.tsx:183 uses that hook for handleContactAction (around line 283) and handleNextStep. All six log mutations in src/hooks/useLeadActivities.ts refreshed ['lead-activities', leadId], with leadId taken from the hook rather than from what was written. So an agent tapping Call, Email or Text in an open lead saw nothing on its timeline until they reopened it, and the list card summaries (useLeadsActivitySummaries, Leads.tsx:145) were never refreshed.\n\nThe fix is in src/hooks/useLeadActivities.ts. A new invalidateTimeline(targetLeadId) helper refreshes ['lead-activities', id], ['lead-activity-summary', id] and ['lead-activity-summaries'], where id = targetLeadId ?? the hook's leadId. logActivity, logNote, logEmail, logCall, logMeeting and createTask pass params.leadId from the mutation variables. completeTask and deleteActivity only receive an activity id, so they use the hook's own lead, which is always set where they are called. logActivity also refreshes ['leads'] for call/email/sms/meeting: CONTACT_ACTIVITY_TYPES matches the IN list in migration 20261107000349, line 83, which sets contacted_at.\n\nNew test: src/hooks/useLeadActivities.invalidation.test.ts (5 tests). With the fix stashed, 4 of the 5 fail: the call, email cross-instance refetch, SMS and note cases. The completeTask case is a regression guard and passes either way. With the fix, all 5 pass.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output. npx vitest run src/hooks/useLeadActivities.invalidation.test.ts: 5 passed. The same file with the fix stashed: 4 failed, 1 passed. npx vitest run src/hooks/ src/components/leads/ src/pages/dashboard/Leads.test.tsx: 26 files, 171 tests passed. No migration, so verify:migrations was not needed. The lint-staged hook (eslint --fix, prettier) ran cleanly on commit.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-393",
+      "lane": "profile",
+      "round": 6,
+      "title": "The public profile hid most of an agent's service cities behind \"+N more\"",
+      "description": "Implements US-281 (US-142 slice 3). The public page header now names every service city in plain words, for example \"Serving Austin, Round Rock and Cedar Park\". The RealEstateAgent and LocalBusiness JSON-LD both build areaServed and the address locality from the same cleaned list.",
+      "acceptanceCriteria": [
+        "All service_cities render with a natural-language join: ProfileHeader shows 'Serving A, B and C' in place of 'A +2 more'",
+        "RealEstateAgent JSON-LD areaServed lists every city. LocalBusiness now has areaServed too. Blank entries and case-insensitive duplicates are dropped.",
+        "Tests cover 1, 2, 3 and 3+ cities, empty lists and lists of only blanks"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Problem: ProfileHeader.tsx (old lines 176-186) rendered only service_cities[0] followed by '+N more'. A visitor could not see whether the agent covers their town. FullProfilePage.tsx (around lines 228-290) passed the raw jsonb array straight into areaServed and addressLocality, so blanks, stray spaces and repeated cities ended up in the structured data, and the LocalBusiness node had no areaServed at all.\n\nChanges:\n- New file src/lib/serviceAreas.ts with three helpers:\n  - cleanServiceCities: trims, collapses whitespace, drops blanks and non-strings, removes case-insensitive duplicates, keeps the original order.\n  - formatServiceCities: 'A', 'A and B', 'A, B and C' (no serial comma).\n  - areaServedSchema: one City per entry, or undefined when the list is empty.\n- src/components/profile/ProfileHeader.tsx: the MapPin row now reads 'Serving <cities>'. It uses items-start and max-w-prose so a long list wraps cleanly, and the icon is aria-hidden.\n- src/pages/public/FullProfilePage.tsx: one serviceCities/areaServed is computed (around line 216) and used for the RealEstateAgent address and areaServed, a new LocalBusiness areaServed, and the meta keywords.\n\nNo schema, migration or edge-function changes. The prerender path, functions/_lib/social-meta.ts:183-213, already lists every city in areaServed (filtering empty strings only), so it was left alone.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output.\nnpx vitest run src/lib/serviceAreas.test.ts src/components/profile/ProfileHeader.test.tsx src/pages/public/FullProfilePage.schema.test.tsx src/pages/public/FullProfilePage.publish.test.tsx: 4 files, 17 tests passed.\nnpx vitest run src/components/profile src/pages/public: 17 files, 85 tests passed.\nnpx impeccable detect src/components/profile/ProfileHeader.tsx: regex-only scan, no findings reported.\nThe pre-commit hook (eslint --fix, prettier) passed.\nThe new schema test feeds the page [' Austin ', 'Round Rock', '', 'austin', 'Cedar Park'] and expects exactly three City nodes on both RealEstateAgent and LocalBusiness. That test would have failed against the old code.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-394",
+      "lane": "uiux",
+      "round": 6,
+      "title": "US-394: TeamPage: owners can make a member an admin, and choose the role when inviting",
+      "description": "The teams edge function already accepts updateRole (supabase/functions/teams/index.ts:211-224), and invite already takes a role (line 136). TeamPage offered neither, so an owner could never give a teammate admin rights from the dashboard. Each non-owner row in the member list now has a labelled role select (Member/Admin) that calls updateRole, and the invite form has a role choice. The role icons now use theme tokens instead of the hard-coded amber-500 and blue-500.",
+      "acceptanceCriteria": [
+        "Each non-owner member row has a role select labelled 'Role for <member>'. Changing it calls teams {action:'updateRole', teamId, memberId, role}, and on success a toast says '<member> is now an admin/member'",
+        "A failed role change shows a destructive toast naming the member and the server message, and the select stays on the role the server holds (no optimistic change)",
+        "The owner row has no role select",
+        "The invite form has a 'Role for the new member' select (default Member). Its value is sent as role with the invite and resets to Member after a successful invite",
+        "The role icons use text-foreground/text-muted-foreground and are aria-hidden, with no hard-coded hues"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "I left US-338 (members see their team read-only) alone, as progress.txt:5325 and 5396 record. It still needs an owner decision and a check of what RLS lets members read on teams/team_members. This slice is the other half of that lane finding (progress.txt:5247, 5397), and it needs no decision because the server action already exists and is gated by is_team_admin.\n\nChanges in src/pages/dashboard/TeamPage.tsx:\n- ASSIGNABLE_ROLES and a shared SELECT_CLASS that matches the Input's height and focus ring: 44px touch height on mobile, 40px from sm up.\n- A changeRole mutation (around line 210), with per-row disabled and aria-busy while it runs.\n- An inviteRole state, sent in the invite body.\n- Member rows now flex-wrap, so the select and remove button wrap on narrow screens.\n- Theme-token role icons.\n\nI used a native select rather than Radix Select so it gets the platform picker on phones and stays reliable in jsdom. Tests: 3 new cases in src/pages/dashboard/TeamPage.test.tsx (updateRole success, updateRole failure, invite with a role). The owner-row assertion is folded into the first case.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output. npx vitest run src/pages/dashboard/TeamPage.test.tsx: 8/8 passed. npx vitest run src/pages/dashboard src/components/settings: 14 files, 101/101 passed. npx vitest run src/test/a11y/fieldNames.test.ts: 7/7 passed. npx impeccable detect src/pages/dashboard/TeamPage.tsx: no findings, but this was a regex-only scan, so it undercounts. The pre-commit eslint --fix and prettier hooks passed. No migration was added.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-395",
+      "lane": "performance",
+      "round": 6,
+      "title": "The agent Analytics page downloaded 107 KB of recharts to draw one chart",
+      "description": "/dashboard/analytics was the heaviest agent-facing dashboard route. Measured as the gzipped JS a visitor downloads on top of the entry chunk, it came to 188.1 KB. 107 KB of that was charts-vendor (recharts, 402 KB minified), and recharts was used for exactly one area chart (src/components/dashboard/AnalyticsChart.tsx). I redrew AnalyticsChart as plain SVG and kept its props the same. The route is now 83.1 KB gzip, 56% lighter. Only the admin screens load recharts now.",
+      "acceptanceCriteria": [
+        "/dashboard/analytics no longer pulls charts-vendor: measured beyond the entry it went from 188.1 KB gzip to 83.1 KB gzip",
+        "AnalyticsChart keeps its props (title, description, data, series, type line/area/bar, height, showLegend, yAxisLabel), so Analytics.tsx did not change",
+        "Hovering shows a tooltip with every series value, styled with theme tokens (bg-popover) so it works in dark mode",
+        "The data is also rendered as a visually hidden table for screen readers",
+        "A test fails if the agent Analytics route imports recharts again",
+        "check-bundle-size passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Choosing the work: US-341 was left alone. Round 5 already found it satisfied (progress.txt:5400: functions/_lib/profile-route.ts:178 makes one PostgREST request per profile), so the integrator can close it. US-340 was skipped as instructed. Next I measured every route after `vite build`: for each lazy route chunk I took its static import closure, removed what the entry already loads, and gzipped the rest. The script is at /tmp/claude-0/-home-user-plain-page-link/3a5c39fd-7090-5660-8a7d-dbafb71cb691/scratchpad/closure.mjs. Agent dashboard routes before the change: Analytics 188.1 KB, Listings 109.7, Leads 94.6, Settings 92.2, Overview 70.5. AdminDashboard is bigger (217.7 KB) but only admins open it. In Analytics, charts-vendor came from a single static import: src/pages/dashboard/Analytics.tsx:4 imports AnalyticsChart, rendered once at :448 as an area chart with 2 series. No other agent route imports recharts; the only other users are under src/components/admin and src/pages/admin.\n\nWhat changed:\n- New src/lib/chartGeometry.ts: pure helpers for round y ticks (whole-number steps for counts, an axis of 0 and 1 when all values are zero), x/y scales, line and area paths, x-label thinning for 90 daily points, and hover snapping.\n- src/components/dashboard/AnalyticsChart.tsx is now SVG. Its width comes from a ResizeObserver. It draws dashed grid lines, a gradient area fill, grouped bars, and an optional y-axis label. The tooltip snaps to the nearest point on pointer move or tap and closes when the pointer leaves. The legend is a list, and the data is also an sr-only table. Following the craft floor, the tooltip has a border and no shadow.\n- The charts-vendor descriptions in scripts/check-bundle-size.mjs and the vite.config.ts:21 baseline comment now say it is admin-only.\n\nHow I checked it: I rebuilt and re-measured (Analytics 83.1 KB gzip; charts-vendor no longer in its closure), and check-bundle-size passed. The new tests are src/lib/chartGeometry.test.ts and src/components/dashboard/AnalyticsChart.test.tsx. They cover rendering, paths and gradients, bar count, the tooltip appearing and disappearing, the single \"No data\" placeholder point, and a guard that the Analytics route never imports recharts. I could not look at the chart in a browser: the dashboard needs a login and this sandbox has no Playwright chromium.\n\nVERIFIED: npx tsc --noEmit: exit 0, run both before and after the pre-commit prettier reformat.\nnpx vitest run src/lib/chartGeometry.test.ts src/components/dashboard/AnalyticsChart.test.tsx: 2 files, 21 tests passed, run after the reformat.\nnpx vitest run src/lib/chartGeometry.test.ts src/components/dashboard src/components/analytics src/profile-bundle.test.ts src/pages/dashboard: 18 files, 134 tests passed.\nnpx eslint on the 4 new or changed TS files: clean.\nnpx vite build: built in 20s.\nnode scripts/check-bundle-size.mjs: OK, 251 chunks within budget, 1 documented exception (three-vendor).\nRoute weight, measured beyond the entry (gzip): Analytics 188.1 KB before, 83.1 KB after. Other routes unchanged.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-401",
+      "lane": "performance",
+      "round": 6,
+      "title": "Cut the Listings dashboard route (109.7 KB gzip beyond the entry)",
+      "description": "Listings is now the heaviest agent dashboard route. Its closure includes form-vendor, KeyboardShortcutsHelper, the share/twitter UI and the import/upload dialogs. Some of these are probably only needed once a dialog opens and could load then.",
+      "acceptanceCriteria": [
+        "Listings route closure measured before and after",
+        "Dialogs that are not open on first render load when they open",
+        "No change in behaviour; tests pass"
+      ],
+      "priority": 2,
       "passes": false,
-      "notes": " (follow-up from US-381)"
+      "notes": "Measure with the closure approach used in US-395 (static import closure minus the entry closure, gzipped). (follow-up from US-395)"
+    },
+    {
+      "id": "US-402",
+      "lane": "performance",
+      "round": 6,
+      "title": "Measure the authenticated dashboard routes in CI",
+      "description": "scripts/check-route-weight.mjs only budgets public routes (/, /demo, /pricing, bio analyzer). No dashboard route has a budget, so charts-vendor could come back on Analytics without any check failing except the source-level test.",
+      "acceptanceCriteria": [
+        "A build-time check computes each dashboard route chunk's static closure beyond the entry and fails above a budget",
+        "Runs in CI without needing a login"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-395)"
+    },
+    {
+      "id": "US-396",
+      "lane": "security",
+      "round": 6,
+      "title": "Link clicks still counted on unpublished pages and switched-off links (US-317)",
+      "description": "increment_link_clicks is SECURITY DEFINER and anon can call it, so it skipped the US-308 links policy. Anyone who knew a link id could keep raising click_count on an unpublished page or on a link the agent had switched off. The agent then saw those numbers in the dashboard as real visitor interest. The function now counts a click only when a visitor could actually see the link, or when the caller owns it. It also runs that check before check_rate_limit, so a made-up link id no longer writes a rate_limit_entries row.",
+      "acceptanceCriteria": [
+        "When the profile is unpublished (is_published false or NULL), anon calling increment_link_clicks leaves click_count unchanged",
+        "An inactive (is_active=false) link is not counted even on a published page",
+        "The owner's click still counts (owner exempt, matching the US-308 functions)",
+        "A call with a nonexistent link id writes no rate_limit_entries row",
+        "verify:schema covers all of the above (check 7b3)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence: the only definition was supabase/migrations/20260902000012_analytics_counters.sql:76-112. It updated links WHERE id = link_id with no visibility check and called check_rate_limit first (line 89). The visitor rule it should match is in supabase/migrations/20261107000308_unpublished_agent_content_private.sql:73-84 (is_active AND NOT is_sample AND p.is_published IS TRUE).\n\nWhat changed:\n- New migration supabase/migrations/20261107000396_link_clicks_published_pages_only.sql. It uses CREATE OR REPLACE on the same signature (link_id uuid, visitor_id text DEFAULT NULL) with SET search_path = public, extensions, pg_temp. It computes v_countable = (l.user_id = auth.uid()) OR (l.is_active IS TRUE AND NOT l.is_sample AND p.is_published IS TRUE) and returns quietly if that is false or NULL, so a missing link returns too. Only then does it run the throttle and the update. Grants are restated: REVOKE FROM PUBLIC, GRANT to anon, authenticated, service_role. It stays in DEFINER_CALLABLE as before. The client (src/hooks/useProfileTracking.ts:88) is unchanged.\n- scripts/verify-schema.mjs: new check 7b3, \"increment_link_clicks counts only links a visitor can see\". It covers anon on an unpublished page, is_published NULL, a nonexistent id (no rate-limit row), the owner's click while unpublished, and a published page with an inactive link.\n- src/lib/unpublishedVisibility.test.ts: a static test holds the newest increment_link_clicks body to the owner/visibility predicate. It also checks that the visibility test comes before check_rate_limit and that search_path is pinned.\n\nI proved the check works by applying all migrations to a scratch Postgres 16. With the new migration, all schema checks pass. With the old function body put back, check 7b3 fails 4 ways: anon clicks counted \"1|1|3\", the inactive link counted, and rate-limit rows were written. The existing 6f throttle check still passes, because its profile is published.\n\nVERIFIED: - npx tsc --noEmit: passed, no errors.\n- npx vitest run src/lib/unpublishedVisibility.test.ts src/hooks/useProfileTracking.test.ts src/schema-references.test.ts: 3 files, 22 tests passed. unpublishedVisibility.test.ts alone had 7 passing after the final tweak.\n- npm run verify:migrations: \"[migrations] OK — 69 migration files structurally valid.\"\n- Scratch Postgres 16 on 127.0.0.1:55396: scripts/supabase-prelude.sql plus every supabase/migrations/*.sql applied in one pass with ON_ERROR_STOP=1.\n- node scripts/verify-schema.mjs --db-url ...: \"All schema checks passed\", including \"ok increment_link_clicks counts only links a visitor can see\" and \"ok view and click counters are throttled, and match the rows they count\".\n- Negative control: with the old function body re-applied, the new check failed (FAIL ... (4)). I then re-applied the new migration.\n- node scripts/gen-supabase-types.mjs --check: \"types.ts is up to date.\"\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000396_link_clicks_published_pages_only.sql to production. It only replaces a function: no data change and no edge-function redeploy."
+    },
+    {
+      "id": "US-397",
+      "lane": "enterprise",
+      "round": 6,
+      "title": "Data export requests sent by POST were never processed, so the subject never got their data",
+      "description": "US-291 slice 1. A POST to gdpr-export queued a gdpr_data_requests row and returned 202 \"Processing will begin shortly\", but nothing ever processed it. The hourly scheduled-maintenance job now takes each queued export and builds the same document the GET download returns. It saves the file to a private gdpr-exports bucket, emails the subject a signed link that lasts 7 days, and marks the request completed. Errors that may clear on their own are retried each hour, with the reason saved in failed_reason. After 24 hours, or if the account no longer exists, the request is marked failed and the subject is told. Files are deleted once their link expires.",
+      "acceptanceCriteria": [
+        "A queued (pending) export request is claimed by scheduled-maintenance and ends either completed, with file_url and file_expires_at set, or failed, with failed_reason set",
+        "The file is in the private gdpr-exports bucket. No storage.objects policy names that bucket, so only service_role can reach it, and the subject reaches the file only through a signed URL that expires after 7 days",
+        "The subject is emailed the link. A request whose email fails is not marked completed; it is retried instead",
+        "Each claim is a conditional update, so two overlapping runs never build the same export twice. A request left at 'processing' by a crashed run is taken back after 1 hour",
+        "Expired files are deleted and their file_url is cleared"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Problem: supabase/functions/gdpr-export/index.ts (POST branch, around lines 83-104 before this change) called request_gdpr_data_export and returned 202, but no code ever processed the row. file_url and file_expires_at were never written.\n\nWhat changed:\n- Moved gdpr-export/collect.ts and its test to supabase/functions/_shared/gdpr-export.ts and _shared/gdpr-export.test.ts with git mv, because no function imports from another function's directory. Added supabaseExportReader() and buildExportDocument() there. The document builder is the old inline GET code, with decryptSecret passed in so vitest can run it. gdpr-export/index.ts now uses both functions, so the GET download and the queued export produce the same document. The POST message now says a link will be emailed.\n- New supabase/functions/_shared/gdpr-export-queue.ts with no Deno globals: processExportQueue (list → claim → build → upload → signed URL → email → complete → audit), purgeExpiredExports, the two email builders, and supabaseExportQueueStore.\n  - Claims are conditional UPDATEs on status, plus processed_at when retaking a stale 'processing' row.\n  - file_url stores the object path (<uid>/<request id>.json), never the signed link, so the link appears only in the email.\n  - At most 3 exports per run.\n  - Retry rules: an ExportIncompleteError, or a storage or email error, puts the request back to 'pending' with the reason. After 24h it is failed and the subject gets a \"could not prepare\" email. A missing account or missing email address fails at once.\n  - Audit entries are written through log_audit_event, with p_resource_id set to the request id.\n- supabase/functions/scheduled-maintenance/index.ts: new task 'data_exports', run after account_deletions. It reports failure (so the run returns 207) while any request is still waiting.\n- New migration supabase/migrations/20261107000397_gdpr_exports_bucket.sql: the private bucket (500 MB, application/json only, no policies), a column comment on file_url, and two partial indexes, one for the queue scan and one for the expiry purge.\n- New supabase/functions/_shared/gdpr-export-queue.test.ts, 14 tests: the happy path (decrypted PII, path not link, TTL, audit), stale cutoff, skipped claim, retry on an unreadable section, no completion when the email fails, give-up after 24h with an email to the subject, permanent fail for a missing account, one failure not stopping the rest, a list error reported, the purge, escaping in the email HTML, and that the migration bucket is private with no CREATE POLICY.\n\nNot run: deno check (deno is not installed here) and verify:schema (no Postgres here). Instead, a standalone strict tsc covering both index.ts files and the new modules was run, with the esm.sh import mapped to node_modules.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- Standalone strict tsc (scratchpad tsconfig: strict, noUnusedLocals, esm.sh mapped to node_modules, deno std serve shimmed) over gdpr-export-queue.ts, both test files, gdpr-export/index.ts and scheduled-maintenance/index.ts: clean apart from one existing error, an unused createClient import in supabase/functions/_shared/auth.ts:6, which this change did not touch.\n- `npm run verify:migrations`: \"[migrations] OK — 69 migration files structurally valid.\"\n- `npx vitest run supabase/functions/_shared supabase/functions/scheduled-maintenance src/schema-references.test.ts src/edge-function-routing.test.ts`: 26 files, 299 tests passed.\n- Full `npx vitest run`: 226 files passed; 2070 tests passed, 1 skipped.\n- After the pre-commit eslint/prettier pass: gdpr-export-queue.test.ts and gdpr-export.test.ts still pass, and the standalone tsc is unchanged.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000397_gdpr_exports_bucket.sql (creates the private gdpr-exports bucket and two indexes) | Rebuild/redeploy the functions.agentbio.net Coolify app so gdpr-export and scheduled-maintenance ship (both now import _shared/gdpr-export.ts; scheduled-maintenance also imports _shared/gdpr-export-queue.ts) | Confirm SUPABASE_URL on the functions app is the public API origin. createSignedUrl builds the emailed link from it, the same way optimize-image builds its getPublicUrl links | Confirm the self-hosted storage FILE_SIZE_LIMIT allows large exports (the bucket allows 500 MB). Also confirm RESEND_API_KEY is set, because a request whose email fails is retried and is not marked completed"
+    },
+    {
+      "id": "US-403",
+      "lane": "enterprise",
+      "round": 6,
+      "title": "Data export: let the subject request a queued export and see its status",
+      "description": "No UI calls POST: useGDPR.ts:64 uses GET only, so the queue is reachable only through the API. Add a 'Email me my data' action to the privacy settings, list the subject's export requests (status, requested, completed, failed_reason) from gdpr_data_requests, and offer the queued path when the immediate GET returns 503 or times out.",
+      "acceptanceCriteria": [
+        "The settings page can queue an export and shows 'we will email you a link'",
+        "The subject sees each export request's status and, when failed, the reason",
+        "A 503 or timeout on the immediate download offers the queued path"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "The 409 'already pending' error from request_gdpr_data_export should show as a friendly message. Do not expose file_url in the UI; the link exists only in the email. (follow-up from US-397)"
+    },
+    {
+      "id": "US-404",
+      "lane": "enterprise",
+      "round": 6,
+      "title": "Data export: re-send a fresh link for a completed export that has not expired",
+      "description": "If the email is lost, the subject has to request a whole new export. Add an authenticated endpoint that signs a new short-lived URL for the caller's own completed export while file_expires_at is in the future, checking that the request's user_id matches the caller.",
+      "acceptanceCriteria": [
+        "Only the owner can get a link, and only before file_expires_at",
+        "The new link expires and is written to the audit log"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-397)"
+    },
+    {
+      "id": "US-405",
+      "lane": "enterprise",
+      "round": 6,
+      "title": "Data export: stream large exports instead of holding the document in memory",
+      "description": "The queued job still builds the whole JSON in memory, up to 100,000 rows per section across 27 sections. Write each section to storage as it is read (for example NDJSON or a zip with one file per section), so the largest accounts do not exhaust the function's memory.",
+      "acceptanceCriteria": [
+        "Peak memory does not grow with the total row count",
+        "The document's content and meta.counts are unchanged for the subject"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-397)"
+    },
+    {
+      "id": "US-398",
+      "lane": "marketing",
+      "round": 6,
+      "title": "/vs/later and the bio analyzer's live email claimed MLS sync and CRM integration that do not exist",
+      "description": "This closes US-387 and US-388, which are the same claim family. Several places promised features that do not exist. Agents type their listings in by hand. The only CRM hand-off is a Zapier webhook (profiles.zapier_webhook_url, sent from submit-lead/index.ts:322) plus a CSV export. The false promises were in four places. The /vs/later comparison page had an \"MLS/IDX Integration: auto-sync active listings from MLS\" row, a \"CRM Integration: auto-send leads to Follow Up Boss, LionDesk\" row, and CRM-sync wording in five more spots, including its FAQPage JSON-LD. The bio analyzer's email 1 (the one that actually sends) and its results page promised \"Auto-updated listings from your MLS\". The landing page labelled lead management \"CRM Built-In\". All of it now describes what ships, and two new guard rules in the claims test fail if this wording comes back.",
+      "acceptanceCriteria": [
+        "VsLater.tsx no longer claims MLS/IDX integration, CRM integration or CRM sync anywhere, including the FAQPage JSON-LD. The CRM row now reads 'Leads Sent to Your CRM: Via Zapier'.",
+        "The bio analyzer's email 1 (plain text and HTML) and InstagramBioAnalyzer.tsx no longer promise listings auto-updated from the MLS",
+        "AgentTestimonials no longer says 'CRM Built-In'",
+        "src/lib/instagram-bio-analyzer/email-templates.ts (dead module promising CRM integration with Follow Up Boss and Salesforce) is deleted",
+        "marketing-claims.test.ts FEATURE_RULES catch MLS sync ('MLS/IDX integration', 'auto-updated ... MLS') and CRM integration/sync/built-in claims across src and supabase/functions. The honest forms are still allowed: 'No CRM integration', 'There is no built-in CRM integration', the add-on waitlist, and the Zapier modal's own setup steps.",
+        "npx tsc --noEmit passes and the claims suites pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The changes:\n- src/pages/landing/VsLater.tsx\n  - Removed the MLS/IDX ComparisonRow (was around line 328).\n  - The CRM row (was around line 340) now reads feature \"Leads Sent to Your CRM\", agentbio \"Via Zapier\", with the description \"Each new lead is posted to your Zapier webhook; CSV export on paid plans\".\n  - Reworded lines 56, 64, 181-185, 222, 434, 548 and 601 to describe listings, buyer/seller forms, open house sign-in, calendar booking, and the Zapier hand-off.\n  - Dropped the \"No CRM integration\" bullet about Later. It was a claim about a competitor that we can't verify, and it only made sense against a feature we don't have.\n- src/pages/tools/InstagramBioAnalyzer.tsx:550: 'Auto-updated MLS listings' is now 'Active and sold listing showcases'.\n- src/lib/instagram-bio-analyzer/link-strategy.ts:14 and :17: removed the \"doesn't integrate with your MLS or CRM\" line and \"auto-updated from MLS\".\n- supabase/functions/send-bio-analyzer-email/index.ts (email 1, sent live from the tool page), plain text and HTML:\n  - The MLS sync bullet now describes listing showcases.\n  - The checklist told the reader to \"Update your link to ${siteUrl}/${firstName.toLowerCase()}\". That is somebody else's profile, or no profile at all. It now points them to a lead-capture page they can create at /auth/register.\n  - \"Agents who implement within 24 hours see results within the first week\" was an outcome nobody measured. It is replaced with a suggestion to compare their own profile visits and link taps a week or two later.\n- src/components/landing/AgentTestimonials.tsx:51: 'CRM Built-In' is now 'One Lead Inbox'.\n- Deleted src/lib/instagram-bio-analyzer/email-templates.ts. Grep shows nothing imports it. Besides the CRM promise it claimed a mortgage calculator, property search integration and a home valuation calculator.\n- src/marketing-claims.test.ts\n  - Added two FEATURE_RULES with a US-398 comment. The CRM rule uses a lookbehind so \"No CRM integration\" and \"no built-in CRM integration\" still pass.\n  - Added 10 fail samples copied verbatim from the removed copy, and 7 allow samples for the honest forms.\n  - I first included bare vendor names (Follow Up Boss, Salesforce) in the CRM rule. That flagged legitimate copy in ZapierIntegrationModal, AddOnWaitlist and ApiKeysPage, so I took the names out.\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx vitest run src/marketing-claims.test.ts src/features-claims.test.ts: 25/25 passed. The new rules first failed on ZapierIntegrationModal, AddOnWaitlist and ApiKeysPage because of the vendor names, which I then removed from the rule.\nnpx vitest run src/marketing-claims.test.ts src/features-claims.test.ts src/landing-claims.test.ts src/routes.test.ts src/lib/instagram-bio-analyzer: 4 files, 33 tests passed.\nThe pre-commit hook (lint-staged: eslint --fix, prettier --write) passed.\nNo migration, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the send-bio-analyzer-email edge function (functions.agentbio.net / Coolify). Its email 1 copy changed."
+    },
+    {
+      "id": "US-406",
+      "lane": "marketing",
+      "round": 6,
+      "title": "Free-tool drip emails carry a fabricated testimonial, invented agent counts and fake expiring coupons; the claims scan never reads edge functions",
+      "description": "marketing-claims.test.ts runs its customer/result/rating RULES only over src/, so the edge-function drips were never checked. Running those same rules over supabase/functions finds: send-scheduled-listing-emails/index.ts:463-464, a named testimonial ('AgentBio saves me 8-10 hours per week' by 'Jennifer M., Top 1% Agent, Austin'); send-scheduled-bio-emails/index.ts:212-215 and :229 ('I analyzed data from 2,847 real estate agents', '~7 leads/month' vs '~45 leads/month', both counts US-159 removed from src); :141 and :144, plus send-bio-analyzer-email/index.ts:147 ('73% of agents make'); :180 ('12-15 qualified leads per month'); :198 ('AgentBio shows you exactly which posts convert'); send-scheduled-listing-emails/index.ts:313-331 ('We analyzed 47,000 listings', '23% fewer showings', '31% more inquiries', '2.4x more responses'); and fake urgency offers with coupons BIO20/LISTING20 that 'expire tonight' or 'in 12 hours'. Emails 2-7 are on no cron yet (US-136 territory), but the subjects get written to instagram_bio_email_sequences and the copy is one cron away from going out. Rewrite the copy, then extend scan() to also walk supabase/functions.",
+      "acceptanceCriteria": [
+        "The marketing-claims RULES scan walks supabase/functions as well as src",
+        "No fabricated testimonial, agent count, leads/month figure or unmeasured percentage remains in the send-scheduled-* and send-bio-analyzer-email copy",
+        "Coupon/expiry offers are removed, or tied to a Stripe coupon that actually exists and has no fake deadline"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Check whether coupons BIO20 and LISTING20 exist in Stripe and whether register reads ?coupon=. If they don't, the offers are false. (follow-up from US-398)"
+    },
+    {
+      "id": "US-399",
+      "lane": "seo",
+      "round": 6,
+      "title": "Blog index and category cards never said who wrote an article",
+      "description": "Closes US-299. Since US-181 the article page has shown a real byline, but the /blog and /blog/category/* cards showed no author at all. Each card now names its author. The names come from one batched profiles lookup per list (id=in.(...), published profiles only, only the columns anon can read). If an author does not resolve, or the name is a role such as \"Admin\", the card shows no byline. If the lookup fails, the list still renders. The prerender intercept now answers the batched in.() request too, so the prerendered list pages show the same bylines as the live ones.",
+      "acceptanceCriteria": [
+        "Blog.tsx and BlogCategory.tsx cards show the resolved author name, and show nothing when the author is unresolved or role-named",
+        "One batched profiles request per list (in('id', ids) + is_published=true), not one request per card, and none when no article has an author_id",
+        "A failed author lookup leaves the article list intact",
+        "The prerender intercept answers both id=eq. and id=in.() author lookups and lets every other profiles query fall through",
+        "tsc passes; the new and related vitest suites pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-299, an open seo-lane story from US-271. It is a visible E-E-A-T gap: the article page has had an author since US-181, but the list cards had none. Evidence before the change: the card bodies in src/pages/Blog.tsx (CardHeader/CardFooter around old lines 225-255) and src/pages/BlogCategory.tsx (old lines 530-565) never read author_id.\n\nChanges:\n- src/lib/articleAuthor.ts: added articleAuthorIds(), which returns the distinct author ids sorted so the query key is stable, and resolveArticleAuthors(), which maps rows to bylines by id using the existing resolveArticleAuthor and so keeps the generic-name guard.\n- src/hooks/useArticleAuthors.ts (new): one useQuery doing profiles.select(ARTICLE_AUTHOR_COLUMNS).in('id', ids).eq('is_published', true). It is disabled when there are no ids. On error it calls logger.debug and returns no rows.\n- src/components/blog/ArticleCardByline.tsx (new): renders \"By {name}\" as plain text. On /blog the whole card is already a Link, so a nested link would be invalid HTML. The article page keeps the linked byline and the Person schema.\n- Blog.tsx and BlogCategory.tsx: call the hook once per list and render the byline under the excerpt. In BlogCategory the hook is called before the early return.\n- scripts/lib/articles.mts: added answerAuthorLookup(), a pure matcher for the eq. and in.() shapes (including PostgREST-quoted values). It returns null for anything else so the request falls through.\n- scripts/prerender.mts:389: interceptArticleAuthors now uses answerAuthorLookup. Without that, the prerendered list pages would send the batch to the build's VITE_SUPABASE_URL and ship with no bylines.\n\nTests: src/pages/BlogCards.test.tsx (new) renders both real pages against a mocked client. It checks:\n- bylines appear on the right cards, and a role-named author gets none\n- the request is exactly one profiles call with the right select, in and eq filters\n- the list still renders when the lookup fails\n- no profiles request is made when no article has an author\n\nUnit tests were added for the two lib helpers and for answerAuthorLookup.\n\nVERIFIED: npx tsc --noEmit: exit 0, no output. npx tsc --noEmit -p tsconfig.node.json: exit 0. npx vitest run src/lib/articleAuthor.test.ts scripts/lib/articles-authors.test.ts src/pages/BlogCards.test.tsx src/pages/BlogArticle.test.tsx: 4 files, 46 tests passed. npx vitest run src/config scripts src/marketing-claims.test.ts src/lib src/pages: 102 files, 1045 tests passed. The pre-commit eslint and prettier run reformatted the staged files; after that commit, the three directly affected suites passed again (38 tests). No migration was added, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages (the frontend build runs the prerender) so the bylines ship. No migration and no edge function changes."
+    },
+    {
+      "id": "US-407",
+      "lane": "seo",
+      "round": 6,
+      "title": "Optional: show bylines on the landing page BlogSection cards",
+      "description": "src/components/blog (BlogSection) lists articles on marketing surfaces without an author. It can reuse useArticleAuthors + ArticleCardByline.",
+      "acceptanceCriteria": [
+        "Same batched single request",
+        "Prerender intercept already covers the in.() shape"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Not in US-299's acceptance criteria; low priority. (follow-up from US-399)"
+    },
+    {
+      "id": "US-400",
+      "lane": "mobile",
+      "round": 6,
+      "title": "One failed app-shell fetch during a service worker update no longer costs the installed app its offline fallback (US-390)",
+      "description": "This closes open story US-390. public/sw.js used to precache the app shell with cache.addAll(APP_SHELL), which saves all four files or none. If one fetch failed on a flaky phone connection, the new precache stayed empty and the error was swallowed. Activate then deleted the previous precache, which was still working. After that, opening a never-visited route offline in the installed app showed a plain-text 503 until the next deploy. Now each shell file is fetched and saved on its own. Before activate deletes an old precache, it copies forward any shell file the new install could not fetch.",
+      "acceptanceCriteria": [
+        "one failing APP_SHELL fetch does not empty the precache (the other shell files are still stored)",
+        "a shell file the server answers with a non-OK status is not stored",
+        "the old precache's index.html/offline.html survive in the new precache when the new install could not fetch them; files the new install did fetch are never replaced by old copies",
+        "an install with no network at all still leaves a working offline fallback for never-visited routes",
+        "with several old precaches, the newest one supplies a missing file",
+        "src/sw.test.ts covers all of the above"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Changes in public/sw.js:\n- New precacheAppShell(cache) replaces cache.addAll(APP_SHELL) in the install handler. It fetches each APP_SHELL path, stores it only if response.ok, and ignores a failure.\n- New carryShellForward(oldCacheName): for each APP_SHELL path missing from the current PRECACHE, it copies the old precache's copy across.\n- The activate handler now handles stale caches one at a time, newest first (caches.keys() returns them in creation order). For an old precache it runs carryShellForward, then the existing adoptPrecachedAssets, then deletes it. Because adoptPrecachedAssets moves the old build's /assets entry chunks into RUNTIME in the same step, a carried-forward old index.html still loads offline.\n- Skipping the waiting state on install and the never-cache rules are unchanged.\n\nChanges in src/sw.test.ts:\n- The fake Cache no longer has addAll, so the old code path cannot pass by accident.\n- The fake fetch now resolves relative URLs against the worker origin, as a real worker does.\n- The `shell` override now changes only the body of a successful network response.\n- One existing assertion changed from 'shell /index.html' to 'page /index.html', because the shell is now fetched through the network fake.\n- New describe block 'installing the app shell file by file (US-400)' with 5 tests.\n\nAgainst the old sw.js, all 5 new tests fail, plus 5 existing tests that relied on the fake's addAll (10 failures); against the new sw.js all 30 tests pass.\n\nVERIFIED: npx tsc --noEmit -> exit 0.\nnpx vitest run src/sw.test.ts src/lib/sw-cleanup.test.ts src/lib/register-sw.test.ts -> 3 files, 42 tests passed.\nsrc/sw.test.ts alone: 30 passed, including after the lint-staged eslint/prettier run on commit.\nRegression check: with the old public/sw.js restored temporarily, src/sw.test.ts had 10 failed / 20 passed (the 5 new tests plus 5 that depended on the removed fake addAll), confirming the new tests exercise the fix.\nNo migration was added, so verify:migrations was not needed.\n\nREVIEW: approve"
     }
   ]
 }
