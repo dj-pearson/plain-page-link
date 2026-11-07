@@ -5,23 +5,14 @@
  * profile_shows_branding (20260923000002), which reads the agent's plan the
  * same way every other limit does. Until it answers the footer stays hidden,
  * so a paying agent's page never flashes the branding they paid to remove.
+ *
+ * The public profile query starts this same read alongside its own (US-307),
+ * so on a profile page it is normally already answered when this mounts.
  */
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { profileShowsBrandingQueryOptions } from '@/lib/publicProfileSideQueries';
 
 export function useProfileShowsBranding(agentId: string | null | undefined): boolean {
-  const { data } = useQuery({
-    queryKey: ['profile-shows-branding', agentId],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('profile_shows_branding', {
-        _user_id: agentId as string,
-      });
-      // On error, show it: the free plan's answer is the safe default.
-      if (error) return true;
-      return data !== false;
-    },
-    enabled: !!agentId,
-    staleTime: 10 * 60 * 1000,
-  });
+  const { data } = useQuery(profileShowsBrandingQueryOptions(agentId));
   return data === true;
 }
