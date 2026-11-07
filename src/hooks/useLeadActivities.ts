@@ -108,8 +108,28 @@ interface LogMeetingParams {
   notes?: string;
 }
 
+/** Activity types that log_lead_activity treats as contact (sets leads.contacted_at). */
+const CONTACT_ACTIVITY_TYPES = new Set<string>(['call', 'email', 'sms', 'meeting']);
+
 export function useLeadActivities(leadId?: string) {
   const queryClient = useQueryClient();
+
+  /**
+   * Refreshes the timeline of the lead a write was FOR, which is not always
+   * the lead this hook instance was opened with (US-392).
+   *
+   * useLeadContactAction calls useLeadActivities(undefined), because it serves
+   * both the Leads list and the detail modal. Its call/email/text logs used to
+   * invalidate ['lead-activities', undefined], so tapping Call or sending a
+   * quick response from an open lead never showed up on that lead's timeline,
+   * and the list card's last-activity line went stale too.
+   */
+  const invalidateTimeline = (targetLeadId: string | undefined) => {
+    const id = targetLeadId ?? leadId;
+    queryClient.invalidateQueries({ queryKey: ['lead-activities', id] });
+    queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', id] });
+    queryClient.invalidateQueries({ queryKey: ['lead-activity-summaries'] });
+  };
 
   // Fetch activities for a specific lead
   const activitiesQuery = useQuery({
@@ -162,9 +182,12 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
+      // sms (and call/email/meeting) set contacted_at server-side.
+      if (CONTACT_ACTIVITY_TYPES.has(params.activityType)) {
+        queryClient.invalidateQueries({ queryKey: ['leads'] });
+      }
     },
     onError: (error) => {
       logger.error('Failed to log activity', error as Error);
@@ -186,9 +209,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       toast.success('Note added');
     },
     onError: (error) => {
@@ -210,9 +232,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update last_contacted_at
       toast.success('Email logged');
     },
@@ -235,9 +256,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update last_contacted_at
       toast.success('Call logged');
     },
@@ -263,9 +283,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       queryClient.invalidateQueries({ queryKey: ['leads'] }); // Update contacted_at
       toast.success('Meeting logged');
     },
@@ -306,9 +325,8 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+    onSuccess: (_data, params) => {
+      invalidateTimeline(params.leadId);
       queryClient.invalidateQueries({ queryKey: ['lead-tasks'] });
       toast.success('Follow-up added');
     },
@@ -329,7 +347,7 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
+      invalidateTimeline(leadId);
       queryClient.invalidateQueries({ queryKey: ['lead-tasks'] });
       toast.success('Follow-up completed');
     },
@@ -347,8 +365,7 @@ export function useLeadActivities(leadId?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', leadId] });
-      queryClient.invalidateQueries({ queryKey: ['lead-activity-summary', leadId] });
+      invalidateTimeline(leadId);
       toast.success('Activity deleted');
     },
     onError: (error) => {
