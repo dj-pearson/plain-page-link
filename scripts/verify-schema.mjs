@@ -1895,9 +1895,9 @@ const DEFINER_CALLABLE = new Map([
   ['get_own_profile', { why: 'returns the row WHERE id = auth.uid() only (US-235)' }],
   ['get_user_sessions', { why: 'assert_caller_is' }],
   ['get_connected_search_platforms', { why: 'assert_caller_is' }],
-  ['log_lead_activity', { why: 'checks lead ownership against auth.uid()' }],
-  ['log_lead_call', { why: 'checks lead ownership against auth.uid()' }],
-  ['log_lead_email', { why: 'checks lead ownership against auth.uid()' }],
+  ['log_lead_activity', { why: 'checks the caller owns or is assigned the lead (auth.uid())' }],
+  ['log_lead_call', { why: 'checks the caller owns or is assigned the lead (auth.uid())' }],
+  ['log_lead_email', { why: 'checks the caller owns or is assigned the lead (auth.uid())' }],
   ['start_workflow_execution', { why: 'assert_caller_is on the workflow owner' }],
   ['get_user_statistics', { why: 'assert_caller_is_admin' }],
   ['log_admin_action', { why: 'assert_caller_is_admin + assert_caller_is' }],
@@ -2757,6 +2757,83 @@ check('an assignee works a lead but cannot take it or hand it away', () => {
   } finally {
     try {
       q(`DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}', '${third}');
+         DELETE FROM public.leads WHERE id = '${lead}';
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}', '${third}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}', '${third}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// US-326 (US-314): the assignee could read and update a routed lead but every
+// note, call, email, follow-up and meeting they recorded was refused, because
+// the log_lead_* RPCs and the lead_activities INSERT policy checked the owner
+// only. The assignee must be able to record work, under their own name; a
+// former assignee and a stranger must not.
+check('an assignee can log calls, emails, notes and follow-ups on a routed lead', () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-000000326a01';
+  const mate = '00000000-dead-beef-0000-000000326a02';
+  const third = '00000000-dead-beef-0000-000000326a03';
+  const lead = '00000000-dead-beef-0000-000000326a04';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  const task = (sub, author) =>
+    `INSERT INTO public.lead_activities (lead_id, user_id, activity_type, title, task_due_date)
+       VALUES ('${lead}', '${author ?? sub}', 'task', 'Call back', now() + interval '1 day');`;
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${owner}', 'log-owner@example.test'), ('${mate}', 'log-mate@example.test'), ('${third}', 'log-third@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.leads (id, user_id, assigned_to, lead_type, name, encrypted_email)
+         VALUES ('${lead}', '${owner}', '${mate}', 'buyer', 'Routed Log Lead', 'enc');`);
+
+    if (refused(() => as(mate, `SELECT public.log_lead_call('${lead}', 'connected', 90, 'Talked budget');`)))
+      out.push('an assignee could not log a call on a lead assigned to them');
+    if (refused(() => as(mate, `SELECT public.log_lead_email('${lead}', 'Hi', 'lead@example.test', 'body');`)))
+      out.push('an assignee could not log an email on a lead assigned to them');
+    if (refused(() => as(mate, `SELECT public.log_lead_activity('${lead}', 'note', 'Prefers texts', 'Note added');`)))
+      out.push('an assignee could not add a note to a lead assigned to them');
+    if (refused(() => as(mate, task(mate))))
+      out.push('an assignee could not add a follow-up to a lead assigned to them');
+
+    const [authors] = q(`SELECT string_agg(DISTINCT user_id::text, ',') FROM public.lead_activities
+                           WHERE lead_id = '${lead}' AND activity_type IN ('call', 'email', 'note', 'task');`);
+    if (authors && authors !== mate) out.push(`the assignee's activity was attributed to ${authors}, not to them`);
+    const [contacted] = q(`SELECT (contacted_at IS NOT NULL)::text FROM public.leads WHERE id = '${lead}';`);
+    if (contacted !== 'true') out.push("an assignee's logged call did not set leads.contacted_at");
+
+    // The assignee cannot write a row in the owner's name.
+    if (!refused(() => as(mate, task(mate, owner))))
+      out.push("an assignee inserted an activity attributed to the lead's owner");
+    // A stranger cannot log anything.
+    if (!refused(() => as(third, `SELECT public.log_lead_call('${lead}', 'connected', 10, 'x');`)))
+      out.push('a user with no claim on the lead logged a call on it');
+    if (!refused(() => as(third, task(third))))
+      out.push('a user with no claim on the lead added a follow-up to it');
+    // The owner still can; and once reassigned, the former assignee cannot.
+    if (refused(() => as(owner, `SELECT public.log_lead_activity('${lead}', 'note', 'Owner note', 'Note added');`)))
+      out.push('the owner could not add a note to their own lead');
+    q(`UPDATE public.leads SET assigned_to = '${third}' WHERE id = '${lead}';`);
+    if (!refused(() => as(mate, `SELECT public.log_lead_call('${lead}', 'connected', 10, 'x');`)))
+      out.push('a former assignee still logged a call on the lead');
+    if (!refused(() => as(mate, task(mate))))
+      out.push('a former assignee still added a follow-up to the lead');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}', '${third}');
          DELETE FROM public.leads WHERE id = '${lead}';
          DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}', '${third}');
          DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}', '${third}');`);
