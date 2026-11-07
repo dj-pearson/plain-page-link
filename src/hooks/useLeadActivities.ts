@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import type { Json } from '@/integrations/supabase/types';
+import type { ActivityType, AgentAuthoredActivityType } from '@/lib/leadActivityTypes';
 
 export interface LeadActivity {
   id: string;
@@ -45,15 +46,7 @@ export interface CreateTaskParams {
   notes?: string;
 }
 
-export type ActivityType =
-  | 'note'
-  | 'email'
-  | 'call'
-  | 'meeting'
-  | 'status_change'
-  | 'task'
-  | 'sms'
-  | 'form_submission';
+export type { ActivityType, AgentAuthoredActivityType } from '@/lib/leadActivityTypes';
 
 /**
  * 'initiated' covers the case the UI can actually observe: the agent tapped a
@@ -83,7 +76,11 @@ export interface LeadActivitySummary {
 
 interface LogActivityParams {
   leadId: string;
-  activityType: ActivityType;
+  /**
+   * log_lead_activity refuses status_change and form_submission (US-349):
+   * those rows are written only by the lead triggers.
+   */
+  activityType: AgentAuthoredActivityType;
   content?: string;
   title?: string;
   metadata?: Record<string, unknown>;

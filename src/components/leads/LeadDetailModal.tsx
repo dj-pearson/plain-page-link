@@ -83,6 +83,7 @@ import { AddLeadToClientsButton } from '@/components/leads/AddLeadToClientsButto
 import { LockedLeadDetails } from '@/components/leads/LockedLeadDetails';
 import { LeadListingCard } from '@/components/leads/LeadListingCard';
 import { describeLeadAnswers } from '@/lib/leadFormSchema';
+import { isAgentAuthoredActivityType } from '@/lib/leadActivityTypes';
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -110,17 +111,14 @@ const ACTIVITY_ICONS: Record<string, typeof StickyNote> = {
 
 /**
  * Timeline rows the agent wrote, and so may remove. status_change and
- * form_submission are the system's record of what happened to the lead; the
- * RLS policy would let the lead owner delete those too (they carry the
- * owner's user_id), so the UI is what keeps the audit trail intact.
+ * form_submission are the system's record of what happened to the lead. This
+ * mirrors the lead_activities DELETE policy (author only, agent-authored types
+ * only, migration 20261107000349), so the button never offers a delete the
+ * database would refuse.
  */
-const AGENT_AUTHORED_ACTIVITY_TYPES = new Set(['note', 'call', 'email', 'sms', 'meeting', 'task']);
-
 export function canDeleteActivity(a: LeadActivity, currentUserId: string | null): boolean {
   return (
-    !!currentUserId &&
-    a.user_id === currentUserId &&
-    AGENT_AUTHORED_ACTIVITY_TYPES.has(a.activity_type)
+    !!currentUserId && a.user_id === currentUserId && isAgentAuthoredActivityType(a.activity_type)
   );
 }
 

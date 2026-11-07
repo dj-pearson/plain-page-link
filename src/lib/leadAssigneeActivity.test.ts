@@ -70,8 +70,12 @@ describe('the US-326 migration', () => {
   });
 
   it('is the latest definition of the three RPCs', () => {
+    // US-349 redefines log_lead_activity to add the activity-type guard and
+    // keeps this migration's owner-or-assignee rule; leadTimelineIntegrity.test.ts
+    // holds it to that.
+    const US_349 = '20261107000349_lead_timeline_system_rows_tamper_proof.sql';
     const later = readdirSync(MIGRATIONS)
-      .filter((f) => f.endsWith('.sql') && f > FILE)
+      .filter((f) => f.endsWith('.sql') && f > FILE && f !== US_349)
       .filter((f) =>
         /FUNCTION public\.log_lead_(activity|call|email)\(/.test(
           readFileSync(join(MIGRATIONS, f), 'utf8')
