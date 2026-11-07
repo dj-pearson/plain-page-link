@@ -191,6 +191,17 @@ export const GENERIC_AUTHOR_NAMES = [
   /^(guest|anonymous|unknown)( author)?$/i,
 ];
 
+/** Images that are social banners, which no logo field may name. */
+const SOCIAL_BANNERS = new Set(['/Cover.png', '/Cover.webp']);
+
+function pathOfAsset(url) {
+  try {
+    return new URL(url, 'https://agentbio.net').pathname;
+  } catch {
+    return url;
+  }
+}
+
 function knownSizeFor(url) {
   if (!url || typeof url !== 'string') return null;
   try {
@@ -221,6 +232,7 @@ export function auditStructuredData(route, html) {
     .replace(/\s+/g, ' ');
 
   let breadcrumbLists = 0;
+  const nodeIds = [];
 
   for (const block of blocks) {
     walkJsonLd(block, (node) => {
@@ -286,6 +298,24 @@ export function auditStructuredData(route, html) {
           problems.push(`${type} declares one image dimension without the other`);
         }
       }
+
+      // A logo that is not a logo (US-346, US-356). The BlogPosting publisher
+      // gave /Cover.png — the 1536x1024 social banner — as AgentBio's logo,
+      // while the Organization node gave /logo.png. Google reads
+      // publisher.logo as the publisher's logo; the social image never is one.
+      if (node.logo) {
+        const logoUrl = typeof node.logo === 'string' ? node.logo : node.logo && node.logo.url;
+        if (typeof logoUrl === 'string' && SOCIAL_BANNERS.has(pathOfAsset(logoUrl))) {
+          problems.push(
+            `${type} gives the social banner ${logoUrl} as its logo; use the organisation logo`
+          );
+        }
+      }
+
+      // Entity ids (the ones with a #fragment), collected for the spelling
+      // check after the walk. Page URLs used as ids are left out: a breadcrumb
+      // rung naming `https://agentbio.net` is a link, not a node declaration.
+      if (typeof node['@id'] === 'string' && node['@id'].includes('#')) nodeIds.push(node['@id']);
 
       // A BreadcrumbList that describes a hierarchy the site does not have
       // (US-167/US-168). Three tool pages asserted a "Free Tools" rung
@@ -392,6 +422,35 @@ export function auditStructuredData(route, html) {
         }
       }
     });
+  }
+
+  // One entity, one @id spelling (US-356). JSON-LD compares node ids as
+  // strings, so `https://agentbio.net#organization` and
+  // `https://agentbio.net/#organization` are two different nodes to a
+  // consumer even though they are the same URL. PageSEO declared the
+  // Organization and WebSite under the first spelling and pointed publishers
+  // at it; four other components used the second. A reference that does not
+  // match its node's id byte for byte resolves to nothing.
+  {
+    const spellings = new Map();
+    for (const id of nodeIds) {
+      let key = id;
+      try {
+        key = new URL(id).href;
+      } catch {
+        // A relative or opaque id is compared as written.
+      }
+      if (!spellings.has(key)) spellings.set(key, new Set());
+      spellings.get(key).add(id);
+    }
+    for (const variants of spellings.values()) {
+      if (variants.size > 1) {
+        problems.push(
+          `one node is named by ${variants.size} different @id spellings ` +
+            `(${[...variants].join(', ')}); a reference only resolves to an exact match`
+        );
+      }
+    }
   }
 
   // og:image:width / :height are read by every unfurl to reserve layout before
