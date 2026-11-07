@@ -237,10 +237,24 @@ describe('marketing claims', () => {
  */
 describe('feature claims', () => {
   const FEATURE_RULES: { rule: string; pattern: RegExp }[] = [
-    { rule: 'a free trial that checkout does not offer', pattern: /free\s+trial|\b14[- ]day\s+(free\s+)?trial|free\s+for\s+14\s+days/i },
-    { rule: 'MLS integration, which does not exist', pattern: /\bMLS\s+integration\b/i },
-    { rule: 'predictive analytics or scoring, which does not exist', pattern: /\bpredictive\s+(lead\s+scoring|analytics)\b/i },
-    { rule: 'property matching or market intelligence, which do not exist', pattern: /\b(smart\s+)?property\s+matching\b|\bmarket\s+intelligence\b/i },
+    {
+      rule: 'a free trial that checkout does not offer',
+      pattern: /free\s+trial|\b14[- ]day\s+(free\s+)?trial|free\s+for\s+14\s+days/i,
+    },
+    // The second form is US-311: every /for/{city} FAQ said AgentBio
+    // "integrates with major MLS and IDX providers", which the first missed.
+    {
+      rule: 'MLS integration, which does not exist',
+      pattern: /\bMLS\s+integration\b|\bintegrates?\s+with\s+(major\s+|popular\s+)?(MLS|IDX)\b/i,
+    },
+    {
+      rule: 'predictive analytics or scoring, which does not exist',
+      pattern: /\bpredictive\s+(lead\s+scoring|analytics)\b/i,
+    },
+    {
+      rule: 'property matching or market intelligence, which do not exist',
+      pattern: /\b(smart\s+)?property\s+matching\b|\bmarket\s+intelligence\b/i,
+    },
   ];
   const ROOTS = [SRC, join(process.cwd(), 'supabase', 'functions')];
   const EXEMPT = ['pages/legal/', 'pages/BlogCategory.tsx', 'marketing-claims.test.ts'];
@@ -249,14 +263,18 @@ describe('feature claims', () => {
     const findings: string[] = [];
     for (const root of ROOTS) {
       for (const file of walk(root)) {
-        const rel = file.slice(process.cwd().length + 1).split('\\').join('/');
+        const rel = file
+          .slice(process.cwd().length + 1)
+          .split('\\')
+          .join('/');
         if (EXEMPT.some((e) => rel.includes(e))) continue;
         const lines = readFileSync(file, 'utf8').split('\n');
         const isComment = commentMask(lines);
         lines.forEach((line, i) => {
           if (isComment[i]) return;
           for (const { rule, pattern } of FEATURE_RULES) {
-            if (pattern.test(line)) findings.push(`${rel}:${i + 1}  ${rule}\n      ${line.trim().slice(0, 90)}`);
+            if (pattern.test(line))
+              findings.push(`${rel}:${i + 1}  ${rule}\n      ${line.trim().slice(0, 90)}`);
           }
         });
       }
@@ -269,10 +287,14 @@ describe('feature claims', () => {
       'Start Your Free 14-Day Trial',
       'Try AgentBio Free for 14 Days',
       '<p className="font-semibold">MLS Integration</p>',
+      'AgentBio integrates with major MLS and IDX providers used in Denver.',
       'with predictive lead scoring and smart property matching',
       'accelerates deals with market intelligence',
     ]) {
-      expect(FEATURE_RULES.some(({ pattern }) => pattern.test(sample)), sample).toBe(true);
+      expect(
+        FEATURE_RULES.some(({ pattern }) => pattern.test(sample)),
+        sample
+      ).toBe(true);
     }
   });
 });
