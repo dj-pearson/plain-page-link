@@ -168,3 +168,21 @@ describe('earlier platforms', () => {
     expect(existsSync(join(ROOT, 'src/components/profile/LinkStackBlocks.tsx'))).toBe(false);
   });
 });
+
+describe('build config is type-checked (US-365)', () => {
+  it('CI runs tsc over tsconfig.node.json, which covers vite.config.ts', () => {
+    const ci = readFileSync(join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toMatch(/npx tsc --noEmit -p tsconfig\.node\.json/);
+    const nodeConfig = JSON.parse(readFileSync(join(ROOT, 'tsconfig.node.json'), 'utf8'));
+    expect(nodeConfig.include).toContain('vite.config.ts');
+    expect(nodeConfig.compilerOptions.strict).toBe(true);
+  });
+
+  it('the app project does not reference it as a composite project', () => {
+    // A composite reference makes the root tsc demand built .d.ts files for
+    // the src/config modules both projects read (TS6305).
+    // tsconfig.json carries comments, so it is read as text rather than JSON.
+    const root = readFileSync(join(ROOT, 'tsconfig.json'), 'utf8');
+    expect(root).not.toMatch(/"references"/);
+  });
+});
