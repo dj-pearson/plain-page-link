@@ -13,7 +13,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { HelmetProvider, type HelmetServerState } from 'react-helmet-async';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
+import PrivacyPolicy from '@/pages/legal/PrivacyPolicy';
 import { ArticleSEO } from '@/components/blog/ArticleSEO';
 import { PageSEO } from '@/components/seo/PageSEO';
 import { generateEnhancedOrganizationSchema } from '@/lib/seo';
@@ -125,5 +127,45 @@ describe('the source', () => {
         /(\}|\.net|\.com)#(organization|website)\b/.test(readFileSync(file, 'utf8'))
       );
     expect(offenders).toEqual([]);
+  });
+
+  it('builds every Organization/WebSite id through site-entities, never by hand (US-380)', () => {
+    // A hand-written `${x}/#website` is right until the spelling or the origin
+    // it is built from drifts. FullProfilePage built it from window.location,
+    // so on a preview host its WebPage pointed at a WebSite no page declares.
+    const offenders = files(join(process.cwd(), 'src'))
+      .filter((file) => !file.endsWith(join('config', 'site-entities.ts')))
+      .filter((file) => /\/#(organization|website)\b/.test(readFileSync(file, 'utf8')));
+    expect(offenders).toEqual([]);
+  });
+
+  it('does not hard-code the production host in the legal pages or the blog category schema', () => {
+    const targets = [
+      ...files(join(process.cwd(), 'src', 'pages', 'legal')),
+      join(process.cwd(), 'src', 'pages', 'BlogCategory.tsx'),
+    ];
+    // Contact addresses and prose are fine; a quoted URL is a canonical, an
+    // @id or a schema url that ignores VITE_APP_URL.
+    const offenders = targets.filter((file) =>
+      /["'`]https:\/\/agentbio\.net[/"'`]/.test(readFileSync(file, 'utf8'))
+    );
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe('a legal page', () => {
+  const [webPage] = jsonLdOf(
+    <MemoryRouter>
+      <PrivacyPolicy />
+    </MemoryRouter>
+  ).filter((node) => node['@type'] === 'WebPage');
+
+  it('is part of the WebSite under the shared id', () => {
+    expect((webPage.isPartOf as Node)['@id']).toBe(websiteId(origin));
+  });
+
+  it('names itself under the configured base URL', () => {
+    expect(webPage.url).toBe(`${origin}/privacy`);
+    expect(webPage['@id']).toBe(`${origin}/privacy#webpage`);
   });
 });

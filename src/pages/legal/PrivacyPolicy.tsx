@@ -1,6 +1,8 @@
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 
 export default function PrivacyPolicy() {
   const lastUpdated = new Date().toLocaleDateString();
@@ -8,13 +10,13 @@ export default function PrivacyPolicy() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    '@id': 'https://agentbio.net/privacy#webpage',
-    url: 'https://agentbio.net/privacy',
+    '@id': `${getCanonicalUrl('/privacy')}#webpage`,
+    url: getCanonicalUrl('/privacy'),
     name: 'Privacy Policy - AgentBio',
     description:
       'AgentBio Privacy Policy detailing how we collect, use, and protect your personal information. Learn about your rights under CCPA, data security, and privacy practices.',
     isPartOf: {
-      '@id': 'https://agentbio.net/#website',
+      '@id': websiteId(getBaseUrl()),
     },
     about: {
       '@type': 'Thing',
@@ -40,7 +42,7 @@ export default function PrivacyPolicy() {
           'real estate privacy',
           'GDPR compliance',
         ]}
-        canonicalUrl="https://agentbio.net/privacy"
+        canonicalUrl={getCanonicalUrl('/privacy')}
         schema={schema}
       />
       <PublicHeader />

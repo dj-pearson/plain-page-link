@@ -1,6 +1,8 @@
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { SkipNavContent } from '@/components/ui/skip-nav';
 import { Button } from '@/components/ui/button';
 import { openCookiePreferences } from '@/lib/cookie-consent';
@@ -21,12 +23,12 @@ export default function PrivacyChoices() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    '@id': 'https://agentbio.net/privacy-choices#webpage',
-    url: 'https://agentbio.net/privacy-choices',
+    '@id': `${getCanonicalUrl('/privacy-choices')}#webpage`,
+    url: getCanonicalUrl('/privacy-choices'),
     name: 'Your Privacy Choices - AgentBio',
     description:
       'Exercise your privacy choices at AgentBio: opt out of the sale or sharing of personal information, manage cookie consent, and access your data rights.',
-    isPartOf: { '@id': 'https://agentbio.net/#website' },
+    isPartOf: { '@id': websiteId(getBaseUrl()) },
     datePublished: '2026-07-23',
     dateModified: lastUpdated,
     inLanguage: 'en-US',
@@ -45,7 +47,7 @@ export default function PrivacyChoices() {
           'CPRA',
           'privacy rights',
         ]}
-        canonicalUrl="https://agentbio.net/privacy-choices"
+        canonicalUrl={getCanonicalUrl('/privacy-choices')}
         schema={schema}
       />
       <PublicHeader />

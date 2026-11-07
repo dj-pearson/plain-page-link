@@ -40,6 +40,8 @@ import { ThreeDBackground } from '@/components/theme/ThreeDBackgroundLazy';
 import { GradientMesh } from '@/components/theme/GradientMeshLazy';
 import { FloatingGeometry } from '@/components/theme/FloatingGeometryLazy';
 import { getSafeOrigin } from '@/lib/utils';
+import { getBaseUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { needsCanonicalRedirect, normalizeUsername } from '@/lib/username';
 import { LazyLoadErrorBoundary } from '@/components/LazyLoadErrorBoundary';
 import { LazyModal } from '@/components/profile/LazyModal';
@@ -313,8 +315,12 @@ export default function FullProfilePage() {
         url: currentUrl,
         name: seoTitle,
         description: seoDescription,
+        // The WebSite is agentbio.net itself, so its id comes from the
+        // configured base URL, never the host that served this page: on a
+        // preview host window.location named a WebSite node no other page
+        // declares (US-380).
         isPartOf: {
-          '@id': `${origin}/#website`,
+          '@id': websiteId(getBaseUrl()),
         },
         about: {
           '@id': `${currentUrl}#agent`,

@@ -17,6 +17,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Search, Calendar, Eye, ArrowLeft } from 'lucide-react';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
@@ -400,12 +402,12 @@ export default function BlogCategory() {
     '@graph': [
       {
         '@type': 'CollectionPage',
-        '@id': `https://agentbio.net/blog/category/${category}#webpage`,
-        url: `https://agentbio.net/blog/category/${category}`,
+        '@id': `${getCanonicalUrl(`/blog/category/${category}`)}#webpage`,
+        url: getCanonicalUrl(`/blog/category/${category}`),
         name: content.title,
         description: content.description,
         isPartOf: {
-          '@id': 'https://agentbio.net/#website',
+          '@id': websiteId(getBaseUrl()),
         },
         about: {
           '@type': 'Thing',
@@ -419,19 +421,19 @@ export default function BlogCategory() {
             '@type': 'ListItem',
             position: 1,
             name: 'Home',
-            item: 'https://agentbio.net',
+            item: getBaseUrl(),
           },
           {
             '@type': 'ListItem',
             position: 2,
             name: 'Blog',
-            item: 'https://agentbio.net/blog',
+            item: getCanonicalUrl('/blog'),
           },
           {
             '@type': 'ListItem',
             position: 3,
             name: content.title,
-            item: `https://agentbio.net/blog/category/${category}`,
+            item: getCanonicalUrl(`/blog/category/${category}`),
           },
         ],
       },
@@ -455,7 +457,7 @@ export default function BlogCategory() {
         title={`${content.title} | AgentBio Blog`}
         description={content.metaDescription}
         keywords={content.keywords}
-        canonicalUrl={`https://agentbio.net/blog/category/${category}`}
+        canonicalUrl={getCanonicalUrl(`/blog/category/${category}`)}
         schema={schema}
       />
 

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Breadcrumb } from '@/components/seo/Breadcrumb';
 import { SEO_CONFIG, getBaseUrl, getOgImageUrl } from '@/config/seo.config';
+import { organizationId, websiteId } from '@/config/site-entities';
 import { getFeaturedLocations, type LocationData } from '@/data/locations';
 import { buildLocationFaqs } from './locationFaq';
 
@@ -52,7 +53,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         url: canonicalUrl,
         name: pageTitle,
         description: pageDescription,
-        isPartOf: { '@id': `${baseUrl}/#website` },
+        isPartOf: { '@id': websiteId(baseUrl) },
         about: { '@id': `${canonicalUrl}#service` },
         breadcrumb: { '@id': `${canonicalUrl}#breadcrumb` },
         inLanguage: 'en-US',
@@ -72,7 +73,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         publisher: {
           '@type': 'Organization',
           name: SEO_CONFIG.organization.name,
-          '@id': `${baseUrl}/#organization`,
+          '@id': organizationId(baseUrl),
         },
       },
       // BreadcrumbList schema
@@ -110,7 +111,7 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
         provider: {
           '@type': 'Organization',
           name: SEO_CONFIG.organization.name,
-          '@id': `${baseUrl}/#organization`,
+          '@id': organizationId(baseUrl),
         },
         areaServed: {
           '@type': 'City',

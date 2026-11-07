@@ -1,6 +1,8 @@
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { SkipNavContent } from '@/components/ui/skip-nav';
 
 export default function AccessibilityStatement() {
@@ -9,13 +11,13 @@ export default function AccessibilityStatement() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    '@id': 'https://agentbio.net/accessibility#webpage',
-    url: 'https://agentbio.net/accessibility',
+    '@id': `${getCanonicalUrl('/accessibility')}#webpage`,
+    url: getCanonicalUrl('/accessibility'),
     name: 'Accessibility Statement - AgentBio',
     description:
       "AgentBio's commitment to digital accessibility. Learn about our WCAG 2.1 AA conformance, accessibility features, and how to report accessibility issues.",
     isPartOf: {
-      '@id': 'https://agentbio.net/#website',
+      '@id': websiteId(getBaseUrl()),
     },
     about: {
       '@type': 'Thing',
@@ -40,7 +42,7 @@ export default function AccessibilityStatement() {
           'keyboard navigation',
           'accessible real estate platform',
         ]}
-        canonicalUrl="https://agentbio.net/accessibility"
+        canonicalUrl={getCanonicalUrl('/accessibility')}
         schema={schema}
       />
       <PublicHeader />

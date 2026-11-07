@@ -1,6 +1,8 @@
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SEOHead } from '@/components/SEOHead';
+import { getBaseUrl, getCanonicalUrl } from '@/config/seo.config';
+import { websiteId } from '@/config/site-entities';
 import { SkipNavContent } from '@/components/ui/skip-nav';
 
 export default function CookiePolicy() {
@@ -9,12 +11,12 @@ export default function CookiePolicy() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    '@id': 'https://agentbio.net/cookies#webpage',
-    url: 'https://agentbio.net/cookies',
+    '@id': `${getCanonicalUrl('/cookies')}#webpage`,
+    url: getCanonicalUrl('/cookies'),
     name: 'Cookie Policy - AgentBio',
     description:
       'How AgentBio uses cookies: strictly necessary, analytics, and preference cookies, and how to manage your consent.',
-    isPartOf: { '@id': 'https://agentbio.net/#website' },
+    isPartOf: { '@id': websiteId(getBaseUrl()) },
     datePublished: '2026-05-17',
     dateModified: lastUpdated,
     inLanguage: 'en-US',
@@ -26,7 +28,7 @@ export default function CookiePolicy() {
         title="Cookie Policy - AgentBio"
         description="Learn which cookies AgentBio uses (strictly necessary, analytics, preferences) and how to manage or withdraw your consent at any time."
         keywords={['cookie policy', 'cookies', 'GDPR cookies', 'ePrivacy', 'cookie consent']}
-        canonicalUrl="https://agentbio.net/cookies"
+        canonicalUrl={getCanonicalUrl('/cookies')}
         schema={schema}
       />
       <PublicHeader />
