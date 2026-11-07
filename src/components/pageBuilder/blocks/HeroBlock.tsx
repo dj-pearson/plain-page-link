@@ -6,7 +6,7 @@
 import { HeroBlockConfig } from '@/types/pageBuilder';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { sanitizeUrl } from '@/utils/sanitize';
+import { usableLinkUrl } from '@/lib/blockLinkTarget';
 
 interface HeroBlockProps {
   config: HeroBlockConfig;
@@ -63,10 +63,16 @@ export function HeroBlock({ config, isEditing = false }: HeroBlockProps) {
     }
   };
 
+  // Sanitised, and '' for a placeholder ('#', example.com) that a visitor
+  // would click and go nowhere (US-350, as LinkBlock does since US-327).
+  const safeUrl = usableLinkUrl(config.ctaUrl);
+  const hasCtaText = Boolean(config.ctaText?.trim());
+  // The button is published only when it has both a label and a destination;
+  // the editor shows it either way so the agent can see what they are setting.
+  const showCta = hasCtaText && (isEditing || Boolean(safeUrl));
+
   const handleCtaClick = () => {
-    if (isEditing || !config.ctaUrl) return;
-    const safeUrl = sanitizeUrl(config.ctaUrl);
-    if (!safeUrl) return;
+    if (isEditing || !safeUrl) return;
     if (safeUrl.startsWith('#')) {
       // A same-page anchor ("#contact", the default): scroll, don't open a tab.
       window.location.href = safeUrl;
@@ -120,7 +126,7 @@ export function HeroBlock({ config, isEditing = false }: HeroBlockProps) {
           </p>
         )}
 
-        {config.ctaText && (
+        {showCta && (
           <Button
             onClick={handleCtaClick}
             disabled={isEditing}
@@ -134,6 +140,16 @@ export function HeroBlock({ config, isEditing = false }: HeroBlockProps) {
             {config.ctaText}
             <ArrowRight className="w-5 h-5" />
           </Button>
+        )}
+
+        {isEditing && hasCtaText && !safeUrl && (
+          <p
+            role="note"
+            className="mt-3 rounded-md bg-background/90 px-3 py-2 text-sm text-foreground"
+          >
+            No destination yet, so this button is hidden on your public page. Add a URL in the block
+            settings.
+          </p>
         )}
       </div>
     </div>
