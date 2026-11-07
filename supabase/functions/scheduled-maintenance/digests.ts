@@ -1,21 +1,59 @@
 /**
- * The morning email task (US-230). Called by scheduled-maintenance every hour;
- * sends only in the configured hour (DIGEST_HOUR_UTC, default 13 — morning in
- * the US), once per agent per day (digest_log), and only when buildDigest
- * finds something worth sending.
+ * The morning email task (US-230, reworked in US-331). Called by
+ * scheduled-maintenance every hour; sends once per agent per day (digest_log),
+ * and only when buildDigest finds something worth sending.
  *
  * Preference: profiles.notification_preferences.digest — 'daily' (default),
  * 'weekly' (Mondays only) or 'off'. Monday's edition adds last week's numbers.
+ *
+ * What US-331 fixed:
+ *
+ * - It ran only when the clock read exactly DIGEST_HOUR_UTC. One missed or
+ *   failed hourly run (a GitHub Actions cron is routinely skipped under load)
+ *   meant nobody got that day's email. Now every run from the digest hour to
+ *   DIGEST_CATCHUP_HOURS after it sends to whoever digest_log says has not had
+ *   today's edition, so a missed run is made up by the next one, exactly once.
+ *   The look-back windows are anchored to the scheduled hour, not to when the
+ *   run happened, so a late edition covers the same leads an on-time one would
+ *   have, and tomorrow's does not repeat them.
+ * - It read the first 5,000 profiles (in practice PostgREST's 1,000-row cap)
+ *   and, across ALL agents, the first 5,000 new leads, 5,000 due tasks and
+ *   10,000 key dates. Everyone past those lines silently got a thinner digest
+ *   or none. Profiles are now read in id-ordered pages, and each page's leads,
+ *   tasks and dates are read for that page's agents only, paged to the end.
+ * - A failed weekly count read as zero, a failed claim or contact lookup read
+ *   as "skipped", and a failed release of a claim after a failed send was
+ *   ignored (so that agent got nothing that day and nobody knew). Each is now
+ *   an error in the report, and the task fails so the 207 says so.
+ *
+ * No Deno globals here, so it runs under vitest; the database side is
+ * digest-store.ts.
  */
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
-import { sendEmail } from '../_shared/email.ts';
-import { getAgentContact } from '../_shared/agent-contact.ts';
-import { getSiteUrl } from '../_shared/env.ts';
-import { buildDigest, type DigestKeyDate, type DigestLead, type DigestTask } from '../_shared/digest.ts';
+import {
+  buildDigest,
+  type DigestKeyDate,
+  type DigestLead,
+  type DigestTask,
+  type WeeklyStats,
+} from '../_shared/digest.ts';
+import type { EmailOptions } from '../_shared/email.ts';
 
 export type DigestPreference = 'daily' | 'weekly' | 'off';
+export type DigestKind = 'daily' | 'weekly';
 
-export function digestKindFor(pref: unknown, now: Date): 'daily' | 'weekly' | null {
+export const DEFAULT_DIGEST_HOUR_UTC = 13;
+/** How many hourly runs after the digest hour may still send a missed edition. */
+export const DEFAULT_CATCHUP_HOURS = 6;
+/** Profiles per page; each page's related rows are read for its agents only. */
+export const PROFILE_PAGE_SIZE = 500;
+/** Agent ids per `in (...)` filter, so the request URL stays short. */
+export const ID_CHUNK = 100;
+/** Rows per related-table read; matches PostgREST's default max-rows. */
+export const ROW_PAGE_SIZE = 1000;
+
+const HOUR_MS = 3_600_000;
+
+export function digestKindFor(pref: unknown, now: Date): DigestKind | null {
   const p: DigestPreference = pref === 'weekly' || pref === 'off' ? pref : 'daily';
   if (p === 'off') return null;
   const monday = now.getUTCDay() === 1;
@@ -28,122 +66,254 @@ export function dueCutoffDay(now: Date): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString().slice(0, 10);
 }
 
-function groupBy<T extends { user_id: string }>(rows: T[] | null): Map<string, T[]> {
-  const out = new Map<string, T[]>();
-  for (const row of rows ?? []) out.set(row.user_id, [...(out.get(row.user_id) ?? []), row]);
+export interface DigestSchedule {
+  /** The edition's date, `YYYY-MM-DD` (digest_log.digest_date). */
+  day: string;
+  /** What the edition's windows are measured back from. */
+  anchor: Date;
+}
+
+/**
+ * Which edition, if any, a run at `now` should send. Null outside
+ * [hour, hour + catchUpHours] UTC unless forced. Forced runs before the hour
+ * anchor on `now`, so they never look into the future.
+ */
+export function digestSchedule(
+  now: Date,
+  opts: { hour?: number; catchUpHours?: number; force?: boolean } = {}
+): DigestSchedule | null {
+  const hour = Number.isInteger(opts.hour) && opts.hour! >= 0 && opts.hour! <= 23 ? opts.hour! : DEFAULT_DIGEST_HOUR_UTC;
+  const requested = Number.isInteger(opts.catchUpHours) && opts.catchUpHours! >= 0 ? opts.catchUpHours! : DEFAULT_CATCHUP_HOURS;
+  // Never roll past midnight: tomorrow's edition is a different day.
+  const catchUp = Math.min(requested, 23 - hour);
+  const day = now.toISOString().slice(0, 10);
+  const scheduled = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour));
+  const since = now.getTime() - scheduled.getTime();
+  if (since >= 0 && since < (catchUp + 1) * HOUR_MS) return { day, anchor: scheduled };
+  if (!opts.force) return null;
+  return { day, anchor: since >= 0 ? scheduled : now };
+}
+
+export interface DigestProfile {
+  id: string;
+  full_name: string | null;
+  notification_preferences: unknown;
+}
+
+export type DigestKeyDateRow = DigestKeyDate & { user_id: string };
+
+/** Everything the digest touches. Each method throws on a failed read or write. */
+export interface DigestStore {
+  /** Profiles with id > afterId (all when null), ordered by id. */
+  listProfiles(afterId: string | null, limit: number): Promise<DigestProfile[]>;
+  /** Of these agents, the ones that already have an edition dated `day`. */
+  listClaimed(userIds: string[], day: string): Promise<Set<string>>;
+  /** Leads created in [from, to). Page through with offset. */
+  listNewLeads(userIds: string[], from: string, to: string, offset: number, limit: number): Promise<(DigestLead & { user_id: string })[]>;
+  /** Open follow-up tasks due at or before `dueBy`. */
+  listDueTasks(userIds: string[], dueBy: string, offset: number, limit: number): Promise<(DigestTask & { user_id: string })[]>;
+  listKeyDates(userIds: string[], offset: number, limit: number): Promise<DigestKeyDateRow[]>;
+  weeklyStats(userId: string, from: string, to: string): Promise<WeeklyStats>;
+  /** Null when the agent cannot be read. */
+  getAgent(userId: string): Promise<{ email: string | null; fullName: string | null } | null>;
+  /** Insert into digest_log. 'duplicate' when this edition was already claimed. */
+  claim(userId: string, day: string, kind: DigestKind): Promise<'claimed' | 'duplicate'>;
+  /** Undo a claim after a failed send, so the next run can retry. */
+  release(userId: string, day: string, kind: DigestKind): Promise<void>;
+  sendEmail(mail: EmailOptions): Promise<{ ok: boolean; error?: string }>;
+}
+
+export interface DigestReport {
+  sent: number;
+  alreadySent: number;
+  off: number;
+  nothingToSend: number;
+  noEmail: number;
+  failed: number;
+  profiles: number;
+  errors: string[];
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
 }
 
-export async function runDigests(supabase: SupabaseClient, opts: { force?: boolean; now?: Date } = {}): Promise<string> {
-  const now = opts.now ?? new Date();
-  const hour = Number.parseInt(Deno.env.get('DIGEST_HOUR_UTC') ?? '13', 10);
-  if (!opts.force && now.getUTCHours() !== hour) return `not the digest hour (${hour}:00 UTC)`;
+/** Every row a paged read returns, over every id chunk. */
+async function readAll<T>(ids: string[], read: (ids: string[], offset: number, limit: number) => Promise<T[]>): Promise<T[]> {
+  const out: T[] = [];
+  for (const part of chunk(ids, ID_CHUNK)) {
+    for (let offset = 0; ; offset += ROW_PAGE_SIZE) {
+      const page = await read(part, offset, ROW_PAGE_SIZE);
+      out.push(...page);
+      if (page.length < ROW_PAGE_SIZE) break;
+    }
+  }
+  return out;
+}
 
-  const day = now.toISOString().slice(0, 10);
-  const since24h = new Date(now.getTime() - 24 * 3_600_000).toISOString();
-  const since7d = new Date(now.getTime() - 7 * 24 * 3_600_000).toISOString();
+function groupBy<T extends { user_id: string }>(rows: T[]): Map<string, T[]> {
+  const out = new Map<string, T[]>();
+  for (const row of rows) {
+    const list = out.get(row.user_id);
+    if (list) list.push(row);
+    else out.set(row.user_id, [row]);
+  }
+  return out;
+}
+
+const short = (id: string) => id.slice(0, 8);
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+export async function runDigests(
+  store: DigestStore,
+  opts: { schedule: DigestSchedule; siteUrl: string }
+): Promise<DigestReport> {
+  const { day, anchor } = opts.schedule;
+  const { siteUrl } = opts;
+  const report: DigestReport = {
+    sent: 0,
+    alreadySent: 0,
+    off: 0,
+    nothingToSend: 0,
+    noEmail: 0,
+    failed: 0,
+    profiles: 0,
+    errors: [],
+  };
+
+  const anchorIso = anchor.toISOString();
+  const since24h = new Date(anchor.getTime() - 24 * HOUR_MS).toISOString();
+  const since7d = new Date(anchor.getTime() - 7 * 24 * HOUR_MS).toISOString();
   // Tasks are stored as the end of the agent's local due day (US-240): a task
   // due today in Los Angeles is 06:59Z tomorrow. Noon UTC tomorrow is the end
   // of today in UTC-12, so every US zone's "due today" is in, and no "due
   // tomorrow" west of UTC+12 is.
-  const endOfDay = `${dueCutoffDay(now)}T11:59:59.999Z`;
+  const endOfDay = `${dueCutoffDay(anchor)}T11:59:59.999Z`;
 
-  const { data: profiles, error: profilesError } = await supabase
-    .from('profiles')
-    .select('id, full_name, notification_preferences')
-    .limit(5000);
-  if (profilesError) throw profilesError;
+  let afterId: string | null = null;
+  for (;;) {
+    // A failed profile read cannot be worked around: throw, and the next run
+    // in the catch-up window starts again (digest_log skips who was sent).
+    const profiles = await store.listProfiles(afterId, PROFILE_PAGE_SIZE);
+    if (profiles.length === 0) break;
+    afterId = profiles[profiles.length - 1].id;
+    report.profiles += profiles.length;
 
-  const [leadsRes, tasksRes, datesRes] = await Promise.all([
-    supabase.from('leads').select('id, user_id, name, lead_type').gte('created_at', since24h).limit(5000),
-    supabase
-      .from('lead_activities')
-      .select('lead_id, user_id, title, task_due_date')
-      .eq('activity_type', 'task')
-      .is('task_completed_at', null)
-      .lte('task_due_date', endOfDay)
-      .limit(5000),
-    supabase
-      .from('contact_key_dates')
-      .select('user_id, kind, event_date, year_known, recurs_annually, remind_days_before, person_name, contacts(first_name, last_name)')
-      .limit(10000),
-  ]);
-  for (const r of [leadsRes, tasksRes, datesRes]) if (r.error) throw r.error;
-
-  const leadsBy = groupBy(leadsRes.data as (DigestLead & { user_id: string })[]);
-  const tasksBy = groupBy(tasksRes.data as (DigestTask & { user_id: string })[]);
-  const datesBy = groupBy(
-    ((datesRes.data ?? []) as (DigestKeyDate & { user_id: string; contacts?: { first_name?: string; last_name?: string } | null })[]).map(
-      (d) => ({
-        ...d,
-        contact_name: d.contacts ? [d.contacts.first_name, d.contacts.last_name].filter(Boolean).join(' ') || null : null,
-      })
-    )
-  );
-
-  let sent = 0;
-  let skipped = 0;
-  let failed = 0;
-  const siteUrl = getSiteUrl();
-
-  for (const profile of profiles ?? []) {
-    const prefs = (profile.notification_preferences ?? {}) as { digest?: unknown };
-    const kind = digestKindFor(prefs.digest, now);
-    if (!kind) {
-      skipped++;
-      continue;
+    const wanted: { profile: DigestProfile; kind: DigestKind }[] = [];
+    for (const profile of profiles) {
+      const prefs = (profile.notification_preferences ?? {}) as { digest?: unknown };
+      const kind = digestKindFor(prefs.digest, anchor);
+      if (kind) wanted.push({ profile, kind });
+      else report.off++;
     }
 
-    let weekly;
-    if (kind === 'weekly') {
-      const [views, leads, clicks] = await Promise.all([
-        supabase.from('analytics_views').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).gte('viewed_at', since7d),
-        supabase.from('leads').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).gte('created_at', since7d),
-        supabase
-          .from('analytics_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', profile.id)
-          .eq('event_type', 'link_click')
-          .gte('occurred_at', since7d),
-      ]);
-      weekly = { views: views.count ?? 0, leads: leads.count ?? 0, linkClicks: clicks.count ?? 0 };
+    if (wanted.length > 0) {
+      try {
+        await sendPage(store, wanted, { day, anchor, anchorIso, since24h, since7d, endOfDay, siteUrl }, report);
+      } catch (error) {
+        // One page's failed read must not cost every later page its digest.
+        report.errors.push(`profiles after ${short(wanted[0].profile.id)}: ${message(error)}`);
+        report.failed += wanted.length;
+      }
     }
 
-    const contact = await getAgentContact(supabase, profile.id);
-    if (!contact?.email) {
-      skipped++;
-      continue;
-    }
-    const mail = buildDigest({
-      to: contact.email,
-      agentName: contact.fullName || profile.full_name || 'there',
-      siteUrl,
-      newLeads: leadsBy.get(profile.id) ?? [],
-      dueTasks: tasksBy.get(profile.id) ?? [],
-      keyDates: datesBy.get(profile.id) ?? [],
-      weekly,
-      today: now,
-    });
-    if (!mail) {
-      skipped++;
-      continue;
-    }
-
-    // Claim first; the primary key makes a second run a no-op.
-    const { error: claimError } = await supabase.from('digest_log').insert({ user_id: profile.id, digest_date: day, kind });
-    if (claimError) {
-      if (claimError.code !== '23505') console.error(`[digests] claim failed for ${profile.id}: ${claimError.message}`);
-      skipped++;
-      continue;
-    }
-    const result = await sendEmail(mail);
-    if (result.ok) {
-      sent++;
-    } else {
-      failed++;
-      await supabase.from('digest_log').delete().eq('user_id', profile.id).eq('digest_date', day).eq('kind', kind);
-    }
+    if (profiles.length < PROFILE_PAGE_SIZE) break;
   }
 
-  return `sent ${sent}, skipped ${skipped}, failed ${failed}`;
+  return report;
+}
+
+async function sendPage(
+  store: DigestStore,
+  wanted: { profile: DigestProfile; kind: DigestKind }[],
+  w: { day: string; anchor: Date; anchorIso: string; since24h: string; since7d: string; endOfDay: string; siteUrl: string },
+  report: DigestReport
+): Promise<void> {
+  const ids = wanted.map((x) => x.profile.id);
+
+  const claimed = new Set<string>();
+  for (const part of chunk(ids, ID_CHUNK)) {
+    for (const id of await store.listClaimed(part, w.day)) claimed.add(id);
+  }
+  const pending = wanted.filter((x) => {
+    if (!claimed.has(x.profile.id)) return true;
+    report.alreadySent++;
+    return false;
+  });
+  if (pending.length === 0) return;
+
+  const pendingIds = pending.map((x) => x.profile.id);
+  const [leads, tasks, dates] = await Promise.all([
+    readAll(pendingIds, (part, offset, limit) => store.listNewLeads(part, w.since24h, w.anchorIso, offset, limit)),
+    readAll(pendingIds, (part, offset, limit) => store.listDueTasks(part, w.endOfDay, offset, limit)),
+    readAll(pendingIds, (part, offset, limit) => store.listKeyDates(part, offset, limit)),
+  ]);
+  const leadsBy = groupBy(leads);
+  const tasksBy = groupBy(tasks);
+  const datesBy = groupBy(dates);
+
+  for (const { profile, kind } of pending) {
+    try {
+      const weekly = kind === 'weekly' ? await store.weeklyStats(profile.id, w.since7d, w.anchorIso) : undefined;
+      const content = {
+        siteUrl: w.siteUrl,
+        newLeads: leadsBy.get(profile.id) ?? [],
+        dueTasks: tasksBy.get(profile.id) ?? [],
+        keyDates: datesBy.get(profile.id) ?? [],
+        weekly,
+        today: w.anchor,
+      };
+      // Decide on content before spending two lookups on the agent's address.
+      if (!buildDigest({ ...content, to: 'check@invalid', agentName: 'there' })) {
+        report.nothingToSend++;
+        continue;
+      }
+
+      const agent = await store.getAgent(profile.id);
+      if (!agent) {
+        report.failed++;
+        report.errors.push(`agent ${short(profile.id)} could not be read`);
+        continue;
+      }
+      if (!agent.email) {
+        report.noEmail++;
+        continue;
+      }
+      const mail = buildDigest({ ...content, to: agent.email, agentName: agent.fullName || profile.full_name || 'there' });
+      if (!mail) {
+        report.nothingToSend++;
+        continue;
+      }
+
+      // Claim first; the primary key makes a second run a no-op.
+      if ((await store.claim(profile.id, w.day, kind)) === 'duplicate') {
+        report.alreadySent++;
+        continue;
+      }
+      const result = await store.sendEmail(mail);
+      if (result.ok) {
+        report.sent++;
+        continue;
+      }
+      report.failed++;
+      report.errors.push(`email to agent ${short(profile.id)} failed: ${result.error ?? 'unknown'}`);
+      try {
+        await store.release(profile.id, w.day, kind);
+      } catch (error) {
+        report.errors.push(`agent ${short(profile.id)} will miss today's digest: releasing the claim failed: ${message(error)}`);
+      }
+    } catch (error) {
+      report.failed++;
+      report.errors.push(`agent ${short(profile.id)}: ${message(error)}`);
+    }
+  }
+}
+
+export function summarizeDigestReport(report: DigestReport): string {
+  return (
+    `sent ${report.sent}, already sent ${report.alreadySent}, nothing to send ${report.nothingToSend}, ` +
+    `off ${report.off}, no email ${report.noEmail}, failed ${report.failed} (of ${report.profiles} profiles)`
+  );
 }
