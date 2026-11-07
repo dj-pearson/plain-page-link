@@ -5085,8 +5085,8 @@
         "test"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Finding from round 2."
+      "passes": true,
+      "notes": "Finding from round 2. DONE in round 7 as US-417."
     },
     {
       "id": "US-324",
@@ -5227,8 +5227,8 @@
         "The create prompt appears only for users who belong to no team"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Needs an owner decision (US-284's last criterion) and a check on what RLS lets a member read on teams and team_members. Overlaps the enterprise lane. (follow-up from US-328)"
+      "passes": true,
+      "notes": "Needs an owner decision (US-284's last criterion) and a check on what RLS lets a member read on teams and team_members. Overlaps the enterprise lane. (follow-up from US-328) DONE in round 7 as US-411."
     },
     {
       "id": "US-339",
@@ -5508,8 +5508,8 @@
         "Keyboard and a11y tests still pass, and no interactive elements are nested"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-348)"
+      "passes": true,
+      "notes": " (follow-up from US-348) DONE in round 7 as US-408."
     },
     {
       "id": "US-360",
@@ -5702,8 +5702,8 @@
         "The browser cannot write user_mfa_settings directly (the setup/verify/disable functions use the service role)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-353)"
+      "passes": true,
+      "notes": " (follow-up from US-353) DONE in round 7 as US-413."
     },
     {
       "id": "US-354",
@@ -5900,8 +5900,8 @@
         "ProfileHeader test covers it"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": " (follow-up from US-374)"
+      "passes": true,
+      "notes": " (follow-up from US-374) DONE in round 7 as US-410."
     },
     {
       "id": "US-375",
@@ -6218,7 +6218,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Measure with the closure approach used in US-395 (static import closure minus the entry closure, gzipped). (follow-up from US-395)"
+      "notes": "Measure with the closure approach used in US-395 (static import closure minus the entry closure, gzipped). (follow-up from US-395) Slice done in round 7 as US-412."
     },
     {
       "id": "US-402",
@@ -6280,8 +6280,8 @@
         "A 503 or timeout on the immediate download offers the queued path"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "The 409 'already pending' error from request_gdpr_data_export should show as a friendly message. Do not expose file_url in the UI; the link exists only in the email. (follow-up from US-397)"
+      "passes": true,
+      "notes": "The 409 'already pending' error from request_gdpr_data_export should show as a friendly message. Do not expose file_url in the UI; the link exists only in the email. (follow-up from US-397) DONE in round 7 as US-414."
     },
     {
       "id": "US-404",
@@ -6341,8 +6341,8 @@
         "Coupon/expiry offers are removed, or tied to a Stripe coupon that actually exists and has no fake deadline"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Check whether coupons BIO20 and LISTING20 exist in Stripe and whether register reads ?coupon=. If they don't, the offers are false. (follow-up from US-398)"
+      "passes": true,
+      "notes": "Check whether coupons BIO20 and LISTING20 exist in Stripe and whether register reads ?coupon=. If they don't, the offers are false. (follow-up from US-398) DONE in round 7 as US-415."
     },
     {
       "id": "US-399",
@@ -6392,6 +6392,305 @@
       "priority": 2,
       "passes": true,
       "notes": "Changes in public/sw.js:\n- New precacheAppShell(cache) replaces cache.addAll(APP_SHELL) in the install handler. It fetches each APP_SHELL path, stores it only if response.ok, and ignores a failure.\n- New carryShellForward(oldCacheName): for each APP_SHELL path missing from the current PRECACHE, it copies the old precache's copy across.\n- The activate handler now handles stale caches one at a time, newest first (caches.keys() returns them in creation order). For an old precache it runs carryShellForward, then the existing adoptPrecachedAssets, then deletes it. Because adoptPrecachedAssets moves the old build's /assets entry chunks into RUNTIME in the same step, a carried-forward old index.html still loads offline.\n- Skipping the waiting state on install and the never-cache rules are unchanged.\n\nChanges in src/sw.test.ts:\n- The fake Cache no longer has addAll, so the old code path cannot pass by accident.\n- The fake fetch now resolves relative URLs against the worker origin, as a real worker does.\n- The `shell` override now changes only the body of a successful network response.\n- One existing assertion changed from 'shell /index.html' to 'page /index.html', because the shell is now fetched through the network fake.\n- New describe block 'installing the app shell file by file (US-400)' with 5 tests.\n\nAgainst the old sw.js, all 5 new tests fail, plus 5 existing tests that relied on the fake's addAll (10 failures); against the new sw.js all 30 tests pass.\n\nVERIFIED: npx tsc --noEmit -> exit 0.\nnpx vitest run src/sw.test.ts src/lib/sw-cleanup.test.ts src/lib/register-sw.test.ts -> 3 files, 42 tests passed.\nsrc/sw.test.ts alone: 30 passed, including after the lint-staged eslint/prettier run on commit.\nRegression check: with the old public/sw.js restored temporarily, src/sw.test.ts had 10 failed / 20 passed (the 5 new tests plus 5 that depended on the removed fake addAll), confirming the new tests exercise the fix.\nNo migration was added, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-408",
+      "lane": "listings",
+      "round": 7,
+      "title": "Listing cards link to the listing page with a real <a href>",
+      "description": "US-359 (as US-408). Listing cards on the public profile and the listing page went to /:username/listing/:id through an onClick on a <button>. Crawlers could not discover listing pages from the profile, and visitors could not middle-click or open a listing in a new tab. Every listing card control is now a react-router <Link> to listingPagePath(...).",
+      "acceptanceCriteria": [
+        "Each card's primary control is an <a> pointing at /:username/listing/:id (ListingCard in ListingGallery, SoldProperties and ListingPage's 'More from'; FeaturedListingsCarousel 'View Details'; UpcomingOpenHouses 'View home')",
+        "No interactive elements are nested: save/share buttons are siblings of the link, not descendants (tested)",
+        "Whole-card pointer target kept via a stretched link (::after), not a click handler on the container div",
+        "With no href, no dead control renders"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What changed:\n- src/components/profile/ListingCard.tsx: the prop changed from `onClick` to `href?: string`. The address control is now a <Link to={href}> with `after:absolute after:inset-0`. The card div is `relative` and no longer has an onClick. The save/share group gets `z-10` so it sits above the stretched link. The \"View Details\" cue is aria-hidden and only renders when there is an href. With no href the card renders as plain text with no link.\n- ListingGallery.tsx and SoldProperties.tsx: `onListingClick` replaced by `listingHref?: (listing) => string`.\n- FeaturedListingsCarousel.tsx: `onViewDetails` replaced by `listingHref`. \"View Details\" is now a <Link> with an sr-only address and a visible focus ring. It is not rendered when there is no href.\n- UpcomingOpenHouses.tsx: `onViewListing` replaced by `listingHref?(listingId): string | null`. \"View home\" is now a <Link> with an sr-only address.\n- FullProfilePage.tsx: the `openListing` navigate callback is replaced by a `listingHref` useCallback. The open-houses href is still limited to listings in activeListings, as before. The unused useNavigate was removed.\n- ListingPage.tsx: \"More from\" cards use `href={listingPagePath(username, other.id)}`. The unused openListing, useNavigate and useCallback were removed.\n\nTests:\n- ListingCard.test.tsx rewritten. It checks the link's role and href, that nothing is nested, that it is the only link, the stretched link and z-10 classes, that Enter navigates, that Save does not navigate, the no-href case, and the touch visibility of save/share. localStorage is cleared between tests.\n- New \"View Details\" tests in FeaturedListingsCarousel.test.tsx and \"View home\" tests in UpcomingOpenHouses.test.tsx.\n- ListingPage.test.tsx now queries links and asserts their hrefs.\n- Playwright specs tests/e2e/listing-deep-link.spec.ts and tests/a11y/accessibility.spec.ts now query role=link instead of role=button. They were edited but not run here.\n\nprd.json and progress.txt were not touched, and nothing was pushed.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output, both before and after the commit (lint-staged ran eslint --fix and prettier during the commit).\n- `npx vitest run src/components/profile src/pages/public src/lib/listingShare.test.ts src/profile-bundle.test.ts`: 19 files, 112 tests, all passed.\n- An earlier run that also included src/lib/publicListingVisibility.test.ts and src/config/site-entities.test.tsx: 36 more tests, all passed.\n- `npx eslint` on the 7 changed source files: clean.\n- No migration, so verify:migrations was not run.\n- The Playwright e2e and a11y specs were updated but not run (no browser run in this session).\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-409",
+      "lane": "leads",
+      "round": 7,
+      "title": "The new-lead email never said which listing the visitor asked about or what they answered, and Reply went nowhere",
+      "description": "notify-lead sends the email most agents read before they first respond to a lead, and it dropped most of what the visitor told them. It never read leads.listing_id, so it couldn't say which property they asked about. It left out a seller's or valuation's own address (property_address). It also left out every qualifier: price range, timeline, financing, form_data answers. US-264 put those on the lead detail, but the email still carried none of them. On top of that, Reply-To was unset, so replying went to noreply@. The button opened the lead list rather than the lead. A phone-only lead (US-228) printed an empty 'Email:' line. The email now carries all of this, Reply reaches the visitor, and the button opens that lead.",
+      "acceptanceCriteria": [
+        "The agent's new-lead email names the listing the visitor asked about (address, city). If the listing is gone it uses the address the form sent",
+        "A seller or valuation lead's own address appears as 'Their property'",
+        "Every answer the form collected (price range, timeline, financing, form_data) appears in the email, with the same labels as the lead detail (exact copy of src/lib/leadFormSchema.ts, held by a parity test)",
+        "Reply-To is the visitor's email, so replying to the notification answers the lead. It is not set for locked leads or malformed addresses",
+        "The email's button opens /dashboard/leads?lead=<id> (the existing US-103 deep link)",
+        "A locked lead's email still drops email, phone and message, and keeps what they asked about and their answers, as the dashboard does",
+        "A phone-only lead has no empty Email line",
+        "The template no longer uses the purple gradient header or the border-left callout (craft floor)",
+        "notify-lead selects named columns instead of *"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Evidence (before): supabase/functions/notify-lead/index.ts:82 select('*') and then passed only name/email/phone/message/lead_type label/referrer_url/score to createLeadNotificationEmail (old :167-179). listing_id, property_address, price_range, timeline, preapproved and form_data were never used. dashboardUrl was `${siteUrl}/dashboard/leads` (no ?lead=). supabase/functions/_shared/email.ts createLeadNotificationEmail returned no replyTo. Its text body always printed `Email: ${data.email}` (empty for phone-only leads). Its HTML used linear-gradient(#667eea,#764ba2) and border-left:4px.\n\nChanges:\n- supabase/functions/_shared/lead-notification.ts (new): pure buildLeadNotificationDetails(lead, listing, siteUrl) returns listingAddress, propertyAddress, answers (via describeLeadAnswers) and dashboardUrl. property_address counts as 'their property' only when there is no listing_id, which is the LeadDetailModal rule (src/components/leads/LeadDetailModal.tsx:634-651). With a listing_id it is the fallback listing address.\n- supabase/functions/_shared/leadFormSchema.ts (new): an exact copy of src/lib/leadFormSchema.ts, because the edge container copies only supabase/functions (Dockerfile). This follows the keyDates.parity precedent. To make the copy importable from Deno, src/lib/leadFormSchema.ts now declares Json locally (structurally the same as types.ts) instead of importing it.\n- supabase/functions/notify-lead/index.ts: selects named LEAD_NOTIFY_COLUMNS. It reads listings(address, city) scoped by id and user_id, best effort. It passes the details into the email.\n- supabase/functions/_shared/email.ts createLeadNotificationEmail: new listingAddress/propertyAddress/answers fields. The subject reads 'New Lead: X asked about <address>' when there is a listing. replyTo is the visitor's email, validated by a strict regex (no CR/LF, no display name). It is unset when locked. The text body is built from the filled rows only. The HTML is restyled to match the US-229 auto-reply (no gradient, no border-left, no emoji), and every value goes through escapeHtml, including the URLs.\n- supabase/functions/_shared/lead-notification.test.ts (new): 12 tests covering parity, the listing/property/answers mapping, the deleted-listing fallback, the deep link, Reply-To, phone-only, malformed reply-to, locked redaction, escaping and the craft floor.\n\nVERIFIED: npx tsc --noEmit: exit 0 (run both before and after the lint-staged prettier/eslint pass in the commit hook).\nnpx vitest run supabase/functions/_shared/lead-notification.test.ts supabase/functions/_shared/email.test.ts src/lib/leadFormSchema.test.ts src/components/leads src/features-claims.test.ts supabase/functions/_shared/function-urls.test.ts supabase/functions/_shared/log-redaction.test.ts: 9 files, 88 tests passed (this is after the commit, so the parity test holds on the prettier-formatted files).\nRoot tsc does not include supabase/functions, so I ran a standalone strict check of the new edge files: npx tsc --noEmit --strict --noUnusedLocals --allowImportingTsExtensions --moduleResolution bundler supabase/functions/_shared/lead-notification.ts supabase/functions/_shared/email.ts plus a Deno declare shim: rc=0. Deno is not installed in this sandbox, so notify-lead/index.ts itself was not type-checked under Deno. No migration was added.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the edge functions server (functions.agentbio.net, the Coolify app built from the root Dockerfile) so notify-lead picks up the new email and _shared/lead-notification.ts + _shared/leadFormSchema.ts"
+    },
+    {
+      "id": "US-418",
+      "lane": "leads",
+      "round": 7,
+      "title": "A step-two enrichment never reaches the agent's email",
+      "description": "submit-lead sends the notification after step one (supabase/functions/submit-lead/index.ts, the notify-lead call before issueEnrichToken). The qualifiers a visitor adds in step two (action 'enrich') update the lead, but the agent is never told. The email described in US-409 therefore often shows no answers for two-step forms. Options: delay the instant email briefly, or send a short 'Dana added details' follow-up on enrich. Which one is a product call.",
+      "acceptanceCriteria": [
+        "An agent with instant notifications learns the step-two answers without opening the dashboard, or the owner decides this is not wanted"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs an owner decision on whether a second email per lead is acceptable. (follow-up from US-409)"
+    },
+    {
+      "id": "US-410",
+      "lane": "profile",
+      "round": 7,
+      "title": "Brokerage logo shows even without a brokerage name (closes US-383)",
+      "description": "If an agent uploaded a brokerage logo but left the brokerage name blank, the logo never appeared on their public page. The cause was ProfileHeader.tsx, which only rendered the brokerage row inside `profile.brokerage_name &&`. Now the row renders when either field is set. The logo's alt text is the brokerage name, or \"Brokerage logo\" when there is no name. The editor help text used to say the logo is shown \"beside your brokerage name\"; it now says the logo replaces the name.",
+      "acceptanceCriteria": [
+        "A profile with brokerage_logo and no brokerage_name shows the logo with alt text 'Brokerage logo'",
+        "When both are set, the logo's accessible name is the brokerage name",
+        "With no logo the name renders as text; with neither field set, no brokerage logo renders",
+        "ProfileHeader.test.tsx covers all four cases, and the logo-without-name case fails without the fix"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-383 because it was a visible bug: a logo the agent uploaded was silently dropped from their page. US-363 is a mechanical type cleanup and US-316 is a performance saving, so both rank lower. Changes:\n- src/components/profile/ProfileHeader.tsx (brokerage block, about lines 118-136): the condition is now `(profile.brokerage_name || profile.brokerage_logo)`, alt is `profile.brokerage_name || 'Brokerage logo'`, and the decorative Building2 icon is aria-hidden.\n- src/pages/dashboard/Profile.tsx (help text near line 648): changed to \"Shown under your name on your page, in place of the brokerage name.\"\n- src/components/profile/ProfileHeader.test.tsx: new describe block 'ProfileHeader brokerage (US-383)' with 4 tests.\n\nTo check that the new test catches the bug, I set the ProfileHeader.tsx change aside with a uniquely tagged stash: 'shows an uploaded logo even when no brokerage name is set' failed (1 failed, 11 passed). I then restored the change with apply by SHA and dropped that one stash entry. The pre-commit hook ran eslint --fix and prettier on the 3 files; the final diff is 48 insertions and 5 deletions.\n\nVERIFIED: npx tsc --noEmit: exit 0.\nnpx vitest run src/components/profile/ src/pages/dashboard/: 24 files, 152 tests passed.\nnpx vitest run src/components/profile/ProfileHeader.test.tsx: 12 passed with the fix; 1 failed, 11 passed without it.\nNo migration, so verify:migrations does not apply.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-411",
+      "lane": "uiux",
+      "round": 7,
+      "title": "Team page: people who accepted an invitation saw \"Create your team\" instead of their team, and admins had no controls",
+      "description": "This closes US-338. TeamPage only looked up teams the user owned (`teams.owner_id = user`). So anyone who had accepted an invitation, member or admin, was shown \"Create your team\", and clicking it made them the owner of a second team. Now, if the user owns no team, the page looks up the team they accepted an invitation to and shows it. Members see it read-only. Admins get the owner's controls, which matches what the teams edge function allows.",
+      "acceptanceCriteria": [
+        "An accepted member sees the team name, seat count and full roster, and a note telling them to ask the owner or an admin. They get no invite form, no role selects, no remove buttons and no lead-routing editor.",
+        "An admin (role 'admin', accepted) sees the invite form, the role selects and the remove buttons, the same as the owner. These call the same teams edge function actions, which are gated on is_team_admin (owner or accepted admin). An admin gets no role or remove control on their own row, and no one does on the owner's row.",
+        "The create prompt appears only when the user owns no team and has no accepted membership. A pending invitation does not count.",
+        "If the membership lookup fails, or the team behind a membership can't be read, the page shows the retryable 'Couldn't load your team' error instead of the create prompt.",
+        "If a user owns a team and is also a member of another, the team they own wins."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Why I took US-338 now when earlier rounds skipped it: those rounds wanted two things first, an owner decision and an RLS check. The RLS check is done, and the schema already settles the decision:\n- `supabase/migrations/20260806000005_squashed_baseline.sql:13951` has \"Team members read team\" (owner_id = auth.uid() OR is_team_member).\n- `:13630` has \"Members read roster\".\n- `supabase/migrations/20261101000021_team_writes_through_edge_function.sql:18` keeps both SELECT policies on purpose.\n- `is_team_member` (baseline :1962) and `is_team_admin` (:1944) both require accepted_at IS NOT NULL.\n\nSo reading the team as a member needs no new grant. The page simply wasn't asking for it.\n\nChanges in `/home/user/plain-page-link/.claude/worktrees/wf_8d6046cd-f73-4/src/pages/dashboard/TeamPage.tsx`:\n- The query now returns `MyTeam {team, role}`. It looks up the owned team first. If there is none, it reads the user's own `team_members` row (`.eq('user_id', uid).not('accepted_at','is',null).order('accepted_at').limit(1).maybeSingle()`), then reads `teams` by id.\n- A membership whose team can't be read throws an error. Returning \"no team\" there would bring the create prompt back.\n- New `canManageTeam(role)` function, equivalent to is_team_admin (owner or admin).\n- For members, the page hides the invite card, the role select and remove button on each row, and `LeadRoutingRules`. Routing-rule writes are refused for members anyway (RLS policy \"Admins manage routing rules\", baseline :13427).\n- Admins don't get controls on their own row. Demoting or removing yourself would be a 'leave team' action, which is a different thing.\n- Members get a short note: \"You're a member of this team. Ask the owner or an admin to invite or remove people.\"\n\nTests are in `/home/user/plain-page-link/.claude/worktrees/wf_8d6046cd-f73-4/src/pages/dashboard/TeamPage.test.tsx`:\n- The Supabase mock now records filters, handles `not`/`limit`, and makes the roster query thenable.\n- 5 new cases: member read-only view, admin controls plus a remove call, membership lookup failure shows the error, an unreadable team behind a membership shows the error, and `canManageTeam`.\n- The existing 'no team' case now also asserts that the membership lookup filters on user_id and accepted_at.\n\nI did not check it in a browser: the dashboard needs a login and there is no Playwright chromium here.\n\nNo migration and no edge-function change.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0, no output.\n- `npx vitest run src/pages/dashboard/TeamPage.test.tsx`: 1 file, 13/13 passed. Re-run after the pre-commit eslint --fix/prettier hook: 13/13 passed.\n- `npx vitest run src/pages/dashboard src/components/settings src/test/a11y/fieldNames.test.ts`: 15 files, 113/113 passed.\n- `npx eslint` on both files: 0 errors and 2 warnings (react/no-unescaped-entities on \"You'll be\" and \"They'll\"). Both lines were already there before this change.\n- `npx impeccable detect src/pages/dashboard/TeamPage.tsx`: no findings, but this was a regex-only scan, so it undercounts.\n- No migration, so verify:migrations was not needed.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-419",
+      "lane": "uiux",
+      "round": 7,
+      "title": "TeamPage: let a member or admin leave a team they joined",
+      "description": "Members and admins can now see their team, but they can't leave it. The teams edge function's 'remove' action needs is_team_admin, so a plain member can't remove their own row. To add this: a 'leave' action in supabase/functions/teams/index.ts (caller removes their own non-owner row), plus a confirmed 'Leave team' button on TeamPage.",
+      "acceptanceCriteria": [
+        "A member or admin can leave after confirming, and their seat is freed",
+        "An owner can't leave this way",
+        "A failed attempt shows a destructive toast"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Overlaps the enterprise lane. The teams function will need redeploying. (follow-up from US-411)"
+    },
+    {
+      "id": "US-420",
+      "lane": "uiux",
+      "round": 7,
+      "title": "teams accept: block joining a second team, or let the page switch between teams",
+      "description": "The accept action (supabase/functions/teams/index.ts:178-195) never checks whether the user already belongs to a team. TeamPage shows the team they own, or else the earliest one they accepted, so any later team they join can't be reached from the dashboard. This needs an owner decision: allow only one team per user, or add a team switcher.",
+      "acceptanceCriteria": [
+        "Decision recorded",
+        "Either accept refuses a second membership with a clear message, or TeamPage offers a team picker"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-411)"
+    },
+    {
+      "id": "US-412",
+      "lane": "performance",
+      "round": 7,
+      "title": "The Listings dashboard downloaded every add/edit/import dialog and the form stack before showing a single listing",
+      "description": "Slice of US-401. /dashboard/listings imported six dialogs statically: AddListingModal, EditListingModal, CSVUploadDialog, URLImportDialog, SocialShareDialog and UpgradeModal. That put react-hook-form and zod (form-vendor, 23.4 KB gzip) and all six dialog UIs on the route. Each dialog now loads the first time it opens. It stays mounted after that, so behaviour is unchanged. Chunks are warmed when the agent shows intent, and the existing LazyModal handles loading and failure.",
+      "acceptanceCriteria": [
+        "Listings route closure measured before and after (static import closure from the vite manifest, gzipped): beyond the entry 109.7 -> 73.1 KB; beyond entry + DashboardLayout 71.8 -> 35.9 KB",
+        "Dialogs that are not open on first render (add, edit, CSV, paste import, share, upgrade) load when they open; form-vendor is off the route",
+        "No change in behaviour: after its first open a dialog stays mounted, so the close animation and any state it holds while closed still work. If a chunk fails to load, the agent gets LazyModal's Reload/Close dialog instead of a full-page error",
+        "tsc passes; full vitest suite passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Before: `npx vite build --manifest`, then a scratch closure script (static `imports` closure of src/pages/dashboard/Listings.tsx minus the entry closure, gzipped). It reproduced the 109.7 KB in US-401. Breakdown: ui-vendor 35.5, form-vendor 23.4, Listings chunk 20.0, date-vendor 6.3, KeyboardShortcutsHelper 2.0, UpgradeModal 1.3, and so on. ui-vendor is already in the DashboardLayout closure, so the real cost of navigating to the route was 71.8 KB.\n\nAfter: the Listings chunk drops from 20.0 to 10.8 KB. Totals are 73.1 KB beyond the entry and 35.9 KB beyond entry + layout. Opening AddListingModal fetches 30.6 KB at that point.\n\nChanges:\n- src/pages/dashboard/Listings.tsx: React.lazy loaders for the six dialogs, placed above `type ViewMode`. Each dialog is wrapped in `LazyModal` and rendered only once `useMountOnFirstOpen(...).mounted` is true. The error Close calls both the setter and `unmount()`, so the next open retries the load.\n- Hover or focus on the Add button, the Add menu chevron, or the empty-state actions calls `preloadAddDialogs`. `handleAddListing` warms SocialShareDialog while the save runs.\n- EditListingFormData became a type import.\n- src/hooks/useMountOnFirstOpen.ts: new hook. It derives state during render, so the dialog mounts in the same render that opens it. `unmount()` resets it.\n\nTests:\n- src/hooks/useMountOnFirstOpen.test.ts: 4 tests.\n- src/pages/dashboard/Listings.lazyDialogs.test.tsx: 6 tests. The page renders without loading the mocked dialogs. Each dialog opens; the add dialog is the real AddListingModal, run end to end. A full plan opens Upgrade, not Add. A source guard fails if Listings value-imports the dialogs, react-hook-form or zod again.\n\nOddity: vi.mock of AddListingModal did not intercept its dynamic import in this file, although the other five mocks did. I did not chase it. The add test uses the real modal instead, which is the stronger check.\n\nVERIFIED: `npx tsc --noEmit`: exit 0, no output.\n`npx vitest run src/pages/dashboard src/hooks/useMountOnFirstOpen.test.ts src/components/profile/LazyModal.test.tsx src/components/modals src/components/listings src/profile-bundle.test.ts src/route-weight.test.ts`: 21 files, 136 tests passed.\nFull `npx vitest run`: 234 files passed, 2147 tests passed, 1 skipped.\n`BUNDLE_DIST=<after build> node scripts/check-bundle-size.mjs`: \"OK — 258 chunks within budget (1 documented exception(s))\". Entry graph has 4 chunks and none of the forbidden ones.\nBefore/after closure: built with `npx vite build --manifest --outDir <scratch>`, measured with a scratch script (not committed): 109.7 -> 73.1 KB gzip beyond the entry, 71.8 -> 35.9 KB beyond entry + DashboardLayout.\nPre-commit lint-staged (eslint --fix, prettier) passed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy Cloudflare Pages (frontend build). No migration, edge function or secret involved."
+    },
+    {
+      "id": "US-421",
+      "lane": "performance",
+      "round": 7,
+      "title": "Listings route: remaining weight beyond the dashboard layout (35.9 KB gzip)",
+      "description": "What is left: date-vendor 6.3 KB, reached through src/lib/format.ts. It is shared and imported from the format chunk; moving format's date-fns use behind a separate module would take it off routes that only format prices. Also KeyboardShortcutsHelper 2.0 KB (always rendered) and keyDates 1.1 KB via localDate.",
+      "acceptanceCriteria": [
+        "Closure beyond entry + DashboardLayout measured before and after",
+        "date-fns not reached from Listings unless a date is actually formatted with it",
+        "No behaviour change; tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Check which format.ts exports use date-fns. A split format/date module also helps every other dashboard route. (follow-up from US-412)"
+    },
+    {
+      "id": "US-422",
+      "lane": "performance",
+      "round": 7,
+      "title": "Apply the load-on-open dialog pattern to other heavy dashboard routes",
+      "description": "useMountOnFirstOpen + LazyModal is now a reusable pattern. Leads, Clients, Testimonials and Profile probably import form dialogs statically too. Measure each route's closure beyond entry + layout and lazy-load dialogs that are closed on first render.",
+      "acceptanceCriteria": [
+        "Each touched route measured before and after",
+        "form-vendor off routes where no form renders on first paint"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Pairs with US-402: a CI budget for dashboard routes should measure beyond entry + DashboardLayout, not just beyond the entry, because ui-vendor is already loaded by the layout. (follow-up from US-412)"
+    },
+    {
+      "id": "US-413",
+      "lane": "security",
+      "round": 7,
+      "title": "A password alone could switch off an agent's legacy MFA, or un-revoke a session",
+      "description": "This closes US-367. Three owner write policies in the squashed baseline had no TO clause. They were on tables where Supabase grants INSERT/UPDATE/DELETE to anon and authenticated: \"Users can insert own MFA settings\" (baseline:14104), \"Users can update own MFA settings\" (baseline:14322) and \"Users can revoke own sessions\" (baseline:14299). A password sign-in returns an aal1 JWT. With only that, anyone could call PostgREST directly and:\n- set user_mfa_settings.mfa_enabled = false. For a legacy (pre-US-085) enrolment, that flag is the only thing that makes the client ask for a code. The gates that read it are useAuthStore.ts:446, useNativeMFA.ts:92 and lib/security/authentication.ts:221 and :293.\n- write backup-code hashes they chose.\n- reset failed_attempts / locked_until to get past verify-mfa's lockout and brute-force TOTP.\n- un-revoke a user_sessions row, or rewrite its IP and location.\nThe browser could also read totp_secret, backup_codes and session_token_hash.",
+      "acceptanceCriteria": [
+        "The browser cannot insert, update or delete user_mfa_settings. Only the setup/verify/disable/regenerate edge functions write it, using the service role.",
+        "The browser cannot insert, update, delete or un-revoke user_sessions. Sessions are revoked only through revoke-session (service role RPCs).",
+        "authenticated can SELECT only the non-secret columns. totp_secret, backup_codes, phone_number, failed_attempts, locked_until and session_token_hash are not readable by the browser, and anon has no grant on either table.",
+        "verify:schema proves the owner is refused for each write and each secret column, that the rows are unchanged afterwards, and that the service role can still write.",
+        "A unit test keeps browser code free of writes to either table and limited to the granted columns."
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Files changed:\n- supabase/migrations/20261107000413_mfa_and_session_rows_system_written.sql (new). It drops the 3 owner write policies. It revokes INSERT/UPDATE/DELETE/TRUNCATE and table-wide SELECT on user_mfa_settings and user_sessions from PUBLIC, anon and authenticated. It then grants authenticated SELECT on named columns only, the same pattern US-254 used on leads. The owner SELECT policies are unchanged. It also adds table comments.\n- scripts/verify-schema.mjs: new check 'MFA settings and sessions cannot be written by their owner, and their secrets are not browser-readable', placed after the US-377 api_keys check.\n- src/lib/security/mfa-session-browser-access.test.ts (new): scans src for .from('user_mfa_settings' | 'user_sessions'). It fails on any insert/update/upsert/delete, and on any selected column the migration's GRANT does not list.\n\nWhy nothing breaks:\n- Browser reads of user_mfa_settings are only `.select('mfa_enabled, verified_at')`, at useAuthStore.ts:446, useNativeMFA.ts:92 and authentication.ts:221 and :293. Both columns are granted.\n- The browser never queries user_sessions directly. get-sessions/index.ts:51 calls the DEFINER RPC get_user_sessions.\n- All writes use service-role clients: setup-mfa:69-70, verify-mfa:100-101, disable-mfa:88-89, regenerate-backup-codes:83-85, login-security:253, revoke-session:56-58 (revoke_user_session and revoke_all_other_sessions).\n- gdpr-export reads with serviceSupabase (gdpr-export/index.ts:54, 115).\n\nVerification:\n- I built a scratch Postgres 16 (port 55413, data in /var/tmp/pg413), loaded scripts/supabase-prelude.sql, and applied all 71 migrations in one pass with ON_ERROR_STOP. All verify:schema checks passed (52 'ok' lines, including the new one).\n- Negative control: I put the old grants and policies back on the live DB. The new check then failed with 22 findings, including 'the owner could update user_mfa_settings.mfa_enabled', the backup_codes / failed_attempts / locked_until / totp_secret updates, and secret-column selects. So the check detects the hole.\n\nVERIFIED: - `npx tsc --noEmit`: exit 0.\n- `npm run verify:migrations`: \"[migrations] OK — 71 migration files structurally valid.\"\n- `node scripts/verify-schema.mjs --db-url postgresql://postgres@localhost:55413/agentbio` (scratch PG16, prelude plus all migrations applied in one pass): \"All schema checks passed.\" It includes \"ok    MFA settings and sessions cannot be written by their owner, and their secrets are not browser-readable\". With the old policies and grants put back, the same check reported FAIL (22).\n- `npx vitest run src/stores/useAuthStore.test.ts src/lib/security src/schema-references.test.ts supabase/functions`: 36 files, 407 tests passed.\n- The new test alone, re-run after lint-staged/prettier reformatted it: 3 passed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Apply migration supabase/migrations/20261107000413_mfa_and_session_rows_system_written.sql to production. It changes only grants, policies and comments: no data change and no edge-function redeploy. | Before applying, check that production has no column on user_mfa_settings or user_sessions that the repo's migrations do not create. The column-level re-grant lists every repo column except the secret ones, so any extra production column would become unreadable to the browser."
+    },
+    {
+      "id": "US-423",
+      "lane": "security",
+      "round": 7,
+      "title": "Drop the legacy user_mfa_settings gate once every enrolment has moved to native MFA",
+      "description": "After the pending aal2 migration (supabase/migrations/pending/README.md) is applied and the count of legacy enrolments is zero, remove the legacy-row reads in useAuthStore, useNativeMFA and lib/security/authentication. Then retire setup-mfa / verify-mfa / disable-mfa / regenerate-backup-codes.",
+      "acceptanceCriteria": [
+        "No browser code reads user_mfa_settings",
+        "The legacy MFA edge functions are removed or return 410"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Needs the owner to confirm the migration count is zero first. (follow-up from US-413)"
+    },
+    {
+      "id": "US-414",
+      "lane": "enterprise",
+      "round": 7,
+      "title": "Users can now ask for their data export by email and see its status",
+      "description": "Before this, no screen sent a POST to gdpr-export. That meant the emailed export built in the background since US-397 could only be reached through the API, and an account too large for the immediate download could not get its data at all. Privacy settings now have an \"Email me a download link\" button next to \"Download now\", and list the user's last five export requests with their status. If the immediate download fails in a way the emailed export would fix, the screen offers the emailed export instead.",
+      "acceptanceCriteria": [
+        "The settings page can queue an export (POST gdpr-export) and says 'we will email you a download link'",
+        "The user sees each export request's status (Queued, Retrying, Being prepared, Ready until <date>, Expired, Completed, Failed, Cancelled). A failed request shows its reason in plain words; the raw failed_reason text is never shown",
+        "A 503, 502, 504, 90s timeout or dropped connection on the immediate download offers the emailed export; a 401 or 429 does not",
+        "A 409 'already pending' shows as a friendly message, and the queue button is disabled while an export is still being prepared",
+        "file_url is never selected or shown"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Picked US-403, the open enterprise slice. Evidence for the gap: the hook at src/hooks/useGDPR.ts:64 only sent GET; the POST branch is at supabase/functions/gdpr-export/index.ts:86-110.\n\nWhat changed:\n- New src/lib/dataExportRequests.ts holds the pure logic:\n  - EXPORT_REQUEST_COLUMNS, the columns the screen reads; it never includes file_url.\n  - describeExportRequest / describeExportFailure turn the raw status and failed_reason into wording for the user (for example \"Could not read: ...\" and the queue's \"no email address\" error each get their own sentence).\n  - shouldOfferQueuedExport decides when to offer the emailed export: 502/503/504, AbortError/TimeoutError, or a TypeError from a network failure.\n  - describeQueueError gives friendly text for 409 and 429.\n  - IMMEDIATE_EXPORT_TIMEOUT_MS is 90s.\n- src/lib/edgeFunctions.ts: callEdgeFunction now accepts an optional `signal` and passes it to fetch.\n- src/hooks/useGDPR.ts:\n  - New `exportRequests` query on gdpr_data_requests, filtered to the user's own export requests, newest first, limit 5. It relies on the existing \"Users can view own GDPR requests\" SELECT policy (squashed_baseline.sql:14436). It re-checks every 60s while an export is pending or processing.\n  - New `queueExport` mutation (POST).\n  - The GET now aborts after 90s; an error that queueing would fix sets `offerQueuedExport`.\n  - The export-requests list refreshes after a successful download, because the GET closes a pending request.\n- src/components/settings/GDPRSettings.tsx: the two buttons stack on mobile; an alert offers \"Email it to me\" when the download did not finish; the request list is a plain divided list with no nested cards and no gradients.\n- No migration and no edge function changes.\n\nHow it was verified:\n- Tests cover the lib logic, the hook (columns exclude file_url, POST call, 409 message, 503 sets the offer, 429 does not, the GET carries an AbortSignal), the component, and edgeFunctions passing the signal through.\n- npx impeccable detect on GDPRSettings.tsx: no findings (regex rules only).\n- The pre-commit hook ran eslint and prettier on the files; tsc and the tests were re-run after that formatting and still pass.\n\nVERIFIED: npx tsc --noEmit -p . passed (exit 0), also re-run after the pre-commit prettier pass.\nnpx vitest run src/lib/dataExportRequests.test.ts src/lib/edgeFunctions.test.ts src/components/settings/ src/hooks/useGDPR.test.ts src/pages/dashboard: 18 files, 141 tests passed.\nAfter formatting, npx vitest run on the four touched suites: 48 tests passed.\nNo migration was added, so verify:migrations was not run.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-424",
+      "lane": "enterprise",
+      "round": 7,
+      "title": "Data export: the immediate download should not mark a queued request completed",
+      "description": "gdpr-export GET (supabase/functions/gdpr-export/index.ts:141-166) sets the newest pending export request to completed with no file and sends no email. A user who queued an export and then downloaded directly sees 'Completed' with no link. The GET should either leave the queued request alone or mark it cancelled.",
+      "acceptanceCriteria": [
+        "A queued request is not marked completed by a GET without a file",
+        "The settings list shows an accurate status after a direct download"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-414)"
+    },
+    {
+      "id": "US-415",
+      "lane": "marketing",
+      "round": 7,
+      "title": "Free-tool drip emails carried a fake testimonial, made-up agent counts and fake expiring coupons, and their sign-up links went to a 404 page",
+      "description": "US-406 is done, as US-415. The marketing-claims scan now reads supabase/functions as well as src. Every claim it found in the free-tool emails has been rewritten: the named testimonial, the invented studies of agents and listings, the unmeasured percentages and leads/month figures, the competitor price and ROI figures, and the coupon offers (BIO20, LISTING20) with fake 'expires tonight' / 'in 12 hours' deadlines. While doing this, two real bugs turned up and were fixed. The listing emails sent every sign-up button to /register, which renders the 404 page. That includes the welcome email, which does send today. And the scheduled bio drip sent to an empty address and then marked the email as sent anyway.",
+      "acceptanceCriteria": [
+        "The marketing-claims RULES scan walks supabase/functions as well as src (src/marketing-claims.test.ts scan() now covers [...walk(SRC), ...walk(FUNCTIONS)])",
+        "No fabricated testimonial, agent count, leads/month figure or unmeasured percentage remains in send-scheduled-bio-emails, send-scheduled-listing-emails, send-bio-analyzer-email or send-listing-generator-email",
+        "The coupon/expiry offers are removed. BIO20/LISTING20 are referenced nowhere in src, and register never reads ?coupon=, so the offers were false",
+        "New RULES catch the shapes that got past the old ones: 'N agents trust', 'analyzed N listings/agents', and coupon or deadline offers. Each is covered by a verbatim sample in 'is actually able to fail'",
+        "Sign-up links in edge-function emails point at /auth/register. A new test fails on a bare ${SITE_URL}/register, /signup or /login"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "What was wrong (before this change):\n- The claims scan only read src/ (old src/marketing-claims.test.ts scan() walked SRC only). Once pointed at supabase/functions it reported 10 findings across 3 files. The ones that matter are send-scheduled-listing-emails/index.ts:463-464 (the 'Jennifer M.' testimonial and '8-10 hours per week'), :322/:325/:331 (the invented study figures) and send-scheduled-bio-emails/index.ts:141/:214/:215/:229. The new rules then caught '4,200+ agents trust AgentBio' in send-listing-generator-email/index.ts:310, which is the welcome email that does send today, plus '2,847 agents', '47,000 listings' and the coupon/deadline text.\n- Listing emails linked to `${SITE_URL}/register`. App.tsx only has /auth/register, and 'register' is a reserved username (src/lib/usernameValidation.ts:46), so the link fell through to the /:slug profile route and showed the 404 page.\n- send-scheduled-bio-emails built its email with `to: ''` ('Will be set by caller', but the caller never set it). It then marked sent_at no matter what sendEmail returned. sendEmail never throws; it returns {ok:false}.\n- The listing drip's email 7 also sold 'AgentBio Pro $23.20 (normally $29)'. The plan called Professional is $49 and Starter is $29. It also promised 'Unlimited AI listing descriptions' (plans meter them, 10/25/100 a month) and a '$97 value' templates pack that does not exist.\n\nWhat changed:\n- New supabase/functions/_shared/bio-drip-emails.ts holds the subjects, the send days and the copy for bio emails 2-7. The copy uses no numbers except the visitor's own score. Links go only to /auth/register or /pricing, and the email HTML now uses one solid-colour button instead of a gradient. Both send-bio-analyzer-email (scheduleEmailSequence) and send-scheduled-bio-emails use it, so the subject recorded is the subject sent.\n- send-scheduled-bio-emails now picks the next email with BIO_DRIP_SEQUENCE_NUMBERS.find. It sends to capture.email and throws when the send fails, so a failed send is never marked as sent.\n- send-scheduled-listing-emails: subjects corrected. Emails 1, 2, 3 and 6 are corrected, and emails 5 and 7 are rewritten. All buttons go through one ctaButton() helper pointing at /auth/register. The offer to 'Reply with your MLS link for a free analysis' is removed.\n- send-listing-generator-email: the welcome email no longer says '4,200+ agents' or claims 'content calendars, automated follow-up', and its button now links to /auth/register.\n\nVerification: the edge functions cannot be type-checked here because there is no deno. Instead I ran TypeScript's syntax check (transpileModule) on the four edited functions and got 0 diagnostics. bio-drip-emails.test.ts checks that each subject matches what is stored, that every link is to an allowed route, and that no email contains a coupon, deadline or percentage.\n\nVERIFIED: npx tsc --noEmit: exit 0 (also re-run after lint-staged prettier ran at commit).\nnpx vitest run supabase/functions src/marketing-claims.test.ts src/features-claims.test.ts src/landing-claims.test.ts src/spa-routes.test.ts: 37 files passed, 415 tests passed, 1 skipped.\nnpx vitest run supabase/functions/_shared/bio-drip-emails.test.ts src/marketing-claims.test.ts (after commit formatting): 15/15 passed.\nBefore the copy was fixed, the extended scan failed with 10 findings in the three edge functions, which confirms it really reads supabase/functions.\nTypeScript transpileModule diagnostics on send-scheduled-bio-emails, send-scheduled-listing-emails, send-bio-analyzer-email and send-listing-generator-email: 0 each.\nNo migration, so verify:migrations was not needed.\n\nREVIEW: approve\n\nOWNER ACTIONS: Redeploy the edge functions send-bio-analyzer-email, send-scheduled-bio-emails, send-scheduled-listing-emails and send-listing-generator-email (functions.agentbio.net Coolify app). The welcome email from send-listing-generator-email is live today and currently links its button to a 404 page. | When a cron is set up for send-scheduled-bio-emails, expect it to really send now. Before this change it sent to an empty address and logged the email as sent anyway."
+    },
+    {
+      "id": "US-425",
+      "lane": "marketing",
+      "round": 7,
+      "title": "Listing drip: unsubscribe link goes to a route that does not exist",
+      "description": "send-listing-generator-email's footer links ${SITE_URL}/unsubscribe. App.tsx has no /unsubscribe route, so it renders the 404 page, and neither drip checks for an opt-out before sending. This is a CAN-SPAM/GDPR gap for marketing email.",
+      "acceptanceCriteria": [
+        "Every marketing email carries a working one-click unsubscribe",
+        "Scheduled senders skip opted-out captures"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": " (follow-up from US-415)"
+    },
+    {
+      "id": "US-416",
+      "lane": "seo",
+      "round": 7,
+      "title": "Search engines got a soft 404 for listing pages whose home was gone or hidden",
+      "description": "On /:username/listing/:id, a listing that is missing, withdrawn, or hidden by the agent's \"Show listings\" or \"Show sold properties\" toggle answered crawlers with 200 and the agent's card. Meanwhile the SPA marked the same URL noindex, with its canonical pointing at the profile. That is a soft 404, and search engines keep re-crawling those URLs and report them as errors. The Pages Function now answers 404 in that case. The body is still the agent's card, so a preview bot that renders a 404 points at the agent. The homepage's `robots index` meta is replaced with `noindex, follow`, and the response sends `X-Robots-Tag: noindex`. It only does this when PostgREST definitely answered both reads. If a read fails, the response stays 200, as before. The legacy /:username?listing= link also stays 200, because that URL is the profile.",
+      "acceptanceCriteria": [
+        "A crawler request to /:username/listing/:id for a listing id that does not exist for that agent answers 404 with x-agentbio-prerender: listing-not-found and X-Robots-Tag: noindex",
+        "A withdrawn listing, a listing hidden by show_listings=false, and a sold listing while show_sold_properties=false all answer 404 on the listing path",
+        "The 404 body carries the agent's card (title, canonical to /:username) and exactly one robots meta, noindex, follow; the homepage's index robots meta is removed",
+        "If the listings or user_settings read errors or times out, the listing path still answers 200 (a blip is not a deindexing event)",
+        "The legacy /:username?listing=<id> link stays 200 for hidden and missing listings",
+        "People (non-crawler user agents) still get the SPA untouched and no database query is made"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "This acts on the listings lane's finding in progress.txt:5458 (soft 404 on hidden or missing listing pages). The open seo stories were either blocked on an owner decision (US-389/US-371 remainder need a decision on custom-domain canonicals), marked optional or low priority (US-298, US-407), or overlap the marketing lane (US-345). US-370 is dead-code cleanup, so it is lower value than a crawl-correctness bug.\n\nChanges:\n- /home/user/plain-page-link/.claude/worktrees/wf_8d6046cd-f73-9/functions/_lib/profile-route.ts:\n  - `fetchVisibleListing` now returns a `ListingLookup`: 'visible' with the listing, 'hidden', or 'unknown'. 'hidden' means both reads answered and `selectListingForPage` returned null. 'unknown' means a read failed.\n  - `serveProfileRoute` sets `listingGone = listingPath && lookup.state === 'hidden'`. For that case it returns status 404 with `injectSocialTags(...)` passed through the new exported `markNoindex()`, which strips any robots meta and inserts `noindex, follow`. It also sets `x-agentbio-prerender: listing-not-found` and `x-robots-tag: noindex`.\n  - The comments explain why the 404 needs a definitive answer and why the legacy ?listing= link is left alone.\n- /home/user/plain-page-link/.claude/worktrees/wf_8d6046cd-f73-9/functions/_tests/username-route.test.ts:\n  - The two US-382 tests that said \"keeps the agent card\" (hidden listings, and sold while sold is hidden) now also assert 404 plus the agent card.\n  - The legacy-link test now asserts status 200.\n  - A new describe block has 6 tests: missing id gives 404 with X-Robots-Tag; withdrawn gives 404; the robots meta is swapped and appears exactly once, with the canonical going to /jane; a failed listings read gives 200; the legacy missing link gives 200; a human gets the SPA with no fetch.\n\nThe SPA's own \"This home is no longer listed\" page (src/pages/public/ListingPage.tsx:134-160) is unchanged. Only crawlers take the Pages Function path.\n\nVERIFIED: `npx tsc --noEmit`: exit 0, no output.\n`npx vitest run functions/`: 37 files, 451 tests passed (the path filter also matched supabase/functions suites).\nAfter the pre-commit eslint/prettier pass: `npx vitest run functions/_tests`: 4 files, 64 tests passed. Working tree clean after commit.\nNo migration, so `verify:migrations` was not needed. Cloudflare Pages routing cannot be exercised in this sandbox, so the route was tested as a plain function against a stubbed fetch and next(), as the existing suite does.\n\nREVIEW: approve"
+    },
+    {
+      "id": "US-426",
+      "lane": "seo",
+      "round": 7,
+      "title": "Answer 404 for single-segment non-routes in RESERVED_SEGMENTS (/legal, /about, /contact, /help, /support, /api)",
+      "description": "progress.txt:2610-2618 records that these reserved segments are not routes but match the /:username rule, so they answer 200 with the homepage (a soft 404). serveProfileRoute returns next() for any reserved segment (functions/_lib/profile-route.ts, isReservedSegment branch). Reserved segments that are not real App.tsx routes could answer notFoundResponse instead.",
+      "acceptanceCriteria": [
+        "A crawler or person requesting /about, /legal, /contact, /help, /support or /api gets 404 with dist/404.html",
+        "Reserved segments that are real routes (e.g. /pricing, /blog) are unaffected",
+        "src/spa-routes.test.ts still agrees with App.tsx and _redirects"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Check each segment against App.tsx first; /legal may have child routes but no index. (follow-up from US-416)"
+    },
+    {
+      "id": "US-417",
+      "lane": "mobile",
+      "round": 7,
+      "title": "Agent pages whose username starts with \"auth\" or \"functions\" were never kept for offline (US-323)",
+      "description": "The service worker decides which requests it must never cache in `isNeverCache` (public/sw.js). It checked paths with a bare `startsWith('/auth')` and `startsWith('/functions')`. That also caught public agent profiles such as /authorname, /authentic-homes or /functionsrealty. Those pages were treated like sign-in traffic: never stored in the pages cache, so they had no offline copy. Added an `isUnderSegment(pathname, prefix)` helper that matches only the prefix itself or a path below it (`p === prefix || p.startsWith(prefix + '/')`). /auth, /auth/ and /auth/* stay network-only, and so do /functions and /functions/*. Matching profile slugs are now cached like any other profile. The `/auth/v1` and `/rest/v1` substring guards, the Authorization-header check and the host checks are unchanged.",
+      "acceptanceCriteria": [
+        "/authorname (and /authentic-homes, /functionsrealty) is cached in agentbio-sw-pages-v1 like any profile",
+        "/auth, /auth/, /auth/reset-password, /functions, /functions/v1/x are never cached (pass-through)",
+        "Existing /auth/login and /auth/callback?code= never-cache tests still pass",
+        "Regression test fails against the previous sw.js and passes against the fix"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Change: public/sw.js:207-222. `isNeverCache` now calls the new `isUnderSegment` helper for '/auth' and '/functions'. The helper's comment cites US-323. Tests: src/sw.test.ts has two new cases next to the existing 'never caches a navigation under /auth' test (~line 334). They run the real worker in the vm harness (pagesWorker/navigate). (1) /auth, /auth/, /auth/reset-password, /functions and /functions/v1/x all pass through and the pages cache is never created. (2) /authorname, /authentic-homes and /functionsrealty get a response and land in agentbio-sw-pages-v1. I checked the regression test against the old code: with the HEAD sw.js swapped back in temporarily, the US-323 case fails (1 failed / 31 passed); with the fix restored, all pass. The /functions prefix had the same flaw as /auth, so it is fixed in the same helper. This app has no route under /functions; Pages Functions sit at /api and /[username].\n\nVERIFIED: npx tsc --noEmit -> passed, no errors (TSC_OK). npx vitest run src/sw.test.ts src/deployed-files.test.ts src/lib/sw-cleanup.test.ts src/route-weight.test.ts -> Test Files 4 passed (4), Tests 64 passed (64). With the HEAD (unfixed) public/sw.js swapped in temporarily: npx vitest run src/sw.test.ts -> 1 failed | 31 passed (32), and the failing case is the new US-323 test. Pre-commit lint-staged (eslint --fix, prettier) ran clean. No migration was added, so verify:migrations does not apply.\n\nREVIEW: approve"
     }
   ]
 }

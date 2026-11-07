@@ -5488,3 +5488,75 @@ Other findings:
 - [seo] Blog.tsx:58 and BlogCategory.tsx:365 still select('*') on articles for the list views. That works, but the list fetches full article content just to show cards, which is a performance-lane concern. The prerender intercept would need to keep answering whatever select is used.
 - [mobile] [mobile] src/App.tsx:163 calls cleanupServiceWorkers() on every app mount (src/lib/sw-cleanup.ts). It allowlists the AgentBio worker and the 'agentbio-sw-' caches, so today the cost is an extra getRegistrations() and caches.keys() pass on each load. Any future same-origin Cache Storage user would be wiped every load. Running it once per build id (for example behind a localStorage flag keyed on the SW version) would remove both problems.
 - [mobile] [mobile] public/sw.js precacheAppShell fetches shell HTML with the default cache mode, the same as the old addAll did. If the host ever serves index.html with a long max-age, a new worker could precache a stale shell from the browser HTTP cache. Worth checking the _headers rule for /index.html and '/', or fetching with cache: 'no-cache'.
+
+---
+
+## Continuous improvement loop — round 7 — 2026-11-07 (US-408 to US-417 done)
+
+Ten lanes, all approved with no fix-ups. Closed US-323, US-338, US-359, US-367, US-383, US-403, US-406; slice of US-401.
+Final: tsc clean (app + node config), 2223 unit tests pass (from 2137), verify:migrations OK (71 files), vite build OK, eslint 645 warnings.
+
+- US-408 [listings] Listing cards link to the listing page with a real <a href>
+- US-409 [leads] The new-lead email never said which listing the visitor asked about or what they answered, and Reply went nowhere
+- US-410 [profile] Brokerage logo shows even without a brokerage name (closes US-383)
+- US-411 [uiux] Team page: people who accepted an invitation saw "Create your team" instead of their team, and admins had no controls
+- US-412 [performance] The Listings dashboard downloaded every add/edit/import dialog and the form stack before showing a single listing
+- US-413 [security] A password alone could switch off an agent's legacy MFA, or un-revoke a session
+- US-414 [enterprise] Users can now ask for their data export by email and see its status
+- US-415 [marketing] Free-tool drip emails carried a fake testimonial, made-up agent counts and fake expiring coupons, and their sign-up links went to a 404 page
+- US-416 [seo] Search engines got a soft 404 for listing pages whose home was gone or hidden
+- US-417 [mobile] Agent pages whose username starts with "auth" or "functions" were never kept for offline (US-323)
+
+Owner actions:
+- US-409: Redeploy the edge functions server (functions.agentbio.net, the Coolify app built from the root Dockerfile) so notify-lead picks up the new email and _shared/lead-notification.ts + _shared/leadFormSchema.ts
+- US-412: Redeploy Cloudflare Pages (frontend build). No migration, edge function or secret involved.
+- US-413: Apply migration supabase/migrations/20261107000413_mfa_and_session_rows_system_written.sql to production. It changes only grants, policies and comments: no data change and no edge-function redeploy.
+- US-413: Before applying, check that production has no column on user_mfa_settings or user_sessions that the repo's migrations do not create. The column-level re-grant lists every repo column except the secret ones, so any extra production column would become unreadable to the browser.
+- US-415: Redeploy the edge functions send-bio-analyzer-email, send-scheduled-bio-emails, send-scheduled-listing-emails and send-listing-generator-email (functions.agentbio.net Coolify app). The welcome email from send-listing-generator-email is live today and currently links its button to a 404 page.
+- US-415: When a cron is set up for send-scheduled-bio-emails, expect it to really send now. Before this change it sent to an empty address and logged the email as sent anyway.
+
+Opened:
+- US-418 [leads] A step-two enrichment never reaches the agent's email
+- US-419 [uiux] TeamPage: let a member or admin leave a team they joined
+- US-420 [uiux] teams accept: block joining a second team, or let the page switch between teams
+- US-421 [performance] Listings route: remaining weight beyond the dashboard layout (35.9 KB gzip)
+- US-422 [performance] Apply the load-on-open dialog pattern to other heavy dashboard routes
+- US-423 [security] Drop the legacy user_mfa_settings gate once every enrolment has moved to native MFA
+- US-424 [enterprise] Data export: the immediate download should not mark a queued request completed
+- US-425 [marketing] Listing drip: unsubscribe link goes to a route that does not exist
+- US-426 [seo] Answer 404 for single-segment non-routes in RESERVED_SEGMENTS (/legal, /about, /contact, /help, /support, /api)
+
+Other findings:
+- [listings] src/components/profile/ListingCard.tsx and FeaturedListingsCarousel.tsx each keep a separate copy of the localStorage 'agentbio_saved_listings' save logic (FeaturedListingsCarousel.tsx:44-68 vs ListingCard handleSave). A save in the carousel does not update an already-mounted card's heart until it remounts. A shared hook would fix this.
+- [listings] ListingCard's 'Featured' badge uses bg-purple-600/90 (ListingCard.tsx, top badges). It is off-palette for themed profiles and is a craft-floor tell; it could use the theme's primary token.
+- [listings] UpcomingOpenHouses on the profile only links 'View home' when the listing is in activeListings (FullProfilePage.tsx listingHref prop). A pending listing with a public open house gets no link even though its listing page may exist. Check whether selectAvailableListings excludes pending listings on purpose.
+- [leads] supabase/functions/submit-lead/index.ts (the email_hash dedup merge): when the same visitor re-enquires within 24h, only form_data and message are merged. A new phone number, a different listing_id, or new price_range/timeline columns are silently dropped.
+- [leads] supabase/functions/submit-lead/index.ts: the auto-reply/profile/listing reads, the Zapier hand-off and the console.* calls use console rather than a structured logger. This is acceptable in Deno, but inconsistent with reportError use elsewhere in the same function.
+- [leads] src/pages/dashboard/Leads.tsx:254-263: the ?lead=<id> deep link only opens a lead that is in the loaded `leads` page. An older lead beyond the first page (if the list is paginated or limited) would not open from the email link. Worth checking the list query limit.
+- [leads] US-362 remains a design guard with no code to write; US-278 is still blocked on the owner's status-vocabulary decision.
+- [profile] Still open in the profile lane: US-316. On /:username, the Stats and Testimonial blocks make their own requests through useAgentPageFacts, even though usePublicProfile already fetched those listings and testimonials.
+- [profile] Still open in the profile lane: US-363. BlockSettings.tsx and BlockRenderer.tsx still cast configs `as any`.
+- [profile] Still open in the profile lane: US-283. This covers the custom_css decision, the theme_color mismatch between manifest.json and index.html, and the ProfileCompletionWidget fields.
+- [profile] src/components/profile/ProfileHeader.tsx: the brokerage logo <img> (h-5) has no width/height or loading hint, unlike typical image handling elsewhere. The CLS impact is minor because it sits in a fixed-height row.
+- [uiux] src/components/settings/LeadRoutingRules.tsx:189-202: the rule on/off Switch has no accessible name, and the delete button is an unnamed icon with no confirmation and no onError. It also uses hard-coded text-red-600/hover:bg-red-50, which has no dark-mode variant. Same class of problem US-328 fixed on TeamPage.
+- [uiux] Pending invitations (user_id null) still show their invited email in the roster to plain members via 'Members read roster' (baseline :13630). That is what the RLS already allows, but the owner may want pending invites shown only to admins.
+- [uiux] supabase/functions/teams/index.ts:212-221: updateRole lets any admin promote or demote other admins. Only the owner row is protected. The owner may want role changes limited to the owner.
+- [performance] US-402 (dashboard route budgets in CI): the closure method is simple to put in a script. Run `vite build --manifest`, take the static `imports` closure of the route key, subtract the entry closure (and the DashboardLayout closure), then gzip. A route key can change from `src/pages/...tsx` to `_Name-hash.js` when Rollup hoists shared modules into the route chunk; it happened to Listings in this change. The check should find the route by `name`/`src` or through App.tsx's dynamic imports, not by a fixed key.
+- [performance] src/components/profile/LazyModal.tsx: its error fallback hard-codes bg-white/text-gray-900/bg-blue-600 instead of theme tokens, so it does not follow the dashboard dark theme. It is now used on the dashboard as well as the public profile. Small uiux polish.
+- [performance] vite.config.ts / src/config/vendor-chunks.ts: ui-vendor is one 35.5 KB chunk for all of @radix-ui. DashboardLayout loads it, so every dashboard route pays for every Radix primitive. Splitting it would need its own measurement and is out of scope here.
+- [security] supabase/functions/revoke-session/index.ts:58 falls back to SUPABASE_ANON_KEY when SUPABASE_SERVICE_ROLE_KEY is missing. The revoke RPCs are not executable by anon, so revocation would fail closed, but the error would be confusing. It should require the service key outright.
+- [security] user_mfa_settings stays readable by its owner for mfa_method / verified_at. If a later story moves the legacy check into a DEFINER RPC, the remaining column grant can go too.
+- [security] Running verify:schema locally as root: runuser/su are refused in this sandbox. A Node script calling spawnSync with {uid:102,gid:104} starts initdb/pg_ctl as the postgres user, with the data and socket under /var/tmp, which keeps the socket path under the 107-byte limit.
+- [enterprise] supabase/functions/gdpr-export/index.ts:141-166: a GET marks the newest pending export request completed without filling file_url or sending an email. Combined with the queue, the user may see a 'Completed' request they never received. Recorded as a next slice.
+- [enterprise] supabase/functions/gdpr-export/index.ts:66: GET and POST share one 3-per-hour limit, so two timed-out downloads plus a queue attempt hit 429. The UI handles the 429, but you may want a separate budget for POST.
+- [enterprise] The privacy settings export dialog lists 'Blog posts' as included. The real table is articles; check what buildExportDocument actually exports so the list matches it.
+- [enterprise] US-386 (getAgentContact callers): nothing loops over agents, per the story's own note, so no change was needed. It can probably be closed as no_change_needed after a quick re-check.
+- [marketing] supabase/functions/send-listing-generator-email/index.ts footer: the ${SITE_URL}/unsubscribe link has no route in App.tsx, so it renders the 404 page. Neither drip honours an opt-out. This is a compliance gap for marketing email.
+- [marketing] The listing and bio email HTML still has a purple-to-pink gradient header and 4px colored border-left callouts (send-listing-generator-email, send-scheduled-listing-emails emails 1/3, send-bio-analyzer-email .score-badge). These break the craft floor; only the buttons in the drips were changed.
+- [marketing] send-scheduled-bio-emails only selects captures from the last 7 days (gte created_at sevenDaysAgo). Email 7 is due on day 7, so it may fall outside the window and never be sent.
+- [marketing] US-297 (dashboard meters emails_per_month, which never send) and US-319 (unsourced Linktree $24 / Beacons $10 on /for-real-estate-agents) are still open. The bio drip's 'Linktree Pro: $9/month' was removed as part of this change.
+- [seo] US-389 / US-371 remainder still needs an owner decision: src/pages/public/FullProfilePage.tsx builds the canonical and node ids from getSafeOrigin(), and nobody has decided whether profiles served on a custom domain should canonicalise to that domain.
+- [seo] US-370 is unchanged: src/config/site-entities.test.tsx is still the only importer of src/components/seo/PageSEO.tsx. Deleting it is a small cleanup slice for a later round.
+- [seo] functions/_lib/profile-route.ts: the legacy /:username?listing=<id> link still unfurls the agent card at 200 for a hidden listing. That is correct because the URL is the profile, but such links could 301 to /:username/listing/:id so that each home has one address. That would change what existing share links do, so it is a product call.
+- [mobile] src/App.tsx:161-166: cleanupServiceWorkers() runs in the mount effect on every page load, and the returned promise is neither awaited nor caught. Each load calls getRegistrations() and enumerates caches. If cleanup finds a legacy controller, nothing triggers the reload the way cleanupAndReload (src/lib/sw-cleanup.ts:~110) does. Worth gating it to run once per worker version, for example with a sessionStorage or localStorage flag in try/catch, or moving it into register-sw.ts. It is cheap but redundant work on the critical path.
+- [mobile] public/sw.js:210 `p.includes('/auth/v1')` and `p.includes('/rest/v1')` are substring checks. A same-origin profile path cannot contain a slash, so these are harmless today, but they would match a nested page such as /blog/rest/v1-guide. Low priority.
