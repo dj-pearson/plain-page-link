@@ -257,7 +257,47 @@ describe('feature claims', () => {
       rule: 'property matching or market intelligence, which do not exist',
       pattern: /\b(smart\s+)?property\s+matching\b|\bmarket\s+intelligence\b/i,
     },
+    // US-333 (US-320): every /for/{city} page's GEO direct-answer paragraph
+    // said AgentBio "integrates with popular CRM systems" and tracks "which
+    // {city} neighborhoods and property types generate the most engagement".
+    // The only CRM hand-off is the Zapier webhook (profiles.zapier_webhook_url)
+    // plus CSV export; analytics are per listing, per link and per source, and
+    // nothing records a neighbourhood.
+    {
+      rule: 'native CRM integrations, which do not exist (the hand-off is a Zapier webhook)',
+      pattern: /\bintegrates?\s+with\s+(?:major\s+|popular\s+|leading\s+|your\s+)?CRMs?\b/i,
+    },
+    {
+      rule: 'analytics broken down by neighbourhood, which nothing records',
+      pattern:
+        /\bwhich\s+(?:\{\w+\}\s+)?neighbou?rhoods\b[^.]{0,80}\b(?:engagement|clicks|leads|generate)\b/i,
+    },
   ];
+
+  /**
+   * JSX wraps prose at the print width, so a phrase can straddle two lines —
+   * the old city-page "with a free\n trial" got past a per-line scan that way.
+   * Each pair of adjacent non-comment lines is also tested joined; a hit is
+   * reported only when neither line matches on its own, so nothing is counted
+   * twice.
+   */
+  function scanLines(lines: string[], isComment: boolean[], rel: string, out: string[]) {
+    lines.forEach((line, i) => {
+      if (isComment[i]) return;
+      for (const { rule, pattern } of FEATURE_RULES) {
+        if (pattern.test(line)) {
+          out.push(`${rel}:${i + 1}  ${rule}\n      ${line.trim().slice(0, 90)}`);
+          continue;
+        }
+        const next = lines[i + 1];
+        if (next === undefined || isComment[i + 1] || pattern.test(next)) continue;
+        const joined = `${line.trim()} ${next.trim()}`;
+        if (pattern.test(joined)) {
+          out.push(`${rel}:${i + 1}-${i + 2}  ${rule}\n      ${joined.slice(0, 120)}`);
+        }
+      }
+    });
+  }
   const ROOTS = [SRC, join(process.cwd(), 'supabase', 'functions')];
   const EXEMPT = ['pages/legal/', 'pages/BlogCategory.tsx', 'marketing-claims.test.ts'];
 
@@ -271,14 +311,7 @@ describe('feature claims', () => {
           .join('/');
         if (EXEMPT.some((e) => rel.includes(e))) continue;
         const lines = readFileSync(file, 'utf8').split('\n');
-        const isComment = commentMask(lines);
-        lines.forEach((line, i) => {
-          if (isComment[i]) return;
-          for (const { rule, pattern } of FEATURE_RULES) {
-            if (pattern.test(line))
-              findings.push(`${rel}:${i + 1}  ${rule}\n      ${line.trim().slice(0, 90)}`);
-          }
-        });
+        scanLines(lines, commentMask(lines), rel, findings);
       }
     }
     expect(findings).toEqual([]);
@@ -292,11 +325,46 @@ describe('feature claims', () => {
       'AgentBio integrates with major MLS and IDX providers used in Denver.',
       'with predictive lead scoring and smart property matching',
       'accelerates deals with market intelligence',
+      'The platform integrates with popular CRM systems used by {city} real estate professionals',
+      'track which {city} neighborhoods and property types generate the most engagement',
     ]) {
       expect(
         FEATURE_RULES.some(({ pattern }) => pattern.test(sample)),
         sample
       ).toBe(true);
     }
+  });
+
+  it('catches a claim that JSX wrapped across two lines', () => {
+    const lines = [
+      '              mobile-optimized link. The platform integrates with popular',
+      '              CRM systems used by agents.',
+    ];
+    const out: string[] = [];
+    scanLines(lines, [false, false], 'x.tsx', out);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain('x.tsx:1-2');
+  });
+
+  it('does not join a line onto a comment', () => {
+    const out: string[] = [];
+    scanLines(['integrates with popular', '// CRM systems'], [false, true], 'x.tsx', out);
+    expect(out).toEqual([]);
+  });
+
+  it('allows the copy that replaced the overclaim', () => {
+    const out: string[] = [];
+    const lines = [
+      "Every new lead can be sent on to the agent's CRM through a Zapier webhook or, on paid plans, exported",
+      'the dashboard shows how many people viewed each listing, clicked each link and which',
+      'campaign sources turned into leads.',
+    ];
+    scanLines(
+      lines,
+      lines.map(() => false),
+      'x.tsx',
+      out
+    );
+    expect(out).toEqual([]);
   });
 });

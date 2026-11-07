@@ -264,10 +264,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
               lead capture forms for buyer/seller qualification, calendar booking for consultation
               scheduling, and testimonial showcases. {city} agents use AgentBio to consolidate their
               property portfolio, contact information, and lead generation tools into one
-              mobile-optimized link that turns Instagram traffic into actual clients. The platform
-              integrates with popular CRM systems used by {city} real estate professionals and
-              provides detailed analytics to track which {city} neighborhoods and property types
-              generate the most engagement.
+              mobile-optimized link that turns Instagram traffic into actual clients. Every new lead
+              can be sent on to the agent's CRM through a Zapier webhook or, on paid plans, exported
+              as a CSV, and the dashboard shows how many people viewed each listing, clicked each
+              link and which campaign sources turned into leads.
             </p>
           </div>
         </section>
@@ -385,10 +385,10 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
                     <TrendingUp className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold mb-2">Track {city} Market Engagement</h3>
+                    <h3 className="text-xl font-bold mb-2">See What {city} Buyers Respond To</h3>
                     <p className="text-muted-foreground">
-                      See which {city} neighborhoods, property types, and price ranges generate the
-                      most clicks and leads.
+                      See how many views each listing gets, which links are clicked and which
+                      campaign sources turn into leads.
                     </p>
                   </div>
                 </div>
@@ -485,9 +485,9 @@ export default function LocationTemplate({ location }: LocationTemplateProps) {
 
               <div className="glass-panel p-6">
                 <CheckCircle className="h-10 w-10 text-primary mb-4" />
-                <h3 className="text-xl font-bold mb-2">CRM Integration</h3>
+                <h3 className="text-xl font-bold mb-2">Zapier Hand-off</h3>
                 <p className="text-muted-foreground text-sm">
-                  Auto-sync leads to your existing system
+                  Send each new lead on to your CRM through Zapier
                 </p>
               </div>
             </div>
