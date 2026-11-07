@@ -19,8 +19,8 @@ that the phrases in the "Removed" list do not come back.
 | Active and sold listings with photos, price, beds/baths, square footage | `src/components/profile/ListingCard.tsx` |
 | Sold properties showcase | `src/components/profile/SoldProperties.tsx` |
 | Best listings highlighted at the top | `src/components/profile/FeaturedListingsCarousel.tsx` |
-| Virtual tour link on a listing | `src/components/profile/ListingDetailModal.tsx` |
-| MLS number shown on each listing | `src/components/profile/ListingDetailModal.tsx` |
+| Virtual tour link on a listing | `src/components/profile/ListingDetails.tsx` |
+| MLS number shown on each listing | `src/components/profile/ListingDetails.tsx` |
 | Open house dates on the profile | `src/components/profile/UpcomingOpenHouses.tsx` |
 | Share an individual listing | `src/components/profile/ListingCard.tsx` |
 | Import listings from a spreadsheet | `src/components/listings/CSVUploadDialog.tsx` |

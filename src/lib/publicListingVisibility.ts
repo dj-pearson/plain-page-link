@@ -33,3 +33,30 @@ export function selectAvailableListings<T extends HasStatus>(listings: T[]): T[]
 export function selectSoldListings<T extends HasStatus>(listings: T[]): T[] {
   return listings.filter((listing) => listing.status === 'sold');
 }
+
+interface ListingPageSettings {
+  show_listings?: boolean | null;
+  show_sold_properties?: boolean | null;
+}
+
+/**
+ * The listing a /:username/listing/:id page may show, or null (US-275).
+ *
+ * The same rules as the profile: an available listing while the agent shows
+ * listings, a sold one only while they also show sold properties. A listing
+ * the profile would not show is not reachable at its own address either —
+ * hiding the gallery must not leave every home one guessable URL away.
+ */
+export function selectListingForPage<T extends HasStatus & { id: string }>(
+  listings: T[],
+  listingId: string | null | undefined,
+  settings: ListingPageSettings | null | undefined
+): T | null {
+  if (!listingId || settings?.show_listings === false) return null;
+  const listing = listings.find((l) => l.id === listingId);
+  if (!listing) return null;
+  if (listing.status === 'sold') {
+    return settings?.show_sold_properties === false ? null : listing;
+  }
+  return selectAvailableListings([listing]).length > 0 ? listing : null;
+}

@@ -132,7 +132,7 @@ describe('buildListingTags', () => {
     expect(tags.description).toContain('3 bd');
     expect(tags.description).toContain('1,980 sqft');
     expect(tags.image).toBe('https://cdn.example.com/412-maple.jpg');
-    expect(tags.url).toBe('https://agentbio.net/jane?listing=abc-123');
+    expect(tags.url).toBe('https://agentbio.net/jane/listing/abc-123');
     expect(tags.jsonLd['@type']).toBe('SingleFamilyResidence');
     // A property is not a person; og:type=profile would be wrong for it.
     expect(tags.ogType).toBe('website');

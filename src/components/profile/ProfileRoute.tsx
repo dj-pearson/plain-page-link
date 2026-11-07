@@ -1,6 +1,7 @@
 /**
  * The /:slug route element: starts the public profile read, then renders the
- * lazily loaded profile page (US-267).
+ * lazily loaded profile page (US-267). Also the element of the listing page
+ * route, /:username/listing/:listingId (US-275).
  *
  * This component is in the entry chunk on purpose. React Router renders it the
  * moment the catch-all matches, so its effect fires while the FullProfilePage
@@ -30,9 +31,11 @@ interface ProfileRouteProps {
 }
 
 export function ProfileRoute({ page: Page }: ProfileRouteProps) {
-  const { slug } = useParams<{ slug: string }>();
+  // /:slug is the profile; /:username/listing/:listingId a listing page on it
+  // (US-275), which reads the same profile query.
+  const { slug, username: usernameParam } = useParams<{ slug?: string; username?: string }>();
   const queryClient = useQueryClient();
-  const username = normalizeUsername(slug);
+  const username = normalizeUsername(slug ?? usernameParam);
   // Same key as usePublicProfile: the viewer decides whether an unpublished
   // page is visible (US-265), so the prefetch must carry it too.
   const viewerId = useAuthStore((s) => s.user?.id ?? null);
