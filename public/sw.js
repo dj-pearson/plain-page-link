@@ -205,11 +205,21 @@ function isNeverCache(request, url) {
   }
   const p = url.pathname;
   return (
-    p.startsWith('/auth') ||
-    p.startsWith('/functions') ||
+    isUnderSegment(p, '/auth') ||
+    isUnderSegment(p, '/functions') ||
     p.includes('/auth/v1') ||
     p.includes('/rest/v1')
   );
+}
+
+/**
+ * True for `prefix` itself and anything below it (`/auth`, `/auth/`,
+ * `/auth/login`), never for a sibling that merely shares its letters. A bare
+ * startsWith('/auth') also matched an agent's public page at /authorname or
+ * /authentic-homes, so those profiles were never kept for offline (US-323).
+ */
+function isUnderSegment(pathname, prefix) {
+  return pathname === prefix || pathname.startsWith(prefix + '/');
 }
 
 /**

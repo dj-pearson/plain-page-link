@@ -338,6 +338,31 @@ describe('offline pages for visited routes (US-312)', () => {
     expect(sw.stores.has('agentbio-sw-pages-v1')).toBe(false);
   });
 
+  it('never caches /auth itself, /auth/ or Supabase-style /functions paths', async () => {
+    const { sw } = pagesWorker();
+    for (const path of [
+      '/auth',
+      '/auth/',
+      '/auth/reset-password',
+      '/functions',
+      '/functions/v1/x',
+    ]) {
+      expect(await navigate(sw, path)).toBeUndefined();
+    }
+    expect(sw.stores.has('agentbio-sw-pages-v1')).toBe(false);
+  });
+
+  it('caches an agent page whose username merely starts with "auth" or "functions" (US-323)', async () => {
+    const { sw } = pagesWorker();
+    for (const path of ['/authorname', '/authentic-homes', '/functionsrealty']) {
+      expect(await navigate(sw, path)).toBeDefined();
+    }
+    const pages = sw.stores.get('agentbio-sw-pages-v1')!;
+    expect(pages.entries.has(`${ORIGIN}/authorname`)).toBe(true);
+    expect(pages.entries.has(`${ORIGIN}/authentic-homes`)).toBe(true);
+    expect(pages.entries.has(`${ORIGIN}/functionsrealty`)).toBe(true);
+  });
+
   it('caps the pages cache at 30, dropping the oldest first', async () => {
     const { sw } = pagesWorker();
     for (let i = 0; i < 35; i++) await navigate(sw, `/agent-${i}`);
