@@ -12,7 +12,7 @@ import {
   type ReadResult,
   type Row,
   type SectionSpec,
-} from './collect.ts';
+} from './gdpr-export.ts';
 
 /** Row columns per relation, from the generated types (as schema-references.test.ts does). */
 function parseSchema(): Map<string, Set<string>> {

@@ -1,6 +1,11 @@
 /**
  * GDPR Data Export Edge Function
- * Exports all user data in JSON format for GDPR compliance
+ *
+ * GET builds the export in this request and returns it as a download.
+ * POST queues it: scheduled-maintenance builds the same document into the
+ * private gdpr-exports bucket and emails the subject a link that expires
+ * (US-397, _shared/gdpr-export-queue.ts). An account too large to export in one
+ * request is served by the queue.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -11,14 +16,13 @@ import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
 import { decryptSecret } from '../_shared/encryption.ts';
 import { reportError } from '../_shared/report.ts';
 import {
+  buildExportDocument,
   collectSections,
   ExportIncompleteError,
-  maskLoginAttempt,
   sectionCounts,
+  supabaseExportReader,
   type CollectedSections,
-  type ExportReader,
-  type Row,
-} from './collect.ts';
+} from '../_shared/gdpr-export.ts';
 
 serve(async (req: Request) => {
   // Per request, from the Origin header. This was the module-level static
@@ -98,7 +102,7 @@ serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           requestId: requestData,
-          message: 'Data export request created. Processing will begin shortly.',
+          message: 'Data export requested. We will email you a download link when it is ready, usually within the hour.',
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -108,21 +112,7 @@ serve(async (req: Request) => {
     } else if (req.method === 'GET') {
       // Every section, every row (paged past PostgREST's row cap), and any
       // query that fails fails the export instead of exporting as empty.
-      const reader: ExportReader = {
-        page: (spec, userId, from, to) =>
-          serviceSupabase
-            .from(spec.table)
-            .select(spec.columns)
-            .eq(spec.ownerColumn, userId)
-            .order('id', { ascending: true })
-            .range(from, to),
-        one: (spec, userId) =>
-          serviceSupabase
-            .from(spec.table)
-            .select(spec.columns)
-            .eq(spec.ownerColumn, userId)
-            .maybeSingle(),
-      };
+      const reader = supabaseExportReader(serviceSupabase);
 
       let collected: CollectedSections;
       try {
@@ -147,78 +137,12 @@ serve(async (req: Request) => {
         );
       }
 
-      const rows = collected.rows;
-      const singles = collected.singles;
-
-      // Decrypt the lead and contact PII for the subject's own copy.
-      // encrypted_* are the only store since US-086, so a subject access
-      // request that returned ciphertext would not be an export at all.
       // decryptSecret passes through any value that is not enc:v1: prefixed.
-      const decryptPii = (list: Row[]) =>
-        Promise.all(
-          list.map(async (row) => {
-            const { encrypted_phone, encrypted_email, ...rest } = row;
-            const [email, phone] = await Promise.all([
-              decryptSecret(encrypted_email as string | null),
-              decryptSecret(encrypted_phone as string | null),
-            ]);
-            return { ...rest, email: email ?? null, phone: phone ?? null };
-          })
-        );
-      const [leads, contacts] = await Promise.all([decryptPii(rows.leads), decryptPii(rows.contacts)]);
-
-      const exportData = {
-        exportedAt: new Date().toISOString(),
-        user: {
-          id: user.id,
-          email: user.email || '',
-          createdAt: user.created_at || '',
-          lastSignIn: user.last_sign_in_at || null,
-        },
-        profile: singles.profile,
-        settings: singles.settings,
-        listings: rows.listings,
-        openHouses: rows.openHouses,
-        leads,
-        leadActivities: rows.leadActivities,
-        contacts,
-        contactKeyDates: rows.contactKeyDates,
-        contactInteractions: rows.contactInteractions,
-        testimonials: rows.testimonials,
-        links: rows.links,
-        customPages: rows.customPages,
-        blogPosts: rows.blogPosts,
-        workflows: rows.workflows,
-        notifications: rows.notifications,
-        billing: {
-          subscriptions: rows.subscriptions,
-          invoices: rows.invoices,
-        },
-        teams: {
-          memberships: rows.teamMemberships,
-          roles: rows.roles,
-        },
-        analytics: {
-          profileViews: rows.profileViews,
-          events: rows.analyticsEvents,
-        },
-        security: {
-          sessions: rows.sessions,
-          loginAttempts: rows.loginAttempts.map(maskLoginAttempt),
-          mfaSettings: singles.mfaSettings,
-          apiKeys: rows.apiKeys,
-          auditLogs: rows.auditLogs,
-        },
-        gdprRequests: rows.gdprRequests,
-        meta: {
-          counts: sectionCounts(collected),
-          // Sections that hit the per-section ceiling. Named so a partial
-          // section is never mistaken for a complete one.
-          truncated: collected.truncated,
-        },
-      };
+      const exportData = await buildExportDocument(user, collected, decryptSecret);
 
       // Close the newest pending export request, if the subject made one.
+      // A request the queue has already claimed is 'processing' and is left
+      // to it.
       // (An UPDATE with order/limit is not something PostgREST does by
       // default, so find the row first and update it by id.)
       const { data: pending, error: pendingError } = await serviceSupabase
@@ -249,7 +173,7 @@ serve(async (req: Request) => {
         p_resource_type: 'gdpr',
         p_ip_address: clientIP,
         p_user_agent: userAgent,
-        p_details: { records_exported: exportData.meta.counts, truncated: collected.truncated },
+        p_details: { records_exported: sectionCounts(collected), truncated: collected.truncated },
         p_risk_level: 'medium',
       });
       if (auditError) {
