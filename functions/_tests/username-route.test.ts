@@ -401,19 +401,24 @@ describe('/:username/listing/:listingId (US-275)', () => {
       expect(settingsUrl).toContain('user_id=eq.profile-jane');
     });
 
-    it('keeps the agent card when the agent hides their listings', async () => {
+    it('answers 404 with the agent card when the agent hides their listings (US-416)', async () => {
       serve(LISTING_ROW, [{ show_listings: false, show_sold_properties: true }]);
-      const html = await listingHtml();
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(404);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('listing-not-found');
+      const html = await response.text();
       expect(html).toContain(AGENT_TITLE);
       expect(html).not.toContain('412 Maple Avenue');
       expect(html).not.toContain('412-maple.jpg');
     });
 
-    it('keeps the agent card for a sold home while sold properties are hidden', async () => {
+    it('answers 404 for a sold home while sold properties are hidden (US-416)', async () => {
       serve({ ...LISTING_ROW, status: 'sold' }, [
         { show_listings: true, show_sold_properties: false },
       ]);
-      const html = await listingHtml();
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(404);
+      const html = await response.text();
       expect(html).toContain(AGENT_TITLE);
       expect(html).not.toContain('412 Maple Avenue');
     });
@@ -441,11 +446,84 @@ describe('/:username/listing/:listingId (US-275)', () => {
       expect(html).not.toContain('412 Maple Avenue');
     });
 
-    it('applies the same rules to the legacy ?listing= link', async () => {
+    it('applies the same rules to the legacy ?listing= link, which stays 200 because it is the profile', async () => {
       serve(LISTING_ROW, [{ show_listings: false, show_sold_properties: true }]);
-      const html = await (await call({ path: '/jane?listing=abc-123' }).promise).text();
+      const response = await call({ path: '/jane?listing=abc-123' }).promise;
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('listing');
+      const html = await response.text();
       expect(html).toContain(AGENT_TITLE);
       expect(html).not.toContain('412 Maple Avenue');
+    });
+  });
+
+  describe('a listing that is not public answers a hard 404, not a soft one (US-416)', () => {
+    const NO_LISTING = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+      return Response.json([]);
+    };
+
+    it('404s a listing id that does not exist for this agent', async () => {
+      fetchMock.mockImplementation(NO_LISTING);
+      const response = await callListing({ path: '/jane/listing/gone', listingId: 'gone' }).promise;
+      expect(response.status).toBe(404);
+      expect(response.headers.get('x-robots-tag')).toBe('noindex');
+    });
+
+    it('404s a withdrawn listing', async () => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+        if (url.includes('/rest/v1/listings'))
+          return Response.json([{ ...LISTING_ROW, status: 'withdrawn' }]);
+        return Response.json([]);
+      });
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(404);
+    });
+
+    it("swaps the homepage's robots index for noindex and points at the agent", async () => {
+      fetchMock.mockImplementation(NO_LISTING);
+      const html = await (
+        await callListing({ path: '/jane/listing/gone', listingId: 'gone' }).promise
+      ).text();
+      expect(html).toContain('<meta name="robots" content="noindex, follow" />');
+      expect(html).not.toMatch(/<meta name="robots" content="index/);
+      expect(html.match(/<meta\s+name="robots"/g)).toHaveLength(1);
+      expect(html).toContain('<link rel="canonical" href="https://agentbio.net/jane" />');
+      expect(html).toContain('<title>Jane Doe — Associate Broker at Summit Realty</title>');
+    });
+
+    it('does not 404 when the listings read failed — a blip is not an answer', async () => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/rest/v1/profiles')) return Response.json([PROFILE_ROW]);
+        if (url.includes('/rest/v1/listings')) throw new Error('upstream down');
+        return Response.json([]);
+      });
+      const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-agentbio-prerender')).toBe('listing');
+    });
+
+    it('keeps the legacy ?listing= link at 200 for a missing listing', async () => {
+      fetchMock.mockImplementation(NO_LISTING);
+      const response = await call({ path: '/jane?listing=gone' }).promise;
+      expect(response.status).toBe(200);
+    });
+
+    it('still leaves a person the SPA, which shows its own "no longer listed" page', async () => {
+      fetchMock.mockImplementation(NO_LISTING);
+      const { promise, next } = callListing({
+        path: '/jane/listing/gone',
+        listingId: 'gone',
+        userAgent: HUMAN,
+      });
+      const response = await promise;
+      expect(response.status).toBe(200);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

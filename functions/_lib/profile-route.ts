@@ -125,13 +125,23 @@ async function notFoundResponse(context: PagesContext): Promise<Response> {
  * If the settings read fails the listing is withheld: a database blip may cost
  * a listing its card for five minutes, but must not publish a home the agent
  * chose to hide. No settings row means the defaults, which show everything.
+ *
+ * `listing: null` comes in two kinds, and only one is an answer (US-416):
+ * `unknown` means a read errored or timed out, so nothing is known about the
+ * home; `hidden` means both reads answered and the home is missing, withdrawn
+ * or hidden by the agent's toggles.
  */
+type ListingLookup =
+  | { state: 'visible'; listing: ListingRow }
+  | { state: 'hidden'; listing: null }
+  | { state: 'unknown'; listing: null };
+
 async function fetchVisibleListing(
   base: string,
   apiKey: string,
   profileId: string,
   listingId: string
-): Promise<ListingRow | null> {
+): Promise<ListingLookup> {
   const [listings, settings] = await Promise.all([
     fetchJson<ListingRow>(
       `${base}/rest/v1/listings?select=${LISTING_COLUMNS}&id=eq.${encodeURIComponent(listingId)}&user_id=eq.${encodeURIComponent(profileId)}&limit=1`,
@@ -142,8 +152,20 @@ async function fetchVisibleListing(
       apiKey
     ),
   ]);
-  if (!listings || !settings) return null;
-  return selectListingForPage(listings, listingId, settings[0] ?? null);
+  if (!listings || !settings) return { state: 'unknown', listing: null };
+  const listing = selectListingForPage(listings, listingId, settings[0] ?? null);
+  return listing ? { state: 'visible', listing } : { state: 'hidden', listing: null };
+}
+
+/**
+ * Replace any robots meta with noindex, follow. The prerendered homepage
+ * carries its own (index), which must not survive on a 404.
+ */
+export function markNoindex(html: string): string {
+  const stripped = html.replace(/<meta\s+name="robots"[^>]*>/gi, '');
+  return stripped.includes('</head>')
+    ? stripped.replace('</head>', '    <meta name="robots" content="noindex, follow" />\n  </head>')
+    : stripped;
 }
 
 /** A single route parameter, whichever shape Pages hands it over in. */
@@ -231,14 +253,28 @@ export async function serveProfileRoute(
 
   const origin = new URL(request.url).origin;
   let tags = buildProfileTags(profile, origin);
+  let listingGone = false;
 
   if (listingId) {
-    const listing = await fetchVisibleListing(base, apiKey, profile.id, listingId);
+    const lookup = await fetchVisibleListing(base, apiKey, profile.id, listingId);
     // A listing that does not resolve, or that the agent has hidden, keeps the
     // agent's card rather than producing a broken one.
-    if (listing) {
-      tags = buildListingTags(profile, listing, origin);
+    if (lookup.state === 'visible') {
+      tags = buildListingTags(profile, lookup.listing, origin);
     }
+    // On its own address, a home that is definitively not public is a 404
+    // (US-416). It used to answer 200 with the agent's card while the SPA
+    // marked the same URL noindex with a canonical to the profile: a soft 404,
+    // which search engines keep re-crawling and may report as an error, for
+    // every withdrawn or sold-and-hidden home whose URL was ever shared or
+    // listed in the sitemap. The body is still the agent's card, so a preview
+    // bot that renders a 404's tags points at the agent rather than at a
+    // generic error page.
+    //
+    // Only when PostgREST answered both reads: a blip ('unknown') must not
+    // turn every listing URL into a deindexing event. The legacy
+    // /:username?listing= link stays 200, because that URL is the profile.
+    listingGone = listingPath && lookup.state === 'hidden';
   }
 
   const assetResponse = await next();
@@ -253,6 +289,17 @@ export async function serveProfileRoute(
   // Crawlers re-fetch; a short shared cache keeps a viral link from becoming a
   // read amplifier on the database.
   headers.set('cache-control', 'public, max-age=0, s-maxage=300');
+
+  if (listingGone) {
+    headers.set('x-agentbio-prerender', 'listing-not-found');
+    headers.set('x-robots-tag', 'noindex');
+    return new Response(markNoindex(injectSocialTags(html, tags)), {
+      status: 404,
+      statusText: 'Not Found',
+      headers,
+    });
+  }
+
   headers.set('x-agentbio-prerender', listingId ? 'listing' : 'profile');
 
   return new Response(injectSocialTags(html, tags), {
