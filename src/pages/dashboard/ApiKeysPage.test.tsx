@@ -175,6 +175,95 @@ describe('ApiKeysPage', () => {
     });
   });
 
+  describe('leaving the page with an uncopied key (US-364)', () => {
+    function unloadPrevented() {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    }
+
+    function clickInAppLink() {
+      const link = document.createElement('a');
+      link.href = '/dashboard/listings';
+      link.textContent = 'Listings';
+      document.body.appendChild(link);
+      try {
+        const click = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+        link.dispatchEvent(click);
+        return click;
+      } finally {
+        link.remove();
+      }
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('does not warn before any key is created', async () => {
+      invoke.mockResolvedValue({ data: { keys: [] }, error: null });
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      renderWithProviders(<ApiKeysPage />);
+      await screen.findByText(/no active api keys yet/i);
+
+      expect(unloadPrevented()).toBe(false);
+      expect(clickInAppLink().defaultPrevented).toBe(false);
+      expect(confirmSpy).not.toHaveBeenCalled();
+    });
+
+    it('has the browser confirm a reload or closed tab while the key is uncopied', async () => {
+      await createKey();
+      expect(unloadPrevented()).toBe(true);
+    });
+
+    it('asks before following an in-app link, and keeps the key when the agent cancels', async () => {
+      await createKey();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      const click = clickInAppLink();
+      expect(confirmSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/haven't copied your new api key/i)
+      );
+      expect(click.defaultPrevented).toBe(true);
+      expect(screen.getByTestId('created-api-key')).toHaveTextContent('ab_secret_value');
+    });
+
+    it('lets the link through when the agent confirms', async () => {
+      await createKey();
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      expect(clickInAppLink().defaultPrevented).toBe(false);
+    });
+
+    it('stops warning once the key was copied', async () => {
+      const copy = await createKey();
+      setClipboard({ writeText: vi.fn().mockResolvedValue(undefined) });
+      await userEvent.click(copy);
+      await screen.findByText('Copied to your clipboard.');
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      expect(unloadPrevented()).toBe(false);
+      expect(clickInAppLink().defaultPrevented).toBe(false);
+      expect(confirmSpy).not.toHaveBeenCalled();
+    });
+
+    it('keeps warning after a refused clipboard write', async () => {
+      const copy = await createKey();
+      setClipboard({ writeText: vi.fn().mockRejectedValue(new Error('NotAllowedError')) });
+      await userEvent.click(copy);
+      await screen.findByText(/browser blocked automatic copying/i);
+      expect(unloadPrevented()).toBe(true);
+    });
+
+    it('stops warning once the key was dismissed', async () => {
+      await createKey();
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+      await userEvent.click(await screen.findByRole('button', { name: /i’ve saved it — close/i }));
+      await waitFor(() => expect(screen.queryByTestId('created-api-key')).not.toBeInTheDocument());
+
+      expect(unloadPrevented()).toBe(false);
+    });
+  });
+
   it('draws the copy-now warning from the theme tokens, so it has a dark variant', async () => {
     await createKey();
     const box = screen.getByText(/copy this key now/i);
