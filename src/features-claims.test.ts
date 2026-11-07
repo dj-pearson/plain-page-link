@@ -97,6 +97,31 @@ const PAGE_FALSE: Record<string, Array<{ pattern: RegExp; why: string }>> = {
     { pattern: /MLS attribution|fair housing disclaimer/i, why: 'neither is rendered' },
     { pattern: /GDPR/i, why: 'not an attestation anyone has made' },
   ],
+  // US-379: the lead-capture slice of US-295.
+  'LeadCapture.tsx': [
+    {
+      pattern: /CRM integration|export to your CRM/i,
+      why: 'no CRM integration; there is a CSV export (paid plans) and a Zapier webhook',
+    },
+    {
+      pattern: /all lead details|budget, timeline, pre-approval status, and message/i,
+      why: 'the email carries name, contact details, message and source, not the qualifying answers',
+    },
+    {
+      pattern: /nurture campaign/i,
+      why: 'there is no nurture campaign; workflow emails do not send',
+    },
+    {
+      pattern:
+        /best time to call|current home value estimate|contact preferences|reason for valuation|email for delivery/i,
+      why: 'none of these is a field on the buyer, seller or valuation form (leadFormSchema.ts)',
+    },
+    { pattern: /#1 lead magnet/i, why: 'unsourced ranking' },
+    {
+      pattern: /0-30 day timeline|30-90 day timeline|90\+ day timeline|budget (defined|undefined)/i,
+      why: 'scoring weighs whether a timeline was given and pre-approval, not timeline bands or budget',
+    },
+  ],
 };
 
 /**
@@ -131,6 +156,21 @@ const FAQ_FALSE: Array<{ pattern: RegExp; why: string }> = [
     why: 'listings are a plan limit; the allowance comes from listingAllowanceSummary()',
   },
   { pattern: /\$39/, why: 'no plan costs $39; prices come from PRICING_PLANS' },
+  // US-379
+  {
+    pattern: /all lead details|within seconds/i,
+    why: 'the lead email has name, contact details, message and source; locked leads have no contact details',
+  },
+  {
+    pattern: /exported to your CRM/i,
+    why: 'there is a CSV export and a Zapier webhook, no CRM integration',
+  },
+  {
+    pattern:
+      /scored as hot, warm, or cold based on (their )?responses like budget|scoring based on budget/i,
+    why: 'budget is not a scoring input (ml-lead-scoring.ts)',
+  },
+  { pattern: /0-30 day timelines/i, why: 'scoring has no timeline bands' },
 ];
 
 const find = (text: string, rules: Array<{ pattern: RegExp; why: string }>) =>
