@@ -208,7 +208,13 @@ serve(async (req) => {
           force: body.force_digest === true,
         });
         if (!schedule) return 'outside the digest window';
-        const report = await runDigests(supabaseDigestStore(supabase), { schedule, siteUrl: getSiteUrl() });
+        // Hourly runs stop reading profiles once a clean pass has completed
+        // today (digest_runs, US-354); a forced run always does a full pass.
+        const report = await runDigests(supabaseDigestStore(supabase), {
+          schedule,
+          siteUrl: getSiteUrl(),
+          useRunMarker: body.force_digest !== true,
+        });
         const summary = summarizeDigestReport(report);
         // Agents still owed today's edition are retried by the next run in
         // the window, but the task is reported failed so the 207 says so.

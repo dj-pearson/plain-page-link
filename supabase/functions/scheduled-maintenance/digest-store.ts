@@ -9,6 +9,11 @@ import { sendEmail } from '../_shared/email.ts';
 import { getAgentContact } from '../_shared/agent-contact.ts';
 import type { DigestKeyDateRow, DigestStore } from './digests.ts';
 
+/** Postgres 42P01 (undefined_table) or PostgREST's PGRST205 (not in the schema cache). */
+export function isMissingTable(error: { code?: string | null }): boolean {
+  return error.code === '42P01' || error.code === 'PGRST205';
+}
+
 export function supabaseDigestStore(supabase: SupabaseClient): DigestStore {
   return {
     async listProfiles(afterId, limit) {
@@ -127,6 +132,30 @@ export function supabaseDigestStore(supabase: SupabaseClient): DigestStore {
         .eq('user_id', userId)
         .eq('digest_date', day)
         .eq('kind', kind);
+      if (error) throw new Error(error.message);
+    },
+
+    async hasCompletedRun(day) {
+      const { data, error } = await supabase
+        .from('digest_runs')
+        .select('digest_date')
+        .eq('digest_date', day)
+        .maybeSingle();
+      // Before migration 20261107000354 is applied there is no marker table:
+      // behave as before (a full pass every run) rather than fail the task.
+      if (error && isMissingTable(error)) return false;
+      if (error) throw new Error(error.message);
+      return data !== null;
+    },
+
+    async markRunCompleted(day, totals) {
+      const { error } = await supabase
+        .from('digest_runs')
+        .upsert(
+          { digest_date: day, profiles: totals.profiles, sent: totals.sent },
+          { onConflict: 'digest_date', ignoreDuplicates: true }
+        );
+      if (error && isMissingTable(error)) return;
       if (error) throw new Error(error.message);
     },
 

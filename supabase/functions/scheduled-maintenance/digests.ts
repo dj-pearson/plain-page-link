@@ -26,6 +26,15 @@
  *   ignored (so that agent got nothing that day and nobody knew). Each is now
  *   an error in the report, and the task fails so the 207 says so.
  *
+ * US-354 (US-344): every run in the catch-up window re-read every profile and
+ * its related rows, only to find everyone sent or with nothing to send. A
+ * complete pass with no errors now writes a digest_runs row for the day, and
+ * later unforced runs that day return before reading a single profile. A pass
+ * with any error writes nothing, so the next run still retries. The cost: an
+ * agent who had nothing at the first clean pass, or who switches the digest
+ * on, signs up or gains a task due today after it, is not reconsidered until
+ * tomorrow's edition — the same as a run exactly on the hour always meant.
+ *
  * No Deno globals here, so it runs under vitest; the database side is
  * digest-store.ts.
  */
@@ -120,6 +129,10 @@ export interface DigestStore {
   claim(userId: string, day: string, kind: DigestKind): Promise<'claimed' | 'duplicate'>;
   /** Undo a claim after a failed send, so the next run can retry. */
   release(userId: string, day: string, kind: DigestKind): Promise<void>;
+  /** Whether a complete, error-free pass already ran for `day` (digest_runs). */
+  hasCompletedRun(day: string): Promise<boolean>;
+  /** Record that the pass for `day` completed with no errors. Idempotent. */
+  markRunCompleted(day: string, totals: { profiles: number; sent: number }): Promise<void>;
   sendEmail(mail: EmailOptions): Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -131,6 +144,8 @@ export interface DigestReport {
   noEmail: number;
   failed: number;
   profiles: number;
+  /** True when an earlier run today already completed a clean pass. */
+  skipped: boolean;
   errors: string[];
 }
 
@@ -168,9 +183,20 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 
 export async function runDigests(
   store: DigestStore,
-  opts: { schedule: DigestSchedule; siteUrl: string }
+  opts: {
+    schedule: DigestSchedule;
+    siteUrl: string;
+    /**
+     * Read and write the per-day run marker (digest_runs). True for the
+     * hourly scheduled runs; false for a forced run, which always does a full
+     * pass and, since it may anchor on `now` before the hour, records nothing
+     * that would stop the on-time edition.
+     */
+    useRunMarker?: boolean;
+  }
 ): Promise<DigestReport> {
   const { day, anchor } = opts.schedule;
+  const useRunMarker = opts.useRunMarker === true;
   const { siteUrl } = opts;
   const report: DigestReport = {
     sent: 0,
@@ -180,8 +206,22 @@ export async function runDigests(
     noEmail: 0,
     failed: 0,
     profiles: 0,
+    skipped: false,
     errors: [],
   };
+
+  if (useRunMarker) {
+    try {
+      if (await store.hasCompletedRun(day)) {
+        report.skipped = true;
+        return report;
+      }
+    } catch (error) {
+      // Not knowing must not cost anyone their digest: do the full pass
+      // (digest_log still stops a double send) and say why it ran.
+      report.errors.push(`reading the digest run marker: ${message(error)}`);
+    }
+  }
 
   const anchorIso = anchor.toISOString();
   const since24h = new Date(anchor.getTime() - 24 * HOUR_MS).toISOString();
@@ -220,6 +260,15 @@ export async function runDigests(
     }
 
     if (profiles.length < PROFILE_PAGE_SIZE) break;
+  }
+
+  if (useRunMarker && report.errors.length === 0 && report.failed === 0) {
+    try {
+      await store.markRunCompleted(day, { profiles: report.profiles, sent: report.sent });
+    } catch (error) {
+      // Every digest went out; the next run will just do the pass again.
+      report.errors.push(`recording the digest run marker: ${message(error)}`);
+    }
   }
 
   return report;
@@ -312,6 +361,7 @@ async function sendPage(
 }
 
 export function summarizeDigestReport(report: DigestReport): string {
+  if (report.skipped) return 'already completed today';
   return (
     `sent ${report.sent}, already sent ${report.alreadySent}, nothing to send ${report.nothingToSend}, ` +
     `off ${report.off}, no email ${report.noEmail}, failed ${report.failed} (of ${report.profiles} profiles)`
