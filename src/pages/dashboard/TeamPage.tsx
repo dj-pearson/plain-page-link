@@ -4,6 +4,14 @@
  * Shows the user's team (creating one if none), its members and roles, an
  * invite form, and aggregate team stats. Owners/admins can invite, remove,
  * and change roles.
+ *
+ * US-411 (US-338): the team is the one the user owns or, failing that, the
+ * one they have accepted an invitation to. Members see it read-only; admins
+ * get the same controls as the owner, because the teams edge function gates
+ * invite / remove / updateRole on is_team_admin (owner, or accepted admin).
+ * RLS already lets accepted members read both tables ("Team members read
+ * team", "Members read roster"); before this the page asked only for teams
+ * the user owned, so an accepted member was offered "Create your team".
  */
 
 import { useState } from 'react';
@@ -52,6 +60,17 @@ interface TeamMember {
 }
 
 type AssignableRole = Exclude<TeamMember['role'], 'owner'>;
+
+/** The team the page shows, and the caller's role in it. */
+export interface MyTeam {
+  team: Team;
+  role: TeamMember['role'];
+}
+
+/** Mirrors is_team_admin: the owner and accepted admins manage the team. */
+export function canManageTeam(role: TeamMember['role']): boolean {
+  return role === 'owner' || role === 'admin';
+}
 
 /** The roles the teams edge function's invite and updateRole actions accept. */
 export const ASSIGNABLE_ROLES: { value: AssignableRole; label: string }[] = [
@@ -103,7 +122,7 @@ export default function TeamPage() {
   // US-328: a failed load used to fall through to "Create your team", which
   // invited an owner to make a second team. Errors are now thrown and shown.
   const {
-    data: team,
+    data: myTeam,
     isLoading: teamLoading,
     error: teamError,
     refetch: refetchTeam,
@@ -111,16 +130,42 @@ export default function TeamPage() {
   } = useQuery({
     queryKey: ['my-team', user?.id],
     enabled: !!user?.id,
-    queryFn: async (): Promise<Team | null> => {
-      const { data, error } = await supabase
+    queryFn: async (): Promise<MyTeam | null> => {
+      const { data: owned, error } = await supabase
         .from('teams')
         .select('id, name, owner_id, max_seats')
         .eq('owner_id', user!.id)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      if (owned) return { team: owned, role: 'owner' };
+
+      // Not an owner: the team they accepted an invitation to, if any. A
+      // pending invite (accepted_at null) does not count — it is accepted
+      // from the emailed link, not here.
+      const { data: membership, error: membershipError } = await supabase
+        .from('team_members')
+        .select('team_id, role')
+        .eq('user_id', user!.id)
+        .not('accepted_at', 'is', null)
+        .order('accepted_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (membershipError) throw membershipError;
+      if (!membership) return null;
+
+      const { data: joined, error: joinedError } = await supabase
+        .from('teams')
+        .select('id, name, owner_id, max_seats')
+        .eq('id', membership.team_id)
+        .maybeSingle();
+      if (joinedError) throw joinedError;
+      // A membership whose team cannot be read is surfaced as an error, not
+      // as "no team": the create prompt would make them owner of a second one.
+      if (!joined) throw new Error('Your team could not be found');
+      return { team: joined, role: membership.role as TeamMember['role'] };
     },
   });
+  const team = myTeam?.team;
 
   const {
     data: members,
@@ -260,7 +305,7 @@ export default function TeamPage() {
   }
 
   // No team yet → creation prompt.
-  if (!team) {
+  if (!myTeam || !team) {
     return (
       <div className="mx-auto max-w-lg space-y-6">
         <div>
@@ -293,6 +338,7 @@ export default function TeamPage() {
     );
   }
 
+  const canManage = canManageTeam(myTeam.role);
   const memberList = members ?? [];
   const acceptedCount = memberList.filter((m) => m.accepted_at).length;
 
@@ -314,51 +360,58 @@ export default function TeamPage() {
             {acceptedCount} active · {memberList.length}/{team.max_seats} seats used
           </p>
         )}
+        {!canManage && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            You’re a member of this team. Ask the owner or an admin to invite or remove people.
+          </p>
+        )}
       </div>
 
       {/* Invite */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Invite a member</CardTitle>
-          <CardDescription>
-            They'll join your team once they accept. Admins can also invite and remove members and
-            change roles.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            type="email"
-            aria-label="Email address to invite"
-            autoComplete="off"
-            placeholder="agent@example.com"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-          />
-          <select
-            aria-label="Role for the new member"
-            className={SELECT_CLASS}
-            value={inviteRole}
-            onChange={(e) => setInviteRole(e.target.value as AssignableRole)}
-          >
-            {ASSIGNABLE_ROLES.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-          <Button
-            onClick={() => invite.mutate({ email: inviteEmail.trim(), role: inviteRole })}
-            disabled={!inviteEmail.trim() || invite.isPending}
-          >
-            {invite.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <UserPlus className="mr-2 h-4 w-4" />
-            )}
-            Invite
-          </Button>
-        </CardContent>
-      </Card>
+      {canManage && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Invite a member</CardTitle>
+            <CardDescription>
+              They'll join your team once they accept. Admins can also invite and remove members and
+              change roles.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              type="email"
+              aria-label="Email address to invite"
+              autoComplete="off"
+              placeholder="agent@example.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <select
+              aria-label="Role for the new member"
+              className={SELECT_CLASS}
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as AssignableRole)}
+            >
+              {ASSIGNABLE_ROLES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              onClick={() => invite.mutate({ email: inviteEmail.trim(), role: inviteRole })}
+              disabled={!inviteEmail.trim() || invite.isPending}
+            >
+              {invite.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <UserPlus className="mr-2 h-4 w-4" />
+              )}
+              Invite
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Members */}
       <Card>
@@ -394,7 +447,9 @@ export default function TeamPage() {
                         </div>
                       </div>
                     </div>
-                    {m.role !== 'owner' && (
+                    {/* Nobody changes the owner's role, and an admin does not
+                        demote or remove themselves from this list. */}
+                    {canManage && m.role !== 'owner' && m.user_id !== user?.id && (
                       <div className="flex shrink-0 items-center gap-1">
                         <select
                           aria-label={`Role for ${memberLabel(m)}`}
@@ -434,7 +489,8 @@ export default function TeamPage() {
       </Card>
 
       {/* Lead routing rules */}
-      <LeadRoutingRules teamId={team.id} members={memberList} />
+      {/* Routing rules are written under is_team_admin RLS; members cannot edit them. */}
+      {canManage && <LeadRoutingRules teamId={team.id} members={memberList} />}
 
       <AlertDialog
         open={!!removeTarget}
