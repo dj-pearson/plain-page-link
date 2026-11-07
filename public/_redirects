@@ -82,3 +82,7 @@
 # real URL under those prefixes is prerendered to a file.
 /:username        /index.html 200
 /:username/review /index.html 200
+
+# US-275: one listing on a profile. functions/[username]/listing/[listingId].ts
+# gives crawlers the listing's share card; everyone else gets the SPA.
+/:username/listing/:listingId /index.html 200

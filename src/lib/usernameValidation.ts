@@ -56,6 +56,8 @@ const RESERVED_USERNAMES = [
   'realtor',
   'realestate',
   'open-house',
+  // /:username/listing/:id is a listing page (US-275).
+  'listing',
 ];
 
 export const containsProfanity = (text: string): boolean => {

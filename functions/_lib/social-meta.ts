@@ -216,7 +216,8 @@ export function buildProfileTags(profile: ProfileMeta, origin: string): SocialTa
 }
 
 /**
- * The tags for one listing, shared as /:username?listing=<id>.
+ * The tags for one listing: /:username/listing/<id>, or the legacy
+ * /:username?listing=<id> share link, which canonicalises to it.
  *
  * Falls back to the agent's own card for anything the listing does not carry,
  * so a listing with no photo still unfurls as that agent rather than as the
@@ -244,7 +245,8 @@ export function buildListingTags(
     ? summarise(listing.description)
     : `${facts.join(' · ')}${facts.length ? '. ' : ''}Listed by ${name}.`;
 
-  const url = `${origin.replace(/\/$/, '')}/${profile.username}?listing=${encodeURIComponent(listing.id)}`;
+  // The listing's own page (US-275), whichever URL the crawler arrived on.
+  const url = `${origin.replace(/\/$/, '')}/${profile.username}/listing/${encodeURIComponent(listing.id)}`;
 
   return {
     title: `${address}${place ? `, ${place}` : ''}${price ? ` — ${price}` : ''}`,

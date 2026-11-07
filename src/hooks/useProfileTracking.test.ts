@@ -4,6 +4,7 @@
  * pass one or the rate limit has nothing to bucket by.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
 
 const rpcMock = vi.fn();
 const insertMock = vi.fn();
@@ -15,7 +16,11 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
-import { trackLinkClick } from './useProfileTracking';
+import {
+  resetProfileViewDedupeForTests,
+  trackLinkClick,
+  useProfileTracking,
+} from './useProfileTracking';
 
 const AGENT = '11111111-1111-1111-1111-111111111111';
 const LINK = '22222222-2222-2222-2222-222222222222';
@@ -59,5 +64,33 @@ describe('trackLinkClick', () => {
   it('does not let a failed count stop the visitor following the link', async () => {
     rpcMock.mockRejectedValue(new Error('offline'));
     await expect(trackLinkClick(LINK, AGENT, 'My listings')).resolves.toBeUndefined();
+  });
+});
+
+describe('useProfileTracking (US-275)', () => {
+  beforeEach(() => {
+    insertMock.mockReset().mockResolvedValue({ error: null });
+    resetProfileViewDedupeForTests();
+  });
+
+  const views = () => insertMock.mock.calls.filter(([table]) => table === 'analytics_views');
+
+  it('counts one view when the visitor comes Back to the profile from a listing page', async () => {
+    const first = renderHook(() => useProfileTracking(AGENT, 'jane'));
+    first.unmount(); // profile -> /jane/listing/x
+    renderHook(() => useProfileTracking(AGENT, 'jane')); // Back
+    await vi.waitFor(() => expect(views()).toHaveLength(1));
+  });
+
+  it('still counts a different profile', async () => {
+    renderHook(() => useProfileTracking(AGENT, 'jane'));
+    renderHook(() => useProfileTracking(LINK, 'sam'));
+    await vi.waitFor(() => expect(views()).toHaveLength(2));
+  });
+
+  it('does not count the owner preview (no id)', async () => {
+    renderHook(() => useProfileTracking(undefined, 'jane'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(views()).toHaveLength(0);
   });
 });

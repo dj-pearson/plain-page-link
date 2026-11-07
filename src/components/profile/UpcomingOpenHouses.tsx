@@ -24,6 +24,8 @@ interface UpcomingOpenHousesProps {
   agentName?: string | null;
   profileUrl?: string;
   onViewListing?(listingId: string): void;
+  /** Only this listing's open houses — the listing page (US-275). */
+  listingId?: string;
 }
 
 interface UpcomingOpenHouse {
@@ -174,11 +176,13 @@ export function UpcomingOpenHouses({
   agentName,
   profileUrl,
   onViewListing,
+  listingId,
 }: UpcomingOpenHousesProps) {
   const { data } = usePublicOpenHouses(agentId);
   const openHouses = (data ?? [])
     .map(toUpcoming)
     .filter((oh): oh is UpcomingOpenHouse => oh !== null)
+    .filter((oh) => !listingId || oh.listingId === listingId)
     .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 
   if (openHouses.length === 0) return null;
@@ -205,7 +209,9 @@ export function UpcomingOpenHouses({
         Open houses
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Come see a home in person — no appointment needed.
+        {listingId
+          ? 'Come see this home in person — no appointment needed.'
+          : 'Come see a home in person — no appointment needed.'}
       </p>
 
       <ul className="mt-4 space-y-4">

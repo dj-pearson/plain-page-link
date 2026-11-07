@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { onRequestGet } from '../[username]';
+import { onRequestGet as onListingRequestGet } from '../[username]/listing/[listingId]';
 
 /**
  * What next() really returns for /:username: dist/index.html, which since
@@ -302,5 +303,65 @@ describe('GET /:username', () => {
     );
     const response = await call({ next }).promise;
     expect(await response.text()).toBe('{"ok":true}');
+  });
+});
+
+describe('/:username/listing/:listingId (US-275)', () => {
+  const callListing = (opts: {
+    path: string;
+    username?: string;
+    listingId?: string;
+    userAgent?: string;
+  }) => {
+    const next = vi.fn(async () => indexResponse());
+    const promise = onListingRequestGet({
+      request: new Request(`https://agentbio.net${opts.path}`, {
+        headers: { 'user-agent': opts.userAgent ?? CRAWLER },
+      }),
+      env: ENV as never,
+      params: { username: opts.username ?? 'jane', listingId: opts.listingId ?? 'abc-123' },
+      next,
+    });
+    return { promise, next };
+  };
+
+  it("gives a crawler the listing's card, scoped to the agent, with the page as its URL", async () => {
+    const response = await callListing({ path: '/jane/listing/abc-123' }).promise;
+    const html = await response.text();
+
+    expect(response.headers.get('x-agentbio-prerender')).toBe('listing');
+    expect(html).toContain('412 Maple Avenue, Salt Lake City, UT — $525,000');
+    expect(html).toContain('https://agentbio.net/jane/listing/abc-123');
+    const listingUrl = fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .find((url) => url.includes('/rest/v1/listings'));
+    expect(listingUrl).toContain('id=eq.abc-123');
+    expect(listingUrl).toContain('user_id=eq.profile-jane');
+  });
+
+  it('301s a mixed-case username to the lowercase listing URL', async () => {
+    const { promise, next } = callListing({
+      path: '/JaneDoe/listing/abc-123?utm_source=ig',
+      username: 'JaneDoe',
+      userAgent: HUMAN,
+    });
+    const response = await promise;
+    expect(response.status).toBe(301);
+    expect(response.headers.get('location')).toBe(
+      'https://agentbio.net/janedoe/listing/abc-123?utm_source=ig'
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('leaves a person the SPA untouched', async () => {
+    const { promise, next } = callListing({ path: '/jane/listing/abc-123', userAgent: HUMAN });
+    expect(await (await promise).text()).toBe(INDEX_HTML);
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('points the legacy ?listing= card at the listing page too', async () => {
+    const html = await (await call({ path: '/jane?listing=abc-123' }).promise).text();
+    expect(html).toContain('https://agentbio.net/jane/listing/abc-123');
   });
 });

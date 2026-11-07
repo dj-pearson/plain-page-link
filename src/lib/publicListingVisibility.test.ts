@@ -6,7 +6,11 @@
  * Pending badge had nothing to render on.
  */
 import { describe, it, expect } from 'vitest';
-import { selectAvailableListings, selectSoldListings } from './publicListingVisibility';
+import {
+  selectAvailableListings,
+  selectListingForPage,
+  selectSoldListings,
+} from './publicListingVisibility';
 
 const l = (id: string, status: string) => ({ id, status });
 
@@ -59,5 +63,35 @@ describe('selectSoldListings', () => {
   it('returns only sold listings', () => {
     const result = selectSoldListings([l('a', 'active'), l('s', 'sold'), l('p', 'pending')]);
     expect(result.map((x) => x.id)).toEqual(['s']);
+  });
+});
+
+describe('selectListingForPage (US-275)', () => {
+  const all = [l('a', 'active'), l('p', 'pending'), l('s', 'sold'), l('d', 'draft')];
+  const shown = { show_listings: true, show_sold_properties: true };
+
+  it('finds an available listing by id', () => {
+    expect(selectListingForPage(all, 'a', shown)?.id).toBe('a');
+    expect(selectListingForPage(all, 'p', shown)?.id).toBe('p');
+  });
+
+  it('returns null for an unknown id, a missing id, or a draft', () => {
+    expect(selectListingForPage(all, 'zzz', shown)).toBeNull();
+    expect(selectListingForPage(all, undefined, shown)).toBeNull();
+    expect(selectListingForPage(all, 'd', shown)).toBeNull();
+  });
+
+  it('shows a sold listing only while the agent shows sold properties', () => {
+    expect(selectListingForPage(all, 's', shown)?.id).toBe('s');
+    expect(selectListingForPage(all, 's', { ...shown, show_sold_properties: false })).toBeNull();
+  });
+
+  it('shows nothing at all while the agent hides listings', () => {
+    expect(selectListingForPage(all, 'a', { show_listings: false })).toBeNull();
+  });
+
+  it('treats missing settings as the defaults (shown)', () => {
+    expect(selectListingForPage(all, 'a', null)?.id).toBe('a');
+    expect(selectListingForPage(all, 's', null)?.id).toBe('s');
   });
 });

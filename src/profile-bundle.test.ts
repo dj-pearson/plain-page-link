@@ -60,7 +60,7 @@ describe('profile modals are lazy (US-244)', () => {
   it('FullProfilePage imports none of them statically', () => {
     const page = source('src/pages/public/FullProfilePage.tsx');
     for (const module of [
-      'ListingDetailModal',
+      'ListingDetails',
       'LeadFormModal',
       'CalendlyModal',
       'HomeValuationForm',
@@ -68,6 +68,14 @@ describe('profile modals are lazy (US-244)', () => {
       'CustomBlocksSection',
       'ui/dialog',
     ]) {
+      expect(staticImportOf(page, module), module).toBe(false);
+    }
+    expect(page).toMatch(/lazy\(\(\) =>\s*import\('@\/components\/profile\/LeadFormModal'\)/);
+  });
+
+  it('ListingPage loads its modals lazily too (US-275)', () => {
+    const page = source('src/pages/public/ListingPage.tsx');
+    for (const module of ['LeadFormModal', 'CalendlyModal', 'ui/dialog']) {
       expect(staticImportOf(page, module), module).toBe(false);
     }
     expect(page).toMatch(/lazy\(\(\) =>\s*import\('@\/components\/profile\/LeadFormModal'\)/);

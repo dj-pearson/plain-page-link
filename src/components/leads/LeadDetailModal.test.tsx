@@ -365,7 +365,7 @@ describe('LeadDetailModal — what the form captured', () => {
     expect(screen.getByText('Austin, TX')).toBeInTheDocument();
     expect(screen.getByText('Pending')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /123 Main St on the public page/ });
-    expect(link.getAttribute('href')).toMatch(/\/janedoe\?listing=listing-1$/);
+    expect(link.getAttribute('href')).toMatch(/\/janedoe\/listing\/listing-1$/);
     // The address is not repeated as a loose "Property:" line.
     expect(screen.queryByText('Property:')).toBeNull();
   });

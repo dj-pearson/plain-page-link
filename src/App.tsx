@@ -139,6 +139,9 @@ const SearchAnalyticsPage = lazy(() => import('./pages/admin/SearchAnalyticsPage
  * site, whether or not they ever opened a profile.
  */
 const ProfilePage = lazy(() => import('./pages/public/FullProfilePage'));
+// One listing on a profile (US-275). Through ProfileRoute too: it reads the
+// same profile query, so the read starts while the chunk downloads.
+const ListingPage = lazy(() => import('./pages/public/ListingPage'));
 // Rendered through ProfileRoute, which starts the profile's data read while
 // this chunk downloads rather than after it (US-267).
 
@@ -337,6 +340,10 @@ function App() {
               {/* Open house sign-in kiosk. Before the username catch-all. */}
               <Route path="/open-house/:openHouseId" element={<OpenHouseSignIn />} />
               <Route path="/:username/review" element={<SubmitReview />} />
+              <Route
+                path="/:username/listing/:listingId"
+                element={<ProfileRoute page={ListingPage} />}
+              />
               <Route path="/:slug" element={<ProfileRoute page={ProfilePage} />} />
             </Route>
 

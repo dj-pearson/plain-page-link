@@ -10,7 +10,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ListingGallery from './ListingGallery';
 import { TestimonialSection } from './TestimonialSection';
-import ListingDetailModal from './ListingDetailModal';
+import ListingDetails from './ListingDetails';
 import type { PublicProfileListing } from '@/types';
 import type { PublicTestimonial } from '@/types/testimonial';
 
@@ -105,10 +105,10 @@ describe('TestimonialSection arrows (US-245)', () => {
   });
 });
 
-describe('ListingDetailModal photo controls (US-245)', () => {
+describe('ListingDetails photo controls (US-245)', () => {
   it('names prev/next and the thumbnails, and marks the current thumbnail', async () => {
     const user = userEvent.setup();
-    render(<ListingDetailModal listing={listing('1')} isOpen onClose={vi.fn()} />);
+    render(<ListingDetails listing={listing('1')} />);
 
     expect(await screen.findByRole('button', { name: 'Previous photo' })).toBeInTheDocument();
     const thumb1 = screen.getByRole('button', { name: 'Show photo 1 of 3' });
@@ -126,5 +126,42 @@ describe('ListingDetailModal photo controls (US-245)', () => {
       'aria-pressed',
       'true'
     );
+  });
+});
+
+describe('ListingDetails on a page (US-275)', () => {
+  it('pages through photos with the arrow keys only while the gallery has focus', async () => {
+    const user = userEvent.setup();
+    render(<ListingDetails listing={listing('1')} />);
+
+    // Not a window-wide listener: arrows pressed elsewhere leave the photo alone.
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByText('1 / 3')).toBeInTheDocument();
+
+    const gallery = screen.getByRole('group', { name: 'Photos of 1 Maple Avenue' });
+    gallery.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+    await user.keyboard('{ArrowLeft}{ArrowLeft}');
+    expect(screen.getByText('3 / 3')).toBeInTheDocument();
+  });
+
+  it('makes the address the page heading and offers a showing on an available home', async () => {
+    const user = userEvent.setup();
+    const onRequestShowing = vi.fn();
+    render(<ListingDetails listing={listing('1')} onRequestShowing={onRequestShowing} />);
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: /1 Maple Avenue, Salt Lake City, UT 84103/ })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Request a Showing' }));
+    expect(onRequestShowing).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }));
+  });
+
+  it('offers no showing on a sold home', () => {
+    render(
+      <ListingDetails listing={listing('1', { status: 'sold' })} onRequestShowing={vi.fn()} />
+    );
+    expect(screen.queryByRole('button', { name: /Showing/ })).not.toBeInTheDocument();
   });
 });
