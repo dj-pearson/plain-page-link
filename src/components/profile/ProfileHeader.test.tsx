@@ -95,3 +95,41 @@ describe('ProfileHeader service area (US-281)', () => {
     expect(screen.queryByText(/^Serving/)).not.toBeInTheDocument();
   });
 });
+
+describe('ProfileHeader brokerage (US-383)', () => {
+  const withBrokerage = (fields: Partial<PublicProfile>) =>
+    ({ ...profile, ...fields }) as PublicProfile;
+
+  it('shows an uploaded logo even when no brokerage name is set', () => {
+    renderWithProviders(
+      <ProfileHeader profile={withBrokerage({ brokerage_logo: 'https://cdn.example/logo.png' })} />
+    );
+    const logo = screen.getByRole('img', { name: 'Brokerage logo' });
+    expect(logo).toHaveAttribute('src', 'https://cdn.example/logo.png');
+  });
+
+  it('names the logo after the brokerage when both are set', () => {
+    renderWithProviders(
+      <ProfileHeader
+        profile={withBrokerage({
+          brokerage_name: 'Acme Realty',
+          brokerage_logo: 'https://cdn.example/logo.png',
+        })}
+      />
+    );
+    expect(screen.getByRole('img', { name: 'Acme Realty' })).toBeInTheDocument();
+  });
+
+  it('shows the name as text when there is no logo', () => {
+    renderWithProviders(
+      <ProfileHeader profile={withBrokerage({ brokerage_name: 'Acme Realty' })} />
+    );
+    expect(screen.getByText('Acme Realty')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /brokerage|Acme/i })).not.toBeInTheDocument();
+  });
+
+  it('renders no brokerage logo when neither field is set', () => {
+    renderWithProviders(<ProfileHeader profile={profile} />);
+    expect(screen.queryByRole('img', { name: /brokerage/i })).not.toBeInTheDocument();
+  });
+});
