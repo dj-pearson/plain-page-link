@@ -22,6 +22,8 @@ import { websiteId } from '@/config/site-entities';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { useArticleAuthors } from '@/hooks/useArticleAuthors';
+import { ArticleCardByline } from '@/components/blog/ArticleCardByline';
 
 /**
  * The editorial copy behind each category page.
@@ -373,6 +375,9 @@ export default function BlogCategory() {
     enabled: !!category,
   });
 
+  // Card bylines: one batched profiles lookup for the whole list (US-399).
+  const authors = useArticleAuthors(articles);
+
   const filteredArticles = useMemo(() => {
     if (!searchQuery) return articles;
 
@@ -549,6 +554,9 @@ export default function BlogCategory() {
                       </div>
                       <CardTitle className="line-clamp-2">{article.title}</CardTitle>
                       <CardDescription className="line-clamp-3">{article.excerpt}</CardDescription>
+                      <ArticleCardByline
+                        author={article.author_id ? authors.get(article.author_id) : undefined}
+                      />
                     </CardHeader>
                     <CardFooter className="mt-auto flex items-center justify-between">
                       <span className="text-sm text-muted-foreground flex items-center gap-1">

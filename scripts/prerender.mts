@@ -38,6 +38,7 @@ import {
   type PrerenderRoute,
 } from '../src/config/prerender-routes';
 import {
+  answerAuthorLookup,
   authorsById,
   categorySlugs,
   loadArticles,
@@ -371,12 +372,13 @@ async function interceptArticles(context: BrowserContext, articles: Article[]): 
 }
 
 /**
- * Answer BlogArticle's author lookup from the rows resolved at build time
- * (US-181).
+ * Answer the article-author lookups from the rows resolved at build time
+ * (US-181, US-399).
  *
- * The page asks `profiles?select=id,full_name,username&id=eq.<author_id>
- * &is_published=eq.true` and expects an array (maybeSingle on a GET). Only that
- * shape is answered here; any other profiles query — the landing page's demo
+ * BlogArticle asks `profiles?select=id,full_name,username&id=eq.<author_id>
+ * &is_published=eq.true`; the /blog and /blog/category/* cards ask the same
+ * with `id=in.(...)`. Both expect an array. Only those shapes are answered
+ * (see answerAuthorLookup); any other profiles query — the landing page's demo
  * showcase, say — falls through to whatever it reached before, so this
  * intercept cannot change a page it was not written for.
  *
@@ -392,19 +394,17 @@ async function interceptArticleAuthors(
   const authors = authorsById(articles);
   await context.route('**/rest/v1/profiles*', async (route) => {
     const request = route.request();
-    const url = new URL(request.url());
-    const id = url.searchParams.get('id');
-    const isAuthorLookup =
-      request.method() === 'GET' &&
-      !!id?.startsWith('eq.') &&
-      url.searchParams.get('is_published') === 'eq.true';
-    if (!isAuthorLookup) return route.fallback();
+    const rows = answerAuthorLookup(
+      request.method(),
+      new URL(request.url()).searchParams,
+      authors
+    );
+    if (!rows) return route.fallback();
 
-    const row = authors.get(decodeURIComponent(id!.slice(3)));
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(row ? [row] : []),
+      body: JSON.stringify(rows),
     });
   });
 }

@@ -152,6 +152,47 @@ export function authorsById(articles: Article[]): Map<string, ArticleAuthorRow> 
   return map;
 }
 
+/**
+ * The rows the prerender answers a `profiles` request with, or null when the
+ * request is not an article-author lookup and must fall through untouched.
+ *
+ * Two shapes are author lookups, both GETs filtered to published profiles:
+ *   - BlogArticle's single author:   id=eq.<id>
+ *   - the blog list cards' batch:    id=in.(<id>,<id>,...)   (US-399)
+ * Without the second, the prerendered /blog and /blog/category/* pages would
+ * send the batch to the build's VITE_SUPABASE_URL and ship with no bylines
+ * while the live pages showed them.
+ */
+export function answerAuthorLookup(
+  method: string,
+  searchParams: URLSearchParams,
+  authors: Map<string, ArticleAuthorRow>
+): ArticleAuthorRow[] | null {
+  if (method !== 'GET' || searchParams.get('is_published') !== 'eq.true') return null;
+  const id = searchParams.get('id');
+  if (!id) return null;
+
+  let wanted: string[];
+  if (id.startsWith('eq.')) {
+    wanted = [id.slice(3)];
+  } else if (id.startsWith('in.(') && id.endsWith(')')) {
+    wanted = id
+      .slice(4, -1)
+      .split(',')
+      .map((value) => value.trim().replace(/^"(.*)"$/, '$1'))
+      .filter(Boolean);
+  } else {
+    return null;
+  }
+
+  const rows: ArticleAuthorRow[] = [];
+  for (const value of new Set(wanted.map((v) => decodeURIComponent(v)))) {
+    const row = authors.get(value);
+    if (row) rows.push(row);
+  }
+  return rows;
+}
+
 async function readSnapshot(): Promise<Article[] | null> {
   if (!existsSync(SNAPSHOT_PATH)) return null;
   try {
