@@ -348,6 +348,9 @@ class PageBuilderEngine {
         defaultConfig: {
           type: 'testimonial',
           title: 'What Clients Say',
+          // The agent's published testimonials, not text typed into the
+          // block (US-305). The settings panel can switch to typed entries.
+          source: 'profile',
           testimonials: [],
           layout: 'slider',
         },
