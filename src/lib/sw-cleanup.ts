@@ -5,6 +5,8 @@
  * authentication requests or causing fetch errors.
  */
 
+import { logger } from '@/lib/logger';
+
 export async function cleanupServiceWorkers(): Promise<boolean> {
   if (!('serviceWorker' in navigator)) {
     return false;
@@ -28,12 +30,12 @@ export async function cleanupServiceWorkers(): Promise<boolean> {
     for (const registration of registrations) {
       const scriptURL = registration.active?.scriptURL || '';
       if (KEEP_SW.some((keep) => scriptURL.includes(keep))) {
-        console.log('[SW Cleanup] Keeping known SW:', scriptURL);
+        logger.debug('[SW Cleanup] Keeping known SW', { scriptURL });
         continue;
       }
 
       // Unregister any other (legacy/unknown) service workers
-      console.log('[SW Cleanup] Unregistering old service worker:', scriptURL);
+      logger.info('[SW Cleanup] Unregistering old service worker', { scriptURL });
       await registration.unregister();
       cleanedUp = true;
     }
@@ -45,7 +47,7 @@ export async function cleanupServiceWorkers(): Promise<boolean> {
       if (stale.length > 0) {
         await Promise.all(
           stale.map((cacheName) => {
-            console.log('[SW Cleanup] Deleting cache:', cacheName);
+            logger.info('[SW Cleanup] Deleting cache', { cacheName });
             return caches.delete(cacheName);
           })
         );
@@ -54,12 +56,12 @@ export async function cleanupServiceWorkers(): Promise<boolean> {
     }
 
     if (cleanedUp) {
-      console.log('[SW Cleanup] Service worker cleanup complete');
+      logger.info('[SW Cleanup] Service worker cleanup complete');
     }
 
     return cleanedUp;
   } catch (error) {
-    console.error('[SW Cleanup] Failed to cleanup service workers:', error);
+    logger.error('[SW Cleanup] Failed to cleanup service workers', error);
     return false;
   }
 }
@@ -73,7 +75,7 @@ export async function cleanupAndReload(): Promise<void> {
 
   // Reload only if we actually removed something
   if (cleaned) {
-    console.log('[SW Cleanup] Reloading to apply changes...');
+    logger.info('[SW Cleanup] Reloading to apply changes');
     // Use replace to prevent back button issues
     window.location.replace(window.location.href);
   }

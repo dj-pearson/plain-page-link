@@ -115,15 +115,16 @@ function loadWorker(
     path: string,
     init: RequestInit & { destination?: string; mode?: string } = {}
   ) {
-    const req = new Request(new URL(path, ORIGIN).href, init);
+    const { destination, mode, ...requestInit } = init;
+    const req = new Request(new URL(path, ORIGIN).href, requestInit);
     // Request's destination/mode are fixed in Node; the worker only reads
     // these fields, so a plain object carrying them is enough.
     const view = {
       url: req.url,
       method: req.method,
       headers: req.headers,
-      destination: init.destination ?? '',
-      mode: init.mode ?? 'cors',
+      destination: destination ?? '',
+      mode: mode ?? 'cors',
     } as unknown as Request;
     let responded: Promise<Response> | undefined;
     const pending: Promise<unknown>[] = [];
@@ -243,6 +244,123 @@ describe('service worker caching (public/sw.js)', () => {
     expect(
       second.stores.get('agentbio-sw-runtime-v1')!.entries.has(`${ORIGIN}/assets/old-build.js`)
     ).toBe(true);
+  });
+});
+
+describe('offline pages for visited routes (US-312)', () => {
+  const html = (body: string, init: ResponseInit = {}) =>
+    new Response(body, {
+      status: 200,
+      ...init,
+      headers: { 'Content-Type': 'text/html; charset=utf-8', ...(init.headers ?? {}) },
+    });
+
+  /** A worker whose network can be switched off and whose pages say which path served them. */
+  function pagesWorker(
+    respond: (req: Request) => Response = (req) => html(`page ${new URL(req.url).pathname}`)
+  ) {
+    const state = { online: true };
+    const sw = loadWorker(SOURCE, async (req) => {
+      if (!state.online) throw new TypeError('Failed to fetch');
+      return respond(req);
+    });
+    return { sw, state };
+  }
+
+  const navigate = (sw: ReturnType<typeof loadWorker>, path: string) =>
+    sw.request(path, { mode: 'navigate' });
+
+  it('serves a visited route its own HTML when offline, not the homepage', async () => {
+    const { sw, state } = pagesWorker();
+    await sw.lifecycle('install');
+    await navigate(sw, '/dashboard/leads');
+    state.online = false;
+    expect(await (await navigate(sw, '/dashboard/leads'))!.text()).toBe('page /dashboard/leads');
+  });
+
+  it('keys pages by path, so a visit with a campaign query string is found without it', async () => {
+    const { sw, state } = pagesWorker();
+    await navigate(sw, '/jane-agent?utm_source=instagram&ref=abc');
+    expect([...sw.stores.get('agentbio-sw-pages-v1')!.entries.keys()]).toEqual([
+      `${ORIGIN}/jane-agent`,
+    ]);
+    state.online = false;
+    expect(await (await navigate(sw, '/jane-agent'))!.text()).toBe('page /jane-agent');
+  });
+
+  it('falls back to /index.html, then /offline.html, for a route never visited', async () => {
+    const { sw, state } = pagesWorker();
+    await sw.lifecycle('install');
+    state.online = false;
+    expect(await (await navigate(sw, '/dashboard/clients'))!.text()).toBe('shell /index.html');
+
+    sw.stores.get('agentbio-sw-precache-dev')!.entries.delete(`${ORIGIN}/index.html`);
+    expect(await (await navigate(sw, '/dashboard/clients'))!.text()).toBe('shell /offline.html');
+  });
+
+  it('answers 503 when nothing at all is cached', async () => {
+    const { sw, state } = pagesWorker();
+    state.online = false;
+    expect((await navigate(sw, '/pricing'))!.status).toBe(503);
+  });
+
+  it('never keeps a redirected, non-200, non-HTML or no-store response', async () => {
+    const { sw } = pagesWorker((req) => {
+      const path = new URL(req.url).pathname;
+      if (path === '/moved') {
+        const r = html('landing');
+        Object.defineProperty(r, 'redirected', { value: true });
+        return r;
+      }
+      if (path === '/missing') return html('not found', { status: 404 });
+      if (path === '/broken') return html('error', { status: 500 });
+      if (path === '/data')
+        return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+      if (path === '/private')
+        return html('x', { headers: { 'Cache-Control': 'private, no-store' } });
+      return html('ok');
+    });
+    for (const path of ['/moved', '/missing', '/broken', '/data', '/private']) {
+      await navigate(sw, path);
+    }
+    expect(sw.stores.get('agentbio-sw-pages-v1')?.entries.size ?? 0).toBe(0);
+  });
+
+  it('never caches a navigation under /auth', async () => {
+    const { sw } = pagesWorker();
+    expect(await navigate(sw, '/auth/login')).toBeUndefined();
+    expect(await navigate(sw, '/auth/callback?code=secret')).toBeUndefined();
+    expect(sw.stores.has('agentbio-sw-pages-v1')).toBe(false);
+  });
+
+  it('caps the pages cache at 30, dropping the oldest first', async () => {
+    const { sw } = pagesWorker();
+    for (let i = 0; i < 35; i++) await navigate(sw, `/agent-${i}`);
+    const pages = sw.stores.get('agentbio-sw-pages-v1')!;
+    expect(pages.entries.size).toBe(30);
+    expect(pages.entries.has(`${ORIGIN}/agent-0`)).toBe(false);
+    expect(pages.entries.has(`${ORIGIN}/agent-34`)).toBe(true);
+  });
+
+  it('keeps the pages cache across a new worker version and trims it on activate', async () => {
+    const sw = loadWorker(stampServiceWorkerVersion(SOURCE, 'build2'));
+    const pages = new FakeCache();
+    for (let i = 0; i < 40; i++) pages.entries.set(`${ORIGIN}/p-${i}`, new Response('x'));
+    sw.stores.set('agentbio-sw-pages-v1', pages);
+    await sw.lifecycle('activate');
+    expect(sw.stores.get('agentbio-sw-pages-v1')).toBe(pages);
+    expect(pages.entries.size).toBe(30);
+    expect(pages.entries.has(`${ORIGIN}/p-39`)).toBe(true);
+  });
+
+  it('refreshes a page from the network whenever there is one', async () => {
+    let version = 'v1';
+    const { sw, state } = pagesWorker(() => html(version));
+    await navigate(sw, '/dashboard');
+    version = 'v2';
+    expect(await (await navigate(sw, '/dashboard'))!.text()).toBe('v2');
+    state.online = false;
+    expect(await (await navigate(sw, '/dashboard'))!.text()).toBe('v2');
   });
 });
 
