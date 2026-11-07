@@ -2797,6 +2797,90 @@ check('the deletion schedule and GDPR requests are not writable by their subject
   return out;
 });
 
+// ---------------------------------------------------------------------------
+// US-377 (US-366): api_keys are written by the api-keys edge function only.
+//   Owner INSERT/UPDATE/DELETE policies let an agent mint a key with a hash
+//   they chose (past the 10-key cap and the audit event), clear revoked_at on
+//   a revoked key, widen its permissions or delete it. The browser now reads
+//   its own keys and writes none.
+// ---------------------------------------------------------------------------
+check('api keys cannot be minted, un-revoked or deleted by their owner', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000377a01';
+  const other = '00000000-dead-beef-0000-000000377a02';
+  const key = '00000000-dead-beef-0000-000000377b01';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${agent}', 'us377a@example.test'), ('${other}', 'us377b@example.test')
+       ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.api_keys (id, user_id, name, key_hash, key_prefix, is_active, revoked_at)
+         VALUES ('${key}', '${agent}', 'revoked', 'hash_us377_revoked', 'ab_us377', false, now());`);
+
+    // The owner still reads their own keys.
+    const [seen] = as(agent, `SELECT count(*) FROM public.api_keys WHERE user_id = '${agent}';`);
+    if (seen !== '1') out.push(`the owner saw ${seen} of their own api keys, expected 1`);
+    const [theirs] = as(other, `SELECT count(*) FROM public.api_keys WHERE user_id = '${agent}';`);
+    if (theirs !== '0') out.push(`another user saw ${theirs} of the agent's api keys`);
+
+    if (
+      !refused(() =>
+        as(agent, `INSERT INTO public.api_keys (user_id, name, key_hash, key_prefix)
+                   VALUES ('${agent}', 'chosen', 'hash_us377_chosen', 'ab_chose');`)
+      )
+    )
+      out.push('the owner could insert an api key with a hash they chose');
+    for (const [col, val] of [
+      ['revoked_at', 'NULL'],
+      ['is_active', 'true'],
+      ['permissions', `'{"read": true, "write": true}'::jsonb`],
+      ['expires_at', `now() + interval '10 years'`],
+      ['key_hash', `'hash_us377_swapped'`],
+    ]) {
+      if (!refused(() => as(agent, `UPDATE public.api_keys SET ${col} = ${val} WHERE id = '${key}';`)))
+        out.push(`the owner could update api_keys.${col}`);
+    }
+    if (!refused(() => as(agent, `DELETE FROM public.api_keys WHERE id = '${key}';`)))
+      out.push('the owner could delete an api key');
+    if (!refused(() => q(`SET ROLE anon; UPDATE public.api_keys SET revoked_at = NULL;`)))
+      out.push('anon could update api_keys');
+
+    const [row] = q(
+      `SELECT (revoked_at IS NOT NULL) || '|' || is_active || '|' || key_hash FROM public.api_keys WHERE id = '${key}';`
+    );
+    if (row !== 'true|false|hash_us377_revoked') out.push(`the revoked key changed to ${row}`);
+    const [minted] = q(`SELECT count(*) FROM public.api_keys WHERE user_id = '${agent}';`);
+    if (minted !== '1') out.push(`the agent ended with ${minted} api keys, expected 1`);
+
+    // The service role (the edge function) still creates and revokes keys.
+    q(`SET ROLE service_role;
+       INSERT INTO public.api_keys (user_id, name, key_hash, key_prefix)
+         VALUES ('${agent}', 'via function', 'hash_us377_fn', 'ab_fn377');
+       UPDATE public.api_keys SET revoked_at = now(), is_active = false WHERE key_hash = 'hash_us377_fn';`);
+    const [fnRow] = q(`SELECT is_active FROM public.api_keys WHERE key_hash = 'hash_us377_fn';`);
+    if (fnRow !== 'f') out.push('the service role could not create and revoke an api key');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.api_keys WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${agent}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${agent}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 check('an assignee works a lead but cannot take it or hand it away', () => {
   const out = [];
   const owner = '00000000-dead-beef-0000-000000236b01';
