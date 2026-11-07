@@ -2938,6 +2938,113 @@ check('an assignee can log calls, emails, notes and follow-ups on a routed lead'
   return out;
 });
 
+// US-349 (US-335, US-313): status_change and form_submission rows are the
+// system's record of what happened to a lead. The owner could forge one
+// through log_lead_activity or a direct insert, delete the real ones (they
+// carry the owner's user_id), and rewrite any row on the lead through the
+// UPDATE policy. Only the SECURITY DEFINER triggers may write them now, and the
+// browser may update nothing but task_completed_at on a follow-up.
+check("a lead's system timeline rows cannot be forged, rewritten or deleted", () => {
+  const out = [];
+  const owner = '00000000-dead-beef-0000-000000349a01';
+  const mate = '00000000-dead-beef-0000-000000349a02';
+  const lead = '00000000-dead-beef-0000-000000349a03';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  const count = (type) =>
+    q(`SELECT count(*) FROM public.lead_activities WHERE lead_id = '${lead}' AND activity_type = '${type}';`)[0];
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${owner}', 'tl-owner@example.test'), ('${mate}', 'tl-mate@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.leads (id, user_id, assigned_to, lead_type, name, encrypted_email, status)
+         VALUES ('${lead}', '${owner}', '${mate}', 'buyer', 'Timeline Lead', 'enc', 'new');`);
+    // The triggers still write as definer when the owner changes the status.
+    as(owner, `UPDATE public.leads SET status = 'contacted' WHERE id = '${lead}';`);
+    if (count('form_submission') !== '1') out.push('auto_log_lead_creation no longer logged the lead');
+    if (count('status_change') !== '1') out.push("the owner's status change was not logged by the trigger");
+
+    // Forgery, by RPC and by direct insert, for the owner and the assignee.
+    for (const who of [owner, mate]) {
+      for (const type of ['status_change', 'form_submission']) {
+        if (!refused(() => as(who, `SELECT public.log_lead_activity('${lead}', '${type}', 'x', 'Forged');`)))
+          out.push(`log_lead_activity accepted a forged ${type}`);
+        if (
+          !refused(() =>
+            as(who, `INSERT INTO public.lead_activities (lead_id, user_id, activity_type, title)
+                       VALUES ('${lead}', '${who}', '${type}', 'Forged');`)
+          )
+        )
+          out.push(`a direct insert of a forged ${type} was accepted`);
+      }
+    }
+    if (count('status_change') !== '1' || count('form_submission') !== '1')
+      out.push('a forged system row reached the timeline');
+
+    // The owner cannot delete or rewrite the system rows.
+    as(owner, `DELETE FROM public.lead_activities WHERE lead_id = '${lead}' AND activity_type IN ('status_change', 'form_submission');`);
+    if (count('status_change') !== '1' || count('form_submission') !== '1')
+      out.push('the owner deleted a system timeline row');
+    for (const [col, val] of [
+      ['new_status', `'won'`],
+      ['activity_type', `'note'`],
+      ['user_id', `'${mate}'`],
+      ['content', `'rewritten'`],
+    ]) {
+      if (!refused(() => as(owner, `UPDATE public.lead_activities SET ${col} = ${val} WHERE lead_id = '${lead}';`)))
+        out.push(`the owner could update lead_activities.${col}`);
+    }
+
+    // What the dashboard does still works: notes, a follow-up the assignee
+    // completes, and deleting your own note.
+    if (refused(() => as(owner, `SELECT public.log_lead_activity('${lead}', 'note', 'Real note', 'Note added');`)))
+      out.push('the owner could not add a note');
+    if (
+      refused(() =>
+        as(owner, `INSERT INTO public.lead_activities (lead_id, user_id, activity_type, title, task_due_date)
+                     VALUES ('${lead}', '${owner}', 'task', 'Call back', now() + interval '1 day');`)
+      )
+    )
+      out.push('the owner could not add a follow-up');
+    if (
+      refused(() =>
+        as(mate, `UPDATE public.lead_activities SET task_completed_at = now()
+                    WHERE lead_id = '${lead}' AND activity_type = 'task' RETURNING id;`)
+      )
+    )
+      out.push('the assignee could not complete a follow-up on the lead');
+    const [done] = q(`SELECT count(*) FROM public.lead_activities
+                        WHERE lead_id = '${lead}' AND activity_type = 'task' AND task_completed_at IS NOT NULL;`);
+    if (done !== '1') out.push('completing the follow-up did not set task_completed_at');
+    as(mate, `UPDATE public.lead_activities SET task_completed_at = now() WHERE lead_id = '${lead}' AND activity_type = 'status_change';`);
+    const [stamped] = q(`SELECT count(*) FROM public.lead_activities
+                           WHERE lead_id = '${lead}' AND activity_type = 'status_change' AND task_completed_at IS NOT NULL;`);
+    if (stamped !== '0') out.push('a system row was updated through the follow-up policy');
+    as(owner, `DELETE FROM public.lead_activities WHERE lead_id = '${lead}' AND activity_type = 'note';`);
+    if (count('note') !== '0') out.push('the owner could not delete their own note');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.notifications WHERE user_id IN ('${owner}', '${mate}');
+         DELETE FROM public.leads WHERE id = '${lead}';
+         DELETE FROM public.profiles WHERE id IN ('${owner}', '${mate}');
+         DELETE FROM auth.users WHERE id IN ('${owner}', '${mate}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 check('reviews reach testimonials only through submit-review (service role)', () => {
   const out = [];
   const agent = '00000000-dead-beef-0000-000000236c01';
