@@ -28,6 +28,10 @@ Each lane is one agent per round. A lane only looks inside its own scope.
   PWA. The `mobile` lane improves the PWA only; do not add Capacitor or any
   other native shell, and do not open stories for store builds.
 - 2026-11-07: **Push notifications removed.** Do not add FCM/web push back.
+- 2026-11-07: **Agents get a time zone setting.** Use it for reminder quiet
+  hours and local-morning digests (unblocks US-318, US-343).
+- 2026-11-07: **Lead statuses include `nurturing` and `closed`** in the one
+  status vocabulary (unblocks US-278).
 - 2026-11-07: **Silent updates stay.** The service worker keeps calling
   skipWaiting, so a deploy takes over open tabs without a Refresh prompt.
 

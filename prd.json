@@ -4402,7 +4402,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Needs a product decision on whether 'nurturing' and 'closed' are real statuses. Check the lead-routing and workflow triggers that read status before adding the CHECK. (follow-up slice from US-264)"
+      "notes": "Needs a product decision on whether 'nurturing' and 'closed' are real statuses. Check the lead-routing and workflow triggers that read status before adding the CHECK. (follow-up slice from US-264) UNBLOCKED 2026-11-07: owner decided 'nurturing' and 'closed' ARE real lead statuses; include them in the one vocabulary."
     },
     {
       "id": "US-279",
@@ -4965,7 +4965,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Needs a product decision on quiet hours, and a timezone column if one does not exist yet. (follow-up from US-309) BLOCKED on owner decision: there is no agent timezone column."
+      "notes": "Needs a product decision on quiet hours, and a timezone column if one does not exist yet. (follow-up from US-309) BLOCKED on owner decision: there is no agent timezone column. UNBLOCKED 2026-11-07: owner decided agents get a time zone setting (column + Settings control); build that first, then use it."
     },
     {
       "id": "US-310",
@@ -5350,7 +5350,7 @@
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Needs a product decision on a timezone column, shared with US-318. digestSchedule in scheduled-maintenance/digests.ts is the seam. (follow-up from US-331)"
+      "notes": "Needs a product decision on a timezone column, shared with US-318. digestSchedule in scheduled-maintenance/digests.ts is the seam. (follow-up from US-331) UNBLOCKED 2026-11-07: owner decided agents get a time zone setting (column + Settings control); build that first, then use it."
     },
     {
       "id": "US-344",
