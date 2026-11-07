@@ -148,3 +148,12 @@ describe('callEdgeFunction error handling', () => {
     await expect(call()).resolves.toEqual({ lead_id: 'abc' });
   });
 });
+
+describe('callEdgeFunction signal (US-414)', () => {
+  it('passes the abort signal to fetch, so a caller can stop waiting', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const controller = new AbortController();
+    await callEdgeFunction('gdpr-export', { method: 'GET', signal: controller.signal });
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
+  });
+});

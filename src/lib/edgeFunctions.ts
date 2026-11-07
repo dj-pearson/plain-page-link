@@ -17,6 +17,8 @@ interface EdgeFunctionOptions {
   body?: any;
   headers?: Record<string, string>;
   auth?: boolean; // Whether to include Supabase auth token
+  /** Aborts the request; fetch then rejects with an AbortError. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -181,7 +183,7 @@ export async function callEdgeFunction<T = any>(
   functionName: string,
   options: EdgeFunctionOptions = {}
 ): Promise<T> {
-  const { method = 'POST', body, headers = {}, auth = false } = options;
+  const { method = 'POST', body, headers = {}, auth = false, signal } = options;
 
   const url = `${EDGE_FUNCTIONS_URL}/${functionName}`;
 
@@ -206,6 +208,7 @@ export async function callEdgeFunction<T = any>(
     method,
     headers: requestHeaders,
     body: body ? JSON.stringify(body) : undefined,
+    signal,
   });
 
   // Handle errors
