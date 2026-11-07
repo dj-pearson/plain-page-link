@@ -9,39 +9,16 @@ import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts';
 import { requireAuth, getClientIP } from '../_shared/auth.ts';
 import { checkRateLimitDb } from '../_shared/rate-limiter.ts';
 import { decryptSecret } from '../_shared/encryption.ts';
-
-interface ExportData {
-  exportedAt: string;
-  user: {
-    id: string;
-    email: string;
-    createdAt: string;
-    lastSignIn: string | null;
-  };
-  profile: Record<string, unknown> | null;
-  settings: Record<string, unknown> | null;
-  listings: unknown[];
-  leads: unknown[];
-  /** The agent's client sphere, with contact details decrypted like leads. */
-  contacts: unknown[];
-  contactKeyDates: unknown[];
-  contactInteractions: unknown[];
-  openHouses: unknown[];
-  testimonials: unknown[];
-  links: unknown[];
-  blogPosts: unknown[];
-  analytics: {
-    profileViews: unknown[];
-    searchQueries: unknown[];
-  };
-  security: {
-    sessions: unknown[];
-    loginAttempts: unknown[];
-    mfaSettings: Record<string, unknown> | null;
-    auditLogs: unknown[];
-  };
-  gdprRequests: unknown[];
-}
+import { reportError } from '../_shared/report.ts';
+import {
+  collectSections,
+  ExportIncompleteError,
+  maskLoginAttempt,
+  sectionCounts,
+  type CollectedSections,
+  type ExportReader,
+  type Row,
+} from './collect.ts';
 
 serve(async (req: Request) => {
   // Per request, from the Origin header. This was the module-level static
@@ -75,19 +52,22 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Rate limit: max 1 export per hour per user. The limiter is keyed by
+    // Rate limit: 3 exports per hour per user. The limiter is keyed by
     // identifier + endpoint, so we pass the user id as the identifier to
-    // get per-user (not per-IP) enforcement.
+    // get per-user (not per-IP) enforcement. It was 1, but the attempt is
+    // counted before the export runs, so a transient failure (now a 503
+    // rather than a silently empty file) would have locked the subject out
+    // for an hour.
     if (req.method === 'POST' || req.method === 'GET') {
       const rl = await checkRateLimitDb(serviceSupabase, user.id, 'gdpr-export', {
-        maxRequests: 1,
+        maxRequests: 3,
         windowSeconds: 3600,
       });
       if (!rl.allowed) {
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'You can only request one data export per hour. Please try again later.',
+            error: 'You have requested several data exports in the last hour. Please try again later.',
           }),
           {
             headers: {
@@ -126,81 +106,68 @@ serve(async (req: Request) => {
         }
       );
     } else if (req.method === 'GET') {
-      // Generate and return data export immediately
-      // In production, this would be queued and processed async
+      // Every section, every row (paged past PostgREST's row cap), and any
+      // query that fails fails the export instead of exporting as empty.
+      const reader: ExportReader = {
+        page: (spec, userId, from, to) =>
+          serviceSupabase
+            .from(spec.table)
+            .select(spec.columns)
+            .eq(spec.ownerColumn, userId)
+            .order('id', { ascending: true })
+            .range(from, to),
+        one: (spec, userId) =>
+          serviceSupabase
+            .from(spec.table)
+            .select(spec.columns)
+            .eq(spec.ownerColumn, userId)
+            .maybeSingle(),
+      };
 
-      // Fetch all user data in parallel
-      const [
-        profileResult,
-        settingsResult,
-        listingsResult,
-        leadsResult,
-        testimonialsResult,
-        linksResult,
-        blogPostsResult,
-        profileViewsResult,
-        sessionsResult,
-        loginAttemptsResult,
-        mfaSettingsResult,
-        auditLogsResult,
-        gdprRequestsResult,
-        contactsResult,
-        contactKeyDatesResult,
-        contactInteractionsResult,
-        openHousesResult,
-      ] = await Promise.all([
-        serviceSupabase.from('profiles').select('*').eq('id', user.id).single(),
-        serviceSupabase.from('user_settings').select('*').eq('user_id', user.id).single(),
-        serviceSupabase.from('listings').select('*').eq('user_id', user.id),
-        serviceSupabase.from('leads').select('*').eq('user_id', user.id),
-        serviceSupabase.from('testimonials').select('*').eq('user_id', user.id),
-        serviceSupabase.from('links').select('*').eq('user_id', user.id),
-        // The articles table holds authored posts; there is no `blog_posts`
-        // table, so this query used to fail and fall through to [] below,
-        // silently omitting the user's articles from their own data export.
-        serviceSupabase.from('articles').select('*').eq('author_id', user.id),
-        // Likewise: profile view events live in analytics_views, keyed by
-        // user_id (not a `profile_views` table keyed by profile_id).
-        serviceSupabase.from('analytics_views').select('*').eq('user_id', user.id).limit(1000),
-        serviceSupabase.from('user_sessions').select('*').eq('user_id', user.id),
-        serviceSupabase.from('login_attempts').select('*').eq('user_id', user.id).limit(100),
-        serviceSupabase.from('user_mfa_settings').select('id, mfa_enabled, mfa_method, verified_at, created_at').eq('user_id', user.id).single(),
-        serviceSupabase.from('audit_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(500),
-        serviceSupabase.from('gdpr_data_requests').select('*').eq('user_id', user.id),
-        serviceSupabase.from('contacts').select('*').eq('user_id', user.id),
-        serviceSupabase.from('contact_key_dates').select('*').eq('user_id', user.id),
-        serviceSupabase.from('contact_interactions').select('*').eq('user_id', user.id),
-        serviceSupabase.from('open_houses').select('*').eq('user_id', user.id),
-      ]);
+      let collected: CollectedSections;
+      try {
+        collected = await collectSections(reader, user.id);
+      } catch (err) {
+        if (!(err instanceof ExportIncompleteError)) throw err;
+        console.error('[gdpr-export] export incomplete:', err.failed);
+        void reportError(err, { functionName: 'gdpr-export', status: 503, method: 'GET' });
+        await serviceSupabase.rpc('log_audit_event', {
+          p_user_id: user.id,
+          p_action: 'gdpr_data_export',
+          p_status: 'failure',
+          p_resource_type: 'gdpr',
+          p_ip_address: clientIP,
+          p_user_agent: userAgent,
+          p_details: { failed_sections: err.failed.map((f) => f.section) },
+          p_risk_level: 'medium',
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: err.message, failedSections: err.failed.map((f) => f.section) }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
+        );
+      }
 
-      // Decrypt the lead PII for the subject's own copy. encrypted_* are the
-      // only store since US-086; decryptSecret passes through any value that
-      // is not enc:v1: prefixed, so a row written before the backfill still
-      // exports readably.
-      const decryptedLeads = await Promise.all(
-        (leadsResult.data || []).map(async (lead) => {
-          const { encrypted_phone, encrypted_email, ...rest } = lead as Record<string, unknown>;
-          const [email, phone] = await Promise.all([
-            decryptSecret(encrypted_email as string | null),
-            decryptSecret(encrypted_phone as string | null),
-          ]);
-          return { ...rest, email: email ?? null, phone: phone ?? null };
-        })
-      );
+      const rows = collected.rows;
+      const singles = collected.singles;
 
-      const decryptedContacts = await Promise.all(
-        (contactsResult.data || []).map(async (contact) => {
-          const { encrypted_phone, encrypted_email, ...rest } = contact as Record<string, unknown>;
-          const [email, phone] = await Promise.all([
-            decryptSecret(encrypted_email as string | null),
-            decryptSecret(encrypted_phone as string | null),
-          ]);
-          return { ...rest, email: email ?? null, phone: phone ?? null };
-        })
-      );
+      // Decrypt the lead and contact PII for the subject's own copy.
+      // encrypted_* are the only store since US-086, so a subject access
+      // request that returned ciphertext would not be an export at all.
+      // decryptSecret passes through any value that is not enc:v1: prefixed.
+      const decryptPii = (list: Row[]) =>
+        Promise.all(
+          list.map(async (row) => {
+            const { encrypted_phone, encrypted_email, ...rest } = row;
+            const [email, phone] = await Promise.all([
+              decryptSecret(encrypted_email as string | null),
+              decryptSecret(encrypted_phone as string | null),
+            ]);
+            return { ...rest, email: email ?? null, phone: phone ?? null };
+          })
+        );
+      const [leads, contacts] = await Promise.all([decryptPii(rows.leads), decryptPii(rows.contacts)]);
 
-      // Build export data object
-      const exportData: ExportData = {
+      const exportData = {
         exportedAt: new Date().toISOString(),
         user: {
           id: user.id,
@@ -208,78 +175,86 @@ serve(async (req: Request) => {
           createdAt: user.created_at || '',
           lastSignIn: user.last_sign_in_at || null,
         },
-        profile: profileResult.data || null,
-        settings: settingsResult.data || null,
-        listings: listingsResult.data || [],
-        // PII in leads must be exported in readable form, never as opaque
-        // ciphertext. US-086 dropped the plaintext columns, so the encrypted_*
-        // values are now the only copy and this decrypts them rather than
-        // stripping them — a subject access request that returned ciphertext
-        // would not be an export at all.
-        leads: decryptedLeads,
-        contacts: decryptedContacts,
-        contactKeyDates: contactKeyDatesResult.data || [],
-        contactInteractions: contactInteractionsResult.data || [],
-        openHouses: openHousesResult.data || [],
-        testimonials: testimonialsResult.data || [],
-        links: linksResult.data || [],
-        blogPosts: blogPostsResult.data || [],
+        profile: singles.profile,
+        settings: singles.settings,
+        listings: rows.listings,
+        openHouses: rows.openHouses,
+        leads,
+        leadActivities: rows.leadActivities,
+        contacts,
+        contactKeyDates: rows.contactKeyDates,
+        contactInteractions: rows.contactInteractions,
+        testimonials: rows.testimonials,
+        links: rows.links,
+        customPages: rows.customPages,
+        blogPosts: rows.blogPosts,
+        workflows: rows.workflows,
+        notifications: rows.notifications,
+        billing: {
+          subscriptions: rows.subscriptions,
+          invoices: rows.invoices,
+        },
+        teams: {
+          memberships: rows.teamMemberships,
+          roles: rows.roles,
+        },
         analytics: {
-          profileViews: profileViewsResult.data || [],
-          searchQueries: [], // Add if you have search query tracking
+          profileViews: rows.profileViews,
+          events: rows.analyticsEvents,
         },
         security: {
-          sessions: (sessionsResult.data || []).map(s => ({
-            ...s,
-            session_token_hash: '[REDACTED]', // Don't expose token hashes
-          })),
-          loginAttempts: (loginAttemptsResult.data || []).map(a => ({
-            ...a,
-            device_fingerprint: a.device_fingerprint ? '[PRESENT]' : null,
-          })),
-          mfaSettings: mfaSettingsResult.data ? {
-            ...mfaSettingsResult.data,
-            totp_secret: '[REDACTED]',
-            backup_codes: '[REDACTED]',
-          } : null,
-          auditLogs: auditLogsResult.data || [],
+          sessions: rows.sessions,
+          loginAttempts: rows.loginAttempts.map(maskLoginAttempt),
+          mfaSettings: singles.mfaSettings,
+          apiKeys: rows.apiKeys,
+          auditLogs: rows.auditLogs,
         },
-        gdprRequests: gdprRequestsResult.data || [],
+        gdprRequests: rows.gdprRequests,
+        meta: {
+          counts: sectionCounts(collected),
+          // Sections that hit the per-section ceiling. Named so a partial
+          // section is never mistaken for a complete one.
+          truncated: collected.truncated,
+        },
       };
 
-      // Update the export request status
-      await serviceSupabase
+      // Close the newest pending export request, if the subject made one.
+      // (An UPDATE with order/limit is not something PostgREST does by
+      // default, so find the row first and update it by id.)
+      const { data: pending, error: pendingError } = await serviceSupabase
         .from('gdpr_data_requests')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        })
+        .select('id')
         .eq('user_id', user.id)
         .eq('request_type', 'export')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
-        .limit(1);
+        .limit(1)
+        .maybeSingle();
+      if (pendingError) {
+        console.error('[gdpr-export] could not read pending export request:', pendingError.message);
+      } else if (pending) {
+        const { error: closeError } = await serviceSupabase
+          .from('gdpr_data_requests')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', pending.id);
+        if (closeError) {
+          console.error('[gdpr-export] could not close export request:', closeError.message);
+        }
+      }
 
-      // Log the export
-      await serviceSupabase.rpc('log_audit_event', {
+      const { error: auditError } = await serviceSupabase.rpc('log_audit_event', {
         p_user_id: user.id,
         p_action: 'gdpr_data_export',
         p_status: 'success',
         p_resource_type: 'gdpr',
         p_ip_address: clientIP,
         p_user_agent: userAgent,
-        p_details: JSON.stringify({
-          records_exported: {
-            listings: exportData.listings.length,
-            leads: exportData.leads.length,
-            testimonials: exportData.testimonials.length,
-            links: exportData.links.length,
-            blog_posts: exportData.blogPosts.length,
-            audit_logs: exportData.security.auditLogs.length,
-          },
-        }),
+        p_details: { records_exported: exportData.meta.counts, truncated: collected.truncated },
         p_risk_level: 'medium',
       });
+      if (auditError) {
+        console.error('[gdpr-export] could not write audit entry:', auditError.message);
+      }
 
       // Return as downloadable JSON
       const filename = `agentbio-data-export-${new Date().toISOString().split('T')[0]}.json`;
