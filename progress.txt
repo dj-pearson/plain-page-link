@@ -5181,3 +5181,86 @@ Other findings:
 - [mobile] public/sw.js isNeverCache uses p.startsWith('/auth'), which also matches any public route beginning with /auth, e.g. a username 'authorname' at /authorname. Such pages are never cached and fall back to /index.html offline. Matching '/auth/' or '/auth' exactly would be stricter. I left it alone because it is existing behaviour.
 - [mobile] src/lib/sw-cleanup.ts cleanupAndReload, called from src/pages/auth/Login.tsx, reloads the page whenever a non-agentbio cache exists. Any third-party cache on the origin would trigger a reload on every login visit until it is deleted. It is deleted on the first pass, so this is low risk.
 - US-324 [marketing] US-143 slice: Landing FAQ and hero copy still lean on vague 'MLS compliance features'
+
+---
+
+## Continuous improvement loop — round 3 — 2026-11-07 (US-325 to US-334 done)
+
+Ten lanes, all approved by an independent reviewer with no fix-ups, all based on the loop branch.
+Closed US-273, US-284, US-286, US-293, US-314, US-315, US-320, US-321, US-322; US-295 partly.
+Final: tsc clean, 1877 unit tests pass (from 1778), verify:migrations OK (62 files).
+
+- US-325 [listings] The Analytics page could not show which listings visitors view most
+- US-326 [leads] Assigned agents can log calls, emails, notes and follow-ups on leads routed to them (closes US-314)
+- US-327 [profile] Page-builder templates no longer publish dead download buttons or a 24-hour reply promise
+- US-328 [uiux] TeamPage: a failed load offered to create a second team, and members were removed with one unconfirmed click (slice of US-284)
+- US-329 [performance] The public profile page (/:username) needed 9 requests over 2 serial round trips before it could render
+- US-330 [security] Agents could rewrite system-written data in their own notifications (US-322)
+- US-331 [enterprise] A missed digest run meant no morning email that day, and agents past the first 1,000 profiles never got one
+- US-332 [marketing] /features calendar-booking, testimonials and analytics advertised features that do not exist (SMS, Google Calendar sync, video testimonials, a live feed, invented agent quotes)
+- US-333 [seo] City pages claimed CRM integrations and per-neighbourhood analytics that do not exist
+- US-334 [mobile] After a deploy, opening the installed app offline on a page the agent had never visited showed a blank screen
+
+Owner actions:
+- US-325: Apply migration supabase/migrations/20261107000325_top_listings.sql. Deploy it with or before the frontend; until it is applied, the Top listings card shows its 'could not be loaded' state with a retry button and the rest of Analytics is unaffected. It depends on 20261107000263_listing_view_stats.sql, which should already be applied (it creates the index this function uses).
+- US-326: Apply the migration supabase/migrations/20261107000326_assignee_logs_lead_activity.sql. It contains only functions and policies, so it can go before or after the frontend deploy. There is no edge-function or frontend redeploy.
+- US-326: Make sure the verify-backend CI job runs on this branch. The new verify:schema check was only run against PGlite, because real Postgres could not be started in this sandbox.
+- US-329: Apply migration supabase/migrations/20261107000329_public_profile_page_one_round_trip.sql. Until it is applied, the frontend falls back to the old 2-round-trip path, so the order of deploy does not matter.
+- US-329: After applying it, reload PostgREST's schema cache (NOTIFY pgrst, 'reload schema') so the RPC is found rather than returning PGRST202.
+- US-330: Apply migration supabase/migrations/20261107000330_notifications_owner_updates_read_at_only.sql to production. No edge function redeploy is needed.
+- US-331: Redeploy the edge functions server (functions.agentbio.net, the Coolify app built from the root Dockerfile) so scheduled-maintenance picks up the new digest logic and the new digest-store.ts file
+- US-331: Optional: set DIGEST_CATCHUP_HOURS (default 6) on the functions server. With DIGEST_HOUR_UTC=13 the catch-up window is 13:00 to 19:59 UTC
+- US-332: Redeploy Cloudflare Pages (frontend copy only; no migration, no edge function change). The prerendered /features/calendar-booking, /features/testimonials and /features/analytics pages pick up the new copy and FAQ JSON-LD on the next build.
+- US-334: Redeploy Cloudflare Pages. The next build stamps a new sw.js VERSION, so installed PWAs install the new worker and precache the entry files. Nothing else to apply.
+
+Owner decisions needed: agent timezone column (blocks US-318 chaser quiet hours and local-morning digest); lead status vocabulary (blocks US-278).
+
+Opened:
+- US-335 [leads] log_lead_activity accepts any activity_type, so system rows can be forged
+- US-336 [leads] Logged meetings do not count as first contact
+- US-337 [profile] Hero and CTA blocks: hide a button whose target goes nowhere
+- US-338 [uiux] TeamPage: show the team (read-only) to invited admins and members
+- US-339 [uiux] ApiKeysPage: confirm before 'Done' throws away an uncopied key, and fix the amber warning box in dark mode
+- US-340 [performance] Remove the table-read fallback from usePublicProfile once get_public_profile_page is live in production
+- US-341 [performance] Serve the crawler/prerender profile read from get_public_profile_page
+- US-342 [security] Select named columns instead of select('*') on listings in useSecureListings and ListingsBlock
+- US-343 [enterprise] Digest: send in each agent's local morning
+- US-344 [enterprise] Digest: record a per-day run marker so the catch-up window does not re-scan everyone
+- US-345 [seo] Replace 'CRM integration' claims on /features/lead-capture and /vs/later with the Zapier hand-off
+- US-346 [seo] ArticleSEO publisher.logo still points at /Cover.png
+- US-347 [mobile] Login reloads the page after any network error whenever the browser holds any cache not owned by the app (finding)
+
+Other findings:
+- [listings] US-275 (per-listing page route) is still open and is the largest remaining listings-lane slice. US-276 touches submit-lead and lead detail and needs coordination with the leads lane.
+- [listings] US-145 is fixed in code, but its notes say its migration 20260903000002_repair_double_encoded_listing_photos.sql still has to be applied to production (passes=false only for that reason). The owner should confirm.
+- [listings] The analytics_events throttle and the client-side visitor_id mean that visitors in top_listings are indicative. The Analytics page's existing caveat paragraph covers this, but the card itself says only 'counted once per visitor session' (src/components/analytics/TopListingsCard.tsx).
+- [leads] supabase/migrations/20260902000006_zip_routing_and_assignee_access.sql:154-162: the lead_activities UPDATE policy lets the owner or assignee update ANY activity row on the lead, including system status_change/form_submission rows and rows another person wrote. It has no WITH CHECK, so lead_id/user_id can also be rewritten to another lead the caller can see. This should be narrowed to the row's own author and the agent-authored types, with a WITH CHECK (security/leads).
+- [leads] US-313 is still open: the DELETE policy (baseline:14034) checks only auth.uid() = user_id.
+- [leads] src/hooks/useLeadContactAction.ts:36 calls useLeadActivities(undefined), so the success handler invalidates ['lead-activities', undefined] and an open lead's timeline does not refresh after a contact action from the list.
+- [leads] The hook's error toasts are generic ('Failed to log call'). Now that an assignee who is later reassigned gets 'Lead not found or access denied', a clearer message such as 'This lead is no longer assigned to you' would help.
+- [leads] US-279 (Leads filter row overflows at 375px) and US-278 (blocked on an owner decision) are still open in this lane.
+- [profile] src/lib/pageTemplates.ts: the Investor contact form's submit button still reads 'Get Investment Analysis', which arguably promises a deliverable. I left it because it is a call to action, not a stated commitment. Owner call.
+- [profile] src/components/pageBuilder/BlockRenderer.tsx: every block config is cast `as any` (lines ~75-105), which goes against CLAUDE.md's no-any rule. A typed discriminated switch would have caught template configs carrying CTA-only keys (Premium Showcase's CTA block config is mixed with contact-form fields around pageTemplates.ts ~520-545).
+- [profile] src/components/pageBuilder/BlockSettings.tsx: the settings components take `{ config, onUpdate }: any`, which is untyped.
+- [profile] The page builder's editor canvas has no element with id="contact", so '#contact' links only work on the published /:username page, not in the builder preview.
+- [uiux] src/pages/dashboard/TeamPage.tsx: the role icons use text-amber-500 for the owner and text-blue-500 for admins, which are hard-coded hues and not theme tokens. This is minor.
+- [uiux] TeamPage has no UI for the existing 'updateRole' action (supabase/functions/teams/index.ts:211-224), so an owner cannot promote a member to admin from the dashboard.
+- [uiux] The invite toast for a failed email says 'Remove and re-invite them in a moment'. Now that removal asks for confirmation, a 'Resend invite' action would be clearer. That needs a resend action in the teams function.
+- [performance] src/components/pageBuilder/blocks/ListingsBlock.tsx:~72-73 still runs select('*') on listings from the public page. That is query cost on a visitor-facing path; it should name its columns as usePublicProfile does.
+- [performance] src/hooks/useSecureListings.ts:69 uses select('*') on listings.
+- [performance] The SQL in the migration is not yet verified against a live Postgres; verify:schema could not run here. CI verify-backend.yml will catch a typo in a column name.
+- [security] Other baseline policies written as FOR UPDATE USING (owner) with table-wide UPDATE grants may let owners rewrite system-written columns in the same way. A sweep should cover tables whose rows the system writes but which also have an owner UPDATE policy (for example audit or notification-like tables). Not audited this round.
+- [security] The new verify-schema check also fails if anon UPDATE comes back through a grant, even though the policy being TO authenticated already means an anon UPDATE affects 0 rows. That is deliberate: it is a defence-in-depth assertion on the grant.
+- [enterprise] supabase/functions/_shared/agent-contact.ts:41 getAgentContact makes two calls per agent (a profile select and auth.admin.getUserById). The digest and the overdue chaser call it once per agent per run. A bulk service-role RPC returning (id, email) for a list of ids would remove up to thousands of admin API calls a day at scale.
+- [enterprise] US-291 (data export queue) is still open: supabase/functions/gdpr-export/index.ts POST creates a gdpr_data_requests row and returns 202, but nothing processes it. It is the next-highest-value enterprise item and needs a private storage bucket plus a scheduled processor; scheduled-maintenance is the obvious host.
+- [enterprise] US-318 (chaser quiet hours) is blocked on a product decision: there is no timezone column. It shares that dependency with the first nextSlice above.
+- [marketing] src/pages/features/Testimonials.tsx and Analytics.tsx TestimonialType/MetricCard icon tiles still use bg-gradient-to-br from-[#80d0c7]/10 to-[#a1c4fd]/10 (a teal-to-blue gradient) and same-size icon-tile cards. These are craft-floor tells and belong to the uiux lane. I changed only the CalendarBooking StepCard circle.
+- [marketing] src/pages/features/Testimonials.tsx 'What Makes a Great Real Estate Testimonial' still uses an illustrative 'John & Mary T., Austin TX (Closed March 2024)' as a Good attribution example. It reads as advice and the guard does not match it, but someone may prefer a clearly generic placeholder.
+- [marketing] docs/product/FEATURES_README.md 'Claims and where they are implemented' has no rows for the /features pages. Adding them (CalendlyModal.tsx, openHouseCalendar.ts, SubmitReview.tsx, ReportBuilder.tsx, digests.ts) would bring these pages under landing-claims.test.ts's file-existence check.
+- [marketing] src/pages/public/Press.tsx:45 describes calendar booking as 'Showing and consultation appointments booked from the page itself'. This is roughly true, but bookings happen through the agent's Calendly; saying so would be more precise.
+- [marketing] Open findings from the brief are untouched: the duplicate id="demo-profiles" (Landing.tsx and DemoProfilesShowcase.tsx), and the raw profile.theme key shown as a badge in DemoProfilesShowcase.tsx. Also untouched: US-296 (dead USAGE_PRICING with SMS prices in pricing-plans.ts), US-297 (emails_per_month meter), US-319 (unsourced competitor prices) and US-324 ('MLS compliance' on the landing FAQ).
+- [seo] src/components/integrations/ZapierIntegrationModal.tsx:285 says 'Connect to popular CRMs (Salesforce, HubSpot, Zoho)'. That is true through Zapier, which is the modal's own subject, so the new guard does not flag it. Keep that file in mind if the guard is widened to bare 'CRM' wording.
+- [seo] src/pages/landing/LocationTemplate.tsx direct-answer paragraph still says 'calendar booking for consultation scheduling'. What ships is a Calendly link (profiles.calendly_url), not native booking. This is borderline; consider saying 'a Calendly booking link'.
+- [seo] The per-line commentMask/RULES scan in the first describe block (numeric claims) still checks one line at a time. scanLines could be reused there too, but its findings need checking against existing wrapped copy first.
+- [mobile] public/sw.js: the APP_SHELL addAll is all-or-nothing. If '/manifest.json' or '/offline.html' fails, the whole shell precache (including /index.html) is skipped, though install still completes. Making it per-file like the entry assets would be sturdier.
+- [mobile] src/App.tsx:160 runs cleanupServiceWorkers() on every app mount and deletes every cache whose name does not start with 'agentbio-sw-'. That is harmless today, but anything added later that uses Cache Storage (for example a library cache) would be wiped on each load.
