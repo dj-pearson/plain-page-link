@@ -140,7 +140,3 @@
 /sw.js
   Content-Type: application/javascript
   Cache-Control: public, max-age=0, must-revalidate
-
-/firebase-messaging-sw.js
-  Content-Type: application/javascript
-  Cache-Control: public, max-age=0, must-revalidate

@@ -5108,3 +5108,4 @@ Other findings (not yet stories):
 - [mobile] The /:username public profile's offline experience and the offline-storage/sync-manager libraries were not audited this round.
 
 Owner decision 2026-11-07: no native iOS/Android apps yet; the mobile lane works on the PWA only (recorded in docs/improvement-loops/LANES.md).
+Owner decisions 2026-11-07: push notifications removed (leftovers deleted: sw-cleanup allowlist, _headers rule, functions README, CLAUDE.md, deploy audit); silent service-worker updates stay as they are.

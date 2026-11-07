@@ -27,6 +27,9 @@ Each lane is one agent per round. A lane only looks inside its own scope.
 - 2026-11-07: **No native iOS/Android apps yet.** Phones use the installed
   PWA. The `mobile` lane improves the PWA only; do not add Capacitor or any
   other native shell, and do not open stories for store builds.
+- 2026-11-07: **Push notifications removed.** Do not add FCM/web push back.
+- 2026-11-07: **Silent updates stay.** The service worker keeps calling
+  skipWaiting, so a deploy takes over open tabs without a Refresh prompt.
 
 ## One improvement per lane per round
 

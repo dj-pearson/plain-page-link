@@ -5,25 +5,6 @@
  * authentication requests or causing fetch errors.
  */
 
-/**
- * Check if there are any service workers that should be removed
- */
-export async function hasInterferingServiceWorkers(): Promise<boolean> {
-  if (!('serviceWorker' in navigator)) {
-    return false;
-  }
-
-  try {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-
-    // Check if there are any SWs other than our Firebase messaging SW
-    return registrations.some((reg) => !reg.active?.scriptURL.includes('firebase-messaging-sw.js'));
-  } catch (error) {
-    console.error('[SW Cleanup] Failed to check service workers:', error);
-    return false;
-  }
-}
-
 export async function cleanupServiceWorkers(): Promise<boolean> {
   if (!('serviceWorker' in navigator)) {
     return false;
@@ -38,7 +19,9 @@ export async function cleanupServiceWorkers(): Promise<boolean> {
     // is auth-safe by design (never caches auth/Supabase — see
     // public/sw.js); legacy/unknown SWs are still purged because the
     // original auth-caching incident was caused by an unscoped SW.
-    const KEEP_SW = ['firebase-messaging-sw.js', '/sw.js'];
+    // Push was removed, so a leftover firebase-messaging-sw.js on a device is
+    // legacy too and is unregistered here.
+    const KEEP_SW = ['/sw.js'];
     // Cache names owned by the app SW — must NOT be wiped here.
     const APP_CACHE_PREFIX = 'agentbio-sw-';
 

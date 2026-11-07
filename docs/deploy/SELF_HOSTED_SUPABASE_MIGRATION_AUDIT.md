@@ -100,17 +100,6 @@ if (url.includes('/storage')) return true;
 | `VITE_APP_URL` | Recommended | Application URL | `src/lib/constants.ts` |
 | `VITE_API_URL` | Optional | Backend API URL | `src/lib/constants.ts` |
 
-#### Firebase (Optional - Push Notifications)
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_FIREBASE_API_KEY` | If using FCM | Firebase API key |
-| `VITE_FIREBASE_AUTH_DOMAIN` | If using FCM | Firebase auth domain |
-| `VITE_FIREBASE_PROJECT_ID` | If using FCM | Firebase project ID |
-| `VITE_FIREBASE_STORAGE_BUCKET` | If using FCM | Firebase storage bucket |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | If using FCM | FCM sender ID |
-| `VITE_FIREBASE_APP_ID` | If using FCM | Firebase app ID |
-| `VITE_FIREBASE_VAPID_KEY` | If using FCM | VAPID key for web push |
-
 #### Search Analytics OAuth (Optional)
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -280,7 +269,6 @@ These are external CDNs, which is correct for Deno edge functions.
 |-----------|--------|----------|
 | Supabase Client | Configured | `src/integrations/supabase/client.ts` |
 | CORS Headers | N/A (backend) | `supabase/functions/_shared/cors.ts` |
-| Firebase Push | Configured | `src/lib/push-notifications.ts` |
 | Image SEO | **NEEDS UPDATE** | `src/lib/image-seo.ts` |
 
 ### Frontend Supabase Client Configuration

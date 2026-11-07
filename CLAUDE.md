@@ -75,7 +75,7 @@ AgentBio Intelligence is an AI-powered real estate platform that transforms agen
 - **Hosting**: Cloudflare Pages
 - **Edge Functions**: Supabase Edge Functions
 - **Analytics**: Google Analytics
-- **Push Notifications**: client-side FCM token registration only — there is no server-side sender yet
+- **Push Notifications**: none. Push was removed (owner decision 2026-11-07); do not add FCM back without asking
 - **CDN**: Cloudflare
 
 ### Development Tools
@@ -155,7 +155,6 @@ plain-page-link/
 │   ├── lib/                # Utility libraries & helpers
 │   │   ├── errorHandler.ts         # Centralized error handling
 │   │   ├── offline-storage.ts      # IndexedDB for offline PWA
-│   │   ├── push-notifications.ts   # FCM push notifications
 │   │   ├── analytics.ts            # Analytics utilities
 │   │   ├── lead-scoring.ts         # Lead scoring algorithms
 │   │   ├── seo.ts                  # SEO utilities
@@ -284,8 +283,6 @@ plain-page-link/
    - `VITE_SUPABASE_ANON_KEY` - Your Supabase anon/public key
    - `VITE_APP_URL` - Your app URL (e.g., https://agentbio.net)
 
-   Optional (for push notifications):
-   - `VITE_FIREBASE_*` - Firebase config for FCM
 
 4. **Start Development Server:**
    ```bash
