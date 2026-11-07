@@ -1526,6 +1526,98 @@ check('client sphere is per-agent and open houses hide private notes', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 7b2. Unpublishing a page hides everything on it (US-308).
+//
+//      The profile row has been gated on is_published since 20260808000002,
+//      but the visitor policies on listings, links and testimonials looked
+//      only at the row itself, so an unpublished agent's listings, links and
+//      reviews stayed readable by user id. Each table, the two open house
+//      RPCs and the response-time aggregate are asserted for a visitor, for
+//      another signed-in agent, and for the owner, then again once published.
+// ---------------------------------------------------------------------------
+check("an unpublished agent's listings, links, reviews and open houses are hidden from visitors", () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000030801';
+  const other = '00000000-dead-beef-0000-000000030802';
+  const listing = '00000000-dead-beef-0000-0000003080a1';
+  const oh = '00000000-dead-beef-0000-0000003080b1';
+  const as = (role, sub, sql) =>
+    q(`SET ROLE ${role}; ${sub ? `SET request.jwt.claim.sub = '${sub}';` : ''} ${sql}`);
+  const visible = (role, sub) => {
+    const [row] = as(
+      role,
+      sub,
+      `SELECT (SELECT count(*) FROM public.listings WHERE user_id = '${agent}')
+           || '|' || (SELECT count(*) FROM public.links WHERE user_id = '${agent}')
+           || '|' || (SELECT count(*) FROM public.testimonials WHERE user_id = '${agent}')
+           || '|' || (SELECT count(*) FROM public.list_public_open_houses('${agent}'))
+           || '|' || (SELECT count(*) FROM public.get_public_open_house('${oh}'))
+           || '|' || coalesce(public.public_agent_response_hours('${agent}')::text, 'null');`
+    );
+    return row;
+  };
+  const NONE = '0|0|0|0|0|null';
+  const ALL = '1|1|1|1|1|2.0';
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${agent}', 'us308agent@example.test'), ('${other}', 'us308other@example.test')
+         ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.profiles (id, username, full_name, is_published) VALUES
+         ('${agent}', 'us308agent', 'Unpublished Agent', false),
+         ('${other}', 'us308other', 'Other Agent', true)
+         ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, is_published = EXCLUDED.is_published;
+       INSERT INTO public.listings (id, user_id, address, city, price, status)
+         VALUES ('${listing}', '${agent}', '308 Hidden Ln', 'Austin', '650000', 'active');
+       INSERT INTO public.links (user_id, title, url, position, is_active)
+         VALUES ('${agent}', 'Book a call', 'https://example.test/book', 1, true);
+       INSERT INTO public.testimonials (user_id, client_name, review, rating, is_published)
+         VALUES ('${agent}', 'A client', 'Sold our house in a week', 5, true);
+       INSERT INTO public.open_houses (id, user_id, listing_id, starts_at, ends_at, is_public, private_notes)
+         VALUES ('${oh}', '${agent}', '${listing}', now() + interval '1 day',
+                 now() + interval '1 day 2 hours', true, 'lockbox 0308');
+       INSERT INTO public.leads (user_id, lead_type, name, created_at, first_responded_at)
+         SELECT '${agent}', 'buyer', 'Lead ' || g, now() - interval '3 hours', now() - interval '1 hour'
+           FROM generate_series(1, 5) g;`);
+
+    const anonSees = visible('anon', null);
+    if (anonSees !== NONE)
+      out.push(`unpublished: a visitor sees "${anonSees}" (listings|links|reviews|open houses|kiosk|response hours); expected "${NONE}"`);
+    const otherSees = visible('authenticated', other);
+    if (otherSees !== NONE)
+      out.push(`unpublished: another signed-in agent sees "${otherSees}"; expected "${NONE}"`);
+    const ownerSees = visible('authenticated', agent);
+    if (ownerSees !== ALL)
+      out.push(`unpublished: the owner sees "${ownerSees}" of their own page; expected "${ALL}" (preview and kiosk)`);
+
+    // A NULL is unpublished for the profile row, so it is for its content too.
+    q(`UPDATE public.profiles SET is_published = NULL WHERE id = '${agent}';`);
+    const nullSees = visible('anon', null);
+    if (nullSees !== NONE) out.push(`is_published NULL: a visitor sees "${nullSees}"; expected "${NONE}"`);
+
+    q(`UPDATE public.profiles SET is_published = true WHERE id = '${agent}';`);
+    const publishedSees = visible('anon', null);
+    if (publishedSees !== ALL)
+      out.push(`published: a visitor sees "${publishedSees}"; expected "${ALL}" — publishing must still show the page`);
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`RESET ROLE;
+         DELETE FROM public.open_houses WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.leads WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.testimonials WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.links WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.listings WHERE user_id IN ('${agent}', '${other}');
+         DELETE FROM public.profiles WHERE id IN ('${agent}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${agent}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
+// ---------------------------------------------------------------------------
 // 7c. Plan limits hold (20260923000002).
 //
 //     A tier is only real if the database refuses the thing the tier does not
