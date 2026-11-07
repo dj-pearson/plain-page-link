@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ArrowLeft,
   ArrowRight,
+  Eye,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -39,6 +40,8 @@ import { CSVUploadDialog } from '@/components/listings/CSVUploadDialog';
 import { URLImportDialog } from '@/components/listings/URLImportDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useListings, type Listing, type NewListing } from '@/hooks/useListings';
+import { useListingViewStats } from '@/hooks/useListingViewStats';
+import { describeListingViews, formatListingViews } from '@/lib/listingViews';
 import type { ImportedListingData } from '@/components/listings/URLImportDialog';
 import type { SharedListing } from '@/components/listings/SocialShareDialog';
 import { useListingImageUpload } from '@/hooks/useListingImageUpload';
@@ -88,6 +91,9 @@ export default function Listings() {
     deleteListing,
     reorderListings,
   } = useListings();
+  // Views per listing from the public profile (US-263). Absent until loaded,
+  // and after a failure, so a card never claims "No views" it did not count.
+  const { stats: viewStats, isReady: viewStatsReady } = useListingViewStats();
   const { uploadListingImages } = useListingImageUpload();
   const { subscription, canAdd } = useSubscriptionLimits();
   const { profile } = useProfile();
@@ -786,6 +792,25 @@ export default function Listings() {
                     {listing.mls_number && (
                       <div className="truncate">MLS# {listing.mls_number}</div>
                     )}
+                    {viewStatsReady && (
+                      <div
+                        className="mt-1 flex items-center gap-1 text-foreground"
+                        title={describeListingViews(viewStats[listing.id])}
+                      >
+                        <Eye
+                          className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">
+                          <span className="sr-only">
+                            {describeListingViews(viewStats[listing.id])}
+                          </span>
+                          <span aria-hidden="true">
+                            {formatListingViews(viewStats[listing.id])}
+                          </span>
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {/* Reorder without drag, for keyboard and touch (US-257). */}
                   <div className="flex shrink-0 gap-1">
@@ -843,6 +868,13 @@ export default function Listings() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground hidden lg:table-cell">
                   Sqft
                 </th>
+                {viewStatsReady && (
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground hidden md:table-cell">
+                    <span title="Times visitors opened this listing on your public page in the last 30 days">
+                      Views (30d)
+                    </span>
+                  </th>
+                )}
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
                   Actions
                 </th>
@@ -896,6 +928,14 @@ export default function Listings() {
                   <td className="px-4 py-3 text-right text-sm hidden lg:table-cell">
                     {(listing.sqft ?? listing.square_feet)?.toLocaleString() ?? '-'}
                   </td>
+                  {viewStatsReady && (
+                    <td
+                      className="px-4 py-3 text-right text-sm tabular-nums hidden md:table-cell"
+                      title={describeListingViews(viewStats[listing.id])}
+                    >
+                      {(viewStats[listing.id]?.views30d ?? 0).toLocaleString()}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
