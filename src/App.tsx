@@ -15,6 +15,7 @@ import { AnnouncerProvider } from './components/ui/live-region';
 import { RouteAnnouncer } from './components/ui/route-announcer';
 import { AccessibilityWidget } from './components/ui/accessibility-widget';
 import { CookieConsent } from './components/ui/cookie-consent';
+import { ProfileRoute } from './components/profile/ProfileRoute';
 
 // Public pages (eager load for better UX on landing)
 import Landing from './pages/public/Landing';
@@ -138,6 +139,8 @@ const SearchAnalyticsPage = lazy(() => import('./pages/admin/SearchAnalyticsPage
  * site, whether or not they ever opened a profile.
  */
 const ProfilePage = lazy(() => import('./pages/public/FullProfilePage'));
+// Rendered through ProfileRoute, which starts the profile's data read while
+// this chunk downloads rather than after it (US-267).
 
 function App() {
   // Selectors, not the whole store (US-241): App wraps every route, and a bare
@@ -334,7 +337,7 @@ function App() {
               {/* Open house sign-in kiosk. Before the username catch-all. */}
               <Route path="/open-house/:openHouseId" element={<OpenHouseSignIn />} />
               <Route path="/:username/review" element={<SubmitReview />} />
-              <Route path="/:slug" element={<ProfilePage />} />
+              <Route path="/:slug" element={<ProfileRoute page={ProfilePage} />} />
             </Route>
 
             {/* Everything that needs a session. One guard (US-120): this was

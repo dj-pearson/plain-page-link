@@ -1,17 +1,35 @@
 import type { PublicProfile } from '@/types/profile';
 import type { PublicProfileListing } from '@/types/listing';
 import { toStringList } from '@/types/profile';
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeUsername } from '@/lib/username';
 
-export const usePublicProfile = (rawUsername: string) => {
+/**
+ * The public profile read, as query options shared by two callers (US-267):
+ *
+ *   - usePublicProfile, inside FullProfilePage, which renders it; and
+ *   - ProfileRoute, in the entry chunk, which starts the same query the moment
+ *     the /:slug route matches — before the FullProfilePage chunk has even
+ *     been requested.
+ *
+ * Before, the profile's critical path was strictly serial: entry JS, then the
+ * lazy FullProfilePage chunk and its imports, then mount, then the profiles
+ * row, then the six related reads. The data could not start until the code
+ * that asks for it had downloaded. Sharing the key lets the chunk download and
+ * the two Supabase round trips overlap; the page's useQuery finds the request
+ * already in flight (or finished) and does not issue another.
+ *
+ * Keep this module light: it is in the entry graph, so it may import only what
+ * the entry already carries (the Supabase client, react-query, small helpers).
+ */
+export const publicProfileQueryOptions = (rawUsername: string) => {
   // Usernames are stored canonical (lower case); the slug comes from a URL a
   // human typed. Compare the two in the same form or `/JaneDoe` 404s.
   const username = normalizeUsername(rawUsername);
 
-  return useQuery({
-    queryKey: ['public-profile', username],
+  return queryOptions({
+    queryKey: ['public-profile', username] as const,
     queryFn: async () => {
       // Fetch profile by username - ONLY PUBLIC FIELDS
       const { data: profile, error: profileError } = await supabase
@@ -258,3 +276,6 @@ export const usePublicProfile = (rawUsername: string) => {
     gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
 };
+
+export const usePublicProfile = (rawUsername: string) =>
+  useQuery(publicProfileQueryOptions(rawUsername));
