@@ -31,3 +31,28 @@ export function usableLinkUrl(url: string | null | undefined): string {
   }
   return safe;
 }
+
+/**
+ * Whether a saved block should be published at all on the public page
+ * (US-327, US-350). A link button and a CTA block exist only to send the
+ * visitor somewhere, so with no usable destination nothing is left worth
+ * showing. Every other block type passes — a hero keeps its headline and only
+ * drops its button (HeroBlock).
+ *
+ * The config arrives as jsonb, so its shape is not trusted.
+ */
+export function blockHasDestination(block: { type?: unknown; config?: unknown }): boolean {
+  const config = (block.config && typeof block.config === 'object' ? block.config : {}) as Record<
+    string,
+    unknown
+  >;
+  const asUrl = (value: unknown) => (typeof value === 'string' ? value : undefined);
+  switch (block.type) {
+    case 'link':
+      return usableLinkUrl(asUrl(config.url)) !== '';
+    case 'cta':
+      return usableLinkUrl(asUrl(config.buttonUrl)) !== '';
+    default:
+      return true;
+  }
+}

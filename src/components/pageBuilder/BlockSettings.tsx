@@ -754,8 +754,12 @@ function HeroSettings({ config, onUpdate }: any) {
           type="url"
           value={config.ctaUrl || ''}
           onChange={(e) => onUpdate({ ctaUrl: e.target.value })}
-          placeholder="https://example.com"
+          placeholder="#contact or https://yourwebsite.com"
+          aria-describedby="hero-cta-url-hint"
         />
+        <p id="hero-cta-url-hint" className="text-xs text-muted-foreground">
+          The button stays off your public page until it has a real URL.
+        </p>
       </div>
     </div>
   );
@@ -1080,8 +1084,12 @@ function CTASettings({ config, onUpdate }: any) {
           type="url"
           value={config.buttonUrl}
           onChange={(e) => onUpdate({ buttonUrl: e.target.value })}
-          placeholder="https://example.com"
+          placeholder="#contact or https://yourwebsite.com"
+          aria-describedby="cta-button-url-hint"
         />
+        <p id="cta-button-url-hint" className="text-xs text-muted-foreground">
+          This block stays off your public page until the button has a real URL.
+        </p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="cta-variant">Style</Label>
