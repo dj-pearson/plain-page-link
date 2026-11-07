@@ -157,7 +157,9 @@ export function ContactBlock({ config, isEditing = false, userId }: ContactBlock
         <div className="text-center space-y-3">
           <CheckCircle className="w-12 h-12 text-green-600 mx-auto" />
           <h3 className="text-lg font-semibold text-green-900">Message Sent!</h3>
-          <p className="text-green-700">{config.successMessage}</p>
+          <p className="text-green-700">
+            {config.successMessage || 'Thanks, your message was sent.'}
+          </p>
         </div>
       </div>
     );
