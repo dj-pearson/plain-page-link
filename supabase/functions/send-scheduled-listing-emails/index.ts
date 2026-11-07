@@ -17,15 +17,37 @@ const SITE_URL = getSiteUrl();
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// Email sequence schedule (days after capture)
+// Email sequence schedule (days after capture).
+//
+// US-415: the copy below used to include "73% of real estate agents make the
+// same listing description mistake", "We analyzed 47,000 real estate listings"
+// with "23% fewer showings", "31% more inquiries" and "2.4x more responses", a
+// named testimonial ("AgentBio saves me 8-10 hours per week" over "Jennifer M.,
+// Top 1% Agent, Austin"), "4,200+ agents trust AgentBio", a "$97 value"
+// templates pack that does not exist, "Unlimited AI listing descriptions"
+// (plans meter them monthly) and "20% off ... expires tonight" / "in 12 hours"
+// with coupon LISTING20, which exists in no Stripe account and which the
+// register page never reads. None of it was measured or real. Every CTA also
+// pointed at /register, which is a reserved username: it rendered the 404 page.
+// src/marketing-claims.test.ts now scans this file.
 const EMAIL_SCHEDULE = {
-  2: { subject: 'The listing description mistake that costs agents thousands', dayNumber: 1 },
+  2: { subject: 'The most common listing description mistake', dayNumber: 1 },
   3: { subject: 'Power words that make buyers take action', dayNumber: 2 },
   4: { subject: 'How to choose the right description style for your listing', dayNumber: 3 },
-  6: { subject: 'Real data: What sells homes faster in 2025', dayNumber: 5 },
+  6: { subject: 'Four things to check before your listing goes live', dayNumber: 5 },
   7: { subject: 'Your listing checklist: Beyond the description', dayNumber: 6 },
-  8: { subject: '20% off AgentBio (expires tonight) + Free listing templates', dayNumber: 7 },
+  8: { subject: 'What AgentBio does with the listings you write', dayNumber: 7 },
 };
+
+const REGISTER_URL = `${SITE_URL}/auth/register`;
+
+function ctaButton(label: string): string {
+  return `<p style="text-align: center; margin-top: 40px;">
+        <a href="${REGISTER_URL}" style="background: #6d28d9; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; display: inline-block; font-weight: 600;">
+          ${label}
+        </a>
+      </p>`;
+}
 
 serve(async (req) => {
   const origin = req.headers.get('origin');
@@ -188,7 +210,7 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p>Yesterday you generated 3 listing descriptions with our AI tool. I wanted to share something important...</p>
 
-      <p><strong>73% of real estate agents make the same listing description mistake:</strong></p>
+      <p><strong>The most common listing description mistake:</strong></p>
 
       <p style="background: #fef3f9; border-left: 4px solid #ec4899; padding: 20px; margin: 20px 0;">
         They list <em>features</em> instead of painting <em>experiences</em>.
@@ -206,16 +228,12 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p>Talk soon,<br>The AgentBio Team</p>
 
-      <p style="text-align: center; margin-top: 40px;">
-        <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Create Your Free Page
-        </a>
-      </p>
+      ${ctaButton('Create Your Free Page')}
     </div>`,
 
     2: `<!-- Email 2: Power Words -->
     <div style="${baseStyles}">
-      <h2 style="color: #9333ea;">${firstName}, these 7 words sell homes faster</h2>
+      <h2 style="color: #9333ea;">${firstName}, 7 words worth using in your next listing</h2>
 
       <p>Quick question: What's the difference between these two descriptions?</p>
 
@@ -241,17 +259,13 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
         <li><strong>Opportunity</strong> - For investment properties</li>
       </ol>
 
-      <p>Look back at your AI-generated descriptions. Count how many power words appear. That's why they convert.</p>
+      <p>Look back at your AI-generated descriptions and count how many of these appear. That's deliberate.</p>
 
       <p>Tomorrow: How to choose which style to use for YOUR specific listing.</p>
 
       <p>- The AgentBio Team</p>
 
-      <p style="text-align: center; margin-top: 40px;">
-        <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Get AI Marketing for Every Listing
-        </a>
-      </p>
+      ${ctaButton('Create Your Free Page')}
     </div>`,
 
     3: `<!-- Email 3: Choosing Style -->
@@ -296,54 +310,33 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p><strong>Pro tip:</strong> Test different styles on different channels. Use Luxury for your email list, Family-Friendly on Facebook, Investment on LinkedIn.</p>
 
-      <p>Tomorrow: Real data on what sells homes faster in 2025.</p>
+      <p>Tomorrow: four things to check before your listing goes live.</p>
 
       <p>- The AgentBio Team</p>
 
-      <p style="text-align: center; margin-top: 40px;">
-        <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Generate Unlimited Descriptions with AgentBio
-        </a>
-      </p>
+      ${ctaButton('Create Your Free Page')}
     </div>`,
 
-    5: `<!-- Email 5: Real Data -->
+    5: `<!-- Email 5: Pre-launch checks -->
     <div style="${baseStyles}">
-      <h2 style="color: #9333ea;">${firstName}, this is what sells homes faster in 2025</h2>
+      <h2 style="color: #9333ea;">${firstName}, four things to check before your listing goes live</h2>
 
-      <p>We analyzed 47,000 real estate listings that sold in under 30 days.</p>
+      <p>Before you paste a description into the MLS, read it once more against this list:</p>
 
-      <p>Here's what we found:</p>
+      <ol style="line-height: 1.8;">
+        <li><strong>Length.</strong> Long enough to say what makes the home different, short enough that the first two sentences carry it. Many portals cut the preview off early.</li>
+        <li><strong>A picture, not a spec sheet.</strong> Beds and baths are already in the listing fields. Use the description for what it feels like to live there.</li>
+        <li><strong>Specific, checkable details.</strong> "Walk to the farmers market" beats "great location". Leave out anything you cannot stand behind, and anything fair-housing rules prohibit.</li>
+        <li><strong>A clear next step.</strong> End with what you want the reader to do: "Schedule a private showing" or "Ask for the disclosure package".</li>
+      </ol>
 
-      <div style="background: #ecfdf5; border: 2px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 8px;">
-        <h3 style="margin-top: 0; color: #059669;">📊 What High-Performing Listings Have in Common</h3>
+      <p>Your AI-generated descriptions were written with all four in mind, but you know the home. Edit freely.</p>
 
-        <p><strong>1. Word count matters</strong><br>
-        Optimal: 400-600 words. Too short (under 200) = 23% fewer showings. Too long (over 800) = 18% fewer.</p>
-
-        <p><strong>2. Emotional triggers work</strong><br>
-        Descriptions with emotion words ("imagine," "picture," "feel") get 31% more inquiries than feature-only lists.</p>
-
-        <p><strong>3. Social proof is powerful</strong><br>
-        Mentioning "award-winning schools" or "sought-after neighborhood" increases engagement by 27%.</p>
-
-        <p><strong>4. Call-to-action is critical</strong><br>
-        Listings ending with specific CTAs ("Schedule your private showing") get 2.4x more responses than generic endings.</p>
-      </div>
-
-      <p>Your AI-generated descriptions already include all 4 elements. That's why they work.</p>
-
-      <p>Want to see how your listing stacks up? Reply to this email with your MLS link and I'll send you a free analysis.</p>
-
-      <p>Tomorrow: Your complete listing success checklist (beyond just the description).</p>
+      <p>Tomorrow: your complete listing checklist, beyond the description.</p>
 
       <p>- The AgentBio Team</p>
 
-      <p style="text-align: center; margin-top: 40px;">
-        <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Create Your Free Page
-        </a>
-      </p>
+      ${ctaButton('Create Your Free Page')}
     </div>`,
 
     6: `<!-- Email 6: Complete Checklist -->
@@ -390,93 +383,47 @@ function getSequenceEmailHTML(sequenceNumber: number, firstName: string): string
 
       <p><strong>The hardest part?</strong> Staying consistent with content creation across all channels.</p>
 
-      <p>That's exactly why we built AgentBio - AI-powered marketing for every listing, automatically optimized for every channel.</p>
+      <p>That's what AgentBio is for: every listing gets a place on your link-in-bio page, with a lead form beside it, and paid plans include AI-written descriptions each month.</p>
 
-      <p>Tomorrow: A special offer just for you.</p>
+      <p>Tomorrow: one last email, then this series ends.</p>
 
       <p>- The AgentBio Team</p>
 
-      <p style="text-align: center; margin-top: 40px;">
-        <a href="${SITE_URL}/register" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block;">
-          Automate Your Listing Marketing
-        </a>
-      </p>
+      ${ctaButton('Put Your Listings on AgentBio')}
     </div>`,
 
-    7: `<!-- Email 7: Final Offer -->
+    7: `<!-- Email 7: What AgentBio does -->
     <div style="${baseStyles}">
-      <div style="text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #9333ea, #ec4899); border-radius: 12px; margin-bottom: 30px;">
-        <h1 style="color: white; margin: 0;">🎁 20% Off AgentBio (Expires Tonight)</h1>
-      </div>
-
       <p>Hi ${firstName},</p>
 
-      <p>Over the past week, you've learned:</p>
+      <p>Over the past week we've covered:</p>
       <ul>
-        <li>✓ How to write emotion-driven descriptions</li>
-        <li>✓ The 7 power words that sell homes</li>
-        <li>✓ How to choose the right style</li>
-        <li>✓ What data says actually works</li>
-        <li>✓ Your complete listing marketing checklist</li>
+        <li>Writing descriptions that describe an experience, not a spec sheet</li>
+        <li>Seven words worth using</li>
+        <li>Choosing the right style for the home</li>
+        <li>Four checks before a listing goes live</li>
+        <li>A listing checklist beyond the description</li>
       </ul>
 
-      <p>Now imagine never having to think about any of this again.</p>
+      <p>A description does its job once a buyer reads it. AgentBio gives you somewhere to put the listing where they can act on it:</p>
 
-      <div style="background: #faf5ff; border: 3px solid #9333ea; padding: 30px; margin: 30px 0; border-radius: 12px; text-align: center;">
-        <h2 style="margin-top: 0; color: #9333ea;">Special Offer: 20% Off Your First 3 Months</h2>
+      <ul>
+        <li>A link-in-bio page with your active and sold listings</li>
+        <li>A page for each listing, with a lead form beside it</li>
+        <li>An email to you the moment a lead comes in</li>
+        <li>Analytics on page views, link clicks and lead sources</li>
+        <li>AI listing descriptions each month on paid plans</li>
+      </ul>
 
-        <p style="font-size: 18px; margin: 20px 0;"><strong>AgentBio Pro: $23.20/month</strong> (normally $29)</p>
+      <p>You can set it up on the free plan and upgrade only if it earns its keep. The plans, and what each includes, are at <a href="${SITE_URL}/pricing" style="color: #6d28d9;">agentbio.net/pricing</a>.</p>
 
-        <p><strong>Includes:</strong></p>
-        <ul style="text-align: left; display: inline-block; margin: 20px 0;">
-          <li>✨ Unlimited AI listing descriptions</li>
-          <li>📸 Instagram bio optimization</li>
-          <li>🔗 Custom link-in-bio page</li>
-          <li>📅 30-day content calendar</li>
-          <li>📧 Automated email sequences</li>
-          <li>📊 Analytics dashboard</li>
-          <li>💬 Priority support</li>
-        </ul>
+      ${ctaButton('Create My Free Page')}
 
-        <a href="${SITE_URL}/register?coupon=LISTING20" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 18px; font-weight: bold; margin-top: 20px;">
-          Claim Your 20% Discount →
-        </a>
+      <p style="margin-top: 40px;">This is the last email in this series.</p>
 
-        <p style="font-size: 12px; color: #6b7280; margin-top: 20px;">Use code LISTING20 at checkout • Expires tonight at midnight</p>
-      </div>
+      <p>To your success,<br>The AgentBio Team</p>
 
-      <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 30px 0;">
-        <h3 style="margin-top: 0; color: #059669;">🎁 Bonus: Free Listing Templates Pack ($97 value)</h3>
-        <p>Sign up today and get:</p>
-        <ul>
-          <li>50 Ready-to-use power words cheat sheet</li>
-          <li>Property photography checklist</li>
-          <li>30 Instagram caption templates</li>
-          <li>Email drip campaign templates</li>
-          <li>Open house marketing checklist</li>
-        </ul>
-      </div>
-
-      <p><strong>Still not sure?</strong> Here's what other agents are saying:</p>
-
-      <div style="background: #f9fafb; padding: 15px; border-left: 4px solid #9333ea; margin: 20px 0;">
-        <p style="font-style: italic; margin: 0;">"AgentBio saves me 8-10 hours per week on content creation. The listing generator alone is worth the price."</p>
-        <p style="margin: 10px 0 0; font-size: 14px; color: #6b7280;">— Jennifer M., Top 1% Agent, Austin</p>
-      </div>
-
-      <p style="font-size: 18px; font-weight: bold; text-align: center; margin: 40px 0 20px;">This offer expires in <span style="color: #dc2626;">12 hours</span></p>
-
-      <p style="text-align: center;">
-        <a href="${SITE_URL}/register?coupon=LISTING20" style="background: linear-gradient(135deg, #9333ea, #ec4899); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 18px; font-weight: bold;">
-          Create My Free Page
-        </a>
-      </p>
-
-      <p style="text-align: center; font-size: 12px; color: #6b7280;">No credit card required • Cancel anytime • 4,200+ agents trust AgentBio</p>
-
-      <p style="margin-top: 40px;">To your success,<br>The AgentBio Team</p>
-
-      <p style="font-size: 12px; color: #9ca3af; margin-top: 40px;">P.S. Can't decide? Hit reply and I'll personally answer any questions you have.</p>
+      <p style="font-size: 12px; color: #6b7280; margin-top: 40px;">P.S. Questions? Hit reply.</p>
     </div>`,
   };
 

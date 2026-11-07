@@ -6,6 +6,7 @@ import { sendEmail } from '../_shared/email.ts'
 import { maskEmail } from '../_shared/log-redaction.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { safeHtmlText } from '../_shared/public-email.ts';
+import { BIO_DRIP_DAY, BIO_DRIP_SEQUENCE_NUMBERS, bioDripEmail, type BioDripSequenceNumber } from '../_shared/bio-drip-emails.ts';
 
 /**
  * Cron job to send scheduled Instagram Bio Analyzer emails
@@ -69,25 +70,28 @@ serve(async (req) => {
 
       const sentNumbers = sentEmails?.map(e => e.sequence_number) || []
 
-      // Determine which email to send based on days since capture
-      let sequenceToSend = 0
-      if (daysSinceCapture >= 1 && !sentNumbers.includes(2)) sequenceToSend = 2
-      else if (daysSinceCapture >= 2 && !sentNumbers.includes(3)) sequenceToSend = 3
-      else if (daysSinceCapture >= 3 && !sentNumbers.includes(4)) sequenceToSend = 4
-      else if (daysSinceCapture >= 5 && !sentNumbers.includes(5)) sequenceToSend = 5
-      else if (daysSinceCapture >= 6 && !sentNumbers.includes(6)) sequenceToSend = 6
-      else if (daysSinceCapture >= 7 && !sentNumbers.includes(7)) sequenceToSend = 7
+      // The earliest email that is due and not yet sent.
+      const sequenceToSend: BioDripSequenceNumber | undefined = BIO_DRIP_SEQUENCE_NUMBERS.find(
+        (n) => daysSinceCapture >= BIO_DRIP_DAY[n] && !sentNumbers.includes(n)
+      )
 
-      if (sequenceToSend > 0) {
+      if (sequenceToSend !== undefined) {
         try {
-          const emailContent = getEmailTemplate(
-            sequenceToSend,
-            safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
-            safeHtmlText(capture.market, 100),
-            capture.instagram_bio_analyses?.overall_score || 0
-          )
+          const emailContent = bioDripEmail(sequenceToSend, {
+            firstName: safeHtmlText(capture.first_name, 100), // visitor-written (US-219)
+            market: safeHtmlText(capture.market, 100),
+            score: capture.instagram_bio_analyses?.overall_score || 0,
+            siteUrl: getSiteUrl(),
+          })
 
-          await sendEmail(emailContent)
+          // US-415: this used to send with `to: ''` ("Will be set by caller" —
+          // it never was) and mark the email sent whatever sendEmail reported,
+          // so a capture's sequence would be recorded as delivered while
+          // nothing left the building.
+          const result = await sendEmail({ to: capture.email, ...emailContent })
+          if (!result.ok) {
+            throw new Error(result.error ?? 'send failed')
+          }
 
           // Mark as sent
           await supabase
@@ -127,170 +131,3 @@ serve(async (req) => {
     )
   }
 })
-
-function getEmailTemplate(
-  sequenceNumber: number,
-  firstName: string,
-  market: string,
-  score: number
-): { to: string; subject: string; body: string; html: string } {
-  const siteUrl = getSiteUrl()
-
-  const templates: Record<number, any> = {
-    2: {
-      subject: "The Instagram bio mistake 73% of agents make",
-      body: `Hey ${firstName},
-
-Yesterday you analyzed your Instagram bio and discovered it scored ${score}/100.
-
-Here's something interesting: 73% of the ${market} agents I've analyzed make the SAME critical mistake.
-
-They're using generic phrases like:
-→ "Helping you find your dream home"
-→ "Making dreams come true"
-→ "Your local real estate expert"
-
-The problem? These phrases are invisible. Your brain skips right over them.
-
-What top performers do instead:
-→ Use specific numbers: "Sold 200+ homes in ${market}"
-→ Highlight unique expertise: "Former architect turned realtor"
-→ Show proof: "Avg. 18 days to close"
-
-How AgentBio Fixes This:
-Your link-in-bio can show dynamic proof:
-→ Live listing count
-→ Recent sales
-→ Client testimonials that update automatically
-
-See How AgentBio Works: ${siteUrl}/pricing
-
-P.S. Your competitors in ${market} are already optimizing. Don't get left behind.`,
-      html: `<p>Hey ${firstName},</p><p>Yesterday you analyzed your bio (${score}/100)...</p><p><a href="${siteUrl}/pricing">See How AgentBio Works</a></p>`
-    },
-    3: {
-      subject: "Your Instagram profile as a 24/7 showing scheduler",
-      body: `${firstName},
-
-Quick question: How many Instagram followers have actually become paying clients?
-
-Most ${market} agents treat Instagram as brand-building, not lead generation.
-
-But here's what's possible:
-Agents get 12-15 qualified leads per month from Instagram with the right strategy.
-
-The secret? A strategic link-in-bio that converts.
-
-Build Your High-Converting Profile: ${siteUrl}/auth/register
-
-Best,
-The AgentBio Team`,
-      html: `<p>${firstName},</p><p>How many followers became clients?</p><p><a href="${siteUrl}/auth/register">Build Your Profile</a></p>`
-    },
-    4: {
-      subject: `${firstName}, here's your 30-day Instagram content calendar`,
-      body: `Hi ${firstName},
-
-"What should I post?" is the #1 question I hear from agents.
-
-I'm sending you a ready-to-use content calendar with 30 days of proven post ideas.
-
-Pro tip: Track which content drives the most link clicks.
-
-AgentBio shows you exactly which posts convert.
-
-Start Free on AgentBio: ${siteUrl}/auth/register
-
-To your success,
-The AgentBio Team`,
-      html: `<p>Hi ${firstName},</p><p>30-day content calendar ready!</p><p><a href="${siteUrl}/auth/register">Try AgentBio Free</a></p>`
-    },
-    5: {
-      subject: "Real data: What converts Instagram followers to clients",
-      body: `${firstName},
-
-I analyzed data from 2,847 real estate agents using Instagram.
-
-Average Agent: ~7 leads/month
-Top Performer: ~45 leads/month
-
-The difference isn't follower count. It's conversion optimization.
-
-Your current bio scored ${score}/100.
-
-If below 70, you're losing 40-60% of potential leads.
-
-AgentBio optimizes all conversion points.
-
-See How AgentBio Works: ${siteUrl}/pricing
-
-Data-driven success,
-The AgentBio Team`,
-      html: `<p>${firstName},</p><p>Top performers get 45 leads/month from Instagram.</p><p><a href="${siteUrl}/pricing">See How</a></p>`
-    },
-    6: {
-      subject: "Linktree vs AgentBio for real estate (honest comparison)",
-      body: `${firstName},
-
-You asked: "Why use AgentBio instead of Linktree?"
-
-Linktree Pro: $9/month
-→ Generic platform
-→ No real estate features
-
-AgentBio: $29/month
-→ Built for real estate
-→ Open house sign-in kiosk
-→ Lead capture
-→ Advanced analytics
-
-The Real Question:
-How much is one extra deal worth?
-
-Average commission: $9,000
-AgentBio cost per year: $348
-ROI if you close ONE deal: 2,500%
-
-Try AgentBio Free: ${siteUrl}/auth/register
-
-Best,
-The AgentBio Team`,
-      html: `<p>${firstName},</p><p>Honest comparison: Linktree vs AgentBio</p><p><a href="${siteUrl}/auth/register">Try AgentBio Free</a></p>`
-    },
-    7: {
-      subject: `${firstName}, final call: 20% off + free setup (expires tonight)`,
-      body: `${firstName},
-
-A week ago, your Instagram bio scored ${score}/100.
-
-You got your optimized bios. Maybe you implemented one.
-
-The real opportunity is in what happens AFTER the bio click.
-
-SPECIAL OFFER (Expires Tonight):
-→ 20% off first 3 months ($23/month instead of $29)
-→ Free professional setup call
-→ Custom QR code design
-→ Priority support
-
-Risk-Free: start on the free plan, upgrade only if it pays for itself
-
-Claim Your 20% Discount: ${siteUrl}/auth/register?coupon=BIO20
-
-This offer expires tonight at midnight.
-
-Your Instagram has potential. Let's unlock it.
-
-To your success,
-The AgentBio Team
-
-P.S. Your competitors in ${market} are already optimizing. Every day you wait is a day of lost leads.`,
-      html: `<p>${firstName},</p><h2>Final Call: 20% Off + Free Setup</h2><p>Expires tonight!</p><p><a href="${siteUrl}/auth/register?coupon=BIO20">Claim Your Discount</a></p>`
-    }
-  }
-
-  return {
-    to: '', // Will be set by caller
-    ...templates[sequenceNumber]
-  }
-}

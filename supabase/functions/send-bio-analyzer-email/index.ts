@@ -8,6 +8,7 @@ import { getClientIP } from '../_shared/client-ip.ts'
 import { stripLinks, safeHtmlText, safeNumber } from '../_shared/public-email.ts'
 import { getErrorMessage } from '../_shared/errorHelpers.ts'
 import { getSiteUrl } from '../_shared/env.ts';
+import { BIO_DRIP_SEQUENCE_NUMBERS, bioDripSubject } from '../_shared/bio-drip-emails.ts';
 
 interface BioAnalyzerEmailData {
   firstName: string
@@ -142,22 +143,20 @@ async function scheduleEmailSequence(
 ) {
   const now = new Date()
 
-  // Schedule emails 2-7 (will be sent by cron job)
-  const schedules = [
-    { day: 1, subject: "The Instagram bio mistake 73% of agents make" },
-    { day: 2, subject: "Your Instagram profile as a 24/7 showing scheduler" },
-    { day: 3, subject: `${firstName}, here's your 30-day Instagram content calendar` },
-    { day: 5, subject: "Real data: What converts Instagram followers to clients" },
-    { day: 6, subject: "Linktree vs AgentBio for real estate (honest comparison)" },
-    { day: 7, subject: `${firstName}, final call: 20% off + free setup (expires tonight)` }
-  ]
+  // Schedule emails 2-7 (sent by send-scheduled-bio-emails). The subjects come
+  // from the module that writes the emails, so what is recorded here is what
+  // is sent (US-415).
+  const schedules = BIO_DRIP_SEQUENCE_NUMBERS.map((sequence) => ({
+    sequence,
+    subject: bioDripSubject(sequence, firstName),
+  }))
 
   for (const schedule of schedules) {
     await supabase
       .from('instagram_bio_email_sequences')
       .insert({
         email_capture_id: captureId,
-        sequence_number: schedule.day + 1,
+        sequence_number: schedule.sequence,
         email_subject: schedule.subject,
         sent_at: null // Will be set when sent by cron
       })

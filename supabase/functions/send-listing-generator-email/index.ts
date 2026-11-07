@@ -300,14 +300,14 @@ function getWelcomeEmailHTML(data: {
   <div style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%); border-radius: 12px; margin: 30px 0;">
     <h2 style="color: white; margin-top: 0;">Want AI-Powered Marketing for EVERY Listing?</h2>
     <p style="color: white; margin-bottom: 25px;">
-      AgentBio creates your entire marketing presence - Instagram optimization, link-in-bio pages, content calendars, and automated follow-up.
+      AgentBio gives you a link-in-bio page with your listings, a lead form beside each one, and analytics on what visitors click.
     </p>
-    <a href="${SITE_URL}/register?utm_source=listing-generator&utm_medium=email&utm_campaign=welcome"
+    <a href="${SITE_URL}/auth/register?utm_source=listing-generator&utm_medium=email&utm_campaign=welcome"
        style="display: inline-block; background: white; color: #9333ea; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
       Create Your Free Page →
     </a>
     <p style="color: white; font-size: 12px; margin-top: 15px; margin-bottom: 0;">
-      No credit card required • Cancel anytime • 4,200+ agents trust AgentBio
+      Free plan • No credit card required
     </p>
   </div>
 
