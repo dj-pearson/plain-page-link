@@ -106,7 +106,7 @@ const luxuryAgentTemplate: PageTemplate = {
           },
         ],
         submitButtonText: 'Request Consultation',
-        successMessage: "Thank you! I'll be in touch within 24 hours.",
+        successMessage: "Thank you! I'll be in touch soon.",
       },
     },
   ],
@@ -159,13 +159,16 @@ const firstTimeBuyerTemplate: PageTemplate = {
         showStatus: true,
       },
     },
+    // Was "📚 First-Time Buyer Guide (Free Download)" with url '#': a dead
+    // button promising a download no agent had uploaded (US-327). It now
+    // scrolls to the profile's contact section, which every page has.
     {
       type: 'link',
       visible: true,
       config: {
         type: 'link',
-        title: '📚 First-Time Buyer Guide (Free Download)',
-        url: '#',
+        title: 'Ask me anything about buying your first home',
+        url: '#contact',
         style: 'button',
         openInNewTab: false,
       },
@@ -272,17 +275,8 @@ const investorFocusedTemplate: PageTemplate = {
         fontSize: 'medium',
       },
     },
-    {
-      type: 'link',
-      visible: true,
-      config: {
-        type: 'link',
-        title: '📊 Market Analysis Report',
-        url: '#',
-        style: 'button',
-        openInNewTab: false,
-      },
-    },
+    // A "📊 Market Analysis Report" button with url '#' stood here; there was
+    // no report behind it (US-327). The form below is the ask.
     {
       type: 'contact',
       visible: true,
@@ -328,7 +322,7 @@ const investorFocusedTemplate: PageTemplate = {
           },
         ],
         submitButtonText: 'Get Investment Analysis',
-        successMessage: "I'll prepare a custom market analysis for you.",
+        successMessage: "Thanks! I'll be in touch to talk through your investment goals.",
       },
     },
     {
@@ -581,7 +575,7 @@ const premiumShowcaseTemplate: PageTemplate = {
           },
         ],
         submitButtonText: 'Send Message',
-        successMessage: "Thank you! I'll get back to you within 24 hours.",
+        successMessage: "Thank you! I'll get back to you soon.",
       },
     },
     {

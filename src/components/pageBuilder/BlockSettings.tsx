@@ -153,8 +153,12 @@ function LinkSettings({ config, onUpdate }: any) {
           type="url"
           value={config.url}
           onChange={(e) => onUpdate({ url: e.target.value })}
-          placeholder="https://example.com"
+          placeholder="https://yourwebsite.com/guide"
+          aria-describedby="link-url-hint"
         />
+        <p id="link-url-hint" className="text-xs text-muted-foreground">
+          The button stays off your public page until it has a real URL.
+        </p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="link-style">Style</Label>

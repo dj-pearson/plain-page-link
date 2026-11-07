@@ -7,7 +7,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import { pageTemplates, applyTemplate } from './pageTemplates';
-import type { StatsBlockConfig, TestimonialBlockConfig } from '@/types/pageBuilder';
+import type {
+  ContactBlockConfig,
+  LinkBlockConfig,
+  StatsBlockConfig,
+  TestimonialBlockConfig,
+} from '@/types/pageBuilder';
+import { usableLinkUrl } from './blockLinkTarget';
 import { isAgentStatSource } from './agentPageFacts';
 import { pageBuilder } from './pageBuilder';
 
@@ -74,5 +80,65 @@ describe('page templates (US-305)', () => {
     const config = template!.defaultConfig as TestimonialBlockConfig;
     expect(config.source).toBe('profile');
     expect(config.testimonials).toEqual([]);
+  });
+});
+
+/**
+ * US-327: First-Time Buyer and Investor shipped link buttons promising a
+ * "Free Download" and a "Market Analysis Report" with url '#', and every
+ * contact form promised a reply "within 24 hours" in the agent's voice.
+ */
+describe('page templates make no promise the agent did not (US-327)', () => {
+  /** Every URL-bearing field a template block can carry. */
+  const URL_FIELDS = ['url', 'ctaUrl', 'buttonUrl'];
+
+  it('every link, hero and CTA button has a real destination', () => {
+    let checked = 0;
+    for (const template of pageTemplates) {
+      for (const block of template.blocks) {
+        const config = block.config as unknown as Record<string, unknown>;
+        for (const field of URL_FIELDS) {
+          if (!(field in config)) continue;
+          checked += 1;
+          expect(
+            usableLinkUrl(config[field] as string),
+            `${template.id} ${block.type}.${field}`
+          ).not.toBe('');
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('no link button promises a download, guide or report', () => {
+    for (const template of pageTemplates) {
+      for (const block of template.blocks) {
+        if (block.type !== 'link') continue;
+        const { title } = block.config as LinkBlockConfig;
+        expect(title, template.id).not.toMatch(/download|guide|report|free/i);
+      }
+    }
+  });
+
+  it('no contact form commits the agent to a response time', () => {
+    let forms = 0;
+    for (const template of pageTemplates) {
+      for (const block of template.blocks) {
+        if (block.type !== 'contact') continue;
+        forms += 1;
+        const { successMessage } = block.config as ContactBlockConfig;
+        expect(successMessage, template.id).toBeTruthy();
+        expect(successMessage, template.id).not.toMatch(
+          /\d|within|hours?|minutes?|same[- ]day|today|prepare/i
+        );
+      }
+    }
+    expect(forms).toBeGreaterThan(0);
+  });
+
+  it('a new Link block starts with no destination, so it is not published by accident', () => {
+    const template = pageBuilder.getBlockTemplates().find((t) => t.type === 'link');
+    expect(template).toBeDefined();
+    expect(usableLinkUrl((template!.defaultConfig as LinkBlockConfig).url)).toBe('');
   });
 });

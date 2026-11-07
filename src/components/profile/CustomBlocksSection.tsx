@@ -1,5 +1,6 @@
 import { BlockRenderer } from '@/components/pageBuilder/BlockRenderer';
-import type { PageBlock } from '@/types/pageBuilder';
+import type { LinkBlockConfig, PageBlock } from '@/types/pageBuilder';
+import { usableLinkUrl } from '@/lib/blockLinkTarget';
 
 interface CustomBlocksSectionProps {
   /** The active page's blocks, straight from the jsonb column. */
@@ -34,6 +35,12 @@ export function CustomBlocksSection({ blocks, userId, title }: CustomBlocksSecti
 
   const visible = list
     .filter((block) => block && typeof block === 'object' && block.visible !== false)
+    // A link button with no real destination ('#', example.com) renders
+    // nothing; drop it here too so it leaves no empty gap (US-327).
+    .filter(
+      (block) =>
+        block.type !== 'link' || usableLinkUrl((block.config as LinkBlockConfig | undefined)?.url)
+    )
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   if (visible.length === 0) return null;
