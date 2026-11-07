@@ -2557,6 +2557,77 @@ check("the browser cannot select a lead's ciphertext, and a copied one is recogn
   return out;
 });
 
+// ---------------------------------------------------------------------------
+// US-322: an agent marks their own notifications read, and changes nothing else.
+//   "Users update own notifications" checked only the row, and UPDATE was
+//   granted table-wide, so the owner could rewrite a system-written row —
+//   including the lead_overdue row whose (type, data.lead_id) is the chaser's
+//   once-only claim (US-309). Only read_at is now updatable by the browser.
+// ---------------------------------------------------------------------------
+check('an agent can mark a notification read but not rewrite it', () => {
+  const out = [];
+  const agent = '00000000-dead-beef-0000-000000322a01';
+  const other = '00000000-dead-beef-0000-000000322a02';
+  const note = '00000000-dead-beef-0000-000000322b01';
+  const theirs = '00000000-dead-beef-0000-000000322b02';
+  const as = (sub, sql) => q(`SET ROLE authenticated; SET request.jwt.claim.sub = '${sub}'; ${sql}`);
+  const refused = (fn) => {
+    try {
+      fn();
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  try {
+    q(`INSERT INTO auth.users (id, email) VALUES
+         ('${agent}', 'us322a@example.test'), ('${other}', 'us322b@example.test')
+       ON CONFLICT (id) DO NOTHING;
+       INSERT INTO public.notifications (id, user_id, type, title, data) VALUES
+         ('${note}', '${agent}', 'lead_overdue', 'Chase', '{"lead_id":"l-1"}'),
+         ('${theirs}', '${other}', 'new_lead', 'New', '{"lead_id":"l-2"}');`);
+
+    // What the dashboard does (useNotifications.markAsRead), including the
+    // `.select('id')` read-back.
+    if (refused(() => as(agent, `UPDATE public.notifications SET read_at = now() WHERE id = '${note}' RETURNING id;`)))
+      out.push('the owner could not mark their notification read');
+    const [readAt] = q(`SELECT read_at IS NOT NULL FROM public.notifications WHERE id = '${note}';`);
+    if (readAt !== 't') out.push('marking read did not set read_at');
+
+    for (const [col, val] of [
+      ['type', `'system_alert'`],
+      ['title', `'x'`],
+      ['message', `'x'`],
+      ['data', `'{"lead_id":"l-9"}'::jsonb`],
+      ['user_id', `'${other}'`],
+      ['created_at', 'now()'],
+    ]) {
+      if (!refused(() => as(agent, `UPDATE public.notifications SET ${col} = ${val} WHERE id = '${note}';`)))
+        out.push(`the owner could update notifications.${col}`);
+    }
+    const [row] = q(`SELECT type || '|' || (data ->> 'lead_id') FROM public.notifications WHERE id = '${note}';`);
+    if (row !== 'lead_overdue|l-1') out.push(`the system-written row changed to ${row}`);
+
+    // Someone else's row is not reached at all, and anon may not update.
+    as(agent, `UPDATE public.notifications SET read_at = now() WHERE id = '${theirs}';`);
+    const [otherRead] = q(`SELECT read_at IS NULL FROM public.notifications WHERE id = '${theirs}';`);
+    if (otherRead !== 't') out.push("an agent marked another agent's notification read");
+    if (!refused(() => q(`SET ROLE anon; UPDATE public.notifications SET read_at = now();`)))
+      out.push('anon could update notifications.read_at');
+  } catch (e) {
+    out.push(String(e.stderr || e.message).split('\n').find((l) => l.includes('ERROR')) || 'check raised');
+  } finally {
+    try {
+      q(`DELETE FROM public.notifications WHERE id IN ('${note}', '${theirs}');
+         DELETE FROM public.profiles WHERE id IN ('${agent}', '${other}');
+         DELETE FROM auth.users WHERE id IN ('${agent}', '${other}');`);
+    } catch {
+      /* best effort */
+    }
+  }
+  return out;
+});
+
 check('an assignee works a lead but cannot take it or hand it away', () => {
   const out = [];
   const owner = '00000000-dead-beef-0000-000000236b01';
