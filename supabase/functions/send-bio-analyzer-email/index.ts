@@ -188,16 +188,16 @@ ${data.bioRewrites[2] || 'Your third optimized bio'}
 QUICK IMPLEMENTATION CHECKLIST:
 ☐ Choose your favorite bio (or mix elements from each)
 ☐ Update your Instagram bio today
-☐ Update your link to ${siteUrl}/${data.firstName.toLowerCase()}
+☐ Point your bio link at a page built to capture leads (free to create at ${siteUrl}/auth/register)
 ☐ Post an announcement about your new optimized profile
 ☐ Track your results for 1-2 weeks
 
 YOUR QUICK WIN:
-Update your bio TODAY. Agents who implement within 24 hours see results within the first week.
+Update your bio today, then compare your profile visits and link taps a week or two later against what you see now.
 
 WANT TO MAXIMIZE EVERY INSTAGRAM CLICK?
 AgentBio gives you a professional link-in-bio built specifically for real estate agents:
-→ Auto-updated listings from your MLS
+→ Active and sold listing showcases
 → Built-in lead capture forms (home valuations, buyer consultations)
 → Analytics to track what's working
 → QR codes for your business cards and flyers
@@ -282,21 +282,21 @@ function getEmail1HTML(data: BioAnalyzerEmailData): string {
       <div class="checklist">
         <div class="checklist-item">✓ Choose your favorite bio (or mix elements from each)</div>
         <div class="checklist-item">✓ Update your Instagram bio today</div>
-        <div class="checklist-item">✓ Update your link to ${siteUrl}/${data.firstName.toLowerCase()}</div>
+        <div class="checklist-item">✓ Point your bio link at a page built to capture leads</div>
         <div class="checklist-item">✓ Post an announcement about your new optimized profile</div>
         <div class="checklist-item">✓ Track your results for 1-2 weeks</div>
       </div>
 
       <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 8px;">
         <p style="margin: 0; font-weight: 600; color: #92400e;">⚡ Your Quick Win:</p>
-        <p style="margin: 8px 0 0 0; color: #78350f;">Update your bio TODAY. Agents who implement within 24 hours see results within the first week.</p>
+        <p style="margin: 8px 0 0 0; color: #78350f;">Update your bio today, then compare your profile visits and link taps a week or two later against what you see now.</p>
       </div>
 
       <div class="cta-box">
         <h3>Want to Maximize Every Instagram Click?</h3>
         <p>AgentBio gives you a professional link-in-bio built specifically for real estate agents:</p>
         <ul>
-          <li>→ Auto-updated listings from your MLS</li>
+          <li>→ Active and sold listing showcases</li>
           <li>→ Built-in lead capture forms</li>
           <li>→ Analytics to track what's working</li>
           <li>→ QR codes for offline marketing</li>

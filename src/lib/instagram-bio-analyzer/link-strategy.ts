@@ -11,10 +11,10 @@ export function analyzeLinkStrategy(input: BioAnalysisInput): LinkStrategyAnalys
   const analyses: Record<typeof situation, LinkStrategyAnalysis> = {
     linktree: {
       currentDiagnosis:
-        "You're using Linktree, which is a decent start but has significant limitations for real estate agents. Linktree doesn't capture lead information, lacks real estate-specific features like listing showcases, and provides limited analytics. Most importantly, it doesn't integrate with your MLS or CRM, and the generic design doesn't reinforce your professional brand.",
+        "You're using Linktree, which is a decent start but has significant limitations for real estate agents. Linktree doesn't capture lead information, lacks real estate-specific features like listing showcases, and provides limited analytics. Most importantly, the generic design doesn't reinforce your professional brand.",
       leadsLost: 45,
       recommendedStructure: [
-        'Featured listing showcase (auto-updated from MLS)',
+        'Featured listing showcase (active and recently sold)',
         'Home valuation calculator with lead capture',
         'Buyer/seller resource downloads (captures emails)',
         'Direct booking link for consultations',
