@@ -195,7 +195,10 @@ describe('ListingPage', () => {
     const more = await screen.findByRole('region', { name: 'More from Jane Doe' });
     expect(more.querySelectorAll('h3')).toHaveLength(MORE_LISTINGS_LIMIT);
 
-    await user.click(screen.getByRole('button', { name: /View listing:\s*m1 Oak Street/ }));
+    const next = screen.getByRole('link', { name: /View listing:\s*m1 Oak Street/ });
+    // A real href (US-408), so it can be opened in a new tab too.
+    expect(next).toHaveAttribute('href', '/janedoe/listing/m1');
+    await user.click(next);
     expect(where()).toBe('/janedoe/listing/m1');
     expect(
       await screen.findByRole('heading', { level: 1, name: /m1 Oak Street/ })
@@ -256,8 +259,10 @@ describe('the old ?listing= links (US-114)', () => {
     h.result = loaded();
     renderAt('/janedoe');
 
-    const buttons = await screen.findAllByRole('button', { name: /View listing:\s*l2 Oak Street/ });
-    await user.click(buttons[0]);
+    const links = await screen.findAllByRole('link', { name: /View listing:\s*l2 Oak Street/ });
+    // Crawlable from the profile (US-408): every card is an <a href>.
+    for (const link of links) expect(link).toHaveAttribute('href', '/janedoe/listing/l2');
+    await user.click(links[0]);
     expect(where()).toBe('/janedoe/listing/l2');
   });
 });

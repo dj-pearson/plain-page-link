@@ -109,3 +109,36 @@ describe('FeaturedListingsCarousel auto-rotation', () => {
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
   });
 });
+
+// US-408: "View Details" was a <button> that navigated in onClick — nothing a
+// crawler could follow from the profile, nothing a visitor could open in a tab.
+describe('FeaturedListingsCarousel "View Details"', () => {
+  beforeEach(() => stubReducedMotion(false));
+  afterEach(() => vi.restoreAllMocks());
+
+  it("is a real link to the current slide's listing page", () => {
+    render(
+      <MemoryRouter>
+        <FeaturedListingsCarousel
+          listings={LISTINGS}
+          autoRotate={false}
+          listingHref={(l) => `/jane/listing/${l.id}`}
+        />
+      </MemoryRouter>
+    );
+    const link = screen.getByRole('link', { name: /view details/i });
+    expect(link).toHaveAttribute('href', '/jane/listing/a');
+    expect(link).toHaveAccessibleName(/412 Maple Avenue/);
+    expect(screen.queryByRole('button', { name: /view details/i })).toBeNull();
+  });
+
+  it('is absent rather than a dead button when there is no page to link to', () => {
+    render(
+      <MemoryRouter>
+        <FeaturedListingsCarousel listings={LISTINGS} autoRotate={false} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('link', { name: /view details/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /view details/i })).toBeNull();
+  });
+});

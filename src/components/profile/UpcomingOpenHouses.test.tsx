@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 
 let hookResult: { data: Record<string, unknown>[] | undefined };
 
@@ -79,8 +80,33 @@ describe('UpcomingOpenHouses', () => {
       'href',
       'https://www.google.com/maps/search/?api=1&query=12%20Elm%20St%2C%20Springfield'
     );
-    // No onViewListing → no "View home" button that would do nothing.
+    // No listingHref → no "View home" control that would go nowhere.
+    expect(screen.queryByRole('link', { name: /view home/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /view home/i })).toBeNull();
+  });
+
+  // US-408: "View home" was a <button> that navigated in onClick.
+  it('links "View home" to the listing page with a real href', () => {
+    hookResult = { data: [oneOpenHouse()] };
+    render(
+      <MemoryRouter>
+        <UpcomingOpenHouses agentId="agent-1" listingHref={(id) => `/jane/listing/${id}`} />
+      </MemoryRouter>
+    );
+    const link = screen.getByRole('link', { name: /view home/i });
+    expect(link).toHaveAttribute('href', '/jane/listing/l-1');
+    // Its name says which home, since a page can list several open houses.
+    expect(link).toHaveAccessibleName(/12 Elm St/);
+  });
+
+  it('shows no "View home" when the listing has no page to open', () => {
+    hookResult = { data: [oneOpenHouse()] };
+    render(
+      <MemoryRouter>
+        <UpcomingOpenHouses agentId="agent-1" listingHref={() => null} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('link', { name: /view home/i })).toBeNull();
   });
 
   // US-260: the add-to-calendar menu was a Radix DropdownMenu, which put the

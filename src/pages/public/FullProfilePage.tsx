@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { ProfileSkeleton } from '@/components/LoadingSpinner';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import ContactButtons from '@/components/profile/ContactButtons';
@@ -74,7 +74,6 @@ const CustomBlocksSection = lazy(() =>
 export default function FullProfilePage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
   const [isHomeValuationModalOpen, setIsHomeValuationModalOpen] = useState(false);
@@ -91,13 +90,15 @@ export default function FullProfilePage() {
    * A listing opens its own page (US-275). It used to open a modal addressed by
    * ?listing=<id> (US-114); the page has the gallery, the open houses and a URL
    * a crawler can index, and the listing_view is counted there.
+   *
+   * Cards link to it with a real href (US-408) rather than navigating in a
+   * click handler, so the listing pages are discoverable from the profile and
+   * a visitor can open one in a new tab.
    */
-  const openListing = useCallback(
-    (listing: PublicProfileListing) => {
-      const username = data?.profile?.username ?? normalizeUsername(slug);
-      navigate(listingPagePath(username, listing.id));
-    },
-    [data?.profile?.username, navigate, slug]
+  const listingHref = useCallback(
+    (listing: PublicProfileListing) =>
+      listingPagePath(data?.profile?.username ?? normalizeUsername(slug), listing.id),
+    [data?.profile?.username, slug]
   );
 
   // One page, one view (US-115). This used to run alongside a redirect to
@@ -473,7 +474,7 @@ export default function FullProfilePage() {
               <section className="pt-4 sm:pt-6">
                 <FeaturedListingsCarousel
                   listings={activeListings}
-                  onViewDetails={openListing}
+                  listingHref={listingHref}
                   autoRotate={true}
                   interval={4000}
                 />
@@ -486,7 +487,7 @@ export default function FullProfilePage() {
                 <ListingGallery
                   listings={activeListings}
                   title="All Properties"
-                  onListingClick={openListing}
+                  listingHref={listingHref}
                 />
               </section>
             )}
@@ -497,9 +498,9 @@ export default function FullProfilePage() {
                 agentId={profile.id}
                 agentName={profile.full_name || profile.username}
                 profileUrl={currentUrl}
-                onViewListing={(listingId) => {
+                listingHref={(listingId) => {
                   const listing = activeListings.find((l) => l.id === listingId);
-                  if (listing) openListing(listing);
+                  return listing ? listingHref(listing) : null;
                 }}
               />
             )}
@@ -515,7 +516,7 @@ export default function FullProfilePage() {
             {/* Sold Properties */}
             {settings?.show_sold_properties !== false && (
               <div className="pt-2 sm:pt-4">
-                <SoldProperties listings={listings} onListingClick={openListing} />
+                <SoldProperties listings={listings} listingHref={listingHref} />
               </div>
             )}
 
