@@ -29,7 +29,7 @@ costs one prerendered page each and puts the blog inside every guard.
 | Fixture | Covers |
 | --- | --- |
 | `fixture-choosing-a-listing-photo` | A `featured_image_url` on a host this repo does not control — the branch where og:image dimensions must NOT be asserted (US-174) |
-| `fixture-what-a-market-report-is-for` | No featured image, so the default social image is used and its dimensions ARE asserted; also a second registry category |
+| `fixture-what-a-market-report-is-for` | No featured image, so the default social image is used and its dimensions ARE asserted; also a second registry category; and an `author_id` resolved to a published profile (`author`), so the Person-author path and the prerender's `profiles` intercept run (US-181) |
 | `fixture-an-unlisted-category` | A category absent from `src/config/blog-categories.ts` — the shape that failed the whole build before US-166, and that must now warn and carry on |
 
 ### Rules
@@ -37,6 +37,7 @@ costs one prerendered page each and puts the blog inside every guard.
 - Every title begins with `Fixture:` and every body opens by saying the article
   does not exist. If one ever reached production it should be obvious in the
   first line rather than plausible.
+- The fixture author is named "Fixture Byline" for the same reason.
 - The image host is under `.invalid`, a reserved TLD that can never resolve.
 - Do not add a fixture to make a check pass. Add one to make a branch run.
 

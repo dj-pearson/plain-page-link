@@ -14,6 +14,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { createQueryBuilder, type MockQueryResult } from '@/test/mocks/supabase';
 
 let articleResult: MockQueryResult;
+let authorResult: MockQueryResult;
 const fromMock = vi.fn();
 const rpcMock = vi.fn();
 
@@ -81,7 +82,10 @@ describe('BlogArticle', () => {
   beforeEach(() => {
     articleResult = { data: ARTICLE, error: null };
     fromMock.mockReset();
-    fromMock.mockImplementation(() => createQueryBuilder(articleResult));
+    authorResult = { data: null, error: null };
+    fromMock.mockImplementation((table: string) =>
+      createQueryBuilder(table === 'profiles' ? authorResult : articleResult)
+    );
     rpcMock.mockReset();
     rpcMock.mockResolvedValue({ data: null, error: null });
   });
@@ -117,5 +121,65 @@ describe('BlogArticle', () => {
     expect(args).toMatchObject({ p_article_id: 'a1' });
     const builders = fromMock.mock.results.map((r) => r.value as Record<string, unknown>);
     for (const b of builders) expect(b.update).not.toHaveBeenCalled();
+  });
+
+  // US-181: articles.author_id resolves to a real byline.
+  const jsonLdAuthor = async () => {
+    await waitFor(() =>
+      expect(document.querySelector('script[type="application/ld+json"]')).not.toBeNull()
+    );
+    const posting = [...document.querySelectorAll('script[type="application/ld+json"]')]
+      .map((el) => JSON.parse(el.textContent || '{}'))
+      .find((node) => node['@type'] === 'BlogPosting');
+    return posting?.author;
+  };
+
+  it('credits a published author by name, in the byline and the JSON-LD', async () => {
+    articleResult = { data: { ...ARTICLE, author_id: 'u1' }, error: null };
+    authorResult = { data: { id: 'u1', full_name: 'Dana Okafor', username: 'dana' }, error: null };
+    const { container } = renderPage();
+
+    const name = await screen.findByText('Dana Okafor');
+    const byline = name.closest('[itemprop="author"]');
+    expect(byline?.getAttribute('itemtype')).toBe('https://schema.org/Person');
+    expect(name.closest('a')?.getAttribute('href')).toMatch(/\/dana$/);
+    expect(container.querySelector('[itemtype="https://schema.org/Organization"]')).toBeNull();
+
+    const author = await jsonLdAuthor();
+    expect(author).toMatchObject({ '@type': 'Person', name: 'Dana Okafor' });
+    expect(author.url).toMatch(/\/dana$/);
+
+    const profileQuery = fromMock.mock.results.find(
+      (_, i) => fromMock.mock.calls[i][0] === 'profiles'
+    )?.value as Record<string, ReturnType<typeof vi.fn>>;
+    expect(profileQuery.select).toHaveBeenCalledWith('id, full_name, username');
+    expect(profileQuery.eq).toHaveBeenCalledWith('id', 'u1');
+    expect(profileQuery.eq).toHaveBeenCalledWith('is_published', true);
+  });
+
+  it('falls back to the organisation when the author has no published profile', async () => {
+    articleResult = { data: { ...ARTICLE, author_id: 'u1' }, error: null };
+    authorResult = { data: null, error: null };
+    renderPage();
+    await screen.findByRole('heading', { level: 1 });
+    expect(await jsonLdAuthor()).toMatchObject({ '@type': 'Organization', name: 'AgentBio' });
+    expect(document.querySelector('[itemprop="author"]')?.getAttribute('itemtype')).toBe(
+      'https://schema.org/Organization'
+    );
+  });
+
+  it('falls back to the organisation, and still renders, when the lookup errors', async () => {
+    articleResult = { data: { ...ARTICLE, author_id: 'u1' }, error: null };
+    authorResult = { data: null, error: { message: 'permission denied' } };
+    renderPage();
+    await screen.findByRole('heading', { level: 1 });
+    expect(await jsonLdAuthor()).toMatchObject({ '@type': 'Organization' });
+  });
+
+  it('does not query profiles for an article with no author_id', async () => {
+    articleResult = { data: { ...ARTICLE, author_id: null }, error: null };
+    renderPage();
+    await screen.findByRole('heading', { level: 1 });
+    expect(fromMock.mock.calls.map((c) => c[0])).not.toContain('profiles');
   });
 });

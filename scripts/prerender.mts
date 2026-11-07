@@ -38,6 +38,7 @@ import {
   type PrerenderRoute,
 } from '../src/config/prerender-routes';
 import {
+  authorsById,
   categorySlugs,
   loadArticles,
   loadFixtureArticles,
@@ -369,6 +370,45 @@ async function interceptArticles(context: BrowserContext, articles: Article[]): 
   });
 }
 
+/**
+ * Answer BlogArticle's author lookup from the rows resolved at build time
+ * (US-181).
+ *
+ * The page asks `profiles?select=id,full_name,username&id=eq.<author_id>
+ * &is_published=eq.true` and expects an array (maybeSingle on a GET). Only that
+ * shape is answered here; any other profiles query — the landing page's demo
+ * showcase, say — falls through to whatever it reached before, so this
+ * intercept cannot change a page it was not written for.
+ *
+ * Without it the lookup would go to the build's VITE_SUPABASE_URL — often a
+ * placeholder — and every prerendered article would carry the organisation as
+ * its author while the live page showed a person: the snapshot and the page
+ * disagreeing about who wrote it.
+ */
+async function interceptArticleAuthors(
+  context: BrowserContext,
+  articles: Article[]
+): Promise<void> {
+  const authors = authorsById(articles);
+  await context.route('**/rest/v1/profiles*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const id = url.searchParams.get('id');
+    const isAuthorLookup =
+      request.method() === 'GET' &&
+      !!id?.startsWith('eq.') &&
+      url.searchParams.get('is_published') === 'eq.true';
+    if (!isAuthorLookup) return route.fallback();
+
+    const row = authors.get(decodeURIComponent(id!.slice(3)));
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(row ? [row] : []),
+    });
+  });
+}
+
 /** Render `routes` with at most `CONCURRENCY` pages open at once. */
 async function renderAll(
   browser: Browser,
@@ -396,6 +436,7 @@ async function renderAll(
   await context.route('https://www.googletagmanager.com/**', (r) => r.abort());
   await context.route('https://www.google-analytics.com/**', (r) => r.abort());
   await interceptArticles(context, articles);
+  await interceptArticleAuthors(context, articles);
   // BlogArticle counts a view on mount through this RPC (US-262). A build is
   // not a reader, and must not count as one against the live database.
   await context.route('**/rest/v1/rpc/increment_article_view*', (r) =>

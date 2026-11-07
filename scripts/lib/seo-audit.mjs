@@ -185,7 +185,7 @@ const KNOWN_IMAGE_SIZES = new Map([
  * deliberately short and literal — the point is not to police names, it is to
  * catch a placeholder that was never replaced.
  */
-const GENERIC_AUTHOR_NAMES = [
+export const GENERIC_AUTHOR_NAMES = [
   /^(real estate|seo|marketing|content|industry)?\s*(expert|team|staff|editor|admin|author|writer)$/i,
   /^(the )?(agentbio )?(team|staff|editorial team)$/i,
   /^(guest|anonymous|unknown)( author)?$/i,
