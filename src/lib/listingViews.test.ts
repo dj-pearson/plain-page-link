@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { describeListingViews, formatListingViews, toListingViewStats } from './listingViews';
+import {
+  describeListingViews,
+  formatListingViews,
+  formatTopListingCounts,
+  toListingViewStats,
+  toTopListings,
+} from './listingViews';
 
 describe('toListingViewStats (US-263)', () => {
   it('indexes listing_view_stats() rows by listing id', () => {
@@ -66,5 +72,71 @@ describe('formatListingViews / describeListingViews (US-263)', () => {
     expect(describeListingViews(s(1, 12, 1))).toBe(
       '12 views by 1 visitor in the last 30 days; 1 view in the last 7 days'
     );
+  });
+});
+
+describe('toTopListings (US-325)', () => {
+  it('keeps the database ranking and maps every field', () => {
+    const rows = toTopListings([
+      {
+        listing_id: 'a',
+        address: ' 1 Main St ',
+        city: 'Austin',
+        status: 'active',
+        views: 12,
+        visitors: 9,
+        last_viewed_at: '2026-11-06T10:00:00Z',
+      },
+      {
+        listing_id: 'b',
+        address: '2 Oak Ave',
+        city: 'Austin',
+        status: 'sold',
+        views: '3',
+        visitors: '2',
+      },
+    ]);
+    expect(rows.map((r) => r.listingId)).toEqual(['a', 'b']);
+    expect(rows[0]).toEqual({
+      listingId: 'a',
+      address: '1 Main St',
+      city: 'Austin',
+      status: 'active',
+      views: 12,
+      visitors: 9,
+      lastViewedAt: '2026-11-06T10:00:00Z',
+    });
+    expect(rows[1]).toMatchObject({ status: 'sold', views: 3, visitors: 2, lastViewedAt: null });
+  });
+
+  it('drops malformed and zero-view rows, and names an address-less listing', () => {
+    const rows = toTopListings([
+      { listing_id: '', views: 4 },
+      { views: 4 },
+      null,
+      { listing_id: 'z', views: 0, visitors: 0 },
+      { listing_id: 'n', address: '', city: null, status: '', views: 1, visitors: 1 },
+    ]);
+    expect(rows).toEqual([
+      {
+        listingId: 'n',
+        address: 'Untitled listing',
+        city: '',
+        status: null,
+        views: 1,
+        visitors: 1,
+        lastViewedAt: null,
+      },
+    ]);
+  });
+
+  it('returns nothing for a non-array response', () => {
+    expect(toTopListings(null)).toEqual([]);
+    expect(toTopListings({ listing_id: 'a', views: 3 })).toEqual([]);
+  });
+
+  it('words the counts with singular and plural forms', () => {
+    expect(formatTopListingCounts({ views: 1, visitors: 1 })).toBe('1 view · 1 visitor');
+    expect(formatTopListingCounts({ views: 1500, visitors: 2 })).toBe('1,500 views · 2 visitors');
   });
 });
