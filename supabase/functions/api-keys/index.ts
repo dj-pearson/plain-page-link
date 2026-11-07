@@ -122,7 +122,7 @@ serve(async (req) => {
 
       const { error } = await service
         .from('api_keys')
-        .update({ revoked_at: new Date().toISOString() })
+        .update({ revoked_at: new Date().toISOString(), is_active: false })
         .eq('id', id)
         .eq('user_id', user.id);
       if (error) throw error;

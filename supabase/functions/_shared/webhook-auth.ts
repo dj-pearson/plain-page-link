@@ -36,7 +36,7 @@ export async function validateApiKey(
     // Query api_keys table for valid key
     const { data: keyData, error } = await supabase
       .from('api_keys')
-      .select('user_id, name, is_active, expires_at, last_used_at')
+      .select('user_id, name, is_active, expires_at, last_used_at, revoked_at')
       .eq('key_hash', keyHash)
       .single();
 
@@ -45,7 +45,9 @@ export async function validateApiKey(
     }
 
     // Check if key is active
-    if (!keyData.is_active) {
+    // The api-keys edge function retires a key by setting revoked_at, so
+    // is_active alone let a revoked key keep authenticating here.
+    if (!keyData.is_active || keyData.revoked_at) {
       throw new Error('API key is inactive');
     }
 
