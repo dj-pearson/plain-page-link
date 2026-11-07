@@ -25,6 +25,10 @@ import { ProfileLoadError } from '@/components/profile/ProfileLoadError';
 import { ProfileUnavailable } from '@/components/profile/ProfileUnavailable';
 import { UnpublishedPreviewBanner } from '@/components/profile/UnpublishedPreviewBanner';
 import { LazyModal } from '@/components/profile/LazyModal';
+import {
+  ListingContactBar,
+  LISTING_CONTACT_BAR_SPACER,
+} from '@/components/profile/ListingContactBar';
 import { SEOHead } from '@/components/SEOHead';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useProfileShowsBranding } from '@/hooks/useProfileShowsBranding';
@@ -206,6 +210,9 @@ export default function ListingPage() {
     else setIsLeadModalOpen(true);
   };
   const closeLeadModal = () => setIsLeadModalOpen(false);
+  const canRequestShowing = listing.status !== 'sold';
+  // Call follows the agent's own "show contact buttons" choice, as on the profile.
+  const contactPhone = data.settings?.show_contact_buttons !== false ? profile.phone : null;
 
   return (
     <>
@@ -225,7 +232,9 @@ export default function ListingPage() {
         className="min-h-screen relative"
         style={PROFILE_MAIN_STYLE}
       >
-        <div className="container mx-auto max-w-5xl px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8">
+        <div
+          className={`container mx-auto max-w-5xl px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8 ${LISTING_CONTACT_BAR_SPACER}`}
+        >
           {/* Who listed it, and the way back to everything else they list. */}
           <nav aria-label="Breadcrumb" className="flex items-center justify-between gap-3">
             <Link
@@ -299,6 +308,17 @@ export default function ListingPage() {
 
           <ProfileComplianceFooter profile={profile} showBranding={showBranding} />
         </div>
+
+        {/* US-361: on a phone the Showing button is below the fold; this keeps
+            asking about and seeing the home one tap away while scrolling. */}
+        <ListingContactBar
+          profileId={profileId}
+          agentName={agentName}
+          phone={contactPhone}
+          onAsk={() => setIsLeadModalOpen(true)}
+          onRequestShowing={canRequestShowing ? requestShowing : undefined}
+          hasCalendly={Boolean(profile.calendly_url)}
+        />
 
         {isLeadModalOpen && (
           <LazyModal onClose={closeLeadModal}>
