@@ -191,7 +191,30 @@ describe('Content-Security-Policy allows what the public profile embeds', () => 
   ] as const) {
     it(`${name} allows Calendly and video embeds`, () => {
       for (const [directive, sources] of Object.entries(required)) {
-        for (const source of sources) expect(policy[directive] ?? [], `${directive} ${source}`).toContain(source);
+        for (const source of sources)
+          expect(policy[directive] ?? [], `${directive} ${source}`).toContain(source);
+      }
+    });
+
+    // US-268: script-src listed https://esm.sh, which nothing in the frontend
+    // loads. esm.sh serves any npm package as a script, so allowing it let an
+    // injected <script src> run arbitrary code from a third party despite the
+    // policy. A package CDN, inline script or eval must not come back.
+    it(`${name} script-src allows no package CDN, inline script or eval`, () => {
+      const scriptSrc = policy['script-src'] ?? [];
+      expect(scriptSrc.length).toBeGreaterThan(0);
+      for (const banned of [
+        'https://esm.sh',
+        'https://unpkg.com',
+        'https://cdn.jsdelivr.net',
+        'https://cdnjs.cloudflare.com',
+        "'unsafe-inline'",
+        "'unsafe-eval'",
+        '*',
+        'https:',
+        'data:',
+      ]) {
+        expect(scriptSrc, banned).not.toContain(banned);
       }
     });
   }
@@ -206,6 +229,8 @@ describe('Sentry reaches production', () => {
     const src = readFileSync(join(ROOT, 'src/lib/sentry.ts'), 'utf8');
     expect(src).toMatch(/tunnel:\s*SENTRY_TUNNEL/);
     expect(src).toMatch(/SENTRY_TUNNEL\s*=\s*'\/api\/sentry'/);
-    expect(readFileSync(join(ROOT, 'functions/api/sentry.ts'), 'utf8')).toMatch(/export async function onRequestPost/);
+    expect(readFileSync(join(ROOT, 'functions/api/sentry.ts'), 'utf8')).toMatch(
+      /export async function onRequestPost/
+    );
   });
 });
