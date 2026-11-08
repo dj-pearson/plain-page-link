@@ -8,6 +8,11 @@ import { LISTING_PHOTO_BUCKET } from '@/lib/images';
 import { listingPhotoUrls, orphanedListingPhotoPaths } from '@/lib/listingPhotoCleanup';
 import { logger } from '@/lib/logger';
 import { OWNER_LISTING_COLUMNS } from '@/lib/listingColumns';
+import {
+  importCsvListings,
+  type CsvImportListing,
+  type CsvImportResult,
+} from '@/lib/listingCsvImport';
 import type { Database } from '@/integrations/supabase/types';
 
 type ListingRow = Database['public']['Tables']['listings']['Row'];
@@ -268,6 +273,54 @@ export function useListings() {
     },
   });
 
+  /**
+   * Save the rows of a CSV import (US-597).
+   *
+   * The import went through addListing once per row, so every success
+   * invalidated the listings query and sent its own audit event: a 100-row
+   * file meant 100 inserts, 100 refetches of the whole list and 100 calls to
+   * the audit function. This inserts in chunks (see importCsvListings, which
+   * retries a refused chunk row by row so each refusal keeps its reason),
+   * audits once per saved chunk and refetches once at the end, whatever
+   * happened. CSV rows carry no uploaded photos, so there is nothing to clean
+   * up when one is refused.
+   */
+  const importListings = useMutation({
+    mutationFn: async ({
+      rows,
+      describeError,
+      today,
+    }: {
+      rows: readonly CsvImportListing[];
+      describeError: (error: unknown) => string;
+      today: string;
+    }): Promise<CsvImportResult> => {
+      if (!user?.id) throw new Error('User not authenticated');
+      const userId = user.id;
+      const insertRows = async (payloads: NewListing[]) => {
+        const { data, error } = await supabase
+          .from('listings')
+          .insert(payloads.map((payload) => ({ user_id: userId, ...payload })))
+          .select('id');
+        if (error) throw error;
+        const ids = (data ?? []).map((row) => row.id);
+        logAuditEvent('listing_import', {
+          resourceType: 'listing',
+          details: { count: ids.length, listing_ids: ids, source: 'csv' },
+        });
+      };
+      return importCsvListings(rows, {
+        insertMany: insertRows,
+        insert: (payload) => insertRows([payload]),
+        describeError,
+        today,
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['listings', user?.id] });
+    },
+  });
+
   const deleteListing = useMutation({
     mutationFn: async (id: string) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -315,6 +368,7 @@ export function useListings() {
     addListing,
     updateListing,
     reorderListings,
+    importListings,
     deleteListing,
     discardUnsavedPhotos,
   };
