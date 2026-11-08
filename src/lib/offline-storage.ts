@@ -21,8 +21,8 @@ interface OfflineDB extends DBSchema {
      * A `listings` row plus the two sync fields.
      *
      * This used to describe a shape the table has never had — `title`,
-     * `images`, `createdAt`, `updatedAt` and `price: number`. sync-manager
-     * caches rows straight off the wire, which carry `address`, `photos`,
+     * `images`, `createdAt`, `updatedAt` and `price: number`. The sync manager (deleted
+     * in US-494) cached rows straight off the wire, which carry `address`, `photos`,
      * `created_at`, `updated_at` and a text `price`, so every listing
      * written to IndexedDB was missing all four declared fields and had a
      * string where a number was promised. Mirroring the row keeps the
